@@ -47,8 +47,12 @@ Jay's specific decisions, app by app and dated, are in [`RULEBOOK.md`](RULEBOOK.
 ## 3. Shipping
 
 - **`npm test`, then push straight to `main`** (`git push origin
-  HEAD:main`). `main` deploys: GitHub Pages for the apps and the kit,
-  Cloudflare for the Workers. No PRs.
+  HEAD:main`). `main` deploys everything to Cloudflare: each repo's
+  workflow tests, builds and publishes its own site
+  (`Orbit-Core/deploy/cf-site.mjs`: static files at its
+  orbit.jaypengx.com path, the kit at `/Orbit-Core/kit/`), and
+  `deploy.yml` the Workers. Nothing is on GitHub Pages any more (Jay,
+  2026-11-01); GitHub keeps the code. No PRs.
 - **Check what a person would see:** if the change is visible,
   `node Orbit-Core/tools/shots.mjs <app> [page…] --before main` (every
   page at 320 and 390, on a phone on its side, a tablet and a computer, light and dark, real data, and what changed against
@@ -66,7 +70,7 @@ Jay's specific decisions, app by app and dated, are in [`RULEBOOK.md`](RULEBOOK.
 
 - **Kit by default.** Anything two apps use lives in `Orbit-Core/kit/`.
   Move duplicates there whenever you see them. The kit is served, not
-  copied: apps load it from Orbit-Core's Pages (`#kit/…`), and
+  copied: apps load it from Orbit-Core's site (`#kit/…`), and
   `node kit/link.mjs` links it for tests.
 - **A new kit export is used with a fallback** (`kit.newThing?.(…)`):
   a phone may still run an older kit, and importing a missing name stops

@@ -27,7 +27,7 @@
 // runs in Taiwan ([placement], wrangler.toml), where the people and most
 // sources are. The Orbit Pass is the only way anything is saved.
 
-import { handleLawAsk } from './law.js';
+import { handleLawAsk, useLawSite } from './law.js';
 import { handleLawChat, lawChatTimes } from './law-chat.js';
 import { DEV, aiSettingOf } from './kit/brand.mjs';
 import { handleLawPage } from './law-page.js';
@@ -1404,6 +1404,7 @@ export default {
   // A route that throws is still answered with the CORS headers (an app sees
   // a failure it can try again, not a blocked request), and logged.
   async fetch(request, env, ctx) {
+    useLawSite(env.LAW_SITE);
     const origin = request.headers.get('Origin') || '';
     const headers = corsHeaders(origin, request.cf?.colo);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
@@ -1428,6 +1429,7 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
+    useLawSite(env.LAW_SITE);
     const tick = new Date(event.scheduledTime || Date.now());
     const min = tick.getUTCMinutes();
     // Each job's heartbeat kept (ops.js: the admin panel's 系統); a failure logged.

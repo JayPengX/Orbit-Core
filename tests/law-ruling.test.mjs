@@ -17,8 +17,8 @@ globalThis.fetch = async (url, init) => {
     gemini.push(JSON.parse(init.body));
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(reply) }] } }] }), { headers: { 'Content-Type': 'application/json' } });
   }
-  if (u === 'https://jaypengx.github.io/Orbit-Law/data/cons/j115-7.json') return new Response(JSON.stringify(CONS));
-  if (u.startsWith('https://jaypengx.github.io/Orbit-Law/data/cons/')) return new Response('', { status: 404 });
+  if (u === 'https://orbit.jaypengx.com/law/data/cons/j115-7.json') return new Response(JSON.stringify(CONS));
+  if (u.startsWith('https://orbit.jaypengx.com/law/data/cons/')) return new Response('', { status: 404 });
   throw new Error(`unexpected fetch ${u}`);
 };
 // (gemini-relay carries Gemini's calls too: only the judgment page is answered here.)

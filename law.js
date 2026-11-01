@@ -31,8 +31,17 @@ import { paceOf } from './pace.js';
 import { sessionLimited } from './orbit-token.js';
 import { DEV } from './kit/brand.mjs';
 import { rulingId, rulingJob } from './law-ruling.js';
+import { SITE } from './kit/domain.mjs';
 
-export const DATA = 'https://jaypengx.github.io/Orbit-Law/data/';
+// Orbit Law's data as its site publishes it (orbit.<domain>/law/data/), read
+// through the service binding LAW_SITE (the orbit-law Worker's files: a
+// Worker can't fetch another Worker's route on its own zone), or over the
+// web where there's none (tests, a local run). worker.js hands the binding
+// over on each request.
+export const DATA = `${SITE}/law/data/`;
+let lawSite = null;
+export const useLawSite = fetcher => void (lawSite = fetcher || null);
+export const lawFetch = (url, init) => (lawSite ? lawSite.fetch(url, init) : fetch(url, init));
 // perDay: Gemini's answers a day in all, /law-ask's and /law-chat's (a chat
 // turn's plan counts with its answer, as one), near the low end of the
 // spec's estimate (about 200 turns a day); the admin panel's 設定 (aiLaw) sets it.
@@ -227,7 +236,7 @@ export async function checkExplain(raw, law, keys) {
 // A file of Orbit Law's data, kept a day at the edge (a 404 a minute, a
 // server error not at all); null when it isn't there.
 export async function readData(path) {
-  const res = await fetch(`${DATA}${path}`, { cf: { cacheTtlByStatus: { '200-299': 86_400, 404: 60, '500-599': 0 }, cacheEverything: true }, signal: AbortSignal.timeout(8000) });
+  const res = await lawFetch(`${DATA}${path}`, { cf: { cacheTtlByStatus: { '200-299': 86_400, 404: 60, '500-599': 0 }, cacheEverything: true }, signal: AbortSignal.timeout(8000) });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`${path} ${res.status}`);
   return res.json();

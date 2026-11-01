@@ -6,11 +6,12 @@
 // Each repo is its own assets-only Worker on routes of its paths, so a push
 // still deploys only that repo, and a file asked for is served straight from
 // Cloudflare (free: no Worker runs, nothing read from GitHub). Routes win
-// over orbit-site's custom domains on the same host (site.js), which only
-// answers what no route claims.
+// over orbit-site's custom domains on the same hosts (site.js), which hold
+// the hosts' DNS and certificates.
 //   an app (kit/brand.mjs SHORT)  orbit.<d>/<slug>…  → orbit-<slug>
-//   Orbit-Core                    orbit.<d>/ /pass/ /Orbit-Core/ (and the
-//                                 old /Shared-Proxy/), <d>/Orbit-Core/ → orbit-pass
+//   Orbit-Core                    orbit.<d>/… bar the apps: / (→ /pass/), /pass/,
+//                                 /Orbit-Core/ (and the old /Shared-Proxy/);
+//                                 <d>/Orbit-Core/ → orbit-pass
 //   Orbit-Showcase                <d>/… (Jay's homepage at /, /showcase/) → orbit-home
 //
 // Paths work as they did on GitHub Pages: /law/ is /law/index.html, /law
@@ -36,9 +37,11 @@ export function siteFor(repo, domain = DOMAIN) {
     return {
       name: 'orbit-pass',
       put: [['', '/pass'], ...kitRoots.map(r => ['', `/${r}`]), ['favicon.ico', '/favicon.ico'], ['icons/apple-touch-icon.png', '/apple-touch-icon.png'], ['icons/apple-touch-icon.png', '/apple-touch-icon-precomposed.png']],
-      // Its own paths on orbit. (the root, the family page, the kit, the
-      // root icons), and the kit on the bare host too (the showcase).
-      routes: [`${orbit}/`, `${orbit}/pass*`, ...kitRoots.map(r => `${orbit}/${r}*`), `${orbit}/favicon.ico*`, `${orbit}/apple-touch-icon*`, ...kitRoots.map(r => `${d}/${r}*`)],
+      // The whole orbit. host bar the apps' paths (theirs are more
+      // specific, so they win): the root, the family page, the kit, the root
+      // icons, and a 404 for anything else. The kit on the bare host too
+      // (the showcase loads it).
+      routes: [`${orbit}/*`, ...kitRoots.map(r => `${d}/${r}*`)],
       redirects: ['/ /pass/ 302']
     };
   }

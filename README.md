@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="Cloudflare" src="https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=fff"> <img alt="D1, R2, KV" src="https://img.shields.io/badge/storage-D1_%C2%B7_R2_%C2%B7_KV-F38020?logo=cloudflare&logoColor=fff"> <img alt="JavaScript" src="https://img.shields.io/badge/JavaScript-ES_modules-F7DF1E?logo=javascript&logoColor=000"> <img alt="GitHub" src="https://img.shields.io/badge/GitHub-Pages-24292F?logo=github&logoColor=fff"> <img alt="Tests" src="https://img.shields.io/badge/Tests-node_--test-339933?logo=nodedotjs&logoColor=fff">
+  <img alt="Cloudflare" src="https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=fff"> <img alt="D1, R2, KV" src="https://img.shields.io/badge/storage-D1_%C2%B7_R2_%C2%B7_KV-F38020?logo=cloudflare&logoColor=fff"> <img alt="JavaScript" src="https://img.shields.io/badge/JavaScript-ES_modules-F7DF1E?logo=javascript&logoColor=000"> <img alt="Tests" src="https://img.shields.io/badge/Tests-node_--test-339933?logo=nodedotjs&logoColor=fff">
 </p>
 
 The Orbit apps are static sites. Everything server-side, plus the kit and brand they all share, lives here: the proxy, the Orbit Pass account, notices, data builds, and the family's home page.
@@ -46,7 +46,7 @@ The family page and Orbit Pass sign-in are at [orbit.jaypengx.com/pass](https://
 - **The kit:** the shared look (an iOS-style design system), the sign-in sheet, sheets, tab bars, the date strip, offline handling, the service worker and the helpers every app loads.
 - **Add to Home Screen** steps written for the phone's own browser (Safari, iPad, Chrome on iPhone, Android Chrome, Samsung Internet, LINE and other in-app browsers), in Chinese and English.
 - **Recommendations that learn** (`kit/feedback.mjs`): what a list of picks showed and what was opened from it, kept on the phone for 30 days, so picks you pass over sink.
-- **The site Worker** that serves every app at its short orbit.jaypengx.com address (and Jay's homepage at jaypengx.com) from each repo's GitHub Pages.
+- **The site publisher** (`deploy/cf-site.mjs`): every repo's push puts its site on Cloudflare at its short orbit.jaypengx.com address (Jay's homepage at jaypengx.com), served as static files.
 - **A cost guard** that reads the bill every five minutes and slows, then stops, the proxy before the $5 plan runs out.
 - **Brand:** every app's icon, share card and manifest generated from one file.
 - **Tools:** a phone-sized preview of any app with real data, and the audits and list builders the apps rely on.
@@ -58,7 +58,7 @@ The family page and Orbit Pass sign-in are at [orbit.jaypengx.com/pass](https://
 | Workers | Cloudflare Workers, plain JavaScript (ES modules), no runtime dependencies |
 | Storage | D1 (`orbit-store`: the Pass), R2 (`orbit-data`: built data and kept reads), KV (caches and limits), Durable Objects (F1 timing log) |
 | AI | Gemini through `gemini-relay`, pinned to Taiwan |
-| Kit and site | GitHub Pages: `kit/` and `site/` (the family page and the admin page) |
+| Kit and site | Cloudflare: `kit/` and `site/` (the family page and the admin page) |
 | CI/CD | GitHub Actions: tests, then Wrangler deploys from `main` |
 | Tools | Node.js 22 and Playwright (Chromium and WebKit) |
 | Tests | `node --test` on the Pass, the money, notices, the data proxy, builders, the guard and the kit |
@@ -66,7 +66,7 @@ The family page and Orbit Pass sign-in are at [orbit.jaypengx.com/pass](https://
 ## How it works
 
 ```
-phones (home-screen apps) ── each app's static files + the kit (#kit/…, from this repo's Pages)
+phones (home-screen apps) ── each app's static files + the kit (#kit/…, from this repo's site)
    │  memory → Cache Storage → localStorage (versioned keys)
    ▼
 orbit-workers-proxy (one Worker)
@@ -79,12 +79,13 @@ orbit-workers-proxy (one Worker)
    /gemini, /nl-edit, /law-ask, /law-chat   Gemini via gemini-relay
    /data          the family's data in R2, built by builders/ on the cron
 quota-guard   reads the bill every 5 minutes; paces, then stops the proxy at 90% of the plan
-orbit-site    serves orbit.jaypengx.com/<app>/ and jaypengx.com from GitHub Pages
+orbit-<app>   each app's static files at orbit.jaypengx.com/<app>/ (orbit-pass: the kit and /pass/, orbit-home: jaypengx.com)
+orbit-site    holds the hostnames; longshot.jaypengx.com's shutdown notice
 ```
 
 A read from an app goes down these layers until one answers: memory, the phone's Cache Storage, the family's data in R2, the proxy's edge cache, reads kept for good in R2, and only then the upstream. A failed read is a failure, never "nothing there".
 
-The kit is **served, not copied**: apps load it from this repo's Pages through an import map (`#kit/…`), every file addressed by its content hash, so a kit change is one push here and a phone downloads only what changed.
+The kit is **served, not copied**: apps load it from this repo's site through an import map (`#kit/…`), every file addressed by its content hash, so a kit change is one push here and a phone downloads only what changed.
 
 Every route, data layer, secret and deploy: **[MAP.md](MAP.md)**.
 
@@ -149,7 +150,7 @@ Push to `main`. GitHub Actions runs the tests and deploys:
 | --- | --- |
 | `deploy.yml` | The proxy, `gemini-relay` and the site Worker, and attaches the jaypengx.com hostnames |
 | `deploy-guard.yml` | The cost guard, when its files change |
-| `pages.yml` | The kit and `site/` to GitHub Pages |
+| `pages.yml` | The kit and `site/` to Cloudflare |
 | `build.yml`, `tail.yml`, `audit.yml` | By hand: run a builder, watch the logs, check secret names |
 
 Secrets live only as GitHub or Cloudflare secrets, never in the repo.

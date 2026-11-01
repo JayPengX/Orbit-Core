@@ -25,9 +25,10 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-19 No separate test step and no Mac test gate: check your own cloud screenshots, push to `main`, Jay tests on his phone.
 - 10-21 "Don't ask me, just push, I allow anything" (repeated 10-22): never post push cards, kit pushes included.
 - 10-21 Fetch and rebase onto `origin/main` right before every push; never push a tree from an old checkout (a stale push wiped Law's 裁判).
-- 10-22 Kit push order: Orbit-Core `main` first, wait for `pages.yml`, then apps; run affected apps' `npm test` against the new kit first (a CI break emails Jay).
-- 10-22 No failure or cancel emails: never add a cancelling `concurrency:` to a Pages workflow; copy the `queue` job; builds check out main's tip, not `github.sha`.
-- 10-22 Orbit-Securities: after a push, confirm "Deploy to Pages" started; if not, run `deploy.yml` by hand.
+- 10-22 Kit push order: Orbit-Core `main` first, wait for `pages.yml` (Kit to Cloudflare), then apps; run affected apps' `npm test` against the new kit first (a CI break emails Jay).
+- 10-22 No failure or cancel emails: never add a cancelling `concurrency:` to a deploy workflow; copy the `queue` job; builds check out main's tip, not `github.sha`.
+- 10-22 Orbit-Securities: after a push, confirm "Deploy to Cloudflare" started; if not, run `deploy.yml` by hand.
+- 11-01 Every site is hosted on Cloudflare under Jay's domain; GitHub keeps the code only, GitHub Pages is off (Jay: "Make sure all sites are moved", "I want them off"). A push to `main` still deploys: each repo's workflow publishes its own site with `Orbit-Core/deploy/cf-site.mjs` (an assets-only Worker on its orbit.jaypengx.com path; reading a file costs nothing). Each app repo has its own `CLOUDFLARE_API_TOKEN`.
 - 10-23 Secrets are copied sealed inside Cloudflare/GitHub; never ask Jay to dig up keys; get his written yes up front when a safety check needs his words.
 - 10-23 While Jay is away or quota is out: don't ask him anything, wait for the reset and resume.
 - 10-30 "Faster" means a substantial improvement ("when I request faster it better be a substantial improvement"): find where the wait really goes, cut it structurally, and report measured before/after times; small trims don't count.
@@ -221,7 +222,11 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 
 | Old rule | Replaced by | When |
 |---|---|---|
+<<<<<<< Updated upstream
 | Category sets for kinds of people (學生, 上班族, 家庭, 全部), asked before the first 記一筆 (Money) | One broad set of twelve for everyone | 11-01 |
+=======
+| Apps and the kit on GitHub Pages, read through by the `orbit-site` Worker | Each repo publishes to Cloudflare itself (`deploy/cf-site.mjs`); Pages off | 11-01 |
+>>>>>>> Stashed changes
 | Apple UI changes go to a branch and wait for a Mac test | Push straight to main after your own WebKit screenshots | 10-19 |
 | Push to the session branch and main | `main` only, no PRs or branches (TRUTH §3) | 10-19 |
 | Only the kit thread may change the kit | Any lane pushes the kit, in kit push order | 10-21 |
