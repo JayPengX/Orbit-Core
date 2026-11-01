@@ -221,6 +221,23 @@ and `--q-col-r` (beside it), `--q-mid` (its middle); never `100vw`.
 - **A phone on its side is short** (330–390 px): no hero taller than half
   the screen, nothing extra pinned to the top or foot, sheets up from the
   foot, 600 wide at most.
-- **Inside a sheet** stays a phone's width (600 at most): one column.
+- **No empty band at the top.** On the rail's screens the top line's round
+  buttons (the account, refresh) stand at the foot of the rail, as iPad's
+  sidebar keeps the account, so the page starts at the top; the rail stands
+  at the top beside the page.
+- **Columns of even height** (Jay 2026-11-01). A tab's sections go in a
+  `.q-flow` and the kit's `flowColumns(root)` deals them (after drawing, and
+  on `onScreen()`): each, at a column's width, to the shortest column so far,
+  so the tops read in the phone's order and no column is left one shelf long
+  beside a long one. A small one (a link row) stays under the one before it.
+- **A phone on its side shows more**: heads, day strips and rows a size
+  tighter so the first cards are on the first screen; nothing a hero.
+- **A sheet** stays a phone's width (600 at most, one column), except one
+  that holds a whole page (a game, a team, a player, a race, a law):
+  `.q-sheet-wide` takes the screen's width on a phone on its side and up to
+  1080 on a tablet or a computer, and is a size container (`q-sheet`), so its
+  insides lay out by the sheet's width: `.q-sheet-cols` (cards in two columns
+  from 600, three from 1000; `.q-sheet-cols-2` two at most), `.q-sheet-pair`
+  (two things side by side: each side's line-up, two conferences' tables).
 - Charts, maps and canvases redraw at the new size on `onScreen()`.
 

@@ -1044,6 +1044,48 @@ export function tag(text, tone = '', color = '') {
   return tag_({ text, tone: color ? `${tone} tint` : tone, color });
 }
 // Cards that scroll sideways to the screen's edge.
+// ---- A page's sections in columns (docs/DESIGN.md §10) ----
+// flowColumns(root): every .q-flow under root (or root itself) has its
+// children (a tab's sections, in the phone's order) dealt into two columns
+// on q-wide, three on q-w3 (.q-flow-2: two at most): each, measured at a
+// column's width, to the shortest column so far, so the tops read left to
+// right in the phone's order and no column is left short (Jay 2026-11-01, an
+// iPad: one column long, the other one shelf, half the screen empty). One
+// under 100px (a link row) stays under the one before it. Upright: one
+// column, as it was. Call it after drawing, and again on onScreen().
+export function flowColumns(root = document) {
+  if (typeof document === 'undefined') return;
+  const html = document.documentElement.classList;
+  const list = root?.classList?.contains('q-flow') ? [root] : [...(root?.querySelectorAll?.('.q-flow') || [])];
+  for (const f of list) {
+    // (Not shown, it has no size: dealt when it's drawn again shown.)
+    if (!f.getClientRects().length) continue;
+    const n = html.contains('q-w3') && !f.classList.contains('q-flow-2') ? 3 : html.contains('q-wide') ? 2 : 1;
+    const items = f.__qItems?.every(i => i.parentNode?.parentNode === f || i.parentNode === f) ? f.__qItems : [...f.children].flatMap(c => (c.classList.contains('q-flow-col') ? [...c.children] : [c]));
+    f.__qItems = items;
+    f.classList.remove('q-flow-laid', 'q-flow-measure');
+    if (n < 2 || items.length < 2) {
+      f.replaceChildren(...items);
+      continue;
+    }
+    f.style.setProperty('--q-flow-n', n);
+    f.classList.add('q-flow-measure');
+    f.replaceChildren(...items);
+    const hs = items.map(i => i.getBoundingClientRect().height + (parseFloat(getComputedStyle(i).marginTop) || 0));
+    f.classList.remove('q-flow-measure');
+    const cols = Array.from({ length: n }, () => ({ h: 0, kids: [] }));
+    let last = null;
+    items.forEach((it, i) => {
+      const c = last && hs[i] < 100 ? last : cols.reduce((a, b) => (b.h < a.h - 1 ? b : a));
+      c.kids.push(it);
+      c.h += hs[i];
+      last = c;
+    });
+    f.replaceChildren(...cols.filter(c => c.kids.length).map(c => h('div', { class: 'q-flow-col' }, c.kids)));
+    f.classList.add('q-flow-laid');
+  }
+}
+
 export function rail(children, { small = false } = {}) {
   return h('div', { class: `q-rail${small ? ' small' : ''}` }, children);
 }
