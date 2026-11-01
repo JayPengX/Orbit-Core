@@ -5046,12 +5046,16 @@ html.q-kb .q-kb-docked {
 /* The rail: the same glass capsule standing down the left side, in the
    middle of the screen's height, its tabs one under another, the app's
    round action under it. A phone on its side has no height to spare for a
-   bar along its foot; a computer has width to spare beside the page. */
+   bar along its foot; a computer has width to spare beside the page.
+   Slim, as iPad's: a smaller mark and a pick that hugs it, concentric with
+   the capsule (Jay 2026-11-01: the first rail read bulky, its pick a big
+   blob). */
 html.q-tabrail {
-  --q-tabrail-w: 92px;
+  --q-tabrail-bw: 60px;
+  --q-tabrail-w: calc(var(--q-tabrail-bw) + 20px);
   /* (Beside the page, never stranded at the far edge of a big screen.) */
-  --q-tabrail-x: max(calc(var(--q-inset-l) + 12px), calc(var(--q-col-l) - 68px - 24px));
-  --q-tabrail-tab: 56px;
+  --q-tabrail-x: max(calc(var(--q-inset-l) + 10px), calc(var(--q-col-l) - var(--q-tabrail-bw) - 20px));
+  --q-tabrail-tab: 54px;
   --q-tabrail-h: calc(var(--q-tabs, 4) * var(--q-tabrail-tab) + 8px);
   /* (Nothing along the foot: what stood above the bar sits near the edge.) */
   --q-nav: var(--q-bar-gap);
@@ -5068,7 +5072,7 @@ html.q-tabrail .q-tabbar.q-tabbar {
   grid-auto-flow: row;
   grid-auto-columns: auto;
   grid-auto-rows: var(--q-tabrail-tab);
-  width: 68px;
+  width: calc(var(--q-tabrail-bw) - 8px);
   max-height: calc(100dvh - 16px);
   transform: translateY(-50%);
 }
@@ -5078,8 +5082,9 @@ html.q-tabrail .q-tabbar.q-tabbar::before {
   left: 4px;
   right: 4px;
   width: auto;
-  height: var(--q-tab-h, 0px);
-  transform: translateY(var(--q-tab-y, 0px));
+  height: calc(var(--q-tab-h, 0px) - 4px);
+  border-radius: 999px;
+  transform: translateY(calc(var(--q-tab-y, 0px) + 2px));
   transition: transform var(--q-dur-snappy) var(--q-spring-snappy), height var(--q-dur-snappy) var(--q-spring-snappy);
 }
 html.q-tabrail .q-tabbar.q-tabbar::after {
@@ -5087,18 +5092,26 @@ html.q-tabrail .q-tabbar.q-tabbar::after {
 }
 html.q-tabrail .q-tab {
   min-height: 0;
-  padding: 4px 2px 5px;
+  padding: 3px 2px 4px;
+  gap: 2px;
+}
+html.q-tabrail .q-tab-icon {
+  height: 24px;
+}
+html.q-tabrail .q-tab svg {
+  width: 22px;
+  height: 22px;
 }
 html.q-tabrail .q-tabbar.q-tabbar.q-tabbar-act {
   top: calc(50% - (var(--q-tabrail-h) + var(--q-act-room)) / 2);
   left: var(--q-tabrail-x);
-  width: 68px;
+  width: calc(var(--q-tabrail-bw) - 8px);
   transform: none;
 }
 html.q-tabrail .q-tab-action {
   top: calc(50% - (var(--q-tabrail-h) + var(--q-act-room)) / 2 + var(--q-tabrail-h) + 10px);
   bottom: auto;
-  left: calc(var(--q-tabrail-x) + (68px - var(--q-act)) / 2);
+  left: calc(var(--q-tabrail-x) + (var(--q-tabrail-bw) - var(--q-act)) / 2);
 }
 /* A phone on its side is short: the large titles a size down, as iOS's;
    the sign-in screens without their big mark. */
