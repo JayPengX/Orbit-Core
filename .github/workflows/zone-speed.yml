@@ -1,0 +1,30 @@
+name: Zone speed settings
+# Cloudflare's speed switches for jaypengx.com (all free): HTTP/3, 0-RTT
+# (a returning phone's first request rides its reconnect), Early Hints (the
+# page's files asked for before the page answers), Brotli, Smart Tiered Cache.
+# Runs when this file changes or by hand; each switch shows what Cloudflare said.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/zone-speed.yml']
+permissions: {}
+jobs:
+  speed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Switch them on
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          api=https://api.cloudflare.com/client/v4
+          auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          zone=$(curl -s -H "$auth" "$api/zones?name=jaypengx.com" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);console.log(j.result?.[0]?.id||"");if(!j.success)console.error(JSON.stringify(j.errors))})')
+          echo "zone ${zone:+found}"
+          for s in http3 0rtt early_hints brotli; do
+            printf '%s: ' "$s"
+            curl -s -X PATCH -H "$auth" -H 'Content-Type: application/json' -d '{"value":"on"}' "$api/zones/$zone/settings/$s" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);console.log(j.success?j.result.value:JSON.stringify(j.errors))})'
+          done
+          printf 'tiered cache: '
+          curl -s -X PATCH -H "$auth" -H 'Content-Type: application/json' -d '{"value":"on"}' "$api/zones/$zone/cache/tiered_cache_smart_topology_enable" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);console.log(j.success?j.result.value:JSON.stringify(j.errors))})'
