@@ -19,6 +19,9 @@ compatibility_date = "2025-01-01"
 # One connection for an app and its server, no CORS preflight. api.<domain>
 # stays (old kits): deploy.yml attaches it. guard.js takes all of them off
 # with the proxy, and deploy.yml keeps them off while it's stopped.
+# (Kept on with the routes, which turn it off by default: old kits and local
+# previews call orbit-workers-proxy.<account>.workers.dev.)
+workers_dev = true
 routes = [
   { pattern = "orbit.jaypengx.com/api/*", zone_name = "jaypengx.com" },
   { pattern = "jaypengx.com/api/*", zone_name = "jaypengx.com" }
