@@ -396,6 +396,16 @@ export function logoPicture(light, dark, cls, fallback, { guess = false } = {}) 
     if (navigator.onLine === false) addEventListener('online', again, { once: true });
     else setTimeout(again, wait);
   });
+  // Never left invisible: a load iPhone didn't report (a lazy picture in a
+  // sheet that never asked for it, one moved while it loaded) shows anyway,
+  // or is asked for now (Jay 2026-11-01: 科莫's badge a blank gap in 近期交手).
+  if (!known)
+    for (const ms of [2500, 6000])
+      setTimeout(() => {
+        if (!img.style.opacity) return;
+        if (img.complete && img.naturalWidth) Object.assign(img.style, { transition: 'opacity 0.18s ease', opacity: '' });
+        else if (img.loading === 'lazy' && picture.isConnected) img.loading = 'eager';
+      }, ms);
   img.src = small(light);
   return picture;
 }

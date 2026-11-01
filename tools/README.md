@@ -47,6 +47,17 @@ tools/shots/accounts/<app>-<name>.txt --click …` saves what the app wrote
 (follows, a watchlist, a timetable). A new account with nothing in it is a
 real state too (its welcome sheet): shoot that when it's what you changed.
 
+## `node tools/live-scroll.mjs [app…] [--sheet "<js>"]`: a live update never moves the page
+
+Each app on real data, scrolled the way iPhone's Safari scrolls (no scroll
+anchoring), then redrawn as a live refresh redraws: something above the view
+grows, and the tab is drawn anew a moment short before it's full again. What
+was read must stay put and the page must not jump. `--sheet` opens a sheet
+and checks it too (`"import('./sheets.js').then(m=>m.openTeam('nba','13'))"`
+in Sports); `--without` leaves the kit's keeper (`kit/hold-place.mjs`) out to
+show what it catches. Exit code 1 on a fault. Run it after any change to how
+a page redraws.
+
 ## `node tools/preview.mjs <app> [view…]`
 
 An app on an iPhone-sized page, signed in with a made-up wallet. Apps:

@@ -290,6 +290,7 @@ refuses `boot.js`, which mends an update that didn't finish.
 | `ui.mjs` | Builders: `segmented`, `sheet` (the one sheet: `detent`, `foot`, `lead`, `trailing`; the Pass is it), `menu`, `toast`, `list`/`cell`, `search`, `toggle`, `empty`, `navTitle` (large title), `pullToRefresh`, `view`, the cards and tiles (`tile`, `tag`, `rowCard`, `stats`, `section`, `logoTile`, `matchCard`, `stockRow`, `progressRing`, `monthCalendar`, `panelGrid`…), the one date selector of every app (`dayBar`/`dayStrip` + `daySwipe`, `dayStep`, `dayList`, `dayTop`/`dayNum`: a sticky strip of day chips, 📅 for any day, a swipe for the next); and HTML-string twins of some (`emptyHtml`, `tileHtml`, `statsHtml`, `stockRowHtml`…) |
 | `ui.mjs` icons | `share`, `trash`, `x`, `bank`, `lock`, `exchange`, `cup`, `flag` join the set (`send`, `key`, `swap`, `spark` already existed); apps read `kitUI.icons?.x`, never import |
 | `orbit.css` pieces | `.q-switch.on` (= aria-checked), `.q-sheet-foot` (sticky primary-button footer at a sheet's bottom, safe-area aware), `.q-fig` (grid of captioned bold figures with hairlines, children `small` over `b`) |
+| `hold-place.mjs` | A live redraw never moves the page: every scroller the person moved (the page, a sheet, a panel) keeps what's at the top of its view and where it sat, put back after any change they didn't make, with room held at the end if the page got shorter (Safari has no scroll anchoring); `scrollBusy()` holds `everyDev`'s beats while a finger is down or a fling runs. Loaded by `ui.mjs` |
 | `boot.js` | The loading screen and the version check |
 | `brand.mjs` | Families, names, colours, marks, repos, `DEV` |
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); every app's guide |
@@ -362,6 +363,7 @@ down on 2026-10-31 (its Worker and data removed); only its notice is here.
 | --- | --- |
 | `node tools/shots.mjs <app> [page…]` | Every screenshot a change needs: 320/390 × light/dark (× WebKit where installed), live data, signed in; contact sheet, faults, `--before main` diff (`tools/README.md`). Pages by name in `tools/shots/pages.mjs`, demo accounts in `tools/shots/accounts/` |
 | `node tools/preview.mjs <app>` | The app at phone size with real data (`--live`, `--width 375`, `--lang en`, `--click`, `--eval`, `--store`, `--webkit`, `--reopen`, `--serve`…; `tools/README.md`). Prints `wraps:`, `cut:`, `scrolls sideways:` |
+| `node tools/live-scroll.mjs [app…]` | A live update never moves the page: each app (and a sheet, `--sheet`) scrolled as Safari scrolls, redrawn as a refresh redraws; exit 1 if what was read moved |
 | `node tools/leagues-audit.mjs` | Every catalogue league against its sources |
 | `node tools/hk-lots.mjs` | Hong Kong board lots for Securities, from HKEX |
 | `node tools/jp-lists.mjs` | Tokyo's TOPIX500 and ETF trading units for Securities, from JPX |
