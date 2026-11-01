@@ -18,6 +18,9 @@ export const PAGES = {
     default: ['tabs'],
     // 賽事 on one league, each of its tabs (laid out wide on a tablet or a computer).
     'epl-table': { args: click('#tab-matches', '[data-league=epl]', wait(2500), tap('排名|Table'), wait(4000)) },
+    // MLS 排名: the East's race card (a clinch said as results), then the West's foot (faded rows, the lock and their key).
+    'mls-table': { args: click('#tab-matches', '[data-league=mls]', wait(2500), tap('排名|Table'), wait(9000), "js:document.querySelector('.title-race')?.scrollIntoView({block:'start'})", wait(1500)) },
+    'mls-key': { args: click('#tab-matches', '[data-league=mls]', wait(2500), tap('排名|Table'), wait(9000), "js:[...document.querySelectorAll('.zone-legend')].pop()?.scrollIntoView({block:'center'})", wait(1500)) },
     'nba-leaders': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('數據|Stats'), wait(5000)) },
     'nba-bracket': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('季後賽|Playoffs'), wait(5000)) },
     'f1-season': { args: click('#tab-matches', '[data-league=f1]', wait(4000)) },
