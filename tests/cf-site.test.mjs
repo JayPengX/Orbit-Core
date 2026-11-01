@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { siteFor, folderRules } from '../deploy/cf-site.mjs';
+import { siteFor, folderRules, ownHeaders } from '../deploy/cf-site.mjs';
 
 test('each repo gets its own Worker on its own paths', () => {
   const law = siteFor('Orbit-Law', 'example.tw');
@@ -18,4 +18,11 @@ test('each repo gets its own Worker on its own paths', () => {
 
 test('folders answer as on GitHub Pages', () => {
   assert.deepEqual(folderRules(['/index.html', '/law/index.html', '/law/app.js']), ['/ /index.html 200', '/law/ /law/index.html 200', '/law /law/ 301']);
+});
+
+test("a repo's own _headers move under where it's put", () => {
+  const text = '# keep\n/samples/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/empty\n';
+  assert.equal(ownHeaders(text, [['', '/beats']]), '/beats/samples/*\n  Cache-Control: public, max-age=31536000, immutable\n');
+  assert.equal(ownHeaders(text, [['home', '/'], ['', '/showcase']]).split('\n')[0], '/showcase/samples/*');
+  assert.equal(ownHeaders('', [['', '/beats']]), '');
 });
