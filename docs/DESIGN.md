@@ -220,7 +220,10 @@ and `--q-col-r` (beside it), `--q-mid` (its middle); never `100vw`.
   meaning) keeps lines under about 40 Chinese characters (720 px).
 - **A phone on its side is short** (330–390 px): no hero taller than half
   the screen, nothing extra pinned to the top or foot, sheets up from the
-  foot, 600 wide at most.
+  foot, 600 wide at most. A page in a sheet keeps its head to one row (a
+  game's: the sides, the time and the stage in one line; its follow star in
+  the sheet's head across from ✕) and, once the head has scrolled away, the
+  sheet's title says what it is (a game's score), as iOS's.
 - **No empty band at the top.** On the rail's screens the top line's round
   buttons (the account, refresh) stand at the foot of the rail, as iPad's
   sidebar keeps the account, so the page starts at the top; the rail stands
@@ -230,6 +233,9 @@ and `--q-col-r` (beside it), `--q-mid` (its middle); never `100vw`.
   on `onScreen()`): each, at a column's width, to the shortest column so far,
   so the tops read in the phone's order and no column is left one shelf long
   beside a long one. A small one (a link row) stays under the one before it.
+  In a `.q-sheet-wide` it goes by the sheet's width (two from 600, three
+  from 1000), so a game's 概況 has level tops and even ends (CSS columns
+  left one side a card lower: Jay 2026-11-01).
 - **A phone on its side shows more**: heads, day strips and rows a size
   tighter so the first cards are on the first screen; nothing a hero.
 - **A sheet** stays a phone's width (600 at most, one column), except one

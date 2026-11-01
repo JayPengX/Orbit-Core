@@ -5233,19 +5233,23 @@ html.q-kb.q-float dialog.q-sheet[open] {
   grid-column: 1 / -1;
 }
 /* A page's sections dealt into columns (ui.mjs flowColumns): .q-flow,
-   laid as .q-flow-laid > .q-flow-col on q-wide. */
-:root.q-wide .q-flow:is(.q-flow-laid, .q-flow-measure) {
+   laid as .q-flow-laid > .q-flow-col on q-wide (in a wide sheet, by its width). */
+:is(:root.q-wide, dialog.q-sheet-wide) .q-flow:is(.q-flow-laid, .q-flow-measure) {
   display: grid;
   grid-template-columns: repeat(var(--q-flow-n, 2), minmax(0, 1fr));
   gap: 0 var(--q-s-5, 24px);
   align-items: start;
 }
-:root.q-wide .q-flow.q-flow-measure > * {
+:is(:root.q-wide, dialog.q-sheet-wide) .q-flow.q-flow-measure > * {
   grid-column: 1;
 }
-:root.q-wide .q-flow-col > :first-child,
-:root.q-wide .q-flow.q-flow-measure > :first-child {
+:is(:root.q-wide, dialog.q-sheet-wide) .q-flow-col > :first-child,
+:is(:root.q-wide, dialog.q-sheet-wide) .q-flow.q-flow-measure > :first-child {
   margin-top: 0;
+}
+/* (In a sheet, the columns as close as its cards: 12, as .q-sheet-cols.) */
+:root dialog.q-sheet-wide .q-flow:is(.q-flow-laid, .q-flow-measure) {
+  column-gap: 12px;
 }
 .q-sheet {
   --q-margin: 16px;
