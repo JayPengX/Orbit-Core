@@ -200,7 +200,8 @@ const ROUTES = { pageFirst, cacheFirst, networkFirst };
 self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
-  if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.endsWith('/version.json')) return;
+  // (The proxy at the page's own /api/: its answers are the app's to keep, never this cache's.)
+  if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/') || url.pathname.endsWith('/version.json')) return;
   // What runs on after the answer: the event is kept alive until it's all done
   // (a save started while another was awaited is waited for too).
   const tail = [];

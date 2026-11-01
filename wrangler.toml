@@ -14,6 +14,16 @@ name = "orbit-workers-proxy"
 main = "worker.js"
 compatibility_date = "2025-01-01"
 
+# The proxy at the apps' own address too (kit/domain.mjs API): orbit.<domain>/api/…
+# and the bare domain's (the showcase); worker.js viaSite takes /api off.
+# One connection for an app and its server, no CORS preflight. api.<domain>
+# stays (old kits): deploy.yml attaches it. guard.js takes all of them off
+# with the proxy, and deploy.yml keeps them off while it's stopped.
+routes = [
+  { pattern = "orbit.jaypengx.com/api/*", zone_name = "jaypengx.com" },
+  { pattern = "jaypengx.com/api/*", zone_name = "jaypengx.com" }
+]
+
 # No [placement]: the proxy runs at the colo each request comes in through,
 # near the caller. It was pinned to Taiwan (gcp:asia-east1) for Gemini (which
 # refuses Hong Kong, where Smart Placement and some callers' colos land) and

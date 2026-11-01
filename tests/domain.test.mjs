@@ -12,10 +12,13 @@ test('domain: none set, everything where it always was', () => {
   assert.ok(!isAllowedOrigin('https://example.tw'));
 });
 
-test('domain: set, a page on it reaches api.<domain>; GitHub Pages still workers.dev; both may call', () => {
+test('domain: set, a page on it reaches the proxy at its own /api; GitHub Pages still workers.dev; both may call', () => {
   const on = homes('Example.TW', 'orbit.example.tw');
   assert.ok(on.on);
-  assert.equal(on.api, 'https://api.example.tw');
+  assert.equal(on.api, 'https://orbit.example.tw/api');
+  assert.equal(homes('example.tw', 'example.tw').api, 'https://example.tw/api', 'the showcase reaches it at its own address too');
+  assert.ok(on.isApi('https://orbit.example.tw/api/eco'));
+  assert.ok(!on.isApi('https://orbit.example.tw/law/'));
   assert.equal(on.site, 'https://orbit.example.tw');
   assert.equal(on.home, 'https://example.tw');
   assert.deepEqual(on.origins, ['https://jaypengx.github.io', 'https://orbit.example.tw', 'https://example.tw']);
