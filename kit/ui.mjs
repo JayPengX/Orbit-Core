@@ -1050,7 +1050,8 @@ export function tag(text, tone = '', color = '') {
 // on q-wide, three on q-w3 (.q-flow-2: two at most): each, measured at a
 // column's width, to the shortest column so far, so the tops read left to
 // right in the phone's order and no column is left short (Jay 2026-11-01, an
-// iPad: one column long, the other one shelf, half the screen empty). One
+// iPad: one column long, the other one shelf, half the screen empty). In a
+// wide sheet (.q-sheet-wide) by the sheet's width instead. One
 // under 100px (a link row) stays under the one before it. Upright: one
 // column, as it was. Call it after drawing, and again on onScreen().
 export function flowColumns(root = document) {
@@ -1060,7 +1061,12 @@ export function flowColumns(root = document) {
   for (const f of list) {
     // (Not shown, it has no size: dealt when it's drawn again shown.)
     if (!f.getClientRects().length) continue;
-    const n = html.contains('q-w3') && !f.classList.contains('q-flow-2') ? 3 : html.contains('q-wide') ? 2 : 1;
+    // (In a wide sheet, by the sheet's own width, as its .q-sheet-cols: two
+    // from 600, three from 1000; elsewhere by the page's, q-wide and q-w3.)
+    const box = f.closest?.('dialog.q-sheet-wide');
+    const bw = box ? box.clientWidth - (parseFloat(getComputedStyle(box).paddingLeft) || 0) - (parseFloat(getComputedStyle(box).paddingRight) || 0) : 0;
+    const w3 = box ? bw >= 1000 : html.contains('q-w3');
+    const n = w3 && !f.classList.contains('q-flow-2') ? 3 : (box ? bw >= 600 : html.contains('q-wide')) ? 2 : 1;
     const items = f.__qItems?.every(i => i.parentNode?.parentNode === f || i.parentNode === f) ? f.__qItems : [...f.children].flatMap(c => (c.classList.contains('q-flow-col') ? [...c.children] : [c]));
     f.__qItems = items;
     f.classList.remove('q-flow-laid', 'q-flow-measure');
