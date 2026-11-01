@@ -22,7 +22,7 @@ import { spawnSync } from 'node:child_process';
 import { DOMAIN } from '../kit/domain.mjs';
 import { SHORT } from '../kit/brand.mjs';
 
-const MAX_FILES = 20_000; // (the paid plan allows 100,000; far over this is a mistake)
+const MAX_FILES = 100_000; // the paid plan's limit per Worker
 const MAX_BYTES = 25 * 1024 * 1024; // one file's limit
 
 // What a repo publishes: its Worker, [built path ('' = the build), path on
