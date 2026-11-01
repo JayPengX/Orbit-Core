@@ -108,7 +108,7 @@ async function main() {
     if ((await stat(src)).isDirectory()) await cp(src, dest, { recursive: true, dereference: true });
     else await mkdir(join(dest, '..'), { recursive: true }).then(() => cp(src, dest));
   }
-  for (const junk of ['_redirects', '_headers', '.assetsignore']) for (const [, to] of site.put) await rm(join(out, to, junk), { force: true });
+  for (const junk of ['_redirects', '_headers', '.assetsignore']) for (const [, to] of site.put) await rm(join(out, to, junk), { force: true }).catch(() => {}); // (a file put, e.g. /favicon.ico: nothing under it)
   const own = await readFile(join(resolve(built), '_headers'), 'utf8').catch(() => '');
   const files = await walk(out);
   if (files.length > MAX_FILES) throw new Error(`${files.length} files: over ${MAX_FILES}`);
