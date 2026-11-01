@@ -43,6 +43,14 @@ test('a CPBL month is over for good only read whole; the days not read come from
   assert.equal(settled(sept, JSON.stringify(filled)), true);
   // No nightly copy: as read, never whole.
   assert.equal(fillCpblMonth(part, null), part);
+  // A nightly copy cut short: the days over it read count as read (a phone asks TheSportsDB only for the rest),
+  // never today or a day to come (the schedule can still move).
+  const nov = { games: [], read: ['2026-11-01'] };
+  const short = { games: [g('2026-10-31T10:35:00Z')], read: ['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02'] };
+  const oct = fillCpblMonth({ games: [], read: ['2026-10-31'] }, short, Date.parse('2026-11-01T04:00:00Z'));
+  assert.deepEqual(oct.read, ['2026-10-30', '2026-10-31']);
+  assert.equal(oct.whole, undefined);
+  assert.deepEqual(fillCpblMonth(nov, { games: [], read: ['2026-11-02'] }, Date.parse('2026-11-01T04:00:00Z')), nov);
 });
 
 test('a finished F1 session is kept for good: 數據 with laps run, every lap once not the live log', () => {

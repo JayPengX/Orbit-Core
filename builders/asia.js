@@ -21,6 +21,7 @@ export async function cpblMonthWhole(ym, { day, league, parse, now = Date.now(),
   const [y, m] = ym.split('-').map(Number);
   const days = Array.from({ length: new Date(Date.UTC(y, m, 0)).getUTCDate() }, (_, i) => `${ym}-${String(i + 1).padStart(2, '0')}`);
   const games = [];
+  const read = [];
   let whole = true;
   for (const d of days) {
     let list = null;
@@ -34,7 +35,7 @@ export async function cpblMonthWhole(ym, { day, league, parse, now = Date.now(),
         await sleep(gap * 2);
       }
     }
-    if (list) games.push(...list);
+    if (list) games.push(...list), read.push(d);
     else whole = false;
     await sleep(gap);
   }
@@ -43,7 +44,8 @@ export async function cpblMonthWhole(ym, { day, league, parse, now = Date.now(),
     league: 'cpbl',
     month: ym,
     games: games.filter(g => !seen.has(g.id) && seen.add(g.id)).sort((a, b) => a.start.localeCompare(b.start)),
-    ...(whole ? { whole: 1 } : {})
+    // (Cut short, the days read: the data proxy counts the past ones as read, so a phone doesn't ask TheSportsDB for them again.)
+    ...(whole ? { whole: 1 } : { read })
   };
 }
 

@@ -1364,12 +1364,18 @@ async function keptCopy(key) {
 // read from the nightly whole copy (builders/asia.js), whole then if that was.
 const isRaceDay = url => url.hostname === 'site.api.espn.com' && /\/racing\/[^/]+\/scoreboard$/.test(url.pathname);
 const isCpblMonth = url => url.hostname === ASIA_HOST && /^\/cpbl\/\d{4}-\d{2}\.json$/.test(url.pathname);
-export function fillCpblMonth(fresh, kept) {
-  if (!fresh || fresh.whole || !Array.isArray(fresh.read) || !kept?.games?.length) return fresh;
+// The days over that the nightly copy read count as read too (a phone reads
+// the days neither did from TheSportsDB itself, kit catalog cpblMonth: a
+// dozen requests on every opening when TheSportsDB had turned the route away).
+export function fillCpblMonth(fresh, kept, now = Date.now()) {
+  if (!fresh || fresh.whole || !Array.isArray(fresh.read) || !kept?.games) return fresh;
   const read = new Set(fresh.read);
   const day = g => new Date(Date.parse(g.start) + 8 * 3_600_000).toISOString().slice(0, 10);
   const games = [...kept.games.filter(g => !read.has(day(g))), ...fresh.games].sort((a, b) => a.start.localeCompare(b.start));
-  return { ...fresh, games, ...(kept.whole ? { whole: 1 } : {}) };
+  const today = new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
+  const keptRead = Array.isArray(kept.read) ? kept.read.filter(d => d < today && !read.has(d)) : [];
+  if (!kept.whole && !keptRead.length && !kept.games.length) return fresh;
+  return { ...fresh, games, read: [...read, ...keptRead].sort(), ...(kept.whole ? { whole: 1 } : {}) };
 }
 async function readKept(key, url) {
   if (notKept.get(key) > Date.now()) return null;
