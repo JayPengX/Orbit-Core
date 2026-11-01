@@ -173,7 +173,8 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-27 Never invent entries, balances or categories; Jay started fresh 2026-11-01; never re-add the 天天記帳 import or commit his CSV.
 - 10-31 No 發票 features (Jay: "發票 feature is weak… a more general tool… remove 條碼、自動對獎"): one 拍照記帳 for any picture (receipt, invoice, bill, app screenshot, transfer notice, price tag). AI reads amount, day, store, items, category and way to pay; it opens as a filled entry to check before saving, and a matching entry already logged (same amount, within a day) is offered to merge, never added twice. No 手機條碼, 對獎, QR scanner or 載具 file. (Replaces 10-27's 發票 hero.)
 - 10-27 Categories have subs and are the person's to edit; auto-fill (自動帶入) is set per user, never hardcoded.
-- 11-01 One set of categories for everyone (Jay picked it over presets): twelve broad spending ones, each with two to four broad subs (餐飲 三餐/飲料點心/聚餐; 交通 TPASS/搭車/長途/汽機車, with YouBike, 捷運, 公車 and 計程車 all under 搭車; 購物 服飾美妝/3C 家電/日用品; 居住 房租房貸/水電瓦斯/電信網路/管理修繕; 娛樂 休閒/旅遊/運動; 數位; 醫療 看診/藥品/保險; 學習; 人情; 家人 孝親/育兒/寵物; 稅費; 其他). What was logged under the old set moved once, amounts untouched. The person can still add, rename, hide or merge their own.
+- 11-01 One set of categories for everyone (Jay picked it over presets): twelve broad spending ones, each with two to four broad subs (餐飲 早餐/午餐/晚餐/飲料點心/聚餐; 交通 TPASS/搭車/長途/汽機車, with YouBike, 捷運, 公車 and 計程車 all under 搭車; 購物 服飾美妝/3C 家電/日用品; 居住 房租房貸/水電瓦斯/電信網路/管理修繕; 娛樂 休閒/旅遊/運動; 數位; 醫療 看診/藥品/保險; 學習; 人情; 家人 孝親/育兒/寵物; 稅費; 其他). What was logged under the old set moved once, amounts untouched. The person can still add, rename, hide or merge their own.
+- 11-01 Meals stay three (Jay: one 三餐 sub is "bad for my 統計"): 餐飲's subs are 早餐/午餐/晚餐/飲料點心/聚餐; 宵夜 counts as 晚餐; no 三餐 sub. Logs the twelve had put under 三餐 went back to the meal they were logged under (from the Pass's kept version before the twelve), else by the hour logged; amounts, days and totals untouched.
 - 10-27 Sheets fit their content; nothing that matters below the fold; 手機條碼 stays black on white in dark mode.
 - 悠遊卡/一卡通 are 儲值卡, never 電子錢包; removing an account never loses history.
 - 10-30 Cards carry their network (卡別: Visa, Mastercard, JCB, American Express, UnionPay…), picked when adding or editing a card and shown wherever the card is (its real mark).
@@ -227,6 +228,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 
 | Old rule | Replaced by | When |
 |---|---|---|
+| 餐飲 with one 三餐 sub (breakfast, lunch, dinner and late night together) (Money) | 早餐, 午餐, 晚餐 apart again; 宵夜 counts as 晚餐 | 11-01 |
 | Category sets for kinds of people (學生, 上班族, 家庭, 全部), asked before the first 記一筆 (Money) | One broad set of twelve for everyone | 11-01 |
 | Apps and the kit on GitHub Pages, read through by the `orbit-site` Worker | Each repo publishes to Cloudflare itself (`deploy/cf-site.mjs`); Pages off | 11-01 |
 | Apple UI changes go to a branch and wait for a Mac test | Push straight to main after your own WebKit screenshots | 10-19 |

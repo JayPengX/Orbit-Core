@@ -1581,6 +1581,10 @@ function makeSession(app, { lang, heartbeat }) {
     });
   // 急難紓困 (pay.mjs): the Worker checks and writes it.
   s.relief = () => withToken(qt => call('POST', '', { op: 'relief', qt })).then(res => (absorb(res), res));
+  // The app's own data as it stood before (kept 30 days): with no `updated`
+  // the list ({ versions: [{ updated, at }] }, newest first), else that
+  // version ({ payload }). Read only (Money's three meals put back, 2026-11-01).
+  s.past = (updated = '') => withToken(qt => call('POST', qs({ app }), { op: 'past', qt, updated }));
   s.dropInbox = id => withToken(qt => call('POST', qs({ app }), { op: 'drop-inbox', qt, inbox: id }));
   // Other passes into this one (they're deleted after).
   s.merge = passes => withToken(qt => call('POST', '', { op: 'merge', qt, sources: passes.map(passcode => ({ passcode })) })).then(absorb);

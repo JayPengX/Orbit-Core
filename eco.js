@@ -369,6 +369,7 @@ const OPS = {
   'share-create': shareCreate,
   'share-redeem': shareRedeem,
   relief: ecoRelief,
+  past: ecoPast,
   admin: ctx => handleAdmin(ctx),
   'passkey-begin': passkeyBegin,
   'passkey-login': passkeyLogin,
@@ -725,6 +726,26 @@ async function ecoRelief(ctx) {
 
 // A device code: 8 characters, good for PAIR_MS and once, to sign in on
 // another device without typing the pass.
+// An app's own data as it stood before (doc-store.js kept versions, 30 days):
+// the list ({ updated, at }, newest first), or with `updated` that version's
+// payload. Only the app's own data of the session's own account, read only;
+// an app uses it to put back what a change of its own lost (Money's three
+// meals, 2026-11-01).
+async function ecoPast(ctx) {
+  const { env, deps, headers, request, body, app } = ctx;
+  if (!ECO_APPS[app] || !deps.store?.versions) return deps.errorJson('ECO_UNKNOWN_APP', 400, headers, request);
+  const c = await liveSession(ctx);
+  if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
+  if (c.a !== app) return deps.errorJson('ECO_UNKNOWN_APP', 403, headers, request);
+  if (sessionLimited(`past:${c.s}`, 20, 60_000, deps.now())) return deps.errorJson('RATE_LIMITED', 429, headers, request);
+  const coll = ECO_APPS[app].collection;
+  const updated = str(body.updated, 64);
+  if (!updated) return deps.json({ versions: (await deps.store.versions(env, c.d, coll)).slice(0, 100).map(v => ({ updated: v.updated, at: v.at })) }, 200, headers);
+  const payload = await deps.store.version(env, coll, c.d, updated);
+  if (payload == null) return deps.errorJson('ECO_NOT_FOUND', 404, headers, request);
+  return deps.json({ updated, payload }, 200, headers);
+}
+
 async function pairCreate(ctx) {
   const { env, deps, headers, request } = ctx;
   const c = await liveSession(ctx);
