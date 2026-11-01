@@ -52,7 +52,10 @@ Jay's specific decisions, app by app and dated, are in [`RULEBOOK.md`](RULEBOOK.
   (`Orbit-Core/deploy/cf-site.mjs`: static files at its
   orbit.jaypengx.com path, the kit at `/Orbit-Core/kit/`), and
   `deploy.yml` the Workers. Nothing is on GitHub Pages any more (Jay,
-  2026-11-01); GitHub keeps the code. No PRs.
+  2026-11-01); GitHub keeps the code. No PRs and no branches: every
+  repo has only `main`, so never push the session branch (`claude/...`)
+  or any other, even when a session's setup asks for one (Jay,
+  2026-11-01).
 - **Check what a person would see:** if the change is visible,
   `node Orbit-Core/tools/shots.mjs <app> [page…] --before main` (every
   page at 320 and 390, on a phone on its side, a tablet and a computer, light and dark, real data, and what changed against
