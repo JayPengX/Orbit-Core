@@ -788,3 +788,25 @@ test('admin 備份: a deleted account listed, its wallet and app data put back f
   assert.equal(back.data.payload, '{"marks":[1,2,3]}');
   assert.equal((await admin('restore', { wallet: gone[0].ref, coll: 'eco-pairs', updated: 'x' })).error.code, 'ECO_PAIR_NOT_FOUND');
 });
+
+test('past: an app reads its own kept versions, never another app\'s or another account\'s', async () => {
+  const { fakeD1 } = await import('./fake-d1.mjs');
+  const { docStore, SCHEMA } = await import('../doc-store.js');
+  const t = setup();
+  const DOCS = docStore({ keep: new Set([WALLET_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]) });
+  t.env.STORE = fakeD1(SCHEMA);
+  Object.assign(t.deps, { fsGet: DOCS.get, fsWrite: DOCS.write, fsDelete: DOCS.delete, fsList: DOCS.list, fsCollections: DOCS.collections, fsBatch: DOCS.batch, store: DOCS });
+  const a = await newPass(t, 'money');
+  const save = payload => t.call('POST', '?app=money', { op: 'write', qt: a.token, payload });
+  assert.equal((await save('{"v":1}')).status, 200);
+  assert.equal((await save('{"v":2}')).status, 200);
+  const list = await t.call('POST', '?app=money', { op: 'past', qt: a.token });
+  assert.equal(list.status, 200);
+  assert.ok(list.data.versions.length >= 1);
+  const one = await t.call('POST', '?app=money', { op: 'past', qt: a.token, updated: list.data.versions.at(-1).updated });
+  assert.equal(one.data.payload, '{"v":1}');
+  // Another app's session: refused; a bad token: refused; no such version: 404.
+  assert.equal((await t.call('POST', '?app=law', { op: 'past', qt: a.token })).status, 403);
+  assert.equal((await t.call('POST', '?app=money', { op: 'past', qt: 'x' })).status, 401);
+  assert.equal((await t.call('POST', '?app=money', { op: 'past', qt: a.token, updated: 'nope' })).status, 404);
+});
