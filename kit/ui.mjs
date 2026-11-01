@@ -1071,9 +1071,25 @@ export function flowColumns(root = document) {
     const n = w3 && !f.classList.contains('q-flow-2') ? 3 : (box ? bw >= 600 : html.contains('q-wide')) ? 2 : 1;
     const items = f.__qItems?.every(i => i.parentNode?.parentNode === f || i.parentNode === f) ? f.__qItems : [...f.children].flatMap(c => (c.classList.contains('q-flow-col') ? [...c.children] : [c]));
     f.__qItems = items;
+    // (Dealt again while read (a live game every few seconds): the page and its
+    // sheet stay where they were scrolled. The columns' height is held while
+    // they're taken apart, so the box never shrinks and drops the reader to the
+    // top (Jay 2026-11-01: live updates reset the scroll).)
+    const scrollers = [];
+    for (let p = f.parentElement; p; p = p.parentElement) if (p.scrollTop) scrollers.push([p, p.scrollTop]);
+    const se = document.scrollingElement;
+    if (se?.scrollTop && !scrollers.some(([p]) => p === se)) scrollers.push([se, se.scrollTop]);
+    const held = f.style.minHeight;
+    if (scrollers.length) f.style.minHeight = `${f.offsetHeight}px`;
     f.classList.remove('q-flow-laid', 'q-flow-measure');
+    const settle = () => {
+      if (!scrollers.length) return;
+      f.style.minHeight = held;
+      for (const [p, top] of scrollers) if (p.scrollTop !== top) p.scrollTop = top;
+    };
     if (n < 2 || items.length < 2) {
       f.replaceChildren(...items);
+      settle();
       continue;
     }
     f.style.setProperty('--q-flow-n', n);
@@ -1091,6 +1107,7 @@ export function flowColumns(root = document) {
     });
     f.replaceChildren(...cols.filter(c => c.kids.length).map(c => h('div', { class: 'q-flow-col' }, c.kids)));
     f.classList.add('q-flow-laid');
+    settle();
   }
 }
 
