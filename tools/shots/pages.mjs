@@ -35,6 +35,8 @@ export const PAGES = {
     'f1-weekend': { args: click('#tab-matches', '[data-league=f1]', tap('Ended|已結束'), "js:document.querySelector('.wk-card.done')?.click()", wait(4000)) },
     // The next race weekend's sheet scrolled to: 賽道 (the circuit drawn) and last year's podium.
     'f1-next': { args: click('#tab-matches', '[data-league=f1]', "js:document.querySelector('.wk-card:not(.done)')?.click()", wait(6000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/賽道|The circuit/.test(c.textContent))?.scrollIntoView({block:'start'})", wait(2500)) },
+    // The race to come: its grid (a car not where it qualified says so; Mexico 2026).
+    'f1-grid': { args: click('#tab-matches', '[data-league=f1]', "js:document.querySelector('.wk-card:not(.done)')?.click()", wait(6000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .wkt-stop')].pop()?.click()", wait(3000), "js:document.querySelector('dialog.q-sheet[open] .f1-field li:nth-child(3)')?.scrollIntoView({block:'start'})", wait(1500)) },
     'f1-podium': { args: click('#tab-matches', '[data-league=f1]', "js:document.querySelector('.wk-card:not(.done)')?.click()", wait(6000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/年這一站|Here in/.test(c.textContent))?.scrollIntoView({block:'end'})", wait(2500)) },
     // A driver who only ran a practice (an FP1 stand-in: Mexico 2026's Minì), his page.
     'f1-guest': { args: click("js:import('./sheets.js').then(m=>m.openPlayer('f1','5910'))", wait(9000)) },
