@@ -633,6 +633,30 @@ test("中場休息 counts down from the half's last play, by the league's break"
   assert.equal(kit.halftimeEnd('t:2'), null);
 });
 
+test("中場休息 counts down in a league whose feed has no half-time event (the Scottish Premiership)", async () => {
+  // Falkirk v Celtic, 2026-11-01, read at HT: only goals, a sub and cards, the
+  // last at 38'. Kicked off 13:00:44; the clock stopped on 45'+3' (47 played):
+  // the second half's kick-off came at 14:02:33, the break's end 14:02:44.
+  const ev = (type, value, wallclock) => ({ type: { type }, period: { number: 1 }, clock: { value }, wallclock });
+  const summary = {
+    header: { competitions: [{ status: { period: 1, displayClock: "45'+3'", type: { name: 'STATUS_HALFTIME', shortDetail: 'HT' } } }] },
+    keyEvents: [ev('goal', 134, '2026-11-01T13:02:59Z'), ev('substitution', 266, '2026-11-01T13:05:10Z'), ev('yellow-card', 2066, '2026-11-01T13:35:10Z'), ev('goal', 2232, '2026-11-01T13:37:56Z')]
+  };
+  const start = Date.parse('2026-11-01T13:47:44Z');
+  assert.equal(kit.halftimeStartOf(summary), start);
+  assert.equal(kit.halftimeClock(start + 900_000, Date.parse('2026-11-01T13:50:00Z')), '12:44');
+  // Never before the half's last play; a soccer half with nothing to date it: no countdown, not a wrong one.
+  assert.equal(kit.soccerStopOf({ ...summary, keyEvents: [...summary.keyEvents, ev('yellow-card', 2700, '2026-11-01T13:49:00Z')] }), Date.parse('2026-11-01T13:49:00Z'));
+  assert.equal(kit.halftimeStartOf({ ...summary, keyEvents: [] }), null);
+  // Extra time's break (the clock on 90'+5', 94 played) from the second half's plays.
+  const et = { header: { competitions: [{ status: { period: 2, displayClock: "90'+5'" } }] }, keyEvents: [{ type: { type: 'goal' }, period: { number: 2 }, clock: { value: 3000 }, wallclock: '2026-11-01T15:05:00Z' }] };
+  assert.equal(kit.soccerStopOf(et), Date.parse('2026-11-01T15:00:00Z') + 49 * 60_000);
+  assert.equal(kit.halftimeMinutes('soccer'), 15);
+  kit.watchHalftime('t:sco', { sport: 'soccer', league: 'scotland', read: async () => summary });
+  await new Promise(r => setTimeout(r, 0));
+  assert.equal(kit.halftimeEnd('t:sco'), start + 900_000);
+});
+
 test('every break counts down by its rule: quarters, innings, timeouts', async () => {
   const nba = { sport: 'basketball', league: 'nba' };
   assert.deepEqual(kit.breakOf({ ...nba, status: { state: 'in', name: 'STATUS_END_PERIOD', period: 1 } })?.seconds, 130);

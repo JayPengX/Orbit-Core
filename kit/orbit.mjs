@@ -4972,10 +4972,39 @@ const HALFTIME_LEAGUE_MIN = { ncaaf: 20, 'college-football': 20, 'football/colle
 const HALFTIME_KEY = 'orbit.halftime';
 export const halftimeMinutes = (sport, league = '') => HALFTIME_LEAGUE_MIN[league] ?? HALFTIME_MIN[sport] ?? null;
 export function halftimeStartOf(summary) {
+  const ball = soccerStopOf(summary);
+  if (ball !== undefined) return ball;
   const drives = summary?.drives || {};
   const plays = [...(summary?.plays || []), ...(summary?.keyEvents || []), ...(drives.previous || []).flatMap(d => d?.plays || []), ...(drives.current?.plays || [])];
   const at = plays.map(p => Date.parse(p?.wallclock || '')).filter(Number.isFinite);
   return at.length ? Math.max(...at) : null;
+}
+// Soccer: the whistle that ended the period now over. ESPN's own
+// 'halftime' (or end of regular time) key event when it has one; some
+// feeds have none (the Scottish Premiership's lists only goals, cards and
+// subs: Falkirk v Celtic, 2026-11-01, 中場休息 with no countdown, the
+// break timed from the 38' goal and long over). Then: the period's kick-off
+// from its plays (a play's wall clock less its game clock), plus the minute
+// the clock stopped on (45'+3' is the 48th minute: 47 played). undefined
+// for a summary that isn't soccer's; null when nothing dates the period.
+const BALL_BASE = [0, 0, 2700, 5400, 6300];
+export function soccerStopOf(summary) {
+  const status = summary?.header?.competitions?.[0]?.status || {};
+  const shown = /^(\d+)'(?:\+(\d+)')?$/.exec(String(status.displayClock || '').trim());
+  if (!shown) return undefined;
+  const period = Number(status.period) || 1;
+  const plays = [...(summary?.keyEvents || []), ...(summary?.commentary || []).map(c => c?.play).filter(Boolean)].filter(p => (p?.period?.number ?? period) === period && Number.isFinite(Date.parse(p?.wallclock || '')));
+  const stops = plays.filter(p => /half-?time|^end-(regular|extra)/i.test(p?.type?.type || '')).map(p => Date.parse(p.wallclock));
+  if (stops.length) return Math.max(...stops);
+  const base = BALL_BASE[period] ?? 0;
+  const kicks = plays
+    .filter(p => Number.isFinite(p?.clock?.value) && p.clock.value >= base)
+    .map(p => Date.parse(p.wallclock) - (p.clock.value - base) * 1000)
+    .sort((a, b) => a - b);
+  if (!kicks.length) return null;
+  const kick = kicks[Math.floor(kicks.length / 2)];
+  const played = (Number(shown[1]) + Number(shown[2] || 0) - 1) * 60 - base;
+  return Math.max(kick + played * 1000, ...plays.map(p => Date.parse(p.wallclock)));
 }
 // "12:34" left at `now`; '' once the break's length is up.
 export function halftimeClock(end, now = Date.now()) {
