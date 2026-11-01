@@ -19,4 +19,6 @@ test("CPBL's month whole: every day read, one at a time; a day refused asked aga
   assert.deepEqual(month, { league: 'cpbl', month: '2026-02', games: [{ id: 'a', start: '2026-02-05T05:05:00Z' }, { id: 'b', start: '2026-02-05T10:35:00Z' }], whole: 1 });
   const never = await cpblMonthWhole('2026-02', { day: 'https://x/e', league: '5111', parse, get: async url => (new URL(url).searchParams.get('d') === '2026-02-10' ? new Response('', { status: 500 }) : ok([])), sleep: async () => {} });
   assert.equal(never.whole, undefined);
+  assert.equal(never.read.length, 27);
+  assert.ok(!never.read.includes('2026-02-10'));
 });
