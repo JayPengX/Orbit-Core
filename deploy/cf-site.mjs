@@ -17,7 +17,7 @@
 // Paths work as they did on GitHub Pages: /law/ is /law/index.html, /law
 // moves to /law/, /law/index.html answers as it is (no redirect a service
 // worker would trip on). Every file may be read from any site (Pages' CORS).
-import { cp, mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { DOMAIN } from '../kit/domain.mjs';
@@ -65,6 +65,25 @@ export function folderRules(files) {
   return rules;
 }
 
+// A repo's own _headers (its paths as on its own site, e.g. /samples/*),
+// moved under each place the build is put (/beats/samples/*).
+export function ownHeaders(text, put) {
+  const blocks = [];
+  let cur = null;
+  for (const line of String(text || '').split('\n')) {
+    if (!line.trim() || line.trim().startsWith('#')) continue;
+    if (/^\s/.test(line)) cur?.rules.push(line.trimEnd());
+    else blocks.push((cur = { path: line.trim(), rules: [] }));
+  }
+  const out = [];
+  for (const [from, to] of put) {
+    if (from !== '') continue;
+    const at = to === '/' ? '' : to;
+    for (const b of blocks) if (b.path.startsWith('/') && b.rules.length) out.push(at + b.path, ...b.rules);
+  }
+  return out.length ? out.join('\n') + '\n' : '';
+}
+
 async function walk(dir, base = '') {
   const out = [];
   for (const e of await readdir(dir, { withFileTypes: true })) {
@@ -89,13 +108,14 @@ async function main() {
     if ((await stat(src)).isDirectory()) await cp(src, dest, { recursive: true, dereference: true });
     else await mkdir(join(dest, '..'), { recursive: true }).then(() => cp(src, dest));
   }
-  for (const junk of ['_redirects', '_headers', '.assetsignore']) await rm(join(out, junk), { force: true });
+  for (const junk of ['_redirects', '_headers', '.assetsignore']) for (const [, to] of site.put) await rm(join(out, to, junk), { force: true });
+  const own = await readFile(join(resolve(built), '_headers'), 'utf8').catch(() => '');
   const files = await walk(out);
   if (files.length > MAX_FILES) throw new Error(`${files.length} files: over ${MAX_FILES}`);
   for (const f of files) if ((await stat(join(out, f))).size > MAX_BYTES) throw new Error(`${f} is over 25 MB`);
   const redirects = [...site.redirects, ...folderRules(files)];
   await writeFile(join(out, '_redirects'), redirects.join('\n') + '\n');
-  await writeFile(join(out, '_headers'), '/*\n  Access-Control-Allow-Origin: *\n');
+  await writeFile(join(out, '_headers'), ownHeaders(own, site.put) + '/*\n  Access-Control-Allow-Origin: *\n');
   const zone = DOMAIN.trim().toLowerCase();
   const config = {
     name: site.name,
