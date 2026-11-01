@@ -14,6 +14,7 @@ on:
       - 'site/**'
       - 'brand/**'
       - 'package.json'
+      - 'deploy/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -71,6 +72,12 @@ jobs:
           mkdir -p _site
           if [ -d site ]; then cp -r site/. _site/; fi
           node kit/stamp.mjs _site "$(git rev-parse HEAD)"
+      # The family page and the kit on Cloudflare, at orbit.<domain>/pass/ and
+      # /Orbit-Core/ (deploy/cf-site.mjs): what phones are served.
+      - name: Publish to Cloudflare
+        run: node deploy/cf-site.mjs Orbit-Core _site
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       - uses: actions/configure-pages@v5
         with:
           # Turns Pages on (Source: GitHub Actions) the first time, if the
