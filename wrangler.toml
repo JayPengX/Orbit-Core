@@ -27,6 +27,13 @@ compatibility_date = "2025-01-01"
 binding = "GEMINI_RELAY"
 service = "gemini-relay"
 
+# Orbit Law's site (the orbit-law Worker's files, deploy/cf-site.mjs): its
+# data, read by /law-* (law.js readData). Its route on our own zone can't be
+# fetched from here.
+[[services]]
+binding = "LAW_SITE"
+service = "orbit-law"
+
 [vars]
 # Orbit Transit (transit.js): TDX calls a minute this Worker allows itself.
 # The owner is on a paid TDX plan (5 a second at least): 4 a second.

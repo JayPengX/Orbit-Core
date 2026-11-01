@@ -1,8 +1,9 @@
 # Orbit-Core: the map
 
 The server side, the shared kit and the brand of every Orbit
-app. The apps are static sites on GitHub Pages; everything server-side is
-here, on Cloudflare.
+app. The apps are static sites on Cloudflare, each published by its own
+repo's push (`deploy/cf-site.mjs`); everything server-side is here, on
+Cloudflare too.
 
 Rules for working on any of it: `docs/TRUTH.md` (one page).
 
@@ -18,14 +19,14 @@ Rules for working on any of it: `docs/TRUTH.md` (one page).
 | Orbit Law | `law` | Orbit-Law |
 | Orbit Money | `money` | Orbit-Money |
 
-Each lives at `https://orbit.jaypengx.com/<slug>/` (§9), served from its repo's
-GitHub Pages. The kit, the family's page and the admin page are this
-repo's Pages.
+Each lives at `https://orbit.jaypengx.com/<slug>/` (§9), published by its
+repo to Cloudflare. The kit, the family's page and the admin page are this
+repo's site (`/Orbit-Core/`, `/pass/`).
 
 ## 1. The system
 
 ```
-phones (home-screen apps)  ──  each app's static files + the kit (#kit/…, from this repo's Pages)
+phones (home-screen apps)  ──  each app's static files + the kit (#kit/…, from this repo's site)
    │  memory → Cache Storage → localStorage (versioned keys)
    ▼
 orbit-workers-proxy (one Worker, Taiwan)
@@ -262,7 +263,7 @@ per app. News that happens once is told once.
 
 ## 8. The kit (`kit/`)
 
-Served from this repo's Pages, never copied. Each app's page carries
+Served from this repo's site, never copied. Each app's page carries
 `kit/loader.html`'s snippets (an import map for `#kit/…`, the stylesheet,
 `boot.js`); `kit/preload.mjs` lists first-screen modules for modulepreload.
 `node kit/apps.mjs` refreshes the snippets; `node kit/link.mjs` links
@@ -324,7 +325,8 @@ down on 2026-10-31 (its Worker and data removed); only its notice is here.
 - `main` deploys:
   - `deploy.yml`: the proxy and `gemini-relay`;
   - `deploy-guard.yml`: the guard, only when its files change;
-  - `pages.yml`: the kit and `site/`.
+  - `pages.yml`: the kit and `site/`, to Cloudflare;
+  - every app repo's deploy workflow: its own site, to Cloudflare.
 - By hand: `build.yml` (a builder now, or a check), `tail.yml` (crons and
   live logs), `audit.yml` (secret names).
 - **Only what must stay secret is a secret.** Public settings live in code
@@ -334,15 +336,21 @@ down on 2026-10-31 (its Worker and data removed); only its notice is here.
   - The proxy: Google's keys, `CWA_KEY`, `MOENV_KEY`, `TDX_CLIENT_*`, and
     `FIREBASE_PRIVATE_KEY` (removed 2026-12-06).
 - **Bindings:** D1 `orbit-store`, R2 `orbit-data`, KV `RATE_LIMIT_KV`,
-  DO `F1Log`, and the services `GEMINI_RELAY` and `GUARD`.
+  DO `F1Log`, and the services `GEMINI_RELAY`, `GUARD` and `LAW_SITE`.
 - **The family's own domain:** `kit/domain.mjs` `DOMAIN` (jaypengx.com),
-  the one place it is set. `site.js`, Worker `orbit-site`, reads GitHub
-  Pages through, so every repo still deploys by its own Pages, on three hosts:
+  the one place it is set. Every repo publishes its built site with
+  `deploy/cf-site.mjs`: an assets-only Worker on routes of its paths (free
+  to serve; routes win over the custom domains), on three hosts:
   `orbit.<DOMAIN>/<slug>/` every Orbit app (`kit/brand.mjs` `slug`/`SHORT`;
   `/pass/` the family page, `/` goes there; one origin, so one Pass sign-in),
   `<DOMAIN>/` Jay's homepage (Orbit-Showcase `public/home/`) with the
   showcase at `/showcase/`, and `longshot.<DOMAIN>/` a notice that Longshot
-  has shut down (`site-closed.js`, read from nowhere). The proxy is at `api.<DOMAIN>`; mail to `*@<DOMAIN>` reaches it
+  has shut down (`site.js`, Worker `orbit-site`, which holds the three hosts'
+  custom domains; `site-closed.js`). Workers: `orbit-<slug>` per app,
+  `orbit-pass` (Orbit-Core: `/`, `/pass/`, `/Orbit-Core/`, the old
+  `/Shared-Proxy/`, and anything else on orbit.), `orbit-home` (Orbit-Showcase).
+  Paths behave as on Pages: `/law/` is its index.html, `/law` moves to `/law/`.
+  The proxy reads Law's data through the service binding `LAW_SITE`. The proxy is at `api.<DOMAIN>`; mail to `*@<DOMAIN>` reaches it
   by Email Routing's catch-all. `deploy.yml` attaches all four hostnames
   (the deploy token has the zone); the guard takes them off with the proxy.
   A new app: a `slug` in `kit/brand.mjs`.

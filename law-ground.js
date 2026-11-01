@@ -15,7 +15,7 @@
 // budgets of the year it names (民國 or western), else the 2 newest. The prompt quotes them as
 // "政府公告與數字" and "立法院進度"; the answer carries them as notices and
 // bills. A file not there yet (or unreadable) is simply left out.
-import { DATA } from './law.js';
+import { DATA, lawFetch } from './law.js';
 
 export const GROUND_LIMITS = { news: 3, newsMin: 6, bills: 6, budgets: 2, factChars: 600, newsChars: 300 };
 export const STAGES = ['提案', '一讀', '委員會', '審查完畢', '協商', '二讀', '三讀', '公布'];
@@ -28,7 +28,7 @@ export const forgetGround = () => files.clear();
 export function readGround(path, now = Date.now()) {
   const had = files.get(path);
   if (had && now - had.at < HOUR_MS) return had.p;
-  const p = fetch(`${DATA}${path}`, { cf: { cacheTtlByStatus: { '200-299': 3600, 404: 60, '500-599': 0 }, cacheEverything: true }, signal: AbortSignal.timeout(8000) })
+  const p = lawFetch(`${DATA}${path}`, { cf: { cacheTtlByStatus: { '200-299': 3600, 404: 60, '500-599': 0 }, cacheEverything: true }, signal: AbortSignal.timeout(8000) })
     .then(res => (res.ok ? res.json() : null))
     .catch(() => null);
   files.set(path, { at: now, p });

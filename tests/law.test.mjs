@@ -36,11 +36,11 @@ globalThis.fetch = async (url, init) => {
     if (id === '202110000020000') return new Response(JSON.stringify({ error: false, data: { 議案名稱: '預算案', 對照表: [] } }));
     return new Response(JSON.stringify({ error: true, message: 'not found' }), { status: 404 });
   }
-  if (u === 'https://jaypengx.github.io/Orbit-Law/data/diff/B0000001.json') return diffStatus === 200 ? new Response(JSON.stringify(DIFF)) : new Response('', { status: diffStatus });
-  if (u === 'https://jaypengx.github.io/Orbit-Law/data/index.json') return new Response(JSON.stringify({ laws: [['B0000001', '民法', '法律', '', '20250101', 0, 'Civil Code', 4]] }));
-  if (u === 'https://jaypengx.github.io/Orbit-Law/data/orders.json') return new Response(JSON.stringify({ laws: [] }));
-  if (u.startsWith('https://jaypengx.github.io/Orbit-Law/data/diff/')) return new Response('', { status: 404 });
-  if (u.startsWith('https://jaypengx.github.io/Orbit-Law/data/law/')) {
+  if (u === 'https://orbit.jaypengx.com/law/data/diff/B0000001.json') return diffStatus === 200 ? new Response(JSON.stringify(DIFF)) : new Response('', { status: diffStatus });
+  if (u === 'https://orbit.jaypengx.com/law/data/index.json') return new Response(JSON.stringify({ laws: [['B0000001', '民法', '法律', '', '20250101', 0, 'Civil Code', 4]] }));
+  if (u === 'https://orbit.jaypengx.com/law/data/orders.json') return new Response(JSON.stringify({ laws: [] }));
+  if (u.startsWith('https://orbit.jaypengx.com/law/data/diff/')) return new Response('', { status: 404 });
+  if (u.startsWith('https://orbit.jaypengx.com/law/data/law/')) {
     laws.push({ u, init });
     return u.endsWith('/B0000001.json') ? new Response(JSON.stringify(LAW), { status: 200 }) : new Response('', { status: 404 });
   }

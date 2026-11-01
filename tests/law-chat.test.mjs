@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeD1 } from './fake-d1.mjs';
 
-const DATA = 'https://jaypengx.github.io/Orbit-Law/data/';
+const DATA = 'https://orbit.jaypengx.com/law/data/';
 const row = (p, n, extra = {}) => [p, n, extra.level || '法律', '', extra.m || '20250101', extra.repealed || 0, 0, 0];
 const INDEX = [row('A0000001', '中華民國憲法'), row('B0000001', '民法'), row('N0030001', '勞動基準法'), row('D0070001', '土地法'), row('X0000001', '舊法', { repealed: 1 })];
 const ORDERS = [row('N0030002', '勞動基準法施行細則', { level: '命令' })];

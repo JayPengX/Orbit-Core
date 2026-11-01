@@ -8,7 +8,7 @@ test('each repo gets its own Worker on its own paths', () => {
   assert.deepEqual(law.put, [['', '/law']]);
   assert.deepEqual(law.routes, ['orbit.example.tw/law*']);
   const core = siteFor('Orbit-Core', 'example.tw');
-  assert.ok(core.routes.includes('orbit.example.tw/pass*'));
+  assert.ok(core.routes.includes('orbit.example.tw/*'));
   assert.ok(core.routes.includes('example.tw/Orbit-Core*'));
   assert.ok(core.put.some(([, to]) => to === '/Shared-Proxy'));
   assert.deepEqual(siteFor('Orbit-Showcase', 'example.tw').routes, ['example.tw/*']);
