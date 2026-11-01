@@ -5057,6 +5057,9 @@ html.q-tabrail {
   --q-tabrail-x: max(calc(var(--q-inset-l) + 10px), calc(var(--q-col-l) - var(--q-tabrail-bw) - 20px));
   --q-tabrail-tab: 54px;
   --q-tabrail-h: calc(var(--q-tabs, 4) * var(--q-tabrail-tab) + 8px);
+  /* (At the top, beside the page's first line, as iPad's sidebar: not
+     floating in the middle of a tall screen, Jay 2026-11-01.) */
+  --q-tabrail-top: calc(var(--q-top) + 12px);
   /* (Nothing along the foot: what stood above the bar sits near the edge.) */
   --q-nav: var(--q-bar-gap);
 }
@@ -5067,14 +5070,14 @@ html.q-tabrail {
 }
 html.q-tabrail .q-tabbar.q-tabbar {
   left: var(--q-tabrail-x);
-  top: 50%;
+  top: var(--q-tabrail-top);
   bottom: auto;
   grid-auto-flow: row;
   grid-auto-columns: auto;
   grid-auto-rows: var(--q-tabrail-tab);
   width: calc(var(--q-tabrail-bw) - 8px);
   max-height: calc(100dvh - 16px);
-  transform: translateY(-50%);
+  transform: none;
 }
 html.q-tabrail .q-tabbar.q-tabbar::before {
   top: 0;
@@ -5103,13 +5106,13 @@ html.q-tabrail .q-tab svg {
   height: 22px;
 }
 html.q-tabrail .q-tabbar.q-tabbar.q-tabbar-act {
-  top: calc(50% - (var(--q-tabrail-h) + var(--q-act-room)) / 2);
+  top: var(--q-tabrail-top);
   left: var(--q-tabrail-x);
   width: calc(var(--q-tabrail-bw) - 8px);
   transform: none;
 }
 html.q-tabrail .q-tab-action {
-  top: calc(50% - (var(--q-tabrail-h) + var(--q-act-room)) / 2 + var(--q-tabrail-h) + 10px);
+  top: calc(var(--q-tabrail-top) + var(--q-tabrail-h) + 10px);
   bottom: auto;
   left: calc(var(--q-tabrail-x) + (var(--q-tabrail-bw) - var(--q-act)) / 2);
 }
@@ -5129,6 +5132,46 @@ html.q-tabrail .q-tab-action {
   }
   .q-page-head {
     padding: 4px 0 10px;
+  }
+}
+/* The top line on a phone on its side or a big screen: only round buttons
+   are in it (the account, refresh), so it takes no row of its own (Jay
+   2026-11-01: a band of nothing above the page, the avatar alone in it).
+   They stand at the foot of the rail, one over the other, as iPad's
+   sidebar keeps the account at its foot: never over the page's first line. */
+html.q-tabrail .q-appbar .q-appbar-inner {
+  min-height: 0;
+  height: 0;
+  padding: 0;
+  overflow: visible;
+}
+html.q-tabrail .q-appbar .q-actions {
+  position: fixed;
+  z-index: 60;
+  left: calc(var(--q-tabrail-x) + (var(--q-tabrail-bw) - 44px) / 2);
+  bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  flex-direction: column;
+  margin: 0;
+}
+html.q-tabrail .q-appbar .q-actions:has(> :nth-child(2)) {
+  padding: 2px 0;
+}
+html.q-tabrail .q-day-bar:not(.flat) {
+  padding-top: 4px;
+}
+/* A phone on its side is short: the day strip's chips a size down. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .q-day-bar .q-day-strip .q-chip.day {
+    min-height: 42px;
+    padding: 3px 4px;
+    gap: 2px;
+    border-radius: 13px;
+  }
+  .q-day-bar .q-day-strip .q-chip.day > span {
+    font-size: 11px;
+  }
+  .q-day-bar .q-day-strip .q-chip.day small {
+    font-size: 14.5px;
   }
 }
 /* An accessory (a player, an order bar) at the foot of the page, as wide
@@ -5189,8 +5232,80 @@ html.q-kb.q-float dialog.q-sheet[open] {
 :root.q-wide .q-cols > .q-span {
   grid-column: 1 / -1;
 }
+/* A page's sections dealt into columns (ui.mjs flowColumns): .q-flow,
+   laid as .q-flow-laid > .q-flow-col on q-wide. */
+:root.q-wide .q-flow:is(.q-flow-laid, .q-flow-measure) {
+  display: grid;
+  grid-template-columns: repeat(var(--q-flow-n, 2), minmax(0, 1fr));
+  gap: 0 var(--q-s-5, 24px);
+  align-items: start;
+}
+:root.q-wide .q-flow.q-flow-measure > * {
+  grid-column: 1;
+}
+:root.q-wide .q-flow-col > :first-child,
+:root.q-wide .q-flow.q-flow-measure > :first-child {
+  margin-top: 0;
+}
 .q-sheet {
   --q-margin: 16px;
+}
+
+/* Wide sheets (Jay 2026-11-01: a game opened on a phone on its side was all
+   too big, "a lot of scrolling", nothing seen at a glance). A sheet that
+   holds a whole page (a game, a team, a law, a stock) opts in with
+   .q-sheet-wide: on a phone on its side it takes the screen's width, on a
+   tablet or a computer up to 1080. It's a size container (q-sheet), so
+   what's in it lays out by the sheet's own width, never the screen's:
+   .q-sheet-cols puts its cards in two columns from 600, three from 1000,
+   read top to bottom then across (the phone's order); .q-sheet-pair sets
+   two things side by side (each side's line-up, two tables). A phone
+   upright is under 600: one column, as before. */
+html.q-tabrail:not(.q-float) dialog.q-sheet.q-sheet-wide {
+  width: calc(100vw - var(--q-inset-l) - var(--q-inset-r) - 16px);
+}
+:root.q-float dialog.q-sheet.q-sheet-wide {
+  width: min(1080px, calc(100vw - 48px));
+}
+dialog.q-sheet.q-sheet-wide {
+  container: q-sheet / inline-size;
+}
+@container q-sheet (min-width: 600px) {
+  .q-sheet-cols.q-sheet-cols {
+    display: block;
+    columns: 2;
+    column-gap: 12px;
+  }
+  .q-sheet-cols.q-sheet-cols > * {
+    break-inside: avoid;
+    margin: 0 0 12px;
+  }
+  .q-sheet-pair.q-sheet-pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    align-items: start;
+  }
+  .q-sheet-pair.q-sheet-pair > * {
+    margin: 0;
+  }
+}
+@container q-sheet (min-width: 1000px) {
+  .q-sheet-cols.q-sheet-cols:not(.q-sheet-cols-2) {
+    columns: 3;
+  }
+}
+/* A phone on its side is short: a sheet's head and handle tighter, so the
+   page under them starts higher. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .q-sheet-head {
+    padding: 10px var(--q-margin) 6px;
+    margin-bottom: 4px;
+  }
+  .q-sheet::before {
+    top: 3px;
+    margin: 3px auto -8px;
+  }
 }
 /* A menu over a sheet: solid, so its rows never mix with what's under them (Money's 付款方式 over the keypad). */
 dialog[open] .q-menu { background: var(--q-sheet); }
