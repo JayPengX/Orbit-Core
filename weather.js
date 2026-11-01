@@ -1371,6 +1371,11 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
   };
   const partial = Object.values(sources).some(v => v === 'error' || v === 'stale');
   const { resp, bySource } = assemble({ cell, now, google: googleV, cwa: cwa.v, air, warnings: warn?.data && county ? parseCwaWarnings(warn.data, county) : [], weights: weights || DEFAULT_WEIGHTS, partial });
+  // Today's hours before the first one (the forecast starts at the hour
+  // now): kept from the cell's last answer, so a day's graph late in the
+  // evening still draws the whole day (`past`, read by the day sheet only).
+  const past = keepPast(own?.resp, resp, now);
+  if (past.length) resp.past = past;
   // The scoring needs the next 24 hours only.
   bySource.hours = bySource.hours.filter(h => h.t < now + 48 * HOUR);
   const nearOnly = google.v ? { ...google.v, far: undefined } : null;
@@ -1379,6 +1384,25 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
   const newer = ['google', 'far', 'gair'].some(k => parts[k]?.at > (square?.parts?.[k]?.at ?? -1)) || (parts.gairOff ?? 0) > (square?.parts?.gairOff ?? 0);
   if (gKey && newer) await keepJson(env, gKey, { at: now, parts: { google: parts.google, far: parts.far, gair: parts.gair, gairOff: parts.gairOff } }, 2 * 86_400, square, defer);
   return { at: now, ...(deferred ? { quick: true } : {}), resp, bySource, sources, parts };
+}
+
+// Today's hours (where the forecast is) before `resp`'s first, from the
+// last answer (its own `past`, then its hours), oldest first.
+export function keepPast(old, resp, now) {
+  const first = resp?.hours?.[0]?.t;
+  if (!old || first == null) return [];
+  const tz = resp.tz || 'Asia/Taipei';
+  const day = dayIn(now, tz);
+  const byT = new Map();
+  for (const h of [...(old.past || []), ...(old.hours || [])]) if (h.t < first && dayIn(h.t, tz) === day) byT.set(h.t, h);
+  return [...byT.values()].sort((a, b) => a.t - b.t);
+}
+function dayIn(ms, tz) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+  } catch {
+    return twDay(ms);
+  }
 }
 
 // A cell's last parts with its square's Google parts where those are newer.
