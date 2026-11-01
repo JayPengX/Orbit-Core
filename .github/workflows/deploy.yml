@@ -190,6 +190,18 @@ jobs:
             curl -fsS --max-time 30 -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$api/$w/subdomain" >/dev/null && echo "$w address off"
             curl -fsS --max-time 30 -X PUT -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H 'Content-Type: application/json' -d '[]' "$api/$w/schedules" >/dev/null && echo "$w crons off"
           done
+          # The proxy's routes (orbit.<domain>/api/…, wrangler.toml) and api.<domain>, which this deploy put back.
+          domain=$(node -e 'import("./kit/domain.mjs").then(m=>console.log(m.DOMAIN.trim().toLowerCase()))')
+          [ -n "$domain" ] || exit 0
+          cf="https://api.cloudflare.com/client/v4"
+          zone=$(curl -sS --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$cf/zones?name=$domain" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).result[0].id)}catch{console.log("")}})')
+          [ -n "$zone" ] || exit 0
+          for id in $(curl -sS --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$cf/zones/$zone/workers/routes" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).result.filter(r=>r.script==="orbit-workers-proxy").map(r=>r.id).join(" "))}catch{}})'); do
+            curl -fsS --max-time 30 -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$cf/zones/$zone/workers/routes/$id" >/dev/null && echo "proxy route $id off"
+          done
+          for id in $(curl -sS --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$cf/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains?service=orbit-workers-proxy" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).result.map(d=>d.id).join(" "))}catch{}})'); do
+            curl -fsS --max-time 30 -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$cf/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains/$id" >/dev/null && echo "proxy domain $id off"
+          done
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       # The family's own domain (kit/domain.mjs DOMAIN; nothing while it's

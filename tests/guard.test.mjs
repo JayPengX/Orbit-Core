@@ -35,6 +35,7 @@ function fakeCf(use, { cpuField = true, fail = false, d1Fail = false } = {}) {
   const workers = Object.fromEntries(WORKERS.map(w => [w, { on: true, crons: w === 'sports-proxy' ? ['* * * * SUN'] : ['*/2 * * * *', '1-59/2 * * * *'] }]));
   const calls = [];
   const domains = [];
+  const routes = [];
   const fetcher = async (url, init = {}) => {
     calls.push(`${init.method || 'GET'} ${url.replace(/^.*\/client\/v4/, '')}`);
     const json = b => ({ ok: true, status: 200, json: async () => b });
@@ -69,6 +70,14 @@ function fakeCf(use, { cpuField = true, fail = false, d1Fail = false } = {}) {
       if (method === 'PUT') domains.push({ id: `d${domains.length + 9}`, ...JSON.parse(init.body) });
       return json({ success: true, result: null });
     }
+    const rm = /zones\/([^/]+)\/workers\/routes(?:\/([^/?]+))?$/.exec(url);
+    if (rm) {
+      const method = init.method || 'GET';
+      if (method === 'GET') return json({ success: true, result: routes.filter(r => r.zone === rm[1]) });
+      if (method === 'DELETE') routes.splice(routes.findIndex(r => r.id === rm[2]), 1);
+      if (method === 'POST') routes.push({ id: `r${routes.length + 9}`, zone: rm[1], ...JSON.parse(init.body) });
+      return json({ success: true, result: null });
+    }
     const m = /scripts\/([^/]+)\/(subdomain|schedules)$/.exec(url);
     const w = workers[m[1]];
     if (!w) return { ok: false, status: 404, json: async () => ({ success: false, errors: [{ message: 'This Worker does not exist on your account.' }] }) };
@@ -81,7 +90,7 @@ function fakeCf(use, { cpuField = true, fail = false, d1Fail = false } = {}) {
     if (method === 'PUT') w.crons = JSON.parse(init.body).map(s => s.cron);
     return json({ success: true, result: { schedules: w.crons.map(cron => ({ cron })) } });
   };
-  return { fetcher, workers, calls, domains };
+  return { fetcher, workers, calls, domains, routes };
 }
 function fakeKv() {
   const m = new Map();
@@ -257,9 +266,11 @@ test('the account is the token\'s own (asked once, kept); the pace is written fo
 test('a custom domain (api.<domain>, the site) goes off with its Worker and comes back with it', async () => {
   const cf = fakeCf({ requests: 9_100_000 });
   cf.domains.push({ id: 'd1', hostname: 'api.example.tw', service: 'orbit-workers-proxy', zone_id: 'z1' }, { id: 'd2', hostname: 'example.tw', service: 'orbit-site', zone_id: 'z1' });
+  cf.routes.push({ id: 'r1', zone: 'z1', pattern: 'orbit.example.tw/api/*', script: 'orbit-workers-proxy' }, { id: 'r2', zone: 'z1', pattern: 'orbit.example.tw/law*', script: 'orbit-law' });
   const kv = fakeKv();
   const s = await guardRun(env, { fetcher: cf.fetcher, kv, now: T('2026-10-30T00:00:00Z') });
   assert.deepEqual(cf.domains, []);
+  assert.deepEqual(cf.routes.map(r => r.script), ['orbit-law'], "the proxy's route off; an app's files (free) stay");
   assert.ok(s.acts.includes('orbit-site off'));
   // A deploy attaches api. again while stopped: off again the next run, still kept once.
   const cf2 = fakeCf({ requests: 9_200_000 });
@@ -272,6 +283,7 @@ test('a custom domain (api.<domain>, the site) goes off with its Worker and come
   const back = await guardRun(env, { fetcher: cf3.fetcher, kv, now: T('2026-11-13T00:05:00Z') });
   assert.equal(back.stopped, null);
   assert.deepEqual(cf3.domains.map(d => `${d.service} ${d.hostname} ${d.zone_id}`).sort(), ['orbit-site example.tw z1', 'orbit-workers-proxy api.example.tw z1']);
+  assert.deepEqual(cf3.routes.map(r => `${r.script} ${r.pattern} ${r.zone}`), ['orbit-workers-proxy orbit.example.tw/api/* z1']);
 });
 
 test("each Worker's errors in 24 hours: the family's Workers only, a status apart from success counted", async () => {

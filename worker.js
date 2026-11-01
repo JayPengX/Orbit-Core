@@ -1400,11 +1400,25 @@ function timed(res, t0) {
   }
 }
 
+// The proxy at a page's own address too (orbit.<domain>/api/…, <domain>/api/…:
+// Cloudflare routes, wrangler.toml; kit/domain.mjs API): one connection for
+// the app and its server, and no CORS preflight. The route's /api is taken off
+// the path, and a same-site GET, which carries no Origin, is named by its own.
+export function viaSite(request) {
+  const url = new URL(request.url);
+  if (!/^\/api(\/|$)/.test(url.pathname) || url.hostname.startsWith('api.') || url.hostname.endsWith('.workers.dev')) return request;
+  url.pathname = url.pathname.slice(4) || '/';
+  const out = new Request(url.toString(), request);
+  if (!out.headers.get('Origin')) out.headers.set('Origin', url.origin);
+  return out;
+}
+
 export default {
   // A route that throws is still answered with the CORS headers (an app sees
   // a failure it can try again, not a blocked request), and logged.
   async fetch(request, env, ctx) {
     useLawSite(env.LAW_SITE);
+    request = viaSite(request);
     const origin = request.headers.get('Origin') || '';
     const headers = corsHeaders(origin, request.cf?.colo);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });

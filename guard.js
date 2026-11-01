@@ -6,8 +6,9 @@
 // use this billing period from Cloudflare's analytics every five minutes and,
 // once anything reaches STOP_AT of what the plan includes, takes both proxies
 // off the air until the next period:
-//   - each one's workers.dev address and custom domains (api.<domain>, the
-//     site on the family's domain) are turned off (a request that never
+//   - each one's workers.dev address, custom domains (api.<domain>, the
+//     site on the family's domain) and routes (orbit.<domain>/api/…) are
+//     turned off (a request that never
 //     reaches a Worker isn't a Worker request: nothing billed);
 //   - each one's crons are emptied (a cron run is a billed request too),
 //     the schedules kept in KV and put back with the address when the new
@@ -304,6 +305,18 @@ async function cfAt(env, fetcher, method, path, body) {
 // Off the air: the workers.dev address and any custom domain (api.<domain>,
 // the site's) off, the crons emptied (domains and crons kept in `saved`).
 const DOMAINS = name => `${name}@domains`;
+const ROUTES = name => `${name}@routes`;
+// A zone's Worker routes (/zones/<id>/workers/routes[/<route id>]).
+async function cfZone(env, fetcher, method, zone, rest = '', body) {
+  const res = await fetcher(`${API}/zones/${zone}/workers/routes${rest}`, {
+    method,
+    headers: { Authorization: `Bearer ${env.CF_GUARD_TOKEN}`, 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok || j.success === false) throw Object.assign(new Error(`${method} routes: ${res.status} ${(j.errors || []).map(e => e.message).join('; ')}`.slice(0, 300)), { status: res.status });
+  return j.result;
+}
 export async function stopWorker(env, fetcher, name, saved) {
   const sub = await cf(env, fetcher, 'GET', `${name}/subdomain`);
   if (sub?.enabled) await cf(env, fetcher, 'DELETE', `${name}/subdomain`);
@@ -317,12 +330,24 @@ export async function stopWorker(env, fetcher, name, saved) {
   const doms = (await cfAt(env, fetcher, 'GET', `workers/domains?service=${encodeURIComponent(name)}`)) || [];
   for (const d of doms) await cfAt(env, fetcher, 'DELETE', `workers/domains/${d.id}`);
   if (doms.length) saved[DOMAINS(name)] = [...new Map([...(saved[DOMAINS(name)] || []), ...doms.map(d => ({ hostname: d.hostname, zone_id: d.zone_id }))].map(d => [d.hostname, d])).values()];
-  return { addressWasOn: !!sub?.enabled || doms.length > 0, crons: crons.length };
+  // Its routes on those zones (the proxy at orbit.<domain>/api/…).
+  const zones = [...new Set((saved[DOMAINS(name)] || []).map(d => d.zone_id).filter(Boolean))];
+  const gone = [];
+  for (const zone of zones) {
+    const routes = (await cfZone(env, fetcher, 'GET', zone)) || [];
+    for (const r of routes.filter(r => r.script === name)) {
+      await cfZone(env, fetcher, 'DELETE', zone, `/${r.id}`);
+      gone.push({ pattern: r.pattern, zone_id: zone });
+    }
+  }
+  if (gone.length) saved[ROUTES(name)] = [...new Map([...(saved[ROUTES(name)] || []), ...gone].map(r => [r.pattern, r])).values()];
+  return { addressWasOn: !!sub?.enabled || doms.length > 0 || gone.length > 0, crons: crons.length };
 }
 // Back on: the address, and the crons it had.
 export async function startWorker(env, fetcher, name, saved) {
   await cf(env, fetcher, 'POST', `${name}/subdomain`, { enabled: true });
   for (const d of saved?.[DOMAINS(name)] || []) await cfAt(env, fetcher, 'PUT', 'workers/domains', { environment: 'production', hostname: d.hostname, service: name, zone_id: d.zone_id });
+  for (const r of saved?.[ROUTES(name)] || []) await cfZone(env, fetcher, 'POST', r.zone_id, '', { pattern: r.pattern, script: name }).catch(e => { if (!/exist|duplicate/i.test(e.message)) throw e; });
   if (saved?.[name]?.length) await cf(env, fetcher, 'PUT', `${name}/schedules`, saved[name].map(cron => ({ cron })));
 }
 
