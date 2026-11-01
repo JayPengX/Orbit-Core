@@ -133,6 +133,8 @@ export const PAGES = {
     draft: { args: click('#tab-bills', tap('預告|Drafts'), wait(2000), "js:document.querySelector('a.lw-bill.notice')?.click()", wait(3000), "js:document.querySelector('.lw-notice-about')?.click()", "js:document.querySelector('.lw-notice-about')?.scrollIntoView({block:'start'})", wait(800)) },
     // 立委 by 縣市 (the default), by party, and an independent in the 國民黨 caucus (陳超明).
     people: { hash: 'tab=bills&f=people', args: click(wait(2500)) },
+    // 議程: a day's sittings, live from the proxy's /law-live.
+    agenda: { hash: 'tab=bills&f=agenda', args: click(wait(2500)) },
     'people-party': { hash: 'tab=bills&f=people', args: click(wait(2500), '[data-by=party]', wait(800)) },
     independent: { hash: 'who=837', args: click(wait(4000), "js:document.querySelector('.lw-person-line')?.scrollIntoView({block:'center'})", wait(600)) }
   },
