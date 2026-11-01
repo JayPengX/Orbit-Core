@@ -222,11 +222,8 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 
 | Old rule | Replaced by | When |
 |---|---|---|
-<<<<<<< Updated upstream
 | Category sets for kinds of people (學生, 上班族, 家庭, 全部), asked before the first 記一筆 (Money) | One broad set of twelve for everyone | 11-01 |
-=======
 | Apps and the kit on GitHub Pages, read through by the `orbit-site` Worker | Each repo publishes to Cloudflare itself (`deploy/cf-site.mjs`); Pages off | 11-01 |
->>>>>>> Stashed changes
 | Apple UI changes go to a branch and wait for a Mac test | Push straight to main after your own WebKit screenshots | 10-19 |
 | Push to the session branch and main | `main` only, no PRs or branches (TRUTH §3) | 10-19 |
 | Only the kit thread may change the kit | Any lane pushes the kit, in kit push order | 10-21 |
