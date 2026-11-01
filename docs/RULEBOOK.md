@@ -43,6 +43,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-19 Gemini (any paid AI) runs only behind a user's tap, never automatically.
 - 10-20 One quality, one family: every app works and feels the same.
 - 10-20 The loading screen lifts once, onto finished content, and still fast; nothing pops in after.
+- 11-01 Smooth and fast in everything, not just opening ("better means literally everything"): a tap answers in the same frame (a tab is chosen as the finger lands, the page follows); a sheet opens at once on what's known, never after a download, with shimmering places the size of what comes; nothing jumps when data lands.
 - 10-20 Real logos and headshots, never letter tiles; pictures for everything that has one.
 - 10-20 Balanced cards at any count (never a lone half card); long names never wrap badly.
 - 10-20 First-tap bugs count as bugs: a button never needs two taps.

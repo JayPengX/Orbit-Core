@@ -4518,6 +4518,7 @@ const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: re
 // and no tab.
 export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.getElementById('tabs'), label: ariaLabel = '', action = null } = {}) {
   const buttons = new Map();
+  let downOn = null;
   const places = {};
   const visited = new Set();
   let current = null;
@@ -4534,7 +4535,21 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
     const b = node('button', { class: 'q-tab', id: `tab-${tab.id}`, type: 'button', role: 'tab', 'data-tab': tab.id, 'aria-controls': `panel-${tab.id}`, 'aria-selected': 'false', tabindex: '-1' });
     b.innerHTML = `<span class="q-tab-icon">${icon(tab.icon)}<b class="q-tab-badge" hidden></b></span><span class="q-tab-label"></span>`;
     b.querySelector('.q-tab-label').textContent = tab.label;
-    b.addEventListener('click', () => (haptic(), tab.id === current ? again(tab.id) : onSelect(tab.id, { again: false })));
+    // (Chosen as the finger lands, as iOS's tab bar does, not ~0.1 s later as
+    // it lifts; the click that follows is then the same choice, not a second tap.)
+    b.addEventListener('pointerdown', e => {
+      if (!e.isPrimary || e.button !== 0 || tab.id === current || b.hidden) return;
+      downOn = { id: tab.id, t: Date.now() };
+      haptic();
+      choose(tab.id);
+    });
+    b.addEventListener('click', () => {
+      const landed = downOn?.id === tab.id && Date.now() - downOn.t < 1500;
+      downOn = null;
+      if (landed) return;
+      haptic();
+      tab.id === current ? again(tab.id) : choose(tab.id);
+    });
     buttons.set(tab.id, b);
   }
   nav.replaceChildren(...buttons.values());
@@ -4552,8 +4567,8 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
   }
   // The chosen tab's pill (the bar's ::before) slides to it on a spring:
   // its place and width as CSS variables, set without a slide the first time.
-  const pill = (still = false) => {
-    const b = buttons.get(current);
+  const pill = (still = false, id = current) => {
+    const b = buttons.get(id);
     if (!b || b.hidden || !b.offsetWidth) return;
     if (still) nav.style.setProperty('transition', 'none');
     nav.style.setProperty('--q-tab-x', `${b.offsetLeft}px`);
@@ -4569,6 +4584,34 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
   // 10 px, hid the labels the icons need, laid the bar out again on every
   // frame of a scroll, and an app's own jumps (a law's article, a field
   // brought above the keys) folded it by mistake.)
+  // A tab answers the moment it's touched (Jay 2026-11-01: "smoothness and
+  // speed"): it lights and its pill slides in this frame, and the app draws
+  // the tab only after that has been painted. Drawing a tab takes 0.1–1 s on
+  // a mid-range phone (measured), and for that long the bar used to stay
+  // where it was, as if the tap hadn't landed. The page keeps showing the
+  // old tab until the new one is drawn, as iOS does.
+  const lit = id => {
+    for (const [tid, b] of buttons) {
+      const on = tid === id;
+      if (b.getAttribute('aria-selected') !== String(on)) b.setAttribute('aria-selected', String(on));
+      if (b.tabIndex !== (on ? 0 : -1)) b.tabIndex = on ? 0 : -1;
+    }
+    pill(false, id);
+  };
+  let pending = 0;
+  let mend = 0;
+  const choose = id => {
+    lit(id);
+    cancelAnimationFrame(pending);
+    clearTimeout(mend);
+    // (After the next paint: a frame, then a task after it.)
+    pending = requestAnimationFrame(() => setTimeout(() => {
+      onSelect(id, { again: false });
+      // (An app that didn't open it after all, a gate or a refusal: the bar
+      // goes back to what's open.)
+      mend = setTimeout(() => current !== id && current != null && lit(current), 1500);
+    }, 0));
+  };
   nav.addEventListener('keydown', event => {
     const shown = [...buttons].filter(([, b]) => !b.hidden).map(([id]) => id);
     const i = shown.indexOf(current);
@@ -4576,7 +4619,7 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
     if (!step || i < 0) return;
     event.preventDefault();
     const next = shown[(i + step + shown.length) % shown.length];
-    onSelect(next, { again: false });
+    choose(next);
     buttons.get(next)?.focus();
   });
   const api = {
