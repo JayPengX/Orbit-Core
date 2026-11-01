@@ -1,8 +1,7 @@
-# The shared kit (kit/) and the family's home page (site/) on GitHub Pages,
-# at https://jaypengx.github.io/Orbit-Core/: every app loads the kit from
-# here (kit/loader.html), so a change to the kit is this one push.
-# One-time setup: repo Settings -> Pages -> Source: GitHub Actions.
-name: Kit to Pages
+# The shared kit (kit/) and the family's page (site/) on Cloudflare, at
+# orbit.<domain>/Orbit-Core/ and /pass/ (deploy/cf-site.mjs): every app loads
+# the kit from there (kit/loader.html), so a change to the kit is this one push.
+name: Kit to Cloudflare
 
 on:
   push:
@@ -21,8 +20,6 @@ on:
 permissions:
   contents: read
   actions: read
-  pages: write
-  id-token: write
 
 jobs:
   # One deploy at a time, without cancelling any (a cancelled run mails its
@@ -72,36 +69,7 @@ jobs:
           mkdir -p _site
           if [ -d site ]; then cp -r site/. _site/; fi
           node kit/stamp.mjs _site "$(git rev-parse HEAD)"
-      # The family page and the kit on Cloudflare, at orbit.<domain>/pass/ and
-      # /Orbit-Core/ (deploy/cf-site.mjs): what phones are served.
       - name: Publish to Cloudflare
         run: node deploy/cf-site.mjs Orbit-Core _site
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      - uses: actions/configure-pages@v5
-        with:
-          # Turns Pages on (Source: GitHub Actions) the first time, if the
-          # token may; otherwise Settings -> Pages -> Source: GitHub Actions.
-          enablement: true
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: '_site'
-
-  deploy:
-    needs: build
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url || steps.again.outputs.page_url }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
-        # A clash with another deploy or a hiccup at GitHub: tried once more.
-        continue-on-error: true
-      - if: steps.deployment.outcome == 'failure'
-        run: sleep 60
-      - name: Deploy to GitHub Pages (again)
-        id: again
-        if: steps.deployment.outcome == 'failure'
-        uses: actions/deploy-pages@v5

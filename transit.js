@@ -814,7 +814,7 @@ async function search(env, q, { fetchFn, ctx, now, cache }) {
   try {
     const hit = cache && (await cache.match(key));
     if (hit) return { items: nearFirst(parseNominatim(await hit.json()).map(i => ({ ...i, dist: lat != null && lon != null ? Math.round(distM(lat, lon, i.lat, i.lon)) : null })), [], text), by: 'osm' };
-    const res = await fetchFn(url, { headers: { 'User-Agent': 'OrbitTransit/1.0 (https://jaypengx.github.io/Orbit-Transit/)', Accept: 'application/json' }, signal: timeout(8000) });
+    const res = await fetchFn(url, { headers: { 'User-Agent': 'OrbitTransit/1.0 (https://orbit.jaypengx.com/transit/)', Accept: 'application/json' }, signal: timeout(8000) });
     if (!res.ok) return { items: [], by: 'osm' };
     const list = await res.json();
     if (cache) {

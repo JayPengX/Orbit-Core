@@ -24,7 +24,7 @@ import { join, dirname, relative, resolve } from 'node:path';
 import { hashFiles } from './hash.mjs';
 import { kitPreloads } from './preload.mjs';
 
-const KIT_VERSION_URL = 'https://jaypengx.github.io/Orbit-Core/kit/version.json';
+const KIT_VERSION_URL = 'https://orbit.jaypengx.com/Orbit-Core/kit/version.json';
 
 async function files(dir) {
   const out = [];

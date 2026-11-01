@@ -44,7 +44,7 @@ while (made < count) {
   const ask = Math.min(100, count - made);
   const res = await fetch(ECO_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Origin: 'https://jaypengx.github.io' },
+    headers: { 'Content-Type': 'application/json', Origin: 'https://orbit.jaypengx.com' },
     body: JSON.stringify({ op: 'admin', token, action: 'issue', count: ask })
   });
   const data = await res.json().catch(() => ({}));
