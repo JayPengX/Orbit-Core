@@ -22,7 +22,9 @@
 //       live      each app's live session: { [app]: { sid, t } }. Every app
 //                 runs at once; one app runs in one place (a device, or
 //                 Safari beside the home-screen app) at a time
-//       sec       the token generation (bumped to sign every device out)
+//       sec       the token generation (bumped to sign every device out);
+//                 `fresh`: a pass someone handed over, not yet replaced
+//                 (freshPass below)
 //   - each app's own data (ECO_APPS[app].collection), under the same id;
 //   - inbox documents (`eco-inbox`), device codes (`eco-pairs`) and Orbit
 //     Class share keys (`eco-shares`).
@@ -551,7 +553,24 @@ async function readInbox(env, deps, wallet, app) {
   return ids.map((id, i) => items[i].exists && { id, payload: items[i].payload }).filter(Boolean);
 }
 
-const sessionToken = (secret, c, now) => signToken(secret, { k: 'ses', d: c.d, a: c.a, s: c.s, g: c.g, e: now + SESSION_MS });
+// (A session on a fresh pass is of its own kind, 'new': every route that
+// reads a session ('ses') turns it away by itself; only replacing the pass
+// takes it: rotate and adding a passkey.)
+const sessionToken = (secret, c, now) => signToken(secret, { k: c.f ? 'new' : 'ses', d: c.d, a: c.a, s: c.s, g: c.g, e: now + SESSION_MS });
+
+// ---- A fresh pass: replaced before anything else -------------------------------------
+//
+// A pass the owner issued (eco-admin.js `issue`) was seen by someone else on
+// its way (a list, a message): its first sign-in must replace it before any
+// app opens (Jay 2026-11-03). Marked `sec.fresh` when issued; passes issued
+// before that are known by never having been used (no app opened, no money,
+// no passkey, never signed out). The mark goes only with the pass itself:
+// `rotate` makes the account's new one (a passkey is added first, then the
+// pass replaced: the kit's freshGate). A pass shown to its own maker (`create`)
+// is never fresh.
+export const unusedPass = w => !gen(w) && !w.entries?.length && !Object.keys(w.apps || {}).length && !w.passkeys?.keys?.length && !w.merged;
+export const freshPass = w => Boolean(w?.sec?.fresh);
+const markFresh = w => (freshPass(w) || !unusedPass(w) ? w : { ...w, sec: { ...(w.sec || {}), fresh: true } });
 const refreshToken = (secret, c, now) => signToken(secret, { k: 'ref', d: c.d, s: c.s, g: c.g, e: now + REFRESH_MS });
 
 // ---- Sessions -------------------------------------------------------------------
@@ -564,12 +583,15 @@ export async function signIn(ctx, docId, { passcode = null } = {}) {
   if (!ECO_APPS[app]) return deps.errorJson('ECO_UNKNOWN_APP', 400, headers, ctx.request);
   const now = deps.now();
   const sid = deps.generateCode(12);
-  const result = await updateWallet(env, deps, docId, w => goLive(touchApp(mergeWallet(w, { entries: paydayEntries(w, now) }), app, now), app, sid, now));
+  // (A pass shown here to its maker is theirs alone; any other first sign-in
+  // on a pass never used marks it fresh before the app's use is noted.)
+  const result = await updateWallet(env, deps, docId, w => goLive(touchApp(mergeWallet(passcode ? w : markFresh(w), { entries: paydayEntries(w, now) }), app, now), app, sid, now));
   if (!result) return null;
-  const c = { d: docId, s: sid, a: app, g: gen(result.wallet) };
-  const out = await sessionReply(env, deps, secret, result, c, now, { app, inbox: body.inbox });
+  const c = { d: docId, s: sid, a: app, g: gen(result.wallet), f: freshPass(result.wallet) };
+  const out = await sessionReply(env, deps, secret, result, c, now, { app: c.f ? '' : app, inbox: !c.f && body.inbox });
   out.refresh = await refreshToken(secret, c, now);
   if (passcode) out.passcode = passcode;
+  if (c.f) out.fresh = true;
   return deps.json(out, 200, headers);
 }
 
@@ -653,7 +675,7 @@ async function ecoRefresh(ctx) {
   const doc = await deps.fsGet(env, WALLET_COLLECTION, c.d);
   const wallet = doc.exists ? parseWallet(doc.payload) : null;
   if (!wallet || gen(wallet) !== c.g) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
-  const claims = { d: c.d, s: c.s, a: app, g: c.g };
+  const claims = { d: c.d, s: c.s, a: app, g: c.g, f: freshPass(wallet) };
   const live = isActive(wallet, claims);
   const w = str(body.w, 100);
   if (!live && !body.claim) return json(sameWallet({ active: false, live: liveOf(wallet, app), wallet: publicWallet(wallet), walletTime: doc.updateTime, pool: poolBalance(wallet) }, w), 200, headers);
@@ -661,20 +683,23 @@ async function ecoRefresh(ctx) {
   if (!live || paydayEntries(wallet, now).length) {
     result = await updateWallet(env, deps, c.d, w => goLive(touchApp(mergeWallet(w, { entries: paydayEntries(w, now) }), app, now), app, c.s, now));
   }
-  const out = sameWallet(await sessionReply(env, deps, secret, result, claims, now, { app: body.data ? app : '', inbox: body.inbox, since: str(body.since, 100) }), w);
+  const out = sameWallet(await sessionReply(env, deps, secret, result, claims, now, { app: body.data && !claims.f ? app : '', inbox: !claims.f && body.inbox, since: str(body.since, 100) }), w);
   out.refresh = await refreshToken(secret, claims, now);
+  if (claims.f) out.fresh = true;
   // Taken back from the same app open somewhere else meanwhile: this copy
   // may be behind (the kit tells the app, 'active').
   if (!live && lives(wallet)[app]) out.took = true;
   return json(out, 200, headers);
 }
 
-async function sessionFor(ctx) {
-  return readToken(ctx.secret, ctx.body.qt, 'ses', ctx.deps.now());
+// (`fresh`: a session on a fresh pass counts too: only for replacing it.)
+async function sessionFor(ctx, { fresh = false } = {}) {
+  const now = ctx.deps.now();
+  return (await readToken(ctx.secret, ctx.body.qt, 'ses', now)) || (fresh ? readToken(ctx.secret, ctx.body.qt, 'new', now) : null);
 }
 // A session whose account still stands at the same generation.
-async function liveSession(ctx) {
-  const c = await sessionFor(ctx);
+async function liveSession(ctx, opts) {
+  const c = await sessionFor(ctx, opts);
   if (!c) return null;
   const doc = await ctx.deps.fsGet(ctx.env, WALLET_COLLECTION, c.d);
   const wallet = doc.exists ? parseWallet(doc.payload) : null;
@@ -817,7 +842,7 @@ async function ecoSignOutAll(ctx) {
 // signed out, and this one comes back signed in with the new pass.
 async function ecoRotate(ctx) {
   const { env, headers, deps, request } = ctx;
-  const c = await liveSession(ctx);
+  const c = await liveSession(ctx, { fresh: true });
   if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
   if (sessionLimited(`rot:${c.s}`, 5, 60_000, deps.now())) return deps.errorJson('RATE_LIMITED', 429, headers, request);
   // Taken first (every device out): two rotates at once make one new pass,

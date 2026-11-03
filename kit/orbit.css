@@ -2674,6 +2674,11 @@ dialog.q-moved::backdrop {
   font-size: 12.5px;
   line-height: 1.55;
 }
+/* A pass someone handed over (freshGate): the passkey's line under it. */
+.q-fresh-note {
+  margin: -4px 0 4px;
+  text-align: center;
+}
 .q-steps {
   width: 100%;
   margin: 8px 0 0;

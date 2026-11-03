@@ -821,3 +821,65 @@ test('past: an app reads its own kept versions, never another app\'s or another 
   assert.equal((await t.call('POST', '?app=money', { op: 'past', qt: 'x' })).status, 401);
   assert.equal((await t.call('POST', '?app=money', { op: 'past', qt: a.token, updated: 'nope' })).status, 404);
 });
+
+test('a pass someone handed over is replaced at its first sign-in, before any app opens (Jay 2026-11-03)', async () => {
+  const t = setup();
+  const admin = (action, extra = {}) => t.call('POST', '', { op: 'admin', token: 'o'.repeat(40), action, ...extra });
+  const [code] = (await admin('issue', { count: 1 })).data.passes;
+  const first = await t.call('POST', '', { op: 'login', passcode: code, app: 'stock' });
+  assert.equal(first.status, 200);
+  assert.equal(first.data.fresh, true);
+  assert.equal(first.data.payload, '', 'no app data with a fresh pass');
+  const { tokenSecret, readToken } = await import('../orbit-token.js');
+  const secret = await tokenSecret(t.env);
+  assert.equal(await readToken(secret, first.data.token, 'ses', t.deps.now()), null, 'its session opens no route that reads a session');
+  assert.ok(await readToken(secret, first.data.token, 'new', t.deps.now()));
+  // Nothing of the account is used or handed on with it.
+  for (const [method, q, body] of [
+    ['GET', `${t.qt(first.data.token)}&app=stock`],
+    ['PATCH', `${t.qt(first.data.token)}&app=stock`, { payload: '{"a":1}' }],
+    ['POST', '', { op: 'relief', qt: first.data.token }],
+    ['POST', '', { op: 'pair-create', qt: first.data.token }],
+    ['POST', '', { op: 'handoff', qt: first.data.token }],
+    ['POST', '', { op: 'share-create', qt: first.data.token }],
+    ['POST', '', { op: 'merge', qt: first.data.token, sources: [] }],
+    ['POST', '', { op: 'signout-all', qt: first.data.token }]
+  ])
+    assert.equal((await t.call(method, q, body)).status, 401, `${method} ${body?.op || ''} refused`);
+  // Signing in again (another device, a refresh) is still fresh.
+  const again = await t.call('POST', '', { op: 'refresh', refresh: first.data.refresh, app: 'stock', claim: true, data: true });
+  assert.equal(again.data.fresh, true);
+  assert.equal(await readToken(secret, again.data.token, 'ses', t.deps.now()), null);
+  assert.equal((await t.call('POST', '', { op: 'login', passcode: code, app: 'vocab' })).data.fresh, true);
+  // Replaced: the handed-over pass stops working, the new one is the person's.
+  const rot = await t.call('POST', '', { op: 'rotate', qt: again.data.token });
+  assert.equal(rot.status, 200);
+  assert.ok(rot.data.passcode && rot.data.passcode !== code);
+  assert.equal(rot.data.fresh, undefined);
+  assert.ok(await readToken(secret, rot.data.token, 'ses', t.deps.now()));
+  assert.ok(rot.data.pool >= PAY.start, 'the opening money comes along');
+  assert.equal((await t.call('POST', '', { op: 'login', passcode: code, app: 'stock' })).status, 404);
+  const mine = await t.call('POST', '', { op: 'login', passcode: rot.data.passcode, app: 'stock' });
+  assert.equal(mine.status, 200);
+  assert.equal(mine.data.fresh, undefined);
+  assert.equal((await t.call('PATCH', `${t.qt(mine.data.token)}&app=stock`, { payload: '{"a":1}' })).status, 200);
+});
+
+test('fresh: passes issued before the mark count while never used; used accounts and a pass shown to its maker never do', async () => {
+  const t = setup();
+  // An issued pass from before the mark: a wallet nobody opened.
+  const admin = (action, extra = {}) => t.call('POST', '', { op: 'admin', token: 'o'.repeat(40), action, ...extra });
+  const [code] = (await admin('issue', { count: 1 })).data.passes;
+  const id = await passKey(t.env, code);
+  const doc = t.store.get(`${WALLET_COLLECTION}/${id}`);
+  const w = JSON.parse(doc.payload);
+  delete w.sec;
+  doc.payload = JSON.stringify(w);
+  assert.equal((await t.call('POST', '', { op: 'login', passcode: code, app: 'match' })).data.fresh, true);
+  // An account in use: as before.
+  const acct = await newPass(t);
+  assert.equal(acct.fresh, undefined, 'a pass made and shown here is its maker’s');
+  const back = await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'vocab' });
+  assert.equal(back.data.fresh, undefined);
+  assert.equal((await t.call('GET', `${t.qt(back.data.token)}&app=vocab`)).status, 200);
+});

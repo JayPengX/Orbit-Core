@@ -9,6 +9,7 @@
 //                          [--geo-path 'lat,lon;…' --geo-every ms]  (the phone moving, during --wait)
 //                          [--safari]  (opened in Safari, not from the home screen: the install screen)
 //                          [--signed-out]  (the sign-in screen, as a new device sees it)
+//                          [--fresh]  (signed in on a pass someone handed over: the screen that replaces it)
 //                          [--entry '{json}']  (a wallet entry to add: an economy scenario)
 //                          [--clock 2026-10-06T10:05]  (the page's clock, Taipei time)
 //                          [--snap '{json}']  (the wallet's snap to start with)
@@ -257,6 +258,8 @@ const inits = [];
 const extRoutes = [];
 const full = flag('full');
 const signedOut = flag('signed-out');
+// (--fresh: the pass is one the owner issued, until the screen replaces it.)
+let freshPass = flag('fresh');
 const dark = flag('dark');
 const noGeo = flag('no-geo');
 // --geo lat,lon: where the phone is (Transit's default: 新竹車站).
@@ -760,6 +763,8 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
   if (req.method() === 'POST' && (body.op === 'refresh' || body.op === 'login' || body.op === 'redeem')) Object.assign(reply, { payload: payload ?? '', inbox: [] });
   if (req.method() === 'GET' && new URL(req.url()).searchParams.get('app')) Object.assign(reply, { payload: payload ?? '', inbox: [] });
   if (body.op === 'pair-create') Object.assign(reply, { code: 'ABCD2345', exp: Date.now() + 600_000 });
+  if (body.op === 'rotate') (freshPass = false), Object.assign(reply, { passcode: 'K7Q2M9XR4T', payload: payload ?? '', inbox: [] });
+  if (freshPass && (body.op === 'refresh' || body.op === 'login' || body.op === 'redeem')) Object.assign(reply, { fresh: true, payload: '' });
   await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(reply) });
 });
 // The admin panel (site/admin, `admin [view…]`): eco-admin.js's own

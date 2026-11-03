@@ -144,7 +144,8 @@ export async function handleAdmin({ env, deps, headers, request, ip, body }) {
     const passes = [];
     for (let i = 0; i < count; i++) {
       const { passcode, docId } = await newPasscode(env, deps);
-      await updateWallet(env, deps, docId, w => ({ ...w, v2: now }), { create: true });
+      // (Fresh: its first sign-in replaces it, eco.js freshPass.)
+      await updateWallet(env, deps, docId, w => ({ ...w, v2: now, sec: { fresh: true } }), { create: true });
       passes.push(passcode);
     }
     return deps.json({ passes }, 200, headers);

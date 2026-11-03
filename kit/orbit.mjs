@@ -1658,10 +1658,11 @@ function makeSession(app, { lang, heartbeat }) {
   // Every other device signed out; this one stays signed in.
   s.signOutEverywhere = () => withToken(qt => call('POST', '', { op: 'signout-all', qt })).then(absorb);
   // A new pass for the account: shown once, the old one stops working.
-  s.rotate = () =>
+  // (`full`: the whole sign-in reply, the new pass in it: freshGate's.)
+  s.rotate = ({ full = false } = {}) =>
     withToken(qt => call('POST', '', { op: 'rotate', qt })).then(res => {
       absorb(res);
-      return res.passcode;
+      return full ? res : res.passcode;
     });
   // A device code: sign in on another device within 10 minutes, once.
   s.deviceCode = () => withToken(qt => call('POST', '', { op: 'pair-create', qt }));
@@ -1757,6 +1758,9 @@ function makeSession(app, { lang, heartbeat }) {
       first = { offline: true, error };
     }
     if (!first) first = await signInGate(s);
+    // A pass someone handed over: replaced before the app opens (the
+    // Worker opens nothing else with it; eco.js freshPass).
+    if (first?.fresh) first = await freshGate(s);
     s.first = first;
     // A while after opening signed in: the one-time passkey offer.
     if (!first?.offline) setTimeout(() => passkeyOffer(s).catch(() => {}), 12_000);
@@ -2169,6 +2173,58 @@ function signInGate(s) {
     keepOnTop(gate);
     keys?.start();
     setTimeout(() => input.focus(), 50);
+  });
+}
+
+// A pass someone handed over (the owner issued it): the first sign-in
+// replaces it before anything else (Jay 2026-11-03). A passkey first where
+// this browser can make one (recommended), then a new pass of the person's
+// own (a backup beside the passkey); or only the new pass. Answers the
+// sign-in reply of the new pass, the app's first.
+function freshGate(s) {
+  const en = s.lang === 'en';
+  const T = (zh, e) => (en ? e : zh);
+  const a = APPS[s.app];
+  document.getElementById('loading')?.setAttribute('hidden', '');
+  return new Promise(resolve => {
+    const here = passkeyHere();
+    const ch = here ? addChallenge(s) : null;
+    const error = node('p', { class: 'q-gate-error', role: 'alert' });
+    const buttons = [];
+    const busy = on => buttons.forEach(b => (b.disabled = on));
+    const replace = async withKey => {
+      busy(true);
+      error.textContent = '';
+      try {
+        if (withKey && !(await addPasskey(s, ch))) return busy(false);
+        const res = await s.rotate({ full: true });
+        dropFromTop(gate);
+        await showNewPass(s, res.passcode);
+        document.documentElement.classList.remove('q-signing-in');
+        // (Asked here: the one-time passkey offer never asks again.)
+        s.write({ wallet: settingPatch('passkeyAsk', withKey ? 'yes' : 'no') }).catch(() => {});
+        resolve(res);
+      } catch (e) {
+        error.textContent = errorText(e, s.lang);
+        busy(false);
+      }
+    };
+    const key = here && node('button', { class: 'q-btn primary block q-passkey-btn', type: 'button', html: `${icons.key || ''}<span>${T('設定通行密鑰（建議）', 'Set up a passkey (recommended)')}</span>`, onclick: () => replace(true) });
+    const pass = node('button', { class: `q-btn block${here ? '' : ' primary'}`, type: 'button', text: T('換一組新的通行碼', 'Get a new pass'), onclick: () => replace(false) });
+    buttons.push(...[key, pass].filter(Boolean));
+    const gate = node('dialog', { class: 'q-gate q-fresh', 'aria-modal': 'true', style: `--q-accent:${a.color}` }, [
+      node('div', { class: 'q-gate-box' }, [
+        node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
+        node('p', { class: 'q-gate-brand', text: 'ORBIT PASS' }),
+        node('h1', { class: 'q-gate-title', text: T('先換掉這組通行碼', 'Replace this pass first') }),
+        node('p', { class: 'q-gate-lede', text: T('這組是別人給你的，先換成你自己的。', 'It was given to you. Make it yours before you start.') }),
+        node('div', { class: 'q-gate-form' }, [...(key ? [key, node('p', { class: 'q-gate-note q-fresh-note', text: T('用 Face ID 登入，另附一組備用通行碼。', 'Sign in with Face ID, plus a new backup pass.') })] : []), pass, error])
+      ])
+    ]);
+    document.documentElement.classList.add('q-signing-in');
+    for (const d of document.querySelectorAll('dialog[open]')) if (!onTop.has(d)) d.close();
+    keepOnTop(gate);
+    ch?.get().catch(() => {});
   });
 }
 
