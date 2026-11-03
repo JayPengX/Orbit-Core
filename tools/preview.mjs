@@ -721,7 +721,8 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/law
 });
 // The /stock Worker's store for the run.
 const stockDocs = new Map();
-await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push|transit|sports-proxy|law-page|data\/)/, async route => {
+// (Orbit Law's /law-live, what IVOD streams now, is public: the real Worker answers it.)
+await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!weather|push|transit|sports-proxy|law-page|law-live|data\/)/, async route => {
   const req = route.request();
   const body = req.postDataJSON?.() || {};
   // Orbit Law's AI (/law-ask, /law-chat) has no dev door (Gemini costs): a
