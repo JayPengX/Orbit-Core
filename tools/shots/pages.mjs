@@ -66,6 +66,10 @@ export const PAGES = {
     'halftime-list': { args: click('#tab-matches', wait(4000), "js:[...document.querySelectorAll('.event-row')].find(e=>e.offsetParent&&/中場休息|Half-time/.test(e.textContent))?.scrollIntoView({block:'center'})", wait(4000)) },
     'halftime-game': { args: click('#tab-matches', wait(4000), "js:[...document.querySelectorAll('.event-row')].find(e=>e.offsetParent&&/中場休息|Half-time/.test(e.textContent))?.click()", wait(8000)) },
     'f1-weekend': { args: click('#tab-matches', '[data-league=f1]', tap('Ended|已結束'), "js:document.querySelector('.wk-card.done')?.click()", wait(4000)) },
+    // F1's 賽程, 已結束: each weekend over, its race's winner.
+    'f1-past': { args: click('#tab-matches', '[data-league=f1]', tap('Ended|已結束'), wait(3000)) },
+    // The last race's 過程 (lap by lap), on the sheet of the weekend just over.
+    'f1-story': { args: click('#tab-matches', '[data-league=f1]', tap('Ended|已結束'), "js:document.querySelector('.wk-card.done')?.click()", wait(6000), `js:[...document.querySelectorAll('dialog.q-sheet[open] .lb-views button')].find(b=>/^(過程|Story)$/.test(b.textContent.trim()))?.click()`, wait(3000), "js:document.querySelector('dialog.q-sheet[open] .f1-views')?.scrollIntoView({block:'start'})", wait(1000)) },
     // An F1 session on now: its live board (the flag, its reason and the
     // restart's countdown, race control, the tower), and each 數據 tab and
     // card. With no session on, a real one replayed at a moment
