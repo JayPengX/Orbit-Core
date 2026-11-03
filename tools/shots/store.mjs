@@ -34,7 +34,8 @@ const busRoute = no => `js:(async()=>{const z=ms=>new Promise(r=>setTimeout(r,ms
 // The busiest YouBike dock in view above the sheet, marked for a real tap (#shot-target).
 const bikeDock = "js:(()=>{const n=m=>(m.textContent.match(/\\d+/g)||[]).reduce((s,x)=>s+ +x,0);const ms=[...document.querySelectorAll('.bike:not(.plan)')].filter(m=>{const r=m.getBoundingClientRect();return r.width&&r.top>120&&r.bottom<400&&r.left>20&&r.right<330&&n(m)});ms.sort((a,b)=>n(b)-n(a));if(ms[0])ms[0].id='shot-target'})()";
 const TAIPEI = ['--geo', '25.0478,121.5170'];
-const MORNING = ['--clock', '2026-11-02T08:20'];
+// Trips on the real clock: a fixed day goes stale (yesterday's timetables are gone). Shoot in Taiwan's morning.
+const MORNING = [];
 
 const SCHOOL = ['--clock', '2026-11-04T10:30'];
 export const STORE = {
