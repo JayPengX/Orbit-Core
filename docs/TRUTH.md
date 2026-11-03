@@ -77,7 +77,8 @@ Jay's specific decisions, app by app and dated, are in [`RULEBOOK.md`](RULEBOOK.
 ## 4. Code structure
 
 - **Kit by default.** Anything two apps use lives in `Orbit-Core/kit/`.
-  Move duplicates there whenever you see them. The kit is served, not
+  Move duplicates there whenever you see them, and look before you write
+  (`node Orbit-Core/tools/kit-find.mjs <word>`; `--apps` finds the copies). The kit is served, not
   copied: apps load it from Orbit-Core's site (`#kit/…`), and
   `node kit/link.mjs` links it for tests.
 - **A new kit export is used with a fallback** (`kit.newThing?.(…)`):
@@ -102,10 +103,13 @@ Jay's specific decisions, app by app and dated, are in [`RULEBOOK.md`](RULEBOOK.
   elsewhere. `guard.js` watches every Cloudflare count; a new Cloudflare
   product goes into its `PLAN`. A new paid call shows in the admin page's
   cost panels.
-- **Read on demand.** Nothing is prefetched that nobody opens. What
-  doesn't change in a day comes from R2 (built by the proxy's cron,
-  `builders/`); the data proxy is for what's live. The layers are in
-  Orbit-Core's MAP.md §2.
+- **Read on demand, one step ahead.** Nothing is read on a timer for a
+  screen nobody has open, but what the person is about to open (the day
+  beside, the next tab's first screen, a followed game) may be read early,
+  from the edge's cache, while the phone is idle (Jay 2026-11-03); never a
+  paid call (Gemini, Google) ahead of a tap. What doesn't change in a day
+  comes from R2 (built by the proxy's cron, `builders/`); the data proxy is
+  for what's live. The layers are in Orbit-Core's `CLAUDE.md` §5.
 - **Use the existing crons** (the proxy's even and odd minutes, or a
   Durable Object alarm). New Cron Triggers registered in October 2026
   never ran.
@@ -162,9 +166,14 @@ Folder-Link is a separate Windows tool with its own notes.
 
 ## 8. Docs
 
-- **This file**, `RULEBOOK.md` (every rule Jay set, dated, newest wins), `DESIGN.md` (how screens look), each repo's `CLAUDE.md` (a pointer here plus what's
-  special to that repo), each repo's README (the short public front page: what it is, the link,
-  the stack) and its MAP.md: a short map with what the
+- **Orbit-Core's `CLAUDE.md`**: the family's map (the kit, the Workers and
+  their APIs, data and sync, the component patterns), read first by every
+  session and updated in the same push as any change to the architecture
+  (`tests/claude-map.test.mjs` names what it misses). Then **this file**,
+  `RULEBOOK.md` (every rule Jay set, dated, newest wins), `DESIGN.md` (how
+  screens look), each app repo's `CLAUDE.md` (a pointer to the map plus
+  what's special to that repo), its README (the short public front page:
+  what it is, the link, the stack) and its MAP.md: a short map with what the
   app is, where the code is, how to run and test it, and the decisions
   still in force.
 - Update a doc only when the change made it wrong. No handoffs, plans or
