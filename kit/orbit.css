@@ -374,6 +374,57 @@
   --q-accent-wash: color-mix(in srgb, var(--q-accent) 20%, transparent);
 }
 
+/* 原生 Native's tokens (DESIGN §11), for an app whose page says <html data-look="native">:
+   the display face for big numbers, the graphite surface and its hairline
+   edge, how deep a hero in the app's colour goes, the tinted glyph's wash.
+   Dark: graphite, not black and grey. */
+html[data-look='native'][data-look='native'] {
+  --nv-display: -apple-system, 'SF Pro Display', BlinkMacSystemFont, system-ui, 'PingFang TC', 'Noto Sans TC', sans-serif;
+  --nv-rounded: ui-rounded, 'SF Pro Rounded', -apple-system, system-ui, 'PingFang TC', sans-serif;
+  --q-r-card: 20px;
+  --nv-edge: rgba(0, 0, 0, 0.06);
+  --nv-lift: 0 1px 1px rgba(0, 0, 0, 0.03), 0 8px 24px -16px rgba(0, 0, 0, 0.2);
+  --nv-card: #ffffff;
+  --nv-deep: #000000;
+  --nv-c-a: 92%;
+  --nv-c-b: 64%;
+  --nv-glyph: #000000;
+  --nv-glyph-a: 88%;
+  --nv-wash: 14%;
+}
+@media (prefers-color-scheme: dark) {
+  html[data-look='native'][data-look='native']:not([data-theme='light']) {
+    --q-bg-2: #151517;
+    --q-grouped-2: #151517;
+    --q-grouped-3: #1f1f22;
+    --q-elevated: #1d1d20;
+    --q-sep: rgba(255, 255, 255, 0.08);
+    --nv-edge: rgba(255, 255, 255, 0.085);
+    --nv-lift: none;
+    --nv-card: linear-gradient(180deg, #19191c, #141416);
+    --nv-c-a: 64%;
+    --nv-c-b: 34%;
+    --nv-glyph: #ffffff;
+    --nv-glyph-a: 80%;
+    --nv-wash: 17%;
+  }
+}
+html[data-look='native'][data-look='native'][data-theme='dark'] {
+  --q-bg-2: #151517;
+  --q-grouped-2: #151517;
+  --q-grouped-3: #1f1f22;
+  --q-elevated: #1d1d20;
+  --q-sep: rgba(255, 255, 255, 0.08);
+  --nv-edge: rgba(255, 255, 255, 0.085);
+  --nv-lift: none;
+  --nv-card: linear-gradient(180deg, #19191c, #141416);
+  --nv-c-a: 64%;
+  --nv-c-b: 34%;
+  --nv-glyph: #ffffff;
+  --nv-glyph-a: 80%;
+  --nv-wash: 17%;
+}
+
 /* The page: San Francisco, smoothed as iOS draws it, on the grouped background. */
 html {
   -webkit-font-smoothing: antialiased;
@@ -5606,4 +5657,129 @@ dialog[open] .q-menu { background: var(--q-sheet); }
    and not while the keys are up (the sheet follows them then). */
 html:not(.q-kb) dialog.q-sheet[open]:not([data-detent]):not(.q-leaving) {
   min-height: min(var(--q-sheet-floor, 0px), calc(100dvh - var(--q-top) - 16px), 900px);
+}
+
+
+/* -- 原生 Native (Jay 2026-11-03, docs/DESIGN.md §11): the look every app is
+   moving to, one app at a time; an app that has moved says so on its page,
+   <html data-look="native">, and the rest keep today's look until their turn.
+   The colour on a screen is the content's own; surfaces are graphite lit from
+   above with a hairline edge; big numbers are light and tabular; a
+   single-choice filter row is text tabs; icons are tinted glyphs; the week row
+   is iOS's. ([data-look] twice where the kit's own rule is as specific.) -- */
+html[data-look='native'] :is(.q-card, .q-rowcard, .q-list, .q-rail-card, .q-action) {
+  background: var(--nv-card);
+  box-shadow: inset 0 0 0 0.5px var(--nv-edge), inset 0 1px 0 rgba(255, 255, 255, 0.035), var(--nv-lift);
+}
+/* (Weight by role; big numbers light and tabular.) */
+html[data-look='native'] .q-section-head h2 {
+  font: 600 21px/26px var(--q-font);
+  letter-spacing: -0.015em;
+}
+html[data-look='native'] .q-ritem-title {
+  font-weight: 500;
+}
+html[data-look='native'] :is(.q-focus-value, .q-hc-big) {
+  font-family: var(--nv-display);
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.035em;
+}
+html[data-look='native'] :is(.num, .q-ritem-value) {
+  font-variant-numeric: tabular-nums;
+}
+/* (A hero with no colour of its own: the app's, deep and matte.) */
+html[data-look='native'] :is(.q-hero-card, .q-focus) {
+  --nv-c: var(--q-accent);
+  background: linear-gradient(165deg, color-mix(in srgb, var(--nv-c) var(--nv-c-a), var(--nv-deep)) 0%, color-mix(in srgb, var(--nv-c) var(--nv-c-b), var(--nv-deep)) 100%);
+  color: #ffffff;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+html[data-look='native'] :is(.q-hero-card, .q-focus) .q-hc-btn {
+  background: #ffffff;
+  color: var(--nv-deep);
+  box-shadow: none;
+}
+/* (A single-choice filter row, .q-chips.q-texttabs: text tabs, the chosen one
+   underlined. A multiple choice, a pin's weekdays, stays chips.) */
+html[data-look='native'] .q-chips.q-texttabs > .q-chip {
+  min-height: 36px;
+  padding: 0 2px;
+  margin-right: 18px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--q-label-2);
+  font: 500 16px/1 var(--q-font);
+}
+html[data-look='native'][data-look='native'] .q-chips.q-texttabs > .q-chip:is([aria-pressed='true'], [aria-selected='true'], .on) {
+  background: transparent;
+  color: var(--q-label);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--q-label);
+}
+/* (The week row: seven days, dayStrip's fit reading --q-day-n and --q-day-min;
+   the weekday over the day's number, the chosen day a filled disc, today in the app's colour.) */
+html[data-look='native'] .q-day-bar .q-day-strip {
+  --q-day-n: 7;
+  --q-day-min: 40px;
+}
+html[data-look='native'][data-look='native'] .q-day-bar .q-day-strip .q-chip.day {
+  min-width: 0;
+  min-height: 62px;
+  gap: 6px;
+  padding: 4px 0 6px;
+  border-radius: 0;
+  background: none;
+}
+html[data-look='native'][data-look='native'] .q-day-bar .q-day-strip .q-chip.day > span {
+  color: var(--q-label-2);
+  font: 500 12px/14px var(--q-font);
+}
+html[data-look='native'][data-look='native'] .q-day-bar .q-day-strip .q-chip.day small {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--q-label);
+  font: 400 19px/1 var(--nv-display);
+  letter-spacing: -0.02em;
+  transition: background 0.2s, color 0.2s;
+}
+html[data-look='native'][data-look='native'] .q-day-bar .q-day-strip .q-chip.day.is-today > span,
+html[data-look='native'][data-look='native'] .q-day-bar .q-day-strip .q-chip.day.is-today small {
+  color: var(--accent, var(--q-accent));
+}
+html[data-look='native'][data-look='native'] .q-day-bar .q-day-strip .q-chip.day.is-today small {
+  font-weight: 600;
+}
+html[data-look='native'][data-look='native'] .q-day-bar .q-day-strip .q-chip.day[aria-pressed='true'] > span {
+  color: var(--q-label);
+  font-weight: 600;
+}
+html[data-look='native'][data-look='native'] .q-day-bar .q-day-strip .q-chip.day[aria-pressed='true'] small {
+  background: var(--q-label);
+  color: var(--q-bg);
+  font-weight: 600;
+}
+html[data-look='native'][data-look='native'] .q-day-bar .q-day-strip .q-chip.day.is-today[aria-pressed='true'] small {
+  background: var(--accent, var(--q-accent));
+  color: #ffffff;
+}
+html[data-look='native'] .q-day-bar .q-day-pick {
+  background: var(--q-fill-4);
+}
+/* (Tags are text: grey for a fact, its colour for an exception; only .solid is filled.) */
+html[data-look='native'] .q-tag:not(.solid) {
+  min-height: 0;
+  padding-inline: 0;
+  background: none;
+  font-weight: 500;
+}
+/* (Icons: the glyph in its colour on a faint wash of it, never a filled square.) */
+html[data-look='native'] .q-tile:not(.q-place) {
+  background: color-mix(in srgb, var(--t) var(--nv-wash), transparent);
+  color: color-mix(in srgb, var(--t) var(--nv-glyph-a), var(--nv-glyph));
+  box-shadow: none;
 }
