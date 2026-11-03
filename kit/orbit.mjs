@@ -1224,6 +1224,95 @@ function pressOnlyWhenPressed() {
 }
 pressOnlyWhenPressed();
 
+// Every switch in every app (.q-switch: the kit's builders' and the apps' own
+// HTML), one way (Jay 2026-11-03: "doesn't have the smoothness"): a tap is felt
+// (haptic), and a finger can drag the knob across: it follows the finger (the
+// track's colour fills as it goes) and, let go past the middle, the switch is
+// tapped for the app (a click, so the app's own handler flips it); let go on
+// the side it started, nothing changes. The click the browser sends after a
+// drag is swallowed, so a drag is never also a tap. The look is orbit.css's.
+export function switchOn(sw) {
+  return sw.getAttribute('aria-checked') === 'true' || sw.classList.contains('on') || Boolean(sw.previousElementSibling?.matches?.('input:checked'));
+}
+// Where the knob sits (px from its start) and how far it can go, for a finger
+// `dx` along from where it landed (pure, for the tests).
+export function switchDrag(on, dx, run) {
+  const x = Math.max(0, Math.min(run, (on ? run : 0) + dx));
+  return { x, p: run > 0 ? x / run : on ? 1 : 0 };
+}
+function switchGlide() {
+  if (typeof document === 'undefined' || document.__orbitSwitch) return;
+  document.__orbitSwitch = true;
+  const feel = () => {
+    haptic();
+    try { globalThis.navigator?.vibrate?.(8); } catch {}
+  };
+  let drag = null;
+  let swallow = null;
+  let swallowTimer = 0;
+  document.addEventListener('click', e => {
+    const t = e.target instanceof Element ? e.target : null;
+    if (!t) return;
+    if (swallow && e.isTrusted && (swallow.contains(t) || t.contains(swallow) || t === swallow.previousElementSibling)) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      swallow = null;
+      return;
+    }
+    // A label's hidden checkbox before its .q-switch: the input's own click
+    // is the one felt (the label's comes first and makes it).
+    if (t.matches('input[type=checkbox]') && t.nextElementSibling?.classList.contains('q-switch')) return feel();
+    const sw = t.closest('.q-switch');
+    if (!sw || sw.disabled || sw.previousElementSibling?.matches?.('input[type=checkbox]')) return;
+    feel();
+  }, true);
+  const end = commit => {
+    const d = drag;
+    drag = null;
+    if (!d) return;
+    if (!d.moved) return;
+    const { sw } = d;
+    sw.classList.remove('q-sw-drag');
+    sw.style.removeProperty('--q-sw-x');
+    sw.style.removeProperty('--q-sw-p');
+    clearTimeout(swallowTimer);
+    swallow = sw;
+    swallowTimer = setTimeout(() => (swallow = null), 600);
+    if (commit && d.p > 0.5 !== d.on) sw.click();
+  };
+  document.addEventListener('pointerdown', e => {
+    end(false);
+    if (!e.isPrimary || e.button > 0 || !(e.target instanceof Element)) return;
+    const sw = e.target.closest('.q-switch');
+    if (!sw || sw.disabled) return;
+    const r = sw.getBoundingClientRect();
+    const cs = getComputedStyle(sw);
+    const grow = parseFloat(cs.getPropertyValue('--q-sw-grow')) || 7;
+    // The knob is the track's height less 2px each side; pressed, it is `grow` wider.
+    const run = r.width - 4 - (r.height - 4) - grow;
+    if (!(run > 0)) return;
+    drag = { sw, id: e.pointerId, x0: e.clientX, y0: e.clientY, on: switchOn(sw), run, moved: false, p: 0 };
+  }, true);
+  document.addEventListener('pointermove', e => {
+    const d = drag;
+    if (!d || e.pointerId !== d.id) return;
+    const dx = e.clientX - d.x0;
+    if (!d.moved) {
+      if (Math.abs(dx) < 4) return;
+      if (Math.abs(e.clientY - d.y0) > Math.abs(dx)) return void (drag = null);
+      d.moved = true;
+      d.sw.classList.add('q-sw-drag');
+    }
+    const { x, p } = switchDrag(d.on, dx, d.run);
+    d.p = p;
+    d.sw.style.setProperty('--q-sw-x', `${x}px`);
+    d.sw.style.setProperty('--q-sw-p', p.toFixed(3));
+  }, true);
+  document.addEventListener('pointerup', e => drag && e.pointerId === drag.id && end(true), true);
+  document.addEventListener('pointercancel', e => drag && e.pointerId === drag.id && end(true), true);
+}
+switchGlide();
+
 // The solid strip under the phone's status bar (see .q-statusbar in orbit.css).
 function statusStrip() {
   if (typeof document === 'undefined' || !document.body || document.querySelector('.q-statusbar')) return;
@@ -2863,7 +2952,7 @@ function offerNotices(s) {
 function toggle(on, label, onchange) {
   const b = node('button', { class: 'q-switch', type: 'button', role: 'switch', 'aria-checked': String(on), 'aria-label': label });
   b.addEventListener('click', async () => {
-    haptic();
+    // (Felt by switchGlide, as every switch is.)
     const next = b.getAttribute('aria-checked') !== 'true';
     const ok = await onchange(next);
     if (ok !== false) b.setAttribute('aria-checked', String(next));
