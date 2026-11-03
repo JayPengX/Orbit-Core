@@ -100,6 +100,8 @@ export const PAGES = {
     // 記一筆 on 數位, its subs and the + for one's own.
     'entry-digital': { args: click('[aria-label="記一筆"],[aria-label="Add an entry"]', wait(1500), tap('數位|Digital'), wait(800)) },
     // 記一筆 on 餐飲: 早餐, 午餐, 晚餐, 飲料點心, 聚餐.
+    // 記一筆 on 轉帳: from, to, the amount, a fee, the day, a note.
+    'entry-move': { args: click('[aria-label="記一筆"],[aria-label="Add an entry"]', wait(1500), tap('轉帳|Transfer'), wait(800)) },
     'entry-food': { args: click('[aria-label="記一筆"],[aria-label="Add an entry"]', wait(1500), tap('餐飲|Food'), wait(800)) },
     // 更多 › 分類: the twelve, each with its subs.
     cats: { hash: 'more', args: click(wait(800), "js:[...document.querySelectorAll('.mn-tool')].find(e=>/^(分類|Categories)/.test(e.textContent.trim())).click()", wait(1200)) },
