@@ -739,59 +739,61 @@ export function tourFor(app, lang = 'zh') {
 
 // A stop's pictures, light and dark, in the page's language: null until it has them.
 export function shotFor(app, stop, lang = 'zh') {
-  const v = SHOTS[`${app}/${stop}`];
-  if (!v) return null;
-  const at = theme => `${new URL(`./img/help/${app}/${stop}.${lang === 'en' ? 'en' : 'zh'}.${theme}.webp`, import.meta.url).href}?v=${v}`;
+  // (Each picture's own hash, zh light, zh dark, en light, en dark: the service worker checks a ?v= file against it.)
+  const v = SHOTS[`${app}/${stop}`]?.split(' ');
+  if (v?.length !== 4) return null;
+  const en = lang === 'en';
+  const at = theme => `${new URL(`./img/help/${app}/${stop}.${en ? 'en' : 'zh'}.${theme}.webp`, import.meta.url).href}?v=${v[(en ? 2 : 0) + (theme === 'dark' ? 1 : 0)]}`;
   return { light: at('light'), dark: at('dark'), w: SHOT_SIZE[0], h: SHOT_SIZE[1] };
 }
 
 // ---- The screenshots' hashes (tools/help-shots.mjs writes this block) ----
 export const SHOTS = {
-  'beats/create': '2e29af311b2a',
-  'beats/game': '7a02df73226c',
-  'beats/home': '9e140475069a',
-  'beats/library': 'd13fe7f06147',
-  'law/article': '000b99922e7a',
-  'law/ask': 'bb6bd5f66ea4',
-  'law/bills': 'f21a4a6b73a8',
-  'law/home': 'c8ea77f7948d',
-  'law/laws': 'f9cefbe2ca04',
-  'law/rulings': '888fa6d42e3b',
-  'match/following': '3f4490323f1f',
-  'match/home': 'a3bb807ad109',
-  'match/live': '64f251e36a54',
-  'match/matches': '67f7c7234ec4',
-  'money/accts': 'eb23ed669fb4',
-  'money/cal': 'a8798e22de0f',
-  'money/entry': 'c91ab3f312cb',
-  'money/more': 'b7c931d52a90',
-  'money/stats': 'a6d79de4c261',
-  'orbit/class': '8c36dfab2a2b',
-  'orbit/today': '5e0326e27c3a',
-  'orbit/tools': 'cd40a0acbf6f',
-  'orbit/week': 'f17210244aa9',
-  'pass/apps': 'aa274781dad2',
-  'pass/looks': '49bdec837836',
-  'pass/pass': '8dccbe01f0a6',
-  'stock/fx': '02d2d597613b',
-  'stock/history': '00911d0a263b',
-  'stock/home': '811fd4eab5b7',
-  'stock/markets': 'eebb71bfe4b7',
-  'stock/portfolio': '1f41aa39a084',
-  'stock/stock': 'f66b46d16b7d',
-  'transit/go': 'a2bb4ec6e20c',
-  'transit/map': '737d6ba5e545',
-  'transit/me': 'cd2814122f71',
-  'transit/times': 'd694d4380e52',
-  'vocab/list': '8c1166206293',
-  'vocab/progress': '3b9a17d2d189',
-  'vocab/quiz': '4778b66f0d75',
-  'vocab/review': '21b488f48b34',
-  'vocab/today': 'fe9416b181c2',
-  'weather/day': '25e92bca5ec0',
-  'weather/now': 'efabbf876863',
-  'weather/places': '49901ce80708',
-  'weather/rain': 'a7b1867ac32d'
+  'beats/create': 'e8b5134b8e3c 0334199c113f edca5cdde181 c9fe56d41a85',
+  'beats/game': 'ab782b00c0db 0ae0d3ef5f26 9814ad92cadf 20c54b7033f6',
+  'beats/home': '3cbca843a8ae 5218e281fd7c 96a9b858a7fd 8e5b1118a633',
+  'beats/library': 'bd0900bcc300 4318f04705ec 6e4bdcef19e3 6ee434b7d90f',
+  'law/article': '0c4a4f3b74bf 3d61b9abf352 aa5f40ff29ea ec513c16fd8b',
+  'law/ask': 'f8ecace14a8f 31316ed12567 5ef60c0b9523 7bbfbdba3a52',
+  'law/bills': '0aa4ded9b304 2df9b342ba50 3098c7d225e2 cb4de73a4419',
+  'law/home': '0a32cccbb2de e45a9504d635 2aa28925dc6b 35b252ad9b7f',
+  'law/laws': '49483858cc81 15e669a62e1a be793f385685 b21dcf13016b',
+  'law/rulings': '1b341f76c5e8 23d9b7384297 3cc6837f389c fd8621b340df',
+  'match/following': 'e9e8e7671466 85ef4d43ba5e 5b22ebf8a62b ffe0b57a91f9',
+  'match/home': '91bf6d8868b8 46b099afdf0e 0d4de0adbfc9 795ec14939b7',
+  'match/live': '4fb5d28c459b 364ea6ecb524 cc437d7bb586 6e7fb84ec359',
+  'match/matches': 'e8b3deb9556c 231cca663e8f 7620363cd5e3 1197145a34b0',
+  'money/accts': '1f9237fc4127 b2b469d0afb8 d5f959cae71b 12588d2e3b9c',
+  'money/cal': 'c9ee4fbac765 f9aebb3fb60a 1906a77b8f32 a9efd8f7c7c0',
+  'money/entry': '42843b52fe62 8ffe19c1053c 7a3eae99e311 807962471431',
+  'money/more': '0471d1626289 a293d46fce71 ada8c2a6d4d3 9c0a8582a887',
+  'money/stats': '37b57abe8cf2 a6986892f7d1 a0c0a264032a 9e7098415134',
+  'orbit/class': '569e0b225f85 1aeb3f01ef8d b53caff4084d 152704a69eb3',
+  'orbit/today': '0435e6a3308f d77a1ccb3985 5bd1d7e24011 4cbba9723728',
+  'orbit/tools': 'a391cc6b7d62 7ead4bc0e2e6 b6ca13db05f3 dafd6abc5e8e',
+  'orbit/week': 'e84e07e5e129 deac6e8b438c 91d73c3391bb 98398a657934',
+  'pass/apps': 'ebb71f5949af 274c9d83dde5 57abd9ade33d 09a22cee4ae4',
+  'pass/looks': '8e968219ba64 ca8fc3011862 a43d1023104f 8df309329c5f',
+  'pass/pass': '1f8c2b6f949f 0830a192747b f3aa88c17fe5 366eec05dbb7',
+  'stock/fx': 'a3c2bc377d5f 6e967403d133 18a64dd50c0d 2ccdb172fa0f',
+  'stock/history': 'e711256fc7c1 eb8bad7709c8 95af2a230dc8 edcb62a8b68b',
+  'stock/home': 'be2b45b0d9ad 6ec499a106d4 c3eded8897af 34693b0319ce',
+  'stock/markets': 'dec0db27c539 03df926c352a a92c25199397 80740db7566b',
+  'stock/portfolio': '7340d825ff49 f6fd582a5eec 672d75a80880 e457f97b4070',
+  'stock/stock': 'c6d8cf77adbf 2712dcba2f66 daa88c8a52da dfa40d3d75c5',
+  'transit/go': 'b2cd701fe0d9 f56d400c5124 d6f9d8a6245f bb3afa30b3f9',
+  'transit/map': 'b4ae2ef1b850 9dc436d5fccb 16e552a75566 5795816c7624',
+  'transit/me': '13e696a0561d cc36eb5936e0 7ffe09df0f24 678759ddf472',
+  'transit/times': 'b94e87f0dc28 320dba89e892 503fe343ac23 b5c4efb2238e',
+  'vocab/list': 'ba239e9b76e3 8b8f047c3e54 b5073fd658f5 774da1d19022',
+  'vocab/progress': '3c4f09023fee fe7eddd7509b 03ffb5530bda 2813d20a6462',
+  'vocab/quiz': '30166a252302 2b037d71439b 366a89bc9167 e8d9f392865c',
+  'vocab/review': '3c8c35f625f0 f7bc3bcae074 52a74f6eb424 d7cd3bb56e86',
+  'vocab/today': '040264d85614 3ef26056bb68 adfa4c10c770 1264d41bcb0a',
+  'weather/day': 'ce9ae27b4e57 28cd9a7ef63e 0fdd47d77dc5 9b8611590e9a',
+  'weather/now': '072fae9f0d37 e945e7005218 f33c95458efc 17558f1533bf',
+  'weather/places': '6ac41bf4f356 2a5ffbe89d13 e1e585c879aa a5017971879a',
+  'weather/rain': 'f1d2444f022b 1f823742d45b b120c14c17d5 883dcfb170f7'
 };
 export const SHOT_SIZE = [480, 578];
 // ---- end of the screenshots' hashes ----
