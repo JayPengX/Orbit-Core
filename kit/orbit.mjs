@@ -3930,8 +3930,11 @@ export function fitNames(root = document) {
 // 2026-11-03: "no more uneven grid anywhere"): as many tiles as fit a row
 // stay one row; past that, fewer columns where they divide the tiles evenly
 // (no fewer than 60% of what fits), else the tiles past the last full row
-// are left out (.q-cut): a grid lists its most telling first. Redone with
-// the names (a turned phone, a tile more).
+// are left out (.q-cut): a grid lists its most telling first. A grid whose
+// every tile must stay (.q-rows-keep: choices, a category or a station to
+// pick) is never cut: it takes the columns that leave its last row fullest,
+// and that row's tiles widen to fill it where they divide it evenly.
+// Redone with the names (a turned phone, a tile more).
 export function fullRows(root = document) {
   for (const grid of root.querySelectorAll?.('.q-rows-full') || []) {
     if (grid.closest('[hidden]')) continue;
@@ -3940,16 +3943,28 @@ export function fullRows(root = document) {
     if (!grid.clientWidth || grid.dataset.qRows === key) continue;
     grid.dataset.qRows = key;
     for (const k of kids) k.classList.remove('q-cut');
+    for (const k of kids) if (k.classList.contains('q-span')) (k.classList.remove('q-span'), (k.style.gridColumn = ''));
     grid.style.gridTemplateColumns = '';
     const n = kids.length;
     const fit = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length;
     if (!n || fit < 2 || n % fit === 0) continue;
     if (n < fit) {
+      // (Things to pick widen at most to twice their size: a lone 立委 fills a phone's row, never a computer's.)
+      if (grid.classList.contains('q-rows-keep') && fit > n * 2) continue;
       grid.style.gridTemplateColumns = `repeat(${n}, minmax(0, 1fr))`;
       continue;
     }
     let cols = 0;
-    for (let c = fit - 1; c >= Math.max(2, Math.ceil(fit * 0.6)); c--) if (n % c === 0) (cols ||= c);
+    const least = Math.max(2, Math.ceil(fit * 0.6));
+    for (let c = fit - 1; c >= least; c--) if (n % c === 0) (cols ||= c);
+    if (!cols && grid.classList.contains('q-rows-keep')) {
+      cols = fit;
+      for (let c = fit - 1; c >= least; c--) if (n % c > n % cols) cols = c;
+      // (Still a part row: its tiles widen to fill it, at most to twice their size: a lone 7th of two a row the whole row.)
+      const r = n % cols;
+      if (cols % r === 0 && cols / r <= 2) for (const k of kids.slice(n - r)) (k.classList.add('q-span'), (k.style.gridColumn = `span ${cols / r}`));
+      if (cols === fit) continue;
+    }
     if (cols) grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
     else for (const k of kids.slice(n - (n % fit))) k.classList.add('q-cut');
   }

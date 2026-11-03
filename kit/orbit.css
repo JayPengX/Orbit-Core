@@ -3413,12 +3413,11 @@ html.q-recording body::after {
 }
 
 /* An add row (新增行程, 釘選地點, 新增帳戶…): the plus alone in the tile's column, no box,
-   pill or wash behind it, and the words in the accent (Jay 2026-11-03: the plus on a
-   green pill "make the UI look cheap"). <button class="q-ritem q-add"><span
+   pill or wash behind it, the plus in the accent and the words in the label's colour
+   (Jay 2026-11-03: the plus on a green pill "make the UI look cheap"; never accent words). <button class="q-ritem q-add"><span
    class="q-add-i">+</span><span class="q-ritem-text"><span class="q-ritem-title">… */
 .q-ritem.q-add {
   min-height: 48px;
-  color: var(--q-accent);
 }
 .q-add-i {
   flex: none;
@@ -3434,7 +3433,7 @@ html.q-recording body::after {
   stroke-width: 2;
 }
 .q-ritem.q-add .q-ritem-title {
-  color: var(--q-accent);
+  color: var(--q-label);
   font-weight: 500;
 }
 
@@ -5727,6 +5726,7 @@ dialog[open] .q-menu { background: var(--q-sheet); }
   color: var(--q-text-2);
   font: 600 14px/1.2 var(--q-font);
   white-space: nowrap;
+  text-decoration: none;
   cursor: pointer;
   transition: transform var(--q-dur-snappy) var(--q-spring-snappy), background-color 0.2s;
 }
@@ -5750,8 +5750,22 @@ dialog[open] .q-menu { background: var(--q-sheet); }
   opacity: 0.8;
   transition: transform var(--q-dur-snappy) var(--q-spring-snappy);
 }
-.q-more[aria-expanded='true'] svg {
+.q-more[aria-expanded='true'] svg,
+details[open] > summary.q-more svg {
   transform: rotate(180deg);
+}
+/* A way on to another view (goBar: 全部球隊數據 ›): the same bar, a › for where it goes. */
+.q-more-go .q-more-chev {
+  font-size: 17px;
+  line-height: 1;
+  margin-top: -1px;
+}
+/* (A disclosure drawn as the bar: <summary class="q-more">.) */
+summary.q-more {
+  list-style: none;
+}
+summary.q-more::-webkit-details-marker {
+  display: none;
 }
 
 /* Room held at a page's or sheet's end after a redraw made it shorter than where the person was (hold-place.mjs), given back as they scroll up. */
