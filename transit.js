@@ -179,6 +179,8 @@ export const TDX_RULES = [
   // Live: arrivals, bikes and docks, metro and train boards.
   { re: /^basic\/v2\/Bus\/EstimatedTimeOfArrival\/(City\/[A-Za-z]+(\/[^/]+)?|InterCity(\/[^/]+)?)$/, fresh: 25e3, stale: 60e3, tier: 'live' },
   { re: /^advanced\/v2\/Bus\/EstimatedTimeOfArrival\/(City\/[A-Za-z]+\/PassThrough\/Station\/[^/]+|InterCity\/PassThrough\/Station\/[^/]+|NearBy)$/, fresh: 25e3, stale: 60e3, tier: 'live' },
+  // Where a route's buses are (A1 GPS, A2 at a stop): a bus whose estimates stopped (快捷8號, 2026-11-03).
+  { re: /^basic\/v2\/Bus\/(RealTimeByFrequency|RealTimeNearStop)\/(City\/[A-Za-z]+\/[^/]+|InterCity\/[^/]+)$/, fresh: 15e3, stale: 60e3, tier: 'live' },
   { re: /^basic\/v2\/Bike\/Availability\/City\/[A-Za-z]+$/, fresh: 50e3, stale: 3 * MIN, tier: 'live' },
   { re: /^advanced\/v2\/Bike\/Availability\/NearBy$/, fresh: 50e3, stale: 3 * MIN, tier: 'live' },
   { re: /^basic\/v2\/Rail\/Metro\/LiveBoard\/[A-Z]+$/, fresh: 20e3, stale: 60e3, tier: 'live' },
