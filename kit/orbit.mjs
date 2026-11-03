@@ -3924,6 +3924,34 @@ export function fitNames(root = document) {
     if (Math.abs(k - was) > 0.01) el.style.fontSize = k === 1 ? '' : `${(base * k).toFixed(2)}px`;
   }
 }
+// A grid of like tiles (.q-rows-full) never ends on a part row (Jay
+// 2026-11-03: "no more uneven grid anywhere"): as many tiles as fit a row
+// stay one row; past that, fewer columns where they divide the tiles evenly
+// (no fewer than 60% of what fits), else the tiles past the last full row
+// are left out (.q-cut): a grid lists its most telling first. Redone with
+// the names (a turned phone, a tile more).
+export function fullRows(root = document) {
+  for (const grid of root.querySelectorAll?.('.q-rows-full') || []) {
+    if (grid.closest('[hidden]')) continue;
+    const kids = [...grid.children];
+    const key = `${grid.clientWidth}|${kids.length}`;
+    if (!grid.clientWidth || grid.dataset.qRows === key) continue;
+    grid.dataset.qRows = key;
+    for (const k of kids) k.classList.remove('q-cut');
+    grid.style.gridTemplateColumns = '';
+    const n = kids.length;
+    const fit = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length;
+    if (!n || fit < 2 || n % fit === 0) continue;
+    if (n < fit) {
+      grid.style.gridTemplateColumns = `repeat(${n}, minmax(0, 1fr))`;
+      continue;
+    }
+    let cols = 0;
+    for (let c = fit - 1; c >= Math.max(2, Math.ceil(fit * 0.6)); c--) if (n % c === 0) (cols ||= c);
+    if (cols) grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+    else for (const k of kids.slice(n - (n % fit))) k.classList.add('q-cut');
+  }
+}
 // A wrapped row of pills (.q-balance) never leaves one alone on its last
 // line: the row is narrowed just enough that the last line takes two or
 // more, as text-wrap: balance does for words (Law's quick questions came
@@ -3963,7 +3991,7 @@ function watchNames() {
   if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || globalThis.__orbitFit) return;
   globalThis.__orbitFit = true;
   let frame = 0;
-  const soon = () => (frame ||= requestAnimationFrame(() => ((frame = 0), fitNames(), balanceRows())));
+  const soon = () => (frame ||= requestAnimationFrame(() => ((frame = 0), fitNames(), balanceRows(), fullRows())));
   const start = () => {
     // (A tab or sheet shown again counts too: a name drawn while hidden had no box to fit.)
     new MutationObserver(soon).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'open', 'aria-selected', 'aria-pressed'] });

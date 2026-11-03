@@ -4836,6 +4836,9 @@ html.q-kb .q-kb-docked {
   bottom: calc(var(--q-kb) + 8px) !important;
 }
 
+/* A grid of like tiles that never ends on a part row (orbit.mjs fullRows): the tiles past its last full row. */
+.q-rows-full > .q-cut { display: none; }
+
 /* ---- Grids that never leave a hole: the kit's panels, and any app grid
    marked .q-even (2 columns) or .q-even3 (3): a lone last card spans the
    row, two left in a row of three share it ---- */

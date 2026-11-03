@@ -241,11 +241,43 @@ export function f1Driver(name) {
 }
 
 // F1 constructors: their colour and a short name, for a badge like the drivers'.
+// Teams of past seasons (a career's 生涯車隊): its own colour and name, and
+// the logo of the team it became where formula1.com keeps one (it keeps
+// 2024 on): Sauber's own (Kick Sauber's, its name on it), the Red Bull
+// junior team's bull, Alpine's A for Renault and Lotus, Aston Martin's for
+// Racing Point and Force India (Jay 2026-11-03: Sauber a grey "SAU").
+// A team that ended with no heir (Manor, Caterham) keeps its colour.
+const F1_PAST = [
+  { name: 'BMW Sauber', zh: 'BMW 索伯', color: '#0066b1', logo: '2025/kicksauber' },
+  { name: 'Alfa Romeo', zh: '愛快羅密歐', color: '#9b0000', logo: '2025/kicksauber' },
+  { name: 'Sauber', aka: ['Kick Sauber', 'Stake F1'], zh: '索伯', color: '#52e252', logo: '2025/kicksauber' },
+  { name: 'AlphaTauri', aka: ['Alpha Tauri'], zh: '阿爾法托利', color: '#2b4562', logo: '2024/rb' },
+  { name: 'Toro Rosso', aka: ['Scuderia Toro Rosso'], zh: '紅牛二隊', color: '#4e7cff', logo: '2024/rb' },
+  { name: 'Minardi', zh: '米納迪', color: '#000000', logo: '2024/rb' },
+  { name: 'Lotus F1', aka: ['Lotus'], zh: '蓮花', color: '#000000', logo: '2024/alpine' },
+  { name: 'Renault', zh: '雷諾', color: '#fff500', logo: '2024/alpine' },
+  { name: 'Force India', zh: '印度力量', color: '#f596c8', logo: 'aston' },
+  { name: 'Racing Point', zh: '賽點', color: '#f596c8', logo: 'aston' },
+  { name: 'Brawn GP', aka: ['Brawn'], zh: '布朗', color: '#b8fd6e', logo: 'mercedes' },
+  { name: 'Jaguar', zh: '捷豹', color: '#08623e', logo: 'redbull' },
+  { name: 'Manor', aka: ['Marussia', 'Virgin'], zh: '馬諾爾', color: '#ed1c24' },
+  { name: 'Caterham', zh: '卡特漢', color: '#005030' },
+  { name: 'HRT', aka: ['Hispania'], zh: 'HRT', color: '#b2945e' },
+  { name: 'Toyota', zh: '豐田', color: '#cc0000' }
+];
+const f1Logo = (year, slug) => `https://media.formula1.com/image/upload/c_fit,h_96/q_auto/v1740000000/common/f1/${year}/${slug}/${year}${slug}logowhite.webp`;
 export function f1Constructor(name) {
   const plain = normalizeTeamName(name);
   const team = plain ? Object.values(F1_TEAMS).find(t => plain.includes(normalizeTeamName(t.name)) || normalizeTeamName(t.name).includes(plain) || (t.aka || []).some(x => plain.includes(normalizeTeamName(x)))) : null;
+  if (!team && plain) {
+    const past = F1_PAST.find(t => [t.name, ...(t.aka || [])].some(x => plain.includes(normalizeTeamName(x))));
+    if (past) {
+      const [year, slug] = past.logo?.includes('/') ? past.logo.split('/') : ['2026', F1_TEAMS[past.logo]?.f1];
+      return { name: name || past.name, zh: past.zh, color: past.color, logo: slug ? f1Logo(year, slug) : null, page: '', drivers: [], short: past.name.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() };
+    }
+  }
   // Its logo (formula1.com's, white: shown on the team's colour).
-  const logo = team?.f1 ? `https://media.formula1.com/image/upload/c_fit,h_96/q_auto/v1740000000/common/f1/2026/${team.f1}/2026${team.f1}logowhite.webp` : null;
+  const logo = team?.f1 ? f1Logo('2026', team.f1) : null;
   return { name: team?.name ?? name, zh: team?.zh ?? name, color: team?.color ?? '#8a8f98', logo, page: team?.page || '', drivers: team?.drivers ?? [], short: (team?.name ?? name).replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() };
 }
 
@@ -381,6 +413,10 @@ export function logoPicture(light, dark, cls, fallback, { guess = false } = {}) 
   let later = 0;
   img.addEventListener('load', () => {
     if (!img.naturalWidth) return;
+    // (Drawn once: eager from now on. Safari picks a <picture>'s source again
+    // whenever it's moved on the page, and a lazy one then never loaded: a
+    // logo gone after a tab switch, Jay 2026-11-03.)
+    img.loading = 'eager';
     if (img.style.opacity) Object.assign(img.style, { transition: 'opacity 0.18s ease', opacity: '' });
     noteDrawn(light, img);
     if (standIn?.isConnected) standIn.replaceWith(picture);
