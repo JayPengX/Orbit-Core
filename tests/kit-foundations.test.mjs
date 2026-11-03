@@ -373,3 +373,12 @@ test('format: SYMBOLS match stock-markets CURRENCIES', async () => {
   assert.deepEqual(Object.keys(SYMBOLS).sort(), Object.keys(CURRENCIES).sort());
   for (const [k, c] of Object.entries(CURRENCIES)) assert.deepEqual(SYMBOLS[k], [c.symbol, c.digits], k);
 });
+
+test('errorText blames the connection only when Orbit gave no answer', () => {
+  const net = orbit.errorText(new TypeError('Load failed'), 'zh');
+  assert.match(net, /網路/);
+  const refused = orbit.errorText(Object.assign(new Error('x'), { code: 'ECO_PAYLOAD_INVALID', status: 400 }), 'zh');
+  assert.doesNotMatch(refused, /網路|連線/);
+  assert.match(refused, /ECO_PAYLOAD_INVALID/);
+  assert.doesNotMatch(orbit.errorText({ code: 'HTTP_500', status: 500 }, 'en'), /connection/);
+});
