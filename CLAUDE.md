@@ -390,15 +390,15 @@ included), then wiped whole. `private/` is never served.
 
 ## 6. The Orbit Pass (`/eco`)
 
-- **A pass** is a random 10-character code, issued by the owner (admin page
-  or `tools/issue-passes.mjs`; no sign-up). The account's id is worked out
-  from it (PBKDF2-SHA256 with a pepper from `ECO_TOKEN_SECRET`, `eco.js
-  passKey`). **`ECO_TOKEN_SECRET` must never change**: passes since
-  2026-10-27 would lose their accounts. Sign-in tries: 30 an hour
-  per address.
+- **A pass** is a random 10-character code the owner issues (admin page,
+  `tools/issue-passes.mjs`), replaced at its first sign-in (`freshPass`: its `new`
+  session takes only `rotate`, a passkey; `freshGate`). The account's id is
+  PBKDF2-SHA256 of it, peppered by `ECO_TOKEN_SECRET` (`passKey`), which **must
+  never change**: passes since 2026-10-27 would lose their accounts. Sign-ins:
+  30 an hour an address.
 - **Passkeys** (`passkey.js`, `webauthn.js`; `kit/passkey.mjs`): any number
-  per Pass, RP ID `jaypengx.com`; the pass still signs in too. Sign-in, a new
-  pass and the admin key are real forms password managers fill.
+  per Pass, RP ID `jaypengx.com`; the pass signs in too. Sign-in, a new pass
+  and the admin key are forms password managers fill.
 - **Devices never keep the pass:** a refresh token (60 days) and a short
   session token (`orbit-token.js`, HMAC under `ECO_TOKEN_SECRET`).
 - **Ops:** login, refresh, read/patch/delete, device codes (`eco-pairs`),
@@ -468,7 +468,7 @@ can be turned off on its own.
   `*@<DOMAIN>` reaches the proxy by Email Routing's catch-all. `deploy.yml`
   attaches the hostnames (the deploy token needs the zone, and Account · D1 ·
   Edit); the guard takes them off with the proxy.
-- Longshot is shut down (2026-10-31): only its notice is here.
+- Longshot is shut down.
 
 ## 11. Tools and tests
 

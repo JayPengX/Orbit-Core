@@ -304,3 +304,26 @@ test('the pass: new ones are found by a peppered, slow id; old ones by their SHA
   assert.equal(JSON.parse(atob(res.data.refresh.split('.')[0].replace(/-/g, '+').replace(/_/g, '/'))).d, oldId);
   assert.equal((await t.post({ op: 'login', passcode: 'ZZZZZZZZZZ', app: 'stock' })).status, 404);
 });
+
+test('a fresh pass: a passkey added first, then the pass replaced; the passkey signs in to the new one', async () => {
+  const t = setup();
+  // (Clear of the other tests' per-session counts: the codes repeat.)
+  t.advance(3_600_000);
+  const [code] = (await t.post({ op: 'admin', token: 'o'.repeat(40), action: 'issue', count: 1 })).data.passes;
+  const acct = (await t.post({ op: 'login', passcode: code, app: 'stock' })).data;
+  assert.equal(acct.fresh, true);
+  const a = await authenticator({ alg: -7 });
+  const begin = await t.post({ op: 'passkey-add-begin', qt: acct.token });
+  assert.equal(begin.status, 200);
+  assert.equal(begin.data.user.name, 'Orbit Pass', 'no account number: it changes with the pass');
+  const added = await t.post({ op: 'passkey-add', qt: acct.token, challenge: begin.data.challenge, credential: a.create(begin.data.challenge), device: 'iPhone' });
+  assert.equal(added.status, 200, JSON.stringify(added.data));
+  // Still fresh until the pass itself is replaced.
+  assert.equal((await login(t, a)).data.fresh, true);
+  const rot = await t.post({ op: 'rotate', qt: acct.token });
+  assert.equal(rot.status, 200);
+  const res = await login(t, a);
+  assert.equal(res.status, 200);
+  assert.equal(res.data.fresh, undefined);
+  assert.equal((await t.post({ op: 'login', passcode: code, app: 'stock' })).status, 404);
+});
