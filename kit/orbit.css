@@ -5846,6 +5846,13 @@ html[data-look='native'] .q-tag:not(.solid) {
   background: none;
   font-weight: 500;
 }
+/* (A tag at a row's end is the row's value: the size of .q-ritem-value, not a
+   12 px whisper beside a 16 px title. Tags under the title stay small.) */
+html[data-look='native'] :is(.q-ritem, .q-cell) > .q-tag:not(.solid) {
+  flex: none;
+  font: 500 15px/20px var(--q-font);
+  font-variant-numeric: tabular-nums;
+}
 /* (Icons: the glyph in its colour on a faint wash of it, never a filled square.) */
 html[data-look='native'] .q-tile:not(.q-place) {
   background: color-mix(in srgb, var(--t) var(--nv-wash), transparent);
