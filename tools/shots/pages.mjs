@@ -291,9 +291,14 @@ export const PAGES = {
     td: { args: click('#tab-fx', '[data-action=tool][data-tool=td]', wait(1200)) },
     access: { args: click('#tab-fx', '[data-action=tool][data-tool=access]', wait(1200)) },
     truth: { args: click('#tab-fx', '[data-action=tool][data-tool=truth]', wait(1200)) },
+    // 開戶與交易資格 › 槓反期貨 ETF 檢核表, scrolled to the end: its pinned 簽署檢核表 over the sheet's bottom edge.
+    'li-check': { args: click('#tab-fx', '[data-action=tool][data-tool=access]', wait(1200), '[data-action=access-key][data-key=liFutures]', wait(1200), "js:document.querySelector('dialog[open]')?.scrollBy(0, 400)", wait(800)) },
     // (Wide screens show 統計分析 beside the activity: no button of its own there.)
     // 首頁 further down (with --account demo: what's held and starred, then the markets).
     'home-lower': { args: click(wait(3000), "js:scrollTo(0, innerHeight * 0.85)", wait(1200)) },
+    // 紀錄's 交易明細 (days of records) and 委託 (open orders, then past ones; --account orders has one open).
+    activity: { args: click('#tab-history', wait(2500)) },
+    orders: { args: click('#tab-history', "js:document.querySelector('[data-action=hview][data-view=orders]')?.click()", wait(2500)) },
     stats: { args: click('#tab-history', "js:document.querySelector('[data-action=hview][data-view=stats]')?.click()", wait(2500)) }
   },
   admin: { default: ['overview', 'accounts', 'money', 'health'], overview: { hash: 'overview' }, accounts: { hash: 'accounts' }, money: { hash: 'money' }, health: { hash: 'health' } }
