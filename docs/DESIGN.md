@@ -248,36 +248,41 @@ and `--q-col-r` (beside it), `--q-mid` (its middle); never `100vw`.
 - Charts, maps and canvases redraw at the new size on `onScreen()`.
 
 
-## 11. 原生 Native: the look every app is moving to
+## 11. Orbit's own look: the redesign every app is moving to
 
-Jay 2026-11-03 picked 原生 Native (RULEBOOK §3): a whole UX redesign, app by
-app, every feature kept, each app shown to Jay beside today's before it ships.
-An app that has moved marks its page `<html data-look="native">`; the kit's
-Native layer (the end of `orbit.css`) applies only there, so the others keep
-today's look until their turn. When every app has moved, the layer becomes
+Jay 2026-11-03 (RULEBOOK §3): a whole UX redesign of all nine apps, every
+tab, sheet, detail page, settings and empty screen, every feature kept,
+shown to Jay beside today's and shipped together once he says go. The apps
+share one design system (this kit: type, spacing, components, tabs, the
+dark theme, motion); each app's home is laid out for its own job, in its own
+colour: Sports' live game cards, Weather's forecast, Transit's next
+departure, Money's balance and entries, Words' practice, Law's search,
+Class's next class, Beats' player, Securities' watchlist. An app that has
+moved marks its page `<html data-look="native">`; the kit's layer (the end of
+`orbit.css`) applies only there. When every app has moved, the layer becomes
 the kit's own and the mark goes.
 
-- **The colour is the content's.** A screen takes its colour from what it
-  shows: Weather's sky is the page, a game is its two clubs' colours, a bus
-  its line's. The app's colour is for the controls (the chosen tab, a
-  button). A hero with no colour of its own (`.q-hero-card`, `.q-focus`) is
-  the app's, deep and matte.
-- **Surfaces are graphite.** Cards, lists and rails are one surface lit from
-  above with a hairline edge (`--nv-card`, `--nv-edge`): white with a soft
-  lift in light, graphite with no shadow in dark. Glass is for what floats
-  over content (the tab bar, a sheet's head, Weather's panels on its sky).
+- **Today's dark page is the base.** The page is the app's own background,
+  never a sky, a photo or a colour filling the screen.
+- **Colour is information, inset on a dark card.** Cards are graphite
+  (`--nv-card`, `--nv-edge`: white with a soft lift in light). Colour goes
+  only on what identifies something inside a card (a team, a bus line, a
+  spending category, a class, a market), as an inset row, band or badge
+  (`.q-band` with `--band`). Never a whole card filled with the app's
+  colour, never two colours blended on one surface (Jay: the Sports hero's
+  two rows, each club on its own colour, beat the orange-filled card). The
+  app's colour is for what's live or now and the main action.
+- **A card is shaped like its content.** Two teams, two rows; a line, its
+  badge and its stops; a day, one line with now lit.
 - **Big numbers are light.** A temperature, a score, the focus: the display
   face, light, tabular (`--nv-display`). Names and labels carry the weight.
-- **One page, fewer tabs.** Views of the same thing are one page (Weather's
-  今天 and 預報); places, like days, swipe sideways (`daySwipe`); what a
-  card opens is a sheet, never a new tab.
 - **Filters are text tabs.** A single-choice filter row is text with the
-  chosen one underlined (`.q-chips.q-texttabs`); a multiple choice (a pin's
-  weekdays) stays chips.
-- **The week row is iOS's.** Seven days, the weekday over the day's number,
-  the chosen day a filled disc, today in the app's colour (`dayBar`; the
-  layer sets `--q-day-n` and `--q-day-min`, which `dayStrip` fits by).
+  chosen one underlined (`.q-chips.q-texttabs`); a multiple choice stays chips.
+- **The day strip is quiet.** The chosen day on a soft plate, today's date
+  in the app's colour (`dayBar`).
 - **Tags are text.** Grey for a fact, its colour for an exception; only
   `.q-tag.solid` is filled.
 - **Icons are tinted glyphs**: the glyph in its colour on a faint wash of it,
-  never a filled square.
+  never a filled square, and never a grid of them as a home's menu.
+- **Nothing drawn after another app.** No layout or signature look taken
+  from Apple's Weather, Sports or Stocks, or anyone's.

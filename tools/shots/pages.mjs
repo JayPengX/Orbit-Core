@@ -25,6 +25,12 @@ export const PAGES = {
     'nba-leaders': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('數據|Stats'), wait(5000)) },
     'nba-bracket': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('季後賽|Playoffs'), wait(5000)) },
     'f1-season': { args: click('#tab-matches', '[data-league=f1]', wait(4000)) },
+    // 首頁 once its day has been read (the lead game on top).
+    'home-read': { args: click(wait(9000)) },
+    // 首頁 scrolled down (what's under the first screen: 我的球隊, 我的聯賽).
+    'home-lower': { args: click(wait(6000), 'js:scrollTo(0,700)', wait(1500)) },
+    // 首頁 on the next day (its games to come, the lead one on top).
+    'home-next': { args: click(wait(3000), "js:(()=>{const d=[...document.querySelectorAll('.q-chip.day')].filter(e=>e.offsetParent);d[d.findIndex(e=>e.classList.contains('is-today'))+1]?.click()})()", wait(7000)) },
     // 首頁 past ELTA's list (11/22: Newcastle v Arsenal, the Lakers): the guessed channel, said 預估 (with --account fan).
     'home-far': { args: click(wait(3000), "js:document.querySelector('.q-day-bar [data-day=\"2026-11-22\"]')?.click()", wait(9000)) },
     // That game's page: 台灣轉播 with the guess (依愛爾達往例預估), scrolled to it.
@@ -90,11 +96,14 @@ export const PAGES = {
   },
   weather: {
     default: ['tabs'],
-    rain: { args: click('.q-panel[data-open="rain"]', '[data-range="rain:10d"]') },
-    air: { args: click('.q-panel[data-open="air"]') },
-    // The day's sheet (the sky card tapped), and the place search (the title).
-    day: { args: click('.wx-hero[data-day]', wait(1500)) },
-    search: { args: click('.wx-title', wait(1200)) }
+    // (The new 天氣's readings first, today's panels after, so a --before main diff finds both.)
+    rain: { args: click('.ot-g[data-metric="rain"], .q-panel[data-open="rain"]', '[data-range="rain:10d"]') },
+    air: { args: click('.ot-g[data-metric="air"], .q-panel[data-open="air"]') },
+    // The day's sheet (the sky's card tapped), and the place search (the title).
+    day: { args: click('.ot-hero[data-day], .wx-hero[data-day]', wait(1500)) },
+    search: { args: click('.wx-title', wait(1200)) },
+    // 天氣 further down: the readings, the advice and the ten days.
+    lower: { args: click('js:window.scrollTo(0, 900)', wait(800)) }
   },
   orbit: {
     default: ['tabs'],

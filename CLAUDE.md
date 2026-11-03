@@ -119,7 +119,7 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | Module | What |
 | --- | --- |
 | `orbit.mjs` | The core: the session, data reads and device storage (§5), the economy's tables, looks and milestones, notices, the frame (`tabBar`, `topActions`, `accountButton`, `ask`/`tell`), screens, fitting, live beats and break countdowns, recommendations (`rank`, `affinity`), the 除錯紀錄 (`rec`); on import it stops pinch zoom, lifts sheets over the keyboard (`watchKeyboard`), holds the first lift for on-screen pictures and presses only when pressed |
-| `orbit.css` | The design system: iOS 27's tokens (colour, type, space, radius, Liquid Glass, springs) and every `q-` component; the apps' accent colours (`tools/accent-css.mjs`); at its end the 原生 Native layer, for an app whose page says `<html data-look="native">` (DESIGN §11) |
+| `orbit.css` | The design system: iOS 27's tokens (colour, type, space, radius, Liquid Glass, springs) and every `q-` component; the apps' accent colours (`tools/accent-css.mjs`); at its end the redesign's layer, for a page with `<html data-look="native">` (DESIGN §11) |
 | `ui.mjs` | The builders (§3.3) and their HTML-string twins (`…Html`) for apps that draw with template strings; loads `hold-place.mjs` |
 | `hold-place.mjs` | A redraw never moves the page, a sheet or a panel (Safari has no scroll anchoring): one the person didn't make holds what they read; a tap or swipe holds the control under the finger; never held to a drawing or a box laid over the page (`loose`); a sheet sized to its content keeps its height while open (`--q-sheet-floor`); `scrollBusy()` holds `everyDev`'s beats while a finger is down or a fling runs |
 | `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, before the app's modules) |
@@ -157,7 +157,8 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | A page on top | `sheet({ detent, foot, lead, trailing })`, `bindSheet`, `setSheetDetent`; `closeSheet` (orbit.mjs) slides it out; `sheetHero`, `sheetFoot` / `.q-sheet-foot`; a whole page (a game, a team, a law) in `.q-sheet-wide` with `.q-sheet-cols` / `.q-sheet-pair` |
 | A question | `ask()` / `tell()` (orbit.mjs), `confirm()` (ui.mjs): never the browser's popups; a one-tap delete gets a `toast` with 復原 |
 | Rows | `list` / `cell` (grouped), `rowCard`, `section` / `sectionHead` / `sectionHtml`, `.q-list-head` |
-| The focal number | `.q-focus` on the app's colour; `heroCardHtml` only when the focus is an action; `stats` / `statsHtml`, `.q-fig` |
+| The focal number | `.q-focus` on the app's colour (graphite in the redesign); `heroCardHtml` only when the focus is an action; `stats` / `statsHtml`, `.q-fig` |
+| Colour on a card | In the redesign, `.q-band` (`--band`; `.q-band-mark`, `-text`, `-end`): a row inset on the colour of what it identifies (a team, a line, a category); never a card filled with the app's colour |
 | Small pieces | `tile` / `tileHtml`, `tag` / `tagHtml` (one exception per row), `.q-chip` (taps only), `toggle`, `search`, `menu`, `.q-badge`, `progressRing`, `monthCalendar`, `rail`, `actionGrid`, `panelGrid`, `leagueTile`, `matchCard`, `liveStrip`, `stockRow`, `movePill`, `placeTile`, `ballRow` |
 | A list's more | `moreToggle({ more, less, open, onToggle })` / `moreHtml` (`.q-more`): 再看 7 則 / 收起 as one quiet bar; `less: null` for a pager. Never accent text links |
 | Nothing here | `empty({ icon, title, body, action })` / `emptyHtml` |
