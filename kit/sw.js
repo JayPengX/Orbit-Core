@@ -170,6 +170,26 @@ async function pageFirst(request, later) {
   return kept;
 }
 
+// An update's reload (watchUpdates, boot.js: the page under ?v=<its
+// version>): the page kept here when it is that version, at once. The watch
+// fetched it (and every file it names) before swapping, so the new page
+// opens from the phone like any other opening. It went to the network every
+// time: a round trip at best, and on a connection that died while the app
+// was in the background, 8 s and a second try before anything showed (the
+// app sat on a blank or loading screen, and a restart opened it at once).
+// Any other ?v= (a mend's reload) asks the network, as before.
+async function versionFirst(request, later) {
+  const want = new URL(request.url).searchParams.get('v');
+  const kept = want ? await caches.match(request, { ignoreSearch: true }) : null;
+  if (kept) {
+    try {
+      const page = await kept.clone().text();
+      if (/<meta name="build-version" content="([^"]*)"/.exec(page)?.[1] === want) return kept;
+    } catch {}
+  }
+  return networkFirst(request, later);
+}
+
 // The kit's boot.js is what mends an update that didn't finish (and draws
 // the loading screen the apps report to): refused while the CDN still had the
 // old one, nothing was left to mend it, and the app sat on a blank loading
@@ -196,7 +216,7 @@ async function cacheFirst(request, later) {
   }
 }
 
-const ROUTES = { pageFirst, cacheFirst, networkFirst };
+const ROUTES = { pageFirst, cacheFirst, networkFirst, versionFirst };
 self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
@@ -207,7 +227,7 @@ self.addEventListener('fetch', event => {
   const tail = [];
   const later = work => tail.push(Promise.resolve(work).catch(() => {}));
   const own = SW.route(request, url);
-  const route = ROUTES[own] || (request.mode === 'navigate' ? (url.searchParams.has('v') ? networkFirst : pageFirst) : url.searchParams.has('v') ? cacheFirst : networkFirst);
+  const route = ROUTES[own] || (request.mode === 'navigate' ? (url.searchParams.has('v') ? versionFirst : pageFirst) : url.searchParams.has('v') ? cacheFirst : networkFirst);
   const answer = own && typeof own !== 'string' ? Promise.resolve(own) : route(request, later);
   event.respondWith(answer);
   event.waitUntil(

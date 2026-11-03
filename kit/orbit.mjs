@@ -3475,12 +3475,22 @@ export function watchUpdates({ current, key, every = 15_000 } = {}) {
     globalThis.__bootUpdating = true;
     // Only the kit changed: the same page again, its loader now on the new
     // kit (the app's own files are still current).
-    if (latest.startsWith('kit:')) return location.reload();
+    if (latest.startsWith('kit:')) {
+      try {
+        sessionStorage.setItem('orbit.updating', JSON.stringify({ how: 'watch-kit', at: Date.now(), path: location.pathname }));
+      } catch {}
+      return location.reload();
+    }
     // (The files kept on the phone stay: every one is kept under its own
     // hash, so the new page asks only for the ones that changed. They were
     // all dropped here, and every update downloaded the whole app again.)
-    const reg = await navigator.serviceWorker?.getRegistration?.(location.pathname);
-    await reg?.update?.().catch(() => {});
+    // (Its service worker checked for a newer one first, a second at most: a
+    // connection left hanging held the swap, and the app with it.)
+    const reg = await Promise.race([navigator.serviceWorker?.getRegistration?.(location.pathname), new Promise(done => setTimeout(done, 1000))]).catch(() => null);
+    await Promise.race([reg?.update?.(), new Promise(done => setTimeout(done, 1000))]).catch(() => {});
+    try {
+      sessionStorage.setItem('orbit.updating', JSON.stringify({ how: 'watch', at: Date.now(), path: location.pathname }));
+    } catch {}
     location.replace(`${location.pathname}?v=${encodeURIComponent(latest)}${location.hash}`);
   }
   // An opening asks once: boot.js has just asked (window.__bootChecked), and
@@ -3524,6 +3534,23 @@ if (typeof document !== 'undefined' && typeof location !== 'undefined') {
   if (current) watchUpdates({ current, key: `orbit.page:${location.pathname}` });
   // Back from an update's reload: the scroll put back once the app lifts its loading screen, in every app.
   const box = document.getElementById('loading');
+  // How long the new page took to show, noted in the 除錯紀錄 (an opening
+  // stuck after an update is told apart from a slow connection by this).
+  let updating = null;
+  try {
+    updating = JSON.parse(sessionStorage.getItem('orbit.updating') || 'null');
+    sessionStorage.removeItem('orbit.updating');
+  } catch {}
+  if (box && updating?.path === location.pathname && Date.now() - updating.at < 120_000 && typeof MutationObserver !== 'undefined') {
+    const t0 = updating.at;
+    const shown = () => {
+      if (!box.hidden || box.classList.contains('q-boot-hold')) return false;
+      rec('update', { how: updating.how, ms: Date.now() - t0, page: Math.round(performance.now()), sw: Boolean(navigator.serviceWorker?.controller) });
+      return true;
+    };
+    const look = new MutationObserver(() => shown() && look.disconnect());
+    look.observe(box, { attributes: true, attributeFilter: ['hidden', 'class'] });
+  }
   let placed = false;
   try {
     placed = Boolean(sessionStorage.getItem('orbit.place'));

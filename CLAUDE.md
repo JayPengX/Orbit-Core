@@ -105,9 +105,9 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
   files a push changed; the kit's `version.json` lists every hash, the
   device notes them (`orbit.kitFiles`), and a push that changes no kit file
   is no update.
-- **Updates.** An open app swaps to a new version only once every file it
-  needs is on the phone (`watchUpdates` → `updateReady`); `sw.js` never
-  refuses `boot.js`, which mends an update that didn't finish.
+- **Updates.** An open app swaps once the new version's files are on the
+  phone (`updateReady`; `sw.js versionFirst` opens it);
+  `sw.js` never refuses `boot.js`, which mends an unfinished update.
 - **A phone may run an older kit.** A new export is used with a fallback
   (`kitUI.newThing?.(…)` through a namespace import), never imported by name,
   or the whole app stops on a phone that still has the old kit.
@@ -122,7 +122,7 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `orbit.css` | The design system: iOS 27's tokens (colour, type, space, radius, Liquid Glass, springs) and every `q-` component; the apps' accent colours (`tools/accent-css.mjs`); at its end Orbit's own look, on every app's page (`data-look="native"`, DESIGN §11) |
 | `ui.mjs` | The builders (§3.3) and their HTML-string twins (`…Html`) for apps that draw with template strings; loads `hold-place.mjs` |
 | `hold-place.mjs` | A redraw never moves the page, a sheet or a panel: one the person didn't make holds what they read; a tap or swipe holds the control under the finger; never held to a drawing or a box laid over the page (`loose`); a content-sized sheet keeps its height while open (`--q-sheet-floor`); `scrollBusy()` holds `everyDev`'s beats under a finger or a fling; `freshScreen()`: a new screen at the top |
-| `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, before the app's modules) |
+| `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, before the app's modules); the cover held for it |
 | `loader.html` | The snippets every app's page carries (`kit:head`, `kit:boot`) |
 | `brand.mjs` | Families, names, colours, marks, repos, slugs, `APP_ORDER`, `DEV` (the owner's live speeds) |
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: never money); every app's guide (`#help=<app>[:topic]`) |
