@@ -41,3 +41,95 @@ test('plan: Maps carried to the month\'s end, and the people it holds', () => {
   assert.equal(p.scale, 1);
   assert.ok(p.cf.holds > 8);
 });
+
+// ---- Each quota from what was really used (quotas, splitHours) ----
+import { quotas, splitHours } from '../capacity.js';
+import { PLAN } from '../guard.js';
+
+const HOUR = 3_600_000;
+const NOW = Date.parse('2026-11-03T06:30:00Z');
+// 7 days hour by hour: the crons' 500 requests and 20,000 CPU ms every hour,
+// plus people in Taiwan's day (08:00–24:00) 1,000 requests and 10,000 ms an hour.
+const week = (() => {
+  const end = Math.floor(NOW / HOUR) * HOUR;
+  const out = [];
+  for (let t = end - 7 * 24 * HOUR; t < end; t += HOUR) {
+    const tw = new Date(t + 8 * HOUR).getUTCHours();
+    const busy = tw >= 8;
+    out.push([t, 500 + (busy ? 1000 : 0), 20_000 + (busy ? 10_000 : 0)]);
+  }
+  return { hours: out };
+})();
+const guardOf = (share = {}) => {
+  const period = { from: Date.parse('2026-10-12T00:00:00Z'), start: Date.parse('2026-10-13T00:00:00Z'), end: Date.parse('2026-11-13T00:00:00Z') };
+  const use = Object.fromEntries(Object.keys(PLAN).map(k => [k, (share[k] || 0) * PLAN[k]]));
+  return { plan: PLAN, stopAt: 0.9, period, use, projected: use };
+};
+
+test('splitHours: the quietest tenth of the hours is the floor; people are what is above it', () => {
+  const s = splitHours(week, NOW);
+  assert.equal(s.requests.fixed, 500 * 24);
+  assert.equal(s.requests.day, 500 * 24 + 1000 * 16);
+  assert.equal(s.requests.people, 1000 * 16);
+  assert.equal(s.cpuMs.fixed, 20_000 * 24);
+  assert.equal(s.cpuMs.people, 10_000 * 16);
+  // Under 5 days of hours: not known.
+  assert.equal(splitHours({ hours: week.hours.slice(-100) }, NOW), null);
+  assert.equal(splitHours(null, NOW), null);
+});
+
+test('splitHours: a week that is nearly all crons still leaves people a tenth (the people held err low)', () => {
+  const flat = { hours: week.hours.map(([t]) => [t, 100, 1000]) };
+  const s = splitHours(flat, NOW);
+  assert.equal(s.requests.people, s.requests.day * 0.1);
+});
+
+test('quotas: people held = this week\'s × room after the fixed part ÷ what people use; the fewest is named', () => {
+  const users = { week: 40 };
+  const q = quotas({ users, guard: guardOf({ requests: 0.05, cpuMs: 0.2, r2ClassA: 0.07 }), hours: week, now: NOW });
+  const cpu = q.rows.find(r => r.key === 'cf:cpuMs');
+  const days = 32;
+  const capDay = (PLAN.cpuMs * 0.9) / days;
+  assert.equal(cpu.measured, true);
+  assert.equal(cpu.holds, Math.floor((40 * (capDay - 20_000 * 24)) / (10_000 * 16)));
+  assert.equal(cpu.slows, Math.floor((40 * ((PLAN.cpuMs * 0.6) / days - 20_000 * 24)) / (10_000 * 16)));
+  // R2 (no hours): all of it counted as people's, from the period's pace.
+  const r2 = q.rows.find(r => r.key === 'cf:r2ClassA');
+  assert.equal(r2.measured, false);
+  assert.equal(r2.holds, Math.floor((40 * 0.9) / 0.07));
+  assert.deepEqual(q.holds, { people: Math.min(...q.rows.filter(r => r.holds != null).map(r => r.holds)), key: q.holds.key });
+  assert.equal(q.measured, true);
+  // Storage isn't counted in people.
+  assert.equal(q.rows.find(r => r.key === 'cf:kvBytes').holds, undefined);
+});
+
+test('quotas: Gemini by its busiest day, a paused feature never the limit; Maps and TDX carried to the month\'s end; Weather by place', () => {
+  const users = { week: 20 };
+  const usage = {
+    ai: [
+      { key: 'aiLaw', cap: 300, days: [5, 10, 30, 2, 0, 4, 6] },
+      { key: 'aiMoneyRead', cap: 0, days: [0, 0, 0, 0, 0, 0, 0] }
+    ],
+    tdx: { points: 30, plan: { month: 200 }, guard: { why: '' } },
+    weather: { googleToday: 200, cap: 450 }
+  };
+  const maps = { routes: { used: 900, month: 3000, cap: 9000 } };
+  const q = quotas({ users, usage, maps, now: NOW });
+  const law = q.rows.find(r => r.key === 'ai:aiLaw');
+  assert.equal(law.holds, Math.floor((20 * 300) / 30));
+  assert.equal(q.rows.find(r => r.key === 'ai:aiMoneyRead').paused, true);
+  assert.equal(q.rows.find(r => r.key === 'maps:routes').holds, Math.floor((20 * 9000) / 3000));
+  const tdx = q.rows.find(r => r.key === 'tdx:points');
+  // Nov 3, 14:30 in Taiwan: 2.6 days gone of 30.
+  assert.ok(Math.abs(tdx.month - (30 / (2 + 14.5 / 24)) * 30) < 1e-6);
+  assert.equal(q.rows.find(r => r.key === 'weather:google').by, 'place');
+  assert.equal(q.holds.key, 'tdx:points');
+  // Nobody this week: nothing held, nothing named.
+  assert.equal(quotas({ users: { week: 0 }, usage, maps, now: NOW }).holds, null);
+});
+
+test('plan carries the quotas', () => {
+  const u = { ...estimateUsers({ active: { day: 4, week: 8 }, apps: { transit: { week: 4 } }, newWeek: 0 }), apps: { transit: 4 } };
+  const p = plan({ users: u, base, guard: guardOf({ cpuMs: 0.2 }), hours: week, usage: {}, now: NOW });
+  assert.ok(p.quotas.rows.some(r => r.key === 'cf:cpuMs' && r.holds > 0));
+});

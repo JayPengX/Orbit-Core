@@ -442,3 +442,43 @@ export async function workerErrors(env, { fetcher = fetch, now = Date.now(), kv 
   }
   return { at: now, workers };
 }
+
+// The last 7 days hour by hour (every Worker of the account, as the plan
+// counts them): [hour start (ms), requests, CPU ms], for capacity.js to
+// tell the crons' steady floor from what people add. Kept an hour in KV
+// (the panel and the proxy's 6-hourly check ask; analytics is asked once).
+export const HOURS_KEY = 'guard:hours';
+const HOURS_Q = cpu => `query($a: string!, $s: Time!, $e: Time!) { viewer { accounts(filter: { accountTag: $a }) {
+  x: workersInvocationsAdaptive(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e }) { sum { requests${cpu ? ' cpuTimeUs' : ''} } ${cpu ? '' : 'quantiles { cpuTimeP99 } '}dimensions { datetimeHour scriptName } }
+} } }`;
+export async function useByHour(env, { fetcher = fetch, now = Date.now(), kv = env.RATE_LIMIT_KV } = {}) {
+  if (!env.CF_GUARD_TOKEN) return { off: true };
+  const kept = JSON.parse((await kv?.get(HOURS_KEY).catch(() => null)) || 'null');
+  if (kept?.at && now - kept.at < 3_600_000) return kept;
+  const state = JSON.parse((await kv?.get(STATE_KEY).catch(() => null)) || 'null') || {};
+  const a = env.CF_ACCOUNT_ID || state.account || (await accountOf(env, fetcher));
+  const end = Math.floor(now / 3_600_000) * 3_600_000;
+  const vars = { a, s: isoTime(end - 7 * DAY), e: isoTime(end - 1000) };
+  let cpuWay = 'sum';
+  let acc;
+  try {
+    acc = await graphql(env, fetcher, HOURS_Q(true), vars);
+  } catch (err) {
+    if (!err.fields) throw err;
+    cpuWay = 'p99';
+    acc = await graphql(env, fetcher, HOURS_Q(false), vars);
+  }
+  const by = new Map();
+  for (const r of acc.x || []) {
+    const t = Date.parse(r.dimensions?.datetimeHour);
+    if (!Number.isFinite(t)) continue;
+    const n = r.sum?.requests || 0;
+    const row = by.get(t) || [t, 0, 0];
+    row[1] += n;
+    row[2] += cpuWay === 'sum' ? (r.sum?.cpuTimeUs || 0) / 1000 : (n * (r.quantiles?.cpuTimeP99 || 0)) / 1000;
+    by.set(t, row);
+  }
+  const out = { at: now, from: end - 7 * DAY, to: end, cpuWay, hours: [...by.values()].sort((x, y) => x[0] - y[0]).map(([t, n, c]) => [t, n, Math.round(c)]) };
+  await kv?.put(HOURS_KEY, JSON.stringify(out)).catch(() => {});
+  return out;
+}

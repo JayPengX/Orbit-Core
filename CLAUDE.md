@@ -276,7 +276,7 @@ OpenF1's tables (`openF1Raw`) and kept in R2 for good.
 
 | Worker | File, toml | What |
 | --- | --- | --- |
-| `quota-guard` | `guard-worker.js`, `guard.js`, `wrangler.guard.toml` | The bill's guard (§9); DO `GuardClock` (its 5-minute alarm), KV for its state |
+| `quota-guard` | `guard-worker.js`, `guard.js`, `wrangler.guard.toml` | The bill's guard (§9); DO `GuardClock` (its 5-minute alarm), KV for its state; `/errors`, `/hours` (7 days hourly) for the panel |
 | `gemini-relay` | `gemini-relay.js`, `wrangler.gemini.toml` | Gemini's calls from Taiwan (placement `gcp:asia-east1`) |
 | `orbit-site` | `site.js`, `site-closed.js`, `wrangler.site.toml` | The domain's custom domains; Longshot's shutdown notice |
 | `orbit-<slug>`, `orbit-pass`, `orbit-home` | `deploy/cf-site.mjs` | Each repo's static site, an assets-only Worker on routes of its paths (§10) |
@@ -431,6 +431,9 @@ can be turned off on its own.
   `gemini_call` (`gemini-use.js`). Gemini runs only behind a person's tap.
 - **Errors**: each route's 5xx tallied (`err:<route>:<day>`); the guard's
   `/errors`; the panel's 部署 runs workflows with `GH_ACTIONS_TOKEN`.
+- **容量** (`capacity.js` `quotas`): each quota's people held = this
+  week's × (room past the fixed part ÷ people's use), the fewest named;
+  Workers' fixed part from the guard's `/hours`.
 - **`quota-guard`** (`guard.js`, every 5 minutes) reads the account's use
   against `PLAN` (Workers, CPU, KV, DO, R2, D1), paces from 60% (`pace.js`:
   slower refreshes, builders parked), tells the owner at 50/75/90%

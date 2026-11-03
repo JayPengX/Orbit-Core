@@ -792,6 +792,25 @@ if (key === 'admin') {
   }
   const kv = new Map();
   const env = { ECO_ADMIN_TOKEN: ADMIN_KEY, RATE_LIMIT_KV: { get: async k => kv.get(k) ?? null, put: async (k, v) => void kv.set(k, v), list: async () => ({ keys: [] }), delete: async k => void kv.delete(k) } };
+  // (The bill as the guard keeps it, at the live shares of 2026-11-03, and its
+  // last 7 days hour by hour: the panel's 容量. Made up, never the account's.)
+  {
+    const { PLAN, STATE_KEY } = await import('../guard.js');
+    const share = { requests: 0.057, cpuMs: 0.19, kvRead: 0.012, kvWrite: 0.018, kvList: 0.013, kvBytes: 0.007, doRequests: 0.019, r2ClassA: 0.069, r2ClassB: 0.052, r2Bytes: 0.032, d1RowsRead: 0.00001, d1RowsWritten: 0.0014, d1Bytes: 0.0003 };
+    const from = now - 22 * DAY;
+    const period = { from, start: from + DAY, end: from + 32 * DAY };
+    const use = Object.fromEntries(Object.keys(PLAN).map(k => [k, Math.round((share[k] || 0) * PLAN[k])]));
+    const projected = Object.fromEntries(Object.entries(use).map(([k, v]) => [k, /Bytes$/.test(k) ? v : Math.round((v * 32) / 22)]));
+    kv.set(STATE_KEY, JSON.stringify({ at: now - 120_000, armed: true, stopAt: 0.9, plan: PLAN, use, projected, period, cpuWay: 'sum', partial: {} }));
+    const end = Math.floor(now / 3_600_000) * 3_600_000;
+    const hours = [];
+    for (let t = end - 7 * DAY; t < end; t += 3_600_000) {
+      const tw = new Date(t + 8 * 3_600_000).getUTCHours();
+      const busy = tw >= 7 ? (tw >= 18 ? 1.6 : 1) : 0.15;
+      hours.push([t, Math.round(520 + 1150 * busy), Math.round(6500 + 11500 * busy)]);
+    }
+    env.GUARD = { fetch: async () => new Response(JSON.stringify({ at: now - 600_000, hours })) };
+  }
   // (Made-up Gemini calls over the week, the panel's AI 今天 and Google's day: D1 over node:sqlite.)
   env.STORE = (await import('../tests/fake-d1.mjs')).fakeD1();
   const { logCall } = await import('../gemini-use.js');
