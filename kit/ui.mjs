@@ -636,7 +636,7 @@ export function toggle({ checked = false, onChange = () => {}, label = '' } = {}
   b.addEventListener('click', () => {
     const on = b.getAttribute('aria-checked') !== 'true';
     b.setAttribute('aria-checked', String(on));
-    tick();
+    // (Felt and dragged by orbit.mjs's switchGlide, as every switch is.)
     onChange(on);
   });
   return b;

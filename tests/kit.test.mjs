@@ -838,3 +838,17 @@ test("one logo, one address: ESPN's scoreboard copy (…/500/scoreboard/lal.png)
   assert.equal(small('https://a.espncdn.com/i/teamlogos/mlb/500-dark/scoreboard/tb.png'), 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/mlb/500-dark/tb.png&w=192&h=192');
   assert.equal(small('https://a.espncdn.com/i/teamlogos/soccer/500/189.png'), 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/soccer/500/189.png&w=192&h=192');
 });
+
+test('switchDrag: the knob follows a finger inside its run, half way decides', () => {
+  assert.deepEqual(kit.switchDrag(false, 0, 13), { x: 0, p: 0 });
+  assert.deepEqual(kit.switchDrag(false, 30, 13), { x: 13, p: 1 });
+  assert.deepEqual(kit.switchDrag(false, -9, 13), { x: 0, p: 0 });
+  assert.deepEqual(kit.switchDrag(true, -13, 13), { x: 0, p: 0 });
+  assert.ok(kit.switchDrag(true, -4, 13).p > 0.5);
+  assert.ok(kit.switchDrag(false, 7, 13).p > 0.5);
+});
+
+test('switches hold still for anyone who asked for less motion', async () => {
+  const css = (await import('node:fs')).readFileSync(new URL('../kit/orbit.css', import.meta.url), 'utf8');
+  assert.match(css, /prefers-reduced-motion: reduce\)[\s\S]{0,200}\.q-switch,\n\s+\.q-switch::after/);
+});

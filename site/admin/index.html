@@ -146,10 +146,6 @@
   .set .val span { color: var(--q-muted); font-size: 14px; min-width: 14px; }
   .set .changed input { border-color: var(--q-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--q-accent) 18%, transparent); }
   .set .def { display: block; margin-top: 2px; font-size: 12px; color: var(--q-muted); white-space: nowrap; }
-  .switch { position: relative; width: 50px; height: 30px; border-radius: 999px; border: 0; padding: 0; background: var(--q-sunken); cursor: pointer; transition: background 0.15s; }
-  .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform 0.15s; }
-  .switch[aria-checked='true'] { background: var(--q-good); }
-  .switch[aria-checked='true']::after { transform: translateX(20px); }
   .savebar { position: sticky; bottom: 12px; z-index: 3; display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; margin-top: 14px; padding: 12px 14px; border-radius: 16px; background: var(--q-surface); border: 1px solid var(--q-border); box-shadow: var(--q-shadow, 0 8px 30px rgba(0,0,0,.18)); }
   .lag { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 10px; }
   .lag div { padding: 10px 12px; border-radius: 12px; background: var(--q-surface-2); }
@@ -1705,7 +1701,7 @@ function drawDev() {
       const changed = devDraft[k] !== devSaved[k];
       let control;
       if (typeof d.def === 'boolean') {
-        control = el('button', { class: 'switch', role: 'switch', 'aria-checked': String(devDraft[k]), 'aria-label': d.zh, onclick: () => { devDraft[k] = !devDraft[k]; drawDev(); } });
+        control = el('button', { class: 'q-switch', type: 'button', role: 'switch', 'aria-checked': String(devDraft[k]), 'aria-label': d.zh, onclick: () => { devDraft[k] = !devDraft[k]; drawDev(); } });
       } else {
         control = el('input', { type: 'number', min: String(d.min), max: String(d.max), step: '1', value: String(devDraft[k]), 'aria-label': d.zh });
         control.onchange = () => { devDraft = cleanDev({ ...devDraft, [k]: control.value }); drawDev(); };
