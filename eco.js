@@ -554,8 +554,8 @@ async function readInbox(env, deps, wallet, app) {
 }
 
 // (A session on a fresh pass is of its own kind, 'new': every route that
-// reads a session ('ses') turns it away by itself; only replacing the pass
-// takes it: rotate and adding a passkey.)
+// reads a session ('ses') turns it away by itself; only `rotate`, which
+// replaces the pass, takes it.)
 const sessionToken = (secret, c, now) => signToken(secret, { k: c.f ? 'new' : 'ses', d: c.d, a: c.a, s: c.s, g: c.g, e: now + SESSION_MS });
 
 // ---- A fresh pass: replaced before anything else -------------------------------------
@@ -565,9 +565,8 @@ const sessionToken = (secret, c, now) => signToken(secret, { k: c.f ? 'new' : 's
 // app opens (Jay 2026-11-03). Marked `sec.fresh` when issued; passes issued
 // before that are known by never having been used (no app opened, no money,
 // no passkey, never signed out). The mark goes only with the pass itself:
-// `rotate` makes the account's new one (a passkey is added first, then the
-// pass replaced: the kit's freshGate). A pass shown to its own maker (`create`)
-// is never fresh.
+// `rotate` makes the account's new one; a passkey is offered after (the
+// kit's freshGate). A pass shown to its own maker (`create`) is never fresh.
 export const unusedPass = w => !gen(w) && !w.entries?.length && !Object.keys(w.apps || {}).length && !w.passkeys?.keys?.length && !w.merged;
 export const freshPass = w => Boolean(w?.sec?.fresh);
 const markFresh = w => (freshPass(w) || !unusedPass(w) ? w : { ...w, sec: { ...(w.sec || {}), fresh: true } });
