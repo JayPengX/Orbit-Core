@@ -14,6 +14,9 @@ const IVOD = 'https://ivod.ly.gov.tw';
 const UA = 'Mozilla/5.0 (Orbit Law)';
 export const LIVE_TTL = 60;
 const KEY = 'https://orbit-law-live.orbit/v1';
+// The last good read kept 30 minutes at the edge too, so a fresh isolate can still
+// answer it while IVOD fails (the old live.json file always held one).
+const KEY_LAST = 'https://orbit-law-live.orbit/v1-last';
 
 // IVOD's live list (/Live/FetchCommInfo, HTML): one row per meeting today,
 // under its unit's heading: [{ unit, time, place, status, title, single }].
@@ -73,10 +76,14 @@ export async function handleLawLive(ctx, headers, { fetchFn = fetch, cache = typ
   try {
     const body = await (pending ||= readLive(fetchFn).finally(() => (pending = null)));
     last = body;
-    if (cache) ctx?.waitUntil?.(Promise.resolve(cache.put(KEY, new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${LIVE_TTL}` } }))).catch(() => {}));
+    if (cache) {
+      const keep = (k, age) => cache.put(k, new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${age}` } }));
+      ctx?.waitUntil?.(Promise.all([keep(KEY, LIVE_TTL), keep(KEY_LAST, 1800)]).catch(() => {}));
+    }
     return out(body);
   } catch (e) {
     console.log('law-live', String(e?.message || e).slice(0, 160));
-    return last ? out(last) : json({ error: 'upstream' }, 502, headers);
+    const kept = last || (cache && (await cache.match(KEY_LAST).then(r => r?.json()).catch(() => null)));
+    return kept ? out(kept) : json({ error: 'upstream' }, 502, headers);
   }
 }
