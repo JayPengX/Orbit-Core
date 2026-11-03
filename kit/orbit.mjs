@@ -752,8 +752,39 @@ async function fetchDirect(url, timeout) {
   if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
   return res.text();
 }
+// Jolpica (F1's results) answers a phone itself too, but turns the proxy
+// away whenever Cloudflare's shared addresses have used its allowance (it
+// counts per address: 429 on every path, 2026-11-03; F1's 數據 waited
+// seconds on each page and a driver's teams never came). A read the proxy
+// couldn't get (turned away, down, no answer) is read from the device at
+// once, and the device reads that host itself for ten minutes after: no
+// trip to a proxy that will say no. (The answer is the source's own, never
+// trimmed: its readers take both.)
+const SELF_TOO = new Set(['api.jolpi.ca']);
+const SELF_FOR_MS = 10 * 60_000;
+const selfUntil = new Map();
+const hostOf = url => {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
+};
+function proxyOrSelf(url, timeout, ask) {
+  const host = hostOf(url);
+  if (!SELF_TOO.has(host)) return ask();
+  if ((selfUntil.get(host) || 0) > Date.now()) return fetchDirect(url, timeout);
+  return ask().catch(error => {
+    // (Not there, or not allowed: the source's own answer, the same from here.)
+    if (error?.status && error.status < 500 && error.status !== 429) throw error;
+    selfUntil.set(host, Date.now() + SELF_FOR_MS);
+    return fetchDirect(url, timeout).catch(() => Promise.reject(error));
+  });
+}
 export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, timeout = 20_000, mirror = true, alone = false } = {}) {
-  return keptJson(url, dataKey(url, trim), { ttl, keep }, () => (isDirect(url) ? fetchDirect(url, timeout) : !mirror ? fetchOne(url, trim, timeout, '&mirror=0') : alone ? fetchOne(url, trim, timeout) : enqueue(url, trim, timeout)));
+  return keptJson(url, dataKey(url, trim), { ttl, keep }, () =>
+    isDirect(url) ? fetchDirect(url, timeout) : proxyOrSelf(url, timeout, () => (!mirror ? fetchOne(url, trim, timeout, '&mirror=0') : alone ? fetchOne(url, trim, timeout) : enqueue(url, trim, timeout)))
+  );
 }
 // The family's data (the proxy's /data/, kept in R2 on Cloudflare; built at
 // night and through the day): what doesn't change in a day (a league's

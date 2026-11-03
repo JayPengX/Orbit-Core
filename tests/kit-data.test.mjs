@@ -100,3 +100,25 @@ test('an ESPN core API read goes straight to ESPN, never through the proxy', asy
   assert.deepEqual(await kit.proxyJson(url, { ttl: 1 }), { splits: {} });
   assert.deepEqual(asked, [url]);
 });
+
+// Jolpica turns the proxy away (its limit counts per address; Cloudflare's are
+// shared, 429 on every path, 2026-11-03) but answers a phone: read it from the
+// device at once, then straight from the device for a while; a 404 is its own.
+test('a Jolpica read the proxy is turned away from is read from the device at once, and from the device after', async () => {
+  const url = 'https://api.jolpi.ca/ergast/f1/2026/drivers.json?limit=60';
+  asked.length = 0;
+  answer = u => (u.startsWith('https://api.jolpi.ca/') ? new Response('{"MRData":{"total":"22"}}') : new Response('', { status: 429 }));
+  assert.deepEqual(await kit.proxyJson(url, { ttl: 1, alone: true }), { MRData: { total: '22' } });
+  assert.equal(asked.length, 2);
+  assert.ok(asked[0].includes(encodeURIComponent(url)) && !asked[0].startsWith('https://api.jolpi.ca/'), 'the proxy first');
+  assert.equal(asked[1], url);
+  // Then straight from the device: the proxy isn't asked.
+  asked.length = 0;
+  const next = 'https://api.jolpi.ca/ergast/f1/2026/results.json?limit=100';
+  assert.deepEqual(await kit.proxyJson(next, { ttl: 1, alone: true, trim: 'jolpica-results' }), { MRData: { total: '22' } });
+  assert.deepEqual(asked, [next]);
+  // Another host is never read from the device.
+  asked.length = 0;
+  await assert.rejects(kit.proxyJson('https://example.test/turned-away.json', { alone: true }));
+  assert.ok(asked.every(u => !u.startsWith('https://example.test/')));
+});
