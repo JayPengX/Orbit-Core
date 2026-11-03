@@ -216,7 +216,20 @@ async function cacheFirst(request, later) {
   }
 }
 
-const ROUTES = { pageFirst, cacheFirst, networkFirst, versionFirst };
+// The app's own pictures with no ?v= (a logo, an icon drawn by a template
+// string): the copy kept here at once, checked with the network behind it.
+// They went to the network first: every opening (and, on iPhone, a redraw the
+// browser's memory didn't cover) waited a round trip with a blank where the
+// logo goes (YouBike's in Transit, Jay 2026-11-03). A changed picture shows
+// from the next time.
+async function pictureFirst(request, later) {
+  const kept = await caches.match(request);
+  if (!kept) return networkFirstNow(request, later);
+  later(networkFirstNow(request, later).catch(() => {}));
+  return kept;
+}
+
+const ROUTES = { pageFirst, cacheFirst, networkFirst, versionFirst, pictureFirst };
 self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
@@ -227,7 +240,7 @@ self.addEventListener('fetch', event => {
   const tail = [];
   const later = work => tail.push(Promise.resolve(work).catch(() => {}));
   const own = SW.route(request, url);
-  const route = ROUTES[own] || (request.mode === 'navigate' ? (url.searchParams.has('v') ? versionFirst : pageFirst) : url.searchParams.has('v') ? cacheFirst : networkFirst);
+  const route = ROUTES[own] || (request.mode === 'navigate' ? (url.searchParams.has('v') ? versionFirst : pageFirst) : url.searchParams.has('v') ? cacheFirst : request.destination === 'image' ? pictureFirst : networkFirst);
   const answer = own && typeof own !== 'string' ? Promise.resolve(own) : route(request, later);
   event.respondWith(answer);
   event.waitUntil(

@@ -35,6 +35,8 @@ import { API, SITE as HOME, isApi } from './domain.mjs';
 import { passkeyHere, passkeyName, deviceName, makePasskey, usePasskey, forgetPasskey, cancelled } from './passkey.mjs';
 import { icons, tile, pullToRefresh, setSheetDetent, toast, h as node } from './ui.mjs';
 import { scrollBusy } from './hold-place.mjs';
+// (A picture drawn again never flashes: steady-pics.mjs, on import.)
+import './steady-pics.mjs';
 
 export const ECO_URL = `${API}/eco`;
 export const PROXY_URL = `${API}/sports-proxy`;
