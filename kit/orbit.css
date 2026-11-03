@@ -3369,6 +3369,32 @@ html.q-recording body::after {
   box-shadow: none;
 }
 
+/* An add row (新增行程, 釘選地點, 新增帳戶…): the plus alone in the tile's column, no box,
+   pill or wash behind it, and the words in the accent (Jay 2026-11-03: the plus on a
+   green pill "make the UI look cheap"). <button class="q-ritem q-add"><span
+   class="q-add-i">+</span><span class="q-ritem-text"><span class="q-ritem-title">… */
+.q-ritem.q-add {
+  min-height: 48px;
+  color: var(--q-accent);
+}
+.q-add-i {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 24px;
+  color: var(--q-accent);
+}
+.q-add-i svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2;
+}
+.q-ritem.q-add .q-ritem-title {
+  color: var(--q-accent);
+  font-weight: 500;
+}
+
 .q-rowcard {
   display: grid;
   margin: 0;
@@ -5872,4 +5898,18 @@ html[data-look='native'] .q-tile:not(.q-place) {
   background: color-mix(in srgb, var(--t) var(--nv-wash), transparent);
   color: color-mix(in srgb, var(--t) var(--nv-glyph-a), var(--nv-glyph));
   box-shadow: none;
+}
+/* (Inside a sheet or a card a button lies flat: a quiet fill, no glass, rim or drop. Glass
+   is for what floats over a map or a picture; inside a surface it read as old 3D buttons
+   (Jay 2026-11-03, Transit's 路線 sheet: "the glassy 3D button design still quite a lot of
+   places"). A button that floats over a map inside one keeps it with .q-glass.) */
+html[data-look='native'] :is(.q-sheet, .q-rowcard, .q-list, .q-section) :is(.q-icon-btn, .q-close):not(.q-glass) {
+  background: var(--q-fill-3);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+html[data-look='native'] :is(.q-sheet, .q-rowcard, .q-list, .q-section) .q-icon-btn:not(.q-glass):is(:active, [data-q-press]):not(:disabled) {
+  transform: scale(0.94);
+  background: var(--q-fill-2);
 }

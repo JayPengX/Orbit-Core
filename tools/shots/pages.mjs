@@ -113,6 +113,13 @@ export const PAGES = {
     'go-lower': { hash: 'go', args: click(wait(8000), "js:(()=>{document.getElementById('panel-go')?.scrollTo(0,700);scrollTo(0,700)})()", wait(1500)) },
     // A pinned bus's route from 交通's row: its stops, where its buses are (進站中 on a stop's dot, one on its way between two).
     route: { hash: 'go', args: click(wait(9000), '[data-route]', wait(6000)) },
+    // 查時刻 › 火車: 新竹 → 臺北's trains, each journey as one line.
+    trains: { hash: 'times', args: click(wait(2500), '[data-view="train"]', wait(1000), "js:(async()=>{const pick=async(w,q)=>{document.querySelector(`[data-pick=${w}]`).click();await new Promise(r=>setTimeout(r,800));const i=document.querySelector('#s-q');i.value=q;i.dispatchEvent(new Event('input',{bubbles:true}));await new Promise(r=>setTimeout(r,900));document.querySelector('#s-body [data-st]').click();await new Promise(r=>setTimeout(r,900))};await pick('from','新竹');await pick('to','臺北')})()", wait(8000)) },
+    // 查時刻 › 捷運: the metro map (台北 first), its line chips, the station card.
+    metro: { hash: 'times', args: click(wait(2500), '[data-view="metro"]', wait(6000)) },
+    // 我的: trips, places, pins; then its 公車站牌 editor (groups, reorder, remove).
+    me: { hash: 'me', args: click(wait(3000)) },
+    stops: { hash: 'me', args: click(wait(3000), '[data-act="groups"]', wait(1500)) },
     // 查時刻: a station's live board (高雄).
     board: { args: click('#tab-times', wait(3000), "js:(async()=>{document.querySelector('[data-pick=to]').click();await new Promise(r=>setTimeout(r,800));const q=document.querySelector('#s-q');q.value='高雄';q.dispatchEvent(new Event('input',{bubbles:true}));await new Promise(r=>setTimeout(r,800));document.querySelector('#s-body [data-st]').click()})()", wait(8000)) }
   },
