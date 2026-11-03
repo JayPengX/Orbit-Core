@@ -2053,6 +2053,13 @@ input[type='checkbox'][switch] {
   transform: translateX(-50%);
   animation: q-toast-in var(--q-dur-bouncy) var(--q-spring-bouncy);
 }
+/* (Over a sheet: a popover in the top layer, ui.mjs toast; the browser's popover box undone.) */
+.q-toast[popover] {
+  inset: auto auto calc(var(--q-nav, 0px) + 12px) var(--q-mid, 50%);
+  margin: 0;
+  border: 0;
+  overflow: visible;
+}
 .q-net {
   position: fixed;
   z-index: 2147482800;
