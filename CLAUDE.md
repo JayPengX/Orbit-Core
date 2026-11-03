@@ -162,7 +162,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | Small pieces | `tile` / `tileHtml`, `tag` / `tagHtml` (one exception per row), `.q-chip` (taps only), `toggle`, `search`, `menu`, `.q-badge`, `progressRing`, `monthCalendar`, `rail`, `actionGrid`, `panelGrid`, `leagueTile`, `matchCard`, `liveStrip`, `stockRow`, `movePill`, `placeTile`, `ballRow` |
 | A list's more | `moreToggle({ more, less, open, onToggle })` / `moreHtml` (`.q-more`): 再看 7 則 / 收起 as one quiet bar; `less: null` for a pager. Never accent text links |
 | Nothing here | `empty({ icon, title, body, action })` / `emptyHtml` |
-| Loading | `#loading` (boot.js) lifted once by `ready(firstScreen)` onto a finished screen (it waits for on-screen pictures); in place, `.q-skel` shimmers the size of what comes |
+| Loading | `#loading` (boot.js) lifted once by `ready(firstScreen)` onto a finished screen (it waits for on-screen pictures); in place, `.q-skel` shimmers the size of what comes; a part read later holds its place as `waiting(shape)` |
 | Pictures | `logoTile` / `logoTileHtml` + `wireLogos`, `darkLogos`; `logos.mjs`, `photos.mjs`; never letter tiles |
 | Icons | `ICONS` (orbit.mjs) / `icons` (ui.mjs): one drawing per idea; new ones read as `kitUI.icons?.x` |
 | Live data | `everyDev(key, fn)` beats at the owner's speeds (they wait while a finger is down); `data-q-live` + `liveChanged` pop a number that changed; patch in place (the same nodes), never rebuild what didn't change; `hold-place.mjs` keeps the reader's place by itself, a tapped control under the finger and a content-sized sheet at its height |
@@ -479,8 +479,8 @@ can be turned off on its own.
 | `node tools/shots.mjs <app> [page…]` | Every screenshot a change needs (five screens × light/dark, live data, signed in), a contact sheet, faults, `--before main` diff; pages in `tools/shots/pages.mjs` |
 | `node tools/preview.mjs <app>` | The app with real data (`--live`, `--width`, `--timing`, `--requests`, `--profile`, `--webkit`, `--reopen`…); prints `wraps:`, `cut:`, `scrolls sideways:` |
 | `node tools/gate.mjs [app…]` | The family quality gate (`tools/gate-page.js`): lift, stalls, dead taps, wraps, cuts, letters, white, mixed language… on every tab |
-| `node tools/f1-replay.mjs --start <UTC> --at <UTC>` | An F1 session as F1's live feed had it at any moment of a recorded one (OpenF1's tables): the proxy's `now.json`/`laps.json` and ESPN's scoreboard as the preview's `--fixture`s, for shots of a red flag or a safety car with no session on (`shots.mjs sports f1-live … -- $(cat <out>/args.txt)`) |
-| `node tools/live-scroll.mjs [app…]` | Nothing jumps: scrolled as Safari scrolls, then a refresh above, a tab drawn short, a moving drawing, taps that fold below and above, a sheet showing less; exit 1 if anything moved |
+| `node tools/f1-replay.mjs --start <UTC> --at <UTC>` | An F1 session as F1's live feed had it at any moment of a recorded one (OpenF1's tables), as the preview's `--fixture`s: shots of a red flag or a safety car with no session on (`shots.mjs sports f1-live … -- $(cat <out>/args.txt)`) |
+| `node tools/live-scroll.mjs [app…]` | Nothing jumps: pages watched as they load (`late`), then scrolled as Safari scrolls: a refresh above, a tab drawn short, a moving drawing, taps that fold below and above, a sheet showing less; exit 1 if anything moved |
 | `node tools/store-shots.mjs <app>` | The README's and Showcase's screenshot set, both languages |
 | `node tools/test-apps.mjs [app…]` | Every app's tests against this kit (checkouts beside this one) |
 

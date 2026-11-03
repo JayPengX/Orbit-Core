@@ -126,3 +126,77 @@ test('ask/confirm: a named icon is a tile, an emoji keeps its old markup', () =>
   assert.match(orbitSrc, /named \? ' pro' : ''/);
   assert.match(orbitSrc, /class: 'q-ask-icon', 'aria-hidden': 'true', text: icon/, 'the emoji branch is unchanged');
 });
+
+// waiting(): a part still being read, held in the shape that's coming (Jay
+// 2026-11-03: 預計先發 came in last and pushed the game's page down).
+test('waiting(): words turn to bars where they sit, empty boxes and pictures shimmer in their own shape, the kept title stays', () => {
+  class Text {
+    constructor(data) {
+      this.nodeType = 3;
+      this.data = data;
+    }
+    replaceWith(n) {
+      const kids = this.parentNode.childNodes;
+      kids[kids.indexOf(this)] = n;
+      n.parentNode = this.parentNode;
+    }
+  }
+  const doc = { createElement: tag => new El(tag) };
+  class El {
+    constructor(tag, cls = '', kids = []) {
+      this.nodeType = 1;
+      this.tagName = tag.toUpperCase();
+      this.ownerDocument = doc;
+      this.attrs = {};
+      this.childNodes = [];
+      this.set = new Set(cls.split(' ').filter(Boolean));
+      this.classList = { add: c => this.set.add(c), contains: c => this.set.has(c) };
+      for (const k of kids) this.append(typeof k === 'string' ? new Text(k) : k);
+    }
+    append(n) {
+      n.parentNode = this;
+      this.childNodes.push(n);
+    }
+    set className(v) {
+      this.set = new Set(v.split(' '));
+    }
+    set textContent(v) {
+      this.childNodes = [];
+      this.append(new Text(v));
+    }
+    matches(sel) {
+      return sel.split(',').some(s => this.set.has(s.trim().replace(/^\./, '')));
+    }
+    querySelectorAll() {
+      return [];
+    }
+    setAttribute(k, v) {
+      this.attrs[k] = v;
+    }
+  }
+  const title = new El('span', 'head', ['先發陣容']);
+  const name = new El('strong', '', ['口口口口']);
+  const face = new El('span', 'face');
+  const pic = new El('img');
+  const row = new El('li', '', [face, pic, name, ' ']);
+  const card = new El('div', 'card', [title, row]);
+  assert.equal(ui.waiting(card, { keep: '.head' }), card);
+  assert.ok(card.set.has('q-wait') && card.attrs['aria-busy'] === 'true' && card.inert === true);
+  assert.equal(title.childNodes[0].nodeType, 3, 'the title kept as it is');
+  assert.ok(face.set.has('q-wait-bit') && pic.set.has('q-wait-bit'), 'an empty box and a picture: their own shape');
+  const bar = name.childNodes[0];
+  assert.ok(bar.set.has('q-wait-bit') && bar.tagName === 'SPAN' && bar.childNodes[0].data === '口口口口', 'words: a bar of their own width');
+  assert.equal(row.childNodes[3].nodeType, 3, 'a bare space is left alone');
+  assert.ok(!name.set.has('q-wait-bit') && !row.set.has('q-wait-bit'));
+  // (Again: nothing marked twice, a bar never wrapped in another.)
+  ui.waiting(card, { keep: '.head' });
+  assert.equal(name.childNodes[0], bar);
+  assert.equal(bar.childNodes[0].nodeType, 3);
+  assert.equal(ui.waiting(null), null);
+  // The look: the kit's shimmer, words rounded, a face its own round; still under reduced motion.
+  assert.match(rawCss, /\.q-wait \.q-wait-bit \{[^}]*q-shimmer/);
+  assert.match(rawCss, /\.q-wait \.q-wait-bit:not\(:empty\) \{\s*border-radius: 6px;/);
+  assert.match(rawCss, /\.q-skel,\s*\.q-wait \.q-wait-bit \{\s*animation: none;/);
+  // (Words put in later, a name fitted once on the page: watched and turned to bars too.)
+  assert.match(readFileSync(new URL('../kit/ui.mjs', import.meta.url), 'utf8'), /new MutationObserver\(\(\) => mark\(shape\)\)/);
+});

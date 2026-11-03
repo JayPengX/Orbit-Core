@@ -50,15 +50,22 @@ real state too (its welcome sheet): shoot that when it's what you changed.
 ## `node tools/live-scroll.mjs [app…] [--sheet "<js>"]`: nothing jumps
 
 Each app on real data (signed in to its demo account in `tools/shots/accounts/`
-where it has one), scrolled the way iPhone's Safari scrolls (no scroll
-anchoring), then: something above the view grows (a refresh); the tab is drawn
+where it has one). First, as it loads, untouched (`late`): from the moment its
+loading screen lifts (a sheet: from the moment it's asked for), every
+card-sized block on screen is noted each 100 ms by what it says, at its place
+in the layout, and one that moves on its own is a fault, named with how far
+and when ("勝率預測 +530px at 1.3s": a part read later popped in above it
+instead of holding its place, the kit's `waiting()`). Sports' game pages are
+checked by themselves: an NBA game to come, one just over, a football game to
+come. Then it's scrolled the way iPhone's Safari scrolls (no scroll
+anchoring), and: something above the view grows (a refresh); the tab is drawn
 anew a moment short before it's full again; a drawing under the view moves (a
 car on a track map, a box laid over the page) and the page must not follow; a
 button is tapped and its tap folds what's under it (the page left short, as a
 segment with less in it) or what's above it, and the button must stay under
 the finger; in a sheet sized to its content, less is shown and the sheet must
-keep its height. `--sheet` opens a sheet and checks it too
-(`"import('./sheets.js').then(m=>m.openTeam('nba','13'))"` in Sports);
+keep its height. `--sheet` opens a sheet and checks it too, in place of the
+app's own (`"import('./sheets.js').then(m=>m.openTeam('nba','13'))"` in Sports; `""` for none);
 `--without` leaves the kit's keeper (`kit/hold-place.mjs`) out to show what it
 catches. Exit code 1 on a fault. Run it after any change to how a page redraws
 or to `hold-place.mjs`.
