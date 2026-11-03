@@ -167,7 +167,15 @@ export const PAGES = {
   },
   beats: {
     default: ['tabs'],
-    'now-playing': { args: click("js:[...document.querySelectorAll('button')].find(b=>b.offsetParent&&/play|播放/i.test(b.getAttribute('aria-label')||'')).click()", wait(8000), '.mp-main', wait(2000)) },
+    // 首頁 playing (the player card, its part lit), and further down. (Each also runs on the
+    // home before Orbit's own look, 2026-11-03, for --before: its first ▶ and its mini bar.)
+    'home-playing': { args: click("js:(document.querySelector('.bt-play')||[...document.querySelectorAll('button')].find(b=>b.offsetParent&&/play|播放/i.test(b.getAttribute('aria-label')||''))).click()", wait(12000)) },
+    'home-lower': { args: click(wait(2500), "js:scrollTo(0, innerHeight * 0.85)", wait(1200)) },
+    jam: { hash: 'jam', args: click(wait(4000)) },
+    studio: { hash: 'studio', args: click(wait(3000)) },
+    make: { hash: 'make', args: click(wait(3000)) },
+    // Now Playing, opened from the home's card (the mini bar steps aside while the card shows).
+    'now-playing': { args: click("js:(document.querySelector('.bt-play')||[...document.querySelectorAll('button')].find(b=>b.offsetParent&&/play|播放/i.test(b.getAttribute('aria-label')||''))).click()", wait(8000), "js:(document.querySelector('.bt-head')||document.querySelector('.mp-main')).click()", wait(2000)) },
     // The rhythm game mid-play (autoplay, no fps text).
     game: { hash: 'create', args: ['--store', 'orbit-beats-game-auto=shot', ...click(card('Rhythm game|節奏遊戲'), wait(2000), "js:[...document.querySelectorAll('.gm-list > *')].find(e=>e.offsetParent).click()", wait(2500), "js:document.querySelectorAll('.gm-level')[2].click()", wait(14000))] }
   },
@@ -212,14 +220,16 @@ export const PAGES = {
     default: ['tabs'],
     // 台股 › 上市, the list; 台積電's page (candles, 6 months), its order ticket; the tool sheets.
     list: { args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(3000)) },
-    stock: { args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(2500), '[data-action=open][data-symbol="2330.TW"]', wait(3000), '[data-action=chart-style][data-v=candle]', '[data-action=range][data-range="6mo"]', wait(4000)) },
-    ticket: { args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(2500), '[data-action=open][data-symbol="2330.TW"]', wait(3000), '[data-action=trade][data-side=buy]', wait(1500)) },
+    stock: { args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(2500), "js:[...document.querySelectorAll('[data-action=open][data-symbol=\"2330.TW\"]')].find(e => e.offsetParent).click()", wait(3000), '[data-action=chart-style][data-v=candle]', '[data-action=range][data-range="6mo"]', wait(4000)) },
+    ticket: { args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(2500), "js:[...document.querySelectorAll('[data-action=open][data-symbol=\"2330.TW\"]')].find(e => e.offsetParent).click()", wait(3000), '[data-action=trade][data-side=buy]', wait(1500)) },
     alloc: { args: click('#tab-portfolio', '[data-action=tool][data-tool=alloc]', wait(1200)) },
     rates: { args: click('#tab-fx', '[data-action=tool][data-tool=rates]', wait(1500)) },
     td: { args: click('#tab-fx', '[data-action=tool][data-tool=td]', wait(1200)) },
     access: { args: click('#tab-fx', '[data-action=tool][data-tool=access]', wait(1200)) },
     truth: { args: click('#tab-fx', '[data-action=tool][data-tool=truth]', wait(1200)) },
     // (Wide screens show 統計分析 beside the activity: no button of its own there.)
+    // 首頁 further down (with --account demo: what's held and starred, then the markets).
+    'home-lower': { args: click(wait(3000), "js:scrollTo(0, innerHeight * 0.85)", wait(1200)) },
     stats: { args: click('#tab-history', "js:document.querySelector('[data-action=hview][data-view=stats]')?.click()", wait(2500)) }
   },
   admin: { default: ['overview', 'accounts', 'money', 'health'], overview: { hash: 'overview' }, accounts: { hash: 'accounts' }, money: { hash: 'money' }, health: { hash: 'health' } }
