@@ -200,3 +200,21 @@ test('waiting(): words turn to bars where they sit, empty boxes and pictures shi
   // (Words put in later, a name fitted once on the page: watched and turned to bars too.)
   assert.match(readFileSync(new URL('../kit/ui.mjs', import.meta.url), 'utf8'), /new MutationObserver\(\(\) => mark\(shape\)\)/);
 });
+
+// Reorder (Jay 2026-11-03): where a lifted row lands, and the keys in their new order.
+test('reorder: a lifted row lands past the middles it crossed, keys follow', () => {
+  const rows = [0, 60, 120, 180].map(top => ({ top, height: 60 }));
+  assert.equal(ui.reorderSlot(rows, 0, 30), 0, 'not moved');
+  assert.equal(ui.reorderSlot(rows, 0, 95), 1, 'past the second row’s middle');
+  assert.equal(ui.reorderSlot(rows, 0, 89), 0, 'not yet past it');
+  assert.equal(ui.reorderSlot(rows, 0, 500), 3, 'below the end: last');
+  assert.equal(ui.reorderSlot(rows, 3, 20), 0, 'up to the top');
+  assert.equal(ui.reorderSlot(rows, 2, 140), 2, 'on its own place');
+  assert.deepEqual(ui.moveKey(['a', 'b', 'c', 'd'], 0, 2), ['b', 'c', 'a', 'd']);
+  assert.deepEqual(ui.moveKey(['a', 'b', 'c', 'd'], 3, 0), ['d', 'a', 'b', 'c']);
+  assert.deepEqual(ui.moveKey(['a', 'b'], 0, 5), ['a', 'b'], 'out of range: unchanged');
+  assert.equal(typeof ui.reorder, 'function');
+  assert.match(ui.gripHtml('排序'), /class="q-grip"[^>]*aria-label="排序"[^>]*data-no-sheet-swipe/);
+  for (const c of ['q-grip', 'q-reorder-lift', 'q-reorder-shift', 'q-row-open']) assert.match(css, new RegExp(`\\.${c}(?![\\w-])`), c);
+  assert.match(css, /\.q-grip\s*\{[^}]*touch-action:\s*none/, 'the grip owns the touch');
+});

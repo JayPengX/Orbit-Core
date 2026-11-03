@@ -15,8 +15,7 @@ same push: a kit module, pattern or family of exports, a route, a Worker, a
 binding, a table, an R2 prefix or KV key family, a data or sync layer, a
 cron's work, a workflow. `npm test` fails on your machine when a kit file,
 Worker file, route, binding, D1 table, builder or workflow isn't named here
-(`tests/claude-map.test.mjs`; on GitHub it only warns, so a missing line
-never stops a deploy). An app's own structure goes in its `MAP.md`.
+(`tests/claude-map.test.mjs`; on GitHub only a warning). An app's own structure goes in its `MAP.md`.
 
 **Look before you write.** Before writing a helper, a component or a style,
 find what the kit has: `node tools/kit-find.mjs <word…>` lists the kit's
@@ -30,8 +29,7 @@ move your own into the kit (TRUTH §4); never a second copy in an app.
   `tools/test-apps.mjs`), and pushes main only if they pass; a red deploy mails Jay.
 - The kit (`kit/`) is served to every app from this repo's site on
   Cloudflare (`pages.yml` → `deploy/cf-site.mjs`): a kit change is one push
-  here. `tools/push.sh` runs every app's tests first: each app's deploy
-  tests against main's kit, and a break mails Jay.
+  here; each app's deploy tests against main's kit.
 - Workers deploy from `main` (`deploy.yml`, the wrangler tomls).
 - `node tools/shots.mjs <app> --before main` takes every screenshot a change
   needs (320/390 upright, a phone on its side, tablet, desktop; light/dark;
@@ -118,10 +116,10 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 
 | Module | What |
 | --- | --- |
-| `orbit.mjs` | The core: the session, data reads and device storage (§5), the economy's tables, looks and milestones, notices, the frame (`tabBar`, `topActions`, `accountButton`, `ask`/`tell`), screens, fitting, live beats and break countdowns, recommendations (`rank`, `affinity`), the 除錯紀錄 (`rec`); on import it stops pinch zoom, lifts sheets over the keyboard (`watchKeyboard`), holds the first lift for on-screen pictures and presses only when pressed |
+| `orbit.mjs` | The core: the session, data reads and device storage (§5), the economy's tables, looks and milestones, notices, the frame (`tabBar`, `topActions`, `accountButton`, `ask`/`tell`), screens, fitting, live beats and break countdowns, recommendations (`rank`, `affinity`), the 除錯紀錄 (`rec`); on import it stops pinch zoom, lifts sheets over the keyboard (`watchKeyboard`), holds the first lift for pictures, presses only when pressed |
 | `orbit.css` | The design system: iOS 27's tokens (colour, type, space, radius, Liquid Glass, springs) and every `q-` component; the apps' accent colours (`tools/accent-css.mjs`); at its end Orbit's own look, on every app's page (`data-look="native"`, DESIGN §11) |
 | `ui.mjs` | The builders (§3.3) and their HTML-string twins (`…Html`) for apps that draw with template strings; loads `hold-place.mjs` |
-| `hold-place.mjs` | A redraw never moves the page, a sheet or a panel: one the person didn't make holds what they read; a tap holds the control under the finger; never a drawing (`loose`); a content-sized sheet keeps its height (`--q-sheet-floor`); `scrollBusy()` holds `everyDev`'s beats under a finger; `freshScreen()`: a new screen at the top |
+| `hold-place.mjs` | A redraw never moves the page, a sheet or a panel: one the person didn't make holds what they read; a tap holds the control under the finger; never a drawing (`loose`); a content-sized sheet keeps its height (`--q-sheet-floor`); `scrollBusy()` holds `everyDev`'s beats under a finger; `freshScreen()`: a new screen at the top; `letGo()`: a drag carries its grip away |
 | `steady-pics.mjs` | A picture drawn again is eager and decoded at once: no blank frame on iPhone |
 | `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, before the app's modules); the cover held for it |
 | `loader.html` | The snippets every app's page carries (`kit:head`, `kit:boot`) |
@@ -161,6 +159,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | The focal number | `.q-focus`, graphite; `heroCardHtml` only when the focus is an action; `stats` / `statsHtml`, `.q-fig` |
 | Colour on a card | `.q-band` (`--band`; `.q-band-mark`, `-text`, `-end`): a row inset on the colour of what it identifies (a team, a line, a category); never a card filled with the app's colour |
 | Small pieces | `tile` / `tileHtml`, `tag` / `tagHtml` (one exception per row), `.q-chip` (taps only), `toggle`, `search`, `menu`, `.q-badge`, `progressRing`, `monthCalendar`, `rail`, `actionGrid`, `panelGrid`, `leagueTile`, `matchCard`, `liveStrip`, `stockRow`, `movePill`, `placeTile`, `ballRow` |
+| Putting in order | `reorder(box, { onChange })`, a `grip()` / `gripHtml()` per row; `.q-row-open` for a row that also opens |
 | A list's more | `moreToggle` / `moreHtml` (`.q-more`): 再看 7 則 / 收起 as one quiet bar; `less: null` for a pager; a way on (全部 ›) too. Never accent text links |
 | Nothing here | `empty({ icon, title, body, action })` / `emptyHtml` |
 | Loading | `#loading` (boot.js) lifted once by `ready(firstScreen)` onto a finished screen (it waits for on-screen pictures); in place, `.q-skel` shimmers the size of what comes; a part read later holds its place as `waiting(shape)` |
@@ -394,12 +393,12 @@ included), then wiped whole. `private/` is never served.
 - **A pass** is a random 10-character code, issued by the owner (admin page
   or `tools/issue-passes.mjs`; no sign-up). The account's id is worked out
   from it (PBKDF2-SHA256 with a pepper from `ECO_TOKEN_SECRET`, `eco.js
-  passKey`). **`ECO_TOKEN_SECRET` must never change**: passes made since
-  2026-10-27 would no longer find their accounts. Sign-in tries: 30 an hour
+  passKey`). **`ECO_TOKEN_SECRET` must never change**: passes since
+  2026-10-27 would lose their accounts. Sign-in tries: 30 an hour
   per address.
 - **Passkeys** (`passkey.js`, `webauthn.js`; `kit/passkey.mjs`): any number
-  per Pass, RP ID `jaypengx.com`; the pass still signs in too. The sign-in
-  screen, a new pass and the admin key are real forms password managers fill.
+  per Pass, RP ID `jaypengx.com`; the pass still signs in too. Sign-in, a new
+  pass and the admin key are real forms password managers fill.
 - **Devices never keep the pass:** a refresh token (60 days) and a short
   session token (`orbit-token.js`, HMAC under `ECO_TOKEN_SECRET`).
 - **Ops:** login, refresh, read/patch/delete, device codes (`eco-pairs`),
@@ -411,8 +410,7 @@ included), then wiped whole. `private/` is never served.
 The numbers live in `eco.js` and the kit's `orbit.mjs` (the same tables in
 both; RULEBOOK §4): NT$200,000 to open, NT$10,000 every Monday, 急難紓困
 (`kit/pay.mjs`), 財富等級 rewards, 1% a month overdraft, no personal loan.
-Money is shown only in Securities (資金); the Pass sheet never shows money.
-Only Securities writes money entries, and `eco:` ids are the Worker's alone.
+Money is shown and written only in Securities (資金), never on the Pass sheet; and `eco:` ids are the Worker's alone.
 Securities' broker rules (`stock-access.mjs`, `stock-credit.mjs`): its MAP.md.
 
 ## 8. Notices (`/push`)
