@@ -158,6 +158,13 @@ The map's question is "where am I and what can I use near me". So:
 - **Money 統計:** "平均每天 NT$645" was a gold capsule: a fact, so plain text.
 - **Law 首頁:** the 問法律 card kept (it's an action) in its indigo; the
   over-line a plain grey word, not spaced caps.
+- **Putting a list in order (Weather 版面, Sports 我的聯賽, before):** ↑ ↓
+  buttons beside a switch on every row, or tap a logo then 往後 again and
+  again. **After:** one quiet grip (three lines) at each row's end; held, the
+  row lifts on a lighter plate with a soft shadow and follows the finger,
+  the others slide aside, and it settles where it's let go (kit `reorder`).
+  A row's own tap still opens it (`.q-row-open`); a ✕ lets go of one with
+  復原 in the toast. One short line under the list says how (按住 ≡ 拖曳).
 - **Don't:** strip a card's colour to make it calm (it reads empty); a
   gap bigger than what it separates; a colour tile on every row; a tag on
   every row; bold values in every row; 3 radii on one screen; accent on

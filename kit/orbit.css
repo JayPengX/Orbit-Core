@@ -5913,3 +5913,108 @@ html[data-look='native'] :is(.q-sheet, .q-rowcard, .q-list, .q-section) .q-icon-
   transform: scale(0.94);
   background: var(--q-fill-2);
 }
+
+/* ---- Reorder (ui.mjs reorder, Jay 2026-11-03): rows put in order by the
+   grip at their end. Held, the row lifts off the list (a lighter plate, a
+   soft shadow, the grip in the app's colour) and follows the finger; the
+   rows it passes slide aside on a spring; let go, it settles in. ---- */
+.q-grip {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin: -6px -10px -6px -2px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--q-r-cell);
+  background: none;
+  color: var(--q-label-3);
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.q-grip svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+/* A row that opens (its page, its sheet) and has a grip: the part that opens is a button inside it. */
+.q-row-open {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-self: stretch;
+  margin: -8px 0;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.q-row-open:is(:active, [data-q-press]) {
+  opacity: 0.6;
+}
+.q-grip:focus-visible {
+  outline: 2px solid var(--q-accent);
+  outline-offset: -6px;
+}
+.q-reorder.q-reordering {
+  overflow: visible;
+}
+.q-reordering,
+.q-reordering * {
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: grabbing;
+}
+.q-reorder-shift {
+  transition: transform 0.26s var(--q-spring-smooth);
+}
+.q-reorder-lift,
+.q-reorder-land {
+  position: relative;
+  z-index: 2;
+  border-radius: var(--q-r-cell);
+  background: linear-gradient(var(--q-fill-4), var(--q-fill-4)), var(--q-surface);
+  box-shadow: 0 0 0 0.5px var(--q-sep), 0 14px 32px -10px rgba(0, 0, 0, 0.45);
+}
+.q-reorder-lift {
+  scale: 1.02;
+  transition: scale 0.18s var(--q-spring-snappy);
+}
+.q-reorder-land {
+  scale: 1;
+  transition: transform 0.2s var(--q-spring-snappy), scale 0.2s var(--q-spring-snappy);
+}
+.q-reorder-lift::before,
+.q-reorder-land::before,
+.q-reorder-lift + *::before {
+  opacity: 0;
+}
+.q-reorder-lift .q-grip {
+  color: var(--q-accent);
+}
+html[data-look='native'] :is(.q-reorder-lift, .q-reorder-land) {
+  background: linear-gradient(var(--q-fill-4), var(--q-fill-4)), var(--nv-card);
+}
+@media (prefers-reduced-motion: reduce) {
+  .q-reorder-shift,
+  .q-reorder-lift,
+  .q-reorder-land {
+    transition: none;
+    scale: none;
+  }
+}

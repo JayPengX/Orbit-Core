@@ -12,10 +12,15 @@ export const tap = text => `js:[...document.querySelectorAll('button,[role=tab],
 export const card = (...texts) => `js:[...document.querySelectorAll('.event-row,.q-card,.q-ritem,button,a')].filter(e=>e.offsetParent&&${JSON.stringify(texts)}.every(t=>new RegExp(t).test(e.textContent))).sort((a,b)=>a.textContent.length-b.textContent.length)[0].click()`;
 export const wait = ms => `js:new Promise(r=>setTimeout(r,${ms}))`;
 const click = (...sels) => sels.flatMap(s => ['--click', s]);
+// A row lifted by its grip mid-drag (kit reorder): the `n`th grip in `scope` held and moved down `by` px, never let go.
+const lift = (scope, n = 0, by = 70) => `js:(()=>{const g=[...document.querySelectorAll('${scope} .q-grip')].filter(e=>e.offsetParent)[${n}];const r=g.getBoundingClientRect();const o={bubbles:true,cancelable:true,pointerId:7,pointerType:'mouse',button:0,clientX:r.x+r.width/2,clientY:r.y+r.height/2};g.dispatchEvent(new PointerEvent('pointerdown',o));setTimeout(()=>{dispatchEvent(new PointerEvent('pointermove',{...o,clientY:o.clientY+12}));dispatchEvent(new PointerEvent('pointermove',{...o,clientY:o.clientY+${by}}))},60)})()`;
 
 export const PAGES = {
   sports: {
     default: ['tabs'],
+    // 追蹤's 設定: the leagues and follows as rows, each with its ✕ and grip; then one league lifted mid-drag (with --account fan).
+    settings: { args: click('#tab-following', wait(3000), "js:document.querySelector('.set-open').click()", wait(2500)) },
+    'settings-drag': { args: click('#tab-following', wait(3000), "js:document.querySelector('.set-open').click()", wait(2500), lift('dialog[open] .set-order'), wait(700)) },
     // 賽事 on one league, each of its tabs (laid out wide on a tablet or a computer).
     'epl-table': { args: click('#tab-matches', '[data-league=epl]', wait(2500), tap('排名|Table'), wait(4000)) },
     // NBA 排名: the two conferences' tables (a pinned rank and name column, the stats beside it).
@@ -123,6 +128,8 @@ export const PAGES = {
     me: { hash: 'me', args: click(wait(3000)) },
     stops: { hash: 'me', args: click(wait(3000), '[data-act="groups"]', wait(1500)) },
     // 查時刻: a station's live board (高雄).
+    // 我的 › 公車站牌: groups and their stops, each with its bin and grip (with --account rides).
+    groups: { hash: 'me', args: click(wait(2000), '[data-act=groups]', wait(1200)) },
     board: { args: click('#tab-times', wait(3000), "js:(async()=>{document.querySelector('[data-pick=to]').click();await new Promise(r=>setTimeout(r,800));const q=document.querySelector('#s-q');q.value='高雄';q.dispatchEvent(new Event('input',{bubbles:true}));await new Promise(r=>setTimeout(r,800));document.querySelector('#s-body [data-st]').click()})()", wait(8000)) }
   },
   weather: {
@@ -134,7 +141,10 @@ export const PAGES = {
     day: { args: click('.ot-hero[data-day], .wx-hero[data-day]', wait(1500)) },
     search: { args: click('.wx-title', wait(1200)) },
     // 天氣 further down: the readings, the advice and the ten days.
-    lower: { args: click('js:window.scrollTo(0, 900)', wait(800)) }
+    lower: { args: click('js:window.scrollTo(0, 900)', wait(800)) },
+    // 地點's 版面: the cards with their switches and grips, then one lifted mid-drag.
+    layout: { args: click(wait(2500), tap('地點|Places'), wait(1500), "js:document.querySelector('[data-act=layout]').click()", wait(1200)) },
+    'layout-drag': { args: click(wait(2500), tap('地點|Places'), wait(1500), "js:document.querySelector('[data-act=layout]').click()", wait(1200), lift('dialog[open]'), wait(700)) }
   },
   orbit: {
     default: ['tabs'],
@@ -166,6 +176,8 @@ export const PAGES = {
     guessing: { hash: 'more', args: click(wait(800), "js:[...document.querySelectorAll('.mn-tool')].find(e=>/^(智慧帶入|Smart fill)/.test(e.textContent.trim())).click()", wait(1200)) },
     // 更多 › 分類: the twelve, each with its subs.
     cats: { hash: 'more', args: click(wait(800), "js:[...document.querySelectorAll('.mn-tool')].find(e=>/^(分類|Categories)/.test(e.textContent.trim())).click()", wait(1200)) },
+    // 分類 with a category lifted mid-drag by its grip.
+    'cats-drag': { hash: 'more', args: click(wait(800), "js:[...document.querySelectorAll('.mn-tool')].find(e=>/^(分類|Categories)/.test(e.textContent.trim())).click()", wait(1200), lift('dialog[open]', 1), wait(700)) },
     // 新增固定收支 scrolled to its foot (開始, the date field that once poked out sideways).
     'repeat-new': { hash: 'more', args: click("js:[...document.querySelectorAll('.mn-tool')].find(e=>/^(固定收支|Repeats)/.test(e.textContent.trim())).click()", wait(1200), tap('新增固定收支|New repeat'), wait(1200), "js:[...document.querySelectorAll('dialog.q-sheet[open]')].pop().scrollTop=9999", wait(600)) }
   },

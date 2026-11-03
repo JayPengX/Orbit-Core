@@ -256,6 +256,11 @@ function keepTap(t) {
   if (s.scrollTop > 0) anchor(s);
 }
 
+// A drag that carries its own control away (a reorder's grip, ui.mjs
+// reorder): no longer a tap to hold under the finger, or the page would
+// scroll after the row to keep the grip where it was picked up.
+export const letGo = () => void (tap = null);
+
 // ---- A sheet keeps its height while open ----
 // The tallest it has been (--q-sheet-floor, its min-height in orbit.css,
 // never past the screen); a sheet with a detent has its own height. Reset
