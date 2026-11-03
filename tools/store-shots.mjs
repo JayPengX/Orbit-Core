@@ -14,7 +14,7 @@
 // Shots are real: live data, made-up accounts only (tools/shots/accounts).
 // A shot with a fault (text wrapping, cut, sideways scroll) is printed; look
 // at sheet.png before --apply. --out dir (default /tmp/orbit-store), --jobs 3.
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync, renameSync, copyFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
@@ -44,6 +44,15 @@ const run = (cmd, args, o = {}) => new Promise(res => {
   p.on('close', code => res({ code, log }));
 });
 
+// A made-up account: a saved one in tools/shots/accounts, or Money's demo books made fresh (sample-books.mjs).
+function accountFile(name) {
+  const saved = join(HERE, 'shots', 'accounts', `${set.app}-${name}.txt`);
+  if (existsSync(saved) || !(set.app === 'money' && name === 'demo')) return saved;
+  const made = join(dir, 'money-demo.txt');
+  if (!existsSync(made)) writeFileSync(made, execFileSync(process.execPath, [join(ROOT, 'Orbit-Money/tools/sample-books.mjs')], { cwd: join(ROOT, 'Orbit-Money'), encoding: 'utf8' }));
+  return made;
+}
+
 // One shot in one language: preview.mjs at 375×812 (750×1624 at 2×).
 async function shoot(n, lang) {
   const s = set.shots[n - 1];
@@ -51,7 +60,7 @@ async function shoot(n, lang) {
   if (s.page && !page) throw new Error(`${key} ${n}: no page "${s.page}" in pages.mjs`);
   const tmp = join(dir, `.tmp-${n}-${lang}`); rmSync(tmp, { recursive: true, force: true });
   const account = s.account ?? set.account;
-  const payload = account ? ['--payload', account.startsWith('/') ? account : join(HERE, 'shots', 'accounts', `${set.app}-${account}.txt`)] : [];
+  const payload = account ? ['--payload', account.startsWith('/') ? account : accountFile(account)] : [];
   const hash = s.hash || page.hash;
   const args = [join(HERE, 'preview.mjs'), set.app, ...(hash ? [hash] : []), '--live', '--lang', lang, '--width', '375', '--height', '812', '--wait', String(s.wait ?? 6000), '--out', tmp,
     ...(s.dark ? ['--dark'] : []), ...payload, ...(set.args || []), ...(page.args || []), ...(s.args || [])];
