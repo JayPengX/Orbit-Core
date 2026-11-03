@@ -240,6 +240,9 @@ export const PAGES = {
     list: { args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(3000)) },
     stock: { args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(2500), "js:[...document.querySelectorAll('[data-action=open][data-symbol=\"2330.TW\"]')].find(e => e.offsetParent).click()", wait(3000), '[data-action=chart-style][data-v=candle]', '[data-action=range][data-range="6mo"]', wait(4000)) },
     ticket: { args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(2500), "js:[...document.querySelectorAll('[data-action=open][data-symbol=\"2330.TW\"]')].find(e => e.offsetParent).click()", wait(3000), '[data-action=trade][data-side=buy]', wait(1500)) },
+    // 持股's 更多 card (組成, 配息, 定期定額, 提醒, 掛單中 with its count), scrolled into view;
+    // --account orders has one open order (a BTC sell at 200,000, placed in the preview).
+    more: { args: click('#tab-portfolio', wait(2500), "js:document.querySelector('.pf-more')?.scrollIntoView({ block: 'center' })", wait(1200)) },
     alloc: { args: click('#tab-portfolio', '[data-action=tool][data-tool=alloc]', wait(1200)) },
     rates: { args: click('#tab-fx', '[data-action=tool][data-tool=rates]', wait(1500)) },
     td: { args: click('#tab-fx', '[data-action=tool][data-tool=td]', wait(1200)) },
