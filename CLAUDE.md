@@ -121,7 +121,8 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `orbit.mjs` | The core: the session, data reads and device storage (§5), the economy's tables, looks and milestones, notices, the frame (`tabBar`, `topActions`, `accountButton`, `ask`/`tell`), screens, fitting, live beats and break countdowns, recommendations (`rank`, `affinity`), the 除錯紀錄 (`rec`); on import it stops pinch zoom, lifts sheets over the keyboard (`watchKeyboard`), holds the first lift for on-screen pictures and presses only when pressed |
 | `orbit.css` | The design system: iOS 27's tokens (colour, type, space, radius, Liquid Glass, springs) and every `q-` component; the apps' accent colours (`tools/accent-css.mjs`); at its end Orbit's own look, on every app's page (`data-look="native"`, DESIGN §11) |
 | `ui.mjs` | The builders (§3.3) and their HTML-string twins (`…Html`) for apps that draw with template strings; loads `hold-place.mjs` |
-| `hold-place.mjs` | A redraw never moves the page, a sheet or a panel: one the person didn't make holds what they read; a tap or swipe holds the control under the finger; never held to a drawing or a box laid over the page (`loose`); a content-sized sheet keeps its height while open (`--q-sheet-floor`); `scrollBusy()` holds `everyDev`'s beats under a finger or a fling; `freshScreen()`: a new screen at the top |
+| `hold-place.mjs` | A redraw never moves the page, a sheet or a panel: one the person didn't make holds what they read; a tap holds the control under the finger; never a drawing (`loose`); a content-sized sheet keeps its height (`--q-sheet-floor`); `scrollBusy()` holds `everyDev`'s beats under a finger; `freshScreen()`: a new screen at the top |
+| `steady-pics.mjs` | A picture drawn again is eager and decoded at once: no blank frame on iPhone |
 | `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, before the app's modules); the cover held for it |
 | `loader.html` | The snippets every app's page carries (`kit:head`, `kit:boot`) |
 | `brand.mjs` | Families, names, colours, marks, repos, slugs, `APP_ORDER`, `DEV` (the owner's live speeds) |
@@ -138,7 +139,7 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `pay.mjs`, `gov.mjs` | The weekly pay and relief (rules only; the Worker alone writes them); what the government took and gave one account |
 | `flight.mjs` | A real plane in the air, on a sphere: the proxy's `/flight` and Class's 專注飛行 |
 | `domain.mjs`, `devconfig.mjs`, `mirror.mjs` | The family's domain (one place); `DEV` for the Workers; the nightly mirror's addresses |
-| `sw.js`, `sw-images.js` | The one service worker every app imports (page kept first and refreshed behind it, `?v=` files from the cache, every file checked against its hash); other sites' pictures in one cache all apps share |
+| `sw.js`, `sw-images.js` | The one service worker every app imports (page and own pictures kept first, refreshed behind; `?v=` files from the cache, checked against their hash); other sites' pictures in one cache all apps share |
 | `apps.mjs`, `link.mjs`, `preload.mjs`, `stamp.mjs`, `stamp-app.mjs`, `hash.mjs` | Build tools, never served: the apps' snippets; `.kit` links; first-screen modulepreload; the kit's and each app's content-hashed build |
 | `img/` | The kit's own pictures (the Premier League's mark, light and dark) |
 
@@ -165,7 +166,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | Loading | `#loading` (boot.js) lifted once by `ready(firstScreen)` onto a finished screen (it waits for on-screen pictures); in place, `.q-skel` shimmers the size of what comes; a part read later holds its place as `waiting(shape)` |
 | Pictures | `logoTile` / `logoTileHtml` + `wireLogos`, `darkLogos`; `logos.mjs`, `photos.mjs`; never letter tiles |
 | Icons | `ICONS` (orbit.mjs) / `icons` (ui.mjs): one drawing per idea; new ones read as `kitUI.icons?.x` |
-| Live data | `everyDev(key, fn)` beats at the owner's speeds (they wait while a finger is down); `data-q-live` + `liveChanged` pop a number that changed; patch in place (the same nodes), never rebuild what didn't change; `hold-place.mjs` keeps the reader's place by itself, a tapped control under the finger and a content-sized sheet at its height |
+| Live data | `everyDev(key, fn)` beats at the owner's speeds (they wait while a finger is down); `data-q-live` + `liveChanged` pop a number that changed; patch in place (the same nodes), never rebuild what didn't change; `hold-place.mjs` keeps the reader's place by itself; `steady-pics.mjs` the pictures |
 | Fitting | `fitNames` (`.q-fit`, `.q-fit-wrap`), `fitNumbers` / `watchFit`, `balanceRows` (`.q-balance`), `fullRows` (`.q-rows-full`), `.q-even` / `.q-even3` |
 | Every screen | `screenFit()` / `onScreen(fn)` mark `html.q-tabrail`, `q-float`, `q-wide`, `q-w3`; `--q-page-max`, `--q-vw`; `.q-cols`; `.q-flow` + `flowColumns(root)` for columns of even height (DESIGN §10) |
 | Pull to refresh, taps | `pullToRefresh`; `haptic()` / `tick()`; `PRESS_DELAY` / `pressSelector` |
