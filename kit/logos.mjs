@@ -340,13 +340,26 @@ function noteDrawn(url, img) {
 // px, a third of the bytes, so a first screen's logos come in with it. (The
 // address everywhere else stays the original: what's remembered, its dark
 // version.)
-const ESPN_500 = /^https:\/\/a\.espncdn\.com\/i\/((?:teamlogos|leaguelogos)\/[\w/-]+\/500(?:-dark)?\/[\w-]+\.png)$/;
+// (ESPN's scoreboards name a team's logo …/500/scoreboard/lal.png, its game
+// pages …/500/lal.png: the same picture, so it's asked for at one address and
+// downloaded once, kept by the service worker for every page. Asked for twice
+// at full size, a slow connection lost the game page's badges.)
+const ESPN_500 = /^https:\/\/a\.espncdn\.com\/i\/((?:teamlogos|leaguelogos)\/[\w/-]+\/500(?:-dark)?\/(?:scoreboard\/)?[\w-]+\.png)$/;
 export const small = url => {
   const m = typeof url === 'string' && url.match(ESPN_500);
-  return m ? `https://a.espncdn.com/combiner/i?img=/i/${m[1]}&w=192&h=192` : url;
+  return m ? `https://a.espncdn.com/combiner/i?img=/i/${m[1].replace('/scoreboard/', '/')}&w=192&h=192` : url;
 };
 
+const canon = url => (typeof url === 'string' ? url.replace(/^(https:\/\/a\.espncdn\.com\/i\/.+\/500(?:-dark)?)\/scoreboard\//, '$1/') : url);
+// A logo this phone has drawn before that won't come now (a slow or broken
+// connection, not a missing picture): its stand-in meanwhile, and the logo
+// put back the moment it comes, tried again when the phone is back online
+// and at these waits, never given up for the visit (Jay 2026-11-03: a game's
+// badges missing on bad internet).
+const LATER_MS = [8_000, 20_000, 60_000, 180_000];
 export function logoPicture(light, dark, cls, fallback, { guess = false } = {}) {
+  light = canon(light);
+  dark = canon(dark);
   if (!light || knownBad(light)) return fallback();
   const img = document.createElement('img');
   const known = drawn.has(light) || logoSeen.has(light);
@@ -363,13 +376,25 @@ export function logoPicture(light, dark, cls, fallback, { guess = false } = {}) 
     picture.append(source);
   }
   picture.append(img);
+  // (Standing in while a logo drawn before is tried again.)
+  let standIn = null;
+  let later = 0;
   img.addEventListener('load', () => {
     if (!img.naturalWidth) return;
     if (img.style.opacity) Object.assign(img.style, { transition: 'opacity 0.18s ease', opacity: '' });
     noteDrawn(light, img);
+    if (standIn?.isConnected) standIn.replaceWith(picture);
+    standIn = null;
   });
   let tries = 0;
   img.addEventListener('error', () => {
+    if (standIn) {
+      if (!standIn.isConnected || later >= LATER_MS.length) return;
+      const again = () => standIn?.isConnected && (img.removeAttribute('src'), (img.src = small(light)));
+      if (navigator.onLine === false) addEventListener('online', again, { once: true });
+      else setTimeout(again, LATER_MS[later++]);
+      return;
+    }
     img.style.opacity = '0';
     // The dark-screen version missing: the ordinary one instead, at once (never the initial).
     const source = picture.querySelector('source');
@@ -381,6 +406,13 @@ export function logoPicture(light, dark, cls, fallback, { guess = false } = {}) 
       return;
     }
     if (tries >= (guess ? 0 : RETRY_MS.length)) {
+      // Drawn here before: the connection, not the logo (kept, and tried again in place).
+      if (!guess && logoSeen.has(light) && picture.parentNode) {
+        standIn = fallback();
+        picture.replaceWith(standIn);
+        img.dispatchEvent(new Event('error'));
+        return;
+      }
       logoBad.set(light, Date.now());
       logoSeen.delete(light);
       if (picture.parentNode) picture.replaceWith(fallback());
