@@ -53,3 +53,12 @@ test('/law-live: kept at the edge, and the last good read when IVOD fails', asyn
   assert.equal(down.status, 200);
   assert.equal((await down.json()).rooms.length, 2);
 });
+
+test('/law-live: a fresh isolate answers the edge-kept last read while IVOD fails (as the old live.json did)', async () => {
+  const { handleLawLive: fresh } = await import('../law-live.js?cold');
+  const store = new Map([['https://orbit-law-live.orbit/v1-last', new Response(JSON.stringify({ at: '2026-11-03T02:00:00Z', rooms: [{ unit: 'x' }] }))]]);
+  const cache = { match: async k => store.get(k)?.clone(), put: async (k, r) => void store.set(k, r) };
+  const r = await fresh({ waitUntil() {} }, {}, { fetchFn: async () => new Response('', { status: 503 }), cache });
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).rooms.length, 1);
+});
