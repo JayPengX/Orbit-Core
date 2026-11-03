@@ -62,6 +62,7 @@ export const CAPS = {
   textSearch: 4_500, // Text Search Pro (a search's places with their names and positions), 5,000
   routes: 9_000, // Compute Routes Essentials (transit, and a walk with its line), 10,000
   matrix: 9_000, // Compute Route Matrix Essentials (walks, an element each), 10,000
+  drive: 3_000, // Compute Route Matrix Pro (a bus's drive to its stops in today's traffic, an element each), 5,000
   showcaseMaps: 600, // the showcase's Transit demo (no sign-in): its own share, each also counted as a map load above
   // The showcase's live demo (a showcase pass, showcase.js): every ask, and
   // the paid ones (search, a place, a route, a walk) out of their own share;
@@ -1367,6 +1368,50 @@ async function walks(env, q, { fetchFn, ctx, now, cache }) {
   return [{ walks: out, src }, 200];
 }
 
+// A bus's drive to its next stops in the traffic now (`/transit/drive?from=
+// lat,lon&to=lat,lon;…`, up to 10): Google's route matrix, TRAFFIC_AWARE (the
+// Pro SKU, an element each, out of `drive`'s share of the 5,000 free). An
+// answer is shared a minute by every phone asking from the same ~10 m.
+const DRIVE_KEEP_S = 60;
+async function drives(env, q, { fetchFn, ctx, now, cache }) {
+  const ll = s => {
+    const m = /^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(s || '');
+    return m && inTaiwan(Number(m[1]), Number(m[2])) ? { lat: Number(m[1]), lon: Number(m[2]) } : null;
+  };
+  const from = ll(q.get('from'));
+  const tos = String(q.get('to') || '').split(';').filter(Boolean).slice(0, 10).map(ll);
+  if (!from || !tos.length || tos.some(t => !t)) return [{ code: 'BAD_LOCATION' }, 400];
+  const p4 = v => v.toFixed(4);
+  const key = new Request(`https://transit-cache.orbit/drive/${p4(from.lat)},${p4(from.lon)}/${tos.map(t => `${p4(t.lat)},${p4(t.lon)}`).join(';')}`);
+  try {
+    const hit = cache && (await cache.match(key));
+    if (hit) return [{ ...(await hit.json()), src: 'cached' }, 200];
+  } catch {}
+  if (!googleKey(env)) return [{ drives: tos.map(() => null), src: 'nokey' }, 200];
+  if (!(await spend(env, 'drive', tos.length, now, ctx))) return [{ drives: tos.map(() => null), src: 'cap' }, 200];
+  const pt = p => ({ waypoint: { location: { latLng: { latitude: p.lat, longitude: p.lon } } } });
+  const secs = d => (d == null ? null : Number(String(d).replace('s', '')) || 0);
+  const out = tos.map(() => null);
+  let src;
+  try {
+    const r = await fetchFn(MATRIX, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': 'originIndex,destinationIndex,distanceMeters,duration,staticDuration,condition' }, body: JSON.stringify({ origins: [pt(from)], destinations: tos.map(pt), travelMode: 'DRIVE', routingPreference: 'TRAFFIC_AWARE', languageCode: 'zh-TW', regionCode: 'tw', units: 'METRIC' }), signal: timeout(8000) });
+    const j = r.ok ? await r.json() : null;
+    for (const el of Array.isArray(j) ? j : []) {
+      const i = el.destinationIndex || 0;
+      if (i < out.length && el.condition === 'ROUTE_EXISTS') out[i] = { dist: Number(el.distanceMeters) || 0, dur: secs(el.duration), base: secs(el.staticDuration) };
+    }
+    src = r.ok ? 'google' : `http ${r.status}`;
+  } catch {
+    src = 'error';
+  }
+  if (src === 'google' && cache) {
+    const put = cache.put(key, new Response(JSON.stringify({ drives: out, at: now }), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `max-age=${DRIVE_KEEP_S}` } })).catch(() => {});
+    if (ctx?.waitUntil) ctx.waitUntil(put);
+    else await put;
+  }
+  return [{ drives: out, at: now, src }, 200];
+}
+
 // Anything that throws is that ask's failure, said in JSON with the CORS headers (never the Worker's 1101 page).
 export async function handleTransit(request, env, headers, path, opts = {}) {
   try {
@@ -1429,6 +1474,11 @@ async function transitRoute(request, env, headers, path, { session = null, limit
   }
   if (path === '/transit/walk') {
     const [body, status] = await walks(env, q, deps);
+    return send(body, status);
+  }
+  if (path === '/transit/drive') {
+    if (session.showcase) return send({ code: 'NOT_FOUND' }, 404);
+    const [body, status] = await drives(env, q, deps);
     return send(body, status);
   }
   return send({ code: 'NOT_FOUND' }, 404);

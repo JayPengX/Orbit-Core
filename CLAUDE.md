@@ -203,7 +203,7 @@ w;dur=` (the Worker's own time), which the 除錯紀錄 notes with a slow read.
 | `/stock` | `stock-fill.js`, `stock-check.js` | Securities' fills at the proxy's own quote; the account replayed on each save |
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
 | `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations), the township, sources scored hourly (`/weather/skill`); during a typhoon warning (NCDR's CAP feed), `dayOff`: each county's 停班停課 from 人事行政總處 (through the relay), else a chance fitted to the counties' past decisions, for all 22 every 3 minutes |
-| `/transit/…` | `transit.js` | TDX (allowlist `TDX_RULES`), map config, search, place, route; `/transit/status?sample=` (a session or the dev door only) |
+| `/transit/…` | `transit.js` | TDX (allowlist `TDX_RULES`), map config, search, place, route, `drive` (a bus in traffic); `/transit/status?sample=` (a session or the dev door only) |
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `f1-people.js`, `fund-nav.js`, `taifex.js` | The data proxy (§4.1): sports, quotes, F1, Asian baseball, SITCA's fund NAVs, TAIFEX |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
