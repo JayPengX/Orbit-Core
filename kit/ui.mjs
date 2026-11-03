@@ -546,7 +546,17 @@ export function toast(text, { tone = '', ms = 2200, action = null, batch = '' } 
       );
     }
   }
-  document.body.append(t);
+  // Over an open sheet (a modal dialog: the page under it is inert, its 復原
+  // couldn't be tapped): inside the sheet, as a popover in the top layer
+  // above it, so it sits at the screen's foot whatever the sheet's scroll.
+  const over = [...document.querySelectorAll('dialog[open]')].at(-1);
+  if (over && typeof t.showPopover === 'function') {
+    over.append(t);
+    try {
+      t.setAttribute('popover', 'manual');
+      t.showPopover();
+    } catch {}
+  } else document.body.append(t);
   mine.timer = setTimeout(close, ms);
   lastToast = batch ? mine : null;
   return t;
