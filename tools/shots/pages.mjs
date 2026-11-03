@@ -31,6 +31,10 @@ export const PAGES = {
     // An MLS club's 接下來 crossing into next season (the 2027 賽季 line, Jay 2026-11-01): Inter Miami.
     'team-mls': { args: click("js:import('./sheets.js').then(m=>m.openTeam('mls','20232'))", wait(9000), "js:[...document.querySelectorAll('dialog.q-sheet[open] button,dialog.q-sheet[open] [role=tab]')].find(b=>/^(賽程|Games)$/.test(b.textContent.trim()))?.click()", wait(2500), "js:document.querySelector('dialog.q-sheet[open] .season-break')?.scrollIntoView({block:'center'})", wait(1500)) },
     'team-nba': { args: click("js:import('./sheets.js').then(m=>m.openTeam('nba','13'))", wait(7000)) },
+    // A player ESPN lists with an all-star side (Carles Gil: MLS All-Stars), shown with his club (New England).
+    'player-allstar': { args: click("js:import('./sheets.js').then(m=>m.openPlayer('mls','152168'))", wait(9000)) },
+    // Raptors at Lakers, 2026-11-02: 勝率走勢's run told where it ended (Lakers 28-8 at 14-31, never at 6-9).
+    'nba-run': { args: click("js:import('./lib/espn.mjs').then(async E=>{const l=await E.scoreboard('nba',['20261101']);const e=l.find(x=>x.id==='401909906');(await import('./sheets.js')).openMatch(e)})", wait(10000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/勝率走勢|Win probability/.test(c.textContent))?.scrollIntoView({block:'start'})", wait(1500)) },
     'nba-game': { args: click('#tab-matches', '[data-league=nba]', "js:[...document.querySelectorAll('.q-chip.day.is-today')].find(e=>e.offsetParent)?.click()", "js:[...document.querySelectorAll('.event-row')].find(e=>e.offsetParent)?.click()", wait(4000)) },
     // Today's first NBA game (under 全部), scrolled to a card by its title: 勝率走勢 (the chart and 關鍵時刻), 本季對戰.
     // Today's first NBA game (under 全部) on each of its tabs: how a game's page lays out wide (Jay 2026-11-01).
