@@ -14,7 +14,15 @@
 //     button stays under the finger;
 //   shrank (a sheet): a sheet sized to its content shows less (a day with
 //     fewer rows) — it keeps its height while open.
-// The same in a sheet when --sheet opens one. Exit code 1 on a fault.
+// And before any of that, as each loads, untouched:
+//   late: the page once its loading screen lifts, and a sheet once open —
+//     nothing drawn on screen moves on its own while the rest is read (a
+//     part that comes later holds its place in its shape from the first
+//     drawing, the kit's waiting(); Jay 2026-11-03: 預計先發 came in after
+//     everything else and pushed the game's page down). Names what moved and
+//     by how much.
+// The same in a sheet when --sheet opens one (Sports: its game pages, by
+// themselves; "" for none). Exit code 1 on a fault.
 // --without: the kit's keeper left out, to see what it catches.
 // (The kit's hold-place.mjs is what holds it; this checks it still does.)
 import { spawn } from 'node:child_process';
@@ -25,14 +33,100 @@ import { join } from 'node:path';
 
 const args = process.argv.slice(2);
 const opt = k => (args.includes(`--${k}`) ? args[args.indexOf(`--${k}`) + 1] : null);
-const sheetJs = opt('sheet');
+// An app's own sheets to check when none is given: Sports' game page (who
+// starts, the season's leaders, who's out and the table all read after the
+// game's own page): an NBA game to come, one just over, a football game to
+// come (the first day ahead with one).
+const gameSheet = (league, step, ahead = 1) => `(async () => {
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  document.querySelector('dialog[open] .q-close')?.click();
+  await wait(800);
+  document.querySelector('#tab-matches')?.click();
+  await wait(2500);
+  [...document.querySelectorAll('[data-league=${league}]')].find(e => e.offsetParent)?.click();
+  await wait(2500);
+  // (The day strip on screen, its panel's rows: 首頁 has a strip of its own.)
+  const today = [...document.querySelectorAll('.q-chip.day.is-today')].find(e => e.getClientRects().length && !e.closest('[hidden]') && e.getBoundingClientRect().top < innerHeight);
+  const panel = today?.closest('[id^=panel-]') || document;
+  const rows = () => [...panel.querySelectorAll('.event-row')].filter(e => e.offsetParent && !e.closest('[hidden]'));
+  for (let i = 0, s = ${step}; today && i < 7; i++, s += ${ahead}) {
+    const days = [...today.parentElement.querySelectorAll('.q-chip.day')];
+    days[days.indexOf(today) + s]?.click();
+    await wait(3000);
+    if (rows().length) break;
+  }
+  rows()[0]?.click();
+})()`;
+const SHEETS = {
+  sports: [
+    ['game to come', gameSheet('nba', 1)],
+    ['game over', gameSheet('nba', -1, -1)],
+    ['football to come', gameSheet('epl', 1)]
+  ]
+};
+const sheetsOf = app => (args.includes('--sheet') ? (opt('sheet') ? [['sheet', opt('sheet')]] : []) : SHEETS[app] || []);
 const without = args.includes('--without');
 const apps = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--sheet');
+// (How long each is watched as it loads.)
+const LATE_MS = 9000;
 const list = apps.length ? apps : ['sports', 'transit', 'weather', 'securities', 'law', 'words', 'money', 'beats'];
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT || 'playwright');
 const preview = fileURLToPath(new URL('./preview.mjs', import.meta.url));
 const accounts = fileURLToPath(new URL('./shots/accounts/', import.meta.url));
+
+// In the page, as it loads: every card-sized block on screen noted each
+// 100 ms by what it says, at its place in the page's layout (a sheet
+// sliding up or a card's fade moves nothing there), and any that moves while
+// nothing's touched is a fault. The page from its loading screen's lift; a
+// sheet from the moment it's asked for (a card popping in as it slides up
+// is seen too).
+const late = async ([inSheet, ms]) => {
+  const wait = t => new Promise(r => setTimeout(r, t));
+  const BLOCK = '.q-card, .q-section, .q-list, section, article, li, .q-cell, [class*="card"], [class*="-row"]';
+  const sigOf = n => `${n.tagName}.${String(n.className).replace(/\bfade-in\b/, '')}|${(n.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 48)}`;
+  const nameOf = n => (n.querySelector('h1, h2, h3, [class*="-h"], strong, b')?.textContent || n.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 24);
+  // (Its top in the scroller's view, from the layout: offsets, never transforms.)
+  const yOf = (n, se) => {
+    let y = 0;
+    for (let k = n; k && k !== se; k = k.offsetParent) {
+      y += k.offsetTop;
+      if (!se.contains(k.offsetParent) && k.offsetParent !== se) break;
+    }
+    return y - (se === document.scrollingElement ? scrollY : se.scrollTop);
+  };
+  const t0 = performance.now();
+  const faults = [];
+  let base = null;
+  while (performance.now() - t0 < ms) {
+    await wait(100);
+    const cover = document.getElementById('loading');
+    if (!inSheet && cover && !cover.hidden && getComputedStyle(cover).display !== 'none') continue;
+    const se = inSheet ? [...document.querySelectorAll('dialog[open]')].pop() : document.scrollingElement;
+    if (!se) continue;
+    const vh = se === document.scrollingElement ? innerHeight : se.clientHeight;
+    const now = new Map();
+    // (The outermost blocks within a screen of the view, in the page's flow.)
+    for (const n of se.querySelectorAll(BLOCK)) {
+      const h = n.offsetHeight;
+      if (h < 8 || !n.offsetParent) continue;
+      let inner = false;
+      for (let k = n.parentElement; k && k !== se && !inner; k = k.parentElement) inner = k.matches(BLOCK) || /^(fixed|sticky)$/.test(getComputedStyle(k).position);
+      if (inner || /^(fixed|sticky|absolute)$/.test(getComputedStyle(n).position)) continue;
+      const y = yOf(n, se);
+      if (y + h < -vh || y > 2 * vh) continue;
+      const k = sigOf(n);
+      now.set(k, now.has(k) ? null : { y, seen: y + h > 0 && y < vh, name: nameOf(n) });
+    }
+    if (base)
+      for (const [k, was] of base) {
+        const is = now.get(k);
+        if (was?.seen && is && Math.abs(is.y - was.y) > 2) faults.push(`${was.name || k.slice(0, 24)} ${is.y > was.y ? '+' : ''}${is.y - was.y}px at ${Math.round((performance.now() - t0) / 100) / 10}s`);
+      }
+    base = now;
+  }
+  return faults;
+};
 
 // In the page: the redraws, on the page's scroller (or the open sheet's).
 const check = async inSheet => {
@@ -240,19 +334,20 @@ for (const app of list) {
     await page.addInitScript(() => document.addEventListener('DOMContentLoaded', () => document.head.append(Object.assign(document.createElement('style'), { textContent: '*{overflow-anchor:none!important}' }))));
     if (without) await page.addInitScript(() => (globalThis.__orbitHoldPlace = true));
     await page.goto(url);
-    await page.waitForTimeout(8000);
-    const results = { page: { ...(await page.evaluate(check, false)), tap: await taps(page, false) } };
-    if (sheetJs) {
-      await page.evaluate(sheetJs);
-      await page.waitForTimeout(8000);
-      results.sheet = { ...(await page.evaluate(check, true)), tap: await taps(page, true) };
+    const pageLate = await page.evaluate(late, [false, LATE_MS]);
+    const results = { page: { late: pageLate, ...(await page.evaluate(check, false)), tap: await taps(page, false) } };
+    for (const [name, js] of sheetsOf(app)) {
+      await page.evaluate(js);
+      const sheetLate = await page.evaluate(late, [true, LATE_MS]);
+      results[name] = { late: sheetLate, ...(await page.evaluate(check, true)), tap: await taps(page, true) };
     }
     for (const [where, r] of Object.entries(results)) {
       const t = r.tap || {};
-      const bad = (!r.skipped && (Math.abs(r.moved) > 2 || Math.abs(r.jumped) > 40 || r.drawing > 2 || Math.abs(t.below ?? 0) > 2 || Math.abs(t.above ?? 0) > 2)) || r.shrank > 2;
+      const bad = (!r.skipped && (Math.abs(r.moved) > 2 || Math.abs(r.jumped) > 40 || r.drawing > 2 || Math.abs(t.below ?? 0) > 2 || Math.abs(t.above ?? 0) > 2)) || r.shrank > 2 || r.late.length > 0;
       if (bad) faults++;
       const said = [`what was read moved ${r.moved}px`, `the page jumped ${r.jumped}px`, `a moving drawing pulled it ${r.drawing}px`, t.below != null ? `a tap folding below moved the button ${t.below}px` : '', t.above != null ? `folding above ${t.above}px` : '', r.shrank != null ? `the sheet shrank ${r.shrank}px` : ''];
-      console.log(`${bad ? '✗' : '✓'} ${app} ${where}: ${r.drawingLost ? "(drawing lost) " : ""}${r.skipped ? [r.skipped, r.shrank != null ? `the sheet shrank ${r.shrank}px` : ''].filter(Boolean).join(', ') : said.filter(Boolean).join(', ')}`);
+      const lateSaid = r.late.length ? `moved as it loaded: ${[...new Set(r.late)].slice(0, 6).join('; ')}` : 'nothing moved as it loaded';
+      console.log(`${bad ? '✗' : '✓'} ${app} ${where}: ${lateSaid}, ${r.drawingLost ? '(drawing lost) ' : ''}${r.skipped ? [r.skipped, r.shrank != null ? `the sheet shrank ${r.shrank}px` : ''].filter(Boolean).join(', ') : said.filter(Boolean).join(', ')}`);
     }
   } finally {
     await browser.close();

@@ -2203,6 +2203,30 @@ input[type='checkbox'][switch] {
     background-position: 0 0;
   }
 }
+/* A part still being read (ui.mjs waiting): the real card's own shape, its
+   words and pictures the same shimmer, its title as is; nothing to tap. */
+.q-wait {
+  pointer-events: none;
+}
+/* (Words a rounded bar; a face or a picture keeps its own round.) */
+.q-wait .q-wait-bit:not(:empty) {
+  border-radius: 6px;
+}
+.q-wait .q-wait-bit {
+  border-color: transparent !important;
+  background: linear-gradient(100deg, var(--q-fill-3) 30%, var(--q-fill-4) 50%, var(--q-fill-3) 70%) 0 0 / 300% 100% !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none !important;
+  animation: q-shimmer 1.4s ease-in-out infinite;
+}
+.q-wait img.q-wait-bit {
+  object-position: -999px 0;
+}
+.q-wait :is(svg, picture, canvas, video).q-wait-bit > * {
+  visibility: hidden;
+}
 
 /* ---- A count or a mark on something ---- */
 .q-badge {
@@ -2391,7 +2415,8 @@ input[type='checkbox'][switch] {
   .q-accessory,
   .q-panel-in,
   .q-bump,
-  .q-skel {
+  .q-skel,
+  .q-wait .q-wait-bit {
     animation: none;
   }
   ::view-transition-old(*),

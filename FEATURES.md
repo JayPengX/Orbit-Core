@@ -10,6 +10,7 @@ To remove a feature on purpose, delete its line here in the same commit and say 
 - A tap or swipe keeps its control under the finger; a map's moving cars never pull the page — `kit/hold-place.mjs`: `function keepTap`, `export const loose`
 - A sheet sized to its content keeps its height while open — `kit/hold-place.mjs`, `kit/orbit.css`: `--q-sheet-floor`
 - One quiet 再看/收起 bar for a list's more — `kit/ui.mjs`, `kit/orbit.css`: `export function moreToggle`, `export function moreHtml`, `.q-more {`
+- A part read after the first drawing holds its place in the shape that's coming — `kit/ui.mjs`, `kit/orbit.css`, `tools/live-scroll.mjs`: `export function waiting`, `.q-wait .q-wait-bit {`, `const late = async`
 - One date selector — `kit/ui.mjs`: `export function dayBar`, `export function dayStrip`
 - The kit's own dialogs, never the browser's — `kit/orbit.mjs`: `export function ask`, `export const tell`
 - The keyboard never pushes content off screen — `kit/orbit.mjs`: `watchKeyboard`

@@ -678,6 +678,45 @@ export function moreToggle({ more = kitW('顯示更多', 'Show more'), less = ki
   });
 }
 
+// ---- A part still being read: its place held in the shape that's coming ----
+// waiting(shape, { keep }): a part of the page a later read fills (who
+// starts, the season's leaders, who's out), drawn from the page's first
+// drawing in the shape it will have, so nothing under it moves when it lands
+// (Jay 2026-11-03: 預計先發 came in last and pushed the whole page down; the
+// keeper, hold-place.mjs, can't hold a page read from its top). `shape` is
+// the app's own card built on stand-ins: rows of the count that comes, each
+// name a few characters (never seen; not blank spaces, which hang past a
+// line's end), a face left empty; so it is the real card's size at every width. Its words and pictures turn to the kit's
+// quiet shimmer; what matches `keep` (the card's title) stays as it is. The
+// app puts the real part in its place when the read lands, or nothing if it
+// brings none. An app drawing with strings calls it on the node once in the page.
+export function waiting(shape, { keep = '' } = {}) {
+  if (!shape?.querySelectorAll) return shape || null;
+  const media = /^(img|svg|picture|canvas|video)$/i;
+  const mark = n => {
+    for (const k of [...n.childNodes]) {
+      // Words: a bar of their own width, where they sit.
+      if (k.nodeType === 3 && /[^ \t\n\r]/.test(k.data)) {
+        const bar = shape.ownerDocument.createElement('span');
+        bar.className = 'q-wait-bit';
+        bar.textContent = k.data;
+        k.replaceWith(bar);
+      } else if (k.nodeType === 1 && !k.classList.contains('q-wait-bit') && !(keep && k.matches(keep))) {
+        // A picture, or a box with nothing in it (a face, a bar, a pill): its own shape.
+        if (media.test(k.tagName) || !k.childNodes.length) k.classList.add('q-wait-bit');
+        else mark(k);
+      }
+    }
+  };
+  mark(shape);
+  // (Words a builder puts in later, a name fitted once it's on the page: a bar too, before it's drawn.)
+  if (typeof MutationObserver === 'function') new MutationObserver(() => mark(shape)).observe(shape, { childList: true, subtree: true, characterData: true });
+  shape.classList.add('q-wait');
+  shape.setAttribute('aria-busy', 'true');
+  shape.inert = true;
+  return shape;
+}
+
 // ---- A large title (iOS's navigation title) ----
 // navTitle('賽程') is the 34pt title at a tab's top; it scrolls away with the
 // page (no bar takes its place). For a tab that isn't the first: the first
