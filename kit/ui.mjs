@@ -1149,6 +1149,22 @@ const tagObjHtml = t => {
   const o = typeof t === 'string' ? { text: t } : t;
   return `<span class="${clsOf('q-tag', o.tone && E(o.tone))}"${styleOf(['--t', o.color])}>${E(o.text)}</span>`;
 };
+// A way on to another view at a card's foot (全部球隊數據 ›, 看完整賽程):
+// the same quiet bar, a › for where it goes; never accent text (Jay 2026-11-03).
+//   goBar(label, onTap | { href }, cls) / goHtml({ label, href, attr, cls }): a link (href) or a button.
+export function goBar(label, onTap = () => {}, cls = '') {
+  const href = typeof onTap === 'object' && onTap ? onTap.href : '';
+  return h(href ? 'a' : 'button', { class: `q-more q-more-go${cls ? ` ${cls}` : ''}`, ...(href ? { href } : { type: 'button', onclick: onTap }) }, [h('span', { text: label }), h('span', { class: 'q-more-chev', 'aria-hidden': 'true', text: '›' })]);
+}
+export function goHtml({ label = '', href = '', attr = '', cls = '' } = {}) {
+  const tag = href ? `a href="${E(href)}"` : 'button type="button"';
+  return `<${tag} class="${clsOf('q-more q-more-go', cls)}"${attr ? ` ${attr}` : ''}><span>${E(label)}</span><span class="q-more-chev" aria-hidden="true">›</span></${href ? 'a' : 'button'}>`;
+}
+// A disclosure drawn as the bar: summaryHtml(words) inside a <details>.
+export function summaryHtml(words = '') {
+  return `<summary class="q-more"><span>${E(words)}</span>${CHEV_DOWN}</summary>`;
+}
+
 // tagHtml('直播', 'red') or tagHtml('3 天', '', '#hex').
 export function tagHtml(text, tone = '', color = '') {
   return tagObjHtml({ text, tone: color ? `${tone} tint` : tone, color });

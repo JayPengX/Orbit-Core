@@ -123,7 +123,7 @@
 
   // Every fault on the screen now.
   gate.check = () => {
-    const out = { blank: [], pictures: [], overflow: [], wraps: [], cut: [], letters: [], slots: [], halfEmpty: [], bareEmpty: [], loading: [], orphan: [], tables: [], sheets: [], old: [], scroll: [], white: [], english: [], mixed: [], column: [] };
+    const out = { blank: [], pictures: [], overflow: [], wraps: [], cut: [], letters: [], slots: [], halfEmpty: [], bareEmpty: [], loading: [], orphan: [], tables: [], sheets: [], old: [], scroll: [], white: [], english: [], mixed: [], column: [], links: [] };
     const all = [...document.querySelectorAll('body *')].filter(seen);
     const clippedBy = el => {
       for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) if (/auto|scroll|hidden|clip/.test(getComputedStyle(p).overflowX)) return true;
@@ -174,13 +174,40 @@
       const cs = getComputedStyle(el);
       if (/logo|badge|crest|avatar|face|flag|headshot|photo|team|mono|tile/i.test(el.className?.baseVal ?? el.className) && r.width >= 14 && r.width <= 96 && Math.abs(r.width - r.height) <= r.width * 0.25 && /^[\p{L}\p{N}.-]{1,5}$/u.test(tx) && /\p{L}/u.test(tx) && !el.querySelector('img, svg, canvas, video') && !/url\(/.test(cs.backgroundImage)) out.letters.push(`${name(el)} "${tx}"`);
     }
+    // An accent text link: words you tap in the app's colour on nothing (Jay 11-03: "I hate this
+    // kind of orange expand text"). A list's more is the kit's quiet bar (.q-more); a chosen
+    // tab, segment or chip is its pick, not a link.
+    {
+      const probe = document.createElement('i');
+      probe.style.cssText = 'position:absolute;visibility:hidden;color:var(--q-accent)';
+      document.body.append(probe);
+      const rgb = c => (c.match(/[\d.]+/g) || []).map(Number);
+      const tints = [getComputedStyle(probe).color];
+      probe.style.color = 'var(--q-blue)';
+      tints.push(getComputedStyle(probe).color);
+      probe.remove();
+      const near = c => { const a = rgb(c); return a.length >= 3 && (a[3] ?? 1) > 0.5 && tints.some(t => { const b = rgb(t); return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) < 40; }); };
+      const clear = cs => (rgb(cs.backgroundColor)[3] ?? 1) < 0.12 && cs.backgroundImage === 'none' && !(parseFloat(cs.borderTopWidth) && (rgb(cs.borderTopColor)[3] ?? 1) > 0.12) && !/inset/.test(cs.boxShadow);
+      for (const el of all) {
+        if (!el.matches('a, button, [role=button], [role=link], summary, [onclick]') && getComputedStyle(el).cursor !== 'pointer') continue;
+        if (el.parentElement?.closest('a, button, [role=button], [role=link], summary')) continue;
+        if (el.closest('.q-tabbar, nav, [role=tablist], .q-seg, .q-segmented, .q-chips, [aria-pressed="true"], [aria-selected="true"], [aria-current]')) continue;
+        const tx = text(el);
+        if (!tx || tx.length > 24) continue;
+        const cs = getComputedStyle(el);
+        if (!near(cs.color) || !clear(cs)) continue;
+        // (Inside a box of its own: a button's face, not words on the page.)
+        if (el.closest('.q-btn, .q-button, .q-hero-card, .q-action')) continue;
+        out.links.push(`${name(el)} "${tx}"`);
+      }
+    }
     // Grids: a last row with a hole, and cards stretched far past what they hold.
     for (const el of all) {
       const cs = getComputedStyle(el);
       if (!cs.display.includes('grid') || cs.gridAutoFlow.startsWith('column')) continue;
       const kids = [...el.children].filter(k => getComputedStyle(k).position !== 'absolute' && k.getBoundingClientRect().width);
       const cols = cs.gridTemplateColumns.split(/\s+(?![^(]*\))/).filter(Boolean).length;
-      if (cols < 2 || cols > 4 || kids.length < 2 || kids.length > 16) continue;
+      if (cols < 2 || cols > 8 || kids.length < 2 || kids.length > 40) continue;
       // (Only grids of like cards, every column the same width: not a row laid out as icon, text, value.)
       const widths = kids.map(k => k.getBoundingClientRect().width);
       if (Math.max(...widths) - Math.min(...widths) > 4 && kids.length <= cols) continue;
