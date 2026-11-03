@@ -158,7 +158,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | Rows | `list` / `cell` (grouped), `rowCard`, `section` / `sectionHead` / `sectionHtml`, `.q-list-head` |
 | The focal number | `.q-focus`, graphite; `heroCardHtml` only when the focus is an action; `stats` / `statsHtml`, `.q-fig` |
 | Colour on a card | `.q-band` (`--band`; `.q-band-mark`, `-text`, `-end`): a row inset on the colour of what it identifies (a team, a line, a category); never a card filled with the app's colour |
-| Small pieces | `tile` / `tileHtml`, `tag` / `tagHtml` (one exception per row), `.q-chip` (taps only), `toggle`, `search`, `menu`, `.q-badge`, `progressRing`, `monthCalendar`, `rail`, `actionGrid`, `panelGrid`, `leagueTile`, `matchCard`, `liveStrip`, `stockRow`, `movePill`, `placeTile`, `ballRow` |
+| Small pieces | `tile` / `tileHtml`, `tag` / `tagHtml` (one exception per row), `.q-chip` (taps only), `toggle` (`.q-switch`), `.q-add` (an add row), `search`, `menu`, `.q-badge`, `progressRing`, `monthCalendar`, `rail`, `actionGrid`, `panelGrid`, `leagueTile`, `matchCard`, `liveStrip`, `stockRow`, `movePill`, `placeTile`, `ballRow` |
 | Putting in order | `reorder(box, { onChange })`, a `grip()` / `gripHtml()` per row; `.q-row-open` for a row that also opens |
 | A list's more | `moreToggle`/`moreHtml` (`.q-more`): 再看 7 則 / 收起, one quiet bar (`less: null` pages); a way on `goBar`/`goHtml`; `summaryHtml`. Never accent links |
 | Nothing here | `empty({ icon, title, body, action })` / `emptyHtml` |
@@ -173,7 +173,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | Picks for you | `rank` + `feedback.mjs` (`lifter`, `shown`, `picked`, `did`, `keep`); measured: `tools/picks-backtest.mjs` |
 | Language | `W`, `makeT`, `place` (lang.mjs): every page in one language |
 | Notices | `schedulePush([{ at, title, body, tag, kind, check }])`, `NOTICE_KINDS`, `notifyOn`, `enablePush` |
-| A bug report | `rec(kind, data)` into the 除錯紀錄 Jay copies from the Pass sheet |
+| A bug report | `rec(kind, data)` into the Pass sheet's 除錯紀錄 |
 
 ### 3.4 Tokens (`orbit.css`)
 
@@ -468,7 +468,7 @@ can be turned off on its own.
   `*@<DOMAIN>` reaches the proxy by Email Routing's catch-all. `deploy.yml`
   attaches the hostnames (the deploy token needs the zone, and Account · D1 ·
   Edit); the guard takes them off with the proxy.
-- Longshot (Play and Slips) is shut down (2026-10-31): only its notice is here.
+- Longshot is shut down (2026-10-31): only its notice is here.
 
 ## 11. Tools and tests
 
