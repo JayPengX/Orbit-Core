@@ -392,7 +392,7 @@ included), then wiped whole. `private/` is never served.
 
 - **A pass** is a random 10-character code the owner issues (admin page,
   `tools/issue-passes.mjs`), replaced at its first sign-in (`freshPass`: its `new`
-  session takes only `rotate`, a passkey; `freshGate`). The account's id is
+  session takes only `rotate`; then a passkey, `freshGate`). The account's id is
   PBKDF2-SHA256 of it, peppered by `ECO_TOKEN_SECRET` (`passKey`), which **must
   never change**: passes since 2026-10-27 would lose their accounts. Sign-ins:
   30 an hour an address.

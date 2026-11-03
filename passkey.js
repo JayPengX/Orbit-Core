@@ -52,11 +52,8 @@ const appleKeychain = (made, device) => (made.be && /^[0-]*$/.test(made.aaguid |
 // What the apps see of a passkey: never its key.
 export const passkeySummary = wallet => keysOf(wallet).map(k => ({ id: k.id, via: k.via || '', on: k.on || '', sync: Boolean(k.be), t: k.t, used: k.used || 0 }));
 
-// (`fresh`: a fresh pass's session too: adding a passkey is one way to
-// replace it, eco.js freshPass.)
-async function session(ctx, { fresh = false } = {}) {
-  const now = ctx.deps.now();
-  const c = (await readToken(ctx.secret, ctx.body.qt, 'ses', now)) || (fresh ? await readToken(ctx.secret, ctx.body.qt, 'new', now) : null);
+async function session(ctx) {
+  const c = await readToken(ctx.secret, ctx.body.qt, 'ses', ctx.deps.now());
   if (!c) return null;
   const doc = await ctx.deps.fsGet(ctx.env, WALLET_COLLECTION, c.d);
   const wallet = doc.exists ? parseWallet(doc.payload) : null;
@@ -112,7 +109,7 @@ export async function passkeyLogin(ctx) {
 // browser shows (the account's number) and the keys it already has.
 export async function passkeyAddBegin(ctx) {
   const { deps, secret } = ctx;
-  const s = await session(ctx, { fresh: true });
+  const s = await session(ctx);
   if (!s) return bad(ctx, 'ECO_TOKEN_INVALID', 401);
   if (sessionLimited(`pk:${s.c.s}`, 20, 60_000, deps.now())) return bad(ctx, 'RATE_LIMITED', 429);
   const keys = keysOf(s.wallet);
@@ -120,15 +117,14 @@ export async function passkeyAddBegin(ctx) {
   const user = s.wallet.passkeys?.user || b64url(crypto.getRandomValues(new Uint8Array(16)));
   const exp = deps.now() + PASSKEY_MS;
   const challenge = await seal(secret, { k: 'pka', d: s.c.d, g: s.c.g, u: user, e: exp });
-  // (The account number as the Pass card shows it: its first 6. A fresh
-  // pass's number changes with the pass right after: no number.)
-  const name = s.c.k === 'new' ? 'Orbit Pass' : `Orbit Pass ${s.c.d.slice(0, 6).toUpperCase()}`;
+  // (The account number as the Pass card shows it: its first 6.)
+  const name = `Orbit Pass ${s.c.d.slice(0, 6).toUpperCase()}`;
   return deps.json({ challenge, exp, user: { id: user, name, displayName: name }, exclude: keys.map(k => k.id) }, 200, ctx.headers);
 }
 
 export async function passkeyAdd(ctx) {
   const { env, deps, body, secret } = ctx;
-  const s = await session(ctx, { fresh: true });
+  const s = await session(ctx);
   if (!s) return bad(ctx, 'ECO_TOKEN_INVALID', 401);
   if (sessionLimited(`pk:${s.c.s}`, 20, 60_000, deps.now())) return bad(ctx, 'RATE_LIMITED', 429);
   const now = deps.now();

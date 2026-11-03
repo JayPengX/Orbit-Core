@@ -2177,54 +2177,88 @@ function signInGate(s) {
 }
 
 // A pass someone handed over (the owner issued it): the first sign-in
-// replaces it before anything else (Jay 2026-11-03). A passkey first where
-// this browser can make one (recommended), then a new pass of the person's
-// own (a backup beside the passkey); or only the new pass. Answers the
-// sign-in reply of the new pass, the app's first.
+// replaces it before anything else (Jay 2026-11-03), in two steps: a new
+// pass of the person's own (required), then a passkey offered (encouraged,
+// skippable) where this browser can make one. Answers the sign-in reply of
+// the new pass, the app's first.
+function passScreen(s, { title, lede, body }) {
+  const gate = node('dialog', { class: 'q-gate q-fresh', 'aria-modal': 'true', style: `--q-accent:${APPS[s.app].color}` }, [
+    node('div', { class: 'q-gate-box' }, [
+      node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
+      node('p', { class: 'q-gate-brand', text: 'ORBIT PASS' }),
+      node('h1', { class: 'q-gate-title', text: title }),
+      node('p', { class: 'q-gate-lede', text: lede }),
+      node('div', { class: 'q-gate-form' }, body)
+    ])
+  ]);
+  for (const d of document.querySelectorAll('dialog[open]')) if (!onTop.has(d)) d.close();
+  keepOnTop(gate);
+  return gate;
+}
 function freshGate(s) {
   const en = s.lang === 'en';
   const T = (zh, e) => (en ? e : zh);
-  const a = APPS[s.app];
   document.getElementById('loading')?.setAttribute('hidden', '');
-  return new Promise(resolve => {
-    const here = passkeyHere();
-    const ch = here ? addChallenge(s) : null;
+  document.documentElement.classList.add('q-signing-in');
+  // Step 1: the new pass.
+  const step1 = new Promise(resolve => {
     const error = node('p', { class: 'q-gate-error', role: 'alert' });
-    const buttons = [];
-    const busy = on => buttons.forEach(b => (b.disabled = on));
-    const replace = async withKey => {
-      busy(true);
-      error.textContent = '';
-      try {
-        if (withKey && !(await addPasskey(s, ch))) return busy(false);
-        const res = await s.rotate({ full: true });
-        dropFromTop(gate);
-        await showNewPass(s, res.passcode);
-        document.documentElement.classList.remove('q-signing-in');
-        // (Asked here: the one-time passkey offer never asks again.)
-        s.write({ wallet: settingPatch('passkeyAsk', withKey ? 'yes' : 'no') }).catch(() => {});
-        resolve(res);
-      } catch (e) {
-        error.textContent = errorText(e, s.lang);
-        busy(false);
+    const go = node('button', {
+      class: 'q-btn primary block',
+      type: 'button',
+      text: T('換一組新的通行碼', 'Get a new pass'),
+      onclick: async () => {
+        go.disabled = true;
+        error.textContent = '';
+        try {
+          const res = await s.rotate({ full: true });
+          dropFromTop(gate);
+          resolve(res);
+        } catch (e) {
+          error.textContent = errorText(e, s.lang);
+          go.disabled = false;
+        }
       }
-    };
-    const key = here && node('button', { class: 'q-btn primary block q-passkey-btn', type: 'button', html: `${icons.key || ''}<span>${T('設定通行密鑰（建議）', 'Set up a passkey (recommended)')}</span>`, onclick: () => replace(true) });
-    const pass = node('button', { class: `q-btn block${here ? '' : ' primary'}`, type: 'button', text: T('換一組新的通行碼', 'Get a new pass'), onclick: () => replace(false) });
-    buttons.push(...[key, pass].filter(Boolean));
-    const gate = node('dialog', { class: 'q-gate q-fresh', 'aria-modal': 'true', style: `--q-accent:${a.color}` }, [
-      node('div', { class: 'q-gate-box' }, [
-        node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
-        node('p', { class: 'q-gate-brand', text: 'ORBIT PASS' }),
-        node('h1', { class: 'q-gate-title', text: T('先換掉這組通行碼', 'Replace this pass first') }),
-        node('p', { class: 'q-gate-lede', text: T('這組是別人給你的，先換成你自己的。', 'It was given to you. Make it yours before you start.') }),
-        node('div', { class: 'q-gate-form' }, [...(key ? [key, node('p', { class: 'q-gate-note q-fresh-note', text: T('用 Face ID 登入，另附一組備用通行碼。', 'Sign in with Face ID, plus a new backup pass.') })] : []), pass, error])
-      ])
-    ]);
-    document.documentElement.classList.add('q-signing-in');
-    for (const d of document.querySelectorAll('dialog[open]')) if (!onTop.has(d)) d.close();
-    keepOnTop(gate);
+    });
+    const gate = passScreen(s, { title: T('先換掉這組通行碼', 'Replace this pass first'), lede: T('這組是別人給你的，先換成你自己的。', 'It was given to you. Make it yours before you start.'), body: [go, error] });
+  });
+  return step1.then(async res => {
+    // (The passkey's challenge asked for now, on the new pass's session,
+    // while its pass is noted: Safari takes the request only in the tap.)
+    const ch = passkeyHere() ? addChallenge(s) : null;
     ch?.get().catch(() => {});
+    await showNewPass(s, res.passcode);
+    // Step 2: a passkey, encouraged; 以後再說 goes on without one.
+    const withKey = ch ? await freshKey(s, ch) : false;
+    document.documentElement.classList.remove('q-signing-in');
+    // (Asked here: the one-time passkey offer never asks again.)
+    s.write({ wallet: settingPatch('passkeyAsk', withKey ? 'yes' : 'no') }).catch(() => {});
+    return res;
+  });
+}
+function freshKey(s, ch) {
+  const en = s.lang === 'en';
+  const T = (zh, e) => (en ? e : zh);
+  return new Promise(resolve => {
+    const error = node('p', { class: 'q-gate-error', role: 'alert' });
+    const done = ok => (dropFromTop(gate), resolve(ok));
+    const add = node('button', {
+      class: 'q-btn primary block q-passkey-btn',
+      type: 'button',
+      html: `${icons.key || ''}<span>${T('加入通行密鑰', 'Add a passkey')}</span>`,
+      onclick: async () => {
+        add.disabled = later.disabled = true;
+        error.textContent = '';
+        try {
+          if (await addPasskey(s, ch)) return done(true);
+        } catch (e) {
+          error.textContent = errorText(e, s.lang);
+        }
+        add.disabled = later.disabled = false;
+      }
+    });
+    const later = node('button', { class: 'q-btn block', type: 'button', text: T('以後再說', 'Not now'), onclick: () => done(false) });
+    const gate = passScreen(s, { title: T('加入 Face ID 登入', 'Sign in with Face ID'), lede: T('建議加入：之後不必輸入通行碼。', 'Recommended: no pass to type next time.'), body: [add, later, error] });
   });
 }
 
