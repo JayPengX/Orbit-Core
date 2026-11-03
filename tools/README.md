@@ -47,16 +47,21 @@ tools/shots/accounts/<app>-<name>.txt --click …` saves what the app wrote
 (follows, a watchlist, a timetable). A new account with nothing in it is a
 real state too (its welcome sheet): shoot that when it's what you changed.
 
-## `node tools/live-scroll.mjs [app…] [--sheet "<js>"]`: a live update never moves the page
+## `node tools/live-scroll.mjs [app…] [--sheet "<js>"]`: nothing jumps
 
-Each app on real data, scrolled the way iPhone's Safari scrolls (no scroll
-anchoring), then redrawn as a live refresh redraws: something above the view
-grows, and the tab is drawn anew a moment short before it's full again. What
-was read must stay put and the page must not jump. `--sheet` opens a sheet
-and checks it too (`"import('./sheets.js').then(m=>m.openTeam('nba','13'))"`
-in Sports); `--without` leaves the kit's keeper (`kit/hold-place.mjs`) out to
-show what it catches. Exit code 1 on a fault. Run it after any change to how
-a page redraws.
+Each app on real data (signed in to its demo account in `tools/shots/accounts/`
+where it has one), scrolled the way iPhone's Safari scrolls (no scroll
+anchoring), then: something above the view grows (a refresh); the tab is drawn
+anew a moment short before it's full again; a drawing under the view moves (a
+car on a track map, a box laid over the page) and the page must not follow; a
+button is tapped and its tap folds what's under it (the page left short, as a
+segment with less in it) or what's above it, and the button must stay under
+the finger; in a sheet sized to its content, less is shown and the sheet must
+keep its height. `--sheet` opens a sheet and checks it too
+(`"import('./sheets.js').then(m=>m.openTeam('nba','13'))"` in Sports);
+`--without` leaves the kit's keeper (`kit/hold-place.mjs`) out to show what it
+catches. Exit code 1 on a fault. Run it after any change to how a page redraws
+or to `hold-place.mjs`.
 
 ## `node tools/store-shots.mjs <app> [n…] [--apply]`: the Showcase's and README's screenshots
 

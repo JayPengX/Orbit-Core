@@ -121,7 +121,7 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `orbit.mjs` | The core: the session, data reads and device storage (§5), the economy's tables, looks and milestones, notices, the frame (`tabBar`, `topActions`, `accountButton`, `ask`/`tell`), screens, fitting, live beats and break countdowns, recommendations (`rank`, `affinity`), the 除錯紀錄 (`rec`); on import it stops pinch zoom, lifts sheets over the keyboard (`watchKeyboard`), holds the first lift for on-screen pictures and presses only when pressed |
 | `orbit.css` | The design system: iOS 27's tokens (colour, type, space, radius, Liquid Glass, springs) and every `q-` component; the apps' accent colours (`tools/accent-css.mjs`) |
 | `ui.mjs` | The builders (§3.3) and their HTML-string twins (`…Html`) for apps that draw with template strings; loads `hold-place.mjs` |
-| `hold-place.mjs` | A redraw the person didn't make never moves the page, a sheet or a panel (Safari has no scroll anchoring); `scrollBusy()` holds `everyDev`'s beats while a finger is down or a fling runs |
+| `hold-place.mjs` | A redraw never moves the page, a sheet or a panel (Safari has no scroll anchoring): one the person didn't make holds what they read; a tap or swipe holds the control under the finger; never held to a drawing or a box laid over the page (`loose`); a sheet sized to its content keeps its height while open (`--q-sheet-floor`); `scrollBusy()` holds `everyDev`'s beats while a finger is down or a fling runs |
 | `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, before the app's modules) |
 | `loader.html` | The snippets every app's page carries (`kit:head`, `kit:boot`) |
 | `brand.mjs` | Families, names, colours, marks, repos, slugs, `APP_ORDER`, `DEV` (the owner's live speeds) |
@@ -159,11 +159,12 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | Rows | `list` / `cell` (grouped), `rowCard`, `section` / `sectionHead` / `sectionHtml`, `.q-list-head` |
 | The focal number | `.q-focus` on the app's colour; `heroCardHtml` only when the focus is an action; `stats` / `statsHtml`, `.q-fig` |
 | Small pieces | `tile` / `tileHtml`, `tag` / `tagHtml` (one exception per row), `.q-chip` (taps only), `toggle`, `search`, `menu`, `.q-badge`, `progressRing`, `monthCalendar`, `rail`, `actionGrid`, `panelGrid`, `leagueTile`, `matchCard`, `liveStrip`, `stockRow`, `movePill`, `placeTile`, `ballRow` |
+| A list's more | `moreToggle({ more, less, open, onToggle })` / `moreHtml` (`.q-more`): 再看 7 則 / 收起 as one quiet bar; `less: null` for a pager. Never accent text links |
 | Nothing here | `empty({ icon, title, body, action })` / `emptyHtml` |
 | Loading | `#loading` (boot.js) lifted once by `ready(firstScreen)` onto a finished screen (it waits for on-screen pictures); in place, `.q-skel` shimmers the size of what comes |
 | Pictures | `logoTile` / `logoTileHtml` + `wireLogos`, `darkLogos`; `logos.mjs`, `photos.mjs`; never letter tiles |
 | Icons | `ICONS` (orbit.mjs) / `icons` (ui.mjs): one drawing per idea; new ones read as `kitUI.icons?.x` |
-| Live data | `everyDev(key, fn)` beats at the owner's speeds (they wait while a finger is down); `data-q-live` + `liveChanged` pop a number that changed; patch in place (the same nodes), never rebuild what didn't change; `hold-place.mjs` keeps the reader's place by itself |
+| Live data | `everyDev(key, fn)` beats at the owner's speeds (they wait while a finger is down); `data-q-live` + `liveChanged` pop a number that changed; patch in place (the same nodes), never rebuild what didn't change; `hold-place.mjs` keeps the reader's place by itself, a tapped control under the finger and a content-sized sheet at its height |
 | Fitting | `fitNames` (`.q-fit`, `.q-fit-wrap`), `fitNumbers` / `watchFit`, `balanceRows` (`.q-balance`), `.q-even` / `.q-even3` |
 | Every screen | `screenFit()` / `onScreen(fn)` mark `html.q-tabrail`, `q-float`, `q-wide`, `q-w3`; `--q-page-max`, `--q-vw`; `.q-cols`; `.q-flow` + `flowColumns(root)` for columns of even height (DESIGN §10) |
 | Pull to refresh, taps | `pullToRefresh`; `haptic()` / `tick()`; `PRESS_DELAY` / `pressSelector` |
@@ -468,7 +469,7 @@ can be turned off on its own.
 | `node tools/preview.mjs <app>` | The app with real data (`--live`, `--width`, `--timing`, `--requests`, `--profile`, `--webkit`, `--reopen`…); prints `wraps:`, `cut:`, `scrolls sideways:` |
 | `node tools/gate.mjs [app…]` | The family quality gate (`tools/gate-page.js`): lift, stalls, dead taps, wraps, cuts, letters, white, mixed language… on every tab |
 | `node tools/f1-replay.mjs --start <UTC> --at <UTC>` | An F1 session as F1's live feed had it at any moment of a recorded one (OpenF1's tables): the proxy's `now.json`/`laps.json` and ESPN's scoreboard as the preview's `--fixture`s, for shots of a red flag or a safety car with no session on (`shots.mjs sports f1-live … -- $(cat <out>/args.txt)`) |
-| `node tools/live-scroll.mjs [app…]` | A live update never moves the page: scrolled as Safari scrolls, redrawn as a refresh redraws; exit 1 if what was read moved |
+| `node tools/live-scroll.mjs [app…]` | Nothing jumps: scrolled as Safari scrolls, then a refresh above, a tab drawn short, a moving drawing, taps that fold below and above, a sheet showing less; exit 1 if anything moved |
 | `node tools/store-shots.mjs <app>` | The README's and Showcase's screenshot set, both languages |
 | `node tools/test-apps.mjs [app…]` | Every app's tests against this kit (checkouts beside this one) |
 

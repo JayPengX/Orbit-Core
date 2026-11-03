@@ -641,6 +641,39 @@ export function empty({ icon = 'list', tint = '', title = '', body = '', action 
   return h('div', { class: cls ? `q-empty ${cls}` : 'q-empty' }, [mark, title ? h('strong', { text: title }) : null, body ? h('p', { text: body }) : null, button]);
 }
 
+const CHEV_DOWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+
+// ---- A list's more: 再看 7 則 / 收起 (Jay 2026-11-03: "I hate this kind of orange expand text") ----
+// One look in every app: a quiet bar the list's width under it, grey words
+// and a chevron that turns as it opens; never accent-coloured text.
+//   moreToggle({ more, less, open, onToggle, cls })
+// more: its words while closed (再看 7 則); less: while open (收起), or
+// null for a pager (再看 25 位: each tap shows more and never folds; the
+// app sets the next words with .set(false, words), or hides it);
+// onToggle(open). Keep the same node through a toggle (the kit holds it
+// under the finger as the list folds above it, hold-place.mjs).
+export function moreToggle({ more = kitW('顯示更多', 'Show more'), less = kitW('收起', 'Show less'), open = false, onToggle = () => {}, cls = '' } = {}) {
+  const words = h('span');
+  const b = h('button', { type: 'button', class: cls ? `q-more ${cls}` : 'q-more' }, [words]);
+  b.insertAdjacentHTML('beforeend', CHEV_DOWN);
+  const paint = () => {
+    words.textContent = open && less != null ? less : more;
+    b.setAttribute('aria-expanded', String(Boolean(open && less != null)));
+  };
+  b.addEventListener('click', () => {
+    if (less != null) open = !open;
+    paint();
+    onToggle(less != null ? open : true);
+  });
+  paint();
+  return Object.assign(b, {
+    set(o, m = more, l = less) {
+      (open = o), (more = m), (less = l);
+      paint();
+    }
+  });
+}
+
 // ---- A large title (iOS's navigation title) ----
 // navTitle('賽程') is the 34pt title at a tab's top; it scrolls away with the
 // page (no bar takes its place). For a tab that isn't the first: the first
@@ -844,6 +877,11 @@ export function emptyHtml({ icon = 'list', tint = '', title = '', body = '', act
   const mark = !icon ? '' : isIcon(icon) ? `<span class="q-tile q-empty-tile" aria-hidden="true"${styleOf(['--t', tint || 'var(--q-accent)'])}>${icons[icon]}</span>` : `<span class="q-empty-icon" aria-hidden="true">${E(icon)}</span>`;
   const button = !action ? '' : typeof action === 'string' ? action : action.href ? `<a class="q-btn primary" href="${E(action.href)}"${dataOf(action.data)}>${E(action.label)}</a>` : `<button class="q-btn primary" type="button"${dataOf({ tap: action.tap, ...action.data })}>${E(action.label)}</button>`;
   return `<div class="${clsOf('q-empty', cls)}">${mark}${title ? `<strong>${E(title)}</strong>` : ''}${body ? `<p>${E(body)}</p>` : ''}${button}</div>`;
+}
+// moreToggle's twin: moreHtml({ more, less, open, attr }) (attr: the app's data-… for its own tap).
+export function moreHtml({ more = kitW('顯示更多', 'Show more'), less = kitW('收起', 'Show less'), open = false, attr = '', cls = '' } = {}) {
+  const on = Boolean(open && less != null);
+  return `<button type="button" class="${clsOf('q-more', cls)}" aria-expanded="${on}"${attr ? ` ${attr}` : ''}><span>${E(on ? less : more)}</span>${CHEV_DOWN}</button>`;
 }
 // navTitleHtml(title), then wireNavTitles(root) once it's in the page.
 export function navTitleHtml(title = '') {

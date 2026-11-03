@@ -5552,5 +5552,58 @@ dialog[open] .q-menu { background: var(--q-sheet); }
   }
 }
 
-/* Room held at a page's or sheet's end after a live redraw made it shorter than where the person was (hold-place.mjs), until they next touch it. */
+/* ---- A list's more (ui.mjs moreToggle / moreHtml): 再看 7 則 / 收起 ----
+   A quiet bar the list's width: grey words and a chevron that turns as it
+   opens, a soft fill, pressed like every button. Never accent-coloured text
+   (Jay 2026-11-03). Inside a card it sits 8 under the list. */
+.q-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 36px;
+  margin: var(--q-s-2) 0 0;
+  padding: 0 var(--q-s-3);
+  border: 0;
+  border-radius: var(--q-r-cell);
+  background: var(--q-fill-4);
+  color: var(--q-text-2);
+  font: 600 14px/1.2 var(--q-font);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform var(--q-dur-snappy) var(--q-spring-snappy), background-color 0.2s;
+}
+.q-more[hidden] {
+  display: none;
+}
+.q-more:is(:active, [data-q-press]) {
+  transform: scale(0.98);
+  background: var(--q-fill-3);
+  transition-duration: 0.12s;
+}
+@media (hover: hover) {
+  .q-more:hover {
+    background: var(--q-fill-3);
+  }
+}
+.q-more svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  opacity: 0.8;
+  transition: transform var(--q-dur-snappy) var(--q-spring-snappy);
+}
+.q-more[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
+/* Room held at a page's or sheet's end after a redraw made it shorter than where the person was (hold-place.mjs), given back as they scroll up. */
 .q-hold-room::after { content: ''; display: block; height: var(--q-hold-room, 0); pointer-events: none; }
+/* A sheet sized to its content keeps the tallest it has been while open
+   (hold-place.mjs, --q-sheet-floor): a day with fewer rows or a part with
+   less in it never pulls it down under the finger. Never past the screen,
+   and not while the keys are up (the sheet follows them then). */
+html:not(.q-kb) dialog.q-sheet[open]:not([data-detent]):not(.q-leaving) {
+  min-height: min(var(--q-sheet-floor, 0px), calc(100dvh - var(--q-top) - 16px), 900px);
+}
