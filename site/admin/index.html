@@ -89,6 +89,7 @@
   #cap .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .flow .bar i.warn { background: var(--q-warn, #c77700); }
   .flow .v.warn { color: var(--q-warn, #c77700); }
+  .flow .v small { display: block; margin-top: 1px; font-size: 12px; font-weight: 500; color: var(--q-muted); }
   .set strong .using { display: block; font-weight: 500; font-size: 12px; color: var(--q-accent); margin-top: 2px; }
   .eq { font-size: 13px; color: var(--q-muted); line-height: 1.6; margin: 10px 0 0; }
   .neg { color: var(--q-bad); }
@@ -1764,23 +1765,32 @@ async function loadCapacity() {
     const p = await admin('capacity');
     const u = p.users;
     const q = p.quotas || { rows: [] };
+    // How much of a quota is used now: a day of Workers, Gemini's busiest day, the month carried to its end.
+    const fillOf = r => {
+      const use = r.kind === 'cf' && r.by === 'people' ? r.day : r.kind === 'ai' ? r.top : r.kind === 'maps' || r.kind === 'tdx' ? r.month : r.used;
+      const cap = r.kind === 'cf' && r.by === 'people' ? r.capDay : r.cap;
+      return cap ? (use || 0) / cap : 0;
+    };
     $('cap-tiles').replaceChildren(
       tile('本週活躍', `${u.week} 人`, `今天 ${u.day} · 本月 ${u.month}`),
       tile('30 天後預估', `${u.expected} 人`, `近兩週新開 ${u.newWeek + u.newPrev} 個`),
-      tile('撐得住', q.holds ? `${n0(q.holds.people)} 人` : '—', q.holds ? quotaName(q.holds.key) : '還沒有人用'),
+      tile('撐得住', q.holds ? `${n0(q.holds.people)} 人` : '—', q.holds ? `${quotaName(q.holds.key)} ${Math.round(fillOf(q.rows.find(r => r.key === q.holds.key)) * 100)}%` : '還沒有人用'),
       tile('開始放慢', q.slows ? `${n0(q.slows.people)} 人` : '—', q.slows ? '帳單保護 60%' : '帳單還沒讀到')
     );
     // (Short: 3.7 萬, 7 億; CPU in seconds.)
     const cn = v => (v >= 1e8 ? `${+(v / 1e8).toFixed(1)} 億` : v >= 1e4 ? `${+(v / 1e4).toFixed(1)} 萬` : n0(v));
     const big = (k, v) => (/Bytes$/.test(k) ? `${(v / 1e9).toFixed(2)} GB` : k === 'cpuMs' ? `${cn(v / 1000)} 秒` : cn(v));
     const tone = share => (share > 1 ? 'neg' : share > 0.8 ? 'warn' : '');
-    // A row: how full it is now (this week's people of the people it holds, or use of cap).
+    // A row: how much of the quota is used now (a day of Workers, Gemini's
+    // busiest day, the month carried to its end), beside the people it holds.
     const row = (r, sub) => {
-      const share = r.holds != null ? (u.week || 0) / Math.max(1, r.holds) : r.cap ? (r.used || 0) / r.cap : 0;
-      const shown = r.paused ? '暫停' : r.holds != null ? `${n0(r.holds)} 人` : r.cap ? `${Math.round(share * 100)}%` : '—';
+      const share = fillOf(r);
+      const pct = r.cap ? `${Math.round(share * 100)}%` : '—';
+      // (People on top, the share used under it; a quota not counted in people: its share alone.)
+      const shown = r.paused ? ['暫停'] : r.holds != null ? [`${n0(r.holds)} 人`, el('small', { text: `用了 ${pct}` })] : [pct];
       return el('li', {}, [
         el('span', { class: 'nm' }, [quotaName(r.key), el('small', { text: sub })]),
-        el('span', { class: `v ${share > 1 ? 'neg' : share > 0.8 ? 'warn' : 'pos'}`, text: shown }),
+        el('span', { class: `v ${share > 1 ? 'neg' : share > 0.8 ? 'warn' : 'pos'}` }, shown),
         el('span', { class: 'bar' }, [el('i', { class: tone(share), style: `width:${Math.max(1.5, Math.min(100, share * 100))}%` })])
       ]);
     };
@@ -1788,7 +1798,7 @@ async function loadCapacity() {
       if (r.kind === 'cf' && r.by === 'store') return `存了 ${big(r.count, r.used)} / ${big(r.count, r.cap)}`;
       if (r.kind === 'cf') {
         const fixed = r.day ? Math.round((r.fixedDay / r.day) * 100) : 0;
-        return `每天 ${big(r.count, r.day)} / ${big(r.count, r.capDay)}${r.measured ? ` · 排程佔 ${fixed}%` : ''}`;
+        return `每天 ${big(r.count, r.day).replace(/ 秒$/, '')} / ${big(r.count, r.capDay)}${r.measured ? ` · 排程 ${fixed}%` : ''}`;
       }
       if (r.kind === 'ai') return r.paused ? 'Gemini · 已暫停' : `Gemini · 最多一天 ${n0(r.top)} / ${n0(r.cap)}`;
       if (r.kind === 'maps') return `本月預估 ${n0(r.month)} / ${n0(r.cap)} 免費`;
