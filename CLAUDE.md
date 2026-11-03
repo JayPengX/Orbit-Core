@@ -185,7 +185,7 @@ Type `--q-t-large`, `--q-t-title1..3`, `--q-t-headline`, `--q-t-body`,
 `--q-s-1..7` (4…48); radius `--q-r-card` 22, `--q-r-cell` 12, `--q-r-sheet`
 38; glass `--q-glass*`; motion `--q-spring-snappy|smooth|bouncy`,
 `--q-dur-*`; Native's own (`html[data-look='native']`): `--nv-display` (big
-numbers), `--nv-card` and `--nv-edge` (the graphite surface), `--nv-lift`.
+numbers), `--nv-card` (`-up` on a sheet), `--nv-edge`, `--nv-lift`.
 `node tools/kit-find.mjs --css <word>` lists them. Apps build on these and
 the `q-` components; they don't restyle them.
 

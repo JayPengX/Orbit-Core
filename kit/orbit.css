@@ -385,6 +385,8 @@ html[data-look='native'][data-look='native'] {
   --nv-edge: rgba(0, 0, 0, 0.06);
   --nv-lift: 0 1px 1px rgba(0, 0, 0, 0.03), 0 8px 24px -16px rgba(0, 0, 0, 0.2);
   --nv-card: #ffffff;
+  --nv-card-up: #ffffff;
+  --nv-edge-up: rgba(0, 0, 0, 0.06);
   --nv-deep: #000000;
   --nv-glyph: #000000;
   --nv-glyph-a: 88%;
@@ -397,9 +399,11 @@ html[data-look='native'][data-look='native'] {
     --q-grouped-3: #1f1f22;
     --q-elevated: #1d1d20;
     --q-sep: rgba(255, 255, 255, 0.08);
-    --nv-edge: rgba(255, 255, 255, 0.085);
+    --nv-edge: rgba(255, 255, 255, 0.1);
     --nv-lift: none;
-    --nv-card: linear-gradient(180deg, #19191c, #141416);
+    --nv-card: linear-gradient(180deg, #1a1a1d, #151518);
+    --nv-card-up: linear-gradient(180deg, #252528, #202023);
+    --nv-edge-up: rgba(255, 255, 255, 0.11);
     --nv-glyph: #ffffff;
     --nv-glyph-a: 80%;
     --nv-wash: 17%;
@@ -411,12 +415,22 @@ html[data-look='native'][data-look='native'][data-theme='dark'] {
   --q-grouped-3: #1f1f22;
   --q-elevated: #1d1d20;
   --q-sep: rgba(255, 255, 255, 0.08);
-  --nv-edge: rgba(255, 255, 255, 0.085);
+  --nv-edge: rgba(255, 255, 255, 0.1);
   --nv-lift: none;
-  --nv-card: linear-gradient(180deg, #19191c, #141416);
+  --nv-card: linear-gradient(180deg, #1a1a1d, #151518);
+  --nv-card-up: linear-gradient(180deg, #252528, #202023);
+  --nv-edge-up: rgba(255, 255, 255, 0.11);
   --nv-glyph: #ffffff;
   --nv-glyph-a: 80%;
   --nv-wash: 17%;
+}
+
+/* On a sheet (dark: the sheet is the cards' own grey), a card is a shade
+   lifted from it, as iOS's cells are, so its edge shows (Jay 2026-11-03:
+   "too black, no border"). A panel that isn't a kit sheet says .q-raised. */
+html[data-look='native'] :is(.q-sheet, .q-raised) {
+  --nv-card: var(--nv-card-up);
+  --nv-edge: var(--nv-edge-up);
 }
 
 /* The page: San Francisco, smoothed as iOS draws it, on the grouped background. */
