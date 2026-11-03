@@ -116,6 +116,10 @@ export const PAGES = {
     trip: { args: ['--google-map', ...click('#tab-map', wait(2500), "js:(()=>{const q=document.querySelector('#q');q.focus();q.value=document.documentElement.lang==='en'?'Taipei Main Station':'臺北車站';q.dispatchEvent(new Event('input',{bubbles:true}))})()", wait(8000), '.ot-res', "js:document.querySelector('[data-card=go]')?.click()", wait(8000), "js:document.querySelector('.ot-plan[data-plan=\"0\"]')?.click()", wait(5000))] },
     // The same trip's 路線 card, the ways listed (none opened).
     plans: { args: ['--google-map', ...click('#tab-map', wait(2500), "js:(()=>{const q=document.querySelector('#q');q.focus();q.value=document.documentElement.lang==='en'?'Taipei Main Station':'臺北車站';q.dispatchEvent(new Event('input',{bubbles:true}))})()", wait(8000), '.ot-res', "js:document.querySelector('[data-card=go]')?.click()", wait(9000))] },
+    // 地圖's 搜尋地點, the field tapped (取消 beside it, your recents under it); then the keyboard put
+    // away with nothing typed (取消 gone, the field the whole row).
+    search: { args: click('#tab-map', wait(3000), "js:document.querySelector('#q').focus()", wait(1500)) },
+    'search-done': { args: click('#tab-map', wait(3000), "js:document.querySelector('#q').focus()", wait(1200), "js:document.querySelector('#q').blur()", wait(1200)) },
     // 地圖's sheet raised to 建議 (with places pinned and --clock a working day's morning: 去公司).
     sugs: { args: click(wait(4000), ...[1, 2].flatMap(() => ["js:document.getElementById('ms-grab').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true}))", wait(1200)])) },
     // 交通 once its rides are read (with --account rides: a trip, a pinned bus, a pinned train), then scrolled to what's near.
