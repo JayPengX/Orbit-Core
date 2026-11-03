@@ -119,7 +119,7 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | Module | What |
 | --- | --- |
 | `orbit.mjs` | The core: the session, data reads and device storage (§5), the economy's tables, looks and milestones, notices, the frame (`tabBar`, `topActions`, `accountButton`, `ask`/`tell`), screens, fitting, live beats and break countdowns, recommendations (`rank`, `affinity`), the 除錯紀錄 (`rec`); on import it stops pinch zoom, lifts sheets over the keyboard (`watchKeyboard`), holds the first lift for on-screen pictures and presses only when pressed |
-| `orbit.css` | The design system: iOS 27's tokens (colour, type, space, radius, Liquid Glass, springs) and every `q-` component; the apps' accent colours (`tools/accent-css.mjs`) |
+| `orbit.css` | The design system: iOS 27's tokens (colour, type, space, radius, Liquid Glass, springs) and every `q-` component; the apps' accent colours (`tools/accent-css.mjs`); at its end the 原生 Native layer, for an app whose page says `<html data-look="native">` (DESIGN §11) |
 | `ui.mjs` | The builders (§3.3) and their HTML-string twins (`…Html`) for apps that draw with template strings; loads `hold-place.mjs` |
 | `hold-place.mjs` | A redraw never moves the page, a sheet or a panel (Safari has no scroll anchoring): one the person didn't make holds what they read; a tap or swipe holds the control under the finger; never held to a drawing or a box laid over the page (`loose`); a sheet sized to its content keeps its height while open (`--q-sheet-floor`); `scrollBusy()` holds `everyDev`'s beats while a finger is down or a fling runs |
 | `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, before the app's modules) |
@@ -152,7 +152,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | Tabs | `tabBar({ tabs, onSelect })` (orbit.mjs): the floating capsule on a phone, a slim rail on a phone on its side and on a computer; an in-progress bar is a `.q-accessory` pill above it |
 | The top line | `topActions`, `accountButton` (the account pill and at most one action) |
 | A tab's title | `navTitle` / `navTitleHtml` + `wireNavTitles` (the 34 pt large title), `pageHead` |
-| Switching a view | `view()` (cross-faded with View Transitions); `segmented` / `segHtml` + `settleSegs` for a whole tab's view (at most 4) |
+| Switching a view | `view()` (cross-faded with View Transitions); `segmented` / `segHtml` + `settleSegs` for a whole tab's view (at most 4); in Native a single-choice filter row is `.q-chips.q-texttabs` (text tabs) |
 | A day | `dayBar` + `dayStrip` + `daySwipe` (`dayStep`, `dayList`, `dayTop`, `dayNum`, `dayToday`): the one date selector |
 | A page on top | `sheet({ detent, foot, lead, trailing })`, `bindSheet`, `setSheetDetent`; `closeSheet` (orbit.mjs) slides it out; `sheetHero`, `sheetFoot` / `.q-sheet-foot`; a whole page (a game, a team, a law) in `.q-sheet-wide` with `.q-sheet-cols` / `.q-sheet-pair` |
 | A question | `ask()` / `tell()` (orbit.mjs), `confirm()` (ui.mjs): never the browser's popups; a one-tap delete gets a `toast` with 復原 |
@@ -183,8 +183,10 @@ Type `--q-t-large`, `--q-t-title1..3`, `--q-t-headline`, `--q-t-body`,
 `--q-live`, the app's accent; one name for light and dark); space
 `--q-s-1..7` (4…48); radius `--q-r-card` 22, `--q-r-cell` 12, `--q-r-sheet`
 38; glass `--q-glass*`; motion `--q-spring-snappy|smooth|bouncy`,
-`--q-dur-*`. `node tools/kit-find.mjs --css <word>` lists them. Apps build
-on these and the `q-` components; they don't restyle them.
+`--q-dur-*`; Native's own (`html[data-look='native']`): `--nv-display` (big
+numbers), `--nv-card` and `--nv-edge` (the graphite surface), `--nv-lift`.
+`node tools/kit-find.mjs --css <word>` lists them. Apps build on these and
+the `q-` components; they don't restyle them.
 
 ## 4. The APIs: the proxy (`orbit-workers-proxy`)
 

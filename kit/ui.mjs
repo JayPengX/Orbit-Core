@@ -150,14 +150,18 @@ export function dayStrip(s, { days = [], current = null, onPick = () => {}, labe
     };
     // Whole days only: as many chips as fit, sharing the row's width (never one
     // cut in half beside the 📅), each at least 62px (the date with room on iPhone's
-    // wider digits); the row comes to rest on a chip's edge.
+    // wider digits); the row comes to rest on a chip's edge. (The look can say
+    // otherwise: Native's week row is seven days, each at least 40px:
+    // --q-day-n and --q-day-min on the row.)
     s.fit = () => {
       const r = s.row;
       if (!r.clientWidth) return;
       const cs = getComputedStyle(r);
       const room = r.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
       const gap = parseFloat(cs.columnGap) || 0;
-      const n = Math.max(1, Math.floor((room + gap) / (62 + gap)));
+      const least = parseFloat(cs.getPropertyValue('--q-day-min')) || 62;
+      const most = parseFloat(cs.getPropertyValue('--q-day-n')) || Infinity;
+      const n = Math.max(1, Math.min(most, Math.floor((room + gap) / (least + gap))));
       const w = `${Math.floor(((room - gap * (n - 1)) / n) * 10) / 10}px`;
       if (r.style.getPropertyValue('--q-day-w') !== w) {
         r.style.setProperty('--q-day-w', w);

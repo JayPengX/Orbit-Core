@@ -247,3 +247,37 @@ and `--q-col-r` (beside it), `--q-mid` (its middle); never `100vw`.
   (two things side by side: each side's line-up, two conferences' tables).
 - Charts, maps and canvases redraw at the new size on `onScreen()`.
 
+
+## 11. 原生 Native: the look every app is moving to
+
+Jay 2026-11-03 picked 原生 Native (RULEBOOK §3): a whole UX redesign, app by
+app, every feature kept, each app shown to Jay beside today's before it ships.
+An app that has moved marks its page `<html data-look="native">`; the kit's
+Native layer (the end of `orbit.css`) applies only there, so the others keep
+today's look until their turn. When every app has moved, the layer becomes
+the kit's own and the mark goes.
+
+- **The colour is the content's.** A screen takes its colour from what it
+  shows: Weather's sky is the page, a game is its two clubs' colours, a bus
+  its line's. The app's colour is for the controls (the chosen tab, a
+  button). A hero with no colour of its own (`.q-hero-card`, `.q-focus`) is
+  the app's, deep and matte.
+- **Surfaces are graphite.** Cards, lists and rails are one surface lit from
+  above with a hairline edge (`--nv-card`, `--nv-edge`): white with a soft
+  lift in light, graphite with no shadow in dark. Glass is for what floats
+  over content (the tab bar, a sheet's head, Weather's panels on its sky).
+- **Big numbers are light.** A temperature, a score, the focus: the display
+  face, light, tabular (`--nv-display`). Names and labels carry the weight.
+- **One page, fewer tabs.** Views of the same thing are one page (Weather's
+  今天 and 預報); places, like days, swipe sideways (`daySwipe`); what a
+  card opens is a sheet, never a new tab.
+- **Filters are text tabs.** A single-choice filter row is text with the
+  chosen one underlined (`.q-chips.q-texttabs`); a multiple choice (a pin's
+  weekdays) stays chips.
+- **The week row is iOS's.** Seven days, the weekday over the day's number,
+  the chosen day a filled disc, today in the app's colour (`dayBar`; the
+  layer sets `--q-day-n` and `--q-day-min`, which `dayStrip` fits by).
+- **Tags are text.** Grey for a fact, its colour for an exception; only
+  `.q-tag.solid` is filled.
+- **Icons are tinted glyphs**: the glyph in its colour on a faint wash of it,
+  never a filled square.
