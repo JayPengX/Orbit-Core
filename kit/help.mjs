@@ -36,6 +36,7 @@ export const HELP = {
       ]],
       ['devices', '登入與裝置', [
         '新裝置：輸入通行碼，或在已登入的裝置按「新增裝置」拿 8 碼裝置代碼（10 分鐘內、只能用一次）。',
+        '第一次用別人給你的通行碼登入時，會先請你換掉它，之後只有你知道。',
         '通行密鑰：在 Pass 分頁加入後，新裝置按「用通行密鑰登入」，用 Face ID、Touch ID 或 Windows Hello 就能登入；通行碼照樣能用。',
         '「在這台裝置登出」只清掉這台裝置的資料；都還在 Orbit Pass，登入就回來。'
       ]],
@@ -76,6 +77,7 @@ export const HELP = {
       ]],
       ['devices', 'Signing in and devices', [
         'On a new device, enter the pass, or choose “Add a device” on a signed-in one for an 8-character device code (10 minutes, once).',
+        'The first time you sign in with a pass someone gave you, you’re asked to replace it, so only you know it.',
         'Passkeys: add one in the Pass tab, then on a new device choose “Sign in with a passkey” and use Face ID, Touch ID or Windows Hello. Your pass still works.',
         '“Sign out on this device” wipes only this device; it all stays on your Orbit Pass.'
       ]],
@@ -580,11 +582,13 @@ export function helpFor(app, lang = 'zh') {
 export const TOURS = {
   pass: {
     zh: [
+      ['first', '第一次登入', ['別人給你的通行碼，第一次登入時先換成你自己的：設定通行密鑰（建議，另附一組備用通行碼），或換一組新的通行碼。換好才打開 App。']],
       ['pass', 'Pass', ['你的卡片（頭像、里程碑、帳號），點它換外觀；下面是這個 App 的設定、新增裝置、通知、除錯紀錄和帳戶安全。']],
       ['looks', '外觀', ['里程碑，和免費的頭像、頭像框。最上面是最接近的下一枚。']],
       ['apps', 'App', ['每個 Orbit App，上次什麼時候用，一點就打開。']]
     ],
     en: [
+      ['first', 'First sign-in', ['A pass someone gave you is made yours at its first sign-in: add a passkey (recommended, with a new backup pass), or get a new pass. Then the app opens.']],
       ['pass', 'Pass', ['Your card (avatar, milestones, account); tap it for your look. Below: this app’s settings, adding a device, notifications, the debug log and security.']],
       ['looks', 'Looks', ['Milestones, and the free avatars and frames. On top, the nearest next medal.']],
       ['apps', 'Apps', ['Every Orbit app, when you last used it, a tap to open it.']]
@@ -773,6 +777,7 @@ export const SHOTS = {
   'orbit/tools': '598835146624 824932e8ad4d 6bcfefbbcfb0 644446c1215c',
   'orbit/week': 'b8ac79106daf b46d443d1083 390d620645e9 7196ad48cb68',
   'pass/apps': 'ebb71f5949af d8d096baa232 57abd9ade33d acc0a766b6ce',
+  'pass/first': '59111b5a6fa3 40ac465dc8a8 4fe17026b2fc 6c2f7f31524b',
   'pass/looks': '8e968219ba64 c478355a65a4 a43d1023104f 7377be49a3c2',
   'pass/pass': '601cec090c7f 7bbf7c5de2f8 d54cefa42676 30dd5ce15398',
   'stock/fx': '93d9775887f9 58905304a8ab 217757064191 902fc319786c',
