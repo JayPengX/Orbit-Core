@@ -2,9 +2,10 @@
 // app's tour, at 390 wide, light and dark, in Chinese and English, with real
 // live data (signed in to the demo account where the app has one), cropped to
 // the screen's top and saved as WebP in kit/img/help/<kit id>/, then each
-// stop's hash written into kit/help.mjs (the guide asks `?v=<hash>`).
+// picture's hash written into kit/help.mjs (the guide asks `?v=<hash>`).
 //
 //   node tools/help-shots.mjs [kit id…] [--stops a,b] [--jobs 4] [--keep dir [--reuse]]
+//   node tools/help-shots.mjs --hashes   (only the hashes, from the pictures in kit/img/help/)
 //
 // Retake after an app's screens change (a tab redrawn, a tab added): the
 // stops are the tour's (TOURS in kit/help.mjs); how each is reached is here.
@@ -54,7 +55,8 @@ const only = opt('stops', '');
 const keep = opt('keep', '');
 // (--reuse: a shot already in the --keep folder is kept, not taken again.)
 const reuse = argv.includes('--reuse') && argv.splice(argv.indexOf('--reuse'), 1);
-const apps = argv.length ? argv : Object.keys(APPS);
+const hashesOnly = argv.includes('--hashes') && argv.splice(argv.indexOf('--hashes'), 1);
+const apps = hashesOnly ? [] : argv.length ? argv : Object.keys(APPS);
 const work = resolve(keep || join(tmpdir(), `help-shots-${Date.now()}`));
 mkdirSync(work, { recursive: true });
 
@@ -128,7 +130,7 @@ for (const t of tasks.filter(t => t.png)) {
 }
 await browser.close();
 
-// Each stop's hash, over its four pictures: the guide asks for `?v=<hash>`
+// Each stop's four pictures' hashes (zh light, zh dark, en light, en dark): the guide asks for `?v=<hash>`
 // (the block at the end of kit/help.mjs, so the guide stays one module).
 const file = join(CORE, 'kit/help.mjs');
 const { SHOTS: old = {} } = await import(`${file}?t=${Date.now()}`);
@@ -139,9 +141,8 @@ for (const id of Object.keys(TOURS)) {
   for (const stop of TOURS[id].zh.map(s => s[0])) {
     const files = ['zh.light', 'zh.dark', 'en.light', 'en.dark'].map(v => join(dir, `${stop}.${v}.webp`));
     if (!files.every(existsSync)) continue;
-    const h = createHash('sha256');
-    for (const f of files) h.update(readFileSync(f));
-    SHOTS[`${id}/${stop}`] = h.digest('hex').slice(0, 12);
+    // (Each picture's own hash, as the kit's files: the service worker checks a ?v= file against it.)
+    SHOTS[`${id}/${stop}`] = files.map(f => createHash('sha256').update(readFileSync(f)).digest('hex').slice(0, 12)).join(' ');
   }
 }
 const lines = Object.keys(SHOTS).sort().map(k => `  '${k}': '${SHOTS[k]}'`);
