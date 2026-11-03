@@ -107,10 +107,12 @@ export const PAGES = {
   },
   orbit: {
     default: ['tabs'],
+    // 今天 one scroll down: the day's classes and the countdowns.
+    lower: { args: click(wait(2000), 'js:scrollTo(0, innerHeight * 0.8)', wait(800)) },
     // (Class needs a timetable: --account demo, or -- --store classFocusData=….)
     class: { args: click('#cx-hero', wait(1200)) },
     // The card's foot (接著 / 下一節) tapped: the class it names, not the card's.
-    next: { args: click('#cx-foot', wait(1200)) },
+    next: { args: click("js:document.querySelector('.nv-foot, #cx-foot')?.click()", wait(1200)) },
     editor: { args: click('js:window.openEditor()', wait(1200)) },
     key: { args: click("js:window.openTransferSheet('key')", wait(1200)) },
     photo: { args: click("js:window.openTransferSheet('photo')", wait(1200)) },
@@ -138,21 +140,23 @@ export const PAGES = {
   },
   words: {
     default: ['tabs'],
+    // 今天 one scroll down: where to pick up, the ways to practise, the rest.
+    lower: { args: click(wait(2500), 'js:scrollTo(0, innerHeight * 0.8)', wait(800)) },
     quiz: { args: click('.hero .q-hc-btn', wait(2000)) },
     // A question answered (the first choice), its verdict and 下一題.
     answered: { args: click('.hero .q-hc-btn', wait(2000), "js:document.querySelector('.choice')?.click()", wait(800)) },
     // 練習模式's 句子填空: a round on the words' own examples, the first question answered.
-    sentence: { args: click(wait(2500), "js:[...document.querySelectorAll('.mode-card')].find(e=>/句子填空|Sentences/.test(e.textContent)).click()", wait(1500), "js:document.querySelector('.choice')?.click()", wait(800)) },
+    sentence: { args: click(wait(2500), "js:[...document.querySelectorAll('.mode-row, .mode-card')].find(e=>/句子填空|Sentences/.test(e.textContent)).click()", wait(1500), "js:document.querySelector('.choice')?.click()", wait(800)) },
     // 拼字比賽 handed in at once (every question blank): the results page.
     contest: { args: click(wait(3000), "js:[...document.querySelectorAll('.contest-card button.primary')][0].click()", wait(1500)) },
     word: { hash: 'word=track' },
     // 複習's flash cards (答錯's deck), and 背新字's first card.
     flash: { hash: 'review', args: click(wait(2000), "js:document.querySelector('#panel-review .hero .q-hc-btn').click()", wait(1200)) },
-    study: { args: click(wait(2500), '.go-card', wait(1500)) },
+    study: { args: click(wait(2500), "js:document.querySelector('.go-card, #panel-today .q-rowcard .q-ritem.chevron')?.click()", wait(1500)) },
     // A word's sheet once it has been answered (its 學習紀錄): a 句子填空 answered wrong, then that word's sheet.
     // 今天's lower shelves (單字卡, 最近練習的字, 今日單字) after one 選中文 round answered.
-    shelves: { args: click("js:(async()=>{const z=ms=>new Promise(r=>setTimeout(r,ms));await z(2500);[...document.querySelectorAll('.mode-card')].find(e=>/選中文|Meaning/.test(e.textContent)).click();for(let i=0;i<90;i++){await z(300);const c=document.querySelector('.choice:not([disabled])');if(c){c.click();continue}const n=document.querySelector('.next-bar button');if(n){n.click();continue}break}await z(500);[...document.querySelectorAll('button')].find(b=>/^(完成|Done)$/.test(b.textContent.trim()))?.click();await z(1200);document.querySelector('.deck-rail,.recent-rail')?.closest('section')?.scrollIntoView();await z(800)})()") },
-    'word-record': { args: click("js:(async()=>{const z=ms=>new Promise(r=>setTimeout(r,ms));await z(2500);[...document.querySelectorAll('.mode-card')].find(e=>/句子填空|Sentences/.test(e.textContent)).click();await z(1500);[...document.querySelectorAll('.choice')][1].click();await z(800);location.hash='word='+document.querySelector('.choice.right .choice-text').textContent;await z(1500);[...document.querySelectorAll('dialog[open]')].pop().querySelector('.word-body').lastElementChild.scrollIntoView();await z(600)})()") }
+    shelves: { args: click("js:(async()=>{const z=ms=>new Promise(r=>setTimeout(r,ms));await z(2500);[...document.querySelectorAll('.mode-row, .mode-card')].find(e=>/選中文|Meaning/.test(e.textContent)).click();for(let i=0;i<90;i++){await z(300);const c=document.querySelector('.choice:not([disabled])');if(c){c.click();continue}const n=document.querySelector('.next-bar button');if(n){n.click();continue}break}await z(500);[...document.querySelectorAll('button')].find(b=>/^(完成|Done)$/.test(b.textContent.trim()))?.click();await z(1200);document.querySelector('.deck-rail,.recent-rail')?.closest('section')?.scrollIntoView();await z(800)})()") },
+    'word-record': { args: click("js:(async()=>{const z=ms=>new Promise(r=>setTimeout(r,ms));await z(2500);[...document.querySelectorAll('.mode-row, .mode-card')].find(e=>/句子填空|Sentences/.test(e.textContent)).click();await z(1500);[...document.querySelectorAll('.choice')][1].click();await z(800);location.hash='word='+document.querySelector('.choice.right .choice-text').textContent;await z(1500);[...document.querySelectorAll('dialog[open]')].pop().querySelector('.word-body').lastElementChild.scrollIntoView();await z(600)})()") }
   },
   beats: {
     default: ['tabs'],
@@ -164,6 +168,10 @@ export const PAGES = {
     default: ['tabs'],
     // 首頁's 為你推薦 (the covers the kit's picks engine ranks), scrolled into view.
     foryou: { args: click(wait(3000), "js:[...document.querySelectorAll('.lw-covers')].pop()?.scrollIntoView({block:'center'})", wait(1200)) },
+    // 首頁 one scroll down; after a search and a question (最近找過); with a search typed in its field.
+    lower: { args: click(wait(6000), 'js:scrollTo(0, innerHeight * 0.8)', wait(800)) },
+    recent: { args: click(wait(4000), "js:(i=>{i.value='勞基法 加班費';i.form.requestSubmit()})(document.querySelector('.nv-find-input'))", wait(2500), 'js:history.back()', wait(2500), "js:(i=>{i.value='房東不還押金怎麼辦';[...document.querySelectorAll('.nv-way')].pop().click()})(document.querySelector('.nv-find-input'))", wait(1500), 'js:history.back()', wait(2500)) },
+    typed: { args: click(wait(4000), "js:(i=>{i.focus();i.value='房東不還押金'})(document.querySelector('.nv-find-input'))", wait(500)) },
     article: { hash: 'law=B0000001&a=184' },
     // 法規 search: a law named (憲法), the start of one's name (憲法增), the start of a short name (勞基).
     'search-named': { hash: 'tab=laws&q=憲法' },
