@@ -90,7 +90,12 @@ export const PAGES = {
   transit: {
     default: ['tabs', 'trip'],
     // A real trip from where the phone is (新竹車站) to 臺北車站: the plans card, then the first plan.
-    trip: { args: ['--google-map', ...click("js:(()=>{const q=document.querySelector('#q');q.focus();q.value=document.documentElement.lang==='en'?'Taipei Main Station':'臺北車站';q.dispatchEvent(new Event('input',{bubbles:true}))})()", wait(8000), '.ot-res', "js:document.querySelector('[data-card=go]')?.click()", wait(8000), "js:document.querySelector('.ot-plan[data-plan=\"0\"]')?.click()", wait(5000))] },
+    trip: { args: ['--google-map', ...click('#tab-map', wait(2500), "js:(()=>{const q=document.querySelector('#q');q.focus();q.value=document.documentElement.lang==='en'?'Taipei Main Station':'臺北車站';q.dispatchEvent(new Event('input',{bubbles:true}))})()", wait(8000), '.ot-res', "js:document.querySelector('[data-card=go]')?.click()", wait(8000), "js:document.querySelector('.ot-plan[data-plan=\"0\"]')?.click()", wait(5000))] },
+    // 交通 once its rides are read (with --account rides: a trip, a pinned bus, a pinned train), then scrolled to what's near.
+    go: { hash: 'go', args: click(wait(9000)) },
+    'go-lower': { hash: 'go', args: click(wait(8000), "js:(()=>{document.getElementById('panel-go')?.scrollTo(0,700);scrollTo(0,700)})()", wait(1500)) },
+    // A pinned bus's route from 交通's row: its stops, where its buses are (進站中 on a stop's dot, one on its way between two).
+    route: { hash: 'go', args: click(wait(9000), '[data-route]', wait(6000)) },
     // 查時刻: a station's live board (高雄).
     board: { args: click('#tab-times', wait(3000), "js:(async()=>{document.querySelector('[data-pick=to]').click();await new Promise(r=>setTimeout(r,800));const q=document.querySelector('#s-q');q.value='高雄';q.dispatchEvent(new Event('input',{bubbles:true}));await new Promise(r=>setTimeout(r,800));document.querySelector('#s-body [data-st]').click()})()", wait(8000)) }
   },
@@ -136,7 +141,7 @@ export const PAGES = {
     // 更多 › 分類: the twelve, each with its subs.
     cats: { hash: 'more', args: click(wait(800), "js:[...document.querySelectorAll('.mn-tool')].find(e=>/^(分類|Categories)/.test(e.textContent.trim())).click()", wait(1200)) },
     // 新增固定收支 scrolled to its foot (開始, the date field that once poked out sideways).
-    'repeat-new': { hash: 'more', args: click(tap('固定收支|Repeats'), wait(1200), tap('新增固定收支|New repeat'), wait(1200), "js:[...document.querySelectorAll('dialog.q-sheet[open]')].pop().scrollTop=9999", wait(600)) }
+    'repeat-new': { hash: 'more', args: click("js:[...document.querySelectorAll('.mn-tool')].find(e=>/^(固定收支|Repeats)/.test(e.textContent.trim())).click()", wait(1200), tap('新增固定收支|New repeat'), wait(1200), "js:[...document.querySelectorAll('dialog.q-sheet[open]')].pop().scrollTop=9999", wait(600)) }
   },
   words: {
     default: ['tabs'],

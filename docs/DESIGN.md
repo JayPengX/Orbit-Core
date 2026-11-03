@@ -20,14 +20,12 @@ loud things mean something.
   the biggest type on the screen, with the most space around it. Money's
   月曆: what I spent this month. Weather: how warm it is now. Sports: the
   game on now.
-- **The focus sits on the app's colour.** The focal block (`.q-focus`: a
-  quiet label, the number at `--q-t-focal`, one line under it, at most three
-  small figures) is a card in the app's colour lit from the corner, the same
-  surface as `.q-hero-card` (an app may give it its own, as Money's black and
-  gold). What's *on* it stays calm: one big number, plain words, no capsules.
-  Jay 2026-10-27: the rollout's open, colourless focus made every screen
-  "feel so empty"; "the cleaner approach is right, but stripping out
-  background is shitty". Clean the content, keep the colour.
+- **The focus is a card.** The focal block (`.q-focus`: a quiet label, the
+  number at `--q-t-focal`, one line under it, at most three small figures)
+  is a graphite card, the same surface as `.q-hero-card`, with colour only
+  inset on what it names (§11; until 2026-11-03 it wore the app's colour).
+  What's *on* it stays calm: one big number, plain words, no capsules. Jay
+  2026-10-27: an open, card-less focus made every screen "feel so empty".
 - At most **one** coloured surface per screen. A second one means two
   things are shouting; demote one.
 - Everything else steps down: section heads, then rows, then captions. If
@@ -70,12 +68,11 @@ loud things mean something.
 - **Meaning colours** only where the value carries the meaning: red/green
   for up/down (Taiwan's way, `--q-up` / `--q-down`), `--q-good` for money
   in, red for over budget or empty, `--q-live` for live. Never as decoration.
-- **Keep the surfaces.** The hero and focus cards wear the app's colour lit
-  from the corner with a soft shadow of it; class, subject and sport cards
-  their own colour; icon tiles a gradient. Calm comes from what's on a card
-  (fewer capsules, weights and accent marks), never from stripping its
-  background (Jay 2026-10-27). Don't add a second coloured hero to a screen
-  that has one.
+- **Keep the surfaces.** The hero and focus cards are graphite cards lit
+  from above (§11); a class, a subject, a team or a line wears its own
+  colour as an inset band or badge on them. Calm comes from what's on a card
+  (fewer capsules, weights and accent marks), never from stripping cards
+  away (Jay 2026-10-27).
 - Icon tiles (white glyph on a colour squircle) say *which kind* (a
   category, an account). Not on every row or heading, and a group that's all
   the same kind needs none.
@@ -248,19 +245,20 @@ and `--q-col-r` (beside it), `--q-mid` (its middle); never `100vw`.
 - Charts, maps and canvases redraw at the new size on `onScreen()`.
 
 
-## 11. Orbit's own look: the redesign every app is moving to
+## 11. Orbit's own look: every app
 
 Jay 2026-11-03 (RULEBOOK §3): a whole UX redesign of all nine apps, every
 tab, sheet, detail page, settings and empty screen, every feature kept,
-shown to Jay beside today's and shipped together once he says go. The apps
-share one design system (this kit: type, spacing, components, tabs, the
-dark theme, motion); each app's home is laid out for its own job, in its own
-colour: Sports' live game cards, Weather's forecast, Transit's next
-departure, Money's balance and entries, Words' practice, Law's search,
-Class's next class, Beats' player, Securities' watchlist. An app that has
-moved marks its page `<html data-look="native">`; the kit's layer (the end of
-`orbit.css`) applies only there. When every app has moved, the layer becomes
-the kit's own and the mark goes.
+shown to Jay beside today's; he said go for all nine ("Ship all nine",
+09:12Z) and they shipped together. The apps share one design system (this
+kit: type, spacing, components, tabs, the dark theme, motion); each app's
+home is laid out for its own job, in its own colour: Sports' live game
+cards, Weather's forecast, Transit's one board, Money's budget and entries,
+Words' practice, Law's search, Class's next class, Beats' player,
+Securities' 總資產 and markets. Every app's page is `<html
+data-look="native">`, its own look CSS linked after its stylesheet (no
+switch); the kit's layer (the end of `orbit.css`) applies there. A later
+pass may fold the layer into the kit's own rules and drop the mark.
 
 - **Today's dark page is the base.** The page is the app's own background,
   never a sky, a photo or a colour filling the screen.
@@ -286,3 +284,18 @@ the kit's own and the mark goes.
   never a filled square, and never a grid of them as a home's menu.
 - **Nothing drawn after another app.** No layout or signature look taken
   from Apple's Weather, Sports or Stocks, or anyone's.
+- **A logo is on its tile.** Every logo sits on the logo tile
+  (`--q-logo-bg`), never see-through on a colour (the Rockets' red mark
+  vanished on their red row; Jay, 11-03).
+- **Live is said, not shouted.** 進站中, 即將進站, 正在進行: the words at the
+  size of those around them, in the live colour; a live bus is a dot of its
+  line's colour a size up from a stop's. Never a red pill: red is for
+  trouble (停駛, late, over budget). (Jay, 11-03: Transit's red pills and
+  bus "disproportional… terrible hard to read".)
+- **Nothing empty on a quiet day.** A reading with nothing to show today
+  says the next thing worth knowing in one line, never an empty bar or
+  chart (Weather's rain on a dry day: when rain comes next, or how long it
+  stays dry; Jay, 11-03).
+- **A home is a home.** It opens on what's worth seeing and the one main
+  action, never straight into the task (Words: a start button, not the
+  first question; Jay, 11-03).
