@@ -36,7 +36,7 @@ const tabClick = id => click(`js:document.getElementById('tab-${id}')?.click()`)
 const page = (app, name) => PAGES[app][name].args || [];
 const passTab = n => click('.q-account', wait(1500), `js:document.querySelectorAll('.q-pass-tabs [role=tab]')[${n}]?.click()`, wait(1200), "js:[...document.querySelectorAll('dialog[open]')].pop().scrollTop=0");
 const APPS = {
-  pass: { app: 'weather', account: 'shots/accounts/weather-pins.txt', wait: 6000, stops: { pass: passTab(0), looks: passTab(1), apps: passTab(2) } },
+  pass: { app: 'weather', account: 'shots/accounts/weather-pins.txt', wait: 6000, stops: { first: ['--fresh', ...click(wait(1500))], pass: passTab(0), looks: passTab(1), apps: passTab(2) }, top: { first: 200 } },
   match: { app: 'sports', account: 'shots/accounts/sports-fan.txt', wait: 25000, stops: {} },
   transit: { app: 'transit', account: 'shots/accounts/transit-rides.txt', wait: 10000, args: ['--google-map'], stops: { times: page('transit', 'board') } },
   weather: { app: 'weather', account: 'shots/accounts/weather-pins.txt', wait: 9000, stops: { day: page('weather', 'day'), rain: page('weather', 'rain') }, top: { rain: 374 } },
