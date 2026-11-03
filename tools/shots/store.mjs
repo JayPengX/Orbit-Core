@@ -36,6 +36,7 @@ const bikeDock = "js:(()=>{const n=m=>(m.textContent.match(/\\d+/g)||[]).reduce(
 const TAIPEI = ['--geo', '25.0478,121.5170'];
 const MORNING = ['--clock', '2026-11-02T08:20'];
 
+const SCHOOL = ['--clock', '2026-11-04T10:30'];
 export const STORE = {
   transit: {
     app: 'transit', brand: 'transit', show: 'transit', prefix: 'transit', args: ['--google-map'],
@@ -71,14 +72,15 @@ export const STORE = {
     ]
   },
   class: {
-    app: 'orbit', brand: 'orbit', show: 'class', prefix: 'class', account: 'week', args: ['--clock', '2026-11-04T10:30'],
+    app: 'orbit', brand: 'orbit', show: 'class', prefix: 'class', account: 'week',
+    // Mid-morning on a school day; the flight on the real clock (planes landing now).
     shots: [
-      { zh: '現在、下一節與剩餘時間', en: 'Now, next, and time left' },
-      { zh: '整週課表一眼看', en: 'Your whole week', dark: true, hash: 'week' },
-      { zh: '每一節課的細節', en: 'Every class, in detail', page: 'class' },
-      { zh: '調課幾秒完成', en: 'Swap a class in seconds', dark: true, page: 'swap' },
+      { zh: '現在、下一節與剩餘時間', en: 'Now, next, and time left', args: SCHOOL },
+      { zh: '整週課表一眼看', en: 'Your whole week', dark: true, hash: 'week', args: SCHOOL },
+      { zh: '每一節課的細節', en: 'Every class, in detail', page: 'class', args: SCHOOL },
+      { zh: '調課幾秒完成', en: 'Swap a class in seconds', dark: true, page: 'swap', args: SCHOOL },
       { zh: '跟著真的飛機專注', en: 'Focus on a real flight', page: 'flight', wait: 12000 },
-      { zh: '拍下課表，AI 幫你讀', en: 'Snap it, AI reads it', dark: true, page: 'photo' }
+      { zh: '拍下課表，AI 幫你讀', en: 'Snap it, AI reads it', dark: true, page: 'photo', args: SCHOOL }
     ]
   },
   money: {
