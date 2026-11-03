@@ -829,3 +829,12 @@ test("CPBL's play-offs from Wikipedia's pages: a game put off and the ones after
   const won = parseCpblSeries(`{{ts|G=4\n|保=中信\n|G1情況=已賽|G1日期=10/09|G1球場=洲際|G1客隊=統一|G1客隊得分=1|G1主隊=中信|G1主隊得分=4\n|G2情況=已賽|G2日期=10/10|G2球場=洲際|G2客隊=統一|G2客隊得分=0|G2主隊=中信|G2主隊得分=2\n|G3情況=如有需要|G3日期=10/11|G3球場=洲際|G3客隊=統一|G3客隊得分=|G3主隊=中信|G3主隊得分=\n}}`, 2026, 'challenge');
   assert.equal(won.length, 2);
 });
+
+test("one logo, one address: ESPN's scoreboard copy (…/500/scoreboard/lal.png) asked for as the game page's, small, so it's downloaded once", async () => {
+  const { small } = await import('../kit/logos.mjs');
+  const page = small('https://a.espncdn.com/i/teamlogos/nba/500/lal.png');
+  assert.equal(page, 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nba/500/lal.png&w=192&h=192');
+  assert.equal(small('https://a.espncdn.com/i/teamlogos/nba/500/scoreboard/lal.png'), page);
+  assert.equal(small('https://a.espncdn.com/i/teamlogos/mlb/500-dark/scoreboard/tb.png'), 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/mlb/500-dark/tb.png&w=192&h=192');
+  assert.equal(small('https://a.espncdn.com/i/teamlogos/soccer/500/189.png'), 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/soccer/500/189.png&w=192&h=192');
+});
