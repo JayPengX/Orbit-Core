@@ -376,7 +376,7 @@
 
 /* 原生 Native's tokens (DESIGN §11), for an app whose page says <html data-look="native">:
    the display face for big numbers, the graphite surface and its hairline
-   edge, how deep a hero in the app's colour goes, the tinted glyph's wash.
+   edge, what a band's colour deepens to, the tinted glyph's wash.
    Dark: graphite, not black and grey. */
 html[data-look='native'][data-look='native'] {
   --nv-display: -apple-system, 'SF Pro Display', BlinkMacSystemFont, system-ui, 'PingFang TC', 'Noto Sans TC', sans-serif;
@@ -386,8 +386,6 @@ html[data-look='native'][data-look='native'] {
   --nv-lift: 0 1px 1px rgba(0, 0, 0, 0.03), 0 8px 24px -16px rgba(0, 0, 0, 0.2);
   --nv-card: #ffffff;
   --nv-deep: #000000;
-  --nv-c-a: 92%;
-  --nv-c-b: 64%;
   --nv-glyph: #000000;
   --nv-glyph-a: 88%;
   --nv-wash: 14%;
@@ -402,8 +400,6 @@ html[data-look='native'][data-look='native'] {
     --nv-edge: rgba(255, 255, 255, 0.085);
     --nv-lift: none;
     --nv-card: linear-gradient(180deg, #19191c, #141416);
-    --nv-c-a: 64%;
-    --nv-c-b: 34%;
     --nv-glyph: #ffffff;
     --nv-glyph-a: 80%;
     --nv-wash: 17%;
@@ -418,8 +414,6 @@ html[data-look='native'][data-look='native'][data-theme='dark'] {
   --nv-edge: rgba(255, 255, 255, 0.085);
   --nv-lift: none;
   --nv-card: linear-gradient(180deg, #19191c, #141416);
-  --nv-c-a: 64%;
-  --nv-c-b: 34%;
   --nv-glyph: #ffffff;
   --nv-glyph-a: 80%;
   --nv-wash: 17%;
@@ -5663,10 +5657,11 @@ html:not(.q-kb) dialog.q-sheet[open]:not([data-detent]):not(.q-leaving) {
 /* -- 原生 Native (Jay 2026-11-03, docs/DESIGN.md §11): the look every app is
    moving to, one app at a time; an app that has moved says so on its page,
    <html data-look="native">, and the rest keep today's look until their turn.
-   The colour on a screen is the content's own; surfaces are graphite lit from
-   above with a hairline edge; big numbers are light and tabular; a
-   single-choice filter row is text tabs; icons are tinted glyphs; the week row
-   is iOS's. ([data-look] twice where the kit's own rule is as specific.) -- */
+   Surfaces are graphite lit from above with a hairline edge, heroes too;
+   colour is information, inset on them (.q-band); big numbers are light and tabular; a
+   single-choice filter row is text tabs; icons are tinted glyphs; the day
+   strip's chosen day sits on a quiet plate. ([data-look] twice where the kit's
+   own rule is as specific.) -- */
 html[data-look='native'] :is(.q-card, .q-rowcard, .q-list, .q-rail-card, .q-action) {
   background: var(--nv-card);
   box-shadow: inset 0 0 0 0.5px var(--nv-edge), inset 0 1px 0 rgba(255, 255, 255, 0.035), var(--nv-lift);
@@ -5688,17 +5683,99 @@ html[data-look='native'] :is(.q-focus-value, .q-hc-big) {
 html[data-look='native'] :is(.num, .q-ritem-value) {
   font-variant-numeric: tabular-nums;
 }
-/* (A hero with no colour of its own: the app's, deep and matte.) */
+/* (A hero is a graphite card like the rest, never filled with the app's
+   colour: colour is information, inset on it (.q-band below), and the app's
+   colour marks only what's live and the main action. Jay 2026-11-03.) */
 html[data-look='native'] :is(.q-hero-card, .q-focus) {
-  --nv-c: var(--q-accent);
-  background: linear-gradient(165deg, color-mix(in srgb, var(--nv-c) var(--nv-c-a), var(--nv-deep)) 0%, color-mix(in srgb, var(--nv-c) var(--nv-c-b), var(--nv-deep)) 100%);
-  color: #ffffff;
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --q-focus-2: var(--q-label-2);
+  background: var(--nv-card);
+  color: var(--q-label);
+  box-shadow: inset 0 0 0 0.5px var(--nv-edge), inset 0 1px 0 rgba(255, 255, 255, 0.035), var(--nv-lift);
 }
-html[data-look='native'] :is(.q-hero-card, .q-focus) .q-hc-btn {
-  background: #ffffff;
-  color: var(--nv-deep);
+html[data-look='native'][data-look='native'] :is(.q-hero-card, .q-focus) :is(.q-hc-sub, .q-focus-label, .q-focus-sub, .q-focus-figs small) {
+  color: var(--q-label-2);
+}
+html[data-look='native'][data-look='native'] :is(.q-hero-card, .q-focus) .q-focus-value {
+  color: var(--q-label);
+}
+html[data-look='native'][data-look='native'] :is(.q-hero-card, .q-focus) .q-hc-pill {
+  background: var(--q-fill-3);
+  color: var(--q-label);
+}
+html[data-look='native'][data-look='native'] :is(.q-hero-card, .q-focus) .q-hc-pill > i {
+  background: var(--q-accent);
+  color: #ffffff;
+}
+html[data-look='native'][data-look='native'] :is(.q-hero-card, .q-focus) .q-hc-btn {
+  background: var(--q-accent);
+  color: #ffffff;
   box-shadow: none;
+}
+html[data-look='native'][data-look='native'] :is(.q-hero-card, .q-focus) .q-hc-btn.ghost {
+  background: var(--q-fill-3);
+  color: var(--q-label);
+}
+html[data-look='native'][data-look='native'] :is(.q-hero-card, .q-focus) .q-focus-bar {
+  background: var(--q-fill-3);
+}
+html[data-look='native'][data-look='native'] :is(.q-hero-card, .q-focus) .q-focus-bar > i {
+  background: var(--q-accent);
+}
+html[data-look='native'][data-look='native'] :is(.q-hero-card, .q-focus) .q-focus-bar.over > i {
+  background: var(--q-red);
+}
+html[data-look='native'][data-look='native'] :is(.q-hero-card, .q-focus) .q-focus-figs b.in {
+  color: var(--q-good);
+}
+/* (An inset coloured row, .q-band with --band: a team, a bus line, a
+   category or a class on its own colour, white over it, a mark at its start;
+   the Sports hero's club rows, as Jay liked them.) */
+html[data-look='native'] .q-band {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px 8px 8px;
+  border-radius: 14px;
+  background: linear-gradient(100deg, color-mix(in srgb, var(--band, var(--q-gray)) 92%, var(--nv-deep)) 0%, color-mix(in srgb, var(--band, var(--q-gray)) 62%, var(--nv-deep)) 100%);
+  color: #ffffff;
+}
+html[data-look='native'] .q-band-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.22);
+  font: 700 15px/1 var(--q-font);
+}
+html[data-look='native'] .q-band-text {
+  display: grid;
+  flex: 1;
+  gap: 1px;
+  min-width: 0;
+}
+html[data-look='native'] .q-band-text b {
+  overflow: hidden;
+  font: 600 17px/22px var(--q-font);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+html[data-look='native'] .q-band-text small {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.74);
+  font: 500 13px/17px var(--q-font);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+html[data-look='native'] .q-band-end {
+  flex: none;
+  font: 600 20px/1 var(--q-font);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 /* (A single-choice filter row, .q-chips.q-texttabs: text tabs, the chosen one
    underlined. A multiple choice, a pin's weekdays, stays chips.) */
@@ -5718,57 +5795,21 @@ html[data-look='native'][data-look='native'] .q-chips.q-texttabs > .q-chip:is([a
   font-weight: 600;
   box-shadow: inset 0 -2px 0 var(--q-label);
 }
-/* (The week row: seven days, dayStrip's fit reading --q-day-n and --q-day-min;
-   the weekday over the day's number, the chosen day a filled disc, today in the app's colour.) */
-html[data-look='native'] .q-day-bar .q-day-strip {
-  --q-day-n: 7;
-  --q-day-min: 40px;
+/* (The day strip: today's capsules, the chosen day on a quiet plate, today's date in the app's colour.) */
+html[data-look='native'][data-look='native'] .q-day-strip .q-chip.day:not([aria-pressed='true']) {
+  background: transparent;
 }
-html[data-look='native'][data-look='native'] .q-day-bar .q-day-strip .q-chip.day {
-  min-width: 0;
-  min-height: 62px;
-  gap: 6px;
-  padding: 4px 0 6px;
-  border-radius: 0;
-  background: none;
-}
-html[data-look='native'][data-look='native'] .q-day-bar .q-day-strip .q-chip.day > span {
-  color: var(--q-label-2);
-  font: 500 12px/14px var(--q-font);
-}
-html[data-look='native'][data-look='native'] .q-day-bar .q-day-strip .q-chip.day small {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+html[data-look='native'][data-look='native'] .q-day-strip .q-chip.day[aria-pressed='true'] {
+  background: var(--q-fill-3);
   color: var(--q-label);
-  font: 400 19px/1 var(--nv-display);
-  letter-spacing: -0.02em;
-  transition: background 0.2s, color 0.2s;
+  box-shadow: none;
 }
-html[data-look='native'][data-look='native'] .q-day-bar .q-day-strip .q-chip.day.is-today > span,
-html[data-look='native'][data-look='native'] .q-day-bar .q-day-strip .q-chip.day.is-today small {
+html[data-look='native'][data-look='native'] .q-day-strip .q-chip.day[aria-pressed='true'] > span,
+html[data-look='native'][data-look='native'] .q-day-strip .q-chip.day[aria-pressed='true'] small {
+  color: var(--q-label);
+}
+html[data-look='native'][data-look='native'] .q-day-strip .q-chip.day.is-today:not([aria-pressed='true']) small {
   color: var(--accent, var(--q-accent));
-}
-html[data-look='native'][data-look='native'] .q-day-bar .q-day-strip .q-chip.day.is-today small {
-  font-weight: 600;
-}
-html[data-look='native'][data-look='native'] .q-day-bar .q-day-strip .q-chip.day[aria-pressed='true'] > span {
-  color: var(--q-label);
-  font-weight: 600;
-}
-html[data-look='native'][data-look='native'] .q-day-bar .q-day-strip .q-chip.day[aria-pressed='true'] small {
-  background: var(--q-label);
-  color: var(--q-bg);
-  font-weight: 600;
-}
-html[data-look='native'][data-look='native'] .q-day-bar .q-day-strip .q-chip.day.is-today[aria-pressed='true'] small {
-  background: var(--accent, var(--q-accent));
-  color: #ffffff;
-}
-html[data-look='native'] .q-day-bar .q-day-pick {
-  background: var(--q-fill-4);
 }
 /* (Tags are text: grey for a fact, its colour for an exception; only .solid is filled.) */
 html[data-look='native'] .q-tag:not(.solid) {
