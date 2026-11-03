@@ -9,7 +9,12 @@
 // - Checks version.json (the app's and the kit's) while the app's files
 //   load: a newer deploy than this page (meta build-version) or a newer kit
 //   is loaded straight away in one reload, before anything starts.
-//   The kit's watchUpdates keeps the page current after.
+//   The cover waits for that answer: an app that's ready first (its kept
+//   files and data, instant offline-capable openings) hides #loading as
+//   always, but the cover stays drawn (q-boot-hold) until the check has
+//   answered, 3 s at most past the app's own lift. It lifted before, so the
+//   old version showed and was swapped under the person's finger seconds
+//   later (Jay 2026-11-03). The kit's watchUpdates keeps the page current after.
 // - When the app fails to start (an error, a script that didn't come, or
 //   15 s with nothing more arriving), asks whether the network is there.
 //   Offline: says so. Online, it's an update that didn't finish (GitHub's
@@ -72,9 +77,45 @@
   q('[data-act=reload]').textContent = L('重新整理', 'Reload');
   q('[data-act=skip]').textContent = L('直接開啟', 'Open anyway');
   q('[data-act=skip]').onclick = function () {
-    // (Opened now: the kit doesn't hold it for pictures.)
+    // (Opened now: the kit doesn't hold it for pictures, nor for the update check.)
     box.setAttribute('data-now', '1');
+    release();
     box.hidden = true;
+  };
+
+  // ---- Held for the update check ----
+  // While the first update check is out, the cover stays drawn even once the
+  // app has hidden it (its `hidden` stays as the app set it, so the app's own
+  // logic and the kit's watchers read it as lifted). Let go when the check
+  // answers, HOLD_MS after the app asked to lift, or offline.
+  var HOLD_MS = 3000;
+  var holding = false;
+  var held = document.createElement('style');
+  held.textContent = '#loading.q-boot-hold,#loading.q-boot-hold[hidden],#loading.q-boot-hold.q-lift{display:grid!important;opacity:1!important;pointer-events:auto!important}';
+  var hold = function () {
+    if (holding || navigator.onLine === false) return;
+    holding = true;
+    document.head.appendChild(held);
+    box.classList.add('q-boot-hold');
+    // (The app asked to lift while the check is still out: at most HOLD_MS more.)
+    var asked = new MutationObserver(function () {
+      if (!box.hidden) return;
+      asked.disconnect();
+      if (!holding) return;
+      step.textContent = L('檢查更新…', 'Checking for updates…');
+      setTimeout(release, HOLD_MS);
+    });
+    asked.observe(box, { attributes: true, attributeFilter: ['hidden'] });
+    window.addEventListener('offline', release);
+  };
+  var release = function () {
+    if (!holding) return;
+    holding = false;
+    box.classList.remove('q-boot-hold');
+  };
+  // (Whether the person can see the app: hidden and not held.)
+  var lifted = function () {
+    return box.hidden && !holding;
   };
 
   // The progress line follows what has really loaded: the app's own files
@@ -118,6 +159,10 @@
     // The app's modules have run: that many files is what it takes.
     if (!counted && started()) {
       counted = true;
+      // (Started: a later failure of this version mends at once again, not after the waits this one ran up.)
+      try {
+        sessionStorage.removeItem(healKey);
+      } catch (e) {}
       var n = files();
       expected = n;
       try {
@@ -376,6 +421,7 @@
   // not read. Then the watch looks again at once, so the first opening after
   // a deploy gets it, not the next one.)
   window.__bootChecked = Date.now();
+  hold();
   window.__bootCheck = Promise.all([read('./version.json'), kit.base ? read(kit.base + 'version.json') : null]).then(function (got) {
     var latest = got[0] && got[0].version;
     var kitLatest = got[1] && got[1].version;
@@ -395,14 +441,19 @@
     }
     if (!appNew && !kitNew) return got[0] && (got[1] || !kit.base) ? 'none' : 'watch';
     // (An app already on screen leaves it to the watch; one still behind
-    // this loading screen is reloaded now, before anything shows.)
-    if (box.hidden) return 'watch';
+    // this loading screen, held or not yet lifted, is reloaded now, before
+    // anything shows.)
+    if (lifted()) return 'watch';
     var flag = 'orbit.bootTo:' + location.pathname;
     var want = (appNew ? latest : current) + '|' + (kitLatest || '');
     var was = String(sessionStorage.getItem(flag) || '').split('#');
     var tries = was[0] === want ? Number(was[1]) || 0 : 0;
     if (tries >= 3) return 'none';
     sessionStorage.setItem(flag, want + '#' + (tries + 1));
+    // (Noted for the new page: how it came, and when, for the 除錯紀錄.)
+    try {
+      sessionStorage.setItem('orbit.updating', JSON.stringify({ how: 'boot', at: Date.now(), path: location.pathname }));
+    } catch (e) {}
     window.__bootUpdating = true;
     going();
     // (The files the phone kept stay: each is kept under its own hash, so
@@ -412,4 +463,11 @@
     else location.reload();
     return 'boot';
   });
+  window.__bootCheck.then(
+    function (r) {
+      // (A reload under way: the cover stays until the new page is up.)
+      if (r !== 'boot') release();
+    },
+    release
+  );
 })();

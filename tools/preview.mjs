@@ -1014,8 +1014,8 @@ if (deployAt && oldRoot) {
     page
       .evaluate(() => {
         const box = document.getElementById('loading');
-        const said = box && !box.hidden ? [...box.querySelectorAll('p')].filter(p => !p.closest('[hidden]') && !p.hidden).map(p => p.innerText.trim()).filter(Boolean).slice(2).join(' / ') : '';
-        return `${globalThis.__fxStarted ? 'running' : 'not started'}${box && !box.hidden ? `, loading screen: ${said}` : ''}; app ${document.querySelector('meta[name=build-version]')?.content}, kit ${globalThis.ORBIT_KIT?.version}`;
+        const said = box && (!box.hidden || box.classList.contains('q-boot-hold')) ? [...box.querySelectorAll('p')].filter(p => !p.closest('[hidden]') && !p.hidden).map(p => p.innerText.trim()).filter(Boolean).slice(2).join(' / ') : '';
+        return `${globalThis.__fxStarted ? "running" : "not started"}${box && (!box.hidden || box.classList.contains("q-boot-hold")) ? `, loading screen: ${said}` : ''}; app ${document.querySelector('meta[name=build-version]')?.content}, kit ${globalThis.ORBIT_KIT?.version}`;
       })
       .catch(e => `(${e.message.split('\n')[0].slice(0, 80)})`);
   let last = '';
