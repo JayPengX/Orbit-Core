@@ -675,6 +675,41 @@ test("walks by Google's streets: five in one matrix call, each kept a month; wit
   assert.equal((await handleTransit(new Request('https://w/transit/walk?from=35,139&to=24.8,120.9'), env, {}, '/transit/walk', { session: { s: 'S' }, fetchFn, now: NOW, cache })).status, 400);
 });
 
+test("a bus's drive to its stops: Google's traffic matrix, an element each from its own share, a minute shared, none past the cap", async () => {
+  fresh();
+  const env = { GOOGLE_MAPS_KEY: 'k', RATE_LIMIT_KV: memKv() };
+  const cache = memCache();
+  let calls = 0;
+  const fetchFn = async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    assert.match(String(url), /computeRouteMatrix/);
+    assert.equal(body.travelMode, 'DRIVE');
+    assert.equal(body.routingPreference, 'TRAFFIC_AWARE');
+    calls++;
+    return json(body.destinations.map((d, i) => ({ originIndex: 0, destinationIndex: i, condition: 'ROUTE_EXISTS', distanceMeters: 800 * (i + 1), duration: `${120 * (i + 1)}s`, staticDuration: `${100 * (i + 1)}s` })));
+  };
+  const ask = (qs, s = { s: 'S' }, e = env) => handleTransit(new Request(`https://w/transit/drive?${qs}`), e, {}, '/transit/drive', { session: s, fetchFn, now: NOW, cache }).then(r => r.json());
+  const qs = 'from=24.8177,121.0163&to=24.82,121.02;24.83,121.03';
+  const a = await ask(qs);
+  assert.equal(a.src, 'google');
+  assert.deepEqual(a.drives, [{ dist: 800, dur: 120, base: 100 }, { dist: 1600, dur: 240, base: 200 }]);
+  assert.equal((await usage(env, NOW)).drive, 2, 'an element each');
+  const b = await ask(qs);
+  assert.equal(b.src, 'cached');
+  assert.equal(calls, 1);
+  // The showcase never spends it.
+  assert.equal((await ask(qs, { s: 'S', showcase: true })).code, 'NOT_FOUND');
+  // Past the month's cap: nothing asked.
+  fresh();
+  const full = { ...env, RATE_LIMIT_KV: memKv() };
+  await full.RATE_LIMIT_KV.put(`transit:use:${billingMonth(NOW)}`, JSON.stringify({ drive: CAPS.drive }));
+  const c = await handleTransit(new Request('https://w/transit/drive?from=24.8177,121.0163&to=24.82,121.02'), full, {}, '/transit/drive', { session: { s: 'S' }, fetchFn, now: NOW, cache: memCache() }).then(r => r.json());
+  assert.deepEqual(c.drives, [null]);
+  assert.equal(c.src, 'cap');
+  assert.equal(calls, 1);
+  assert.ok(CAPS.drive < 5000, "inside Google's free 5,000");
+});
+
 test("a sample spends a real ask: none without a session or past the limit (a stranger can't use up the month's Google routes or TDX's points)", async () => {
   fresh();
   const env = { GOOGLE_MAPS_KEY: 'GK', TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', RATE_LIMIT_KV: memKv() };
