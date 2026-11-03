@@ -3036,12 +3036,47 @@ dialog {
 .q-pass .q-btn.block { width: 100%; }
 .q-pass .q-chips.small .q-chip { min-height: 30px; padding: 0 12px; font-size: 13px; }
 .q-pass .app-card.here { border-color: var(--accent); }
-.q-pass .help-list { display: grid; gap: 12px; margin: 10px 0 14px; }
-.q-pass .help-card h3 { font-size: 16px; font-weight: 800; margin-bottom: 8px; }
-.q-pass .help-card p { font-size: 14.5px; line-height: 1.7; color: var(--q-text-2); }
-.q-pass .help-card p + p { margin-top: 8px; }
-.q-pass .help-card.focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
-.q-pass .help-list .q-card + .q-card { margin-top: 0; }
+/* 說明 (pass.mjs renderHelp, help.mjs): which app's guide (a row of marks),
+   the app's head, what it is, a tour of its screens (each its real
+   screenshot, help-shots.mjs, held at its size so nothing moves in), then
+   the questions, one folded row each. */
+.q-pass .hp { display: grid; gap: var(--q-s-5); container: hp / inline-size; }
+.q-pass .hp-apps { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; margin: 0 calc(-1 * var(--q-margin)); padding: 0 var(--q-margin); scroll-padding: 0 var(--q-margin); }
+.q-pass .hp-apps::-webkit-scrollbar { display: none; }
+.q-pass .hp-app { flex: 0 0 auto; display: grid; justify-items: center; gap: 4px; width: 64px; padding: 8px 0 7px; border: 0; border-radius: var(--q-r-cell); background: none; color: var(--q-label-2); font: 500 12px/14px var(--q-font); white-space: nowrap; cursor: pointer; }
+.q-pass .hp-app img { border-radius: 9px; }
+.q-pass .hp-app[aria-selected='true'] { background: var(--q-fill-3); color: var(--q-label); font-weight: 600; }
+.q-pass .hp-head { display: flex; align-items: center; gap: 14px; }
+.q-pass .hp-head > img { flex: 0 0 auto; border-radius: 13px; }
+.q-pass .hp-head-text { display: grid; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.q-pass .hp-head-text h3 { font: var(--q-t-title2); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.q-pass .hp-head-text small { font: var(--q-t-subhead); color: var(--q-label-2); }
+.q-pass .hp-go { flex: 0 0 auto; min-height: 32px; padding: 0 16px; border-radius: 999px; background: var(--accent); border-color: transparent; color: #fff; font-weight: 600; }
+.q-pass .hp-what { display: grid; gap: 8px; margin-top: calc(-1 * var(--q-s-2)); }
+.q-pass .hp-what p { font: var(--q-t-body); line-height: 1.6; color: var(--q-label); }
+.q-pass .hp-tour, .q-pass .hp-more { display: grid; gap: 12px; }
+.q-pass .hp-tour .q-list-head, .q-pass .hp-more .q-list-head { margin: 0 0 -4px; padding: 0 4px; }
+.q-pass .hp .q-card + .q-card { margin-top: 0; }
+.q-pass .hp-stop { padding: 12px; display: grid; gap: 12px; overflow: hidden; }
+/* A screenshot: the screen's top, its own size held (aspect-ratio) before
+   it's read, fading out at its foot: the screen goes on below. */
+.q-pass .hp-shot { display: block; border-radius: 14px; overflow: hidden; background: var(--q-fill-4); box-shadow: inset 0 0 0 0.5px var(--q-sep); -webkit-mask-image: linear-gradient(#000 80%, transparent); mask-image: linear-gradient(#000 80%, transparent); }
+.q-pass .hp-shot img { display: block; width: 100%; height: auto; aspect-ratio: 480 / 440; object-fit: cover; object-position: top; }
+.q-pass .hp-stop-text { display: grid; gap: 4px; padding: 0 4px 4px; }
+.q-pass .hp-stop-text h5 { font: var(--q-t-headline); margin: 0; }
+.q-pass .hp-stop-text p { font: var(--q-t-subhead); line-height: 1.55; color: var(--q-label-2); margin: 0; }
+@container hp (min-width: 500px) {
+  .q-pass .hp-stop { grid-template-columns: 200px minmax(0, 1fr); align-items: center; gap: 18px; }
+}
+.q-pass .hp-folds { padding: 0; overflow: hidden; }
+.q-pass .hp-fold + .hp-fold { border-top: 0.5px solid var(--q-sep); }
+.q-pass .hp-fold summary { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 16px; font: var(--q-t-body); font-weight: 500; color: var(--q-label); cursor: pointer; list-style: none; }
+.q-pass .hp-fold summary::-webkit-details-marker { display: none; }
+.q-pass .hp-fold summary span:first-child { flex: 1 1 auto; min-width: 0; }
+.q-pass .hp-chev { display: grid; color: var(--q-label-3, var(--q-label-2)); transition: transform var(--q-dur-fast, .2s) ease; }
+.q-pass .hp-fold[open] .hp-chev { transform: rotate(90deg); }
+.q-pass .hp-fold-body { display: grid; gap: 10px; padding: 0 16px 16px; }
+.q-pass .hp-fold-body p { font: var(--q-t-subhead); line-height: 1.65; color: var(--q-label-2); margin: 0; }
 
 
 .q-pass .looks { display: grid; gap: 10px; }

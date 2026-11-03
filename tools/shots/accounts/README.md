@@ -10,3 +10,8 @@ Make one by using the app, never by writing it by hand:
 
 Money's `demo` is its sample books (`Orbit-Money/tools/sample-books.mjs`, run
 each time so the dates sit around today).
+
+Class's `week` is a week of seven periods a day (國文, 英文, 數學… with their
+teachers and rooms), typed into the app's own store (`classFocusData`) and
+kept as the app synced it; shoot it with `-- --clock 2026-11-04T10:30` for a
+class in progress.

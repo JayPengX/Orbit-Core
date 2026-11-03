@@ -258,20 +258,67 @@ function renderHelp(box, { q, t, locale }, { app, topic }) {
     );
     return;
   }
-  const { HELP_ORDER, helpFor } = helpMod;
+  const { HELP_ORDER, helpFor, tourFor, shotFor, ROLE } = helpMod;
   const at = HELP_ORDER.includes(app) ? app : 'pass';
-  const name = a => (a === 'pass' ? 'Orbit Pass' : APPS[a]?.short || a);
-  const chips = el(
+  const en = locale === 'en';
+  const name = a => (a === 'pass' ? 'Pass' : APPS[a]?.short || a);
+  const full = a => (a === 'pass' ? 'Orbit Pass' : APPS[a]?.name || a);
+  const mark = (a, size) => el('img', { class: 'hp-mark', src: svgUrl(appIcon(a)), alt: '', width: size, height: size });
+  const again = a => () => (renderHelp(box, { q, t, locale }, { app: a, topic: null }), box.closest('dialog')?.scrollTo?.({ top: 0 }));
+  // Which guide: every app's mark and short name, one row that scrolls; the chosen on a soft plate.
+  const picker = el(
     'div',
-    { class: 'q-chips small' },
-    HELP_ORDER.map(a => el('button', { class: 'q-chip', type: 'button', 'aria-pressed': String(at === a), text: name(a), onclick: () => renderHelp(box, { q, t, locale }, { app: a, topic: null }) }))
+    { class: 'hp-apps', role: 'tablist', 'aria-label': t('tab_help') },
+    HELP_ORDER.map(a => el('button', { class: 'hp-app', type: 'button', role: 'tab', 'aria-selected': String(at === a), onclick: at === a ? null : again(a) }, [mark(a, 36), el('span', { text: name(a) })]))
   );
-  const cards = helpFor(at, locale).map(([id, title, paras]) => el('article', { class: `q-card pad help-card${topic === id ? ' focus' : ''}`, id: `q-help-${id}` }, [el('h3', { text: title }), ...paras.map(p => el('p', { text: p }))]));
-  const go = at !== 'pass' && at !== q.app && APPS[at] ? el('button', { class: 'q-btn primary block', type: 'button', text: t('openApp', { app: APPS[at].name }), onclick: () => q.go(at) }) : null;
-  put(box, chips, el('div', { class: 'help-list' }, cards), go);
-  // The app's own chip in view (Transit's is far along the row at 320 px).
-  setTimeout(() => { const on = chips.querySelector('[aria-pressed="true"]'); if (on) chips.scrollLeft = on.offsetLeft - (chips.clientWidth - on.offsetWidth) / 2; }, 0);
-  if (topic) setTimeout(() => box.querySelector(`#q-help-${topic}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 50);
+  const topics = helpFor(at, locale);
+  const what = topics.find(([id]) => id === 'what');
+  const go = at !== 'pass' && at !== q.app && APPS[at] ? el('button', { class: 'q-btn hp-go', type: 'button', text: t('open'), 'aria-label': t('openApp', { app: full(at) }), onclick: () => q.go(at) }) : null;
+  const head = el('header', { class: 'hp-head' }, [
+    mark(at, 56),
+    el('div', { class: 'hp-head-text' }, [el('h3', { text: full(at) }), el('small', { text: (ROLE?.[at] || APPS[at]?.role)?.[en ? 'en' : 'zh'] || '' })]),
+    go
+  ]);
+  const intro = what ? el('div', { class: 'hp-what' }, what[2].map(p => el('p', { text: p }))) : null;
+  // The tour: each tab (and the screens worth knowing), its real screenshot and what it's for.
+  const shot = (stop, label) => {
+    const src = shotFor?.(at, stop, locale);
+    if (!src) return null;
+    return el('picture', { class: 'hp-shot' }, [
+      el('source', { media: '(prefers-color-scheme: dark)', srcset: src.dark }),
+      el('img', { src: src.light, alt: label, loading: 'lazy', decoding: 'async', width: src.w, height: src.h })
+    ]);
+  };
+  const stops = tourFor?.(at, locale) || [];
+  const tour = stops.length
+    ? el('section', { class: 'hp-tour', id: 'q-help-tabs' }, [
+        el('h4', { class: 'q-list-head', text: en ? 'Around the app' : '畫面導覽' }),
+        ...stops.map(([id, title, lines]) =>
+          el('article', { class: 'q-card hp-stop', id: `q-help-tab-${id}` }, [shot(id, title), el('div', { class: 'hp-stop-text' }, [el('h5', { text: title }), ...lines.map(p => el('p', { text: p }))])])
+        )
+      ])
+    : null;
+  // The rest, one question a row, folded: a tap opens it.
+  const chev = el('span', { class: 'hp-chev', 'aria-hidden': 'true', html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>' });
+  const rest = topics.filter(([id]) => id !== 'what' && !(stops.length && id === 'tabs'));
+  const folds = rest.length
+    ? el('section', { class: 'hp-more' }, [
+        el('h4', { class: 'q-list-head', text: en ? 'How it works' : '怎麼用' }),
+        el(
+          'div',
+          { class: 'q-card hp-folds' },
+          rest.map(([id, title, paras]) => el('details', { class: 'hp-fold', id: `q-help-${id}`, open: topic === id }, [el('summary', {}, [el('span', { text: title }), chev.cloneNode(true)]), el('div', { class: 'hp-fold-body' }, paras.map(p => el('p', { text: p })))]))
+        )
+      ])
+    : null;
+  put(box, el('div', { class: 'hp' }, [picker, head, intro, tour, folds]));
+  // The app's own mark in view (Transit's is far along the row at 320 px).
+  setTimeout(() => {
+    const on = picker.querySelector('[aria-selected="true"]');
+    if (on) picker.scrollLeft = on.offsetLeft - (picker.clientWidth - on.offsetWidth) / 2;
+  }, 0);
+  const to = topic === 'tabs' ? '#q-help-tabs' : topic ? `#q-help-${topic}, #q-help-tab-${topic}` : '';
+  if (to) setTimeout(() => box.querySelector(to)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 50);
 }
 
 // The looks: the milestones' (earned once, each an avatar and a frame, worn

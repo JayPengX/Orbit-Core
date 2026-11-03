@@ -3,12 +3,13 @@
 // #help=<app>, or #help=<app>:<topic> for one topic.
 //
 // Every app's guide has the same shape, in the same words:
-//   what    「X 是什麼」: its part in Orbit, in two or three lines
-//   tabs    「每個分頁」: one line per tab, in the tab bar's order
-//   …       what's particular to it (a few topics)
+//   what    「X 是什麼」: its part in Orbit, in two or three lines (under its name)
+//   the tour (TOURS, below): each tab and the screens worth knowing, each
+//           its real screenshot and a line or two, in the tab bar's order
+//   …       what's particular to it (a few topics, folded: 怎麼用)
 //   money   「錢怎麼算」: how it touches the money (Securities' alone)
-// (The Orbit Pass's own guide: what, tabs, devices, one, net, notify, safe,
-// looks, money.)
+// (The Orbit Pass's own guide: what, install, looks, devices, one, net,
+// notify, safe, money.)
 //
 // HELP[app][lang] = [[topic id, title, [paragraphs]], …]
 
@@ -29,12 +30,6 @@ export const HELP = {
         '電腦不用安裝，直接在瀏覽器打開。想要自己的視窗：Chrome、Edge 點網址列右邊的安裝圖示；Mac 的 Safari 選「檔案」→「加入 Dock」。',
         '加好以後，每次都從主畫面的圖示打開。Android 的圖示打開又回到加入的那一頁，表示加成了捷徑：刪掉它，重新加入並選「安裝」。'
       ]],
-      ['tabs', '四個分頁', [
-        'Pass：上方是你的卡片（頭像、里程碑、帳號），點它換外觀。下面是這個 App 的設定、新增裝置、通知、除錯紀錄和帳戶安全。',
-        '外觀：里程碑，和免費的頭像、頭像框。',
-        'App：每個 Orbit App，上次什麼時候用，一點就打開。',
-        '說明：就是這裡。'
-      ]],
       ['looks', '頭像、頭像框與里程碑', [
         '免費的頭像和頭像框隨時換，點一下戴上，再點一下拿下。每個 App 的帳戶按鈕都看得到。',
         '里程碑每個 App 一個，分銅、銀、金三級，拿到就永久保留。拿到第一級就能戴上它的頭像和頭像框（一起戴上），升級後會換成銀色、金色。最上面是最接近的下一枚：要做什麼、還差多少。'
@@ -48,7 +43,7 @@ export const HELP = {
         '所有 App 可以同時開。同一個 App 在另一台裝置（或 Safari 和主畫面 App 之間）打開時，原本那個會暫停，按「在這裡繼續」拿回來，資料不會互相蓋掉。'
       ]],
       ['net', '沒有網路的時候', [
-        'Weather、Class、Words 沒網路也能開，連上後再同步。Sports、Transit、Securities 是即時的，沒網路時只顯示「沒有網路連線」，連上就回來。網路慢時先用手機上的資料。'
+        'Sports、Transit、Securities 是即時的，沒網路時只顯示「沒有網路連線」，連上就回來。其他 App 沒網路也能打開上次的資料，連上後再同步。網路慢時先用手機上的資料，新的到了再換上。'
       ]],
       ['notify', '通知與除錯紀錄', [
         '「系統通知」一個開關管全部，下面每個 App 的每種通知各自開關。設定跟著 Orbit Pass，每台裝置都一樣。',
@@ -75,12 +70,6 @@ export const HELP = {
         'On a computer there’s nothing to install: just use the browser. For a window of its own: in Chrome or Edge, tap the install icon at the right of the address bar; in Safari on a Mac, choose File → “Add to Dock”.',
         'Once added, always open it from its home-screen icon. On Android, an icon that brings back the “add” page was added as a shortcut: remove it and add it again with “Install”.'
       ]],
-      ['tabs', 'The four tabs', [
-        'Pass: your card on top (avatar, milestones, account number); tap it to change your look. Below: this app’s settings, adding a device, notifications, the debug log and security.',
-        'Looks: milestones, and the free avatars and frames.',
-        'Apps: every Orbit app, when you last used it, a tap to open it.',
-        'Help: here.'
-      ]],
       ['looks', 'Avatars, frames and milestones', [
         'The free avatars and frames change any time: tap to wear, tap again to take off. They show on your account button in every app.',
         'One milestone per app, in bronze, silver and gold, each kept for good once reached. The first earns its avatar and frame (worn together), which turn silver and gold as you go. On top: the nearest next medal, what it asks and how far along you are.'
@@ -94,7 +83,7 @@ export const HELP = {
         'Every app can be open at once. Opening the same app somewhere else (another device, or Safari beside the home-screen app) pauses the first; “Continue here” takes it back, and nothing is overwritten.'
       ]],
       ['net', 'Without a connection', [
-        'Weather, Class and Words open offline and sync once you’re back. Sports, Transit and Securities are live, so offline they show only “No internet connection” and come back by themselves. On a slow connection an app opens on what the phone has.'
+        'Sports, Transit and Securities are live, so offline they show only “No internet connection” and come back by themselves. The others open on what they kept and sync once you’re back. On a slow connection an app opens on what the phone has, then swaps in the new.'
       ]],
       ['notify', 'Notifications and the debug log', [
         'One switch, System notices, turns them all on or off; below it each app’s kinds have their own. They follow your Orbit Pass to every device.',
@@ -113,13 +102,6 @@ export const HELP = {
     zh: [
       ['what', 'Orbit Securities 是什麼', [
         'Orbit 讓錢長大的地方：用錢包裡的新台幣投資全世界的股票、ETF、各國公債、共同基金、加密貨幣、黃金白銀存摺和外匯，價格是真實的市場價格，規則照真的券商。'
-      ]],
-      ['tabs', '每個分頁', [
-        '「首頁」：總資產和今日漲跌、為你推薦、漲跌幅前五名、全球市場，各分類清單（先列 15 檔）和搜尋（中文、英文或代號）；點任何標的看走勢、公司資料和下單。',
-        '「資產」：淨值與走勢、配置、持股、現金與各幣別錢包、股利利息收入、定期定額和到價提醒。',
-        '「資金」：換匯（你付出／你會收到，兩邊都能輸入）、匯率看板、融資、信用帳戶、定存和借券出借；下面是你的帳戶：薪水、急難紓困、財富等級和「真相」。',
-        '「紀錄」：交易明細、委託、統計分析（報酬、費用與稅、和只買大盤比），和回測。',
-        '右上角：說明、重新整理和你的 Orbit Pass；漲跌的顏色在 Orbit Pass 的 Pass 分頁設定。'
       ]],
       ['orders', '委託單', [
         '每筆委託都由 Orbit 的伺服器用它的即時報價成交；掛著的時候，要用的現金或股票會先保留。',
@@ -172,13 +154,6 @@ export const HELP = {
     en: [
       ['what', 'What Orbit Securities is', [
         'Where Orbit’s money grows: invest the NT$ in your wallet in stocks, ETFs, government bonds, mutual funds, crypto, gold and silver passbooks and forex worldwide, at real market prices and a real broker’s rules.'
-      ]],
-      ['tabs', 'The tabs', [
-        'Home: your total and today’s change, for you, the top five up and down, world markets, lists by kind (15 at first) and search (Chinese, English or ticker); tap anything for its chart, company facts and the order ticket.',
-        'Portfolio: net worth and its history, allocation, holdings, cash and each currency’s wallet, income, monthly plans and price alerts.',
-        'Money: exchange (you pay / you get, type either), the rates board, margin, the credit account, time deposits and lending shares; below them your account: pay, relief, wealth levels and Truth.',
-        'History: activity, orders, stats (returns, costs and taxes, you against just buying an index) and the backtest.',
-        'Top right: help, refresh and your Orbit Pass; the colours for up and down are set in its Pass tab.'
       ]],
       ['orders', 'Orders', [
         'Every order is filled by Orbit’s server at its own live quote; while an order waits, the cash or shares it needs are held.',
@@ -234,13 +209,6 @@ export const HELP = {
       ['what', 'Orbit Sports 是什麼', [
         'Orbit 的運動 App：台灣看得到的每個聯賽（愛爾達 ELTA.tv 和 Apple TV）的比分、賽程、排名、球隊和球員，每場比賽的詳細數據，還有依你追蹤的排好的今天看什麼，一點就打開轉播。'
       ]],
-      ['tabs', '每個分頁', [
-        '「首頁」：今天看什麼。正在進行的比賽在最上面，接著是依你的喜好排好、時間不撞的「今日推薦」和更多推薦，再來是你的球隊今天的比賽；可以選一天（一個月前到六週後，📅 選任何一天），或只看追蹤、我的球隊或某個運動。',
-        '「賽事」：依運動和聯賽找比賽，打開就在離現在最近的比賽日；賽程、排名、季後賽／淘汰賽；最上面搜尋聯賽、球隊和球員（中文英文都可以）。F1 每站一張卡。',
-        '「轉播」：什麼時候、在哪一台。正在轉播的比賽（點「觀看」直接開愛爾達或 Apple TV）、你追蹤的接下來 7 天的轉播、接下來 24 小時的其他比賽、剛結束的，和愛爾達完整轉播表。',
-        '「追蹤」：你追蹤的比賽、球隊和選手現在怎麼樣：排名、近況、上一場和下一場；「我的設定」也在這裡。',
-        '右上角：說明、重新整理和你的 Orbit Pass；再點一次目前的分頁會回到頂端。'
-      ]],
       ['game', '比賽頁', [
         '比分、系列賽戰況和逐局（節、半場）比分；進行中有即時面板（壘包和球數、進球和紅牌、得分最多的球員）和勝率走勢，按住走勢看每個時刻，關鍵時刻標在線上。',
         '概況、數據、球員（box score，可以排序）、過程（每一球、每一回合）、先發和場上球員、陣容、傷兵、排名和比賽資訊。點任何球員打開他在這場的數據。',
@@ -266,13 +234,6 @@ export const HELP = {
     en: [
       ['what', 'What Orbit Sports is', [
         'Orbit’s sports app: every league you can watch in Taiwan (ELTA.tv and Apple TV), with scores, schedules, tables, teams and players, every game in detail, a day planned around what you follow, and one tap to watch.'
-      ]],
-      ['tabs', 'The tabs', [
-        'Home: what to watch today. Games on now come first, then today’s picks (ranked for you, no clashes) and more picks, then your teams’ games today; pick a day (a month back to six weeks ahead, 📅 for any), or only what you follow, your teams or one sport.',
-        'Matches: find games by sport and league, opening on the game day nearest now; schedule, tables, playoffs or knockouts; search leagues, teams and players at the top (Chinese or English). F1 has a card per weekend.',
-        'On TV: when and where. What’s on now (Watch opens ELTA or Apple TV), your follows’ games in the next 7 days, the next 24 hours’ other games, games just ended, and ELTA’s whole guide.',
-        'Following: how the matches, teams and drivers you follow are doing: table place, form, last and next game; My settings lives here too.',
-        'Top right: help, refresh and your Orbit Pass; tap the open tab again to go back to its top.'
       ]],
       ['game', 'A game’s page', [
         'The score, the series and the line score; while it’s on, a live panel (bases and count, goals and red cards, the top scorers) and the win chance over time: hold it to read any moment, the key moments marked on its line.',
@@ -302,19 +263,11 @@ export const HELP = {
       ['what', 'Orbit Words 是什麼', [
         'Orbit 的背單字 App：大考中心高中英文參考詞彙 6,169 字，每個字都有真人發音，記憶模型替你安排什麼時候複習。沒有網路也能用，進度每一步都存在手機上，連上網路再和 Orbit Pass 合併。'
       ]],
-      ['tabs', '每個分頁', [
-        '「今天」：今天的目標、連續天數、等級，該複習、還沒學和已精熟的字數，一鍵開始這一輪；背新字、上次答錯的字用卡片看一遍，還有今日單字。',
-        '「練習」：選級別、學習方式（智慧、選意思、選英文、聽音選字、拼字母、填空、聽寫）和發音的語速。',
-        '「複習」：答錯、該複習、學習中、收藏的字分開列，寫著每個字錯在哪裡（拼錯的地方、選成或聽成哪個字、不認識），可以搜尋和排序；「卡片複習」一張一張翻（點一下翻面、左右滑換張），看完再測驗這批字，測驗才會更新記憶模型。',
-        '「單字」：全部的字，照級別、新字／學習中／精熟／收藏篩選，英文或中文都能搜尋。',
-        '「進度」：各級別學到哪裡、正確率和每題花的時間、最近 14 天、接下來 7 天要複習多少、學會的字記得多久、記憶模型怎麼配合你，還有最常忘的字。',
-        '點任何一個字都會打開它的卡片：完整意思、記憶小撇步、你搞混過和常被搞混的字、你拼錯的樣子、作答紀錄和現在還記得的機率；按 ☆ 收藏，或按「我會了」不再考。'
-      ]],
       ['words', '背單字', [
         '大考中心高中英文參考詞彙第 1 到 6 級，每個字都有真人發音錄音（Microsoft Jenny），不會打斷你正在聽的音樂。每一輪 10、20 或 30 個字，混合該複習的字和新字；答錯的字會在這一輪最後換個方向再問一次（選錯的從另一邊問，拼錯的改聽寫）。「背新字」一張一張看新字（發音、意思），背滿一批就考這批字，考完之後照記憶模型排複習。',
         '題目故意出得難，因為想得辛苦才記得住：錯的選項都是最容易選錯的字：拼法幾乎一樣的（adapt、adopt、adept）、意思很接近的、同詞性同長度的、常被搞混的，還有你以前搞混過的那個字；不會出兩個都對的選項。',
         '新字在一輪裡第一次出現是一題「檢查」：看字（聽發音）從四個意思選一個，下面有「不認識」，不用猜。一眼就答對算已經會，六週後才再問；答得穩三週後；答得慢幾天內再問；答錯就開始學。要考哪些新字，是照你的作答紀錄猜：你在哪個級別、哪種詞性、多長的字比較常錯，還有跟你最近答錯的字長得像的字，最可能不會的先考。',
-        '「智慧」模式照這個字練到哪裡出題：還在學的，練兩個方向和聽音（選意思、選英文、聽音選字）；記穩了就考聽寫。填空和拼字母不在智慧模式裡，可以在「練習」單獨選；片語不考聽寫。',
+        '「智慧」模式照這個字練到哪裡出題：還在學的，練兩個方向和聽音（選意思、選英文、聽音選字）；記穩了就考聽寫。填空和拼字母不在智慧模式裡，可以在「今天」的練習模式單獨選；片語不考聽寫。',
         '每個字有自己的記憶模型（FSRS，Anki 用的排程）：記得多穩（天數）和對你多難。算出還記得的機率掉到 90% 時，它就該複習；對你容易的字等到 80–85% 才考，時間留給弱點。隔越久還答對、用寫的答對、答得快，下次就隔越久；選擇題答對、答得慢，加得少；答錯會大幅縮短，這個字也會被記成比較難。記得超過 10 天算「精熟」。每一輪先考最可能忘的字，把你搞混過的字排在同一輪讓你分辨，長得像的字不會連著出；還在學的字太多時少加新字，沒什麼要複習時新字最多占一輪的六成。'
       ]],
       ['goal', '每日目標與等級', [
@@ -329,19 +282,11 @@ export const HELP = {
       ['what', 'What Orbit Words is', [
         'Orbit’s vocabulary app: the 6,169 words of Taiwan’s high-school English reference list, each recorded by a real voice, with a memory model deciding when each comes back. It works offline: progress is kept on the phone at every step and merged with your Orbit Pass once you’re online.'
       ]],
-      ['tabs', 'The tabs', [
-        'Today: the day’s goal, your streak and level, how many words are due, new and mastered, and a round a tap away; new words to study as cards, last time’s missed words as cards, and the word of the day.',
-        'Practice: the levels, the way to learn (smart, meaning, English, by ear, letters, fill in, dictation) and the voice’s speed.',
-        'Review: missed, due, learning and bookmarked words apart, each saying how it went wrong (where it was misspelt, the word it was taken for, not known), searchable and sortable; flash cards one at a time (tap to flip, swipe for the next), then a test on the deck, which is what updates the memory model.',
-        'Words: every word, filtered by level and new / learning / mastered / bookmarked, searchable in English or Chinese.',
-        'Progress: each level’s progress, accuracy and seconds an answer, the last 14 days, reviews due in the next 7, how long learnt words stay remembered, how the model fits you, and the words you forget most.',
-        'Tap any word for its card: the whole meaning, a way to remember it, the words you mixed it up with and the ones it’s often confused with, how you misspelt it, your answers and the chance you still know it; ☆ bookmarks it, I know this puts it away.'
-      ]],
       ['words', 'Learning words', [
         'Levels 1 to 6 of the College Entrance Examination Center’s list, each word recorded by a real voice (Microsoft Jenny), played without stopping your music. A round is 10, 20 or 30 words, due ones and new ones mixed; a missed word comes back at the end of the round the other way round (picked wrong: from the other side; misspelt: dictated). Study new words shows them one at a time (sound, meaning); a full batch is then quizzed, and the quiz starts their schedule.',
         'Questions are hard on purpose, because effortful recall is what sticks: every wrong option is the likeliest slip: spelt almost the same (adapt, adopt, adept), close in meaning, the same part of speech and length, commonly confused, or a word you’ve mixed it up with before; two options are never both right.',
         'A new word’s first question in a round is a check: the word (and its sound) and four meanings, with I don’t know under them, so there’s no guessing. Right at a glance, it’s known and back in six weeks; steady, in three; slow, within days; missed, it’s learnt. Which new words come first is guessed from your answers: the levels, parts of speech and lengths you miss most, and look-alikes of your latest misses; the likeliest unknown first.',
-        'Smart mode asks what a word is being trained in: while it’s learnt, both ways and by ear (meaning, English, by ear); once it’s held, dictation. Fill in and letters aren’t in smart mode; choose them in Practice. Phrases are never dictated.',
+        'Smart mode asks what a word is being trained in: while it’s learnt, both ways and by ear (meaning, English, by ear); once it’s held, dictation. Fill in and letters aren’t in smart mode; choose them from the ways to practise on Today. Phrases are never dictated.',
         'Every word has its own memory model (FSRS, Anki’s scheduler): how stable it is (in days) and how hard it is for you. When the chance you still remember it falls to 90% it’s due; words that are easy for you wait until 80–85%, so time goes to weak spots. Right after a long gap, typed, or fast pushes the next review further out; multiple choice or slow adds less; a miss cuts it sharply and marks the word harder. Over 10 days is mastered. Each round asks the words likeliest forgotten first, puts the words you’ve confused together so you can tell them apart, and never asks look-alikes back to back; with many words still being learnt it adds fewer new ones, and with little due new words take up to 60% of a round.'
       ]],
       ['goal', 'Daily goal and level', [
@@ -357,11 +302,6 @@ export const HELP = {
     zh: [
       ['what', 'Orbit Class 是什麼', [
         'Orbit 的課表 App。打開就知道現在是哪一節、還剩幾分鐘、下一節是什麼。課表存在 Orbit Pass，登入的每台裝置都一樣；沒有網路也能看，改的地方連上網路再送出。'
-      ]],
-      ['tabs', '每個分頁', [
-        '「今天」：目前這一節（午休、打掃也算）、倒數和下一節；下面是今天的全部課程，點一節看詳細資料（一週哪幾天、第幾節上這門課）。今天的課上完了，就換成下一個上課日的課。倒數活動也在這裡，左右滑動換一個。',
-        '「課表」：選星期看那天的課，上方切換單週或雙週（附日期），隔週上的課兩週都看得到；下面是之後的調課。',
-        '「工具」：整週課表和「編輯課表」（課程、老師、時間和倒數活動）；AI 課表編輯（用一句話修改）和拍照匯入；分享金鑰。'
       ]],
       ['swap', '調課', [
         '點一節課再按「調課」，或在「課表」按「新增調課」，選要對調的另一節（同一天、別天或別週都可以；選空堂就是把課搬過去，週六補課也可以）。隔週上的課，先在「課表」切到那一週再點。',
@@ -382,11 +322,6 @@ export const HELP = {
     en: [
       ['what', 'What Orbit Class is', [
         'Orbit’s class schedule app: open it to see the period now, the minutes left and what’s next. The schedule lives on your Orbit Pass, the same on every device you sign in on; it opens offline too, and an edit made then is sent once you’re back online.'
-      ]],
-      ['tabs', 'The tabs', [
-        'Today: the period now (lunch and cleaning too), its countdown and the next; below, the whole day, a tap on a class for its details (which days and periods it meets). Once the day’s classes are over, it shows the next school day’s. Countdowns are here too: swipe between them.',
-        'Timetable: pick a weekday for its classes, odd or even week at the top (with dates), so a class met every other week shows in both; the swaps to come below.',
-        'Tools: the whole week and Edit timetable (classes, teachers, times and countdowns); AI timetable edit (change it in a sentence) and photo import; share keys.'
       ]],
       ['swap', 'Swapping classes', [
         'Tap a class and Swap, or Swap a class in Timetable, then pick the period to trade with (the same day, another day or another week; a free period moves the class there, a Saturday make-up too). For a class met every other week, switch Timetable to that week first.',
@@ -410,41 +345,39 @@ export const HELP = {
       ['what', 'Orbit Weather 是什麼', [
         'Orbit 的天氣 App：一個答案的天氣。中央氣象署、Google 和環境部的預報和測站的實測，合成一份約 1 公里的預報：會不會下雨、要不要帶傘、穿什麼、紫外線和空氣品質。沒有網路時打開上次的預報。'
       ]],
-      ['tabs', '畫面', [
-        '每個地點一頁，左右滑動整頁（或點上面的地點）切換「我的行程」、目前位置和各個釘選地點。',
-        '一頁由上到下：鄉鎮、現在的天氣、今天最高最低和體感、一句話；接下來 24 小時（每 3 小時）；紫外線、降雨機率、空氣品質三張小卡；建議（帶傘、防曬、穿什麼、口罩、熱、這一週）；10 天預報；更多資訊（風、氣壓、濕度、能見度、日出日落、最近測站的實測）。',
-        '點最上面的天氣看今天，點 10 天預報的任一天看那一天的逐時溫度、降雨和紫外線，左右滑動換一天。三張小卡打開是大圖，上方切換今天（晚上 6 點後是今晚到隔天早上）、明天和之後每一天。按住圖表滑動看每小時（或每天）的數字。',
-        'App 開著時資料滿 15 分鐘就更新；超過 30 分鐘沒更新會變淡並寫著是多久以前的。定位關掉或抓不到時顯示上次的位置，按「定位」重新抓。'
-      ]],
       ['pins', '釘選地點與我的行程', [
-        '地點列最後的「+ 釘選」新增地點：名稱、鄉鎮，和你在那裡的星期和時間；那段時間打開 App 會直接顯示那裡。打開「這是我的家」，沒有其他行程的時間就當作在家。釘選地點的頁面最下面可以編輯。',
+        '在「地點」按「新增地點」：名稱、鄉鎮，和你在那裡的星期和時間；那段時間打開 App 會直接顯示那裡。打開「這是我的家」，沒有其他行程的時間就當作在家。按「編輯」改或排順序。',
         '「我的行程」每個小時取你那時在的地方的天氣，拼成一頁（例如平日 7 到 17 點在學校，其他時間在家）；手機發現你在別的地方，就用你真正在的地方。放假日不算學校的行程。'
       ]],
       ['notify', '設定與通知', [
-        '右上角的 ⚙︎：卡片的順序、關掉不需要的卡片，和早晨天氣的時間。',
+        '「地點」的設定：早晨天氣的時間，和版面（卡片的順序、關掉不需要的）。',
         '早晨天氣：每天在設定的時間一句話（降雨、溫度、紫外線、空氣），以那時的釘選地點為準。降雨提醒：白天 2 小時內可能下雨時，一天最多一次。兩個開關都在 Orbit Pass 的通知。'
       ]],
-      ['money', '錢怎麼算', ['Orbit Weather 不用錢。']]
+      ['fresh', '資料多新', [
+        'App 開著時每 15 分鐘更新；超過 30 分鐘沒更新會變淡並寫著是多久以前的。定位關掉或抓不到時用上次的位置。'
+      ]],
+      ['money', '錢怎麼算', [
+        'Orbit Weather 不用錢。'
+      ]]
     ],
     en: [
       ['what', 'What Orbit Weather is', [
         'Orbit’s weather app: one answer. The Central Weather Administration’s, Google’s and the Ministry of Environment’s forecasts and real station readings, blended into one forecast for about a square kilometre: will it rain, take an umbrella, what to wear, UV and air quality. Offline, it opens on the last forecast.'
       ]],
-      ['tabs', 'The screen', [
-        'Each place is a page: swipe the whole page (or tap a place at the top) between My day, where you are and each pinned place.',
-        'A page from the top: the township, the weather now, today’s high and low with feels-like, one sentence; the next 24 hours (every 3); UV, rain and air cards; advice (umbrella, sunscreen, what to wear, mask, heat, the week); 10 days; more (wind, pressure, humidity, visibility, sunrise and sunset, the nearest station’s reading).',
-        'Tap the weather at the top for today, or any of the 10 days for that day’s hourly temperature, rain and UV, swiping to the next day. The three cards open into big charts, with today (from 6 pm tonight into the morning), tomorrow and each day after at the top. Hold a chart and slide for each hour (or day).',
-        'While the app is open the forecast refreshes once it’s 15 minutes old; over 30 minutes old it fades and says how old it is. With location off or not found, the last place is shown: Locate asks again.'
-      ]],
       ['pins', 'Pinned places and My day', [
-        '+ Pin at the end of the places adds one: a name, a township, and the days and hours you’re there; opening the app in those hours shows it. Turn on This is my home, and any hour without another place counts as home. A pinned place’s page has Edit at its foot.',
+        'Add a place in Places: a name, a township, and the days and hours you’re there; opening the app in those hours shows it. Turn on This is my home, and any hour without another place counts as home. Edit changes or reorders them.',
         'My day stitches each hour’s weather from where you’ll be then (school 7 to 17 on weekdays, home the rest, say); when the phone finds you somewhere else, where you really are is used. Holidays don’t count school.'
       ]],
       ['notify', 'Settings and notices', [
-        '⚙︎ at the top right: the cards’ order, hiding the ones you don’t need, and the morning brief’s time.',
+        'Settings in Places: the morning brief’s time, and the layout (the cards’ order, hiding the ones you don’t need).',
         'Morning weather: one line each day at that time (rain, temperature, UV, air), for the pinned place you’re at then. Rain alert: rain likely within 2 hours in the daytime, once a day at most. Both switches are in the Orbit Pass’s notifications.'
       ]],
-      ['money', 'Money', ['Orbit Weather uses no money.']]
+      ['fresh', 'How fresh it is', [
+        'While open it refreshes every 15 minutes; past 30 minutes without one it fades and says how old it is. With location off or not found, the last place is used.'
+      ]],
+      ['money', 'Money', [
+        'Orbit Weather uses no money.'
+      ]]
     ]
   },
   money: {
@@ -452,15 +385,9 @@ export const HELP = {
       ['what', 'Orbit Money 是什麼', [
         '你自己的記帳本：每天花了多少、每個帳戶還有多少。記的是你真實的錢，和 Securities 的遊戲錢完全分開，不會互相影響。資料存在你的 Orbit Pass 裡，換手機也在。'
       ]],
-      ['tabs', '每個分頁', [
-        '「月曆」：這個月花了多少、收入和結餘，每天格子下面是當天的支出；點一天看那天的每一筆。右下角的 ＋ 隨時記一筆。',
-        '「帳戶」：現金、銀行帳戶、悠遊卡等電子票證、電子支付、信用卡，各自的餘額；可以把某個帳戶設成不計入總資產（例如定存或別人的錢）。銀行帳戶可以加簽帳金融卡，信用卡設好結帳日、繳款日和從哪個帳戶繳。',
-        '「統計」：週、月、年的支出，和上一期比較、每天平均、每個分類占多少，還有每月預算。',
-        '「更多」：拍照記帳、分類、到期提醒、固定收支和匯出。'
-      ]],
       ['entry', '記一筆', [
-        '選支出、收入或轉帳，用下面的鍵盤輸入金額（可以打 120+35 這樣相加），選分類、從哪個帳戶付、日期，要的話寫備註。常用的帳戶和分類會記住。',
-        '轉帳是錢在你自己的帳戶之間移動（例如提款、儲值悠遊卡、繳卡費），不算支出。固定收支（房租、薪水、訂閱）設一次，到日子自動記上。'
+        '按右下角的 ＋。種類（支出、收入、轉帳）、分類、細項和付款方式會照你的習慣先選好（時間、平日假日、你以前怎麼選）；金額點數字欄用手機的鍵盤輸入，或點建議的金額。日期和備註要的話再改。',
+        '轉帳是錢在你自己的帳戶之間移動（提款、儲值悠遊卡、繳卡費），只有金額、從哪裡到哪裡、日期、手續費和備註，不算支出。固定收支（房租、薪水、訂閱）設一次，到日子自動記上。'
       ]],
       ['photo', '拍照記帳', [
         '在記一筆或「更多」按「拍照」，拍或選一張照片：收據、發票、帳單、外送或付款 App 的截圖、轉帳通知、價格標籤都可以。AI 會讀出金額、日期、店家、品項，猜好分類和付款方式，你看過、改好再儲存。',
@@ -474,33 +401,23 @@ export const HELP = {
       ['what', 'What Orbit Money is', [
         'Your own books: what you spend each day and what each account holds. It tracks your real money, kept apart from the play money in Securities. It lives on your Orbit Pass, the same on any phone.'
       ]],
-      ['tabs', 'Each tab', [
-        'Calendar: the month’s spending, income and what’s left, with each day’s spending under its date; tap a day for its entries. The + adds one any time.',
-        'Accounts: cash, bank accounts, stored-value cards like EasyCard, e-payments and credit cards, each with its balance. An account can be left out of the total (a deposit, someone else’s money). Banks take debit cards; a credit card has its statement day, due day and the account that pays it.',
-        'Stats: spending by week, month or year, against the last one, a day on average, by category, and monthly budgets.',
-        'More: entries from a photo, categories, reminders, repeats and export.'
-      ]],
       ['entry', 'Adding an entry', [
-        'Pick spent, income or transfer, type the amount on the keypad (120+35 adds up), then the category, the account, the day and a note if you like. Your usual account and category are remembered.',
-        'A transfer moves money between your own accounts (a withdrawal, an EasyCard top-up, a card bill) and isn’t spending. Repeats (rent, salary, subscriptions) are set once and added on their day.'
+        'Tap the ＋ at the bottom. The kind (spent, income, transfer), category, sub and way to pay are picked for you from your habits (the hour, weekday or weekend, what you chose before); tap the amount to type it on the phone’s keys, or tap a suggested one. Change the day or add a note if you like.',
+        'A transfer moves money between your own accounts (a withdrawal, an EasyCard top-up, a card bill): just the amount, from and to, the day, a fee and a note; it isn’t spending. Repeats (rent, salary, subscriptions) are set once and added on their day.'
       ]],
       ['photo', 'Entries from a photo', [
         'Tap Photo in a new entry or under More, then take or pick a picture: a receipt, an invoice, a bill, a delivery or payment app’s screenshot, a transfer notice, a price tag. AI reads the amount, day, store and items and guesses the category and way to pay, for you to check before saving.',
         'If the same one is already in (same amount, within a day), you’re asked whether to merge: the store and items go onto the entry you made, so nothing is counted twice. A screenshot with several shows them all for a look first.'
       ]],
-      ['money', 'Money', ['Orbit Money only keeps your own books: it neither uses nor pays Orbit money.']]
+      ['money', 'Money', [
+        'Orbit Money only keeps your own books: it neither uses nor pays Orbit money.'
+      ]]
     ]
   },
   beats: {
     zh: [
       ['what', 'Orbit Beats 是什麼', [
-        'Orbit 的節拍作曲：給它一組節拍片段（鼓、貝斯、旋律、Loop），它聽出速度和每段的角色，排成一首首新歌。全部在手機上算，什麼都不上傳；沒有網路也能用。'
-      ]],
-      ['tabs', '每個分頁', [
-        '「做歌」：放片段，選情境（放鬆、熱血、律動、經典）或鼓的風格、首數，做出來的歌在這裡播。',
-        '「樂器」：用 App 自己的樂器做片段：鼓組（或打擊樂）或旋律，1、2 或 4 小節。鼓再點一下是重音、第三下拿掉；旋律可以一次放和弦。搖擺、復原、把第一小節複製到每一小節；「自動編」幫你起個頭。按「加進片段」，歌就用它；「♡ 收藏」留在收藏的片段裡，也能匯出 MIDI。',
-        '「即興」：一打開就是「內建」的 16 個打擊墊（App 自己的樂團：鼓、Hi-hat、貝斯、和弦、旋律，同一個調），點節奏的標籤或 🎲 換一組；有了片段，「我的片段」就是你自己的片段，配上用你的鼓打的節奏。Loop 從下一小節開始，再點一下停；單擊的對到你選的格子（16 分、8 分、拍或自由）。按「● 錄一段」，錄下來的就是一首歌，在「做歌」裡。',
-        '「歌單」：按 ♡ 留下的歌，在這支手機上；找歌名、節奏或調，四種排序，改名、分享、刪除，看到的一次下載成 zip。'
+        'Orbit 的音樂 App：按播放，App 用自己的樂器現做一首首新歌，不會重複；也可以自己做：放進節拍片段排成歌、在樂器上編鼓和旋律、即興，或玩節奏遊戲。全部在手機上算，聲音不上傳，沒有網路也能用。'
       ]],
       ['add', '放進片段', [
         '一段錄音（片段之間留 0.2 秒以上的安靜，會自動切開）、一整包取樣，或用麥克風錄；WAV 最好，m4a、mp3 也可以。切出來的數量不對，到「切片」把「安靜門檻」調高（例如 -60 dB）。'
@@ -522,13 +439,7 @@ export const HELP = {
     ],
     en: [
       ['what', 'What Orbit Beats is', [
-        'Orbit’s beat maker: give it a set of beat pieces (drums, bass, melodies, loops) and it hears the tempo and what each piece is, then arranges them into new songs. It all runs on the phone: nothing is uploaded, and it works offline.'
-      ]],
-      ['tabs', 'The tabs', [
-        'Make: add pieces, pick a mood (Chill, Hype, Groove, Classic) or the drum styles and how many, and play the songs made.',
-        'Studio: pieces on the app’s own instruments: drums (or percussion) or melody, 1, 2 or 4 bars. Tap a drum again to accent it, a third time to take it out; melody notes can go in as chords. Swing, undo, bar 1 copied over every bar; Write one gives you a start. Add to pieces and the songs use it; ♡ Keep puts it in Kept clips, and it exports as MIDI too.',
-        'Jam: it opens on Built-in, 16 pads of the app’s own band (drums, hats, bass, chords and melody, in one key); a groove chip or 🎲 swaps the set. Once you have pieces, My clips plays your own pieces as pads, over a groove played on your own drums. A loop starts on the next bar and stops when tapped again; a one-shot lands on the grid you pick (16th, 8th, beat or free). Tap ● Record, and the take becomes a song in Make.',
-        'Library: the songs kept with ♡, on this phone; find one by name, groove or key, four orders, rename, share, remove, and download what’s shown in a zip.'
+        'Orbit’s music app: press play and it makes new songs on its own instruments, never the same twice. Or make your own: beat pieces arranged into songs, drums and melody in the studio, a jam, or the rhythm game. It all runs on the phone: no sound is uploaded, and it works offline.'
       ]],
       ['add', 'Adding pieces', [
         'One recording (0.2 s or more of silence between pieces, split for you), a whole sample pack, or the microphone; WAV is best, m4a and mp3 work too. If the count is off, raise Silence below under Splitting (say to -60 dB).'
@@ -554,12 +465,6 @@ export const HELP = {
       ['what', 'Orbit Transit 是什麼', [
         'Orbit 的大眾運輸 App：全台公車、台鐵、高鐵、捷運和 YouBike，路線規劃、到站時間和導航都在一起。到站時間和規劃都是即時的，所以需要網路。'
       ]],
-      ['tabs', '每個分頁', [
-        '「地圖」：像 Apple 地圖，下面一張卡片可以往上拉或往下拉。卡片裡有搜尋、常用（家、公司⋯點一下就規劃去那裡）、建議（該出發的行程）、最近找過的和附近的 YouBike。地圖上有 YouBike 站、每個公車站和台鐵、高鐵、捷運站；點任何一個看它的車、班次或剩幾台。找地點（連鎖店從離你最近的分店排起）或點地圖上的地方，按「路線」規劃怎麼去。',
-        '「交通」：常用和釘選的行程接下來怎麼走（點一下就導航），釘選的公車、火車和地點；每條公車都寫著下一班什麼時候到（沒有車在路上時，是時刻表的下一班）。',
-        '「查時刻」：台鐵、高鐵站到站（自動找最快的轉乘），附票價和今天的誤點；公車用號碼或站名找，每條路線都寫著離你最近那一站的下一班，點開看每一站現在的車，或任一天的時刻表。都可以 ☆ 釘選。',
-        '「我的」：地點、行程（可以設時間、每週固定幾天，回程自動有）、釘選的公車和火車（可以分組）、交通方式的偏好（不搭哪些、每 30 分鐘換 YouBike、TPASS、導航時走路騎車交給 Google 地圖還是 Apple 地圖），和各城市的捷運路網圖。'
-      ]],
       ['plan', '規劃路線', [
         '出發地可以換成釘選地點、搜尋的地點，或在地圖上選；可以設「出發時間」或「抵達時間」。每個方案都照公車實際的到站時間排好：你趕得上的那一班，後面的轉乘跟著調整，會錯過的火車會標出來。',
         '台鐵、高鐵自動找最快的轉乘站；捷運、YouBike（全程騎、騎到車站、或下車後騎）都會一起比。YouBike 照站的位置規劃，從騎車開始的行程不會選現在沒有車的站。只用你在「我的」允許的交通方式；TPASS 涵蓋的算免費。按 ☆ 把行程存起來。'
@@ -575,17 +480,13 @@ export const HELP = {
         '到站提醒（🔔）：例如「5608 離我的站 5 分鐘時告訴我」，到時通知你，手機鎖著也會。',
         '導航中：該出發、要搭的公車快到了、火車快開、下一站要下車，都會通知到鎖定畫面。兩種通知都在 Orbit Pass 的通知各自開關。'
       ]],
-      ['money', '錢怎麼算', ['Orbit Transit 不用錢；票價只是參考。']]
+      ['money', '錢怎麼算', [
+        'Orbit Transit 不用錢；票價只是參考。'
+      ]]
     ],
     en: [
       ['what', 'What Orbit Transit is', [
         'Orbit’s public transport app: Taiwan’s buses, railways, high-speed rail, metros and YouBike, with trip plans, arrivals and navigation in one place. Arrivals and plans are live, so it needs the connection.'
-      ]],
-      ['tabs', 'The tabs', [
-        'Map: as in Apple Maps, a card at the foot you pull up or down. In it: search, Favorites (home, work…; tap one to plan the way there), For you (a trip it’s time to leave for), Recents and Nearby (the YouBike stations near you). On the map: YouBike stations, every bus stop, and railway, high-speed rail and metro stations; tap any for its buses, trains or bikes. Find a place (a chain’s branches nearest you first) or tap one on the map, then Route to plan the way there.',
-        'Transit: your saved and pinned trips’ next ways to go (a tap navigates), and your pinned buses, trains and places; every bus says when its next one comes (the timetable’s next when none is on its way).',
-        'Times: railway and high-speed rail station to station (changing wherever it’s faster), with fares and today’s delays; buses by number or stop name, each route with its next bus at its stop nearest you, opening to every stop’s buses now or any day’s timetable. ☆ pins any of them.',
-        'Me: places, trips (at a time, on set weekdays; the way back comes by itself), pinned buses and trains (in groups), how you like to travel (what not to take, swapping YouBike every 30 minutes, TPASS, whether walks and rides go to Google Maps or Apple Maps), and each city’s metro map.'
       ]],
       ['plan', 'Planning a trip', [
         'Start from where you are, a pinned place, a search or a spot on the map, leaving or arriving by a time. Every plan is timed by the buses’ real arrivals: the bus you’d really catch, the rest moved with it, a train you’d now miss marked.',
@@ -602,7 +503,61 @@ export const HELP = {
         'Bus alert (🔔): “tell me when the 5608 is 5 minutes from my stop”, even with the phone locked.',
         'Navigating: time to leave, your bus nearly here, your train about to leave, your stop next, all on the lock screen. Both kinds have their own switch in the Orbit Pass’s notifications.'
       ]],
-      ['money', 'Money', ['Orbit Transit is free; fares are a guide.']]
+      ['money', 'Money', [
+        'Orbit Transit is free; fares are a guide.'
+      ]]
+    ]
+  },
+  law: {
+    zh: [
+      ['what', 'Orbit Law 是什麼', [
+        '台灣的法律，三面連在一起：法規（每個條號都能點）、法院怎麼判（憲法法庭和最高法院）、立法院正在改什麼。資料每天從官方更新，打開過的沒網路也能看。不是法律意見；重要的事請問律師或主管機關。'
+      ]],
+      ['ask', '問法律', [
+        '用白話問，例如「房東不還押金怎麼辦」。AI 先從法規、裁判和函釋裡找出相關的條文，只用找到的回答：先給結論，每一點都附出處，點出處直接看原文。可以接著問。',
+        '你的城市（問法律裡選）會帶進地方自治法規。每人每天 30 次。'
+      ]],
+      ['read', '讀法規', [
+        '一條條讀，目錄跳到章節；條文裡的「第幾條」「前項」「某某法第幾條」都是連結。每條的「白話解釋」用平常的話說它在講什麼。⋯ 裡有沿革（每次修了什麼）、施行日期、英文版和相關的判決。',
+        '修過的條文會標出來，點開看修法前後對照。'
+      ]],
+      ['rulings', '裁判', [
+        '憲法法庭的每號釋字和憲判字、最高法院和最高行政法院的判決，依法條連到它。每份裁判有 AI 說明：判了什麼、為什麼、影響誰，每一點都附段落。'
+      ]],
+      ['bills', '立法', [
+        '法案一案一頁：走到哪一階段、誰提的、條文對照表（改了哪裡）、表決紀錄和各黨怎麼投。還有行政院的預告、立委（依縣市或政黨）、議程和立法院正在直播的。'
+      ]],
+      ['mine', '我的', [
+        '收藏的法規、追蹤的法案和立委，有新的修法或進度會標出數字。'
+      ]],
+      ['money', '錢怎麼算', [
+        'Orbit Law 不用錢。'
+      ]]
+    ],
+    en: [
+      ['what', 'What Orbit Law is', [
+        'Taiwan’s law on three linked sides: the laws (every article a link), how the courts ruled (the Constitutional Court and the top courts), and what 立法院 is changing. Updated daily from the official sources; what you’ve opened reads offline. Not legal advice: for anything that matters, ask a lawyer or the agency.'
+      ]],
+      ['ask', 'Ask the law', [
+        'Ask in plain words, say “my landlord won’t return the deposit”. The AI finds the articles, rulings and agency letters that apply and answers from them only: the verdict first, every point cited, a tap on a citation shows the text. Ask on from there.',
+        'Your city (chosen in Ask) brings in its own local rules. 30 questions a day.'
+      ]],
+      ['read', 'Reading a law', [
+        'Read it article by article, contents to jump; “Article 5”, “the preceding paragraph” and another law’s article are all links. Explain says what an article means in everyday words. ⋯ has its history (what each amendment changed), when it took effect, the English version and the rulings on it.',
+        'Amended articles are marked; tap for before and after.'
+      ]],
+      ['rulings', 'Rulings', [
+        'The Constitutional Court’s every interpretation and judgment, and the Supreme Court’s and Supreme Administrative Court’s rulings, linked from the articles. Each has an AI note: what was decided, why and whom it affects, every point citing its paragraphs.'
+      ]],
+      ['bills', 'Bills', [
+        'A page a bill: its stage, who proposed it, the comparison table (what changes), the votes and how each party voted. Also the Executive Yuan’s draft notices, legislators by county or party, the agenda and what 立法院 streams now.'
+      ]],
+      ['mine', 'Mine', [
+        'Starred laws, followed bills and legislators, with a count when something new happens.'
+      ]],
+      ['money', 'Money', [
+        'Orbit Law is free.'
+      ]]
     ]
   }
 };
@@ -613,3 +568,230 @@ export const HELP_ORDER = ['pass', ...APP_ORDER.filter(a => a in HELP)];
 export function helpFor(app, lang = 'zh') {
   return HELP[app]?.[lang === 'en' ? 'en' : 'zh'] || [];
 }
+
+
+// ---- The tour ----------------------------------------------------------------------------
+// Each app's screens, in its tab bar's order (and the few screens worth
+// knowing beside them), each with its real screenshot (kit/img/help/<app>/
+// <stop>.<lang>.<theme>.webp, retaken by tools/help-shots.mjs; their hashes
+// in SHOTS at the end of this file) and a line or two on what it's for.
+//   TOURS[app][lang] = [[stop id, title, [lines]], …]
+
+export const TOURS = {
+  pass: {
+    zh: [
+      ['pass', 'Pass', ['你的卡片（頭像、里程碑、帳號），點它換外觀；下面是這個 App 的設定、新增裝置、通知、除錯紀錄和帳戶安全。']],
+      ['looks', '外觀', ['里程碑，和免費的頭像、頭像框。最上面是最接近的下一枚。']],
+      ['apps', 'App', ['每個 Orbit App，上次什麼時候用，一點就打開。']]
+    ],
+    en: [
+      ['pass', 'Pass', ['Your card (avatar, milestones, account); tap it for your look. Below: this app’s settings, adding a device, notifications, the debug log and security.']],
+      ['looks', 'Looks', ['Milestones, and the free avatars and frames. On top, the nearest next medal.']],
+      ['apps', 'Apps', ['Every Orbit app, when you last used it, a tap to open it.']]
+    ]
+  },
+  match: {
+    zh: [
+      ['home', '首頁', ['今天看什麼：正在進行的比賽在最上面，接著是依你的喜好排好、時間不撞的推薦，和你的球隊。', '上方選一天，或只看我的比賽、某個運動。']],
+      ['matches', '賽事', ['依運動和聯賽找比賽，打開就在離現在最近的比賽日；賽程、排名、季後賽。', '最上面搜尋聯賽、球隊和球員；點任何一場看比賽頁。']],
+      ['live', '轉播', ['什麼時候、在哪一台：下一場轉播、你追蹤的接下來 7 天，和愛爾達節目表。', '正在轉播的點「觀看」直接打開。']],
+      ['following', '追蹤', ['你的球隊和選手現在怎麼樣：排名、近況、上一場和下一場。']]
+    ],
+    en: [
+      ['home', 'Home', ['What to watch today: games on now first, then picks ordered by your taste that never clash, and your teams.', 'Pick a day on top, or just your games or one sport.']],
+      ['matches', 'Matches', ['Games by sport and league, opening on the nearest match day; schedules, tables and playoffs.', 'Search leagues, teams and players at the top; tap any game for its page.']],
+      ['live', 'TV', ['When and on which channel: the next broadcast, the next 7 days of what you follow, and ELTA’s full guide.', 'Tap Watch on a game on air to open it.']],
+      ['following', 'Following', ['How your teams and drivers are doing: standing, form, the last game and the next.']]
+    ]
+  },
+  transit: {
+    zh: [
+      ['map', '地圖', ['YouBike、公車站和台鐵、高鐵、捷運站都在地圖上，點一個看它的車或剩幾台。', '下面的卡片往上拉：搜尋、常用和附近。']],
+      ['go', '交通', ['要去哪裡？我的路線（行程、釘選的公車和火車）下一班什麼時候到，和附近的公車。點一條就出發。']],
+      ['times', '查時刻', ['火車站到站的每一班（自動找最快的轉乘）、票價和誤點；公車用號碼或站名找，看每一站現在的車；還有捷運。']],
+      ['me', '我的', ['行程、地點、釘選的公車和火車，TPASS 和交通方式的偏好。']]
+    ],
+    en: [
+      ['map', 'Map', ['YouBike docks, bus stops and every rail and metro station on the map; tap one for its next rides or bikes left.', 'Pull up the card below for search, favourites and what’s near.']],
+      ['go', 'Transit', ['Where to? When the next ride comes on your routes (trips, pinned buses and trains), and the buses near you. Tap one to go.']],
+      ['times', 'Times', ['Every train between two stations (the fastest change found for you), fares and delays; any bus by number or stop, with each stop’s buses now; and the metro.']],
+      ['me', 'Me', ['Trips, places, pinned buses and trains, TPASS and how you like to travel.']]
+    ]
+  },
+  weather: {
+    zh: [
+      ['now', '天氣', ['一個地點一頁：現在的天氣、你的行程每一站到時幾度、每小時，和今日數據（降雨、紫外線、空氣）。', '點標題換地點。']],
+      ['day', '一天', ['點最上面的天氣，或 10 天預報的任一天：那天的逐時溫度、降雨和建議（帶傘、穿著、曬衣）。上方換一天。']],
+      ['rain', '大圖', ['今日數據點一行看大圖：每小時或每天的降雨、紫外線和空氣，按住圖表滑動看數字。']],
+      ['places', '地點', ['「我的行程」和釘選的地點，每個地方現在幾度；點一個打開它，也能新增或排順序。']]
+    ],
+    en: [
+      ['now', 'Weather', ['One page a place: the weather now, how warm each stop of your day will be, the hours ahead and today’s readings (rain, UV, air).', 'Tap the title to change place.']],
+      ['day', 'A day', ['Tap the weather at the top, or any of the ten days: that day hour by hour, its rain and what to bring or wear. Change day on top.']],
+      ['rain', 'Charts', ['Tap a reading for its chart: rain, UV and air by the hour or the day; hold and slide for the numbers.']],
+      ['places', 'Places', ['My day and your pinned places, each with its weather now; tap one to open it, or add and reorder them.']]
+    ]
+  },
+  orbit: {
+    zh: [
+      ['today', '今天', ['現在這一節（或下一節）和還剩多久，今天的課排成一條線，還有幾節、幾點放學；下面選一天看那天的課，還有倒數活動。']],
+      ['class', '一節課', ['點一節課：老師、每週幾節、下次什麼時候、一週排在哪幾節，和調課；點圖示換一個。']],
+      ['week', '課表', ['整週的課表，單週、雙週切換；點星期幾看那天；下面是之後的調課。']],
+      ['tools', '工具', ['編輯課表、專注飛行、AI 課表編輯（用一句話改）、拍照匯入和分享金鑰。']]
+    ],
+    en: [
+      ['today', 'Today', ['The class on now (or next) and how long is left, the day’s classes on one line; pick a day below for its classes, and your countdowns.']],
+      ['class', 'A class', ['Tap a class: its teacher, how many a week, when it’s next, where it sits in the week, and swapping it; tap its icon to change it.']],
+      ['week', 'Week', ['The whole week, odd or even; tap a day to open it; swaps to come below.']],
+      ['tools', 'Tools', ['Edit the timetable, focus flights, AI edits (one sentence), import from a photo and share keys.']]
+    ]
+  },
+  money: {
+    zh: [
+      ['cal', '月曆', ['這個月花了多少（設了預算就是還能花多少）；每天格子下面是當天的支出，點一天看那天每一筆。']],
+      ['entry', '記一筆', ['右下角的 ＋，每個分頁都有。種類、分類和付款方式依你的習慣先選好，金額點一下就填；也能拍照記帳。']],
+      ['accts', '帳戶', ['現金、銀行、悠遊卡等儲值卡、電子支付和信用卡，各自的餘額和總資產。']],
+      ['stats', '統計', ['週、月、年的支出和收入：每個分類和細項占多少、跟上一期比、最大筆、在哪裡花最多。']],
+      ['more', '更多', ['拍照記帳、分類、智慧帶入（猜中幾成）、到期提醒、固定收支和匯出。']]
+    ],
+    en: [
+      ['cal', 'Calendar', ['What this month cost (with a budget, what’s left to spend); each day’s spending under it, a tap for every entry that day.']],
+      ['entry', 'Add an entry', ['The ＋ at the bottom, on every tab. Kind, category and way to pay are guessed from your habits, the amount a tap away; or log from a photo.']],
+      ['accts', 'Accounts', ['Cash, banks, stored-value cards, e-wallets and credit cards, each balance and your net worth.']],
+      ['stats', 'Stats', ['Spending and income by week, month or year: each category and sub’s share, against the period before, the largest, where you spent most.']],
+      ['more', 'More', ['Photo entries, categories, smart fill (and how often it guesses right), reminders, repeats and export.']]
+    ]
+  },
+  vocab: {
+    zh: [
+      ['today', '今天', ['今天的目標和連續天數，一鍵開始這一輪；下面是今日單字、繼續（新字、該複習、上次錯的）和練習模式。']],
+      ['quiz', '一題', ['選中文、選英文、聽音選字、填空、拼字…答完馬上看對錯和這個字的意思。']],
+      ['review', '複習', ['答錯、該複習、學習中、收藏的字分開列，寫著每個字錯在哪裡；用卡片翻一遍再測驗。']],
+      ['list', '單字', ['全部的字，照級別和狀態篩選，英文或中文都能搜尋；點一個字看它的卡片。']],
+      ['progress', '進度', ['等級和點數、正確率、最近 14 天、接下來要複習多少，和最常忘的字。']]
+    ],
+    en: [
+      ['today', 'Today', ['Today’s goal and streak, one tap to start the round; then the word of the day, what to continue (new, due, missed) and the ways to practise.']],
+      ['quiz', 'A question', ['Pick the meaning, the word, by ear, fill the gap, spell it… each answer shows at once with the word’s meaning.']],
+      ['review', 'Review', ['Missed, due, learning and starred words apart, each with what went wrong; flip through them as cards, then a test.']],
+      ['list', 'Words', ['Every word, by level and state, searched in English or Chinese; tap one for its card.']],
+      ['progress', 'Progress', ['Level and points, accuracy, the last 14 days, what’s due next and the words you forget most.']]
+    ]
+  },
+  beats: {
+    zh: [
+      ['home', '首頁', ['按播放就是 App 自己現做的歌，一首接一首；選心情（放鬆、熱血、律動、經典）或電台、類型。♡ 留下喜歡的。']],
+      ['create', '創作', ['做歌、樂器、即興和節奏遊戲：用自己的片段做歌、在格子上編鼓和旋律、點打擊墊玩即興。']],
+      ['game', '節奏遊戲', ['跟著歌點落下的音符，三種難度。']],
+      ['library', '資料庫', ['留下的歌和收藏的片段，在這支手機上；搜尋、排序、改名、分享和下載。']]
+    ],
+    en: [
+      ['home', 'Home', ['Press play for songs the app makes on the spot, one into the next; pick a mood (calm, hype, groove, classic), a station or a genre. ♡ keeps one.']],
+      ['create', 'Create', ['Songs, Studio, Jam and the rhythm game: songs from your own pieces, drums and melody on a grid, pads to jam on.']],
+      ['game', 'Rhythm game', ['Tap the notes as they fall to the song, at three levels.']],
+      ['library', 'Library', ['Kept songs and clips, on this phone; search, sort, rename, share and download.']]
+    ]
+  },
+  law: {
+    zh: [
+      ['home', '首頁', ['一個欄位：打字搜尋法規，或按「問法律」用白話問。下面是試試這樣問（之後是你最近找過的）、繼續閱讀、立法院今天的議程和直播，和生活情境。']],
+      ['laws', '法規', ['搜尋法規名稱、簡稱、條文或生活問題，或依生活情境、類別一路找下去。']],
+      ['article', '讀法條', ['每條法規可以讀全文、目錄和沿革；條文裡提到的條號都能點，按「白話解釋」看這條在說什麼。']],
+      ['rulings', '裁判', ['憲法法庭和大法官的每一號、最高法院、最高行政法院和各級法院的判決，從法條就連得到；每份都有 AI 說明判了什麼、為什麼。']],
+      ['bills', '立法', ['立法院的法案一階段一階段走到哪裡，還有議程、行政院的預告、表決、立委和總預算。']],
+      ['ask', '問法律', ['旁邊的圓鈕：用白話問，AI 只用找到的條文回答，每一點都附出處可以點開核對。']]
+    ],
+    en: [
+      ['home', 'Home', ['One field: type to search the laws, or Ask the law in plain words. Below: questions to try (later, your recent finds), where you were reading, 立法院’s agenda and streams today, and life situations.']],
+      ['laws', 'Laws', ['Search law names, short names, text or an everyday problem, or browse by life situation and kind.']],
+      ['article', 'Reading a law', ['Each law with its text, contents and history; every article it names is a link, and Explain says what one means.']],
+      ['rulings', 'Rulings', ['Every Constitutional Court judgment and interpretation, and rulings of the top and lower courts, linked from the articles; an AI note on each says what was decided and why.']],
+      ['bills', 'Bills', ['Bills in 立法院 stage by stage, plus the agenda, draft notices, votes, legislators and the budget.']],
+      ['ask', 'Ask the law', ['The round button beside the tabs: ask in plain words; the AI answers only from the articles it found, each point cited for you to check.']]
+    ]
+  },
+  stock: {
+    zh: [
+      ['home', '首頁', ['總資產和今天的漲跌，你持有和自選的，各市場今天怎麼走、漲跌幅排行和為你推薦。']],
+      ['markets', '市場', ['搜尋（中文、英文或代號），和每種商品的完整清單：台股、期權、複委託、基金、債券、外匯、黃金、加密。']],
+      ['stock', '標的頁', ['點任何一檔：走勢（線圖或 K 線）、公司資料、你的部位，和買進、賣出。']],
+      ['portfolio', '資產', ['淨值與走勢、配置、持股、各幣別現金、股利利息、定期定額和到價提醒。']],
+      ['fx', '資金', ['換匯、匯率看板、融資、信用帳戶、定存、借券；下面是你的帳戶：薪水、紓困、財富等級和「真相」。']],
+      ['history', '紀錄', ['交易明細、委託、統計分析（報酬、費用與稅、和只買大盤比）和回測。']]
+    ],
+    en: [
+      ['home', 'Home', ['Your total and today’s change, what you hold and watch, how each market moves today, the top movers and picks for you.']],
+      ['markets', 'Markets', ['Search (Chinese, English or ticker) and every product’s whole list: Taiwan, futures and options, overseas, funds, bonds, forex, gold, crypto.']],
+      ['stock', 'A symbol', ['Tap any one: its chart (line or candles), the company, your position, and buy or sell.']],
+      ['portfolio', 'Portfolio', ['Net worth and its history, allocation, holdings, cash in each currency, income, monthly plans and price alerts.']],
+      ['fx', 'Money', ['Exchange, the rates board, margin, the credit account, time deposits, lending shares; then your account: pay, relief, wealth levels and Truth.']],
+      ['history', 'History', ['Activity, orders, stats (returns, costs and taxes, you against just buying the index) and the backtest.']]
+    ]
+  }
+};
+
+// The Pass's own line under its name (the apps' are brand.mjs `role`).
+export const ROLE = { pass: { zh: '你在每個 Orbit App 的帳號', en: 'Your account in every Orbit app' } };
+
+export function tourFor(app, lang = 'zh') {
+  return TOURS[app]?.[lang === 'en' ? 'en' : 'zh'] || [];
+}
+
+// A stop's pictures, light and dark, in the page's language: null until it has them.
+export function shotFor(app, stop, lang = 'zh') {
+  const v = SHOTS[`${app}/${stop}`];
+  if (!v) return null;
+  const at = theme => `${new URL(`./img/help/${app}/${stop}.${lang === 'en' ? 'en' : 'zh'}.${theme}.webp`, import.meta.url).href}?v=${v}`;
+  return { light: at('light'), dark: at('dark'), w: SHOT_SIZE[0], h: SHOT_SIZE[1] };
+}
+
+// ---- The screenshots' hashes (tools/help-shots.mjs writes this block) ----
+export const SHOTS = {
+  'beats/create': '2e29af311b2a',
+  'beats/game': '7a02df73226c',
+  'beats/home': '9e140475069a',
+  'beats/library': 'd13fe7f06147',
+  'law/article': '000b99922e7a',
+  'law/ask': 'bb6bd5f66ea4',
+  'law/bills': 'f21a4a6b73a8',
+  'law/home': 'c8ea77f7948d',
+  'law/laws': 'f9cefbe2ca04',
+  'law/rulings': '888fa6d42e3b',
+  'match/following': '3f4490323f1f',
+  'match/home': 'a3bb807ad109',
+  'match/live': '64f251e36a54',
+  'match/matches': '67f7c7234ec4',
+  'money/accts': 'eb23ed669fb4',
+  'money/cal': 'a8798e22de0f',
+  'money/entry': 'c91ab3f312cb',
+  'money/more': 'b7c931d52a90',
+  'money/stats': 'a6d79de4c261',
+  'orbit/class': '8c36dfab2a2b',
+  'orbit/today': '5e0326e27c3a',
+  'orbit/tools': 'cd40a0acbf6f',
+  'orbit/week': 'f17210244aa9',
+  'pass/apps': 'aa274781dad2',
+  'pass/looks': '49bdec837836',
+  'pass/pass': '8dccbe01f0a6',
+  'stock/fx': '02d2d597613b',
+  'stock/history': '00911d0a263b',
+  'stock/home': '811fd4eab5b7',
+  'stock/markets': 'eebb71bfe4b7',
+  'stock/portfolio': '1f41aa39a084',
+  'stock/stock': 'f66b46d16b7d',
+  'transit/go': 'a2bb4ec6e20c',
+  'transit/map': '737d6ba5e545',
+  'transit/me': 'cd2814122f71',
+  'transit/times': 'd694d4380e52',
+  'vocab/list': '8c1166206293',
+  'vocab/progress': '3b9a17d2d189',
+  'vocab/quiz': '4778b66f0d75',
+  'vocab/review': '21b488f48b34',
+  'vocab/today': 'fe9416b181c2',
+  'weather/day': '25e92bca5ec0',
+  'weather/now': 'efabbf876863',
+  'weather/places': '49901ce80708',
+  'weather/rain': 'a7b1867ac32d'
+};
+export const SHOT_SIZE = [480, 578];
+// ---- end of the screenshots' hashes ----
