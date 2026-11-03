@@ -39,6 +39,8 @@ export const PAGES = {
     // 首頁 on the next day (its games to come, the lead one on top).
     'home-next': { args: click(wait(3000), "js:(()=>{const d=[...document.querySelectorAll('.q-chip.day')].filter(e=>e.offsetParent);d[d.findIndex(e=>e.classList.contains('is-today'))+1]?.click()})()", wait(7000)) },
     // 首頁 past ELTA's list (11/22: Newcastle v Arsenal, the Lakers): the guessed channel, said 預估 (with --account fan).
+    // 賽事 on Thursday 11/5, NBA: a followed club's game (Lakers at Kings) marked ★ 追蹤 and softly lit in the list.
+    'matches-mine': { args: click('#tab-matches', '[data-league=nba]', wait(2500), "js:document.querySelector('.q-day-bar [data-day=\"2026-11-05\"]')?.click()", wait(6000), "js:document.querySelector('.event-row.mine')?.scrollIntoView({block:'center'})", wait(1500)) },
     'home-far': { args: click(wait(3000), "js:document.querySelector('.q-day-bar [data-day=\"2026-11-22\"]')?.click()", wait(9000)) },
     // That game's page: 台灣轉播 with the guess (依愛爾達往例預估), scrolled to it.
     'game-far': { args: click("js:import('./lib/espn.mjs').then(async E=>{const l=await E.scoreboard('epl',['20261121']);const e=l.find(x=>/Arsenal/.test(x.away?.en||x.away?.name||''))||l.at(-1);(await import('./sheets.js')).openMatch(e)})", wait(10000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/台灣轉播|Watch in Taiwan/.test(c.textContent))?.scrollIntoView({block:'center'})", wait(1500)) },
