@@ -166,6 +166,14 @@ export const PAGES = {
   },
   money: {
     default: ['tabs'],
+    // 統計's card on each scale (日 週 月 年), a past month picked from its bars, the period's menu, 自訂期間.
+    stats: { hash: 'stats', args: click(wait(800)) },
+    'stats-day': { hash: 'stats', args: click(wait(800), "js:document.querySelectorAll('.mn-range button')[0].click()", wait(800)) },
+    'stats-week': { hash: 'stats', args: click(wait(800), "js:document.querySelectorAll('.mn-range button')[1].click()", wait(800)) },
+    'stats-year': { hash: 'stats', args: click(wait(800), "js:document.querySelectorAll('.mn-range button')[3].click()", wait(800)) },
+    'stats-picked': { hash: 'stats', args: click(wait(800), "js:[...document.querySelectorAll('.mn-pbar')].at(-3)?.click()", wait(800)) },
+    'stats-menu': { hash: 'stats', args: click(wait(800), "js:document.querySelector('.mn-hero-pick').click()", wait(600)) },
+    'stats-custom': { hash: 'stats', args: click(wait(800), "js:document.querySelector('.mn-hero-pick').click()", wait(500), "js:[...document.querySelectorAll('.q-menu button')].pop().click()", wait(1200)) },
     // 記一筆 on 數位, its subs and the + for one's own.
     'entry-digital': { args: click('[aria-label="記一筆"],[aria-label="Add an entry"]', wait(1500), tap('數位|Digital'), wait(800)) },
     // 記一筆 on 轉帳: from, to, the amount, a fee, the day, a note.
