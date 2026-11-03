@@ -130,7 +130,7 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs` is qrcode-generator 2.0.4 (MIT), vendored as is |
 | `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's date), `addDays` |
-| `feedback.mjs` | What a recommendation list showed and what was opened from it (`shown`, `picked`, `lift`, `lifter`, `hitRate`), for every app's picks; `affinity` (orbit.mjs) hears what people do |
+| `feedback.mjs` | One engine for every app's picks: `shown`, `picked`, `passed`, `did` → a weight per key (30-day half-life); `scorer`, `lifter`, `whyOf` (常看), `hitRate`; on the Pass: `fb:<app>` |
 | `holidays.mjs`, `dayoff.mjs` | Taiwan's days off; typhoon days off (停班停課) by the place that decides them for each app |
 | `catalog.mjs`, `logos.mjs`, `names.mjs`, `photos.mjs`, `photo-urls.mjs` | Every sport and league once; logos (ESPN, TheSportsDB, flags, F1); teams in Chinese; studio headshots; photos' addresses alone |
 | `f1live.mjs`, `postseason.mjs`, `sports-espn.mjs`, `sports-broadcast.mjs`, `sports-highlights.mjs`, `sports-winprob.mjs` | F1's own timing read one way everywhere; MLB's postseason; ESPN's scoreboards as events (one parser for the proxy and the phone); where to watch in Taiwan (past ELTA's list, `eltaGuess`: its usual line-up, said 預估); highlights; win probability (also run by the builders) |
@@ -170,7 +170,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | Every screen | `screenFit()` / `onScreen(fn)` mark `html.q-tabrail`, `q-float`, `q-wide`, `q-w3`; `--q-page-max`, `--q-vw`; `.q-cols`; `.q-flow` + `flowColumns(root)` for columns of even height (DESIGN §10) |
 | Pull to refresh, taps | `pullToRefresh`; `haptic()` / `tick()`; `PRESS_DELAY` / `pressSelector` |
 | Offline | `onlineOnly` (live apps: Securities, Transit, Sports), `keepOffline` (the rest open on what they kept), `netState` / `netVerdict` |
-| Picks for you | `rank` with `affinity` and `feedback.mjs`'s lift |
+| Picks for you | `rank` + `feedback.mjs` (`lifter`, `shown`, `picked`, `did`, `keep`); measured: `tools/picks-backtest.mjs` |
 | Language | `W`, `makeT`, `place` (lang.mjs): every page in one language |
 | Notices | `schedulePush([{ at, title, body, tag, kind, check }])`, `NOTICE_KINDS`, `notifyOn`, `enablePush` |
 | A bug report | `rec(kind, data)` into the 除錯紀錄 Jay copies from the Pass sheet |
@@ -486,8 +486,8 @@ can be turned off on its own.
 
 The rest (leagues, Securities' lists, ESPN's shapes, passes, accent colours): `tools/README.md`.
 
-`npm test` covers the Pass, money, push, the data proxy, F1, transit, weather,
-the builders, the guard, the kit, and this map (`tests/claude-map.test.mjs`).
+`npm test` covers every Worker route, the builders, the guard, the kit, and
+this map (`tests/claude-map.test.mjs`).
 
 ## 12. If you change…
 
