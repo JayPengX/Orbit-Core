@@ -10,7 +10,7 @@ Read with the two docs it doesn't repeat:
 - [`DESIGN.md`](DESIGN.md): how a screen looks (focus, type, colour, space, chips, maps).
 
 When a line here and a team memory file differ, this file is the rule and the memory file has the
-history and the code details. Each repo's `MAP.md` keeps that app's internal decisions. A rule Jay
+history and the code details. Orbit-Core's `CLAUDE.md` is the family's map (read first); each app repo's `MAP.md` keeps that app's internal decisions. A rule Jay
 changes gets edited here in the same push, with the old version moved to "Replaced" at the bottom.
 
 Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
@@ -20,7 +20,8 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-18 Fully automatic: build fixes and features without approval, then report in plain words.
 - 10-18 Never idle: never wait on another lane, a check or a merge; start the next independent item.
 - 10-18 Only what the task needs in context; helpers get only the files and checks they need and return short reports.
-- 10-19 Helper tiers: Light haiku/low, Mid sonnet/medium, Mid+ sonnet/high, Strong opus/medium (design choices only); always set model and effort; do small jobs yourself (plans/roadmap/model-rules.md).
+- 11-03 Every session reads Orbit-Core's `CLAUDE.md` first (the family's map: the kit, the Workers and their APIs, data and sync, the component patterns) and updates it in the same push after any major feature or architecture change (Jay: "After finishing ANY major feature branch or architecture change, you must immediately create or update a CLAUDE.md… Every time a new session starts, you must read this file first… ensure no redundant code is created"). Each app repo's `CLAUDE.md` points there; an app's own structure goes in its `MAP.md`. `tests/claude-map.test.mjs` fails on your machine when a kit file, Worker file, route, binding, D1 table, builder or workflow isn't named (on GitHub it only warns); `node tools/kit-find.mjs <word>` finds what the kit has before anything is written.
+- 11-03 The right model and effort for each task (Jay: "the most important thing is using the right model and effort for specific task, because we've done rounds of this kind of big things but often it fell short and regress and create new problems… carefully step up the model and effort when it matter"): the strongest model at high effort or more for design, architecture, the kit, anything across apps and anything that regressed before; lighter tiers only for mechanical work (renames, test runs, doc edits); always set model and effort; do small jobs yourself.
 - 10-19 Concrete work only: no general polish sweeps; walk the screens you changed.
 - 10-19 No separate test step and no Mac test gate: check your own cloud screenshots, push to `main`, Jay tests on his phone.
 - 10-21 "Don't ask me, just push, I allow anything" (repeated 10-22): never post push cards, kit pushes included.
@@ -46,6 +47,8 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-20 One quality, one family: every app works and feels the same.
 - 10-20 The loading screen lifts once, onto finished content, and still fast; nothing pops in after.
 - 11-01 Smooth and fast in everything, not just opening ("better means literally everything"): a tap answers in the same frame (a tab is chosen as the finger lands, the page follows); a sheet opens at once on what's known, never after a download, with shimmering places the size of what comes; nothing jumps when data lands.
+- 11-03 Instant everywhere (Jay: "Ensure the app switches and navigates instantly. Users must experience zero latency and notice absolutely no friction or white-screen lag. Implement robust edge caching (such as Stale-While-Revalidate), optimistic UI updates, and smart pre-fetching for our APIs (Transit, Weather, Sports) via Cloudflare Workers"): a screen paints at once on what the phone or the edge has and refreshes behind it (stale-while-revalidate, never for a live number shown as live); a tap shows its result at once and settles when the server answers (undone, with a word, if it fails); what the person will open next is read ahead while the phone is idle, from the edge's cache, never a paid call. Replaces TRUTH §5's "nothing is prefetched that nobody opens". The phased plan: project files `plans/overhaul-2026-11-03/`.
+- 11-03 Apps stay thin (Jay: "Centralize all shared utilities, global style tokens, data persistence logic, and account synchronization strictly within our Core Shared Hub and its Kits. Individual micro-apps must remain lightweight consumer modules that extend from the Core"): device storage, Pass sync, patching a screen in place and every piece two apps use live in the kit; an app keeps only what is truly its own (extends 10-27).
 - 10-20 Real logos and headshots, never letter tiles; pictures for everything that has one.
 - 10-20 Balanced cards at any count (never a lone half card); long names never wrap badly.
 - 10-20 First-tap bugs count as bugs: a button never needs two taps.
@@ -85,7 +88,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 ## 3. Design
 
 - 11-01 The tab rail (a phone on its side, a computer) is slim, as iPad's: 60 wide (was 76), smaller icons, the pick a capsule hugging its tab (Jay: the first rail read bulky, its pick a big blob).
-- 10-28 The look is final as it is now: Jay saw 7 whole-app looks (Paper, Poster, Aurora, Ledger, Tint, Clay, Spotlight) and chose no change, since today's look is the best in dark. No redesign or restyle rounds unless Jay asks for one; fixes keep today's look.
+- 11-03 A premium redesign is on (Jay: "Our current UI looks ugly and generic… Elevate the visual design to a premium, commercial-grade level. Introduce clean layout primitives, perfect typography scales, fluid micro-interactions, skeleton loaders, and organic animations. It must feel like a top-tier native app, not an AI template"). It lifts 10-28's "the look is final". Directions are shown to Jay as real screenshots of the apps first and he picks; the pick is built in the kit (tokens and components, not app by app), keeps the dark-first strength of today's look, and starts after the bug threads of 11-03 have landed. Until then, fixes keep today's look.
 - 10-27 `DESIGN.md` is the standard ("looks AI-made"): one focal point per screen, weight 700 only for the focal number and large titles, accent as a pointer (about 4 uses), chips only for taps or exceptions, one radius, 4-point spacing, backgrounds kept (see below). Fix with design principles, never by copying another app; change the kit, not every screen.
 - 10-27 Keep backgrounds: hero and focus cards on the app's colour (lit, soft shadow), class/sport/subject cards and icon tiles in their colours. Clean the content (one focus, fewer chips, quieter weights and accents), never by stripping colour (Jay: "the cleaner approach is right, but stripping out background is shitty").
 - 10-27 Tight spacing: 24 between sections, 16 between groups of one list and after the focus, 8 under a line that names what follows; no gap bigger than what it separates (Jay: "so much gap for IDK what").
@@ -230,6 +233,9 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 
 | Old rule | Replaced by | When |
 |---|---|---|
+| The look is final: no redesign or restyle rounds (10-28, after 7 looks) | A premium redesign: directions shown as screenshots, Jay picks, built in the kit | 11-03 |
+| Read on demand: nothing prefetched that nobody opens (TRUTH §5) | Instant everywhere: stale-while-revalidate, optimistic taps, the next screen read ahead from the edge | 11-03 |
+| Helper tiers: Light haiku/low, Mid sonnet/medium, Mid+ sonnet/high, Strong opus/medium for design choices only (10-19) | The right model and effort per task, stepped up where it matters | 11-03 |
 | 餐飲 with one 三餐 sub (breakfast, lunch, dinner and late night together) (Money) | 早餐, 午餐, 晚餐 apart again; 宵夜 counts as 晚餐 | 11-01 |
 | Category sets for kinds of people (學生, 上班族, 家庭, 全部), asked before the first 記一筆 (Money) | One broad set of twelve for everyone | 11-01 |
 | Apps and the kit on GitHub Pages, read through by the `orbit-site` Worker | Each repo publishes to Cloudflare itself (`deploy/cf-site.mjs`); Pages off | 11-01 |
@@ -267,4 +273,3 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 ## 7. Contradictions to watch
 
 - New kit exports: `TRUTH.md` says use them with a `kit.x?.()` fallback, while the 10-20 cleanup made existing fallbacks direct. Both hold: a new export gets the fallback; once every phone has the kit it can go direct.
-- Helper tiers: the 10-18 kit roadmap said Strong = opus/high; the 10-19 rule sheet says opus/medium. The newer one (medium) holds.

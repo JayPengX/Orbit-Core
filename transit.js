@@ -33,7 +33,7 @@
 // The caps are this Worker's own count (KV, flushed in batches so KV's
 // million writes a month aren't spent on counting): the hard stop is
 // Google Cloud's per-day quotas, which the owner sets on each API (the
-// MAP.md, §3.3).
+// CLAUDE.md, §4).
 
 import { SHOWCASE_ORIGINS } from './showcase.js';
 import { cleanDev } from './kit/devconfig.mjs';
