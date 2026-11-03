@@ -52,6 +52,7 @@ export const roundOff = e => Boolean(e?.round?.key && broadcastsOf(e.league)[0]?
 // channel named), NBA.com (its ELTA games, the channel not yet), else when
 // the list was checked. A league ELTA carries whole (F1) is no NBA.com game.
 export function twSource(exact, en) {
+  if (exact.some(b => b.guess)) return en ? "ELTA's usual line-up" : '依愛爾達往例預估';
   if (exact.some(b => b.ch)) return en ? "ELTA's schedule" : '愛爾達節目表';
   // (MLB's postseason, its channel to come: ELTA has the whole of it, not NBA.com's word.)
   if (exact.some(b => b.tba)) return en ? 'MLB postseason' : 'MLB 季後賽';
@@ -314,6 +315,102 @@ export function nbaEltaGame(games, e, ids) {
   return same.sort((a, b) => Math.abs(a.start - t) - Math.abs(b.start - t))[0] || null;
 }
 
+// ---- Past ELTA's list: a guess from its own pattern ---------------------------------------
+//
+// ELTA's list runs about two weeks ahead, and a league's games go in only
+// as it gets to them. Past that (Jay, 2026-11-03: "ELTA air every Premier
+// League game… we can still reliably guess it because it usually the same
+// pattern"), a game of a league ELTA has whole (`ALL`: every game of it in
+// its lists of 9/27–11/18 2026, 157 of 157) is taken as on ELTA, and an NBA game
+// NBA.com gives ELTA too. A league ELTA has in part (Ligue 1 five games in
+// nine, the Europa League, Scotland, the Nations League) stays unknown: its
+// list holds two rounds, too few to tell its picks. The channel comes from
+// the list itself: how ELTA lays the league out at that weekday and hour on
+// the league's own clock (a 體育台 or a MAX channel, which one), named only
+// where that's plain (the game alone in its league then, on a channel that
+// had the league at that slot three times in four), else only 愛爾達 (which
+// of a Saturday's five gets 愛爾達1台 is ELTA's pick, week by week). Every
+// guess says so (`guess`) and gives way to ELTA's own word once its list
+// has the day. Measured (Orbit-Sports scripts/tv-guess.mjs: 10/1's list
+// guessing 10/17–10/23, 10/8's guessing 10/31–11/18): all 110 games of the
+// four leagues taken as on, none wrongly; a channel named for 42, 36 right
+// (the NBA's 23 of 23, football's 13 of 19).
+const ALL = new Set(['epl', 'seriea', 'bundesliga', 'ucl']);
+const MAIN_TV = new Set([101, 105, 110, 115]);
+const MAX_TV = ch => ch >= 540 && ch <= 549;
+// A game's weekday and minute of the day on its league's own clock (London's
+// for European football, New York's for the NBA and MLB, Taiwan's for CPBL):
+// ELTA's slots follow the kick-offs, which follow their own summer time
+// (12:30 in England was 19:20 in Taiwan to 10/25, 20:20 after).
+const ZONE = { nba: 'America/New_York', mlb: 'America/New_York', cpbl: 'Asia/Taipei' };
+const clocks = new Map();
+const clockCache = new Map();
+function leagueClock(ms, league = '') {
+  const zone = ZONE[league] || 'Europe/London';
+  const key = `${zone}|${ms}`;
+  const had = clockCache.get(key);
+  if (had) return had;
+  let f = clocks.get(zone);
+  if (!f) clocks.set(zone, (f = new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'short', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' })));
+  const parts = Object.fromEntries(f.formatToParts(new Date(ms)).map(x => [x.type, x.value]));
+  const out = { wd: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts.weekday), min: Number(parts.hour) * 60 + Number(parts.minute) };
+  if (clockCache.size > 5000) clockCache.clear();
+  clockCache.set(key, out);
+  return out;
+}
+// A league's programs at the game's weekday and hour (half an hour either
+// way, a game itself on a streamed channel), else at that hour on any day,
+// else all of them: the first seen at two times at least.
+function slotRows(programs, t, league) {
+  const rows = programs.filter(p => p.league === league && p.ch < 980 && !ALT_VIEW.has(p.audio));
+  const at = leagueClock(t, league);
+  const near = p => Math.abs(leagueClock(p.start, league).min - at.min) <= 30;
+  const tries = [rows.filter(p => near(p) && leagueClock(p.start, league).wd === at.wd), rows.filter(near), rows];
+  return tries.find(r => new Set(r.map(p => Math.round(p.start / 600_000))).size >= 2) || tries.find(r => r.length) || [];
+}
+const mostUsed = list => {
+  const n = new Map();
+  for (const x of list) n.set(x, (n.get(x) || 0) + 1);
+  return [...n].sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), 'en', { numeric: true })).map(([x]) => x);
+};
+// Each time then (to ten minutes) and the channels it had.
+function slotTimes(rows) {
+  const times = new Map();
+  for (const p of rows) {
+    const key = Math.round(p.start / 600_000);
+    times.set(key, (times.get(key) || new Set()).add(p.ch));
+  }
+  return [...times.values()];
+}
+const ELTA_LEAGUES = new Set(Object.keys(BROADCAST).filter(k => BROADCAST[k][0]?.svc === 'elta'));
+// Taken as on ELTA past its list: every game of a league it has whole.
+const takenOn = league => ALL.has(league);
+// The guess for a game ELTA's list doesn't say yet: { ch, audio, adFree }
+// (ch null: on ELTA, its channel not said), or null (not taken as on ELTA).
+// `on`: known to be on, only its channel to guess (an NBA game NBA.com gives
+// ELTA). `others`: the games known.
+export function eltaGuess(e, programs, { others = [], on = false } = {}) {
+  if (!e || e.kind !== 'match' || !programs?.length || e.status?.state === 'post' || e.status?.void) return null;
+  if (!ELTA_LEAGUES.has(e.league) || roundOff(e)) return null;
+  if (!on && !takenOn(e.league)) return null;
+  const t = Date.parse(e.start);
+  const none = { ch: null, audio: null, adFree: false };
+  // Another game of its league then (within 45 minutes): which of them gets
+  // which channel isn't plain. (An NBA game NBA.com gives ELTA is alone on it.)
+  if (!on && others.some(o => o !== e && o.id !== e.id && o.league === e.league && o.kind === 'match' && !o.status?.void && Math.abs(Date.parse(o.start) - t) < 45 * 60_000)) return none;
+  // Alone: the 體育台 ELTA puts the league on then, if it does most times,
+  // else its MAX channel; named only on one that had the league at that
+  // slot three times in four at least (twice seen at least).
+  const rows = slotRows(programs, t, e.league);
+  const times = slotTimes(rows);
+  const onMain = times.filter(x => [...x].some(c => MAIN_TV.has(c))).length * 2 >= times.length;
+  const ch = (onMain ? mostUsed(rows.filter(p => MAIN_TV.has(p.ch)).map(p => p.ch))[0] : null) ?? mostUsed(rows.filter(p => MAX_TV(p.ch)).map(p => p.ch))[0] ?? null;
+  const used = times.filter(x => x.has(ch)).length;
+  if (ch == null || times.length < 2 || used / times.length < 0.75) return none;
+  const audio = mostUsed(rows.filter(p => p.ch === ch).map(p => p.audio))[0] || eltaAudio('', ch, e.league).audio;
+  return { ch, audio, adFree: MAX_TV(ch) };
+}
+
 // ---- Everything a game is on --------------------------------------------------------------
 //
 // The channels a game is on in Taiwan: ELTA's from its schedule when the
@@ -357,7 +454,10 @@ export function broadcastsFor(e, programs, { sides = [], others = [], prefer = '
   if (e.league === 'nba') {
     const g = nbaEltaGame(nba?.games, e, nba?.ids);
     const near = g && programs?.some(p => p.league === 'nba' && Math.abs(p.start - g.start) <= 30 * 60_000);
-    return g && (!listed || near) ? [{ ...base[0], note: null, at: g.start, exact: true }] : [];
+    if (!g || (listed && !near)) return [];
+    // Past ELTA's list: its channel guessed too (its NBA game is on 愛爾達1台, nearly always).
+    const guess = !listed && eltaGuess(e, programs, { others, on: true });
+    return [guess ? guessed(guess, g.start) : { ...base[0], note: null, at: g.start, exact: true }];
   }
   // Every session on ELTA (F1): this one too, its channel not yet named.
   if (base[0].every && e.kind !== 'match') return [{ ...base[0], exact: true }];
@@ -373,8 +473,14 @@ export function broadcastsFor(e, programs, { sides = [], others = [], prefer = '
     if (!other || blank) return [{ ...base[0], note: CHANNEL_TBA, at: null, exact: true, tba: true }];
   }
   // ELTA's list covers the day and hasn't the game: not on ELTA.
-  return listed ? [] : base;
+  if (listed) return [];
+  // Past it: on ELTA by its pattern, the channel guessed, else not known.
+  const guess = eltaGuess(e, programs, { others });
+  return guess ? [guessed(guess, Date.parse(e.start))] : base;
 }
+// A guessed channel as a broadcast: exact to the game (it's this game's), said to be a guess.
+// (預估 said beside its name by the page, not in it: a name with its note wrapped at 320.)
+const guessed = (g, at) => (g.ch ? { ...eltaChannel(g.ch), at, audio: g.audio, adFree: g.adFree, exact: true, guess: true } : { ...ELTA, note: null, at, exact: true, guess: true });
 
 // ---- ELTA's replays: a finished game, again -----------------------------------------
 //

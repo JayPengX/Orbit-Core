@@ -25,6 +25,10 @@ export const PAGES = {
     'nba-leaders': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('數據|Stats'), wait(5000)) },
     'nba-bracket': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('季後賽|Playoffs'), wait(5000)) },
     'f1-season': { args: click('#tab-matches', '[data-league=f1]', wait(4000)) },
+    // 首頁 past ELTA's list (11/22: Newcastle v Arsenal, the Lakers): the guessed channel, said 預估 (with --account fan).
+    'home-far': { args: click(wait(3000), "js:document.querySelector('.q-day-bar [data-day=\"2026-11-22\"]')?.click()", wait(9000)) },
+    // That game's page: 台灣轉播 with the guess (依愛爾達往例預估), scrolled to it.
+    'game-far': { args: click("js:import('./lib/espn.mjs').then(async E=>{const l=await E.scoreboard('epl',['20261121']);const e=l.find(x=>/Arsenal/.test(x.away?.en||x.away?.name||''))||l.at(-1);(await import('./sheets.js')).openMatch(e)})", wait(10000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/台灣轉播|Watch in Taiwan/.test(c.textContent))?.scrollIntoView({block:'center'})", wait(1500)) },
     // A table scrolled to its tie lines (a tie on a zone's edge and what settled it), if any.
     ...Object.fromEntries(['epl', 'nba', 'seriea', 'ucl', 'mls'].map(l => [`${l}-ties`, { args: click('#tab-matches', `[data-league=${l}]`, wait(2500), tap('排名|Table|Standings'), wait(5000), "js:(()=>{const d=[...document.querySelectorAll('.tie-why')].find(e=>e.offsetParent);if(d){d.open=true;d.scrollIntoView({block:'center'})}})()", wait(800)) }])),
     // A team's page (the Lakers): 概況.
