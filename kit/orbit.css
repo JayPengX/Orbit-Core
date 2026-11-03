@@ -1585,13 +1585,14 @@ dialog.q-sheet.q-full {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+/* A section head's way to all of it (全部 9 ›): quiet grey words, never accent text (RULEBOOK 11-03). */
 .q-section-head a,
 .q-section-head button:not(.q-tag) {
   flex: none;
   border: 0;
   background: none;
-  color: var(--q-accent);
-  font: 400 17px/1 var(--q-font);
+  color: var(--q-text-2);
+  font: 500 15px/1 var(--q-font);
   text-decoration: none;
   cursor: pointer;
 }
@@ -3787,7 +3788,7 @@ div.q-ritem {
   min-height: 44px;
   margin: -12px 0 -12px auto;
   padding: 0 0 0 12px;
-  color: var(--q-blue);
+  color: var(--q-text-2);
   font: 500 15px/1 var(--q-font);
 }
 .q-sh-more svg {
