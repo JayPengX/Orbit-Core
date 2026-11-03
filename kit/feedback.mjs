@@ -14,6 +14,9 @@
 //                                     2.7× as likely to be opened as the usual pick); `sure`: as
 //                                     low as it may well be (a groove heard once by luck isn't one
 //                                     heard ten times), `explore`: a day's draw of what it might be
+//   chance(app, now)                  item → the chance it's taken when shown (0.2 with nothing known,
+//                                     the person's usual for any pick, moved by its keys): for one
+//                                     shown alone, whether to show it at all
 //   whyOf(app, now, { min, evidence }) item → the key it's picked for, when the person's own doing
 //                                     says so strongly enough (a 常看), else null
 //   lifter(app, now, { explore })     item → × on a score (0.4–2.5; the kit's rank() takes it)
@@ -253,6 +256,12 @@ export function whyOf(app, now = Date.now(), { min = 0.6, evidence = 1 } = {}) {
     }
     return best;
   };
+}
+
+export function chance(app, now = Date.now()) {
+  const b = now_(read(app).b, now, BASE)[0];
+  const score = scorer(app, now);
+  return item => round(sig(b + score(item)));
 }
 
 export const lift = (app, item, now = Date.now()) => lifter(app, now)(item);

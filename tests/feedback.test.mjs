@@ -176,3 +176,16 @@ test('keep(q, app): the Pass\'s copy merged as the wallet comes; this phone\'s w
   handlers.wallet({ settings: { 'fb:kq': { value: { k: { 'team:z': [2, 4] }, t: T0 } , t: T0 } } });
   assert.ok(F.scorer('kq', T0 + 5000)({ keys: ['team:z'] }) > 1.5);
 });
+
+test('chance: of a pick shown alone, how likely it is taken (0.2 with nothing known), the person\'s usual moved by its keys', () => {
+  F.useStore(mem());
+  assert.equal(F.chance('ch', T0)({ keys: ['to:home'] }), 0.2);
+  for (let d = 0; d < 10; d++) {
+    F.shown('ch', [{ id: `home:${d}`, keys: ['to:home'] }, { id: `gym:${d}`, keys: ['to:gym'] }], T0 + d * DAY);
+    F.picked('ch', { id: `gym:${d}`, keys: ['to:gym'] }, T0 + d * DAY + 60_000, { from: 'elsewhere' });
+  }
+  const c = F.chance('ch', T0 + 11 * DAY);
+  // (The person's usual rose with every gym: a new place starts there.)
+  assert.ok(c({ keys: ['to:home'] }) < 0.2 && c({ keys: ['to:home'] }) < c({ keys: ['to:new'] }), 'never gone to');
+  assert.ok(c({ keys: ['to:gym'] }) > 0.6, 'gone to each time');
+});
