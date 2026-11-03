@@ -82,6 +82,8 @@ export const PAGES = {
     default: ['tabs'],
     // (Class needs a timetable: --account demo, or -- --store classFocusData=….)
     class: { args: click('#cx-hero', wait(1200)) },
+    // The card's foot (接著 / 下一節) tapped: the class it names, not the card's.
+    next: { args: click('#cx-foot', wait(1200)) },
     editor: { args: click('js:window.openEditor()', wait(1200)) },
     key: { args: click("js:window.openTransferSheet('key')", wait(1200)) },
     photo: { args: click("js:window.openTransferSheet('photo')", wait(1200)) },
