@@ -7,6 +7,9 @@ To remove a feature on purpose, delete its line here in the same commit and say 
 - One tab bar (the floating capsule; a rail on wide screens) — `kit/orbit.mjs`: `export function tabBar`
 - Every screen size: screenFit, wide sheets, columns of even height — `kit/orbit.mjs`, `kit/ui.mjs`: `screenFit`, `q-sheet-wide`, `export function flowColumns`
 - A live update never moves the page — `kit/hold-place.mjs`, `kit/ui.mjs`: `scrollBusy`, `scrollers.push`
+- A tap or swipe keeps its control under the finger; a map's moving cars never pull the page — `kit/hold-place.mjs`: `function keepTap`, `export const loose`
+- A sheet sized to its content keeps its height while open — `kit/hold-place.mjs`, `kit/orbit.css`: `--q-sheet-floor`
+- One quiet 再看/收起 bar for a list's more — `kit/ui.mjs`, `kit/orbit.css`: `export function moreToggle`, `export function moreHtml`, `.q-more {`
 - One date selector — `kit/ui.mjs`: `export function dayBar`, `export function dayStrip`
 - The kit's own dialogs, never the browser's — `kit/orbit.mjs`: `export function ask`, `export const tell`
 - The keyboard never pushes content off screen — `kit/orbit.mjs`: `watchKeyboard`

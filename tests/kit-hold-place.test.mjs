@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { signature, scrollBusy } from '../kit/hold-place.mjs';
+import { signature, scrollBusy, loose } from '../kit/hold-place.mjs';
 
 const kit = f => readFileSync(new URL(`../kit/${f}`, import.meta.url), 'utf8');
 
@@ -30,4 +30,34 @@ test('the keeper corrects after any redraw, on the page and in sheets', () => {
   assert.match(src, /observe\(document\.documentElement, \{ childList: true, subtree: true/);
   // Never turned off for a case: no flag, no app list.
   assert.doesNotMatch(src, /localStorage|location\.|BRANDS/);
+});
+
+// Jay 2026-11-03: "this kind of jumping … fixed across all apps" (a segment
+// tapped, a day swiped, a map's cars moving, an orange 展開 link).
+test('a drawing or a box laid over the page is never what the page holds to', () => {
+  // (A car on a track map moves every update: the page followed it before.)
+  assert.equal(loose(true, 'static'), true);
+  assert.equal(loose(false, 'absolute'), true);
+  assert.equal(loose(false, 'sticky'), true);
+  assert.equal(loose(false, 'fixed'), true);
+  assert.equal(loose(false, 'relative'), false);
+  assert.equal(loose(false, 'static'), false);
+});
+
+test('a tapped control stays under the finger, and a sheet keeps its height', () => {
+  const src = kit('hold-place.mjs');
+  assert.match(src, /addEventListener\('pointerdown', ev => \(\(lastGesture = Date\.now\(\)\), noteTap\(ev\.target\)\)/);
+  assert.match(src, /function keepTap\(/);
+  assert.match(src, /new ResizeObserver/);
+  assert.match(kit('orbit.css'), /dialog\.q-sheet\[open\]:not\(\[data-detent\]\)[^{]*\{\s*min-height: min\(var\(--q-sheet-floor/);
+});
+
+test("a list's more is one quiet bar in every app, never accent text", () => {
+  const ui = kit('ui.mjs');
+  assert.match(ui, /export function moreToggle\(/);
+  assert.match(ui, /export function moreHtml\(/);
+  const css = kit('orbit.css');
+  const rule = css.slice(css.indexOf('.q-more {'), css.indexOf('}', css.indexOf('.q-more {')));
+  assert.match(rule, /color: var\(--q-text-2\)/);
+  assert.doesNotMatch(rule, /--q-accent|--accent/);
 });
