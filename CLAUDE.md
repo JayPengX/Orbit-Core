@@ -111,8 +111,8 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 - **A phone may run an older kit.** A new export is used with a fallback
   (`kitUI.newThing?.(…)` through a namespace import), never imported by name,
   or the whole app stops on a phone that still has the old kit.
-- **Kit CSS loads after the app's**: an app overriding a kit component needs
-  higher specificity, and should rarely need to (TRUTH §4).
+- **Kit CSS loads after the app's**: an override needs higher specificity,
+  and should be rare (TRUTH §4).
 
 ### 3.2 Modules
 
