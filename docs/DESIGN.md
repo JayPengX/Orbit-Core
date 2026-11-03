@@ -306,3 +306,21 @@ pass may fold the layer into the kit's own rules and drop the mark.
 - **A home is a home.** It opens on what's worth seeing and the one main
   action, never straight into the task (Words: a start button, not the
   first question; Jay, 11-03).
+- **Accent is for meaning.** The tab you're on, what's live, a chart's
+  line. Buttons (追蹤, 收看), numbers, links and section heads are grey or
+  the label colour. Never an accent-coloured text link: a way on to more is
+  the quiet bar at a card's foot (`.q-more`, a ›), a list's more the same bar
+  (再看 N 則 / 收起). (Jay, 11-03: "Why this orange text design still exist".)
+- **A name stays on one line** at its row's size: the short form where it
+  fits (G. Antetokounmpo), never wrapped, never shrunk, never cut (`fitNames`).
+- **No part rows.** A grid of like things (a team's stats, leagues to pick)
+  is filled to whole rows (`fullRows`, `.q-rows-full`), never a lone tile at
+  the end (Jay, 11-03: "I hate uneven grid").
+- **Adding is the plus alone.** An add row is a `+` and its words in the
+  row's own colours (`.q-add`), never a filled pill; icon and close buttons
+  sit flat inside sheets and cards (glass only over a map).
+- **A card on a sheet** is a shade lifted from the sheet in dark, with a
+  stronger edge, so it never blends into it.
+- **Switches move like a switch** (`.q-switch`): the knob glides on a
+  spring, stretches while pressed, can be dragged across, and is felt
+  (`haptic`). Never an app's own switch.
