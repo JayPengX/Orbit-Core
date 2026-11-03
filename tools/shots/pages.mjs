@@ -126,6 +126,11 @@ export const PAGES = {
     // 記一筆 on 轉帳: from, to, the amount, a fee, the day, a note.
     'entry-move': { args: click('[aria-label="記一筆"],[aria-label="Add an entry"]', wait(1500), tap('轉帳|Transfer'), wait(800)) },
     'entry-food': { args: click('[aria-label="記一筆"],[aria-label="Add an entry"]', wait(1500), tap('餐飲|Food'), wait(800)) },
+    // 記一筆 as it opens (its guess), then NT$25 typed: guessed again with the amount.
+    entry: { args: click('[aria-label="記一筆"],[aria-label="Add an entry"]', wait(1500)) },
+    'entry-typed': { args: click('[aria-label="記一筆"],[aria-label="Add an entry"]', wait(1500), "js:(i=>{i.value='25';i.dispatchEvent(new Event('input',{bubbles:true}));i.blur()})(document.querySelector('.mn-amount-in'))", wait(1000)) },
+    // 更多 › 智慧帶入: what 記一筆 guesses from, and how often it was right.
+    guessing: { hash: 'more', args: click(wait(800), "js:[...document.querySelectorAll('.mn-tool')].find(e=>/^(智慧帶入|Smart fill)/.test(e.textContent.trim())).click()", wait(1200)) },
     // 更多 › 分類: the twelve, each with its subs.
     cats: { hash: 'more', args: click(wait(800), "js:[...document.querySelectorAll('.mn-tool')].find(e=>/^(分類|Categories)/.test(e.textContent.trim())).click()", wait(1200)) },
     // 新增固定收支 scrolled to its foot (開始, the date field that once poked out sideways).
@@ -157,6 +162,8 @@ export const PAGES = {
   },
   law: {
     default: ['tabs'],
+    // 首頁's 為你推薦 (the covers the kit's picks engine ranks), scrolled into view.
+    foryou: { args: click(wait(3000), "js:[...document.querySelectorAll('.lw-covers')].pop()?.scrollIntoView({block:'center'})", wait(1200)) },
     article: { hash: 'law=B0000001&a=184' },
     // 法規 search: a law named (憲法), the start of one's name (憲法增), the start of a short name (勞基).
     'search-named': { hash: 'tab=laws&q=憲法' },
