@@ -46,8 +46,11 @@ Jay's specific decisions, app by app and dated, are in [`RULEBOOK.md`](RULEBOOK.
 
 ## 3. Shipping
 
-- **`npm test`, then push straight to `main`** (`git push origin
-  HEAD:main`). `main` deploys everything to Cloudflare: each repo's
+- **Push straight to `main` with `sh Orbit-Core/tools/push.sh`**, never
+  `git push` by hand: it rebases onto `origin/main`, runs what the deploy
+  runs (the repo's tests against main's kit, Class's build, every app's
+  tests on a kit change) and pushes only when they pass, so no red deploy
+  mails Jay (11-03). `main` deploys everything to Cloudflare: each repo's
   workflow tests, builds and publishes its own site
   (`Orbit-Core/deploy/cf-site.mjs`: static files at its
   orbit.jaypengx.com path, the kit at `/Orbit-Core/kit/`), and
