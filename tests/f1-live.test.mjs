@@ -259,3 +259,34 @@ test('deletedOf: each car\'s lap times taken away, one given back not', async ()
   assert.deepEqual(deletedOf(msgs), { 3: [95860], 44: [] });
   assert.deepEqual(deletedOf(null), {});
 });
+
+test("F1 live: every word that turned the race kept whole, the noise left out (Mexico 2026: lap 7's VSC was gone by the red flag on lap 45, thirty kept)", async () => {
+  const { trimF1Live } = await import('../f1-live.js');
+  const msg = (Utc, Lap, Message, extra = {}) => ({ Utc, Lap, Category: 'Other', Message, ...extra });
+  const noise = Array.from({ length: 60 }, (_, i) => msg(`2026-11-01T20:${String(20 + (i % 30)).padStart(2, '0')}:00`, 20 + (i % 20), i % 3 ? `WAVED BLUE FLAG FOR CAR ${i} (ABC) TIMED AT 14:00:00` : `CAR ${i} (ABC) TIME 1:23.${100 + i} DELETED - TRACK LIMITS AT TURN 12 LAP 5 14:10:09`));
+  const r = trimF1Live({
+    RaceControlMessages: {
+      Messages: [
+        msg('2026-11-01T20:12:05', 7, 'VSC DEPLOYED', { Category: 'SafetyCar' }),
+        msg('2026-11-01T20:12:18', 7, 'MARSHALS ON TRACK AT TURN 6'),
+        msg('2026-11-01T20:14:42', 8, 'VSC ENDING', { Category: 'SafetyCar' }),
+        ...noise,
+        msg('2026-11-01T21:04:06', 44, 'OVERTAKE DISABLED'),
+        msg('2026-11-01T21:04:07', 44, 'CAR 44 TIME DELETED'),
+        msg('2026-11-01T21:06:02', 45, 'RED FLAG - RACE SUSPENDED'),
+        msg('2026-11-01T21:14:01', 46, 'RESUMPTION ORDER: 3, 16, 12')
+      ]
+    }
+  });
+  assert.deepEqual(r.control.map(m => m.message), ['VSC DEPLOYED', 'MARSHALS ON TRACK AT TURN 6', 'VSC ENDING', 'RED FLAG - RACE SUSPENDED', 'RESUMPTION ORDER: 3, 16, 12']);
+});
+
+test("yellowSectors: each marshal sector's last word since the track was clear, a double yellow said so (the red flag's two sectors under it, not the board's 'yellow')", async () => {
+  const { yellowSectors } = await import('../f1-live.js');
+  const m = (Message, Flag = '') => ({ Message, Flag, Category: 'Flag' });
+  assert.deepEqual(
+    yellowSectors([m('YELLOW IN TRACK SECTOR 7'), m('TRACK CLEAR', 'CLEAR'), m('DOUBLE YELLOW IN TRACK SECTOR 3'), m('YELLOW IN TRACK SECTOR 2'), m('DOUBLE YELLOW IN TRACK SECTOR 16'), m('CLEAR IN TRACK SECTOR 16')]),
+    [{ s: 2, double: false }, { s: 3, double: true }]
+  );
+  assert.deepEqual(yellowSectors([m('YELLOW IN TRACK SECTOR 4'), m('CHEQUERED FLAG', 'CHEQUERED')]), []);
+});

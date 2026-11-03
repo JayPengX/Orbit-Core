@@ -26,7 +26,7 @@ const GIVE_UP = 2 * DAY;
 // Where ESPN draws its own (all but a game now and then), only the last week is looked at.
 const ESPN_DRAWS = new Set(['baseball', 'basketball', 'football', 'hockey']);
 // What a race's turns hold, and how its line is drawn: one kept with less is read again once.
-export const TURNS = 8;
+export const TURNS = 9;
 export const LINE = 2;
 const month = ms => new Date(ms).toISOString().slice(0, 7);
 

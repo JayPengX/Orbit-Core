@@ -92,6 +92,24 @@ export function stewardsOf(msgs) {
   return out;
 }
 
+// Race control's words that say nothing of how the session went: a blue
+// flag to a car being lapped, a sector's yellow and clear (`yellow` has
+// them), a lap time taken away, DRS or the overtake mode, the rain's odds.
+const CONTROL_NOISE = /^WAVED BLUE FLAG|IN TRACK SECTOR \d+$|^CAR \d+(?: \(\w+\))? (LAP|TIME)\b.*DELETED|^(DRS|OVERTAKE)\b.*(ENABLED|DISABLED)$|^RISK OF RAIN/i;
+// The marshal sectors under a yellow now: each sector's last word, since the track was last said clear.
+export function yellowSectors(msgs) {
+  const now = new Map();
+  for (const m of list(msgs)) {
+    const t = String(m?.Message || '').toUpperCase();
+    if (/^TRACK CLEAR$|^CHEQUERED FLAG$/.test(t)) now.clear();
+    const x = /^(?:(DOUBLE )?YELLOW|CLEAR) IN TRACK SECTOR (\d+)$/.exec(t);
+    if (!x) continue;
+    if (t.startsWith('CLEAR')) now.delete(x[2]);
+    else now.set(x[2], Boolean(x[1]));
+  }
+  return [...now].map(([s, double]) => ({ s: Number(s), double })).sort((a, b) => a.s - b.s);
+}
+
 // The feed's state, trimmed to what the board shows.
 export function trimF1Live(r, now = Date.now()) {
   const info = r?.SessionInfo || {};
@@ -162,7 +180,8 @@ export function trimF1Live(r, now = Date.now()) {
       };
     })
     .sort((a, b) => a.pos - b.pos);
-  const rcm = list(r?.RaceControlMessages?.Messages).at(-1);
+  const rcAll = list(r?.RaceControlMessages?.Messages);
+  const rcm = rcAll.at(-1);
   return {
     at: now,
     session: { key: info.Key || 0, type: info.Type || '', name: info.Name || '', start: info.StartDate || '', gmt: info.GmtOffset || '', status: r?.SessionStatus?.Status || info.SessionStatus || '', circuit: info.Meeting?.Circuit?.Key || 0 },
@@ -179,17 +198,22 @@ export function trimF1Live(r, now = Date.now()) {
     // Each car's place on every lap since the start, and its stops (Orbit Sports' 車手比較).
     places: placesOf(r?.LapSeries),
     stops: stopsOf(r?.PitStopSeries),
-    // Race control's last words, newest first (the blue flags left out: a race has hundreds, each to one car being lapped).
-    messages: list(r?.RaceControlMessages?.Messages)
-      .filter(m => m?.Message && !/^WAVED BLUE FLAG/.test(m.Message))
-      .slice(-8)
-      .reverse()
-      .map(m => ({ text: m.Message, at: m.Utc || '', lap: Number(m.Lap) || 0, flag: m.Flag || '', category: m.Category || '' })),
-    // The safety car, the virtual one and the flags so far (Orbit Sports' race chart shades them), and what sent them out (a car stopped, a collision).
-    control: list(r?.RaceControlMessages?.Messages)
-      .filter(m => m.Category === 'SafetyCar' || /SAFETY CAR|VSC|STOPPED|CRASH|BARRIER|GRAVEL|INCIDENT INVOLVING|\bRED FLAG\b|TRACK CLEAR/i.test(m.Message || '') || m.Flag === 'RED' || (m.Flag === 'GREEN' && /RESUME|TRACK CLEAR/i.test(m.Message || '')))
-      .slice(-30)
+    // Race control's last words, newest first (the blue flags left out: a
+    // race has hundreds, each to one car being lapped; a sector's yellow and
+    // its clear too: twenty a crash pushed out what was said, the flag's
+    // sectors are in `yellow`).
+    messages: rcAll.filter(m => m?.Message && !/^WAVED BLUE FLAG|IN TRACK SECTOR \d+$/i.test(m.Message)).slice(-12).reverse().map(m => ({ text: m.Message, at: m.Utc || '', lap: Number(m.Lap) || 0, flag: m.Flag || '', category: m.Category || '' })),
+    // Every word that turned the session, the whole of it (Orbit Sports' flag
+    // and its reason, the red flag's restart, the race chart's bands, 過程):
+    // all but the noise (blue flags, a sector's yellow, a lap deleted, the
+    // overtake mode). Thirty kept before: a race's early safety car was gone by lap 46.
+    control: rcAll
+      .filter(m => m?.Message && !CONTROL_NOISE.test(m.Message))
+      .slice(-120)
       .map(m => ({ at: m.Utc || '', lap: Number(m.Lap) || 0, category: m.Category || '', flag: m.Flag || '', message: m.Message || '' })),
+    // The marshal sectors under a yellow now ([{ s, double }]): each sector's
+    // last word since the track was last clear.
+    yellow: yellowSectors(rcAll),
     // Who's under investigation or has a penalty to serve (Orbit Sports' 成績).
     stewards: stewardsOf(r?.RaceControlMessages?.Messages),
     deleted: deletedOf(r?.RaceControlMessages?.Messages),

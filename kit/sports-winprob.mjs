@@ -223,6 +223,11 @@ export async function raceLaps(start, getJson) {
 // messages ({ category, flag, message }, OpenF1's or F1's live feed's, in
 // order): [[from, to, 'sc' | 'vsc' | 'red', the message that sent it out]],
 // from and to by `at` (a lap, or a time); one still out runs to `end`.
+// What ends a red flag: the session started again (a standing or rolling
+// start, the pit exit's green light). Not the track said clear, nor "RACE
+// WILL RESUME AT 15:45" or the resumption order, all said while it's still
+// out (Mexico 2026: the track clear two minutes in, the restart 39 later).
+const RESTART = /^SESSION (STARTED|RESUMED)$|^(STANDING|ROLLING) START\b|^(RACE|SPRINT) START$/;
 export function controlBands(messages, at, end) {
   const bands = [];
   let open = null;
@@ -230,9 +235,9 @@ export function controlBands(messages, at, end) {
     const msg = String(m.message || '').toUpperCase();
     const flag = String(m.flag || '').toUpperCase();
     // A red flag is sometimes only said ("RED FLAG - RACE SUSPENDED"), its flag left out.
-    const kind = /(VIRTUAL SAFETY CAR|VSC) DEPLOYED/.test(msg) ? 'vsc' : /SAFETY CAR DEPLOYED/.test(msg) ? 'sc' : flag === 'RED' || /\bRED FLAG\b/.test(msg) ? 'red' : '';
+    const kind = /(VIRTUAL SAFETY CAR|VSC) DEPLOYED/.test(msg) ? 'vsc' : /SAFETY CAR DEPLOYED/.test(msg) ? 'sc' : flag === 'RED' || /^RED FLAG\b/.test(msg) ? 'red' : '';
     const clear = msg === 'TRACK CLEAR';
-    const ends = open && ((open.kind === 'vsc' && (/(VIRTUAL SAFETY CAR|VSC) ENDING/.test(msg) || clear)) || (open.kind === 'sc' && (/SAFETY CAR IN THIS LAP/.test(msg) || clear)) || (open.kind === 'red' && (flag === 'GREEN' || clear || /RESUME|START/.test(msg))));
+    const ends = open && ((open.kind === 'vsc' && (/(VIRTUAL SAFETY CAR|VSC) ENDING/.test(msg) || clear)) || (open.kind === 'sc' && (/SAFETY CAR IN THIS LAP/.test(msg) || clear)) || (open.kind === 'red' && RESTART.test(msg)) || (open.kind === 'red' && flag === 'GREEN'));
     // One turned into another (a virtual safety car into the real one): the first ends there.
     if (open && (ends || (kind && kind !== open.kind))) {
       bands.push([open.from, Math.max(open.from, at(m)), open.kind, open.m]);
@@ -257,6 +262,39 @@ export function causeOf(messages, at, out = [], nameOf = () => '') {
   if (stopped) return { kind: 'stopped', who: cars(stopped.message) };
   const crash = near(120, 30).find(m => /INCIDENT INVOLVING|COLLISION/i.test(m.message) && cars(m.message).length);
   return crash ? { kind: 'crash', who: [...new Set(cars(crash.message))] } : null;
+}
+
+// A driver's climbs through the field (Jay 2026-11-03: "nothing reflects the
+// fact that Max Verstappen made places"): from each car's place at each
+// lap's end (`places`, lap 0 the grid; 0 or none a lap not read), every run
+// it never lost a place in that gained it `min` or more, from the lap it
+// first gained to the lap it reached its best: [{ from, to, lap0, lap1 }]
+// (places, laps). Mexico 2026's Verstappen: P5 after his stop on lap 28, P1
+// on lap 44.
+export function placeClimbs(places = [], min = 2) {
+  const out = [];
+  let top = null;
+  let best = null;
+  const close = () => {
+    if (top && best && top.p - best.p >= min) out.push({ from: top.p, to: best.p, lap0: top.gain, lap1: best.lap });
+  };
+  for (let lap = 0; lap < places.length; lap++) {
+    const p = Number(places[lap]) || 0;
+    if (!p) continue;
+    // A place lost: the run so far is told, the next begins here.
+    if (!top || p > (best?.p ?? top.p)) {
+      close();
+      top = { p, lap, gain: null };
+      best = null;
+      continue;
+    }
+    if (p < (best?.p ?? top.p)) {
+      if (top.gain == null) top.gain = lap;
+      best = { p, lap };
+    }
+  }
+  close();
+  return out;
 }
 
 // What turned a race, from OpenF1 once it's over: the safety car, the
@@ -302,7 +340,8 @@ export async function raceEvents(start, getJson, laps, names) {
   const ev = [];
   for (const p of pits) {
     const k = numbers.indexOf(p.driver_number);
-    if (k >= 0 && p.lap_number) ev.push([p.lap_number, 'pit', k]);
+    // (Not the drive from the garage to the grid, before the start: OpenF1 files it as a stop on lap 1.)
+    if (k >= 0 && p.lap_number && sec(p.date) >= laps[0].t) ev.push([p.lap_number, 'pit', k]);
   }
   for (const r of result) {
     const k = numbers.indexOf(r.driver_number);
@@ -329,6 +368,19 @@ export async function raceEvents(start, getJson, laps, names) {
     if (now != null && now !== leader && who(now) != null) ev.push([l.lap, 'lead', who(now)]);
     if (now != null) leader = now;
   }
+  // Each drawn driver's climbs through the field ([lap reached, 'climb', k, from, to, first lap]).
+  const placeAt = (car, t) => {
+    let p = 0;
+    for (const x of byTime) {
+      if (sec(x.date) > t) break;
+      if (x.driver_number === car) p = x.position;
+    }
+    return p;
+  };
+  numbers.forEach((car, k) => {
+    if (car == null) return;
+    for (const c of placeClimbs(laps.map(l => placeAt(car, l.t)))) ev.push([laps[c.lap1]?.lap ?? c.lap1, 'climb', k, c.from, c.to, laps[c.lap0]?.lap ?? c.lap0]);
+  });
   return { bands, events: ev.sort((a, b) => a[0] - b[0]) };
 }
 
