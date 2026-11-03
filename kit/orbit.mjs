@@ -2044,11 +2044,20 @@ const ERR = {
   ECO_PASSKEY_EXPIRED: ['等太久了，請再試一次。', 'That took too long. Please try again.'],
   ECO_PASSKEY_TAKEN: ['這個通行密鑰已經加入過了。', 'This passkey is already added.'],
   ECO_PASSKEY_FULL: ['最多 10 個通行密鑰，請先移除一個。', 'Ten passkeys at most: remove one first.'],
-  INVALID_PASSCODE: ['請輸入 10 碼通行碼（例如 ABCDE-23456）或 8 碼裝置代碼。', 'Enter your 10-character pass (like ABCDE-23456) or an 8-character device code.']
+  INVALID_PASSCODE: ['請輸入 10 碼通行碼（例如 ABCDE-23456）或 8 碼裝置代碼。', 'Enter your 10-character pass (like ABCDE-23456) or an 8-character device code.'],
+  ECO_DATA_CHANGED: ['另一台裝置剛改過，請再試一次。', 'Another device just changed this. Please try again.'],
+  OFFLINE: ['沒有網路連線，連上後會再試一次。', 'No connection. It tries again once you’re online.']
 };
+// Only a call that got no answer is the connection's fault: one Orbit
+// answered and refused (a `status`) says so with its code, never "check the
+// network" (Class's saves were refused for a day under that line, 2026-11-03).
 export const errorText = (error, lang) => {
   const e = ERR[error?.code];
   if (e) return lang === 'en' ? e[1] : e[0];
+  if (error?.status) {
+    const code = error.code || `HTTP_${error.status}`;
+    return lang === 'en' ? `Orbit answered with an error (${code}). Please try again later.` : `Orbit 回覆錯誤（${code}），請稍後再試。`;
+  }
   return lang === 'en' ? 'Couldn’t reach Orbit. Check the connection and try again.' : '無法連線到 Orbit，請檢查網路後再試一次。';
 };
 

@@ -539,7 +539,10 @@ const asJson = text => {
     return false;
   }
 };
-export const savable = (stored, payload) => !stored?.exists || !/^\s*[[{]/.test(stored.payload) || asJson(payload);
+// (JSON is what parses as JSON: Class's schedule is `[ORBIT]…[/ORBIT]`, which
+// starts with `[` and isn't JSON. Taken for JSON, every save of a Class
+// schedule after the first was refused, ECO_PAYLOAD_INVALID, 2026-11-03.)
+export const savable = (stored, payload) => !stored?.exists || !/^\s*[[{]/.test(stored.payload) || !asJson(stored.payload) || asJson(payload);
 
 // (Read side by side, not one after another: up to 12 round trips to D1.)
 async function readInbox(env, deps, wallet, app) {

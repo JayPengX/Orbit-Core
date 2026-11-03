@@ -737,6 +737,17 @@ test('a session run out still reads public data for READ_GRACE_MS, never past it
   assert.equal(await readToken(secret, long, 'ses', now - READ_GRACE_MS), null);
 });
 
+test("Class's schedule ([ORBIT]…[/ORBIT], starts with '[' but isn't JSON) saves over itself", async () => {
+  // Taken for JSON, every save after the first was refused (ECO_PAYLOAD_INVALID)
+  // and the phone said 同步上傳失敗：無法連線到 Orbit (2026-11-03).
+  const t = setup();
+  const a = await newPass(t, 'orbit');
+  const save = body => t.call('POST', '?app=orbit', { op: 'write', qt: a.token, ...body });
+  assert.equal((await save({ payload: '[ORBIT]abc[/ORBIT]' })).status, 200);
+  assert.equal((await save({ payload: '[ORBIT]def[/ORBIT]' })).status, 200);
+  assert.equal(t.store.get(`${ECO_APPS.orbit.collection}/${await passKey(t.env, a.passcode)}`).payload, '[ORBIT]def[/ORBIT]');
+});
+
 test('a save never breaks or blindly replaces the stored data: JSON stays JSON, a stale `base` is refused, a `seen` the Pass moved past keeps the old version', async () => {
   const t = setup();
   const a = await newPass(t, 'law');
