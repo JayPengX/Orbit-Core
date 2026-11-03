@@ -62,6 +62,11 @@ Jay's specific decisions, app by app and dated, are in [`RULEBOOK.md`](RULEBOOK.
   what's live, on one sheet). Fix anything it reports under `wraps:`, `cut:`
   or `scrolls sideways:`. Heavier modes (`--webkit`, `--reopen`, `--flaky`,
   the iOS Simulator) only when the bug is about them.
+- **Features are listed:** each repo's `FEATURES.md` names every feature
+  a person uses and the code that makes it; its test fails when a mark
+  goes. A refactor that drops one is caught there (features vanished in the
+  10-23 and 10-31 layout rebuilds with nobody noticing). A new feature gets
+  a line; one removed on purpose loses its line in the same commit.
 - **Tests for logic only:** money, data, ranking, planning and settling,
   where a bug is silent. None for layout or wording.
 - **Commits:** one plain line of what a person sees, numbers when there
