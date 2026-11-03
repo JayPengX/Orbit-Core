@@ -25,12 +25,13 @@ move your own into the kit (TRUTH §4); never a second copy in an app.
 
 ## Working here
 
-- `npm test`, then `git push origin HEAD:main` (no branches, no PRs; fetch
-  and rebase onto `origin/main` right before the push).
+- Push with `sh tools/push.sh` (no branches, no PRs): it rebases onto
+  `origin/main`, runs `npm test` (and with a kit/ change every app's tests,
+  `tools/test-apps.mjs`), and pushes main only if they pass; a red deploy mails Jay.
 - The kit (`kit/`) is served to every app from this repo's site on
   Cloudflare (`pages.yml` → `deploy/cf-site.mjs`): a kit change is one push
-  here. Run `node tools/test-apps.mjs` first: every app's deploy tests
-  against main's kit, and a break mails Jay.
+  here. `tools/push.sh` runs every app's tests first: each app's deploy
+  tests against main's kit, and a break mails Jay.
 - Workers deploy from `main` (`deploy.yml`, the wrangler tomls).
 - `node tools/shots.mjs <app> --before main` takes every screenshot a change
   needs (320/390 upright, a phone on its side, tablet, desktop; light/dark;

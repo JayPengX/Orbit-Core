@@ -151,6 +151,7 @@ importScripts('../Orbit-Core/kit/sw.js');
 | Tool | What |
 | --- | --- |
 | `node tools/kit-find.mjs [--css] [--apps] <word…>` | What the kit already has: its exports and `orbit.css` classes and tokens whose name or comment has every word; `--apps` adds the apps' own definitions of that name (a copy to move into the kit). Run it before writing a helper, a component or a style |
+| `sh tools/push.sh` (from an app: `sh ../Orbit-Core/tools/push.sh`) | The one way to push: rebases onto origin/main, runs what the deploy runs (`npm test` against main's kit, Class's build, every app's tests on a kit change) and pushes main only if it all passes, so no deploy goes red and mails Jay |
 | `node tools/test-apps.mjs [app…]` | Every app's tests (checkouts beside this one) against this kit; run before pushing a kit change, since each app's deploy tests against main's kit and a break mails Jay |
 | `node tools/accent-css.mjs` | Write each app's accent colours (`kit/brand.mjs`) into `kit/orbit.css`; run after changing a brand colour |
 | `node tools/leagues-audit.mjs [--sport soccer] [--json]` | Every catalogue league against its sources today |
