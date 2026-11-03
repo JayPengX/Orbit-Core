@@ -197,6 +197,20 @@ function restore(s) {
   anchor(s);
 }
 
+// A new screen in the same page (a round started from a row far down the
+// home, its end back to the home): nothing of the old one is held, no room
+// kept at the end, and the page at its top. Called before the new screen is
+// drawn. (The page left down where the tapped row was, on a screen a fraction
+// of that tall: a round opened on blank, Jay 2026-11-03.)
+export function freshScreen(s = typeof document !== 'undefined' ? document.scrollingElement : null) {
+  if (!s) return;
+  s = rootOf(s);
+  held.delete(s);
+  if (tap?.s === s) tap = null;
+  holdRoom(s, 0);
+  if (s.scrollTop) s.scrollTop = 0;
+}
+
 // ---- The tapped control stays under the finger ----
 const CONTROL = 'button, a[href], [role="tab"], [role="button"], [role="switch"], label, summary, input, select, textarea';
 // The scroller a node scrolls in: the nearest box that scrolls up and down, else the page.

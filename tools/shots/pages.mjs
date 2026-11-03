@@ -18,6 +18,8 @@ export const PAGES = {
     default: ['tabs'],
     // 賽事 on one league, each of its tabs (laid out wide on a tablet or a computer).
     'epl-table': { args: click('#tab-matches', '[data-league=epl]', wait(2500), tap('排名|Table'), wait(4000)) },
+    // NBA 排名: the two conferences' tables (a pinned rank and name column, the stats beside it).
+    'nba-table': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('排名|Table|Standings'), wait(5000)) },
     // MLS 排名: the East's race card (a clinch said as results), then the West's foot (faded rows, the lock and their key).
     'mls-table': { args: click('#tab-matches', '[data-league=mls]', wait(2500), tap('排名|Table'), wait(9000), "js:document.querySelector('.title-race')?.scrollIntoView({block:'start'})", wait(1500)) },
     'mls-playoffs': { args: click('#tab-matches', '[data-league=mls]', wait(2500), tap('季後賽|Playoffs'), wait(6000)) },
@@ -153,7 +155,10 @@ export const PAGES = {
     // A question answered (the first choice), its verdict and 下一題.
     answered: { args: click('.hero .q-hc-btn', wait(2000), "js:document.querySelector('.choice')?.click()", wait(800)) },
     // 練習模式's 句子填空: a round on the words' own examples, the first question answered.
-    sentence: { args: click(wait(2500), "js:[...document.querySelectorAll('.mode-row, .mode-card')].find(e=>/句子填空|Sentences/.test(e.textContent)).click()", wait(1500), "js:document.querySelector('.choice')?.click()", wait(800)) },
+    sentence: { args: click(wait(2500), "js:[...document.querySelectorAll('.mode-row, .mode-card')].find(e=>/句子填空|Sentences/.test(e.textContent)).click()", wait(600), "js:document.querySelector('.mode-go')?.click()", wait(1500), "js:document.querySelector('.choice')?.click()", wait(800)) },
+    // 練習模式 in view, 選英文 picked (ticked, its 開始 under the list), then that 開始 tapped from down there: the round at the top.
+    modes: { args: click(wait(2500), "js:document.querySelector('.mode-list')?.scrollIntoView({block:'center'})", wait(600), "js:[...document.querySelectorAll('.mode-row')].find(e=>/選英文|Pick the word/.test(e.textContent))?.click()", wait(800)) },
+    'mode-start': { args: click(wait(2500), "js:document.querySelector('.mode-list')?.scrollIntoView({block:'center'})", wait(600), "js:[...document.querySelectorAll('.mode-row')].find(e=>/選英文|Pick the word/.test(e.textContent))?.click()", wait(600), "js:document.querySelector('.mode-go')?.click()", wait(1500)) },
     // 拼字比賽 handed in at once (every question blank): the results page.
     contest: { args: click(wait(3000), "js:[...document.querySelectorAll('.contest-card button.primary')][0].click()", wait(1500)) },
     word: { hash: 'word=track' },
