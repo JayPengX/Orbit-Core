@@ -65,6 +65,24 @@ One set per app, in both languages, for the Showcase's App tab and the app's REA
 `sheet.png` to look at; `--apply` writes the Showcase's copies and captions and the
 README's framed copies and picture rows (English, then 中文畫面 in a fold).
 
+## `node tools/f1-replay.mjs --start <UTC> --at <UTC> [--out dir]`: an F1 session live, any moment of a real one
+
+Rebuilds what F1's live feed said at a moment of a recorded session from
+OpenF1's tables (cached in the temp folder): the proxy's `now.json` and
+`laps.json` and ESPN's scoreboard with the session on. Nothing made up: a red
+flag, a safety car, a pit window as they were. It prints the preview's
+arguments and writes them to `<out>/args.txt`:
+
+```bash
+node tools/f1-replay.mjs --start 2026-11-01T20:00:00Z --at 2026-11-01T21:40:00Z --out /tmp/red   # Mexico 2026, red flag
+node tools/shots.mjs sports f1-live f1-live-chart f1-live-tyres -- $(cat /tmp/red/args.txt)
+```
+
+`--start` is the session's start (OpenF1's `date_start`); the pages
+`f1-live`, `f1-live-track|tyres|laps|points`, `f1-live-chart` and
+`f1-live-title` are the live board, its 數據 tabs and the weekend's cards.
+(The standings are today's: a past race's points can show twice in 冠軍之爭.)
+
 ## `node tools/preview.mjs <app> [view…]`
 
 An app on an iPhone-sized page, signed in with a made-up wallet. Apps:

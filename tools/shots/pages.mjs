@@ -52,6 +52,13 @@ export const PAGES = {
     'halftime-list': { args: click('#tab-matches', wait(4000), "js:[...document.querySelectorAll('.event-row')].find(e=>e.offsetParent&&/中場休息|Half-time/.test(e.textContent))?.scrollIntoView({block:'center'})", wait(4000)) },
     'halftime-game': { args: click('#tab-matches', wait(4000), "js:[...document.querySelectorAll('.event-row')].find(e=>e.offsetParent&&/中場休息|Half-time/.test(e.textContent))?.click()", wait(8000)) },
     'f1-weekend': { args: click('#tab-matches', '[data-league=f1]', tap('Ended|已結束'), "js:document.querySelector('.wk-card.done')?.click()", wait(4000)) },
+    // An F1 session on now: its live board (the flag, its reason and the
+    // restart's countdown, race control, the tower), and each 數據 tab and
+    // card. With no session on, a real one replayed at a moment
+    // (tools/f1-replay.mjs, its args.txt after --): a red flag, a safety car.
+    'f1-live': { args: click('#tab-matches', '[data-league=f1]', '.wk-card.live', wait(9000)) },
+    ...Object.fromEntries([['track', 2], ['tyres', 3], ['laps', 4], ['points', 5]].map(([k, n]) => [`f1-live-${k}`, { args: click('#tab-matches', '[data-league=f1]', '.wk-card.live', wait(9000), `js:document.querySelector('dialog.q-sheet[open] .lb-views button:nth-child(${n})')?.click()`, wait(3000), "js:document.querySelector('dialog.q-sheet[open] .f1-views')?.scrollIntoView({block:'start'})", wait(1000)) }])),
+    ...Object.fromEntries([['chart', '勝率走勢|Win probability'], ['title', '冠軍之爭|Title fight']].map(([k, t]) => [`f1-live-${k}`, { args: click('#tab-matches', '[data-league=f1]', '.wk-card.live', wait(12000), `js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/${t}/.test(c.textContent))?.scrollIntoView({block:'start'})`, wait(1500)) }])),
     // The next race weekend's sheet scrolled to: 賽道 (the circuit drawn) and last year's podium.
     'f1-next': { args: click('#tab-matches', '[data-league=f1]', "js:document.querySelector('.wk-card:not(.done)')?.click()", wait(6000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/賽道|The circuit/.test(c.textContent))?.scrollIntoView({block:'start'})", wait(2500)) },
     // The race to come: its grid (a car not where it qualified says so; Mexico 2026).

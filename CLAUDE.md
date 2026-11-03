@@ -466,6 +466,7 @@ can be turned off on its own.
 | `node tools/shots.mjs <app> [page…]` | Every screenshot a change needs (five screens × light/dark, live data, signed in), a contact sheet, faults, `--before main` diff; pages in `tools/shots/pages.mjs` |
 | `node tools/preview.mjs <app>` | The app with real data (`--live`, `--width`, `--timing`, `--requests`, `--profile`, `--webkit`, `--reopen`…); prints `wraps:`, `cut:`, `scrolls sideways:` |
 | `node tools/gate.mjs [app…]` | The family quality gate (`tools/gate-page.js`): lift, stalls, dead taps, wraps, cuts, letters, white, mixed language… on every tab |
+| `node tools/f1-replay.mjs --start <UTC> --at <UTC>` | An F1 session as F1's live feed had it at any moment of a recorded one (OpenF1's tables): the proxy's `now.json`/`laps.json` and ESPN's scoreboard as the preview's `--fixture`s, for shots of a red flag or a safety car with no session on (`shots.mjs sports f1-live … -- $(cat <out>/args.txt)`) |
 | `node tools/live-scroll.mjs [app…]` | A live update never moves the page: scrolled as Safari scrolls, redrawn as a refresh redraws; exit 1 if what was read moved |
 | `node tools/store-shots.mjs <app>` | The README's and Showcase's screenshot set, both languages |
 | `node tools/test-apps.mjs [app…]` | Every app's tests against this kit (checkouts beside this one) |
