@@ -301,3 +301,43 @@ test("each Worker's errors in 24 hours: the family's Workers only, a status apar
   assert.deepEqual(r.workers, { 'orbit-workers-proxy': { requests: 1007, errors: 7, by: { scriptThrewException: 7 } } });
   assert.deepEqual(await workerErrors({}), { off: true });
 });
+
+test('the last 7 days hour by hour: every Worker summed per hour, kept an hour, the p99 way where the API has no cpuTimeUs', async () => {
+  const { useByHour, HOURS_KEY } = await import('../guard.js');
+  const rows = [
+    { sum: { requests: 100, cpuTimeUs: 2_000_000 }, dimensions: { datetimeHour: '2026-11-03T05:00:00Z', scriptName: 'orbit-workers-proxy' } },
+    { sum: { requests: 12, cpuTimeUs: 500_000 }, dimensions: { datetimeHour: '2026-11-03T05:00:00Z', scriptName: 'quota-guard' } },
+    { sum: { requests: 80, cpuTimeUs: 1_000_000 }, dimensions: { datetimeHour: '2026-11-03T04:00:00Z', scriptName: 'orbit-workers-proxy' } }
+  ];
+  const kv = new Map();
+  const store = { get: async k => kv.get(k) ?? null, put: async (k, v) => void kv.set(k, v) };
+  let asks = 0;
+  let vars = null;
+  const fetcher = async (url, init) => {
+    asks++;
+    vars = JSON.parse(init.body).variables;
+    return new Response(JSON.stringify({ data: { viewer: { accounts: [{ x: rows }] } } }));
+  };
+  const now = Date.parse('2026-11-03T06:30:00Z');
+  const r = await useByHour({ CF_GUARD_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, { fetcher, now, kv: store });
+  assert.equal(vars.s, '2026-10-27T06:00:00Z');
+  assert.deepEqual(r.hours, [
+    [Date.parse('2026-11-03T04:00:00Z'), 80, 1000],
+    [Date.parse('2026-11-03T05:00:00Z'), 112, 2500]
+  ]);
+  assert.ok(kv.has(HOURS_KEY));
+  // Asked again within the hour: the kept copy, analytics not asked.
+  await useByHour({ CF_GUARD_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, { fetcher, now: now + 30 * 60_000, kv: store });
+  assert.equal(asks, 1);
+  // No cpuTimeUs: each Worker's hour as requests × its 99th percentile.
+  let n = 0;
+  const old = async () => {
+    n++;
+    if (n === 1) return new Response(JSON.stringify({ errors: [{ message: 'unknown field "cpuTimeUs"' }] }));
+    return new Response(JSON.stringify({ data: { viewer: { accounts: [{ x: [{ sum: { requests: 10 }, quantiles: { cpuTimeP99: 3000 }, dimensions: { datetimeHour: '2026-11-03T05:00:00Z', scriptName: 'orbit-workers-proxy' } }] }] } } }));
+  };
+  const p = await useByHour({ CF_GUARD_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, { fetcher: old, now, kv: null });
+  assert.equal(p.cpuWay, 'p99');
+  assert.deepEqual(p.hours, [[Date.parse('2026-11-03T05:00:00Z'), 10, 30]]);
+  assert.deepEqual(await useByHour({}), { off: true });
+});

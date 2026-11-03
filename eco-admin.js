@@ -56,7 +56,9 @@ async function capacityNow(env, deps, base, inUse = base) {
   const usage = await ADMIN_TOOLS.usage({ env, deps }).catch(() => ({}));
   // The month's real Cloudflare bill so far, as the guard last read it (guard.js).
   const guard = env.RATE_LIMIT_KV ? JSON.parse((await env.RATE_LIMIT_KV.get(GUARD_STATE).catch(() => null)) || 'null') : null;
-  return { ...capacityPlan({ users, base, inUse, usage, now }), guard: guard && { at: guard.at, armed: guard.armed, error: guard.error, stopAt: guard.stopAt, plan: guard.plan, use: guard.use, share: guard.share, projected: guard.projected, period: guard.period, cpuWay: guard.cpuWay, partial: guard.partial, stopped: guard.stopped ? { at: guard.stopped.at, why: guard.stopped.why } : null } };
+  // The last 7 days hour by hour (the guard's /hours, kept an hour): the crons' floor apart from people's part.
+  const hours = env.GUARD ? await env.GUARD.fetch('https://quota-guard/hours').then(r => r.json()).catch(() => null) : null;
+  return { ...capacityPlan({ users, base, inUse, usage, guard, hours: hours?.hours ? hours : null, now }), hours: hours && { at: hours.at, n: hours.hours?.length || 0, error: hours.error || null, off: !!hours.off }, guard: guard && { at: guard.at, armed: guard.armed, error: guard.error, stopAt: guard.stopAt, plan: guard.plan, use: guard.use, share: guard.share, projected: guard.projected, period: guard.period, cpuWay: guard.cpuWay, partial: guard.partial, stopped: guard.stopped ? { at: guard.stopped.at, why: guard.stopped.why } : null } };
 }
 async function writeDev(env, deps, base, p) {
   const applied = base.autoScale && p ? cleanDev(p.applied) : base;

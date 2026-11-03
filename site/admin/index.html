@@ -524,6 +524,7 @@
         <p id="cap-error" class="error"></p>
         <div class="tiles" id="cap-tiles"></div>
         <ul class="flow stack" id="cap-plans" style="margin-top:8px"></ul>
+        <details class="note" id="cap-idle-wrap" hidden><summary id="cap-idle-sum"></summary><ul class="flow stack" id="cap-idle" style="margin-top:8px"></ul></details>
         <details class="note"><summary>說明</summary><p class="muted" id="cap-note" style="margin:8px 0 0"></p><p class="muted" id="cap-bill" style="margin:8px 0 0"></p></details>
       </div>
       <div id="dev-sets"></div>
@@ -1745,41 +1746,66 @@ async function loadDev() {
 }
 // ---- 容量 (capacity.js) ----
 const n0 = v => Math.round(v || 0).toLocaleString();
-const SKU_ZH = { maps: '地圖載入', autocomplete: '地點搜尋', details: '地點位置', detailsPro: '地點名稱', textSearch: '搜尋補充', routes: '路線規劃' };
+const SKU_ZH = { maps: '地圖載入', autocomplete: '地點搜尋', details: '地點位置', detailsPro: '地點名稱', textSearch: '搜尋補充', routes: '路線規劃', matrix: '步行時間' };
+const BILL_ZH = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'KV 讀取', kvWrite: 'KV 寫入', kvDelete: 'KV 刪除', kvList: 'KV 列出', kvBytes: 'KV 儲存', doRequests: 'Durable Objects 請求', doBytes: 'Durable Objects 儲存', r2ClassA: 'R2 寫入', r2ClassB: 'R2 讀取', r2Bytes: 'R2 儲存', d1RowsRead: 'D1 讀取', d1RowsWritten: 'D1 寫入', d1Bytes: 'D1 儲存' };
+// A quota's name (capacity.js quotas: `cf:<count>`, `ai:<setting>`, `maps:<sku>`, `weather:google`, `tdx:points`).
+const quotaName = key => {
+  const [kind, k] = String(key).split(':');
+  if (kind === 'cf') return BILL_ZH[k] || k;
+  if (kind === 'ai') return DEV[k]?.zh || k;
+  if (kind === 'maps') return `Google ${SKU_ZH[k] || k}`;
+  if (kind === 'weather') return 'Google 天氣';
+  if (kind === 'tdx') return 'TDX 點數';
+  return key;
+};
 async function loadCapacity() {
   $('cap-error').textContent = '';
   try {
     const p = await admin('capacity');
     const u = p.users;
-    const cf = p.cf;
+    const q = p.quotas || { rows: [] };
     $('cap-tiles').replaceChildren(
       tile('本週活躍', `${u.week} 人`, `今天 ${u.day} · 本月 ${u.month}`),
       tile('30 天後預估', `${u.expected} 人`, `近兩週新開 ${u.newWeek + u.newPrev} 個`),
-      tile('Cloudflare 每天', n0(cf.now.total), `額度 ${n0(cf.plan)}（估）`),
-      tile('撐得住', cf.holds == null ? '—' : `${n0(cf.holds)} 人`, '每週活躍，照你的設定')
+      tile('撐得住', q.holds ? `${n0(q.holds.people)} 人` : '—', q.holds ? quotaName(q.holds.key) : '還沒有人用'),
+      tile('開始放慢', q.slows ? `${n0(q.slows.people)} 人` : '—', q.slows ? '帳單保護 60%' : '帳單還沒讀到')
     );
-    const rows = [];
-    const row = (name, used, cap, sub) => {
-      const share = cap ? used / cap : 0;
+    // (Short: 3.7 萬, 7 億; CPU in seconds.)
+    const cn = v => (v >= 1e8 ? `${+(v / 1e8).toFixed(1)} 億` : v >= 1e4 ? `${+(v / 1e4).toFixed(1)} 萬` : n0(v));
+    const big = (k, v) => (/Bytes$/.test(k) ? `${(v / 1e9).toFixed(2)} GB` : k === 'cpuMs' ? `${cn(v / 1000)} 秒` : cn(v));
+    const tone = share => (share > 1 ? 'neg' : share > 0.8 ? 'warn' : '');
+    // A row: how full it is now (this week's people of the people it holds, or use of cap).
+    const row = (r, sub) => {
+      const share = r.holds != null ? (u.week || 0) / Math.max(1, r.holds) : r.cap ? (r.used || 0) / r.cap : 0;
+      const shown = r.paused ? '暫停' : r.holds != null ? `${n0(r.holds)} 人` : r.cap ? `${Math.round(share * 100)}%` : '—';
       return el('li', {}, [
-        el('span', { class: 'nm' }, [name, sub ? el('small', { text: sub }) : null]),
-        el('span', { class: `v ${share > 1 ? 'neg' : share > 0.8 ? 'warn' : 'pos'}`, text: cap ? `${Math.round(share * 100)}%` : '—' }),
-        el('span', { class: 'bar' }, [el('i', { class: share > 1 ? 'neg' : share > 0.8 ? 'warn' : '', style: `width:${Math.max(1.5, Math.min(100, share * 100))}%` })])
+        el('span', { class: 'nm' }, [quotaName(r.key), el('small', { text: sub })]),
+        el('span', { class: `v ${share > 1 ? 'neg' : share > 0.8 ? 'warn' : 'pos'}`, text: shown }),
+        el('span', { class: 'bar' }, [el('i', { class: tone(share), style: `width:${Math.max(1.5, Math.min(100, share * 100))}%` })])
       ]);
     };
-    rows.push(row('Cloudflare', p.cf.expected.total, cf.budget, `30 天後每天 ${n0(p.cf.expected.total)} / ${n0(cf.budget)}`));
-    for (const [k, m] of Object.entries(p.maps || {})) rows.push(row(`Google ${SKU_ZH[k] || k}`, m.expected, m.cap, `30 天後 ${n0(m.expected)} / ${n0(m.cap)}${m.holds ? ` · 撐 ${m.holds} 人` : ''}`));
-    if (p.weather) rows.push(row('Google 天氣', p.weather.today, p.weather.cap, `今天 ${n0(p.weather.today)} / ${n0(p.weather.cap)} · 看地點`));
-    if (p.tdx?.plan) rows.push(row('TDX 點數', p.tdx.month, p.tdx.plan, `本月 ${(p.tdx.month || 0).toFixed(1)} / ${p.tdx.plan}${p.tdx.guard?.why ? ' · 已放慢' : ''}`));
-    // The month's real Cloudflare bill (guard.js): each count of the $5 plan, so far and at this pace.
-    const g = p.guard;
-    const BILL_ZH = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'KV 讀取', kvWrite: 'KV 寫入', kvDelete: 'KV 刪除', kvList: 'KV 列出', kvBytes: 'KV 儲存', doRequests: 'Durable Objects 請求', doBytes: 'Durable Objects 儲存', r2ClassA: 'R2 寫入', r2ClassB: 'R2 讀取', r2Bytes: 'R2 儲存', d1RowsRead: 'D1 讀取', d1RowsWritten: 'D1 寫入', d1Bytes: 'D1 儲存' };
-    const big = (k, v) => (/Bytes$/.test(k) ? `${(v / 1e9).toFixed(2)} GB` : k === 'cpuMs' ? `${n0(v / 1000)} 秒` : n0(v));
-    if (g?.use)
-      for (const k of Object.keys(BILL_ZH)) {
-        const cap = g.plan[k] * g.stopAt;
-        rows.push(row(`Cloudflare ${BILL_ZH[k]}`, g.use[k], cap, `本期 ${big(k, g.use[k])} / ${big(k, cap)}${/Bytes$/.test(k) ? '' : ` · 照這速度 ${big(k, g.projected?.[k] || 0)}`}`));
+    const subOf = r => {
+      if (r.kind === 'cf' && r.by === 'store') return `存了 ${big(r.count, r.used)} / ${big(r.count, r.cap)}`;
+      if (r.kind === 'cf') {
+        const fixed = r.day ? Math.round((r.fixedDay / r.day) * 100) : 0;
+        return `每天 ${big(r.count, r.day)} / ${big(r.count, r.capDay)}${r.measured ? ` · 排程佔 ${fixed}%` : ''}`;
       }
+      if (r.kind === 'ai') return r.paused ? 'Gemini · 已暫停' : `Gemini · 最多一天 ${n0(r.top)} / ${n0(r.cap)}`;
+      if (r.kind === 'maps') return `本月預估 ${n0(r.month)} / ${n0(r.cap)} 免費`;
+      if (r.kind === 'tdx') return `本月預估 ${(r.month || 0).toFixed(1)} / ${r.cap} 點${r.slowed ? ' · 已放慢' : ''}`;
+      if (r.kind === 'weather') return `今天 ${n0(r.used)} / ${n0(r.cap)} · 看地點不看人`;
+      return '';
+    };
+    // The fewest people first; then what isn't counted by people (an area,
+    // what's kept); what nobody used yet (or is paused) folded below.
+    const idle = r => r.by === 'people' && (r.paused || r.holds == null);
+    const order = r => (r.by !== 'people' ? 2e9 + (r.by === 'place' ? 0 : 1) : r.holds);
+    const rows = q.rows.filter(r => !idle(r)).sort((a, b) => order(a) - order(b)).map(r => row(r, subOf(r)));
+    const rest = q.rows.filter(idle);
+    $('cap-idle').replaceChildren(...rest.map(r => row(r, subOf(r))));
+    $('cap-idle-sum').textContent = `還沒用到或暫停的額度（${rest.length}）`;
+    $('cap-idle-wrap').hidden = !rest.length;
+    const g = p.guard;
     $('cap-bill').textContent = !g
       ? 'Cloudflare 帳單保護還沒跑過（quota-guard 部署後五分鐘內）。'
       : !g.armed
@@ -1788,11 +1814,14 @@ async function loadCapacity() {
           ? `代理已經停了（${fmt(g.stopped.at)}，${g.stopped.why.map(k => BILL_ZH[k] || '讀不到用量').join('、')}到 ${Math.round(g.stopAt * 100)}%），下個帳單週期開始時自動恢復，不會多付一毛。`
           : g.error
             ? `Cloudflare 用量讀取失敗：${g.error}（連續 6 小時讀不到就先停兩個代理）。`
-            : `$5 方案：任何一項到 ${Math.round(g.stopAt * 100)}% 就停代理到下個週期，不會多付。本期 ${fmt(g.period.start)} 起，${fmt(g.at)} 讀取。${g.partial && Object.keys(g.partial).length ? `（這幾項讀不到：${Object.keys(g.partial).join('、')}）` : ''}`;
+            : `$5 方案：任何一項到 60% 就放慢、到 ${Math.round(g.stopAt * 100)}% 就停代理到下個週期，不會多付。本期 ${fmt(g.period.start)} 起，${fmt(g.at)} 讀取。${g.partial && Object.keys(g.partial).length ? `（這幾項讀不到：${Object.keys(g.partial).join('、')}）` : ''}`;
     $('cap-plans').replaceChildren(...rows);
     const on = devSaved?.autoScale;
     const slow = p.scale == null ? '最慢也不夠：要減少即時功能，否則會碰到 $5 方案的上限而停' : p.scale > 1 ? `即時更新要放慢 ×${p.scale}` : '不用放慢';
-    $('cap-note').textContent = `30 天後 ${u.expected} 人：${slow}。${on ? '「依人數自動調整」開著，每 6 小時照這個套用（下面的數字是你的設定，也是最快的）。' : p.scale > 1 || p.scale == null ? '打開下面的「依人數自動調整」就會自動套用。' : ''}Cloudflare 每天是估算（看幾分鐘即時畫面 × 多久問一次），下面本期的是 Cloudflare 的實際用量。${fmt(p.at)} 估算。`;
+    const how = (q.holds ? `撐得住＝最先滿的那一項（${quotaName(q.holds.key)}）撐的人數；開始放慢＝Cloudflare 任何一項到 60%。` : '') + (q.measured
+      ? '每一項的「撐 N 人」＝本週活躍人數 ×（上限扣掉固定用量）÷ 現在大家用掉的。Cloudflare 的固定用量是近 7 天最安靜的一成小時 × 24（排程、建置、帳單保護，沒人用也在跑）；其他項目全部算成人用的，所以只會估少。'
+      : `每一項的「撐 N 人」＝本週活躍人數 × 上限 ÷ 現在用掉的；${p.hours?.error ? `近 7 天的逐時用量讀不到（${p.hours.error}），` : '還沒有近 7 天的逐時用量，'}排程的固定用量也算成人用的，所以只會估少。`);
+    $('cap-note').textContent = `${how}Gemini 看一週裡最忙的一天；Google 地圖、TDX 看本月照這速度到月底。30 天後 ${u.expected} 人：${slow}。${on ? '「依人數自動調整」開著，每 6 小時照這個套用（下面的數字是你的設定，也是最快的）。' : p.scale > 1 || p.scale == null ? '打開下面的「依人數自動調整」就會自動套用。' : ''}${fmt(p.at)} 估算。`;
   } catch (e) {
     $('cap-error').textContent = e.message;
   }

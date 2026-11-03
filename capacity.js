@@ -20,8 +20,10 @@
 // (its daily cap, by place, not person).
 
 import { DEV } from './kit/brand.mjs';
+import { PLAN, STOP_AT, PACES } from './guard.js';
 
 const DAY = 86_400_000;
+const HOUR = 3_600_000;
 // The plan a day: guard.js's stop (90% of 10M a month) over a 31-day month;
 // and the share left after the rest (opening pages, the crons, Weather).
 export const CF_DAY = 290_000;
@@ -99,9 +101,102 @@ export function applyScale(base, scale) {
   return out;
 }
 
+// ---- Each quota, from what was really used ----
+// The model above is a guess of minutes on a screen; the panel's 撐得住 is
+// worked out from the bill itself. For every quota: its use a day, the part
+// that is there whoever comes (the crons, the builders, the guard) and the
+// part that grows with people; the people it holds = this week's people ×
+// (room left after the fixed part ÷ what people use now). The fewest is the
+// family's limit, and the quota that sets it is named.
+
+// The steady floor of Workers' requests and CPU: the last 7 days hour by hour
+// (guard.js useByHour); the quietest tenth of the hours is what runs with
+// nobody there (crons a minute; hourly builders included), × 24 a day.
+// What people add is at least a tenth of the day (never ~0 from a busy cron
+// week), so the people it holds err low. Under 5 days of hours: unknown.
+export const QUIET = 0.1;
+export function splitHours(h, now = Date.now()) {
+  const rows = h?.hours;
+  if (!Array.isArray(rows)) return null;
+  const end = Math.floor(now / HOUR) * HOUR;
+  const from = end - 7 * DAY;
+  const seen = rows.filter(r => r[0] >= from && r[0] < end);
+  if (seen.length < 5 * 24) return null;
+  const out = {};
+  for (const [i, k] of [[1, 'requests'], [2, 'cpuMs']]) {
+    const v = new Array(7 * 24).fill(0);
+    for (const r of seen) v[Math.floor((r[0] - from) / HOUR)] = r[i] || 0;
+    const day = v.reduce((a, b) => a + b, 0) / 7;
+    const quiet = [...v].sort((a, b) => a - b)[Math.floor(v.length * QUIET)];
+    const fixed = Math.min(day, quiet * 24);
+    out[k] = { day, fixed, people: Math.max(day - fixed, day * 0.1) };
+  }
+  return out;
+}
+
+// The people a quota holds: this week's × room ÷ use (null with nobody yet or nothing used).
+const holdsOf = (week, room, use) => (week > 0 && use > 0 ? Math.max(0, Math.floor((week * room) / use)) : null);
+
+// Every quota as a row: { key, kind, name, used, cap, day, fixedDay,
+// perPerson, holds, slows, by }. `by`: 'people' (grows with them),
+// 'place' (Google Weather: by area), 'store' (what's kept).
+export function quotas({ users = {}, guard = null, hours = null, usage = {}, maps = {}, now = Date.now() }) {
+  const week = users.week || 0;
+  const rows = [];
+  // Cloudflare's $5 plan (the guard's last read of the bill).
+  if (guard?.use) {
+    const planOf = guard.plan || PLAN;
+    const stop = guard.stopAt ?? STOP_AT;
+    const p = guard.period;
+    const pdays = p ? (p.end - p.from) / DAY : 31;
+    const split = splitHours(hours, now);
+    for (const k of Object.keys(PLAN)) {
+      if (planOf[k] == null) continue;
+      const cap = planOf[k] * stop;
+      if (/Bytes$/.test(k)) {
+        rows.push({ key: `cf:${k}`, kind: 'cf', count: k, used: guard.use[k] || 0, cap, by: 'store' });
+        continue;
+      }
+      const s = split?.[k];
+      // A day's use: the last 7 days' where they were read, else the period's pace.
+      const day = s ? s.day : (guard.projected?.[k] ?? guard.use[k] ?? 0) / pdays;
+      const fixedDay = s ? s.fixed : 0;
+      const people = s ? s.people : day;
+      const capDay = cap / pdays;
+      const slowDay = (planOf[k] * PACES[1].at) / pdays;
+      rows.push({ key: `cf:${k}`, kind: 'cf', count: k, by: 'people', measured: !!s, used: guard.use[k] || 0, projected: guard.projected?.[k] ?? null, cap, day, capDay, fixedDay, perPerson: week ? people / week : null, holds: holdsOf(week, capDay - fixedDay, people), slows: holdsOf(week, slowDay - fixedDay, people) });
+    }
+  }
+  // Gemini: each feature's cap a day against its busiest day of the week.
+  for (const a of usage.ai || []) {
+    const days = a.days || [];
+    const top = days.length ? Math.max(...days) : 0;
+    rows.push({ key: `ai:${a.key}`, kind: 'ai', count: a.key, by: 'people', used: days.at(-1) || 0, top, cap: a.cap || 0, paused: !a.cap, perPerson: week ? top / week : null, holds: a.cap ? holdsOf(week, a.cap, top) : null });
+  }
+  // Google Maps (Transit): each SKU's free month against this month carried to its end.
+  // (The showcase's own shares are its demo's, not people's: left out.)
+  for (const [k, m] of Object.entries(maps)) if (!k.startsWith('showcase')) rows.push({ key: `maps:${k}`, kind: 'maps', count: k, by: 'people', used: m.used, month: m.month, cap: m.cap, perPerson: week ? m.month / week : null, holds: holdsOf(week, m.cap, m.month) });
+  // Google Weather: shared by area (a 5 km square), not by person.
+  if (usage.weather?.cap) rows.push({ key: 'weather:google', kind: 'weather', by: 'place', used: usage.weather.googleToday || 0, cap: usage.weather.cap });
+  // TDX's month of points, carried to its end (Taiwan's month).
+  const tdx = usage.tdx;
+  if (tdx?.plan?.month) {
+    const tw = new Date(now + 8 * HOUR);
+    const dayOf = tw.getUTCDate() - 1 + tw.getUTCHours() / 24 + tw.getUTCMinutes() / 1440;
+    const monthDays = new Date(Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth() + 1, 0)).getUTCDate();
+    // (The first day's hours alone say too little: a day at least.)
+    const month = ((tdx.points || 0) / Math.max(1, dayOf)) * monthDays;
+    rows.push({ key: 'tdx:points', kind: 'tdx', by: 'people', used: tdx.points || 0, month, cap: tdx.plan.month, slowed: !!tdx.guard?.why, perPerson: week ? month / week : null, holds: holdsOf(week, tdx.plan.month, month) });
+  }
+  const least = f => rows.filter(r => r.by === 'people' && r[f] != null && !r.paused).reduce((a, r) => (!a || r[f] < a[f] ? r : a), null);
+  const h = least('holds');
+  const s = least('slows');
+  return { rows, week, holds: h ? { people: h.holds, key: h.key } : null, slows: s ? { people: s.slows, key: s.key } : null, measured: !!splitHours(hours, now) };
+}
+
 // What the panel shows and the cron applies: people, each budget against
 // them, and the settings for the people expected.
-export function plan({ users, base, inUse = base, usage = {}, now = Date.now() }) {
+export function plan({ users, base, inUse = base, usage = {}, guard = null, hours = null, now = Date.now() }) {
   const scale = scaleFor(base, users.daily, users.growth);
   const applied = applyScale(base, Number.isFinite(scale) ? scale : Infinity);
   // Today's people at the settings running now.
@@ -132,7 +227,9 @@ export function plan({ users, base, inUse = base, usage = {}, now = Date.now() }
     applied,
     maps,
     weather,
-    tdx: usage.tdx ? { month: usage.tdx.points, plan: usage.tdx.plan?.month, guard: usage.tdx.guard } : null
+    tdx: usage.tdx ? { month: usage.tdx.points, plan: usage.tdx.plan?.month, guard: usage.tdx.guard } : null,
+    // Every quota from what was really used, and the people each holds.
+    quotas: quotas({ users, guard, hours, usage, maps, now })
   };
 }
 
