@@ -305,6 +305,11 @@ A read (`kit proxyJson`) goes down these until one answers:
 - A failed read is a failure, never "nothing there". It answers the device's
   copy of any age and is asked again soon. A batch item that fails is that
   item's failure alone.
+- Two sources answer the phone itself (open to any page): ESPN's core API
+  is always read from the device (it refuses the proxy); Jolpica through
+  the proxy, but a read the proxy can't get (Jolpica counts per address,
+  and Cloudflare's are shared) is read from the device at once, and from
+  the device for ten minutes after (`proxyJson`, `SELF_TOO`).
 - On top of these, apps put live knowledge over slower copies: Sports'
   `liveTable` counts results before ESPN does; F1's own timing calls a
   session over at the flag; MLB's postseason comes from MLB itself.
