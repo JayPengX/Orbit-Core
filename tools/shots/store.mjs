@@ -111,7 +111,7 @@ export const STORE = {
       { zh: '用你的方式創作', en: 'Create your way', dark: true, page: 'make' },
       { zh: '在樂器室做節拍', en: 'Make beats in the studio', page: 'studio' },
       { zh: '用打擊墊即興', en: 'Jam on the pads', dark: true, page: 'jam' },
-      { zh: '每首歌都能玩節奏遊戲', en: 'A rhythm game for any song', dark: true, page: 'game', wait: 16000 }
+      { zh: '每首歌都能玩節奏遊戲', en: 'A rhythm game for any song', dark: true, page: 'game', args: click(wait(14000)) }
     ]
   },
   law: {
