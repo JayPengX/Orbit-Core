@@ -15,6 +15,9 @@ const click = (...sels) => sels.flatMap(s => ['--click', s]);
 // A row lifted by its grip mid-drag (kit reorder): the `n`th grip in `scope` held and moved down `by` px, never let go.
 const lift = (scope, n = 0, by = 70) => `js:(()=>{const g=[...document.querySelectorAll('${scope} .q-grip')].filter(e=>e.offsetParent)[${n}];const r=g.getBoundingClientRect();const o={bubbles:true,cancelable:true,pointerId:7,pointerType:'mouse',button:0,clientX:r.x+r.width/2,clientY:r.y+r.height/2};g.dispatchEvent(new PointerEvent('pointerdown',o));setTimeout(()=>{dispatchEvent(new PointerEvent('pointermove',{...o,clientY:o.clientY+12}));dispatchEvent(new PointerEvent('pointermove',{...o,clientY:o.clientY+${by}}))},60)})()`;
 
+// A finger swiped across `sel` by `dx` px (touch events, as a phone sends them): a day on in a day swipe.
+const swipe = (sel, dx) => `js:(async()=>{const n=document.querySelector('${sel}');const r=n.getBoundingClientRect();const x=r.x+r.width/2,y=r.y+Math.min(r.height/2,60);const t=X=>new Touch({identifier:1,target:n,clientX:X,clientY:y});const ev=(k,X)=>n.dispatchEvent(new TouchEvent(k,{bubbles:true,cancelable:true,touches:k==='touchend'?[]:[t(X)],changedTouches:[t(X)]}));ev('touchstart',x);for(let i=1;i<=8;i++){await new Promise(r=>setTimeout(r,16));ev('touchmove',x+(${dx})*i/8)}ev('touchend',x+(${dx}))})()`;
+
 export const PAGES = {
   sports: {
     default: ['tabs'],
@@ -35,6 +38,9 @@ export const PAGES = {
     'nba-leaders': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('數據|Stats'), wait(5000)) },
     'nba-bracket': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('季後賽|Playoffs'), wait(5000)) },
     'f1-season': { args: click('#tab-matches', '[data-league=f1]', wait(4000)) },
+    // 轉播's 愛爾達節目表 (full height whatever the day), then swiped a finger left across it: the next day.
+    guide: { args: click('#tab-live', wait(6000), "js:document.querySelector('.guide-link .q-ritem').click()", wait(2500)) },
+    'guide-swipe': { args: click('#tab-live', wait(6000), "js:document.querySelector('.guide-link .q-ritem').click()", wait(2500), swipe('dialog.q-sheet[open] .tv-guide', -160), wait(1200)) },
     // 首頁 once its day has been read (the lead game on top).
     'home-read': { args: click(wait(9000)) },
     // 首頁 scrolled down (what's under the first screen: 我的球隊, 我的聯賽).
