@@ -62,8 +62,32 @@ const US = {
     'Vegas Golden Knights': ['維加斯', '黃金騎士'], 'Washington Capitals': ['華盛頓', '首都'], 'Winnipeg Jets': ['溫尼伯', '噴射機']
   }
 };
+// Names a franchise played under before (a player's 生涯球隊 reaches back to
+// them: Durant's Seattle SuperSonics, Ramírez's Cleveland Indians), as Taiwan
+// called them; never in search (a team is found by the name it has now).
+const FORMER = {
+  nba: {
+    'Seattle SuperSonics': ['西雅圖', '超音速'], 'New Jersey Nets': ['紐澤西', '籃網'], 'New Orleans Hornets': ['紐奧良', '黃蜂'], 'NO/Oklahoma City Hornets': ['紐奧良', '黃蜂'],
+    'New Orleans/Oklahoma City Hornets': ['紐奧良', '黃蜂'], 'Charlotte Bobcats': ['夏洛特', '山貓'], 'Vancouver Grizzlies': ['溫哥華', '灰熊'], 'Washington Bullets': ['華盛頓', '子彈'],
+    'Kansas City Kings': ['堪薩斯', '國王'], 'San Diego Clippers': ['聖地牙哥', '快艇']
+  },
+  mlb: {
+    'Cleveland Indians': ['克里夫蘭', '印地安人'], 'Florida Marlins': ['佛羅里達', '馬林魚'], 'Montreal Expos': ['蒙特婁', '博覽會'], 'Tampa Bay Devil Rays': ['坦帕灣', '魔鬼魚'],
+    'Anaheim Angels': ['安那罕', '天使'], 'Los Angeles Angels of Anaheim': ['洛杉磯', '天使'], 'California Angels': ['加州', '天使']
+  },
+  wnba: {
+    'San Antonio Stars': ['聖安東尼奧', '銀星'], 'San Antonio Silver Stars': ['聖安東尼奧', '銀星'], 'Utah Starzz': ['猶他', '星'], 'Tulsa Shock': ['土爾沙', '震撼'], 'Detroit Shock': ['底特律', '震撼'],
+    'Orlando Miracle': ['奧蘭多', '奇蹟']
+  },
+  nfl: {
+    'Oakland Raiders': ['奧克蘭', '突擊者'], 'San Diego Chargers': ['聖地牙哥', '閃電'], 'St. Louis Rams': ['聖路易', '公羊'], 'Washington Redskins': ['華盛頓', '紅人'], 'Washington Football Team': ['華盛頓', '足球隊']
+  },
+  nhl: {
+    'Arizona Coyotes': ['亞利桑那', '郊狼'], 'Phoenix Coyotes': ['鳳凰城', '郊狼'], 'Atlanta Thrashers': ['亞特蘭大', '鶇鳥'], 'Mighty Ducks of Anaheim': ['安那罕', '巨鴨']
+  }
+};
 // By normalizeTeamName() too (Kambi's and Polymarket's spellings).
-const US_BY_KEY = Object.fromEntries(Object.entries(US).map(([k, t]) => [k, Object.fromEntries(Object.entries(t).map(([n, v]) => [normalizeTeamName(n), v]))]));
+const US_BY_KEY = Object.fromEntries(Object.keys(US).map(k => [k, { ...FORMER[k], ...US[k] }]).map(([k, t]) => [k, Object.fromEntries(Object.entries(t).map(([n, v]) => [normalizeTeamName(n), v]))]));
 
 // Clubs (soccer's, whatever the competition), by normalizeTeamName().
 const CLUBS = {
@@ -186,7 +210,7 @@ const SOCCER = new Set(['soccer']);
 export function teamNameZh(key, name, sport = '') {
   if (!name) return null;
   const n = normalizeTeamName(name);
-  const us = US[key]?.[name] || US_BY_KEY[key]?.[n];
+  const us = US[key]?.[name] || FORMER[key]?.[name] || US_BY_KEY[key]?.[n];
   if (us) return { full: `${us[0]}${us[0] && /^[\d]/.test(us[1]) ? ' ' : ''}${us[1]}`, short: us[1] };
   const own = LEAGUE_BY_NAME[key]?.[n];
   if (own) return { full: own, short: own };

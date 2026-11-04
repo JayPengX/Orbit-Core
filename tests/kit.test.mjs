@@ -852,3 +852,25 @@ test('switches hold still for anyone who asked for less motion', async () => {
   const css = (await import('node:fs')).readFileSync(new URL('../kit/orbit.css', import.meta.url), 'utf8');
   assert.match(css, /prefers-reduced-motion: reduce\)[\s\S]{0,200}\.q-switch,\n\s+\.q-switch::after/);
 });
+
+// Jay 2026-11-04: Durant's 生涯球隊 read "SuperSonics" with a tiny OKC mark.
+test("a franchise's former names: in Chinese, never in search; their own badge or today's trimmed logo", async () => {
+  const { teamNameZh, teamsByZh } = await import('../kit/names.mjs');
+  const { formerLogo } = await import('../kit/logos.mjs');
+  assert.deepEqual(teamNameZh('nba', 'Seattle SuperSonics', 'basketball'), { full: '西雅圖超音速', short: '超音速' });
+  assert.equal(teamNameZh('nba', 'NO/Oklahoma City\r\n Hornets', 'basketball')?.short, '黃蜂');
+  assert.equal(teamNameZh('wnba', 'Tulsa Shock', 'basketball')?.short, '震撼');
+  assert.ok(!teamsByZh('超音速').length);
+  assert.match(formerLogo('nba', 'Seattle SuperSonics'), /thesportsdb\.com\/.+\/do916u1572164500\.png\/small$/);
+  assert.equal(formerLogo('mlb', 'Cleveland Indians'), 'https://a.espncdn.com/i/teamlogos/mlb/500/cle.png');
+  assert.equal(formerLogo('nba', 'Boston Celtics'), null);
+});
+// A logo drawn for a part not on the page yet (a sheet's tab not open) is
+// asked for all the same: a lazy one off the page never loads, and iPhone
+// left it blank once put on until a tap (Jay 2026-11-04).
+test('a lazy logo off the page is made eager by the rescue, not only one on it', async () => {
+  const src = (await import('node:fs')).readFileSync(new URL('../kit/logos.mjs', import.meta.url), 'utf8');
+  const rescue = src.slice(src.indexOf('Never left invisible'), src.indexOf('img.src = small(light);\n  return picture;'));
+  assert.match(rescue, /img\.loading === 'lazy'\) img\.loading = 'eager'/);
+  assert.doesNotMatch(rescue, /lazy' && picture\.isConnected/);
+});
