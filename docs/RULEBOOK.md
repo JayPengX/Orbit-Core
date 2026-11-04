@@ -148,6 +148,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 11-03 追公車 ("you are the software you know the numbers the best"): from live data, any route, never hard-coded: a YouBike to a stop further along the bus's way where it still catches a bus you'd miss walking, planned when 3+ minutes sooner and offered while navigating.
 - 11-03 A trip with stops is one coherent trip while navigating (not its first stretch alone): the chips and end time run to the last place; riding a YouBike to a stop, it asks 停著 or 還車 with which is sooner; with the free half hour, 附近換車 from 25 minutes on a bike.
 - 11-03 Trains go beyond TPASS ("some train you buy ticket, HSR as well"): inside a TPASS area the train list and planner still keep to the pass's trains, but any 台鐵 or 高鐵 train can be set as the one you hold a ticket for (指定車次 by number, or 用這班規劃路線 from 查時刻), and the trip is planned around that exact train; 查時刻 has 全部班次 beside its TPASS note.
+- 11-04 A train you pick is the train you take ("I intentionally select a train later and it thought I am catching this one"): a later departure chosen over an earlier one (the plans card, 交通's 其他班次, 改搭別班, 指定車次) is never switched to a sooner one by itself; a plan you didn't pick still moves to a sooner train still to come (10-28).
 
 ### Sports
 - 10-20 Every break gets a countdown, timeouts too.
