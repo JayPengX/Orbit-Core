@@ -41,6 +41,8 @@ export const PAGES = {
     // 轉播's 愛爾達節目表 (full height whatever the day), then swiped a finger left across it: the next day.
     guide: { args: click('#tab-live', wait(6000), "js:document.querySelector('.guide-link .q-ritem').click()", wait(2500)) },
     'guide-swipe': { args: click('#tab-live', wait(6000), "js:document.querySelector('.guide-link .q-ritem').click()", wait(2500), swipe('dialog.q-sheet[open] .tv-guide', -160), wait(1200)) },
+    // 轉播 scrolled to 我的比賽 (their own games by day: no row lit grey, Jay 2026-11-05; with --account fan).
+    'tv-mine': { args: click('#tab-live', wait(8000), "js:document.querySelector('.mine-list')?.scrollIntoView({block:'start'})", wait(1500)) },
     // 首頁 once its day has been read (the lead game on top).
     'home-read': { args: click(wait(9000)) },
     // 首頁 scrolled down (what's under the first screen: 我的球隊, 我的聯賽).
