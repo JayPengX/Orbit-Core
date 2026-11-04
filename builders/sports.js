@@ -18,6 +18,7 @@
 // pack stays). A year no longer kept goes.
 
 import { CATALOG, ESPN_SITE as SITE, asiaMonthUrl } from '../kit/catalog.mjs';
+import { BROADCAST } from '../kit/sports-broadcast.mjs';
 import { mirrorPath } from '../kit/mirror.mjs';
 import { twDay } from '../kit/format.mjs';
 import { asiaBaseballResponse } from '../asia-baseball.js';
@@ -161,7 +162,8 @@ export async function runSports({ store, get = fetch, now = Date.now(), sleep = 
     if (copy?.data?.games) return copy.data.games;
     return (await (await asiaBaseballResponse(new URL(url))).json().catch(() => null))?.games || [];
   };
-  const leagues = Object.entries(CATALOG).filter(([key, l]) => l.data === 'espn' && l.espn && (!only.length || only.includes(key)));
+  // (Only the leagues Orbit Sports shows: LaLiga is in the catalogue for its players' photos alone.)
+  const leagues = Object.entries(CATALOG).filter(([key, l]) => BROADCAST[key] && l.data === 'espn' && l.espn && (!only.length || only.includes(key)));
   const built = new Date(now).toISOString();
   const old = (await store.json('sports/index.json')) || { leagues: {} };
   const index = { built, leagues: {} };
@@ -215,7 +217,7 @@ export async function runSports({ store, get = fetch, now = Date.now(), sleep = 
   await store.put('sports/index.json', index, { always: true });
   if (!only.length) {
     const askable = Object.fromEntries(Object.entries(index.leagues).filter(([, v]) => v.bounds).map(([k, v]) => [k, v.bounds]));
-    for (const [key, l] of Object.entries(CATALOG).filter(([, l]) => l.asia)) {
+    for (const [key, l] of Object.entries(CATALOG).filter(([k, l]) => BROADCAST[k] && l.asia)) {
       const b = await asiaBounds(l.asia, asiaMonth, now).catch(() => null);
       if (b) askable[key] = b;
     }

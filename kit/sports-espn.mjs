@@ -26,7 +26,7 @@ import { teamNameZh } from '#kit/names.mjs';
 // ---- The leagues (Orbit Sports' lib/leagues.mjs) -----------------------------------
 // Every league of the catalogue that's on ELTA.tv or Apple TV in Taiwan, soccer
 // in the order a Taiwan viewer would watch it (the owner's calls, 2026-10-15).
-const SOCCER_WATCH = ['epl', 'bundesliga', 'seriea', 'ligue1', 'laliga', 'mls', 'ucl', 'uel', 'uecl', 'facup', 'scotland', 'worldcup', 'nationsleague'];
+const SOCCER_WATCH = ['epl', 'bundesliga', 'seriea', 'ligue1', 'mls', 'ucl', 'uel', 'uecl', 'facup', 'scotland', 'nationsleague'];
 const watchRank = k => (SOCCER_WATCH.includes(k) ? SOCCER_WATCH.indexOf(k) : SOCCER_WATCH.length);
 const inOrder = entries => {
   const soccer = entries.filter(([, l]) => l.sport === 'soccer').sort(([a], [b]) => watchRank(a) - watchRank(b));
@@ -103,7 +103,7 @@ export function overByRule(status, away, home, league) {
 // a final is first asked for (Orbit Sports' result notices),
 // then every 2 minutes. A quick game is under its usual length (a 2 h 20
 // baseball game, a blowout), so never that.
-export const SHORTEST_MIN = { soccer: 105, baseball: 110, basketball: 110, football: 160, hockey: 115, sets: 60, racing: 90 };
+export const SHORTEST_MIN = { soccer: 105, baseball: 110, basketball: 110, racing: 90 };
 
 const logoOf = team => team?.logo || team?.logos?.[0]?.href || null;
 // ESPN's F1 headshots (headshots/f1/) stopped in 2021 (a newer driver has

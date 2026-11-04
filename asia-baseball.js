@@ -1,10 +1,7 @@
-// Asian baseball's schedules and scores from the leagues' own sites, as one
-// shape for Orbit Sports. Kambi only lists a
-// game a day or so ahead and drops it after, and ESPN doesn't carry these
-// leagues, so without this Orbit Sports had "no recent games" mid-season.
+// The CPBL's schedules and scores, as one shape for Orbit Sports. Kambi only
+// lists a game a day or so ahead and drops it after, and ESPN doesn't carry
+// it, so without this Orbit Sports had "no recent games" mid-season.
 //
-//   NPB   npb.jp's monthly schedule page (HTML)
-//   KBO   koreabaseball.com's monthly schedule list (a POST answered in JSON rows)
 //   CPBL  TheSportsDB's day lists (CPBL's own site turns addresses outside Taiwan away)
 //
 // Served by the sports proxy as if from `https://asia-baseball.orbit/<league>/<YYYY-MM>.json`,
@@ -17,153 +14,11 @@ import { parseTsdbDay, TSDB_DAY, TSDB_CPBL } from './kit/catalog.mjs';
 
 export const ASIA_HOST = 'asia-baseball.orbit';
 
-// Each club: the source's name -> English (the logo tables' spelling) and Taiwan's name.
-const NPB_TEAMS = {
-  巨人: ['Yomiuri Giants', '讀賣巨人'],
-  ヤクルト: ['Tokyo Yakult Swallows', '東京養樂多燕子'],
-  DeNA: ['Yokohama DeNA BayStars', '橫濱DeNA海灣之星'],
-  中日: ['Chunichi Dragons', '中日龍'],
-  阪神: ['Hanshin Tigers', '阪神虎'],
-  広島: ['Hiroshima Toyo Carp', '廣島東洋鯉魚'],
-  日本ハム: ['Hokkaido Nippon-Ham Fighters', '北海道日本火腿鬥士'],
-  楽天: ['Tohoku Rakuten Golden Eagles', '東北樂天金鷲'],
-  西武: ['Saitama Seibu Lions', '埼玉西武獅'],
-  ロッテ: ['Chiba Lotte Marines', '千葉羅德海洋'],
-  オリックス: ['Orix Buffaloes', '歐力士猛牛'],
-  ソフトバンク: ['Fukuoka SoftBank Hawks', '福岡軟銀鷹']
-};
-const KBO_TEAMS = {
-  LG: ['LG Twins', 'LG雙子'],
-  두산: ['Doosan Bears', '斗山熊'],
-  KIA: ['Kia Tigers', '起亞虎'],
-  삼성: ['Samsung Lions', '三星獅'],
-  롯데: ['Lotte Giants', '樂天巨人'],
-  한화: ['Hanwha Eagles', '韓華鷹'],
-  NC: ['NC Dinos', 'NC恐龍'],
-  KT: ['KT Wiz', 'KT巫師'],
-  SSG: ['SSG Landers', 'SSG登陸者'],
-  키움: ['Kiwoom Heroes', '培證英雄']
-};
-const team = (table, name) => {
-  const hit = table[String(name || '').trim()];
-  return hit ? { en: hit[0], zh: hit[1] } : { en: String(name || '').trim(), zh: String(name || '').trim() };
-};
-
 const HOUR = 3_600_000;
-// A game past its start and not marked over counts as on for this long.
-const LONGEST = 5 * HOUR;
-const clean = html => String(html || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-// A local wall-clock time in a zone `offset` hours ahead of UTC, as UTC ISO.
-const utc = (y, m, d, hh, mm, offset) => new Date(Date.UTC(y, m - 1, d, hh - offset, mm)).toISOString();
-const num = x => (x === '' || x == null || !Number.isFinite(Number(x)) ? null : Number(x));
-function stateOf({ start, over, scored, now }) {
-  if (over) return 'post';
-  const t = Date.parse(start);
-  if (now < t) return 'pre';
-  if (now - t < LONGEST) return 'in';
-  return scored ? 'post' : 'pre';
-}
-
-// ---- NPB -------------------------------------------------------------------------
-
-export function parseNpb(html, year, now = Date.now()) {
-  const games = [];
-  for (const part of String(html).split(/<tr id="date(\d{4})"/).slice(1).reduce((out, x, i, all) => (i % 2 === 0 ? [...out, [x, all[i + 1]]] : out), [])) {
-    const [mmdd, body] = part;
-    const home = /class="team1">([^<]*)</.exec(body)?.[1];
-    const away = /class="team2">([^<]*)</.exec(body)?.[1];
-    if (!home || !away) continue;
-    const time = /class="time">\s*(\d{1,2}):(\d{2})/.exec(body);
-    const [hh, mm] = time ? [Number(time[1]), Number(time[2])] : [18, 0];
-    const start = utc(year, Number(mmdd.slice(0, 2)), Number(mmdd.slice(2)), hh, mm, 9);
-    const homeScore = num(/class="score1">\s*(\d+)/.exec(body)?.[1]);
-    const awayScore = num(/class="score2">\s*(\d+)/.exec(body)?.[1]);
-    const comment = clean(/class="comment">([\s\S]*?)<\/div>/.exec(body)?.[1]);
-    // Over once a winning pitcher is named (a tie names none: then by the clock).
-    const over = /勝：/.test(body) || /引分/.test(comment);
-    const id = /\/scores\/\d{4}\/(\d{4}\/[\w-]+)\//.exec(body)?.[1]?.replace('/', '-') || `${mmdd}-${home}-${away}`;
-    const scored = homeScore != null && awayScore != null;
-    games.push({
-      id: `npb-${year}-${id}`,
-      start,
-      home: team(NPB_TEAMS, home),
-      away: team(NPB_TEAMS, away),
-      homeScore,
-      awayScore,
-      state: /中止|ノーゲーム/.test(comment) ? 'void' : stateOf({ start, over, scored, now }),
-      venue: clean(/class="place">([^<]*)</.exec(body)?.[1])
-    });
-  }
-  return games;
-}
-
-// ---- KBO -------------------------------------------------------------------------
-
-// The list's rows: a day cell starts each day (rowspan), then per game its
-// time, "AWAY score vs score HOME", the broadcast link (리뷰 once over,
-// 프리뷰 before), TV, stadium and a note (우천취소, a rain-out).
-export function parseKbo(data, year, now = Date.now()) {
-  const games = [];
-  let day = null;
-  for (const { row } of data?.rows || []) {
-    const cells = row || [];
-    const dayCell = cells.find(c => c.Class === 'day');
-    if (dayCell) day = /(\d{2})\.(\d{2})/.exec(dayCell.Text);
-    const play = cells.find(c => c.Class === 'play');
-    if (!day || !play) continue;
-    const time = /(\d{1,2}):(\d{2})/.exec(clean(cells.find(c => c.Class === 'time')?.Text));
-    const names = [...String(play.Text).matchAll(/<span>([^<]+)<\/span>/g)].map(m => m[1]).filter(x => x !== 'vs');
-    if (names.length < 2) continue;
-    const scores = [...String(play.Text).matchAll(/<span class="(?:win|lose|same)">(\d+)<\/span>/g)].map(m => Number(m[1]));
-    const relay = clean(cells.find(c => c.Class === 'relay')?.Text);
-    const rest = cells.filter(c => !c.Class).map(c => clean(c.Text));
-    const start = utc(year, Number(day[1]), Number(day[2]), time ? Number(time[1]) : 18, time ? Number(time[2]) : 30, 9);
-    const [away, home] = [names[0], names.at(-1)];
-    const note = rest.at(-1) || '';
-    const scored = scores.length === 2;
-    games.push({
-      id: `kbo-${start.slice(0, 10)}-${away}-${home}`,
-      start,
-      home: team(KBO_TEAMS, home),
-      away: team(KBO_TEAMS, away),
-      homeScore: scored ? scores[1] : null,
-      awayScore: scored ? scores[0] : null,
-      state: /취소|노게임/.test(note) || /취소/.test(relay) ? 'void' : stateOf({ start, over: relay === '리뷰', scored, now }),
-      venue: rest.at(-2) || ''
-    });
-  }
-  return games;
-}
-
-// ---- CPBL ------------------------------------------------------------------------
-
 // ---- Fetching ----------------------------------------------------------------------
 
 const UA = 'Mozilla/5.0 (compatible; Orbit-Sports/1.0; +https://github.com/JayPengX/Orbit-Sports)';
 const TIMEOUT = 10_000;
-
-async function fetchNpb(year, month) {
-  const res = await fetch(`https://npb.jp/games/${year}/schedule_${String(month).padStart(2, '0')}_detail.html`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(TIMEOUT) });
-  if (res.status === 404) return [];
-  if (!res.ok) throw new Error(`npb ${res.status}`);
-  return parseNpb(await res.text(), year);
-}
-
-async function fetchKbo(year, month) {
-  const res = await fetch('https://www.koreabaseball.com/ws/Schedule.asmx/GetScheduleList', {
-    method: 'POST',
-    headers: {
-      'User-Agent': UA,
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'X-Requested-With': 'XMLHttpRequest',
-      Referer: 'https://www.koreabaseball.com/Schedule/Schedule.aspx'
-    },
-    body: `leId=1&srIdList=0%2C9%2C6&seasonId=${year}&gameMonth=${String(month).padStart(2, '0')}&teamId=`,
-    signal: AbortSignal.timeout(TIMEOUT)
-  });
-  if (!res.ok) throw new Error(`kbo ${res.status}`);
-  return parseKbo(await res.json(), year);
-}
 
 // CPBL's site turns a bot's user agent away (a 404) and sends a new reader
 // round its cookie check a few times: a browser's user agent, the redirects
@@ -253,7 +108,7 @@ async function cpbl(year, month, now = Date.now()) {
   if (month === 12 || month <= 2) return { games: [], read: [], whole: 1 };
   return fetchCpblTsdb(year, month, { now });
 }
-const FETCHERS = { npb: fetchNpb, kbo: fetchKbo, cpbl };
+const FETCHERS = { cpbl };
 
 // ---- A CPBL game's box score (the league's own: its box page's getlive) -----------
 //
@@ -379,7 +234,7 @@ export async function cpblDay(day, via = relay) {
 
 // `/<league>/<YYYY-MM>.json` -> { league, month } or null.
 export function asiaTarget(url) {
-  const m = /^\/(npb|kbo|cpbl)\/(\d{4})-(\d{2})\.json$/.exec(url.pathname);
+  const m = /^\/(cpbl)\/(\d{4})-(\d{2})\.json$/.exec(url.pathname);
   if (!m) return null;
   const month = Number(m[3]);
   return month >= 1 && month <= 12 ? { league: m[1], year: Number(m[2]), month } : null;

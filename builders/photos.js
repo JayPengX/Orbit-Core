@@ -97,13 +97,12 @@ export async function plPhotos() {
 // a pause between, and on FotMob's "too many" a minute's wait, a second one
 // stops it asking; a list it couldn't make keeps the last one.
 export const FOTMOB = 'https://www.fotmob.com/api/data';
-// Orbit's leagues → FotMob's (the Nations League's A to D; a key in place
-// of an id: a cup made of those leagues' clubs).
+// Orbit Sports' leagues → FotMob's (the Nations League's A to D; a key in
+// place of an id: a cup made of those leagues' clubs). A face list is read by
+// the player's league (kit photos.mjs faceFor), so only Sports' own.
 export const FOTMOB_LEAGUES = {
-  epl: [47], laliga: [87], seriea: [55], bundesliga: [54], ligue1: [53], scotland: [64], mls: [130],
-  ucl: [42], uel: [73], uecl: [10216], championship: [48], eredivisie: [57], ligamx: [230],
-  brasileirao: [268], jleague: [223], kleague: [9080], worldcup: [77], nationsleague: [9806, 9807, 9808, 9809],
-  facup: [132]
+  epl: [47], seriea: [55], bundesliga: [54], ligue1: [53], scotland: [64], mls: [130],
+  ucl: [42], uel: [73], uecl: [10216], nationsleague: [9806, 9807, 9808, 9809], facup: [132]
 };
 export const FOTMOB_PACE = { at: 3, gap: 400, wait: 60_000 };
 // The teams in a league's tables (this season's), or, a cup without one yet, its games'.

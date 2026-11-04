@@ -24,7 +24,7 @@ const DAY = 24 * HOUR;
 // A game's market can take a while to settle; two days on without one, none.
 const GIVE_UP = 2 * DAY;
 // Where ESPN draws its own (all but a game now and then), only the last week is looked at.
-const ESPN_DRAWS = new Set(['baseball', 'basketball', 'football', 'hockey']);
+const ESPN_DRAWS = new Set(['baseball', 'basketball']);
 // What a race's turns hold, and how its line is drawn: one kept with less is read again once.
 export const TURNS = 9;
 export const LINE = 2;

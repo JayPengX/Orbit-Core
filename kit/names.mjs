@@ -37,29 +37,6 @@ const US = {
     'Portland Trail Blazers': ['波特蘭', '拓荒者'], 'Sacramento Kings': ['沙加緬度', '國王'], 'San Antonio Spurs': ['聖安東尼奧', '馬刺'], 'Toronto Raptors': ['多倫多', '暴龍'], 'Utah Jazz': ['猶他', '爵士'], 'Washington Wizards': ['華盛頓', '巫師'],
     // A preseason guest from outside the league (2026-10: the Trail Blazers').
     'London Lions': ['倫敦', '雄獅']
-  },
-  wnba: {
-    'Atlanta Dream': ['亞特蘭大', '夢想'], 'Chicago Sky': ['芝加哥', '天空'], 'Connecticut Sun': ['康乃狄克', '太陽'], 'Dallas Wings': ['達拉斯', '飛翼'], 'Golden State Valkyries': ['金州', '女武神'],
-    'Indiana Fever': ['印第安納', '狂熱'], 'Las Vegas Aces': ['拉斯維加斯', '王牌'], 'Los Angeles Sparks': ['洛杉磯', '火花'], 'Minnesota Lynx': ['明尼蘇達', '山貓'], 'New York Liberty': ['紐約', '自由人'],
-    'Phoenix Mercury': ['鳳凰城', '水星'], 'Seattle Storm': ['西雅圖', '風暴'], 'Washington Mystics': ['華盛頓', '神秘人'], 'Toronto Tempo': ['多倫多', '節奏'], 'Portland Fire': ['波特蘭', '火焰']
-  },
-  nfl: {
-    'Arizona Cardinals': ['亞利桑那', '紅雀'], 'Atlanta Falcons': ['亞特蘭大', '獵鷹'], 'Baltimore Ravens': ['巴爾的摩', '烏鴉'], 'Buffalo Bills': ['水牛城', '比爾'], 'Carolina Panthers': ['卡羅來納', '黑豹'],
-    'Chicago Bears': ['芝加哥', '熊'], 'Cincinnati Bengals': ['辛辛那提', '孟加拉虎'], 'Cleveland Browns': ['克里夫蘭', '布朗'], 'Dallas Cowboys': ['達拉斯', '牛仔'], 'Denver Broncos': ['丹佛', '野馬'],
-    'Detroit Lions': ['底特律', '雄獅'], 'Green Bay Packers': ['綠灣', '包裝工'], 'Houston Texans': ['休士頓', '德州人'], 'Indianapolis Colts': ['印第安納波利斯', '小馬'], 'Jacksonville Jaguars': ['傑克森維爾', '美洲豹'],
-    'Kansas City Chiefs': ['堪薩斯城', '酋長'], 'Las Vegas Raiders': ['拉斯維加斯', '突擊者'], 'Los Angeles Chargers': ['洛杉磯', '閃電'], 'Los Angeles Rams': ['洛杉磯', '公羊'], 'Miami Dolphins': ['邁阿密', '海豚'],
-    'Minnesota Vikings': ['明尼蘇達', '維京人'], 'New England Patriots': ['新英格蘭', '愛國者'], 'New Orleans Saints': ['紐奧良', '聖徒'], 'New York Giants': ['紐約', '巨人'], 'New York Jets': ['紐約', '噴射機'],
-    'Philadelphia Eagles': ['費城', '老鷹'], 'Pittsburgh Steelers': ['匹茲堡', '鋼人'], 'San Francisco 49ers': ['舊金山', '49 人'], 'Seattle Seahawks': ['西雅圖', '海鷹'], 'Tampa Bay Buccaneers': ['坦帕灣', '海盜'],
-    'Tennessee Titans': ['田納西', '泰坦'], 'Washington Commanders': ['華盛頓', '指揮官']
-  },
-  nhl: {
-    'Anaheim Ducks': ['安那罕', '鴨'], 'Boston Bruins': ['波士頓', '棕熊'], 'Buffalo Sabres': ['水牛城', '軍刀'], 'Calgary Flames': ['卡加利', '火焰'], 'Carolina Hurricanes': ['卡羅來納', '颶風'],
-    'Chicago Blackhawks': ['芝加哥', '黑鷹'], 'Colorado Avalanche': ['科羅拉多', '雪崩'], 'Columbus Blue Jackets': ['哥倫布', '藍夾克'], 'Dallas Stars': ['達拉斯', '星'], 'Detroit Red Wings': ['底特律', '紅翼'],
-    'Edmonton Oilers': ['艾德蒙頓', '油人'], 'Florida Panthers': ['佛羅里達', '美洲豹'], 'Los Angeles Kings': ['洛杉磯', '國王'], 'Minnesota Wild': ['明尼蘇達', '荒野'], 'Montreal Canadiens': ['蒙特婁', '加拿大人'],
-    'Nashville Predators': ['納什維爾', '掠奪者'], 'New Jersey Devils': ['紐澤西', '魔鬼'], 'New York Islanders': ['紐約', '島人'], 'New York Rangers': ['紐約', '遊騎兵'], 'Ottawa Senators': ['渥太華', '參議員'],
-    'Philadelphia Flyers': ['費城', '飛人'], 'Pittsburgh Penguins': ['匹茲堡', '企鵝'], 'San Jose Sharks': ['聖荷西', '鯊魚'], 'Seattle Kraken': ['西雅圖', '海怪'], 'St. Louis Blues': ['聖路易', '藍調'],
-    'Tampa Bay Lightning': ['坦帕灣', '閃電'], 'Toronto Maple Leafs': ['多倫多', '楓葉'], 'Utah Mammoth': ['猶他', '猛獁'], 'Utah Hockey Club': ['猶他', '冰球俱樂部'], 'Vancouver Canucks': ['溫哥華', '加人'],
-    'Vegas Golden Knights': ['維加斯', '黃金騎士'], 'Washington Capitals': ['華盛頓', '首都'], 'Winnipeg Jets': ['溫尼伯', '噴射機']
   }
 };
 // Names a franchise played under before (a player's 生涯球隊 reaches back to
@@ -74,16 +51,6 @@ const FORMER = {
   mlb: {
     'Cleveland Indians': ['克里夫蘭', '印地安人'], 'Florida Marlins': ['佛羅里達', '馬林魚'], 'Montreal Expos': ['蒙特婁', '博覽會'], 'Tampa Bay Devil Rays': ['坦帕灣', '魔鬼魚'],
     'Anaheim Angels': ['安那罕', '天使'], 'Los Angeles Angels of Anaheim': ['洛杉磯', '天使'], 'California Angels': ['加州', '天使']
-  },
-  wnba: {
-    'San Antonio Stars': ['聖安東尼奧', '銀星'], 'San Antonio Silver Stars': ['聖安東尼奧', '銀星'], 'Utah Starzz': ['猶他', '星'], 'Tulsa Shock': ['土爾沙', '震撼'], 'Detroit Shock': ['底特律', '震撼'],
-    'Orlando Miracle': ['奧蘭多', '奇蹟']
-  },
-  nfl: {
-    'Oakland Raiders': ['奧克蘭', '突擊者'], 'San Diego Chargers': ['聖地牙哥', '閃電'], 'St. Louis Rams': ['聖路易', '公羊'], 'Washington Redskins': ['華盛頓', '紅人'], 'Washington Football Team': ['華盛頓', '足球隊']
-  },
-  nhl: {
-    'Arizona Coyotes': ['亞利桑那', '郊狼'], 'Phoenix Coyotes': ['鳳凰城', '郊狼'], 'Atlanta Thrashers': ['亞特蘭大', '鶇鳥'], 'Mighty Ducks of Anaheim': ['安那罕', '巨鴨']
   }
 };
 // By normalizeTeamName() too (Kambi's and Polymarket's spellings).
@@ -146,18 +113,15 @@ const CLUBS = {
   hertha: '柏林赫塔', 'hertha bsc': '柏林赫塔', 'hertha berlin': '柏林赫塔', 'fortuna dusseldorf': '杜塞道夫', 'hannover 96': '漢諾威 96', nurnberg: '紐倫堡', '1 nurnberg': '紐倫堡', karlsruher: '卡爾斯魯厄', kaiserslautern: '凱澤斯勞滕', '1 kaiserslautern': '凱澤斯勞滕', sion: '錫永', basel: '巴塞爾', 'basel 1893': '巴塞爾', zurich: '蘇黎世', lugano: '盧加諾', servette: '塞爾維特', 'st gallen': '聖加崙'
 };
 
-// NPB, KBO, CPBL as Taiwan writes them (their own names and Kambi's spellings), by normalizeTeamName().
+// The CPBL as Taiwan writes it (its own names and Kambi's spellings), by normalizeTeamName().
 const ASIA = {
-  'tsg hawks': '台鋼雄鷹', 'uni lions': '統一7-ELEVEn獅', 'uni president lions': '統一7-ELEVEn獅', 'fubon guardians': '富邦悍將', 'chinatrust brothers': '中信兄弟', 'ctbc brothers': '中信兄弟', 'rakuten monkeys': '樂天桃猿', 'wei chuan dragons': '味全龍',
-  'yomiuri giants': '讀賣巨人', 'hanshin tigers': '阪神虎', 'chunichi dragons': '中日龍', 'yokohama dena baystars': '橫濱DeNA海灣之星', 'hiroshima toyo carp': '廣島東洋鯉魚', 'tokyo yakult swallows': '東京養樂多燕子', 'fukuoka softbank hawks': '福岡軟銀鷹',
-  'hokkaido nippon ham fighters': '北海道日本火腿鬥士', 'chiba lotte marines': '千葉羅德海洋', 'tohoku rakuten golden eagles': '東北樂天金鷲', 'orix buffaloes': '歐力士猛牛', 'saitama seibu lions': '埼玉西武獅',
-  'kia tigers': '起亞虎', 'samsung lions': '三星獅', 'lg twins': 'LG雙子', 'doosan bears': '斗山熊', 'kt wiz': 'KT巫師', 'ssg landers': 'SSG登陸者', 'lotte giants': '樂天巨人', 'hanwha eagles': '韓華鷹', 'nc dinos': 'NC恐龍', 'kiwoom heroes': '培證英雄',
-  'yokohama bay stars': '橫濱DeNA海灣之星', 'nippon ham fighters': '北海道日本火腿鬥士', 'rakuten golden eagles': '東北樂天金鷲', 'seibu lions': '埼玉西武獅', 'kt wiz suwon': 'KT巫師', yomiuri: '讀賣巨人', 'hiroshima carp': '廣島東洋鯉魚'
+  'tsg hawks': '台鋼雄鷹', 'uni lions': '統一7-ELEVEn獅', 'uni president lions': '統一7-ELEVEn獅', 'fubon guardians': '富邦悍將', 'chinatrust brothers': '中信兄弟', 'ctbc brothers': '中信兄弟', 'rakuten monkeys': '樂天桃猿', 'wei chuan dragons': '味全龍'
 };
-// Asian clubs' short names ("統一7-ELEVEn獅" → 統一獅), for a row.
-const ASIA_SHORT = { '統一7-ELEVEn獅': '統一獅', '橫濱DeNA海灣之星': '橫濱DeNA', '北海道日本火腿鬥士': '火腿', '東北樂天金鷲': '樂天金鷲', '東京養樂多燕子': '養樂多', '廣島東洋鯉魚': '廣島鯉魚', '福岡軟銀鷹': '軟銀鷹', '千葉羅德海洋': '羅德', '埼玉西武獅': '西武獅', '歐力士猛牛': '歐力士' };
+// Its clubs' short names ("統一7-ELEVEn獅" → 統一獅), for a row.
+const ASIA_SHORT = { '統一7-ELEVEn獅': '統一獅' };
 
-// American college football (FBS) by school, as Taiwan's lottery writes them:
+// American colleges (FBS) by school, as Taiwan's lottery writes them (a
+// player's 大學, Sports' player page: teamNameZh('ncaaf', …)):
 // the school, no nickname ("Florida State Seminoles" → 佛羅里達州立). Matched
 // on the start of ESPN's name, longest school first (Florida State before Florida).
 const COLLEGE = {
@@ -178,11 +142,10 @@ function collegeZh(name) {
   return school ? COLLEGE[school] : null;
 }
 
-// Clubs of the leagues carried beyond Europe's big ones (2026-10: every
-// club ESPN lists for each), by their English name as ESPN or Kambi write it
-// (normalized below, as CLUBS'). Soccer's go in with CLUBS, as clubs meet in
-// other competitions (Utrecht in the Europa League); a name two leagues share
-// (Santos) is the league's own below.
+// Clubs of leagues beyond Europe's big ones (every club ESPN lists for each),
+// by their English name as ESPN or Kambi write it (normalized below, as
+// CLUBS'). They go in with CLUBS: they meet ours in the cups (Utrecht in the
+// Europa League) and in players' careers (生涯球隊).
 const MORE_CLUBS = {
   // Eredivisie
   'ADO Den Haag': '海牙', Excelsior: '鹿特丹精英', 'FC Groningen': '格羅寧根', 'FC Utrecht': '烏德勒支', 'Fortuna Sittard': '錫塔德', 'Go Ahead Eagles': '前進之鷹', Heerenveen: '海倫芬', 'PEC Zwolle': '茲沃勒', 'SC Cambuur': '坎布爾', 'Sparta Rotterdam': '鹿特丹斯巴達', Telstar: '特爾斯達', 'Willem II': '威廉二世',
@@ -193,16 +156,7 @@ const MORE_CLUBS = {
   // K League
   'Jeonbuk Hyundai Motors': '全北現代', 'Jeonbuk Motors': '全北現代', 'Ulsan HD': '蔚山 HD', 'Ulsan Hyundai': '蔚山 HD', 'Pohang Steelers': '浦項制鐵', 'FC Seoul': '首爾', Gangwon: '江原', 'Gangwon FC': '江原', 'Gwangju FC': '光州', 'Daejeon Hana Citizen': '大田市民', 'Daejeon Citizen': '大田市民', 'Jeju United': '濟州', 'Jeju SK': '濟州', 'Incheon United': '仁川聯', 'Anyang FC': '安養', 'FC Anyang': '安養', 'Gimcheon Sangmu FC': '金泉尚武', 'Gimcheon Sangmu': '金泉尚武', 'Suwon FC': '水原 FC', 'Daegu FC': '大邱', 'Suwon Samsung Bluewings': '水原三星', 'Bucheon FC 1995': '富川 FC', 'Bucheon FC': '富川 FC', 'Jeonnam Dragons': '全南天龍'
 };
-// A league's own names: its clubs a name shared with another league's
-// (Liga MX's Santos), and the NBL's (basketball: not CLUBS').
-const LEAGUE_NAMES = {
-  ligamx: { Santos: '桑托斯拉古納' },
-  // EuroLeague (basketball: not CLUBS', as 運彩 lists them)
-  euroleague: { 'Virtus Bologna': '博洛尼亞維圖斯', 'Virtus Segafredo Bologna': '博洛尼亞維圖斯', 'Hapoel Tel Aviv': '特拉維夫夏普爾', 'Hapoel Tel Aviv BC': '特拉維夫夏普爾', 'Anadolu Efes': '艾菲斯', 'Anadolu Efes SK': '艾菲斯', 'BC Dubai': '杜拜', 'Dubai Basketball': '杜拜', 'Real Madrid': '皇家馬德里', 'Real Madrid Baloncesto': '皇家馬德里', 'Maccabi Tel Aviv': '特拉維夫馬卡比', 'Maccabi Tel Aviv BC': '特拉維夫馬卡比', 'Maccabi Playtika Tel Aviv': '特拉維夫馬卡比', 'Saski Baskonia': '巴斯克尼亞', 'Baskonia': '巴斯克尼亞', 'Milano': '米蘭奧林匹亞', 'Olimpia Milano': '米蘭奧林匹亞', 'EA7 Emporio Armani Milan': '米蘭奧林匹亞', 'KK Crvena Zvezda Belgrade': '貝爾格勒紅星', 'KK Crvena zvezda': '貝爾格勒紅星', 'Crvena Zvezda': '貝爾格勒紅星', 'Partizan Belgrade': '貝爾格勒游擊隊', 'KK Partizan': '貝爾格勒游擊隊', 'Partizan': '貝爾格勒游擊隊', 'ASVEL Lyon-Villeurbanne': '維勒班', 'LDLC ASVEL Villeurbanne': '維勒班', 'ASVEL': '維勒班', 'Žalgiris Kaunas': '考納斯薩爾基里斯', 'BC Žalgiris': '考納斯薩爾基里斯', 'Zalgiris Kaunas': '考納斯薩爾基里斯', 'Fenerbahce SK': '費內巴切', 'Fenerbahce': '費內巴切', 'Fenerbahçe Beko Istanbul': '費內巴切', 'Olympiacos BC': '奧林匹亞科斯', 'Olympiacos': '奧林匹亞科斯', 'Olympiacos Piraeus': '奧林匹亞科斯', 'Valencia Basket Club': '瓦倫西亞', 'Valencia Basket': '瓦倫西亞', 'Paris Basket': '巴黎', 'Paris Basketball': '巴黎', 'Panathinaikos BC': '帕納辛納克斯', 'Panathinaikos': '帕納辛納克斯', 'Panathinaikos AKTOR Athens': '帕納辛納克斯', 'AS Monaco Basket': '摩納哥', 'AS Monaco': '摩納哥', 'Monaco': '摩納哥', 'FC Barcelona Basquet': '巴塞隆納', 'FC Barcelona': '巴塞隆納', 'Barcelona': '巴塞隆納', 'Bayern München Basketball': '拜仁慕尼黑', 'FC Bayern Munich': '拜仁慕尼黑', 'Bayern Munich': '拜仁慕尼黑', 'Besiktas Basketbol': '貝西克塔斯', 'Besiktas': '貝西克塔斯' },
-  nbl: { 'Adelaide 36ers': '阿德萊德 36 人', 'Brisbane Bullets': '布里斯本子彈', 'Cairns Taipans': '凱恩斯太攀蛇', 'Illawarra Hawks': '伊拉瓦拉老鷹', 'Melbourne United': '墨爾本聯', 'New Zealand Breakers': '紐西蘭破浪者', 'Perth Wildcats': '伯斯野貓', 'South East Melbourne Phoenix': '東南墨爾本鳳凰', 'Sydney Kings': '雪梨國王', 'Tasmania JackJumpers': '塔斯馬尼亞跳蟻' }
-};
 for (const [name, zh] of Object.entries(MORE_CLUBS)) CLUBS[normalizeTeamName(name)] ??= zh;
-const LEAGUE_BY_NAME = Object.fromEntries(Object.entries(LEAGUE_NAMES).map(([k, t]) => [k, Object.fromEntries(Object.entries(t).map(([name, zh]) => [normalizeTeamName(name), zh]))]));
 
 const SOCCER = new Set(['soccer']);
 // A team in Chinese: { full, short }, or null when there's no Chinese name.
@@ -212,13 +166,11 @@ export function teamNameZh(key, name, sport = '') {
   const n = normalizeTeamName(name);
   const us = US[key]?.[name] || FORMER[key]?.[name] || US_BY_KEY[key]?.[n];
   if (us) return { full: `${us[0]}${us[0] && /^[\d]/.test(us[1]) ? ' ' : ''}${us[1]}`, short: us[1] };
-  const own = LEAGUE_BY_NAME[key]?.[n];
-  if (own) return { full: own, short: own };
   if (key === 'ncaaf') {
     const zh = collegeZh(name);
     return zh ? { full: zh, short: zh } : null;
   }
-  if (['npb', 'kbo', 'cpbl'].includes(key)) {
+  if (key === 'cpbl') {
     const zh = ASIA[n];
     return zh ? { full: zh, short: ASIA_SHORT[zh] || zh } : null;
   }
@@ -245,7 +197,6 @@ export function teamsByZh(query, most = 6) {
   for (const table of Object.values(US)) for (const [name, [city, nick]] of Object.entries(table)) add(name, `${city}${nick}`);
   for (const [name, zh] of Object.entries(CLUBS)) add(name, zh);
   for (const [name, zh] of Object.entries(ASIA)) add(name, zh);
-  for (const t of Object.values(LEAGUE_NAMES)) for (const [name, zh] of Object.entries(t)) add(name, zh);
   for (const [name, zh] of Object.entries(COLLEGE)) add(name, zh);
   // One English name a team (a club written several ways: the first).
   const seen = new Set();

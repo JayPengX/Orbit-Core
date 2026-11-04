@@ -131,7 +131,7 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's date), `addDays` |
 | `feedback.mjs` | Every app's picks, one engine: `shown`, `picked`, `passed`, `did` → weights per key (30-day half-life); `scorer`, `lifter`, `chance`, `whyOf` (常看), `hitRate`; on the Pass: `fb:<app>` |
 | `holidays.mjs`, `dayoff.mjs` | Taiwan's days off; typhoon days off (停班停課) by the place that decides them for each app |
-| `catalog.mjs`, `logos.mjs`, `names.mjs`, `photos.mjs`, `photo-urls.mjs` | Every sport and league once; logos (ESPN, TheSportsDB, flags, F1, old names); teams in Chinese; studio headshots; photos' addresses alone |
+| `catalog.mjs`, `logos.mjs`, `names.mjs`, `photos.mjs`, `photo-urls.mjs` | Sports' leagues once; logos (ESPN, TheSportsDB, flags, F1, old names); teams in Chinese; studio headshots; photos' addresses alone |
 | `f1live.mjs`, `postseason.mjs`, `sports-espn.mjs`, `sports-broadcast.mjs`, `sports-highlights.mjs`, `sports-winprob.mjs` | F1's own timing read one way everywhere; MLB's postseason; ESPN's scoreboards as events (one parser for the proxy and the phone); where to watch in Taiwan (past ELTA's list, `eltaGuess`: its usual line-up, said 預估); highlights; win probability (also run by the builders) |
 | `stock-account.mjs`, `stock-access.mjs`, `stock-credit.mjs`, `stock-markets.mjs`, `stock-quotes.mjs`, `stock-bonds.mjs`, `stock-savings.mjs`, `stock-ipo.mjs`, `stock-holidays.mjs`, `stock-hk-lots.mjs`, `stock-jp-lists.mjs`, `stock-codec.mjs` | Securities' ledger, broker rules, markets, prices, bonds, savings, IPOs, exchange holidays, lot sizes and saved-copy codec, shared with the Worker |
 | `pay.mjs`, `gov.mjs` | The weekly pay and relief (rules only; the Worker alone writes them); what the government took and gave one account |
@@ -245,7 +245,7 @@ w;dur=` (the Worker's own time), which the 除錯紀錄 notes with a slow read.
 
 `?url=<encoded>&app=<kit id>&qt=` passes an upstream through if its host is
 on `SPORTS_PROXY_ALLOWED_HOSTS`. Two hosts are not real: `asia-baseball.orbit`
-(NPB, KBO, CPBL from their own sites) and `f1-live.orbit` (F1's live timing:
+(the CPBL's months, from TheSportsDB) and `f1-live.orbit` (F1's live timing:
 `now.json`, `session.json`, `laps.json`, `circuit.json`; `/about.json` and
 `/face.json` for drivers the F1 sites don't know, `f1-people.js`; the DO
 `F1Log` logs laps). A finished session is F1's archive's, else rebuilt from

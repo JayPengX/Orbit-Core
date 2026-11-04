@@ -186,7 +186,7 @@ const APPLE_SEARCHES = 40;
 // (a football video kept only with ext, or x: the extended cut looked for). How many, back.
 export const CHECKED = 5;
 // (As the kit's sports-highlights.mjs has them.)
-export const TIMED = new Set(['mlb', 'cpbl', 'npb', 'kbo', 'nba', 'wnba', 'nbl', 'nhl', 'nfl', 'ncaaf']);
+export const TIMED = new Set(['mlb', 'cpbl', 'nba']);
 export function recheck(store, checked, isSoccer, now = Date.now()) {
   const again = new Set();
   const due = key => (checked < 1 && isSoccer(key)) || (checked < 2 && key === 'mls') || (checked < 3 && TIMED.has(key));

@@ -68,7 +68,7 @@ export function grandPrix(name) {
 const nm = x => x?.en || x?.name || '';
 // A CPBL club in Chinese (its full name: 中信兄弟), whatever the reader's language.
 const zhOf = x => [x?.zh, x?.name, x?.short].find(n => /[\u3400-\u9fff]/.test(n || '')) || nm(x);
-const SOCCER = new Set(['epl', 'seriea', 'bundesliga', 'ligue1', 'scotland', 'facup', 'ucl', 'uel', 'uecl', 'nationsleague', 'mls', 'worldcup']);
+const SOCCER = new Set(['epl', 'seriea', 'bundesliga', 'ligue1', 'scotland', 'facup', 'ucl', 'uel', 'uecl', 'nationsleague', 'mls']);
 const football = e => SOCCER.has(e?.league);
 // A playoff game's number and its round's short name, from ESPN's note
 // ("NLDS - Game 3", "East Semifinals - Game 5"): { round, game } or null.
@@ -161,7 +161,7 @@ const twDay = title => {
 // 2026"; in the US's leagues "(9/18/26)" too), each 'M-D', or [].
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const MONTH = '(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun[e]?|jul[y]?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?';
-const US = new Set(['mlb', 'nba', 'wnba', 'mls']);
+const US = new Set(['mlb', 'nba', 'mls']);
 export function titleDays(title, league = '') {
   const t = String(title || '').toLowerCase();
   const days = [];
@@ -199,7 +199,7 @@ const NOT_HIGHLIGHTS = /every play|reaction|preview|press conference|post-?match
 // the game's own, 2026-10-13).
 const PART_OF_GAME = /\b(\d+(st|nd|rd|th)|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|extra) (inning|quarter|period)s?\b|\binnings?\b|\bfull (top|bottom|bot)\b|\b(final|last) (\d+|three|two) outs?\b|\bfinal out\b/i;
 // (The leagues played in innings, quarters or periods, by key: this file reads no league list.)
-const TIMED = new Set(['mlb', 'cpbl', 'npb', 'kbo', 'nba', 'wnba', 'nbl', 'nhl', 'nfl', 'ncaaf']);
+const TIMED = new Set(['mlb', 'cpbl', 'nba']);
 // How official a channel is for a game: 0 the league's, 1 a side's, 2 an
 // English rights holder's, 3 an NBA game's full-game channel;
 // null for anyone else.
