@@ -47,7 +47,7 @@ tools/shots/accounts/<app>-<name>.txt --click …` saves what the app wrote
 (follows, a watchlist, a timetable). A new account with nothing in it is a
 real state too (its welcome sheet): shoot that when it's what you changed.
 
-## `node tools/live-scroll.mjs [app…] [--sheet "<js>"]`: nothing jumps
+## `node tools/live-scroll.mjs [app…] [--sheet "<js>"] [--account <name>] [--fast] [--no-days]`: nothing jumps
 
 Each app on real data (signed in to its demo account in `tools/shots/accounts/`
 where it has one). First, as it loads, untouched (`late`): from the moment its
@@ -57,7 +57,13 @@ in the layout, and one that moves on its own is a fault, named with how far
 and when ("勝率預測 +530px at 1.3s": a part read later popped in above it
 instead of holding its place, the kit's `waiting()`). Sports' game pages are
 checked by themselves: an NBA game to come, one just over, a football game to
-come. Then it's scrolled the way iPhone's Safari scrolls (no scroll
+come; Sports' 首頁 also two and three days on, picked on its strip, and a game
+row that comes into the first screen after some were drawn is a fault too ("a
+game came in (艾佛頓 v 科芬特里城) at 8.6s": the loading screen lifted on today's
+ended games and the next day's came in over them). Sports is opened as on a
+phone's link (each proxy read a round trip and more for its size later; `--fast`
+for the cloud's speed) with one league (the Scottish) unanswered for 3 s from
+each first ask. `--account fill` signs in with 填滿空檔 on (`sports-fill.txt`). Then it's scrolled the way iPhone's Safari scrolls (no scroll
 anchoring), and: something above the view grows (a refresh); the tab is drawn
 anew a moment short before it's full again; a drawing under the view moves (a
 car on a track map, a box laid over the page) and the page must not follow; a

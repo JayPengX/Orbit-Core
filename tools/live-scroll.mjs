@@ -65,8 +65,28 @@ const SHEETS = {
   ]
 };
 const sheetsOf = app => (args.includes('--sheet') ? (opt('sheet') ? [['sheet', opt('sheet')]] : []) : SHEETS[app] || []);
+// Days picked on a page's own date strip, each watched as it loads like the
+// page (Jay 2026-11-04, Sports 首頁: "the games often jump in": with
+// 填滿空檔 on, the filled games came in after theirs and pushed the list
+// down). Two and three days on: days the page hasn't read ahead.
+const dayPick = ahead => `(async () => {
+  scrollTo(0, 0);
+  const chips = [...document.querySelectorAll('#panel-home [data-day], .q-day-bar [data-day]')].filter(c => c.getClientRects().length);
+  const i = chips.findIndex(c => c.classList.contains('is-today'));
+  (i >= 0 ? chips[i + ${ahead}] : null)?.click();
+  // (The strip lights the chip first and draws the day a frame later: watched from then.)
+  await new Promise(r => requestAnimationFrame(() => setTimeout(r, 200)));
+})()`;
+const DAYS = { sports: [['two days on', dayPick(2)], ['three days on', dayPick(3)]] };
+const ROWS = { sports: '.event-row' };
+// (Each page of that league, as the URL asks it.)
+const FLAKY = { sports: /https:\/\/[^&]*soccer\/sco\.1\/[^&]*/g };
+const daysOf = app => (args.includes('--no-days') ? [] : DAYS[app] || []);
 const without = args.includes('--without');
-const apps = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--sheet');
+const apps = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--sheet' && args[i - 1] !== '--account');
+// --account <name>: signed in to tools/shots/accounts/<app>-<name>.txt (Sports'
+// `fill`: 填滿空檔 on), not the first one there.
+const accountName = opt('account');
 // (How long each is watched as it loads.)
 const LATE_MS = 9000;
 const list = apps.length ? apps : ['sports', 'transit', 'weather', 'securities', 'law', 'words', 'money', 'beats'];
@@ -81,7 +101,12 @@ const accounts = fileURLToPath(new URL('./shots/accounts/', import.meta.url));
 // nothing's touched is a fault. The page from its loading screen's lift; a
 // sheet from the moment it's asked for (a card popping in as it slides up
 // is seen too).
-const late = async ([inSheet, ms]) => {
+// `rows`: an app's list rows (Sports' games): once some are drawn on the
+// first screen, one that comes in there later is a fault too (a whole list
+// redrawn has new text everywhere, so nothing "moved"; Jay 2026-11-04, 首頁:
+// the cover lifted on today's ended games, then the next day's games came in
+// over them; 填滿空檔's games after theirs).
+const late = async ([inSheet, ms, rows]) => {
   const wait = t => new Promise(r => setTimeout(r, t));
   const BLOCK = '.q-card, .q-section, .q-list, section, article, li, .q-cell, [class*="card"], [class*="-row"]';
   const sigOf = n => `${n.tagName}.${String(n.className).replace(/\bfade-in\b/, '')}|${(n.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 48)}`;
@@ -98,6 +123,9 @@ const late = async ([inSheet, ms]) => {
   const t0 = performance.now();
   const faults = [];
   let base = null;
+  // (A row by who plays, not the score, the clock or a tag put on it later: a live game's line is the same row.)
+  const rowKey = n => ([...n.querySelectorAll('.side-name')].map(x => x.textContent.trim()).join(' v ') || (n.querySelector('.event-sides')?.firstElementChild || n).textContent.replace(/[\d:'’+–-]+/g, '').replace(/\s+/g, ' ').trim()).slice(0, 40);
+  let rowsSeen = null;
   while (performance.now() - t0 < ms) {
     await wait(100);
     const cover = document.getElementById('loading');
@@ -117,6 +145,16 @@ const late = async ([inSheet, ms]) => {
       if (y + h < -vh || y > 2 * vh) continue;
       const k = sigOf(n);
       now.set(k, now.has(k) ? null : { y, seen: y + h > 0 && y < vh, name: nameOf(n) });
+    }
+    if (rows) {
+      const inView = [...se.querySelectorAll(rows)].filter(n => n.offsetParent && !n.closest('.q-rail')).filter(n => {
+        const y = yOf(n, se);
+        return y + n.offsetHeight > 0 && y < vh;
+      });
+      // (A stand-in row of a shape held while the day's read says nothing: not a game.)
+      const keys = new Set(inView.map(rowKey).filter(Boolean));
+      if (rowsSeen?.size) for (const k of keys) if (!rowsSeen.has(k)) faults.push(`a game came in (${k.slice(0, 24)}) at ${Math.round((performance.now() - t0) / 100) / 10}s`);
+      if (keys.size) rowsSeen = new Set([...(rowsSeen || []), ...keys]);
     }
     if (base)
       for (const [k, was] of base) {
@@ -313,7 +351,7 @@ let faults = 0;
 for (const app of list) {
   const port = 8300 + Math.floor(Math.random() * 500);
   // (Signed in to the app's demo account where it has one: a fan's 首頁 is long enough to scroll.)
-  const demo = readdirSync(accounts).find(f => f.startsWith(`${app}-`) && f.endsWith('.txt'));
+  const demo = readdirSync(accounts).find(f => (accountName ? f === `${app}-${accountName}.txt` : f.startsWith(`${app}-`)) && f.endsWith('.txt'));
   const srv = spawn(process.execPath, [preview, app, '--live', '--serve', '--port', String(port), ...(demo ? ['--payload', join(accounts, demo)] : [])], { stdio: ['ignore', 'pipe', 'pipe'] });
   const url = await new Promise((res, rej) => {
     const t = setTimeout(() => rej(new Error('preview did not start')), 30_000);
@@ -333,9 +371,33 @@ for (const app of list) {
     // Safari's way: no scroll anchoring anywhere.
     await page.addInitScript(() => document.addEventListener('DOMContentLoaded', () => document.head.append(Object.assign(document.createElement('style'), { textContent: '*{overflow-anchor:none!important}' }))));
     if (without) await page.addInitScript(() => (globalThis.__orbitHoldPlace = true));
+    // A phone's link, not the cloud's: each read through the data proxy
+    // answers a round trip later, and more for how much it carries (a batch
+    // of 24 leagues' pages lands after one of 6), so a part read alongside
+    // comes in after the rest, as on Jay's iPhone (--fast: the cloud's own speed).
+    // And one league whose pages don't answer for 3 s from their first ask
+    // (Sports: the Scottish league, one of the others; a phone often has
+    // one), with whatever is asked in the same batch: what waits on it
+    // can't hold the rest (the move to the next day of theirs waited for its
+    // retry and came after the loading screen lifted), and a day isn't drawn
+    // without it to have it come in 4 s later.
+    const firstAsked = new Map();
+    if (!args.includes('--fast'))
+      await page.route(/sports-proxy/, async route => {
+        const url = decodeURIComponent(route.request().url());
+        await new Promise(r => setTimeout(r, 250 + 30 * Math.max(1, (url.match(/[?&]u=/g) || []).length)));
+        const flaky = FLAKY[app] ? url.match(FLAKY[app]) || [] : [];
+        for (const u of flaky) if (!firstAsked.has(u)) firstAsked.set(u, Date.now());
+        if (flaky.some(u => Date.now() - firstAsked.get(u) < 3_000)) return route.fulfill({ status: 503, body: '{"error":"flaky"}', headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
+        return route.continue();
+      });
     await page.goto(url);
-    const pageLate = await page.evaluate(late, [false, LATE_MS]);
+    const pageLate = await page.evaluate(late, [false, LATE_MS, ROWS[app]]);
     const results = { page: { late: pageLate, ...(await page.evaluate(check, false)), tap: await taps(page, false) } };
+    for (const [name, js] of daysOf(app)) {
+      await page.evaluate(js);
+      results[name] = { late: await page.evaluate(late, [false, LATE_MS, ROWS[app]]), skipped: 'a day picked on the strip' };
+    }
     for (const [name, js] of sheetsOf(app)) {
       await page.evaluate(js);
       const sheetLate = await page.evaluate(late, [true, LATE_MS]);
