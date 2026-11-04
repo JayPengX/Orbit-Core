@@ -4,11 +4,11 @@
 //   sport   one of SPORTS
 //   kind    'match' two sides; 'field' a race weekend
 //   data    where its schedule and scores come from: 'espn' (espn path),
-//           'kambi' (kambi path), 'asia' (the leagues' own sites, through the
-//           sports proxy: asiaMonth below). Orbit Sports shows only the leagues on ELTA.tv
-//           or Apple TV in Taiwan (its lib/broadcast.mjs).
+//           'asia' (the CPBL's, through the sports proxy: asiaMonth below).
+//           Orbit Sports shows the leagues on ELTA.tv or Apple TV in Taiwan
+//           (kit/sports-broadcast.mjs BROADCAST); only those are kept here.
 //   bet     the league's key for its logos and team names (logos.mjs, names.mjs)
-//   espn / kambi   the paths on each source
+//   espn / kambi   the paths on each source (Kambi: baseball's live innings)
 //   standings  a cup with a table ESPN keeps (a league phase, groups):
 //           its table shown and each game's group said
 
@@ -16,8 +16,6 @@ export const SPORTS = {
   soccer: { zh: '足球', en: 'Soccer', icon: '⚽' },
   baseball: { zh: '棒球', en: 'Baseball', icon: '⚾' },
   basketball: { zh: '籃球', en: 'Basketball', icon: '🏀' },
-  football: { zh: '美式足球', en: 'Football', icon: '🏈' },
-  hockey: { zh: '冰球', en: 'Hockey', icon: '🏒' },
   racing: { zh: '賽車', en: 'Racing', icon: '🏎️' }
 };
 
@@ -28,22 +26,13 @@ const soccer = (path, zh, en, bet, extra = {}) => espn('soccer', `soccer/${path}
 export const CATALOG = {
   // Baseball
   mlb: espn('baseball', 'baseball/mlb', 'MLB 美國職棒', 'MLB', 'mlb', { top: true, kambi: 'baseball/mlb' }),
-  npb: { sport: 'baseball', kind: 'match', data: 'asia', asia: 'npb', homeFirst: true, kambi: 'baseball/japan/npb', zh: '日本職棒', en: 'NPB', bet: 'npb', icon: '⚾', badge: 'lk85rg1575038781' },
-  kbo: { sport: 'baseball', kind: 'match', data: 'asia', asia: 'kbo', kambi: 'baseball/south_korea/kbo_league', zh: '韓國職棒', en: 'KBO', bet: 'kbo', icon: '⚾', badge: 'qfr1hx1589707979' },
   cpbl: { sport: 'baseball', kind: 'match', data: 'asia', asia: 'cpbl', kambi: 'baseball/taiwan/chinese_professional_baseball', zh: '中華職棒', en: 'CPBL', bet: 'cpbl', top: true, icon: '⚾', badge: 'c3vetj1655924198' },
   // Basketball
   nba: espn('basketball', 'basketball/nba', 'NBA', 'NBA', 'nba', { top: true, kambi: 'basketball/nba' }),
-  wnba: espn('basketball', 'basketball/wnba', 'WNBA', 'WNBA', 'wnba', { kambi: 'basketball/wnba' }),
-  nbl: espn('basketball', 'basketball/nbl', '澳洲職籃', 'NBL', 'nbl', { kambi: 'basketball/australia/nbl', homeFirst: true }),
-  euroleague: { sport: 'basketball', kind: 'match', data: 'kambi', homeFirst: true, kambi: 'basketball/euroleague', zh: '歐洲籃球聯賽', en: 'EuroLeague', bet: 'euroleague', icon: '🏀', badge: '7xjtuy1554397263' },
-  // Football
-  nfl: espn('football', 'football/nfl', 'NFL', 'NFL', 'nfl', { top: true, kambi: 'american_football/nfl' }),
-  ncaaf: espn('football', 'football/college-football', '美國大學美式足球', 'College Football', 'ncaaf', { kambi: 'american_football/ncaaf', icon: '🏈' }),
-  // Hockey
-  nhl: espn('hockey', 'hockey/nhl', 'NHL', 'NHL', 'nhl', { kambi: 'ice_hockey/nhl' }),
   // Soccer
   epl: soccer('eng.1', '英超', 'Premier League', 'epl', { top: true, logo: 23, kambi: 'football/england/premier_league' }),
-  laliga: soccer('esp.1', '西甲', 'LaLiga', 'laliga', { top: true, logo: 15, kambi: 'football/spain/la_liga' }),
+  // Not shown (not on ELTA): its clubs' players' photos (the cups', builders/photos.js).
+  laliga: soccer('esp.1', '西甲', 'LaLiga', 'laliga', { logo: 15 }),
   seriea: soccer('ita.1', '義甲', 'Serie A', 'seriea', { logo: 12, kambi: 'football/italy/serie_a' }),
   bundesliga: soccer('ger.1', '德甲', 'Bundesliga', 'bundesliga', { logo: 10, kambi: 'football/germany/bundesliga' }),
   ligue1: soccer('fra.1', '法甲', 'Ligue 1', 'ligue1', { logo: 9, kambi: 'football/france/ligue_1' }),
@@ -52,16 +41,7 @@ export const CATALOG = {
   uecl: soccer('uefa.europa.conf', '歐協聯', 'Conference League', 'uecl', { cup: true, logo: 20296, kambi: 'football/conference_league', standings: true }),
   scotland: soccer('sco.1', '蘇超', 'Scottish Premiership', 'scotland', { logo: 45, kambi: 'football/scotland/scottish_premiership' }),
   mls: soccer('usa.1', '美職足', 'MLS', 'mls', { logo: 19, kambi: 'football/usa/mls' }),
-  // Korea's K League 1: not on ESPN, Kambi's schedule and prices (three-way).
-  kleague: { sport: 'soccer', kind: 'match', data: 'kambi', kambi: 'football/south_korea/k-league_1', zh: '韓國職業足球聯賽', en: 'K League 1', bet: 'kleague', icon: '⚽' },
-  jleague: soccer('jpn.1', '日職聯', 'J1 League', 'jleague', { logo: 2199 }),
-  championship: soccer('eng.2', '英冠', 'Championship', 'championship', { logo: 24, kambi: 'football/england/the_championship' }),
-  eredivisie: soccer('ned.1', '荷甲', 'Eredivisie', 'eredivisie', { logo: 11, kambi: 'football/netherlands/eredivisie' }),
-  ligamx: soccer('mex.1', '墨超', 'Liga MX', 'ligamx', { logo: 22, kambi: 'football/mexico/liga_mx' }),
-  brasileirao: soccer('bra.1', '巴甲', 'Brasileirão', 'brasileirao', { logo: 85, kambi: 'football/brazil/brasileirao_serie_a' }),
   facup: soccer('eng.fa', '英足總盃', 'FA Cup', 'facup', { cup: true, logo: 40, kambi: 'football/england/fa_cup' }),
-  // The big tournaments: every few years, the board fills when one is on.
-  worldcup: soccer('fifa.world', '世界盃', 'FIFA World Cup', 'worldcup', { cup: true, logo: 4, standings: true }),
   nationsleague: soccer('uefa.nations', '歐國聯', 'Nations League', 'nationsleague', { cup: true, logo: 2395, kambi: 'football/uefa_nations_league', standings: true }),
   // Racing
   f1: { sport: 'racing', kind: 'field', data: 'espn', espn: 'racing/f1', zh: 'F1 一級方程式', en: 'Formula 1', bet: 'f1', top: true, standings: true }
@@ -71,13 +51,11 @@ export const CATALOG = {
 export const familyOfSport = sport => sport;
 
 // The sports shown home side first, as their own broadcasts show them:
-// soccer (and rugby, handball, volleyball). Every US-style sport (baseball,
-// basketball, American football, hockey) lists the visitors first ("Lakers
-// @ Celtics"), and so does anything not known here. A league that goes its
-// own way says so (`homeFirst`): EuroLeague and Australia's NBL, as Europe
-// and Australia list games; Japan's NPB (巨人－阪神 is the Giants at home).
-// The CPBL and the KBO keep the visitors first, as their broadcasts do.
-const HOME_FIRST = new Set(['soccer', 'rugby', 'handball', 'volleyball']);
+// soccer. Every US-style sport (baseball, basketball) lists the visitors
+// first ("Lakers @ Celtics"), and so does anything not known here; the CPBL
+// keeps the visitors first, as its broadcasts do. A league that goes its own
+// way would say so (`homeFirst`).
+const HOME_FIRST = new Set(['soccer']);
 
 // A game's two sides in the order to show them: [first, second]. `game` has
 // `home` and `away` (a team, a name or a score: whatever the screen draws)
@@ -91,7 +69,7 @@ export function sidesInOrder(game) {
 export const ESPN_SITE = 'https://site.api.espn.com/apis/site/v2/sports';
 export const yyyymmdd = date => date.toISOString().slice(0, 10).replaceAll('-', '');
 
-// ---- Asian baseball (NPB, KBO, CPBL) -------------------------------------------------
+// ---- Asian baseball (the CPBL) -------------------------------------------------
 //
 // The sports proxy gathers these from the leagues' own sites (Orbit-Core's
 // asia-baseball.js) and answers as if from this host, by month: { league,

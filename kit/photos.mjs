@@ -155,8 +155,8 @@ const loads = url =>
 // official headshot, for players the feed didn't give an id for. Checked to
 // exist before it's used.
 const ESPN_SEARCH = 'https://site.web.api.espn.com/apis/common/v3/search?type=player&limit=6&query=';
-const SEARCH_SPORT = { racing: 'racing', soccer: 'soccer', basketball: 'basketball', baseball: 'baseball', football: 'football', hockey: 'hockey' };
-const HEADSHOT_FOLDER = { racing: 'rpm', soccer: 'soccer', basketball: 'nba', baseball: 'mlb', football: 'nfl', hockey: 'nhl' };
+const SEARCH_SPORT = { racing: 'racing', soccer: 'soccer', basketball: 'basketball', baseball: 'baseball' };
+const HEADSHOT_FOLDER = { racing: 'rpm', soccer: 'soccer', basketball: 'nba', baseball: 'mlb' };
 export async function espnSearchPhoto(name, sport, fetchJson = defaultJson, check = loads) {
   if (!SEARCH_SPORT[sport]) return '';
   // (A failed search throws: findPhoto keeps nothing, and asks again later.)
@@ -164,8 +164,7 @@ export async function espnSearchPhoto(name, sport, fetchJson = defaultJson, chec
   const want = plain(name);
   const hit = items.find(i => i.type === 'player' && i.sport === SEARCH_SPORT[sport] && plain(i.displayName) === want);
   if (!hit?.id) return '';
-  const folder = sport === 'basketball' && hit.league === 'wnba' ? 'wnba' : HEADSHOT_FOLDER[sport];
-  const url = smallPhoto(`${CDN}/${folder}/players/full/${hit.id}.png`);
+  const url = smallPhoto(`${CDN}/${HEADSHOT_FOLDER[sport]}/players/full/${hit.id}.png`);
   return (await check(url)) ? url : '';
 }
 
@@ -174,7 +173,7 @@ export async function espnSearchPhoto(name, sport, fetchJson = defaultJson, chec
 // their name and sport match. Its thumbnails are often casual pictures, so
 // only the cutout counts.
 const TSDB_SEARCH = 'https://www.thesportsdb.com/api/v1/json/123/searchplayers.php?p=';
-const TSDB_SPORT = { soccer: 'Soccer', baseball: 'Baseball', basketball: 'Basketball', football: 'American Football', hockey: 'Ice Hockey', racing: 'Motorsport', tennis: 'Tennis', badminton: 'Badminton', tabletennis: 'Table Tennis' };
+const TSDB_SPORT = { soccer: 'Soccer', baseball: 'Baseball', basketball: 'Basketball', racing: 'Motorsport' };
 // Its free key takes about 30 searches a minute: they go one at a time, 2.1 s
 // apart, so a roster opened (or a few teams flicked through) never hits the
 // limit; one that does pauses the queue a minute. A failed search throws.

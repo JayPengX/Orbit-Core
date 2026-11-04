@@ -12,11 +12,11 @@ export const smallPhoto = url =>
   : /^https:\/\/r2\.thesportsdb\.com\/images\/media\/player\/cutout\/[^/]+\.png$/.test(url) ? `${url}/small`
   : url;
 // ESPN's headshot folders by league (racing: this season's, see freshHeadshot).
-const ESPN_FOLDER = { f1: 'rpm', nba: 'nba', wnba: 'wnba', mlb: 'mlb', nfl: 'nfl', nhl: 'nhl' };
+const ESPN_FOLDER = { f1: 'rpm', nba: 'nba', mlb: 'mlb' };
 // A rookie or two-way player ESPN has no pro headshot for yet keeps his
 // college one (Rafael Castro, Lakers, 2026-10: mens-college-basketball):
 // tried after the pro one.
-const ESPN_COLLEGE = { nba: 'mens-college-basketball', wnba: 'womens-college-basketball', nfl: 'college-football' };
+const ESPN_COLLEGE = { nba: 'mens-college-basketball' };
 export function espnCollegeHeadshot(league, id) {
   return ESPN_COLLEGE[league] && id && /^\d+$/.test(String(id)) ? `${CDN}/${ESPN_COLLEGE[league]}/players/full/${id}.png` : null;
 }

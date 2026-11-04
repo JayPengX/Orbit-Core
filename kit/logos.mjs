@@ -58,41 +58,19 @@ export const EPL_ESPN_ID = {
 
 // Logos ESPN's scoreboards give for teams of leagues without a table here.
 const seenLogos = new Map();
-export const NFL_ABBR = {
-  'Arizona Cardinals': 'ari', 'Atlanta Falcons': 'atl', 'Baltimore Ravens': 'bal', 'Buffalo Bills': 'buf', 'Carolina Panthers': 'car',
-  'Chicago Bears': 'chi', 'Cincinnati Bengals': 'cin', 'Cleveland Browns': 'cle', 'Dallas Cowboys': 'dal', 'Denver Broncos': 'den',
-  'Detroit Lions': 'det', 'Green Bay Packers': 'gb', 'Houston Texans': 'hou', 'Indianapolis Colts': 'ind', 'Jacksonville Jaguars': 'jax',
-  'Kansas City Chiefs': 'kc', 'Las Vegas Raiders': 'lv', 'Los Angeles Chargers': 'lac', 'Los Angeles Rams': 'lar', 'Miami Dolphins': 'mia',
-  'Minnesota Vikings': 'min', 'New England Patriots': 'ne', 'New Orleans Saints': 'no', 'New York Giants': 'nyg', 'New York Jets': 'nyj',
-  'Philadelphia Eagles': 'phi', 'Pittsburgh Steelers': 'pit', 'San Francisco 49ers': 'sf', 'Seattle Seahawks': 'sea', 'Tampa Bay Buccaneers': 'tb',
-  'Tennessee Titans': 'ten', 'Washington Commanders': 'wsh'
-};
-export const NHL_ABBR = {
-  'Anaheim Ducks': 'ana', 'Boston Bruins': 'bos', 'Buffalo Sabres': 'buf', 'Calgary Flames': 'cgy', 'Carolina Hurricanes': 'car',
-  'Chicago Blackhawks': 'chi', 'Colorado Avalanche': 'col', 'Columbus Blue Jackets': 'cbj', 'Dallas Stars': 'dal', 'Detroit Red Wings': 'det',
-  'Edmonton Oilers': 'edm', 'Florida Panthers': 'fla', 'Los Angeles Kings': 'la', 'Minnesota Wild': 'min', 'Montreal Canadiens': 'mtl',
-  'Montréal Canadiens': 'mtl', 'Nashville Predators': 'nsh', 'New Jersey Devils': 'nj', 'New York Islanders': 'nyi', 'New York Rangers': 'nyr',
-  'Ottawa Senators': 'ott', 'Philadelphia Flyers': 'phi', 'Pittsburgh Penguins': 'pit', 'San Jose Sharks': 'sj', 'Seattle Kraken': 'sea',
-  'St. Louis Blues': 'stl', 'St Louis Blues': 'stl', 'Tampa Bay Lightning': 'tb', 'Toronto Maple Leafs': 'tor', 'Utah Mammoth': 'utah', 'Utah Hockey Club': 'utah',
-  'Vancouver Canucks': 'van', 'Vegas Golden Knights': 'vgk', 'Washington Capitals': 'wsh', 'Winnipeg Jets': 'wpg'
-};
 export function rememberLogo(sport, name, url) {
   if (url) seenLogos.set(`${sport}|${normalizeTeamName(name)}`, url);
 }
 
-// Club badges from TheSportsDB (free, hot-linkable) for the leagues ESPN
-// doesn't cover, by club name; a feed's own spelling finds its club by the
-// words the names share (Kambi's "Yokohama Bay Stars", "KT Wiz Suwon").
+// Club badges from TheSportsDB (free, hot-linkable) for the league ESPN
+// doesn't cover (the CPBL), by club name; a feed's own spelling finds its
+// club by the words the names share.
 const SPORTSDB = 'https://r2.thesportsdb.com/images/media';
 export const TEAM_BADGES = {
   cpbl: { 'CTBC Brothers': 'nbtugc1655923087', 'Fubon Guardians': 'aj83wn1655923095', 'Rakuten Monkeys': 'kk0rch1655923103', 'TSG Hawks': 'n67jn51712658044', 'Uni-President Lions': 'kehxfy1655923111', 'Wei Chuan Dragons': 'ljv5o51655923122' },
-  npb: { 'Chiba Lotte Marines': 'na10tn1576008207', 'Chunichi Dragons': 'jli5jv1576009060', 'Fukuoka SoftBank Hawks': 'ampozy1576009547', 'Hanshin Tigers': 'h2jhos1576009994', 'Hiroshima Toyo Carp': 'bv50e51576010505', 'Hokkaido Nippon-Ham Fighters': 'qxgzq01576011016', 'Orix Buffaloes': '53lv6f1576011517', 'Saitama Seibu Lions': 'onmvow1576012163', 'Tohoku Rakuten Golden Eagles': 'qx24pm1576012656', 'Tokyo Yakult Swallows': 'ryyku01576013231', 'Yokohama DeNA BayStars': 'fuhqf21576013789', 'Yomiuri Giants': '0qyqs41576014298' },
-  kbo: { 'Doosan Bears': '2qo9zp1740573854', 'Hanwha Eagles': '7aztmc1740573842', 'KT Wiz': 'qk8erg1589709962', 'Kia Tigers': '2z389i1648069353', 'Kiwoom Heroes': 'qcj18p1589709259', 'LG Twins': 'ajpsiq1648069368', 'Lotte Giants': 'p7q92w1742225576', 'NC Dinos': '6gwcg81589708218', 'SSG Landers': 'kii9pd1742225451', 'Samsung Lions': '5u6k511589709673' },
-  euroleague: { 'AS Monaco Basket': 'fl2ti01649168915', 'Anadolu Efes SK': 'uldz0d1782050729', 'BC Žalgiris': 'dn7ouv1703960565', 'Baskonia': 'p4x3o61767366090', 'Bayern München Basketball': 'z2r3eh1678017187', 'Dubai Basketball': 'fgtnti1758215967', 'FC Barcelona Basquet': '0tz26j1729097443', 'Hapoel Tel Aviv BC': 'yrrsml1767366305', 'KK Crvena zvezda': '5tlez31767366440', 'KK Partizan': 'us0e1z1767366567', 'Maccabi Tel Aviv BC': 'z0mk1l1789281457', 'Olimpia Milano': 'aurbi61790186853', 'Olympiacos BC': '4s5lug1676581220', 'Panathinaikos BC': '7cdjwz1767366987', 'Paris Basketball': '9q0d6x1726681476', 'Real Madrid Baloncesto': 'g4ev2c1522175902', 'Valencia Basket': '9qyc231536398868', 'Besiktas Basketbol': 'rx0o811667119583', 'ASVEL Lyon-Villeurbanne': 'qbaoia1602706639', 'Virtus Bologna': 'nfl8dz1786178078' },
-  kleague: { 'Ulsan HD': '0wooic1706533767', 'Pohang Steelers': '63jst01769097748', 'Jeonbuk Hyundai Motors': '8jif3b1747853225', 'FC Seoul': '31z1zf1579473186', 'Gangwon FC': 'c4igx71579729617', 'Gimcheon Sangmu': 'g4cjyk1609536787', 'Daegu FC': 'xzjzn11579473073', 'Daejeon Hana Citizen': 'o9z6eq1589558557', 'Suwon FC': 'x39pm41589559443', 'Jeju SK': 'hna7ae1736207131', 'Gwangju FC': 'uuzr4x1579473084', 'FC Anyang': '0tens91589557588', 'Incheon United': '2no9nq1579473100', 'Bucheon FC 1995': 'mhcuwe1589557777', 'Suwon Samsung Bluewings': 'ym5u611579473171', 'Jeonnam Dragons': 'fgmush1643552285' }
 };
 // Words too common to tell clubs apart.
-const COMMON_WORDS = new Set(['basket', 'basketball', 'baloncesto', 'club', 'tokyo', 'osaka', 'nagoya', 'city', 'the']);
+const COMMON_WORDS = new Set(['club', 'city', 'the']);
 const badgeIndex = new Map();
 export function teamBadge(sport, name) {
   const table = TEAM_BADGES[sport];
@@ -118,8 +96,6 @@ export function teamLogo(sport, name, dark = false) {
   const size = dark ? '500-dark' : '500';
   if (sport === 'mlb' && MLB_ABBR[name]) return `${base}/mlb/${size}/${MLB_ABBR[name]}.png`;
   if (sport === 'nba') return NBA_ID[name] ? `https://cdn.nba.com/logos/nba/${NBA}${NBA_ID[name]}/primary/${dark ? 'D' : 'L'}/logo.svg` : NBA_GUESTS[name] || null;
-  if (sport === 'nfl' && NFL_ABBR[name]) return `${base}/nfl/${size}/${NFL_ABBR[name]}.png`;
-  if (sport === 'nhl' && NHL_ABBR[name]) return `${base}/nhl/${size}/${NHL_ABBR[name]}.png`;
   if (sport === 'epl' && EPL_ESPN_ID[normalizeTeamName(name)]) return `${base}/soccer/${size}/${EPL_ESPN_ID[normalizeTeamName(name)]}.png`;
   // Otherwise a logo ESPN gave us for the club (scoreboards, team lists).
   // Players' names in either order (Kambi's "Han Shi", ESPN's "Shi Han").
@@ -134,15 +110,12 @@ export function teamLogo(sport, name, dark = false) {
 // Indians): its own old badge where one can be had (TheSportsDB), else the
 // franchise's logo as it is now, trimmed as every other logo is (ESPN gives
 // these the heir's logo padded into a 500px square: a tiny mark in a row of
-// full-sized ones). `league` is ESPN's (nba, mlb, wnba, nfl, nhl); null for a
+// full-sized ones). `league` is ESPN's (nba, mlb); null for a
 // name not known to have changed.
-const FORMER_BADGE = { 'Seattle SuperSonics': 'do916u1572164500', 'Atlanta Thrashers': 'wc28qr1707384830', 'Arizona Coyotes': '3n1yqw1635072720', 'Phoenix Coyotes': '3n1yqw1635072720', 'San Diego Chargers': 'rtputr1421812863', 'St. Louis Rams': 'vqwwsp1427607671' };
+const FORMER_BADGE = { 'Seattle SuperSonics': 'do916u1572164500' };
 const FORMER_HEIR = {
   nba: { 'New Jersey Nets': 'bkn', 'New Orleans Hornets': 'no', 'NO/Oklahoma City Hornets': 'no', 'New Orleans/Oklahoma City Hornets': 'no', 'Charlotte Bobcats': 'cha', 'Vancouver Grizzlies': 'mem', 'Washington Bullets': 'wsh', 'Kansas City Kings': 'sac', 'San Diego Clippers': 'lac' },
   mlb: { 'Cleveland Indians': 'cle', 'Florida Marlins': 'mia', 'Montreal Expos': 'wsh', 'Tampa Bay Devil Rays': 'tb', 'Anaheim Angels': 'laa', 'Los Angeles Angels of Anaheim': 'laa', 'California Angels': 'laa', 'Oakland Athletics': 'ath' },
-  wnba: { 'San Antonio Stars': 'lv', 'San Antonio Silver Stars': 'lv', 'Utah Starzz': 'lv', 'Tulsa Shock': 'dal', 'Detroit Shock': 'dal', 'Orlando Miracle': 'conn' },
-  nfl: { 'Oakland Raiders': 'lv', 'Washington Redskins': 'wsh', 'Washington Football Team': 'wsh' },
-  nhl: { 'Mighty Ducks of Anaheim': 'ana', 'Utah Hockey Club': 'utah' }
 };
 const FORMER_KEY = Object.fromEntries(Object.entries(FORMER_HEIR).map(([k, t]) => [k, new Map(Object.entries(t).map(([n, abbr]) => [normalizeTeamName(n), abbr]))]));
 const FORMER_BADGE_KEY = new Map(Object.entries(FORMER_BADGE).map(([n, id]) => [normalizeTeamName(n), id]));
@@ -159,23 +132,14 @@ export function formerLogo(league, name) {
 
 // ESPN's soccer league logo ids.
 const SOCCER_LOGO = {
-  epl: 23, laliga: 15, seriea: 12, bundesliga: 10, ligue1: 9, ucl: 2, uel: 2310, uecl: 20296,
-  scotland: 45, mls: 19, jleague: 2199, facup: 40, nationsleague: 2395, worldcup: 4,
-  championship: 24, eredivisie: 11, brasileirao: 85
+  epl: 23, seriea: 12, bundesliga: 10, ligue1: 9, ucl: 2, uel: 2310, uecl: 20296,
+  scotland: 45, mls: 19, facup: 40, nationsleague: 2395
 };
-// TheSportsDB's league badges. (Liga MX's is its own today, the light
-// "LIGA MX" one that reads on a light or a dark tile: ESPN's is still the old
-// Liga Bancomer wordmark, dark blue, which all but vanished on a dark tile;
-// Jay 2026-10-22.)
-const LEAGUE_BADGE = {
-  npb: 'lk85rg1575038781', kbo: 'qfr1hx1589707979', cpbl: 'c3vetj1655924198', euroleague: '7xjtuy1554397263', kleague: 'zaw2cj1628430843',
-  ligamx: 'mav5rx1686157960'
-};
+// TheSportsDB's league badges.
+const LEAGUE_BADGE = { cpbl: 'c3vetj1655924198' };
 // ESPN's other league logos.
 const ESPN_LEAGUE = {
-  mlb: 'teamlogos/leagues/500/mlb.png', nba: 'teamlogos/leagues/500/nba.png', wnba: 'teamlogos/leagues/500/wnba.png', nfl: 'teamlogos/leagues/500/nfl.png',
-  nhl: 'teamlogos/leagues/500/nhl.png', f1: 'teamlogos/leagues/500/f1.png',
-  nbl: 'teamlogos/leagues/500/nbl.png'
+  mlb: 'teamlogos/leagues/500/mlb.png', nba: 'teamlogos/leagues/500/nba.png', f1: 'teamlogos/leagues/500/f1.png'
 };
 // ESPN's resizer at 192 px, sharp to 64 px on a 3x screen, for a third of
 // the 500 px original's bytes (the NBA's: 19 KB to 7 KB), so a first

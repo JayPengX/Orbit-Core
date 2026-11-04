@@ -425,14 +425,14 @@ test('pictures: national sides get flags, names in either order', async () => {
   const L = await import('../kit/logos.mjs');
   assert.equal(L.countryCode('England'), 'GB-ENG');
   assert.equal(L.countryFlag('Wales'), '🇬🇧');
-  assert.match(L.teamBadge('kleague', 'Ulsan HD'), /thesportsdb/);
+  assert.match(L.teamBadge('cpbl', 'Uni-President 7-Eleven Lions'), /thesportsdb/);
   assert.equal(L.teamLogo('nba', 'Boston Celtics'), 'https://cdn.nba.com/logos/nba/1610612738/primary/L/logo.svg');
   assert.equal(L.teamLogo('nba', 'Boston Celtics', true), 'https://cdn.nba.com/logos/nba/1610612738/primary/D/logo.svg');
   assert.match(L.teamLogo('nba', 'London Lions'), /London_Lions_logo/, 'a preseason guest: its own (NBA_GUESTS)');
   assert.equal(L.teamLogo('nba', 'Somebody Else'), null);
   L.rememberLogo('mls', 'Miami Inter', 'https://a.espncdn.com/i/teamlogos/soccer/500/20232.png');
   assert.match(L.teamLogo('mls', 'Inter Miami'), /20232\.png$/);
-  for (const key of ['kleague', 'euroleague', 'npb', 'cpbl']) assert.ok(L.leagueLogo(key), key);
+  for (const key of ['cpbl', 'epl', 'mlb', 'f1']) assert.ok(L.leagueLogo(key), key);
 });
 
 test('the kit and the Worker agree on the pay and the levels', async () => {
@@ -615,10 +615,8 @@ test("中場休息 counts down from the half's last play, by the league's break"
     keyEvents: [{ type: { type: 'kickoff' }, wallclock: '2026-10-17T11:32:18Z' }, { type: { type: 'halftime' }, wallclock: '2026-10-17T12:20:20Z' }]
   };
   assert.equal(kit.halftimeStartOf(summary), Date.parse('2026-10-17T12:20:20Z'));
-  // Football's end of half sits inside its drives.
-  assert.equal(kit.halftimeStartOf({ drives: { previous: [{ plays: [{ wallclock: '2026-10-11T15:09:32Z' }] }] } }), Date.parse('2026-10-11T15:09:32Z'));
   assert.equal(kit.halftimeMinutes('soccer'), 15);
-  assert.equal(kit.halftimeMinutes('football', 'ncaaf'), 20);
+  assert.equal(kit.halftimeMinutes('basketball', 'nba'), 15);
   assert.equal(kit.halftimeMinutes('baseball'), null);
   const end = Date.parse('2026-10-17T12:35:20Z');
   assert.equal(kit.halftimeClock(end, Date.parse('2026-10-17T12:22:46Z')), '12:34');
@@ -665,10 +663,6 @@ test('every break counts down by its rule: quarters, innings, timeouts', async (
   const to = kit.breakOf({ ...nba, status: { state: 'in', name: 'STATUS_IN_PROGRESS', period: 1 }, live: { lastType: 'Full Timeout', lastId: '401909089112' } });
   assert.deepEqual([to.kind, to.seconds, to.play], ['timeout', 75, '401909089112']);
   assert.equal(kit.breakOf({ ...nba, status: { state: 'in', name: 'STATUS_IN_PROGRESS', period: 1 }, live: { lastType: 'Substitution' } }), null);
-  assert.equal(kit.breakOf({ sport: 'basketball', league: 'euroleague', status: { state: 'in', name: 'STATUS_END_PERIOD', period: 3 } }).seconds, 120);
-  assert.equal(kit.breakOf({ sport: 'football', league: 'nfl', status: { state: 'in', name: 'STATUS_END_PERIOD', period: 2 } }).kind, 'half');
-  assert.equal(kit.breakOf({ sport: 'hockey', league: 'nhl', status: { state: 'in', name: 'STATUS_END_PERIOD', period: 1 } }).seconds, 1080);
-  assert.equal(kit.breakOf({ sport: 'hockey', league: 'nhl', status: { state: 'in', name: 'STATUS_END_PERIOD', period: 3 } }), null);
   assert.equal(kit.breakOf({ sport: 'baseball', league: 'mlb', status: { state: 'in', name: 'STATUS_IN_PROGRESS', period: 3 }, live: { half: 'mid' } }).seconds, 135);
   assert.equal(kit.breakOf({ sport: 'baseball', league: 'mlb', post: true, status: { state: 'in', period: 3 }, live: { half: 'end' } }).seconds, 190);
   assert.equal(kit.breakOf({ sport: 'baseball', league: 'mlb', status: { state: 'in', period: 3 }, live: { half: 'top' } }), null);
@@ -739,14 +733,6 @@ test('政府: the taxes Securities reports and relief, a side of its own; the fo
   assert.equal(s.given - s.fees + s.gov.net + s.own, s.worth);
   // Nothing reported, junk ignored.
   assert.equal(kit.govOf({ snap: { stock: { gov: { trade: 'x', nhi: -5 } } } }).paidTotal, 0);
-});
-
-test('every EuroLeague and K League club has a Chinese name (Jay 2026-10-21)', async () => {
-  const { teamZh } = await import('../kit/names.mjs');
-  const { TEAM_BADGES } = await import('../kit/logos.mjs').catch(() => ({}));
-  const el = ['Virtus Bologna', 'Hapoel Tel Aviv', 'Anadolu Efes', 'BC Dubai', 'Real Madrid Baloncesto', 'Maccabi Tel Aviv', 'Saski Baskonia', 'Milano', 'KK Crvena Zvezda Belgrade', 'Partizan Belgrade', 'ASVEL Lyon-Villeurbanne', 'Žalgiris Kaunas', 'Fenerbahce SK', 'Olympiacos BC', 'Valencia Basket Club', 'Paris Basket', ...Object.keys(TEAM_BADGES?.euroleague || {})];
-  for (const n of el) assert.match(teamZh('euroleague', n, 'basketball'), /\p{Script=Han}/u, n);
-  for (const n of ['Bucheon FC 1995', ...Object.keys(TEAM_BADGES?.kleague || {})]) assert.match(teamZh('kleague', n, 'soccer'), /\p{Script=Han}/u, n);
 });
 
 test('a break not in the summary yet is asked again by itself while it is on screen', async t => {
@@ -859,7 +845,7 @@ test("a franchise's former names: in Chinese, never in search; their own badge o
   const { formerLogo } = await import('../kit/logos.mjs');
   assert.deepEqual(teamNameZh('nba', 'Seattle SuperSonics', 'basketball'), { full: '西雅圖超音速', short: '超音速' });
   assert.equal(teamNameZh('nba', 'NO/Oklahoma City\r\n Hornets', 'basketball')?.short, '黃蜂');
-  assert.equal(teamNameZh('wnba', 'Tulsa Shock', 'basketball')?.short, '震撼');
+  assert.equal(teamNameZh('mlb', 'Cleveland Indians', 'baseball')?.short, '印地安人');
   assert.ok(!teamsByZh('超音速').length);
   assert.match(formerLogo('nba', 'Seattle SuperSonics'), /thesportsdb\.com\/.+\/do916u1572164500\.png\/small$/);
   assert.equal(formerLogo('mlb', 'Cleveland Indians'), 'https://a.espncdn.com/i/teamlogos/mlb/500/cle.png');

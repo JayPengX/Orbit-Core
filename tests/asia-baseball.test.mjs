@@ -1,36 +1,11 @@
-// Asian baseball from the leagues' own sites (asia-baseball.js), on saved pages.
+// The CPBL's months (asia-baseball.js), on saved pages.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseNpb, parseKbo, parseTsdbDay, asiaTarget, parseCpblBox, cpblBoxTarget } from '../asia-baseball.js';
+import { parseTsdbDay, asiaTarget, parseCpblBox, cpblBoxTarget } from '../asia-baseball.js';
 
 const fixture = name => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
 const now = Date.parse('2026-09-29T12:00:00Z');
-
-test('NPB: home first, Japan time, finished once a winner is named', () => {
-  const games = parseNpb(fixture('npb-2026-09.html'), 2026, now);
-  assert.equal(games.length, 7);
-  const giants = games[0];
-  assert.deepEqual([giants.home.en, giants.away.en, giants.homeScore, giants.awayScore, giants.state], ['Yomiuri Giants', 'Tokyo Yakult Swallows', 11, 0, 'post']);
-  assert.equal(giants.start, '2026-09-27T09:00:00.000Z');
-  assert.equal(giants.home.zh, '讀賣巨人');
-  const next = games.at(-1);
-  assert.equal(next.state, 'pre');
-  assert.equal(next.homeScore, null);
-  // On after its start, until a winner is named.
-  assert.equal(parseNpb(fixture('npb-2026-09.html'), 2026, Date.parse('2026-09-30T10:00:00Z')).at(-1).state, 'in');
-});
-
-test('KBO: away first in the list, rain-outs void', () => {
-  const games = parseKbo(JSON.parse(fixture('kbo-2026-09.json')), 2026, now);
-  assert.equal(games.length, 10);
-  const [first] = games;
-  assert.deepEqual([first.away.en, first.home.en, first.awayScore, first.homeScore, first.state], ['NC Dinos', 'Doosan Bears', 2, 5, 'post']);
-  assert.equal(first.start, '2026-09-29T09:30:00.000Z');
-  assert.ok(games.slice(5).every(g => g.state === 'pre' && g.homeScore == null));
-  const rained = parseKbo({ rows: [{ row: [{ Class: 'day', Text: '09.03(수)' }, { Class: 'time', Text: '<b>18:30</b>' }, { Class: 'play', Text: '<span>LG</span><em><span>vs</span></em><span>두산</span>' }, { Class: 'relay', Text: '' }, { Class: null, Text: '잠실' }, { Class: null, Text: '우천취소' }] }] }, 2026, now);
-  assert.equal(rained[0].state, 'void');
-});
 
 test("CPBL: TheSportsDB's day list", () => {
   const day = parseTsdbDay(JSON.parse(fixture('tsdb-cpbl-2026-09-28.json')), now);
@@ -40,9 +15,10 @@ test("CPBL: TheSportsDB's day list", () => {
 });
 
 test('the address names a league and a month', () => {
-  assert.deepEqual(asiaTarget(new URL('https://asia-baseball.orbit/kbo/2026-09.json')), { league: 'kbo', year: 2026, month: 9 });
+  assert.deepEqual(asiaTarget(new URL('https://asia-baseball.orbit/cpbl/2026-09.json')), { league: 'cpbl', year: 2026, month: 9 });
+  assert.equal(asiaTarget(new URL('https://asia-baseball.orbit/kbo/2026-09.json')), null);
   assert.equal(asiaTarget(new URL('https://asia-baseball.orbit/mlb/2026-09.json')), null);
-  assert.equal(asiaTarget(new URL('https://asia-baseball.orbit/npb/2026-13.json')), null);
+  assert.equal(asiaTarget(new URL('https://asia-baseball.orbit/cpbl/2026-13.json')), null);
 });
 
 test('CPBL: every source refusing is an error, never an empty month', async () => {
