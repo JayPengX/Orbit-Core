@@ -130,6 +130,31 @@ export function teamLogo(sport, name, dark = false) {
   return dark ? seen.replace('/500/', '/500-dark/') : seen;
 }
 
+// A team under a name it has since left (Seattle SuperSonics, Cleveland
+// Indians): its own old badge where one can be had (TheSportsDB), else the
+// franchise's logo as it is now, trimmed as every other logo is (ESPN gives
+// these the heir's logo padded into a 500px square: a tiny mark in a row of
+// full-sized ones). `league` is ESPN's (nba, mlb, wnba, nfl, nhl); null for a
+// name not known to have changed.
+const FORMER_BADGE = { 'Seattle SuperSonics': 'do916u1572164500', 'Atlanta Thrashers': 'wc28qr1707384830', 'Arizona Coyotes': '3n1yqw1635072720', 'Phoenix Coyotes': '3n1yqw1635072720', 'San Diego Chargers': 'rtputr1421812863', 'St. Louis Rams': 'vqwwsp1427607671' };
+const FORMER_HEIR = {
+  nba: { 'New Jersey Nets': 'bkn', 'New Orleans Hornets': 'no', 'NO/Oklahoma City Hornets': 'no', 'New Orleans/Oklahoma City Hornets': 'no', 'Charlotte Bobcats': 'cha', 'Vancouver Grizzlies': 'mem', 'Washington Bullets': 'wsh', 'Kansas City Kings': 'sac', 'San Diego Clippers': 'lac' },
+  mlb: { 'Cleveland Indians': 'cle', 'Florida Marlins': 'mia', 'Montreal Expos': 'wsh', 'Tampa Bay Devil Rays': 'tb', 'Anaheim Angels': 'laa', 'Los Angeles Angels of Anaheim': 'laa', 'California Angels': 'laa', 'Oakland Athletics': 'ath' },
+  wnba: { 'San Antonio Stars': 'lv', 'San Antonio Silver Stars': 'lv', 'Utah Starzz': 'lv', 'Tulsa Shock': 'dal', 'Detroit Shock': 'dal', 'Orlando Miracle': 'conn' },
+  nfl: { 'Oakland Raiders': 'lv', 'Washington Redskins': 'wsh', 'Washington Football Team': 'wsh' },
+  nhl: { 'Mighty Ducks of Anaheim': 'ana', 'Utah Hockey Club': 'utah' }
+};
+const FORMER_KEY = Object.fromEntries(Object.entries(FORMER_HEIR).map(([k, t]) => [k, new Map(Object.entries(t).map(([n, abbr]) => [normalizeTeamName(n), abbr]))]));
+const FORMER_BADGE_KEY = new Map(Object.entries(FORMER_BADGE).map(([n, id]) => [normalizeTeamName(n), id]));
+export function formerLogo(league, name) {
+  const n = normalizeTeamName(name);
+  if (!n) return null;
+  const badge = FORMER_BADGE_KEY.get(n);
+  if (badge) return `${SPORTSDB}/team/badge/${badge}.png/small`;
+  const heir = FORMER_KEY[league]?.get(n);
+  return heir ? `https://a.espncdn.com/i/teamlogos/${league}/500/${heir}.png` : null;
+}
+
 // ---- League logos ----------------------------------------------------------------
 
 // ESPN's soccer league logo ids.
@@ -472,7 +497,10 @@ export function logoPicture(light, dark, cls, fallback, { guess = false } = {}) 
       setTimeout(() => {
         if (!img.style.opacity) return;
         if (img.complete && img.naturalWidth) Object.assign(img.style, { transition: 'opacity 0.18s ease', opacity: '' });
-        else if (img.loading === 'lazy' && picture.isConnected) img.loading = 'eager';
+        // (Off the page too: a part drawn ahead for a tab not open yet, as a
+        // player's 生涯球隊. A lazy picture off the page is never asked for, and
+        // put on later, iPhone left it blank until a tap: Jay 2026-11-04.)
+        else if (img.loading === 'lazy') img.loading = 'eager';
       }, ms);
   img.src = small(light);
   return picture;
