@@ -48,6 +48,7 @@
 import { STATIONS } from './weather-stations.js';
 import { twDay } from './kit/format.mjs';
 import { COUNTIES, readTyphoon, readDgpa, readSeatRain, dayOffFor, closuresFor, tradeClosed, stampSeen } from './typhoon.js';
+import { lineAnswer } from './http.js';
 
 export const GOOGLE = 'https://weather.googleapis.com/v1/';
 export const GOOGLE_AIR = 'https://airquality.googleapis.com/v1/';
@@ -1729,17 +1730,16 @@ export async function handleWeather(request, env, headers, path, { session = nul
     let rest = null;
     const first = { ...(await withDayOff(env, await cellForecast(env, ctx, lat, lon, { fetchFn, follow: q.get('lines') ? job => (rest = job) : null }), { lat, lon }, fetchFn, ctx)), ...where };
     if (!rest) return send(first);
-    const enc = new TextEncoder();
-    const { readable, writable } = new TransformStream();
-    const out = writable.getWriter();
+    // (Gzipped, each line flushed: http.js lineAnswer. Sent whole, the two lines were 156 KB.)
+    const lines = lineAnswer(request, headers);
     const body = (async () => {
-      await out.write(enc.encode(`${JSON.stringify(first)}\n`));
+      await lines.line(first);
       const whole = await rest.catch(() => null);
-      if (whole) await out.write(enc.encode(`${JSON.stringify({ ...(await withDayOff(env, whole, { lat, lon }, fetchFn, ctx)), ...where })}\n`));
-      await out.close();
-    })().catch(() => out.abort().catch(() => {}));
+      if (whole) await lines.line({ ...(await withDayOff(env, whole, { lat, lon }, fetchFn, ctx)), ...where });
+      await lines.end();
+    })().catch(() => lines.abort());
     if (ctx?.waitUntil) ctx.waitUntil(body);
-    return new Response(readable, { headers: { ...headers, 'Content-Type': 'application/x-ndjson; charset=utf-8' } });
+    return lines.response;
   }
   return send({ code: 'NOT_FOUND' }, 404);
 }

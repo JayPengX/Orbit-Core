@@ -324,6 +324,35 @@ test('/weather?lines=1: the quick answer, then the whole one on the same request
   assert.ok(!JSON.parse(again).more);
 });
 
+test('/weather?lines=1 to a phone that takes gzip: the same two lines, gzipped, the first readable before the second comes (Cloudflare compresses no x-ndjson: 156 KB went whole)', async () => {
+  const { gunzipSync } = await import('node:zlib');
+  const e = { ...env, RATE_LIMIT_KV: memKv() };
+  const waits = [];
+  const res = await handleWeather(new Request('https://w.example/weather?lat=25.034&lon=121.565&lines=1', { headers: { 'Accept-Encoding': 'gzip, deflate, br' } }), e, {}, '/weather', { fetchFn: upstream(), cf: undefined, session: { s: 'x' }, ctx: { waitUntil: p => waits.push(p) } });
+  assert.equal(res.headers.get('Content-Encoding'), 'gzip');
+  const r = res.body.getReader();
+  const parts = [];
+  for (;;) {
+    const { done, value } = await r.read();
+    if (done) break;
+    parts.push(value);
+  }
+  const lines = gunzipSync(Buffer.concat(parts)).toString().trim().split('\n').map(l => JSON.parse(l));
+  assert.equal(lines.length, 2);
+  assert.equal(lines[0].more, true);
+  assert.ok(!lines[1].more && lines[1].air.hourly.length === 96);
+  // The first part alone holds the whole first line.
+  const { createGunzip } = await import('node:zlib');
+  const un = createGunzip();
+  const got = [];
+  un.on('data', d => got.push(d));
+  un.write(parts[0]);
+  await new Promise(done => setTimeout(done, 20));
+  assert.deepEqual(JSON.parse(Buffer.concat(got).toString()), lines[0]);
+  un.destroy();
+  await Promise.all(waits);
+});
+
 test("Google's count: two asks of one refresh side by side both count, the newest written last", async () => {
   const store = new Map();
   let slow = 40;
