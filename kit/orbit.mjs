@@ -4414,6 +4414,15 @@ export function restorePlace() {
   } catch {}
 }
 
+// How tall the strip along the screen's foot is where a swipe up leaves the
+// app (the home indicator's safe area, at least 34 px on an iPhone without a
+// home button, plus a finger's slack): a touch landing in it may be that swipe.
+function homeStrip() {
+  const root = typeof document !== 'undefined' && document.documentElement;
+  const css = root && globalThis.getComputedStyle ? parseFloat(getComputedStyle(root).getPropertyValue('--q-safe-bottom')) || 0 : 0;
+  return Math.max(css, 20) + 12;
+}
+
 // The fixed tab bar keeps clear of the iPhone's home indicator even when iOS
 // reports no safe area after a resume (the largest inset seen is a floor).
 const SAFE_KEY = 'orbit.safeBottom';
@@ -4838,8 +4847,14 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
     b.querySelector('.q-tab-label').textContent = tab.label;
     // (Chosen as the finger lands, as iOS's tab bar does, not ~0.1 s later as
     // it lifts; the click that follows is then the same choice, not a second tap.)
+    // (Not when a finger lands in the strip along the screen's foot where a
+    // swipe up leaves the app: the bar's lower edge sits in it, as iOS's own
+    // does. There the tab waits for the finger to lift (the click); a swipe
+    // home takes the touch away first (pointercancel), so it never picks a
+    // tab, as iOS's own tab bar, Jay 2026-11-05.)
     b.addEventListener('pointerdown', e => {
       if (!e.isPrimary || e.button !== 0 || tab.id === current || b.hidden) return;
+      if (e.pointerType !== 'mouse' && e.clientY > (globalThis.innerHeight || 0) - homeStrip()) return;
       downOn = { id: tab.id, t: Date.now() };
       haptic();
       choose(tab.id);
