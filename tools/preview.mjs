@@ -817,7 +817,8 @@ if (key === 'admin') {
     env.GUARD = { fetch: async () => new Response(JSON.stringify({ at: now - 600_000, hours })) };
   }
   // (Made-up Gemini calls over the week, the panel's AI 今天 and Google's day: D1 over node:sqlite.)
-  env.STORE = (await import('../tests/fake-d1.mjs')).fakeD1();
+  // (The docs table too: 公開領取 counts its claims' accounts from it, gift.js.)
+  env.STORE = (await import('../tests/fake-d1.mjs')).fakeD1((await import('../doc-store.js')).SCHEMA);
   const { logCall } = await import('../gemini-use.js');
   const usage = { promptTokenCount: 1800, cachedContentTokenCount: 400, candidatesTokenCount: 220, thoughtsTokenCount: 90 };
   for (let i = 0; i < 60; i++) await logCall(env, { feature: ['law-ask', 'law-chat', 'money-read', 'nl-edit'][i % 4], model: i % 4 === 1 ? 'gemini-3.7-flash' : 'gemini-3.5-flash-lite', status: i === 7 ? 429 : 200, usage, at: Date.now() - i * 2.7 * 3_600_000 });

@@ -38,6 +38,7 @@ import zhTW from './locales/zh-TW.js';
 import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION } from './eco.js';
 import { checkStock } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
+import { handleGift } from './gift.js';
 import { handleShowcasePass, showcaseOf, SHOW_PER_MIN } from './showcase.js';
 import { handlePush, sendDue } from './push.js';
 import { handleWeather } from './weather.js';
@@ -1260,6 +1261,8 @@ async function route(request, env, ctx, headers, origin) {
   if (path === '/sports-proxy') return handleSports(request, env, ctx, headers, ip);
   // The showcase's live demos (showcase.js): a short pass for its reads, never a real Pass.
   if (path === '/showcase/pass') return handleShowcasePass(request, env, headers, { ip, origin, ctx });
+  // Passes given away in public (gift.js): the page at orbit.<domain>/key/, the owner's switch and count.
+  if (path === '/gift') return handleGift(request, env, headers, { ip, origin, ctx, deps: ECO_DEPS });
   // Orbit Sports' day of scoreboards on one request (sports-today.js): public
   // scores, so no Pass, but a page of ours or a local one (the origin, as the
   // Gemini routes'); built on demand, kept 60 s at the edge, no cron.
