@@ -867,10 +867,7 @@ button,
    down. What scrolls beneath fades towards the edge (iOS's scroll edge
    effect). A phone's frame on every screen (the column, below). ---- */
 :root {
-  /* (The bar stands just above the iPhone's home indicator, never inside its
-     strip: a swipe up to leave the app starts there, and a bar that dipped
-     into it took the swipe as a tap on a tab, Jay 2026-11-05.) */
-  --q-bar-gap: max(calc(env(safe-area-inset-bottom) + 4px), calc(var(--q-safe-bottom, 0px) + 4px), 12px);
+  --q-bar-gap: max(calc(env(safe-area-inset-bottom) - 14px), calc(var(--q-safe-bottom, 0px) - 14px), 12px);
   --q-nav: calc(62px + var(--q-bar-gap));
 }
 .q-appbar {
