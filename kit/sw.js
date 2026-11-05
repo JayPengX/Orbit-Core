@@ -257,16 +257,34 @@ self.addEventListener('fetch', event => {
 
 // The page lists the files it loaded before this worker was in charge, so
 // the very first visit already works offline next time (each checked, as
-// any file this worker keeps).
+// any file this worker keeps). A file named by its hash is taken from the
+// browser's copy the page just loaded, as it is (it can't change under its
+// address, and its hash is checked): asking the server again cost the first
+// visit a round trip each (Sports: 95 more requests over a phone's link
+// while its first screen was still loading, 2026-11-05). Only the app's own
+// files, as the fetch handler keeps: the page lists every address it read,
+// and its reads through /api/ (each with its session's token, so new each
+// time) were all downloaded again here whenever the app went to the
+// background (a season's pack, a day's scores: hundreds of KB, and as many
+// requests to the proxy, for nothing anyone reads from this cache).
+const ownFile = u => {
+  try {
+    const url = new URL(u);
+    return url.origin === self.location.origin && !url.pathname.startsWith('/api/') && !url.pathname.endsWith('/version.json');
+  } catch {
+    return false;
+  }
+};
 self.addEventListener('message', event => {
   if (event.data?.type !== 'cache') return;
-  const urls = (event.data.urls || []).filter(u => new URL(u).origin === self.location.origin && !u.endsWith('/version.json'));
+  const urls = (event.data.urls || []).filter(ownFile);
   event.waitUntil(
     Promise.all(
       urls.map(u =>
         caches.match(u).then(async hit => {
           if (hit) return;
-          const res = await fetch(u).catch(() => null);
+          let res = hashedAs(u) ? await fetch(u, { cache: 'force-cache' }).catch(() => null) : null;
+          if (!res || !(await isTrue(u, res))) res = await fetch(u).catch(() => null);
           if (res && (await isTrue(u, res))) await keep(new Request(u), res);
         })
       )

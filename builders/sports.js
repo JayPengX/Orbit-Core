@@ -27,13 +27,35 @@ import { within } from './within.js';
 
 const DAY = 86_400_000;
 
-// What no app reads of a scoreboard (the heavy part of it).
-const DROP = new Set(['links', 'logos', 'leaders', 'statistics', 'headlines', 'odds', 'tickets', 'geoBroadcasts', 'uid', '$ref', 'guid', 'format', 'situation', 'recent', 'alternateIds', 'playByPlayAvailable', 'wasSuspended', 'highlights']);
-export function slim(x) {
-  if (Array.isArray(x)) return x.map(slim);
+// What no app reads of a scoreboard (the heavy part of it). A pack is read
+// by the kit's parseScoreboard and the builders (watch.js, winprob.js,
+// season.js); tests/builders-slim.test.mjs checks they read a slim pack as
+// the whole one. (2026-11-05: probables, featuredAthletes, linescores'
+// copies, every record but the one read, a goal's details on a game not on
+// now: MLB's 13.9 MB pack to 6.6 MB, the family's 41 MB to 22 MB, 46% less
+// to a phone.)
+const DROP = new Set(['links', 'logos', 'leaders', 'statistics', 'headlines', 'odds', 'tickets', 'geoBroadcasts', 'uid', '$ref', 'guid', 'format', 'situation', 'recent', 'alternateIds', 'playByPlayAvailable', 'wasSuspended', 'highlights', 'featuredAthletes', 'probables', 'projections']);
+// Of a side's team, of a game's ground and of a channel: what's never read.
+const DROP_IN = { team: new Set(['location', 'logoDark', 'venue', 'isActive']), venue: new Set(['address']), broadcasts: new Set(['market']) };
+// A period's score: only its text is read (lines: displayValue, else value).
+const lineOf = l => (l && typeof l === 'object' ? (l.displayValue != null ? { displayValue: l.displayValue } : 'value' in l ? { value: l.value } : {}) : l);
+// A side's records: the season's (the one read: type total or overall), and the first.
+const recordsOf = list => {
+  const keep = r => (r && typeof r === 'object' ? Object.fromEntries(['type', 'name', 'summary'].filter(k => r[k] != null).map(k => [k, r[k]])) : r);
+  const total = list.find(r => r?.type === 'total' || r?.name === 'overall');
+  return [...new Set([list[0], total].filter(r => r !== undefined))].map(keep);
+};
+export function slim(x, inside = '') {
+  if (Array.isArray(x)) return x.map(v => slim(v, inside));
   if (!x || typeof x !== 'object') return x;
   const out = {};
-  for (const [k, v] of Object.entries(x)) if (!DROP.has(k)) out[k] = slim(v);
+  const drop = DROP_IN[inside];
+  for (const [k, v] of Object.entries(x)) {
+    if (DROP.has(k) || drop?.has(k)) continue;
+    out[k] = k === 'linescores' && Array.isArray(v) ? v.map(lineOf) : k === 'records' && Array.isArray(v) ? recordsOf(v) : slim(v, k);
+  }
+  // A game's goals and cards are read only while it's on (the kit's liveOf).
+  if (Array.isArray(x.competitors) && 'details' in out && x.status?.type?.state !== 'in') delete out.details;
   // A team's logo kept as the one the apps use (logo, else the first of logos).
   if (!out.logo && Array.isArray(x.logos) && x.logos[0]?.href) out.logo = x.logos[0].href;
   return out;
@@ -77,7 +99,8 @@ async function leagueYear(page, espn, year, old = null, now = Date.now()) {
   // a late game there is on its US day's page, the month before's).
   const carryTo = from > 12 ? Infinity : Date.UTC(year, from - 1, 2);
   let carried = 0;
-  if (from > 1) for (const e of old.events) if (!seen.has(e.id) && Date.parse(e.date) < carryTo) seen.set(e.id, e), carried++;
+  // (Slimmed again: a pack from before a field was dropped sheds it too; slim(slim(e)) is slim(e).)
+  if (from > 1) for (const e of old.events) if (!seen.has(e.id) && Date.parse(e.date) < carryTo) seen.set(e.id, slim(e)), carried++;
   const events = [...seen.values()].filter(e => String(e.date || '').startsWith(String(year)) || !e.date).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   return { leagues: slim((head.leagues || []).slice(0, 1)), events, carried, read: Math.max(0, 13 - from) };
 }
