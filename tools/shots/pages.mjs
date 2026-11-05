@@ -194,6 +194,10 @@ export const PAGES = {
     // The card's foot (接著 / 下一節) tapped: the class it names, not the card's.
     next: { args: click("js:document.querySelector('.nv-foot, #cx-foot')?.click()", wait(1200)) },
     editor: { args: click('js:window.openEditor()', wait(1200)) },
+    // A class's icon and colour: from its sheet's pencil, and from 編輯課表's class list.
+    look: { args: click('#cx-hero', wait(1200), '.cx-pick-lead', wait(1200)) },
+    'editor-classes': { args: click('js:window.openEditor()', wait(1200), "js:document.querySelector('#ed-parts > *').click()", wait(1000), "js:document.querySelector('#teacher-list .teacher-summary-text').click()", wait(800)) },
+    'editor-look': { args: click('js:window.openEditor()', wait(1200), "js:document.querySelector('#teacher-list .tc-look').click()", wait(1200)) },
     key: { args: click("js:window.openTransferSheet('key')", wait(1200)) },
     photo: { args: click("js:window.openTransferSheet('photo')", wait(1200)) },
     swap: { hash: 'week', args: click('.cx-way.is-swap', wait(1200)) },
