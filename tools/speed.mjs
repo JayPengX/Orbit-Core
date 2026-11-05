@@ -297,6 +297,10 @@ async function runApp(app, side, { prof = profile, rate = cpu, idle = idleS } = 
           for (const [k, value] of [['visibilityState', v ? 'visible' : 'hidden'], ['hidden', !v]]) Object.defineProperty(document, k, { value, configurable: true });
           document.dispatchEvent(new Event('visibilitychange'));
           window.dispatchEvent(new Event(v ? 'pageshow' : 'pagehide'));
+          // (Back on screen: the browser's own answer again. Left saying 'visible', the page leaving
+          // for an update later read it in its real visibilitychange and drew its screen again on
+          // the way out, which no phone does: Securities' logos asked 76 times as it went.)
+          if (v) for (const k of ['visibilityState', 'hidden']) delete document[k];
         }, visible);
       results.push(await step('away', page, cdp, dev, async () => (await show(false), { readyMs: 0 })));
       results.push(await step('back', page, cdp, dev, async () => void (await show(true))));
