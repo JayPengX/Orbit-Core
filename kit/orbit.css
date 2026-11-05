@@ -2767,14 +2767,18 @@ dialog.q-moved::backdrop {
   inset: 0;
   z-index: 2147482500;
   display: grid;
+  /* (One column the width left inside the padding: the box keeps its
+     margins on a 320 phone, never a track sized to its own 360.) */
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
-  padding: 24px;
+  padding: 24px max(16px, env(safe-area-inset-right)) 24px max(16px, env(safe-area-inset-left));
   background: color-mix(in srgb, var(--q-page) 72%, transparent);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   font-family: var(--q-font);
 }
 .q-moved-box {
+  box-sizing: border-box;
   width: min(360px, 100%);
   display: grid;
   gap: 10px;
