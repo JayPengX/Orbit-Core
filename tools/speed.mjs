@@ -73,6 +73,8 @@ for (const [name, ref] of sides) {
   const t = Date.now();
   built[name] = await buildSide({ name, ref, apps, dir: join(work, name) });
   console.log(`built ${name} (${ref}): kit ${built[name].kit.version}, ${apps.map(a => `${a} ${built[name].apps[a].sha}`).join(', ')} in ${Math.round((Date.now() - t) / 1000)} s`);
+  // The deploy the update step lands: this side's code with a push's worth of change.
+  if (steps.includes('update')) built[`${name}-next`] = await buildSide({ name: `${name}-next`, ref, apps, dir: join(work, `${name}-next`), next: true });
 }
 
 // ---- The server ----
@@ -299,15 +301,16 @@ async function runApp(app, side, { prof = profile, rate = cpu, idle = idleS } = 
       results.push(await step('away', page, cdp, dev, async () => (await show(false), { readyMs: 0 })));
       results.push(await step('back', page, cdp, dev, async () => void (await show(true))));
     }
-    // A deploy while the app is open (the other side goes live: before's page
-    // updates to after's files, after's to before's, so each side's own update
-    // code is timed on the same change), and the person comes back to it: what
-    // the phone downloads until the new version is on screen, and how long.
-    if (steps.includes('update') && built.before && built.after) {
+    // A deploy while the app is open (the same side's code with a line
+    // changed in the kit's orbit.mjs and in the app's entry module, so each
+    // side's update is timed on both ends, on the same change), and the person
+    // comes back to it: what the phone downloads until the new version is on
+    // screen, and how long.
+    if (steps.includes('update') && built[`${side}-next`]) {
       results.push(
         await step('update', page, cdp, dev, async () => {
           const t0 = now();
-          dev.side = built[side === 'before' ? 'after' : 'before'];
+          dev.side = built[`${side}-next`];
           const moved = page.waitForNavigation({ timeout: 110_000, waitUntil: 'commit' }).catch(() => null);
           await page.evaluate(() => (document.dispatchEvent(new Event('visibilitychange')), window.dispatchEvent(new Event('focus'))));
           if (!(await moved)) return { readyMs: null, more: { updated: false } };
@@ -316,7 +319,7 @@ async function runApp(app, side, { prof = profile, rate = cpu, idle = idleS } = 
           return { readyMs: Math.round(now() - t0), resetMut: true, pageT0: 0, more: { updated: true, live } };
         }, { max: 120_000 })
       );
-      dev.side = built[side];
+      // (The steps after it run on the version it landed: a reopen is the updated app's.)
     }
     if (steps.includes('reopen')) {
       // The app closed (the browser gone, its service worker too) and opened
