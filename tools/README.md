@@ -104,6 +104,37 @@ each stop's hash in the block at the end of `kit/help.mjs`. How each stop is rea
 Retake an app's after its screens change (a tab redrawn, a tab added); Orbit Class
 needs `npm run build` first.
 
+## `node tools/speed.mjs <app…|all>`: every load, before and after, on a 3G link
+
+What a person waits for and what the phone spends, measured the same way
+for the code as it is (`--before`, a git ref, `main` by default) and your
+working tree (`--after work`). Each app runs in Chromium on a link like a
+weak 3G (400 kbps, 400 ms; `--net 4g|wifi`) with its CPU slowed 4×, signed
+in with a test Pass, through steps: `open` (the first opening, nothing on
+the phone), `idle` (30 s left open), each tab, `scroll`, `away` (to the
+background and back) and `reopen` (closed, opened again 15 minutes later
+on the page's clock). For each: the time to the first screen (`#loading`
+gone) and until the page settles, KB and requests (the app's own files,
+the proxy's, other sites'), CPU, long tasks, layouts, nodes redrawn, memory,
+and the proxy's requests with their estimated Worker CPU.
+
+Every answer from outside is fetched live once and recorded (`record.jsonl`
+beside the results), then replayed to both sides, at one fixed moment
+(`clock.json`; `--at <ISO>` sets it), so the two ask the same world.
+`--refresh-after <regex>`: those addresses are read fresh for the after
+side (a change on the server: a slimmer pack). `--warm` records each app
+once first, so no live read is timed.
+
+```bash
+git -C ../Orbit-Weather tag speed-before   # (each repo, as long work begins)
+node tools/speed.mjs weather --before speed-before --warm --verbose
+node tools/speed.mjs all --only before --out /tmp/base   # today's numbers alone
+```
+
+It writes `results.md` (a table a step a row) and `results.json` (every
+request of every step: when, how big, how long). Needs port 443 free, and
+the app repos beside this one.
+
 ## `node tools/f1-replay.mjs --start <UTC> --at <UTC> [--out dir]`: an F1 session live, any moment of a real one
 
 Rebuilds what F1's live feed said at a moment of a recorded session from

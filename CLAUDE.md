@@ -31,7 +31,7 @@ it, extend it, or move yours into the kit (TRUTH §4); never a second copy.
   here; each app's deploy tests against main's kit.
 - Workers deploy from `main` (`deploy.yml`, the wrangler tomls).
 - `node tools/shots.mjs <app> --before main` takes every screenshot a change
-  needs (320/390 upright, a phone on its side, tablet, desktop; light/dark;
+  needs (320/390 upright, on its side, tablet, desktop; light/dark;
   a diff against live); `tools/README.md` lists the tools.
 - Brand, icons, share cards: `kit/brand.mjs`, `node brand/generate.mjs`.
 
@@ -187,7 +187,8 @@ the `q-` components; they don't restyle them.
 ## 4. The APIs: the proxy (`orbit-workers-proxy`)
 
 `worker.js` routes (`route()`); each route's work is in its own file;
-`http.js` is what every route answers with (who may call, CORS, JSON). No
+`http.js` is what every route answers with (who may call, CORS, JSON;
+`lineAnswer`: lines gzipped, each flushed). No
 placement: it runs near each caller; only Gemini goes through
 `gemini-relay.js`, pinned to Taiwan. Every answer carries `Server-Timing:
 w;dur=` (the Worker's own time), which the 除錯紀錄 notes with a slow read.
@@ -198,7 +199,7 @@ w;dur=` (the Worker's own time), which the 除錯紀錄 notes with a slow read.
 | `/stock` | `stock-fill.js`, `stock-check.js` | Securities' fills at the proxy's own quote; the account replayed on each save |
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
 | `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations), the township, sources scored hourly (`/weather/skill`); during a typhoon warning (NCDR's CAP feed), `dayOff`: each county's 停班停課 from 人事行政總處 (through the relay), else a chance fitted to the counties' past decisions, for all 22 every 3 minutes |
-| `/transit/…` | `transit.js` | TDX (allowlist `TDX_RULES`), map config, search, place, route, `drive` (a bus in traffic); `/transit/status?sample=` (a session or the dev door only) |
+| `/transit/…` | `transit.js` | TDX (allowlist `TDX_RULES`; a day's trains trimmed, `tdxTrim`), map config, search, place, route, `drive` (a bus in traffic); `/transit/status?sample=` (a session or the dev door only) |
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `f1-people.js`, `fund-nav.js`, `taifex.js` | The data proxy (§4.1): sports, quotes, F1, Asian baseball, SITCA's fund NAVs, TAIFEX |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
@@ -474,12 +475,12 @@ can be turned off on its own.
 | `node tools/shots.mjs <app> [page…]` | Every screenshot a change needs (five screens × light/dark, live data, signed in), a contact sheet, faults, `--before main` diff; pages in `tools/shots/pages.mjs` |
 | `node tools/preview.mjs <app>` | The app with real data (`--live`, `--width`, `--timing`, `--requests`, `--profile`, `--webkit`, `--reopen`…); prints `wraps:`, `cut:`, `scrolls sideways:` |
 | `node tools/gate.mjs [app…]` | The family quality gate (`tools/gate-page.js`): lift, stalls, dead taps, wraps, cuts, letters, white, mixed language… on every tab |
-| `node tools/f1-replay.mjs --start <UTC> --at <UTC>` | An F1 session as its live feed had it at any moment (OpenF1's tables), as the preview's `--fixture`s: a red flag or safety car shot with no session on (`shots.mjs sports f1-live … -- $(cat <out>/args.txt)`) |
+| `node tools/speed.mjs <app…>` | Before vs after on 3G, CPU ×4, real answers replayed: each step's (open, tabs, scroll, away, reopen) time, KB, requests, CPU, redraws, memory, proxy calls |
 | `node tools/live-scroll.mjs [app…] [--webkit]` | Nothing jumps: a live game through 4 refreshes; pages as they load (`late`), then scrolled: a refresh above, a tab drawn short, a moving drawing, taps folding below and above, a sheet showing less |
 | `node tools/store-shots.mjs <app>` | The README's and Showcase's screenshot set, both languages |
 | `node tools/test-apps.mjs [app…]` | Every app's tests against this kit (checkouts beside this one) |
 
-The rest (leagues, Securities' lists, ESPN's shapes, passes, accent colours): `tools/README.md`.
+The rest (F1 replays, leagues, Securities' lists, ESPN's shapes, passes, accent colours): `tools/README.md`.
 
 `npm test` covers the Workers, kit and this map.
 
