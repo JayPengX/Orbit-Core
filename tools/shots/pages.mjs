@@ -276,6 +276,10 @@ export const PAGES = {
   },
   law: {
     default: ['tabs'],
+    // 我的 with what a person follows (`--account follows`: two bills, two 立委, a law), and a 立委 and a bill tapped there: each a sheet over 我的.
+    mine: { hash: 'tab=mine', args: click(wait(5000)) },
+    'mine-person': { hash: 'tab=mine', args: click(wait(5000), '#mine-people .lw-track-head', wait(2500)) },
+    'mine-bill': { hash: 'tab=mine', args: click(wait(5000), '#panel-mine a[href^="#item="]', wait(2500)) },
     // 首頁's 為你推薦 (the covers the kit's picks engine ranks), scrolled into view.
     foryou: { args: click(wait(3000), "js:[...document.querySelectorAll('.lw-covers')].pop()?.scrollIntoView({block:'center'})", wait(1200)) },
     // 首頁 one scroll down; after a search and a question (最近找過); with a search typed in its field.
