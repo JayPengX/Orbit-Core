@@ -38,7 +38,7 @@ import zhTW from './locales/zh-TW.js';
 import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION } from './eco.js';
 import { checkStock } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
-import { handleGift } from './gift.js';
+import { handleGift, giftNight } from './gift.js';
 import { handleShowcasePass, showcaseOf, SHOW_PER_MIN } from './showcase.js';
 import { handlePush, sendDue } from './push.js';
 import { handleWeather } from './weather.js';
@@ -1488,6 +1488,8 @@ export default {
     if (!storeReady(env)) return;
     // The Pass's store kept safe each night, 04:30 Taiwan: old versions
     // thinned (doc-store.js), then the whole store copied to R2 (store-backup.js).
+    // The giveaway's (gift.js): passes never replaced back to the pool, and its empty accounts cleared if the owner turned that on, 03:50 Taiwan.
+    if (min === 50 && tick.getUTCHours() === 19) run('gift-clean', () => giftNight(env, ECO_DEPS), r => (r.back || r.cleared ? r : null));
     if (min === 30 && tick.getUTCHours() === 20) run('store-backup', async () => ({ pruned: await DOCS.prune(env), ...(await backupStore(env, DOCS, tick.getTime())) }));
     // The live refreshes by how many people there are (capacity.js), every 6 hours.
     if (min === 20 && tick.getUTCHours() % 6 === 0) run('capacity', () => capacityCron(env, ECO_DEPS));

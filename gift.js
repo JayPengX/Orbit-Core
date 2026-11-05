@@ -26,10 +26,25 @@
 // so it's a minute's pace, not a cap), and the owner's total. Cost: the page
 // is static; one GET a visit, a claim is one PBKDF2 and a few D1 rows.
 //
-// Taken back: a claim older than `hold` hours whose account never signed in
-// (eco.js unusedPass, still fresh) is deleted and goes back to the pool,
-// swept lazily (at most every 5 minutes, on a visit or the panel's read).
-import { WALLET_COLLECTION, newPasscode, updateWallet, parseWallet, unusedPass, freshPass, gen } from './eco.js';
+// Taken back: a claim older than `hold` hours whose pass was never replaced
+// (still fresh: never signed in, or signed in and left at 「先換掉這組通行碼」,
+// where no app opens, so nothing of theirs is there) is deleted and goes
+// back to the pool; swept lazily (at most every 5 minutes, on a visit or
+// the panel's read) and each night.
+//
+// Cleared (Jay 2026-11-05: "Maybe we need a system to clear empty account?
+// Cause giveaway is those things that will end in chaos"): an account a
+// giveaway made (wallet `gift`, the claim's time, carried through rotate) and
+// left empty: not used for `days` days, no passkey, not priority, never
+// merged, no money of its own (only the opening money and pay), and under
+// EMPTY_BYTES of app data in all (settings, nothing made). Only when the
+// owner turns it on (admin 公開領取, off by default), each night at 03:50
+// Taiwan (worker.js), at most CLEAN_MAX a night; the panel lists who would go
+// first. Passes the owner issued by hand and every account made before are
+// never touched. A cleared account is deleted as any is (eco.js
+// deleteAccount): its last versions stay in D1's history for 30 days, so
+// the panel's 備份與復原 can put it back.
+import { WALLET_COLLECTION, ECO_APPS, newPasscode, updateWallet, parseWallet, unusedPass, freshPass, gen, deleteAccount } from './eco.js';
 import { seal, unseal, tokenSecret, HANDOFF_MS } from './orbit-token.js';
 import { placeOf } from './showcase.js';
 import { isAllowedOrigin } from './http.js';
@@ -39,6 +54,10 @@ export const GIFT_SCHEMA = [
   'CREATE TABLE IF NOT EXISTS gift_claim (round INTEGER NOT NULL, device TEXT NOT NULL, place TEXT NOT NULL, doc TEXT NOT NULL, at INTEGER NOT NULL, used INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (round, device))',
   'CREATE INDEX IF NOT EXISTS gift_claim_place ON gift_claim (place, at)'
 ];
+// (Added after the table was first made: run once, an error for a column already there ignored.)
+const GIFT_COLUMNS = ['ALTER TABLE gift ADD COLUMN clean INTEGER NOT NULL DEFAULT 0', 'ALTER TABLE gift ADD COLUMN days INTEGER NOT NULL DEFAULT 30'];
+export const EMPTY_BYTES = 2000;
+const CLEAN_MAX = 200;
 export const GIFT_DEFAULTS = { live: 0, total: 50, opens: 0, closes: 0, rate: 20, hold: 2 };
 export const GIFT_MAX = 5000;
 const SWEEP_MS = 5 * 60_000;
@@ -55,6 +74,7 @@ async function db(env) {
     ready.set(
       d,
       GIFT_SCHEMA.reduce((p, sql) => p.then(() => d.prepare(sql).run()), Promise.resolve())
+        .then(() => GIFT_COLUMNS.reduce((p, sql) => p.then(() => d.prepare(sql).run().catch(() => {})), Promise.resolve()))
         .then(() => d.prepare('INSERT OR IGNORE INTO gift (id, round, live, total, claimed, back, opens, closes, rate, hold, swept, updated) VALUES (1, 1, ?1, ?2, 0, 0, ?3, ?4, ?5, ?6, 0, 0)').bind(GIFT_DEFAULTS.live, GIFT_DEFAULTS.total, GIFT_DEFAULTS.opens, GIFT_DEFAULTS.closes, GIFT_DEFAULTS.rate, GIFT_DEFAULTS.hold).run())
         .catch(e => (ready.delete(d), Promise.reject(e)))
     );
@@ -73,11 +93,12 @@ export function giftState(g, now) {
   return 'open';
 }
 
-// One pass, fresh (its first sign-in replaces it): the admin's `issue` and a claim.
-export async function mintPass(env, deps) {
+// One pass, fresh (its first sign-in replaces it): the admin's `issue` and
+// a claim (`gift`: marked as the giveaway's, the only accounts ever cleared).
+export async function mintPass(env, deps, { gift = false } = {}) {
   const now = deps.now();
   const { passcode, docId } = await newPasscode(env, deps);
-  await updateWallet(env, deps, docId, w => ({ ...w, v2: now, sec: { fresh: true } }), { create: true });
+  await updateWallet(env, deps, docId, w => ({ ...w, v2: now, sec: { fresh: true }, ...(gift ? { gift: now } : {}) }), { create: true });
   return { passcode, docId };
 }
 
@@ -99,7 +120,8 @@ async function claimOf(env, deps, round, device) {
   return { row, wallet: w, state: !freshPass(w) ? 'done' : unusedPass(w) ? 'ready' : 'started' };
 }
 
-// Passes nobody signed in with, past `hold` hours: back to the pool.
+// Passes never replaced, past `hold` hours: back to the pool (a past
+// round's too, its count left as it was).
 export async function sweepGift(env, deps, { force = false } = {}) {
   const d = await db(env);
   const now = deps.now();
@@ -107,23 +129,56 @@ export async function sweepGift(env, deps, { force = false } = {}) {
   if (!g || (!force && now - g.swept < SWEEP_MS)) return { back: 0 };
   await d.prepare('UPDATE gift SET swept = ?1 WHERE id = 1').bind(now).run();
   if (!g.hold) return { back: 0 };
-  const old = (await d.prepare('SELECT device, doc FROM gift_claim WHERE round = ?1 AND used = 0 AND doc <> \'\' AND at < ?2 ORDER BY at LIMIT ?3').bind(g.round, now - g.hold * 3_600_000, SWEEP_MAX).all()).results || [];
+  const old = (await d.prepare('SELECT round, device, doc FROM gift_claim WHERE used = 0 AND doc <> \'\' AND at < ?1 ORDER BY at LIMIT ?2').bind(now - g.hold * 3_600_000, SWEEP_MAX).all()).results || [];
   let back = 0;
   for (const c of old) {
     const doc = await deps.fsGet(env, WALLET_COLLECTION, c.doc);
     const w = doc.exists ? parseWallet(doc.payload) : null;
-    if (!w || !(freshPass(w) && unusedPass(w))) {
-      await d.prepare('UPDATE gift_claim SET used = 1 WHERE round = ?1 AND device = ?2').bind(g.round, c.device).run();
+    if (!w || !freshPass(w)) {
+      await d.prepare('UPDATE gift_claim SET used = 1 WHERE round = ?1 AND device = ?2').bind(c.round, c.device).run();
       continue;
     }
-    await deps.fsDelete(env, WALLET_COLLECTION, c.doc);
+    await deleteAccount(env, deps, c.doc);
     await d.batch([
-      d.prepare('DELETE FROM gift_claim WHERE round = ?1 AND device = ?2').bind(g.round, c.device),
-      d.prepare('UPDATE gift SET claimed = MAX(0, claimed - 1), back = back + 1 WHERE id = 1 AND round = ?1').bind(g.round)
+      d.prepare('DELETE FROM gift_claim WHERE round = ?1 AND device = ?2').bind(c.round, c.device),
+      d.prepare('UPDATE gift SET claimed = MAX(0, claimed - 1), back = back + 1 WHERE id = 1 AND round = ?1').bind(c.round)
     ]);
     back++;
   }
   return { back };
+}
+
+// The giveaway's accounts left empty (see the top): { id, ref, last, bytes, apps }, oldest first.
+const MINE_ONLY = new Set(['start', 'pay']);
+const lastUse = w => Math.max(Number(w.gift) || 0, Number(w.v2) || 0, ...Object.values(w.apps || {}).map(a => Number(a?.last) || 0));
+export async function emptyGiftAccounts(env, deps, days) {
+  const d = await db(env);
+  const now = deps.now();
+  const colls = Object.values(ECO_APPS).map(a => a.collection);
+  const rows = (await d.prepare("SELECT id, payload FROM docs WHERE coll = ?1 AND json_extract(payload, '$.gift') IS NOT NULL").bind(WALLET_COLLECTION).all()).results || [];
+  const out = [];
+  for (const r of rows) {
+    const w = parseWallet(r.payload);
+    if (!w?.gift || w.sec?.priority || w.passkeys?.keys?.length || w.merged) continue;
+    if ((w.entries || []).some(e => e.app !== 'eco' || !MINE_ONLY.has(e.kind))) continue;
+    const last = lastUse(w);
+    if (now - last < days * 86_400_000) continue;
+    const data = (await d.prepare(`SELECT coll, length(payload) AS n FROM docs WHERE id = ?1 AND coll IN (${colls.map((_, i) => `?${i + 2}`).join(', ')})`).bind(r.id, ...colls).all()).results || [];
+    const bytes = data.reduce((sum, x) => sum + (x.n || 0), 0);
+    if (bytes > EMPTY_BYTES) continue;
+    out.push({ id: r.id, ref: r.id.slice(0, 8), last, bytes, apps: Object.keys(w.apps || {}) });
+  }
+  return out.sort((a, b) => a.last - b.last);
+}
+
+// Each night (worker.js): the pool swept, then the empty accounts cleared if the owner turned it on.
+export async function giftNight(env, deps, { force = false } = {}) {
+  const swept = await sweepGift(env, deps, { force: true });
+  const g = await readGift(env);
+  if (!g.clean && !force) return { ...swept, cleared: 0 };
+  const empty = (await emptyGiftAccounts(env, deps, g.days)).slice(0, CLEAN_MAX);
+  for (const a of empty) await deleteAccount(env, deps, a.id);
+  return { ...swept, cleared: empty.length };
 }
 
 const publicGift = (g, now) => ({ state: giftState(g, now), left: Math.max(0, g.total - g.claimed), total: g.total, opens: g.opens || 0, closes: g.closes || 0, now });
@@ -190,7 +245,7 @@ export async function handleGift(request, env, headers, { ip = '', origin = '', 
   }
   let pass;
   try {
-    pass = await mintPass(env, deps);
+    pass = await mintPass(env, deps, { gift: true });
     await d.prepare('UPDATE gift_claim SET doc = ?1 WHERE round = ?2 AND device = ?3').bind(pass.docId, g.round, device).run();
   } catch (e) {
     await drop();
@@ -222,7 +277,8 @@ async function giftView(env, deps) {
     else if (!unusedPass(w)) started++;
   }
   const hour = rows.filter(r => now - r.at < 3_600_000).length;
-  return { gift: { ...publicGift(g, now), live: !!g.live, rate: g.rate, hold: g.hold, round: g.round, claimed: g.claimed, back: g.back, started, done, hour, last: rows[0]?.at || 0 } };
+  const empty = await emptyGiftAccounts(env, deps, g.days);
+  return { empty: { on: !!g.clean, days: g.days, count: empty.length, first: empty.slice(0, 20).map(({ id, ...a }) => a) }, gift: { ...publicGift(g, now), live: !!g.live, rate: g.rate, hold: g.hold, round: g.round, claimed: g.claimed, back: g.back, started, done, hour, last: rows[0]?.at || 0 } };
 }
 
 export const GIFT_TOOLS = {
@@ -244,6 +300,19 @@ export const GIFT_TOOLS = {
     if (next.opens && next.closes && next.closes <= next.opens) return { error: 'GIFT_TIMES', status: 400 };
     await (await db(env)).prepare('UPDATE gift SET live = ?1, total = ?2, opens = ?3, closes = ?4, rate = ?5, hold = ?6, updated = ?7 WHERE id = 1').bind(next.live, next.total, next.opens, next.closes, next.rate, next.hold, deps.now()).run();
     return giftView(env, deps);
+  },
+  // The empty accounts' clearing: { clean, days } (days 7 to 365).
+  async 'gift-clean-set'({ env, deps, body }) {
+    const g = await readGift(env);
+    const clean = body.clean == null ? g.clean : body.clean ? 1 : 0;
+    const days = body.days == null ? g.days : num(body.days, 7, 365, g.days);
+    await (await db(env)).prepare('UPDATE gift SET clean = ?1, days = ?2, updated = ?3 WHERE id = 1').bind(clean, days, deps.now()).run();
+    return giftView(env, deps);
+  },
+  // …and now, by hand (the list the panel shows).
+  async 'gift-clean-run'({ env, deps }) {
+    const { cleared } = await giftNight(env, deps, { force: true });
+    return { cleared, ...(await giftView(env, deps)) };
   },
   // A new round: the count starts again, every device may claim once more
   // (the passes already given stay theirs).
