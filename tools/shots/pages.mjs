@@ -304,6 +304,12 @@ export const PAGES = {
     draft: { args: click('#tab-bills', tap('預告|Drafts'), wait(2000), "js:document.querySelector('a.lw-bill.notice')?.click()", wait(3000), "js:document.querySelector('.lw-notice-about')?.click()", "js:document.querySelector('.lw-notice-about')?.scrollIntoView({block:'start'})", wait(800)) },
     // 立委 by 縣市 (the default), by party, and an independent in the 國民黨 caucus (陳超明).
     people: { hash: 'tab=bills&f=people', args: click(wait(2500)) },
+    // 預算: the budget in 立法院 now; further down 追加預算 and 第二預備金 (a stuck one at 協商, reserve
+    // reports deemed reviewed); a stuck budget's page (113年度追加預算) and a reserve report's.
+    budget: { hash: 'tab=bills&f=budget', args: click(wait(3000)) },
+    'budget-lower': { hash: 'tab=bills&f=budget', args: click(wait(3000), "js:[...document.querySelectorAll('.lw-sec h2')].find(h=>/追加預算|Supplementary/.test(h.textContent))?.scrollIntoView({block:'start'})", wait(800)) },
+    'budget-stuck': { hash: 'tab=bills&f=budget&budget=113%E8%BF%BD%E5%8A%A0', args: click(wait(3500)) },
+    'budget-reserve': { hash: 'tab=bills&f=budget&budget=112%E9%A0%90%E5%82%99%E9%87%91', args: click(wait(3500)) },
     // 議程: a day's sittings, live from the proxy's /law-live.
     agenda: { hash: 'tab=bills&f=agenda', args: click(wait(2500)) },
     'people-party': { hash: 'tab=bills&f=people', args: click(wait(2500), '[data-by=party]', wait(800)) },
