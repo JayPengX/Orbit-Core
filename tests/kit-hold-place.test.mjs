@@ -61,3 +61,25 @@ test("a list's more is one quiet bar in every app, never accent text", () => {
   assert.match(rule, /color: var\(--q-text-2\)/);
   assert.doesNotMatch(rule, /--q-accent|--accent/);
 });
+
+// Jay 2026-11-05, the third time a live game threw him up the page: Safari
+// moves a scroller by itself when what's in it is drawn anew, and the keeper
+// took any move that wasn't a clamp for the app's own scroll. Only a scroll
+// the code asks for may move a held place; one nobody made is put back.
+test('only a scroll the code asks for moves a held place; the browser\'s own is put back', () => {
+  const src = kit('hold-place.mjs');
+  const fn = src.slice(src.indexOf('function scrolledByCode('), src.indexOf('}', src.indexOf('function scrolledByCode(')));
+  assert.match(fn, /codeScrolled\(s\)/, 'scrolledByCode asks whether the code scrolled that scroller');
+  assert.doesNotMatch(fn, /scrollHeight/, 'never "moved and not clamped" alone');
+  for (const k of ['scrollTo', 'scroll', 'scrollBy', 'scrollIntoView']) assert.ok(src.includes(`'${k}'`), `${k} noted`);
+  assert.match(src, /Object\.defineProperty\(Element\.prototype, 'scrollTop'/);
+  assert.match(src, /HTMLElement\.prototype, 'focus'/);
+  // (The keeper's own moves go round the note: setTop.)
+  assert.doesNotMatch(src.slice(src.indexOf('function place('), src.indexOf('function scrolledByCode(')), /s\.scrollTop = /);
+  // A scroll nobody made, heard as it happens.
+  assert.match(src, /if \(st && !chains\.get\(s\) && !settle\.has\(s\)\) return restore\(s\);/);
+  // The live game in WebKit is in the guard.
+  const guard = readFileSync(new URL('../tools/live-scroll.mjs', import.meta.url), 'utf8');
+  assert.match(guard, /--webkit/);
+  assert.match(guard, /async function liveGame\(/);
+});

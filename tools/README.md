@@ -47,7 +47,18 @@ tools/shots/accounts/<app>-<name>.txt --click …` saves what the app wrote
 (follows, a watchlist, a timetable). A new account with nothing in it is a
 real state too (its welcome sheet): shoot that when it's what you changed.
 
-## `node tools/live-scroll.mjs [app…] [--sheet "<js>"] [--account <name>] [--fast] [--no-days]`: nothing jumps
+## `node tools/live-scroll.mjs [app…] [--sheet "<js>"] [--account <name>] [--fast] [--no-days] [--webkit] [--live-only]`: nothing jumps
+
+**Run it with `--webkit` too.** Safari moves a scroller by itself when what's in it is
+drawn anew, and Chromium never does: a live game's page went to the top on every refresh
+on Jay's iPhone (2026-11-05, the third time) while this passed in Chromium. In the cloud,
+once: the apt-get line under `--webkit` below, then
+`PLAYWRIGHT_BROWSERS_PATH=/tmp/pw-webkit node $(dirname $(readlink -f $(which playwright)))/cli.js install webkit`,
+and run with the same `PLAYWRIGHT_BROWSERS_PATH`. Sports first opens a game on now (賽事,
+league by league), scrolls it to the middle of 概況 and the end of 數據, and leaves it
+through four live refreshes: the card that was under the view's upper third must stay where
+it was on screen ("概況 put at 1523px moved 1523px": today's kit before the fix). No game
+on anywhere: said and skipped. `--live-only`: just that.
 
 Each app on real data (signed in to its demo account in `tools/shots/accounts/`
 where it has one). First, as it loads, untouched (`late`): from the moment its

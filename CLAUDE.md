@@ -119,8 +119,8 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `orbit.mjs` | The core: the session, data reads and device storage (§5), the economy's tables, looks and milestones, notices, the frame (`tabBar`, `topActions`, `accountButton`, `ask`/`tell`), screens, fitting, live beats and break countdowns, recommendations (`rank`, `affinity`), the 除錯紀錄 (`rec`); on import it stops pinch zoom, lifts sheets over the keyboard (`watchKeyboard`), holds the lift for pictures, presses only when pressed; `switchGlide` |
 | `orbit.css` | The design system: iOS 27's tokens (colour, type, space, radius, Liquid Glass, springs) and every `q-` component; the apps' accent colours (`tools/accent-css.mjs`); at its end Orbit's own look, on every app's page (`data-look="native"`, DESIGN §11) |
 | `ui.mjs` | The builders (§3.3) and their HTML-string twins (`…Html`) for apps that draw with template strings; loads `hold-place.mjs` |
-| `hold-place.mjs` | A redraw never moves the page, a sheet or a panel: one the person didn't make holds what they read; a tap holds the control under the finger; never a drawing (`loose`); a content-sized sheet keeps its height (`--q-sheet-floor`); `scrollBusy()` holds `everyDev`'s beats under a finger; `freshScreen()`: a new screen at the top; `letGo()`: a drag carries its grip away |
-| `steady-pics.mjs` | A picture drawn again is eager and decoded at once: no blank frame on iPhone |
+| `hold-place.mjs` | A redraw never moves the page, a sheet or a panel: one the person didn't make holds what they read; only the code's scrolls move it; a tap holds the control under the finger; never a drawing (`loose`); a content-sized sheet keeps its height (`--q-sheet-floor`); `scrollBusy()` holds `everyDev`'s beats under a finger; `freshScreen()`: a new screen at the top; `letGo()`: a drag carries its grip away |
+| `steady-pics.mjs` | A picture drawn again is eager and decoded at once |
 | `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, before the app's modules); the cover held for it |
 | `loader.html` | The snippets every app's page carries (`kit:head`, `kit:boot`) |
 | `brand.mjs` | Families, names, colours, marks, repos, slugs, `APP_ORDER`, `DEV` (speeds, §9) |
@@ -479,7 +479,7 @@ can be turned off on its own.
 | `node tools/preview.mjs <app>` | The app with real data (`--live`, `--width`, `--timing`, `--requests`, `--profile`, `--webkit`, `--reopen`…); prints `wraps:`, `cut:`, `scrolls sideways:` |
 | `node tools/gate.mjs [app…]` | The family quality gate (`tools/gate-page.js`): lift, stalls, dead taps, wraps, cuts, letters, white, mixed language… on every tab |
 | `node tools/f1-replay.mjs --start <UTC> --at <UTC>` | An F1 session as F1's live feed had it at any moment of a recorded one (OpenF1's tables), as the preview's `--fixture`s: shots of a red flag or a safety car with no session on (`shots.mjs sports f1-live … -- $(cat <out>/args.txt)`) |
-| `node tools/live-scroll.mjs [app…]` | Nothing jumps: pages watched as they load (`late`), then scrolled as Safari scrolls: a refresh above, a tab drawn short, a moving drawing, taps that fold below and above, a sheet showing less; exit 1 if anything moved |
+| `node tools/live-scroll.mjs [app…] [--webkit]` | Nothing jumps: a live game through 4 refreshes; pages as they load (`late`), then scrolled: a refresh above, a tab drawn short, a moving drawing, taps folding below and above, a sheet showing less |
 | `node tools/store-shots.mjs <app>` | The README's and Showcase's screenshot set, both languages |
 | `node tools/test-apps.mjs [app…]` | Every app's tests against this kit (checkouts beside this one) |
 

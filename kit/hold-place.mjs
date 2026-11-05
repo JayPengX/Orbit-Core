@@ -83,7 +83,7 @@ function anchorsAt(s, n) {
     }
     const r = k.getBoundingClientRect();
     if (r.height < 8) continue;
-    anchors.push({ node: k, sig: sigOf(k), y: r.top });
+    anchors.push({ node: k, sig: sigOf(k), y: r.top, top: s.scrollTop });
   }
   return anchors;
 }
@@ -126,8 +126,13 @@ function standIn(s, a, toggle = false) {
   if (!same.length && flip) same = all.filter(n => n.hasAttribute('aria-expanded') && sigOf(n).split('|')[1] === kind);
   let best = null;
   let gap = Infinity;
+  // (Nearest where it was in the scroller's content, not on the screen: the
+  // browser may have moved the scroller by itself (Safari, to the top), and
+  // the twin nearest the old screen place was then another card high up the
+  // page: the place "kept" was the top. Jay 2026-11-05.)
+  const was = a.y + (a.top ?? s.scrollTop);
   for (const n of same) {
-    const d = Math.abs(n.getBoundingClientRect().top - a.y);
+    const d = Math.abs(n.getBoundingClientRect().top + s.scrollTop - was);
     if (d < gap) (gap = d), (best = n);
   }
   return best;
@@ -176,14 +181,27 @@ function place(s, want) {
     if (short < 1 || !r) break;
     r += short;
   }
-  if (Math.abs(s.scrollTop - want) >= 1) s.scrollTop = want;
+  if (Math.abs(s.scrollTop - want) >= 1) setTop(s, want);
 }
 // Moved by the code that drew (it scrolled on purpose: to the top, to a
-// section), not by the page getting shorter under it.
+// section), not by the browser. Only a scroll the code asked for counts:
+// Safari moves a scroller by itself when what's in it is drawn anew (a live
+// game's score header rebuilt every few seconds threw the reader up 190px,
+// or to the top; Jay 2026-11-05, the third time), with the page as tall as
+// before, so "moved and not clamped" was taken for the code's own scroll and
+// kept. Now: moved, and the code scrolled just now (codeScrolled), or it's
+// the code's by the old rule only where no browser can tell us (no DOM).
+// (Each scroller by itself: a chip row centring its chip sideways at every
+// refresh is no scroll of the page or sheet it sits in.)
+const CODE_MS = 120;
+let anyAt = 0;
+const codeAt = new WeakMap();
+const codeScrolled = s => Date.now() - Math.max(anyAt, codeAt.get(s) || 0) < CODE_MS;
 function scrolledByCode(s, was) {
-  const max = s.scrollHeight - s.clientHeight;
-  return Math.abs(s.scrollTop - was) > 1 && !(s.scrollTop < was && s.scrollTop >= max - 1);
+  return Math.abs(s.scrollTop - was) > 1 && codeScrolled(s);
 }
+// The keeper's own moves are never the code's (held places put back).
+let setTop = (s, v) => (s.scrollTop = v);
 
 function restore(s) {
   const st = held.get(s);
@@ -208,7 +226,7 @@ export function freshScreen(s = typeof document !== 'undefined' ? document.scrol
   held.delete(s);
   if (tap?.s === s) tap = null;
   holdRoom(s, 0);
-  if (s.scrollTop) s.scrollTop = 0;
+  if (s.scrollTop) setTop(s, 0);
 }
 
 // ---- The tapped control stays under the finger ----
@@ -243,7 +261,7 @@ function keepTap(t) {
     tap = null;
     return anchor(s);
   }
-  const n = t.node.isConnected && shown(t.node) ? t.node : standIn(s, { node: t.node, sig: t.sig, y: t.y }, true);
+  const n = t.node.isConnected && shown(t.node) ? t.node : standIn(s, { node: t.node, sig: t.sig, y: t.y, top: t.top }, true);
   // Gone (a part with no such control), or grown above it (a list opened over its 再看): the view's place.
   const off = n ? n.getBoundingClientRect().top - viewTop(s) + s.scrollTop : 0;
   if (!n || off > t.off + 1) {
@@ -293,6 +311,29 @@ const unfloor = () => {
 
 if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' && !globalThis.__orbitHoldPlace) {
   globalThis.__orbitHoldPlace = true;
+  // Every scroll the code asks for, noted (scrollTop, scrollTo, scrollBy,
+  // scrollIntoView, focus without preventScroll; on the window too): only
+  // those may move a held place. Anything else that moved it is the browser,
+  // and the place is put back.
+  // (Up and down only: a scroll sideways alone, { left }, moves no held place.)
+  const upDown = a => !(a.length === 1 && a[0] && typeof a[0] === 'object' && !('top' in a[0]));
+  const note = n => void codeAt.set(rootOf(n), Date.now());
+  const top = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
+  if (top?.set) {
+    setTop = (s, v) => top.set.call(s, v);
+    Object.defineProperty(Element.prototype, 'scrollTop', { ...top, set(v) { note(this); top.set.call(this, v); } });
+  }
+  const wrap = (proto, k, mark) => {
+    const f = proto?.[k];
+    if (typeof f === 'function') proto[k] = function (...a) { mark(this, a); return f.apply(this, a); };
+  };
+  for (const k of ['scrollTo', 'scroll', 'scrollBy']) {
+    wrap(Element.prototype, k, (n, a) => upDown(a) && note(n));
+    wrap(globalThis, k, (n, a) => upDown(a) && note(document.scrollingElement));
+  }
+  // (These may move any scroller around the element: all of them.)
+  wrap(Element.prototype, 'scrollIntoView', () => void (anyAt = Date.now()));
+  if (typeof HTMLElement !== 'undefined') wrap(HTMLElement.prototype, 'focus', (n, [o]) => o?.preventScroll || void (anyAt = Date.now()));
   addEventListener('pointerdown', ev => ((lastGesture = Date.now()), noteTap(ev.target)), true);
   // (The window counts from the finger lifting: a slow swipe's day lands after it.)
   addEventListener('pointerup', () => ((lastGesture = Date.now()), tap && (tap.at = Date.now())), true);
@@ -311,6 +352,8 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
   globalThis.visualViewport?.addEventListener('resize', unfloor);
   // Any scroller the person moves is held from then on; its anchor read once the scroll settles.
   const settle = new Map();
+  // (Each scroller's scroll now: someone's, or the browser's.)
+  const chains = new WeakMap();
   addEventListener(
     'scroll',
     ev => {
@@ -319,6 +362,21 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
       const st = held.get(s);
       if (st && st.top === s.scrollTop) return;
       if (!st && !s.scrollTop) return;
+      // A scroll no one made: the browser's own, after a redraw with no
+      // change to the page left to hear (Safari put a live game's page back
+      // to the top a moment after its refresh, Jay 2026-11-05): the place put
+      // back at once. A scroll is someone's when it starts with a finger, a
+      // wheel, a key or the code (a fling runs on from there).
+      const quiet = Date.now() - lastScroll > SCROLL_IDLE_MS;
+      if (quiet || !chains.has(s)) chains.set(s, theirs() || touching > 0 || codeScrolled(s));
+      if (st && !chains.get(s) && !settle.has(s)) return restore(s);
+      // (The code's own jump, no finger: held from where it landed at once,
+      // not once it settles; a redraw just after it is kept too.)
+      if (!theirs() && !touching && codeScrolled(s)) {
+        clearTimeout(settle.get(s));
+        settle.delete(s);
+        return s.scrollTop > 0 ? anchor(s) : (held.delete(s), trimRoom(s));
+      }
       lastScroll = Date.now();
       clearTimeout(settle.get(s));
       settle.set(

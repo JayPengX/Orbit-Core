@@ -24,6 +24,18 @@
 // The same in a sheet when --sheet opens one (Sports: its game pages, by
 // themselves; "" for none). Exit code 1 on a fault.
 // --without: the kit's keeper left out, to see what it catches.
+// --webkit: Safari's own engine (WebKit) instead of Chromium. Use it: Safari
+//   moves a scroller by itself when what's in it is drawn anew, and Chromium
+//   never does (a live game's page went up on every refresh on Jay's iPhone,
+//   2026-11-05, the third time, while this passed in Chromium). Once in the
+//   cloud: tools/README.md's apt-get line, then
+//   `PLAYWRIGHT_BROWSERS_PATH=<dir> node $(dirname $(readlink -f $(which playwright)))/cli.js install webkit`
+//   and the same PLAYWRIGHT_BROWSERS_PATH for this run.
+// And Sports' live game (Jay 2026-11-05: "I click on a live match and it's
+// jumping my scroll back up every few seconds"): a game on now opened,
+// scrolled to the middle of 概況 and to the end of 數據, then left through
+// four live refreshes untouched: the page stays where it was put. No game on
+// anywhere: said, and skipped. --live-only: just that.
 // (The kit's hold-place.mjs is what holds it; this checks it still does.)
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -77,6 +89,85 @@ const dayPick = ahead => `(async () => {
   // (The strip lights the chip first and draws the day a frame later: watched from then.)
   await new Promise(r => requestAnimationFrame(() => setTimeout(r, 200)));
 })()`;
+// Sports' game on now: the first live row in 賽事, league by league.
+const LIVE = {
+  sports: `(async () => {
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  document.querySelector('dialog[open] .q-close')?.click();
+  await wait(800);
+  document.querySelector('#tab-matches')?.click();
+  await wait(2500);
+  const leagues = [...document.querySelectorAll('[data-league]')].filter(e => e.offsetParent).map(e => e.dataset.league);
+  for (const lg of [...new Set(leagues)]) {
+    [...document.querySelectorAll('[data-league=' + lg + ']')].find(e => e.offsetParent)?.click();
+    await wait(3000);
+    const row = [...document.querySelectorAll('.event-row.live')].find(e => e.offsetParent && !e.disabled);
+    if (row) {
+      row.click();
+      return lg;
+    }
+  }
+  return null;
+})()`
+};
+// Its tabs, each scrolled to a place (a share of the way down), and how many refreshes it's left through.
+const LIVE_SPOTS = [['概況', 0.5], ['數據', 1]];
+const LIVE_BEATS = 4;
+async function liveGame(page, js) {
+  const league = await page.evaluate(js);
+  if (!league) return { skipped: 'no game on now' };
+  await page.waitForTimeout(8000);
+  const out = { league, spots: [] };
+  for (const [tab, at] of LIVE_SPOTS) {
+    const ok = await page.evaluate(t => {
+      const b = [...document.querySelectorAll('dialog[open] .match-tabs button')].find(x => x.textContent.trim() === t);
+      b?.click();
+      return Boolean(b);
+    }, tab);
+    if (!ok) continue;
+    await page.waitForTimeout(1500);
+    const put = await page.evaluate(at => {
+      const s = document.querySelector('dialog[open].q-sheet');
+      s.scrollTop = Math.round((s.scrollHeight - s.clientHeight) * at);
+      return s.scrollTop;
+    }, at);
+    // (Settled, then watched untouched through the refreshes, every 250 ms:
+    // what's read, the card under the view's upper third, stays where it is on
+    // screen. By what it says, its digits aside, as a live redraw makes a new
+    // one; the scroll itself where the card's not found. A card that grew or
+    // shrank above it is the keeper's to hold, so the scroll may change.)
+    await page.waitForTimeout(800);
+    const mark = await page.evaluate(() => {
+      const s = document.querySelector('dialog[open].q-sheet');
+      const r = s.getBoundingClientRect();
+      let n = document.elementFromPoint(r.left + r.width / 2, r.top + s.clientHeight * 0.35);
+      while (n && n !== s && !(n.matches('.q-card, section, [class*="card"]') && n.getBoundingClientRect().height < s.clientHeight * 2)) n = n.parentElement;
+      if (!n || n === s) return null;
+      const sig = `${n.className}|${n.textContent.replace(/[\d\s:'’.,+\-–%]/g, '').slice(0, 40)}`;
+      globalThis.__lsMark = { sig, cls: n.classList[0] };
+      return n.getBoundingClientRect().top - r.top;
+    });
+    const where = () =>
+      page.evaluate(() => {
+        const s = document.querySelector('dialog[open].q-sheet');
+        const m = globalThis.__lsMark;
+        const n = m && [...s.querySelectorAll('.' + CSS.escape(m.cls))].find(x => `${x.className}|${x.textContent.replace(/[\d\s:'’.,+\-–%]/g, '').slice(0, 40)}` === m.sig);
+        return { top: s.scrollTop, at: n ? n.getBoundingClientRect().top - s.getBoundingClientRect().top : null };
+      });
+    // (A game's beat is DEV.sportsGame, 5 s by default.)
+    const beat = 6000;
+    let worst = 0;
+    const end = Date.now() + LIVE_BEATS * beat + 1000;
+    while (Date.now() < end) {
+      const w = await where();
+      const off = mark != null && w.at != null ? w.at - mark : w.top - put;
+      if (Math.abs(off) > Math.abs(worst)) worst = Math.round(off);
+      await page.waitForTimeout(250);
+    }
+    out.spots.push({ tab, put, worst });
+  }
+  return out;
+}
 const DAYS = { sports: [['two days on', dayPick(2)], ['three days on', dayPick(3)]] };
 const ROWS = { sports: '.event-row' };
 // (Each page of that league, as the URL asks it.)
@@ -91,7 +182,10 @@ const accountName = opt('account');
 const LATE_MS = 9000;
 const list = apps.length ? apps : ['sports', 'transit', 'weather', 'securities', 'law', 'words', 'money', 'beats'];
 const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.PLAYWRIGHT || 'playwright');
+const pw = require(process.env.PLAYWRIGHT || 'playwright');
+const webkit = args.includes('--webkit');
+const engine = webkit ? pw.webkit : pw.chromium;
+const liveOnly = args.includes('--live-only');
 const preview = fileURLToPath(new URL('./preview.mjs', import.meta.url));
 const accounts = fileURLToPath(new URL('./shots/accounts/', import.meta.url));
 
@@ -365,7 +459,7 @@ for (const app of list) {
     faults++;
     continue;
   }
-  const browser = await chromium.launch();
+  const browser = await engine.launch();
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     // Safari's way: no scroll anchoring anywhere.
@@ -392,6 +486,14 @@ for (const app of list) {
         return route.continue();
       });
     await page.goto(url);
+    if (LIVE[app]) {
+      await page.waitForTimeout(4000);
+      const r = await liveGame(page, LIVE[app]);
+      const bad = !r.skipped && (!r.spots.length || r.spots.some(x => Math.abs(x.worst) > 2));
+      if (bad) faults++;
+      console.log(`${bad ? '✗' : '✓'} ${app} live game${webkit ? ' (WebKit)' : ' (Chromium: run --webkit too)'}: ${r.skipped || `${r.league}, ${r.spots.map(x => `${x.tab} put at ${x.put}px moved ${x.worst}px over ${LIVE_BEATS} refreshes`).join('; ') || 'no tab to scroll'}`}`);
+      if (liveOnly) continue;
+    } else if (liveOnly) continue;
     const pageLate = await page.evaluate(late, [false, LATE_MS, ROWS[app]]);
     const results = { page: { late: pageLate, ...(await page.evaluate(check, false)), tap: await taps(page, false) } };
     for (const [name, js] of daysOf(app)) {
