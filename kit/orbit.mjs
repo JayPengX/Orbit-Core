@@ -4826,7 +4826,7 @@ const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: re
 // and no tab.
 // The tab pill's slide (orbit.css .q-tabbar::before, --q-dur-snappy).
 const SLIDE_MS = 340;
-export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.getElementById('tabs'), label: ariaLabel = '', action = null } = {}) {
+export function tabBar({ tabs, onSelect, onShow = null, hash = id => `#${id}`, nav = document.getElementById('tabs'), label: ariaLabel = '', action = null } = {}) {
   const buttons = new Map();
   let downOn = null;
   const places = {};
@@ -4946,8 +4946,18 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
       const h = hash(id);
       if (h != null && location.hash !== h) history.replaceState(null, '', h || location.pathname + location.search);
     } catch {}
+    // (An app's own frame for the tab, a class on the page, set now so its
+    // place can be scrolled to: Transit's map tab holds the page to one screen.)
+    try {
+      onShow?.(id);
+    } catch {}
     globalThis.scrollTo?.(0, places[id] || 0);
+    want = places[id] || 0;
   };
+  // (The place it was left at, as asked when shown early: a page that can't
+  // scroll that far yet, the tab it left still laid out (Transit's map holds
+  // the page to one screen), is taken there once the app has drawn the tab.)
+  let want = 0;
   const choose = id => {
     lit(id);
     cancelAnimationFrame(pending);
@@ -4999,6 +5009,12 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
       if (shownEarly) {
         early = prior = null;
         if (top) globalThis.scrollTo?.(0, 0);
+        else if (want && (globalThis.scrollY || 0) < want - 1) {
+          const y = want;
+          globalThis.scrollTo?.(0, y);
+          requestAnimationFrame(() => (globalThis.scrollY || 0) < y - 1 && globalThis.scrollTo(0, y));
+        }
+        want = 0;
       }
       const changed = current !== id;
       const first = current == null;

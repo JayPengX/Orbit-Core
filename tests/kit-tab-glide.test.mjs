@@ -153,6 +153,61 @@ test('a tab drawn before shows at once; the app draws it after the slide', () =>
   assert.equal(panels.home.hidden, true);
 });
 
+// Its place back even when the page can't scroll there in the tap (Jay
+// 2026-11-05, Transit: 查時刻 and 我的 came back at the top after the map,
+// which holds the page to one screen): the app's frame for the tab is set
+// first (onShow), and a place still short when the app draws it is gone to then.
+test('a tab comes back at its place: onShow sets its frame first; a clamped place is mended', () => {
+  let limit = Infinity;
+  globalThis.scrollTo = (x, y) => (scrolled = Math.min(limit, typeof x === 'object' ? x.top : y));
+  const shown = [];
+  const bar = tabBar({ tabs: Object.keys(buttons).map(id => ({ id, label: id, icon: 'home' })), onSelect: () => {}, onShow: id => (shown.push(id), (limit = id === 'home' ? 0 : Infinity)), nav });
+  const tab = id => nav.kids.find(b => b.attrs['data-tab'] === id);
+  bar.select('live');
+  run(50);
+  tab('matches').fire('pointerdown');
+  run(100);
+  bar.select('matches');
+  scrolled = 700;
+  run(50);
+  // To home (one screen) and back: onShow lifts the limit before the place is asked for.
+  tab('home').fire('pointerdown');
+  run(500);
+  bar.select('home');
+  // (Home holds the page to one screen, as Transit's map.)
+  limit = 0;
+  assert.equal(scrolled, 0);
+  tab('matches').fire('pointerdown');
+  assert.equal(shown.at(-1), 'matches');
+  assert.equal(scrolled, 700, 'matches where it was left, in the tap');
+  run(500);
+  bar.select('matches');
+  // An app without onShow: the page still short in the tap, the place taken once the app draws.
+  const bar2 = tabBar({ tabs: Object.keys(buttons).map(id => ({ id, label: id, icon: 'home' })), onSelect: () => {}, nav });
+  const tab2 = id => nav.kids.find(b => b.attrs['data-tab'] === id);
+  limit = Infinity;
+  bar2.select('live');
+  run(50);
+  tab2('matches').fire('pointerdown');
+  run(100);
+  bar2.select('matches');
+  scrolled = 700;
+  run(50);
+  tab2('home').fire('pointerdown');
+  run(500);
+  bar2.select('home');
+  limit = 0;
+  scrolled = 0;
+  tab2('matches').fire('pointerdown');
+  assert.equal(scrolled, 0, 'held short by the tab it left');
+  run(500);
+  limit = Infinity;
+  bar2.select('matches');
+  run(50);
+  assert.equal(scrolled, 700, 'its place once drawn');
+  globalThis.scrollTo = (x, y) => (scrolled = typeof x === 'object' ? x.top : y);
+});
+
 test('the pill and the tab icons ride béziers, never a linear() spring', () => {
   const rule = sel => css.slice(css.indexOf(sel)).split('}')[0];
   for (const sel of ['.q-tabbar.q-tabbar::before {', 'html.q-tabrail .q-tabbar.q-tabbar::before {', '.q-tab-icon {']) {
