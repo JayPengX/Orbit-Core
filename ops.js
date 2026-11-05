@@ -18,7 +18,7 @@
 //     collections, R2's folders, which secrets and bindings are set (never
 //     their values).
 
-import { STATE_KEY as GUARD_STATE } from './guard.js';
+import { STATE_KEY as GUARD_STATE, PACES } from './guard.js';
 import { paceOf } from './pace.js';
 import { notifyNow } from './push.js';
 import { ECO_APPS } from './eco.js';
@@ -89,9 +89,10 @@ export function billNotice(g, lang) {
   const title = g.stopped
     ? en ? 'Cloudflare: the proxy is stopped until the next period' : 'Cloudflare：代理已停到下個週期'
     : en ? `Cloudflare: ${top} at ${PCT(share)} of the $5 plan` : `Cloudflare：${ZH[top] || top} 已用 ${PCT(share)}`;
+  const slow = PACES[pace]?.slow || 1;
   const body = en
-    ? `Pace ${pace}${pace ? ` (live refreshes ×${[1, 2, 4, 8][pace]} slower)` : ' (as configured)'}; nothing is billed past $5.`
-    : `節流 ${pace}${pace ? `（即時更新放慢 ×${[1, 2, 4, 8][pace]}）` : '（照設定）'}；不會超過 $5。`;
+    ? `Pace ${pace}${pace ? ` (live refreshes ×${slow} slower${pace === PACES.length - 1 ? ', basics first: nobody new let in' : ''})` : ' (as configured)'}; nothing is billed past $5.`
+    : `節流 ${pace}${pace ? `（即時更新放慢 ×${slow}${pace === PACES.length - 1 ? '，先顧基本功能：新的人先等' : ''}）` : '（照設定）'}；不會超過 $5。`;
   return { title, body, tag: 'ops:bill', kind: 'bill', url: `${SITE}/Orbit-Core/admin/#health` };
 }
 // What's news: a higher alert, a stop, or a pace that changed (this period).
@@ -183,7 +184,7 @@ export async function systemReport(env, deps) {
   ]);
   return {
     at: deps.now(),
-    guard: g && { at: g.at, armed: g.armed, error: g.error, share: g.share, projected: g.projected, plan: g.plan, top: g.top, pace: g.pace || 0, paceTop: g.paceTop, paceSince: g.paceSince, alert: g.alert || 0, stopped: g.stopped ? { at: g.stopped.at, why: g.stopped.why } : null, period: g.period, partial: g.partial },
+    guard: g && { at: g.at, armed: g.armed, error: g.error, share: g.share, projected: g.projected, plan: g.plan, top: g.top, pace: g.pace || 0, paceTop: g.paceTop, paceWhy: g.paceWhy || null, forecast: g.forecast || null, paceSince: g.paceSince, alert: g.alert || 0, stopped: g.stopped ? { at: g.stopped.at, why: g.stopped.why } : null, period: g.period, partial: g.partial },
     pace,
     told,
     // (Its reference: the first 8 of its id, as the panel shows accounts.)

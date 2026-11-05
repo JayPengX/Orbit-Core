@@ -1,12 +1,15 @@
 // ---- pace.js: the month paced, as the bill's guard sets it ----
-// guard.js projects each count to the end of the billing period and writes a
-// pace (`guard:pace` in KV, only when it changes; 0 as configured … 3 the
-// leanest). The proxy follows it:
+// guard.js paces on what was really used (a count past its mark whose last
+// days' rate would reach the stop before the period ends; never a forecast)
+// and writes the pace (`guard:pace` in KV, only when it changes; 0 as
+// configured … 3 basics first). The proxy follows it:
 //   - the live refreshes (GET /config, which every app and the data proxy
 //     read) are slowed `slow` times, never past each one's own slowest;
 //   - each session's reads a minute are `reads` of the usual;
 //   - the builders that can wait (pace 1) or all of them (pace 2 and up), and
-//     the hourly extras (Weather's scoring, the capacity check), are skipped.
+//     the hourly extras (Weather's scoring, the capacity check), are skipped;
+//   - `newcomers` false (pace 3): nobody new is let in by whatever seats
+//     people; sign-in, sync and notices go on for those already in.
 // Read once a minute an isolate at most (KV's edge copy kept 5 minutes).
 
 import { PACE_KEY, PACES } from './guard.js';

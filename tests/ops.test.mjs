@@ -44,6 +44,8 @@ test('the bill\'s news: a higher alert, a stop, a pace that changed; a new perio
   const n = billNotice(g(1, 2), 'zh');
   assert.match(n.title, /Workers 請求 已用 60%/);
   assert.match(n.body, /×4/);
+  assert.match(billNotice(g(3, 3), 'zh').body, /×8，先顧基本功能：新的人先等/, 'pace 3: basics first');
+  assert.match(billNotice(g(3, 3), 'en').body, /nobody new let in/);
   assert.equal(billNotice(g(1), 'en').title, 'Cloudflare: requests at 60% of the $5 plan');
 });
 

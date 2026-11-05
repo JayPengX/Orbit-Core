@@ -230,35 +230,91 @@ test('a Worker that is gone (the old sports-proxy, deleted) never keeps the prox
   assert.ok(cf.workers['orbit-workers-proxy'].on);
 });
 
-test('pacing: the projected month sets the pace; it goes up at once, down only 10 points under its mark', async () => {
+test('pacing: only real use paces, past its mark and only while the last days\' rate would reach the stop before the period ends (the owner, 2026-11-05: a forecast alone never rate-limits); up at once, down 5 points under or 10 under the stop', async () => {
   const { paceFor, alertFor, PACES } = await import('../guard.js');
-  assert.equal(paceFor({ requests: 5_000_000 }).pace, 0);
-  assert.equal(paceFor({ requests: 6_100_000 }).pace, 1);
-  assert.equal(paceFor({ cpuMs: 24_500_000 }).pace, 2);
-  assert.equal(paceFor({ kvWrite: 950_000 }).pace, 3);
-  assert.equal(paceFor({ requests: 8_500_000 }, 3).pace, 3, 'held: 85% is within 10 points of 90%');
-  assert.equal(paceFor({ requests: 7_500_000 }, 3).pace, 2);
-  assert.equal(paceFor({ requests: 4_000_000 }, 1).pace, 0);
-  assert.equal(paceFor({ kvBytes: 999_000_000 }).pace, 0, 'storage is never paced');
+  const perDay = (k, n) => ({ [k]: n / DAY });
+  const req = n => perDay('requests', n);
+  // A forecast alone: 30% used at a rate that would end at 290%: nobody slowed.
+  assert.equal(paceFor({ requests: 3_000_000 }, { rate: req(2_000_000), left: 13 * DAY }).pace, 0);
+  // 61% used, the rest lasts the period: none; it wouldn't: 1.
+  assert.equal(paceFor({ requests: 6_100_000 }, { rate: req(200_000), left: 10 * DAY }).pace, 0);
+  assert.equal(paceFor({ requests: 6_100_000 }, { rate: req(400_000), left: 10 * DAY }).pace, 1);
+  assert.equal(paceFor({ cpuMs: 24_000_000 }, { rate: perDay('cpuMs', 1_000_000), left: 5 * DAY }).pace, 2);
+  const basics = paceFor({ kvWrite: 860_000 }, { rate: perDay('kvWrite', 20_000), left: 3 * DAY });
+  assert.equal(basics.pace, 3);
+  assert.deepEqual(basics.why, { key: 'kvWrite', share: 0.86, end: 0.92 });
+  // Basics first: nobody new let in at 3 only.
+  assert.deepEqual(PACES.map(p => p.newcomers), [true, true, true, false]);
   assert.deepEqual(PACES.map(p => p.slow), [1, 2, 4, 8]);
+  // 86% used, an hour left at the usual rate: the stop isn't reached, nobody slowed.
+  assert.equal(paceFor({ requests: 8_600_000 }, { rate: req(200_000), left: 3_600_000 }).pace, 0);
+  // Held: 81% is within 5 points of 85%, 79% isn't.
+  assert.equal(paceFor({ requests: 8_100_000 }, { rate: req(400_000), left: 5 * DAY, last: 3 }).pace, 3);
+  assert.equal(paceFor({ requests: 7_900_000 }, { rate: req(400_000), left: 5 * DAY, last: 3 }).pace, 2);
+  // Ending at 85% with pace 1 on: held (the slower pace lowered the rate); at 75%: eased.
+  assert.equal(paceFor({ requests: 6_500_000 }, { rate: req(200_000), left: 10 * DAY, last: 1 }).pace, 1);
+  assert.equal(paceFor({ requests: 6_500_000 }, { rate: req(200_000), left: 10 * DAY }).pace, 0);
+  assert.equal(paceFor({ requests: 6_500_000 }, { rate: req(100_000), left: 10 * DAY, last: 1 }).pace, 0);
+  assert.equal(paceFor({ kvBytes: 999_000_000 }, { rate: { kvBytes: 1 }, left: DAY }).pace, 0, 'storage is never paced');
   assert.equal(alertFor({ requests: 0.2, cpuMs: 0.55 }), 1);
   assert.equal(alertFor({ requests: 0.91 }), 3);
 });
 
+test("the last days' rate: since the oldest mark of the last 3½ days at least 12 hours old; before one, the period's own (three days at least)", async () => {
+  const { rateOf, marksAfter, forecastOf } = await import('../guard.js');
+  const H = 3_600_000;
+  const p = { from: 0, start: DAY, end: 32 * DAY };
+  const now = 20 * DAY;
+  const perDay = r => Math.round(r.requests * DAY);
+  assert.equal(perDay(rateOf({ requests: 10_000_000 }, [], p, now)), 500_000, "the period's own: 10M in 20 days");
+  assert.equal(perDay(rateOf({ requests: 3_000_000 }, [], p, DAY)), 1_000_000, 'three days at least');
+  const marks = [[now - 5 * DAY, { requests: 1 }], [now - 2 * DAY, { requests: 8_000_000 }], [now - 6 * H, { requests: 9_900_000 }]];
+  assert.equal(perDay(rateOf({ requests: 10_000_000 }, marks, p, now)), 1_000_000, 'from 2 days ago: 1M a day');
+  // Its forecast: 10M + 12 days at 1M = 220% at the end, the stop (9M) already passed: at once.
+  const f = forecastOf({ requests: 10_000_000 }, rateOf({ requests: 10_000_000 }, marks, p, now), p, now);
+  assert.deepEqual([f.key, f.end, f.warn, f.at], ['requests', 2.2, true, now]);
+  assert.equal(forecastOf({ requests: 1_000_000 }, { requests: 100_000 / DAY }, p, now).warn, false);
+  // Kept: a new mark every 6 hours, none older than 3½ days, none from the last period.
+  let m = marksAfter([], { requests: 5 }, now);
+  m = marksAfter(m, { requests: 6 }, now + H);
+  assert.equal(m.length, 1, 'under 6 hours: no new mark');
+  m = marksAfter(m, { requests: 7 }, now + 6 * H);
+  assert.deepEqual(m.map(x => x[1].requests), [5, 7]);
+  assert.equal(Object.keys(m[0][1]).some(k => /Bytes$/.test(k)), false, 'storage isn\'t marked');
+  assert.deepEqual(marksAfter(m, { requests: 8 }, now + 4 * DAY).map(x => x[1].requests), [8], 'older than 3½ days: gone');
+  assert.deepEqual(marksAfter(m, { requests: 1 }, now + 7 * H, true).map(x => x[1].requests), [1], 'a new period starts afresh');
+});
+
+test('a busy day early in the period (a school demo) slows nobody: the forecast is a warning only', async () => {
+  // Five days in (from Oct 12), 30% used: the period's own rate (600,000 a day) would end at 192%.
+  const cf = fakeCf({ requests: 3_000_000 });
+  const kv = fakeKv();
+  const s = await guardRun(env, { fetcher: cf.fetcher, kv, now: T('2026-10-17T00:00:00Z') });
+  assert.equal(s.pace, 0);
+  assert.equal(kv.m.get('guard:pace'), undefined);
+  assert.equal(s.forecast.warn, true);
+  assert.equal(s.forecast.key, 'requests');
+  assert.equal(s.paceTop, 1.92);
+  assert.equal(s.marks.length, 1);
+  assert.equal(s.stopped, undefined);
+});
+
 test('the account is the token\'s own (asked once, kept); the pace is written for the proxy only when it changes', async () => {
-  const cf = fakeCf({ requests: 2_000_000 });
+  const cf = fakeCf({ requests: 8_600_000 });
   const kv = fakeKv();
   const bare = { CF_GUARD_TOKEN: 't', PERIOD_DAY: '13' };
-  // Five days in at 2M: 12M a month projected, pace 3.
-  const s = await guardRun(bare, { fetcher: cf.fetcher, kv, now: T('2026-10-18T00:00:00Z') });
+  // 18 days in at 8.6M (86%), 14 days left at the period's rate: 15M, past the stop: pace 3.
+  const s = await guardRun(bare, { fetcher: cf.fetcher, kv, now: T('2026-10-30T00:00:00Z') });
   assert.equal(s.account, 'acct-1');
   assert.ok(s.armed);
   assert.equal(s.pace, 3);
-  assert.equal(JSON.parse(kv.m.get('guard:pace')).slow, 8);
+  assert.equal(s.paceWhy.key, 'requests');
+  const written = JSON.parse(kv.m.get('guard:pace'));
+  assert.deepEqual([written.slow, written.reads, written.newcomers], [8, 0.25, false]);
   assert.equal(cf.calls.filter(c => c.endsWith('/accounts')).length, 1);
   assert.equal(JSON.parse(kv.m.get(STATE_KEY)).account, 'acct-1', 'kept at once, not asked again each run');
   kv.m.delete('guard:pace');
-  const again = await guardRun(bare, { fetcher: fakeCf({ requests: 2_000_000 }).fetcher, kv, now: T('2026-10-18T00:05:00Z') });
+  const again = await guardRun(bare, { fetcher: fakeCf({ requests: 8_600_000 }).fetcher, kv, now: T('2026-10-30T00:05:00Z') });
   assert.equal(again.pace, 3);
   assert.equal(kv.m.get('guard:pace'), undefined, 'unchanged: not written again');
 });

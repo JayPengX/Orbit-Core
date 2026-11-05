@@ -447,7 +447,7 @@
 
     <!-- 健康 -->
     <section data-pane="health" hidden>
-      <div class="pane-head"><div><h2>帳單與節流</h2><p class="muted">Cloudflare $5 方案：推估到 60%、80%、90% 逐步放慢，任何一項用到 90% 就停代理到下個週期。</p></div></div>
+      <div class="pane-head"><div><h2>帳單與節流</h2><p class="muted">Cloudflare $5 方案：只看實際用掉的。用到 60%、75%、85%，而且照最近幾天的速度撐不到週期結束，才逐步放慢；預估只是提醒。任何一項用到 90% 就停代理到下個週期。</p></div></div>
       <p id="sys-error" class="error"></p>
       <div class="tiles" id="sys-tiles"></div>
       <p class="muted" id="sys-pace" style="margin:10px 0 0"></p>
@@ -1889,7 +1889,7 @@ async function loadCapacity() {
       tile('本週活躍', `${u.week} 人`, `今天 ${u.day} · 本月 ${u.month}`),
       tile('30 天後預估', `${u.expected} 人`, `近兩週新開 ${u.newWeek + u.newPrev} 個`),
       tile('撐得住', q.holds ? `${n0(q.holds.people)} 人` : '—', q.holds ? `${quotaName(q.holds.key)} ${Math.round(fillOf(q.rows.find(r => r.key === q.holds.key)) * 100)}%` : '還沒有人用'),
-      tile('開始放慢', q.slows ? `${n0(q.slows.people)} 人` : '—', q.slows ? '帳單保護 60%' : '帳單還沒讀到')
+      tile('本期預估', p.guard?.forecast ? pct(p.guard.forecast.end) : '—', !p.guard?.forecast ? '帳單還沒讀到' : p.guard.forecast.warn ? `${fmtDay(p.guard.forecast.at)} 會到 90%（只是提醒）` : '撐得到週期結束')
     );
     // (Short: 3.7 萬, 7 億; CPU in seconds.)
     const cn = v => (v >= 1e8 ? `${+(v / 1e8).toFixed(1)} 億` : v >= 1e4 ? `${+(v / 1e4).toFixed(1)} 萬` : n0(v));
@@ -1938,11 +1938,11 @@ async function loadCapacity() {
           ? `代理已經停了（${fmt(g.stopped.at)}，${g.stopped.why.map(k => BILL_ZH[k] || '讀不到用量').join('、')}到 ${Math.round(g.stopAt * 100)}%），下個帳單週期開始時自動恢復，不會多付一毛。`
           : g.error
             ? `Cloudflare 用量讀取失敗：${g.error}（連續 6 小時讀不到就先停兩個代理）。`
-            : `$5 方案：任何一項到 60% 就放慢、到 ${Math.round(g.stopAt * 100)}% 就停代理到下個週期，不會多付。本期 ${fmt(g.period.start)} 起，${fmt(g.at)} 讀取。${g.partial && Object.keys(g.partial).length ? `（這幾項讀不到：${Object.keys(g.partial).join('、')}）` : ''}`;
+            : `$5 方案：實際用到 60% 以上、而且照最近幾天的速度撐不到週期結束才放慢；任何一項到 ${Math.round(g.stopAt * 100)}% 就停代理到下個週期，不會多付。本期 ${fmt(g.period.start)} 起，${fmt(g.at)} 讀取。${g.partial && Object.keys(g.partial).length ? `（這幾項讀不到：${Object.keys(g.partial).join('、')}）` : ''}`;
     $('cap-plans').replaceChildren(...rows);
     const on = devSaved?.autoScale;
     const slow = p.scale == null ? '最慢也不夠：要減少即時功能，否則會碰到 $5 方案的上限而停' : p.scale > 1 ? `即時更新要放慢 ×${p.scale}` : '不用放慢';
-    const how = (q.holds ? `撐得住＝最先滿的那一項（${quotaName(q.holds.key)}）撐的人數；開始放慢＝Cloudflare 任何一項到 60%。` : '') + (q.measured
+    const how = (q.holds ? `撐得住＝最先滿的那一項（${quotaName(q.holds.key)}）撐的人數，這個人數以內不會放慢：Cloudflare 只有實際用到 60% 以上、而且照最近幾天的速度撐不到週期結束才放慢。` : '') + (q.measured
       ? '每一項的「撐 N 人」＝本週活躍人數 ×（上限扣掉固定用量）÷ 現在大家用掉的。Cloudflare 的固定用量是近 7 天最安靜的一成小時 × 24（排程、建置、帳單保護，沒人用也在跑）；其他項目全部算成人用的，所以只會估少。'
       : `每一項的「撐 N 人」＝本週活躍人數 × 上限 ÷ 現在用掉的；${p.hours?.error ? `近 7 天的逐時用量讀不到（${p.hours.error}），` : '還沒有近 7 天的逐時用量，'}排程的固定用量也算成人用的，所以只會估少。`);
     $('cap-note').textContent = `${how}Gemini 看一週裡最忙的一天；Google 地圖、TDX 看本月照這速度到月底。30 天後 ${u.expected} 人：${slow}。${on ? '「依人數自動調整」開著，每 6 小時照這個套用（下面的數字是你的設定，也是最快的）。' : p.scale > 1 || p.scale == null ? '打開下面的「依人數自動調整」就會自動套用。' : ''}${fmt(p.at)} 估算。`;
@@ -2004,7 +2004,7 @@ async function ghRun(repo, what, label) {
   }
 }
 const BILL_NAME = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'KV 讀取', kvWrite: 'KV 寫入', kvDelete: 'KV 刪除', kvList: 'KV 列出', kvBytes: 'KV 儲存', doRequests: 'Durable Objects 請求', doBytes: 'Durable Objects 儲存', r2ClassA: 'R2 寫入', r2ClassB: 'R2 讀取', r2Bytes: 'R2 儲存', d1RowsRead: 'D1 讀取', d1RowsWritten: 'D1 寫入', d1Bytes: 'D1 儲存' };
-const PACE_WORD = ['照設定', '放慢 ×2，可以等的建置暫停', '放慢 ×4，建置全停，每個人讀取減半', '放慢 ×8，讀取剩四分之一'];
+const PACE_WORD = ['照設定', '放慢 ×2，可以等的建置暫停', '放慢 ×4，建置全停，每個人讀取減半', '放慢 ×8，讀取剩四分之一，先顧基本功能：新的人先等'];
 // ---- 錯誤 (eco-admin.js errors): each Worker's in 24 hours, the proxy's by route ----
 const STATUS_ZH = { scriptThrewException: '程式出錯', exceededResources: '超過資源上限', exceededCpu: '超過 CPU', exceededMemory: '超過記憶體', internalError: 'Cloudflare 內部錯誤', responseStreamDisconnected: '回應中斷' };
 const WORKER_ZH = { 'orbit-workers-proxy': '代理（api）', 'orbit-site': '網站（jaypengx.com）', 'sports-proxy': 'Sports 代理' };
@@ -2077,7 +2077,9 @@ async function loadSystem() {
       tile('本期', g?.period ? `${fmtDay(g.period.start)} 起` : '—', g?.period ? `到 ${fmtDay(g.period.end)}，每月 13 日續約` : '')
     );
     // (Only when it says something the 節流 tile doesn't: slowed down, or the bill unread.)
-    $('sys-pace').textContent = [r.pace.pace ? `現在：${PACE_WORD[r.pace.pace] || ''}。` : '', g?.error ? `讀取失敗：${g.error}` : ''].join(' ').trim();
+    // (The forecast is a warning only: nobody is slowed by it, the owner 2026-11-05.)
+    const fc = g?.forecast;
+    $('sys-pace').textContent = [r.pace.pace ? `現在：${PACE_WORD[r.pace.pace] || ''}。` : '', fc?.warn && fc.at ? `照最近幾天的速度，${BILL_NAME[fc.key] || fc.key}會在 ${fmt(fc.at)} 用到 90%（只是提醒：實際用到 60% 以上才會放慢）。` : '', g?.error ? `讀取失敗：${g.error}` : ''].join(' ').trim();
     $('sys-pace').hidden = !$('sys-pace').textContent;
     $('alert-note').textContent = r.alertAccount ? `警示送到帳戶 ${r.alertAccount}（它第一個開了通知的 App）：用量過 50%、75%、90%，節流改變，或代理停了。` : '還沒設定：輸入你的 Orbit Pass，用量過 50%、75%、90%、節流改變或代理停了，就會通知你開了通知的 App。';
     const now = Date.now();

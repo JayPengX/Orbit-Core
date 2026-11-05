@@ -131,7 +131,8 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-27 Data must never be lost or corrupted; saves stay lean. Kept collections get version history and nightly backups; new user-data collections join the keep set in `worker.js`.
 - 10-27 Keep the US$5 Workers Paid plan; don't re-propose dropping it unless heavy work leaves Workers.
 - 10-27 Gemini is very reliable, only costly: replace it only where a free path is just as reliable; otherwise make calls cheaper (free first, e.g. invoice QR on the phone, local parsers).
-- Every Gemini route has a daily global cap; Google Weather is shared per 0.05° square and paced under its daily cap.
+- Every Gemini route has a daily global cap, one count for every Worker (D1); Google Weather is shared per 0.05° square, paced under its daily cap and kept inside Google's free month.
+- 11-05 Never billed past what's included, and slowed only for real (Jay: "even if our quota runs out it never charge me extra and as quota drain closer to limit is start rate limiting to make sure basic thing still work?"; "It should be realistic so a estimate of this month exceeding should not immediately resulting in rate limiting"): Cloudflare stops at 90% of any count; before that a count slows things only once its real share used passes 60%, 75%, 85% AND the last days' rate would reach the stop before the period ends. A forecast is a warning in the admin panel, never a slow-down, so a busy day (a school demo) with the month ahead slows nobody. At 85% the basics come first: sign-in, sync and notices go on for everyone already in, nobody new is let in. Paid outside APIs stop inside their free amounts (Maps at 90% of each SKU, Weather under 10,000 a month) and spend freely until 70% of the month is really used, then spread what's left.
 - New Cron Triggers don't run: reuse the proxy's even/odd minute crons or a Durable Object alarm (TRUTH §5).
 
 ## 5. Per app

@@ -20,7 +20,7 @@
 // (its daily cap, by place, not person).
 
 import { DEV } from './kit/brand.mjs';
-import { PLAN, STOP_AT, PACES } from './guard.js';
+import { PLAN, STOP_AT } from './guard.js';
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
@@ -138,7 +138,7 @@ export function splitHours(h, now = Date.now()) {
 const holdsOf = (week, room, use) => (week > 0 && use > 0 ? Math.max(0, Math.floor((week * room) / use)) : null);
 
 // Every quota as a row: { key, kind, name, used, cap, day, fixedDay,
-// perPerson, holds, slows, by }. `by`: 'people' (grows with them),
+// perPerson, holds, by }. `by`: 'people' (grows with them),
 // 'place' (Google Weather: by area), 'store' (what's kept).
 export function quotas({ users = {}, guard = null, hours = null, usage = {}, maps = {}, now = Date.now() }) {
   const week = users.week || 0;
@@ -163,8 +163,9 @@ export function quotas({ users = {}, guard = null, hours = null, usage = {}, map
       const fixedDay = s ? s.fixed : 0;
       const people = s ? s.people : day;
       const capDay = cap / pdays;
-      const slowDay = (planOf[k] * PACES[1].at) / pdays;
-      rows.push({ key: `cf:${k}`, kind: 'cf', count: k, by: 'people', measured: !!s, used: guard.use[k] || 0, projected: guard.projected?.[k] ?? null, cap, day, capDay, fixedDay, perPerson: week ? people / week : null, holds: holdsOf(week, capDay - fixedDay, people), slows: holdsOf(week, slowDay - fixedDay, people) });
+      // (Nobody is slowed before this many either: guard.js paces only a
+      // count that would reach the stop before the period ends.)
+      rows.push({ key: `cf:${k}`, kind: 'cf', count: k, by: 'people', measured: !!s, used: guard.use[k] || 0, projected: guard.projected?.[k] ?? null, cap, day, capDay, fixedDay, perPerson: week ? people / week : null, holds: holdsOf(week, capDay - fixedDay, people) });
     }
   }
   // Gemini: each feature's cap a day against its busiest day of the week.
@@ -190,8 +191,7 @@ export function quotas({ users = {}, guard = null, hours = null, usage = {}, map
   }
   const least = f => rows.filter(r => r.by === 'people' && r[f] != null && !r.paused).reduce((a, r) => (!a || r[f] < a[f] ? r : a), null);
   const h = least('holds');
-  const s = least('slows');
-  return { rows, week, holds: h ? { people: h.holds, key: h.key } : null, slows: s ? { people: s.slows, key: s.key } : null, measured: !!splitHours(hours, now) };
+  return { rows, week, holds: h ? { people: h.holds, key: h.key } : null, measured: !!splitHours(hours, now) };
 }
 
 // What the panel shows and the cron applies: people, each budget against

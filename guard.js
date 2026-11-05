@@ -36,19 +36,30 @@
 // and the period is counted from a day before it starts (UTC midnight of the
 // day before PERIOD_DAY): an earlier start only counts more.
 //
-// Pacing (the owner, 2026-10-14: "pace it out greatly"): before any stop,
-// the month is paced. From the period's use so far the guard projects where
-// each count ends (the first three days counted as three, so a busy first
-// day isn't read as a month of them) and sets a pace the proxy follows
-// (`guard:pace` in KV, written only when it changes; pace.js):
-//   0  under 60% projected: as configured;
-//   1  60%: live refreshes ×2 slower, the background builders that can wait
-//      (photos, cutouts, buses, win probability) and the hourly extras off;
-//   2  80%: ×4, every builder off, each session's reads halved;
-//   3  90% (the stop's own mark, reached before the month ends): ×8, reads
-//      quartered.
-// A pace goes up at once and down only 10 points under its mark. The stop at
-// STOP_AT of what's been used stays the last word.
+// Pacing (the owner, 2026-10-14: "pace it out greatly"; 2026-11-05: "It
+// should be realistic so a estimate of this month exceeding should not
+// immediately resulting in rate limiting"): only what was really used
+// paces, never a forecast. A count is paced once its real share of the plan
+// has passed a mark AND, at the rate of the last days, what's left would
+// reach the stop before the period ends. The rate: from `marks`, a copy of
+// the counts every 6 hours, the oldest of the last 3½ days that's at least
+// 12 hours old (before there is one, the period's own, its first three days
+// counted as three). So a busy day (a school's demo) with most of the month
+// left slows nobody, and a count that lasts the period is never paced however
+// high it is. The pace goes to the proxy (`guard:pace` in KV, written only
+// when it changes; pace.js):
+//   0  as configured;
+//   1  60% used: live refreshes ×2 slower, the background builders that can
+//      wait (photos, cutouts, buses, win probability) and the hourly extras off;
+//   2  75%: ×4, every builder off, each session's reads halved;
+//   3  85%, basics first: ×8, reads quartered, and nobody new let in
+//      (`newcomers: false`, for the door that seats people); sign-in, sync
+//      and notices go on for everyone already in.
+// A pace goes up at once, and down only 5 points under its mark or once the
+// period would end 10 points under the stop (the slower pace itself lowers
+// the rate). The stop at STOP_AT of what's been used stays the last word.
+// The forecast (`forecast`: where the top count ends at the last days'
+// rate, and when it would reach the stop) is the panel's warning, nothing else.
 //
 // Alerts: `alert` is the highest of 50%, 75%, 90% any count has reached this
 // period; the proxy's cron tells the owner's phone when it or the pace rises
@@ -82,12 +93,13 @@ export const R2_CLASS_B = new Set(['HeadBucket', 'HeadObject', 'GetObject', 'Usa
 export const R2_FREE = new Set(['DeleteObject', 'DeleteBucket', 'AbortMultipartUpload']);
 export const STOP_AT = 0.9;
 export const PACE_KEY = 'guard:pace';
-// A pace's mark (projected share of the plan) and what it does (pace.js reads `slow`, `reads`).
+// A pace's mark (the share of the plan really used) and what it does
+// (pace.js hands on `slow`, `reads` and `newcomers`).
 export const PACES = [
-  { at: 0, slow: 1, reads: 1 },
-  { at: 0.6, slow: 2, reads: 1 },
-  { at: 0.8, slow: 4, reads: 0.5 },
-  { at: 0.9, slow: 8, reads: 0.25 }
+  { at: 0, slow: 1, reads: 1, newcomers: true },
+  { at: 0.6, slow: 2, reads: 1, newcomers: true },
+  { at: 0.75, slow: 4, reads: 0.5, newcomers: true },
+  { at: 0.85, slow: 8, reads: 0.25, newcomers: false }
 ];
 export const ALERTS = [0.5, 0.75, 0.9];
 // (sports-proxy, the old forwarder, is deleted from 2026-10-20: a 404 for it is
@@ -253,8 +265,8 @@ export function judge(use, stopAt = STOP_AT) {
   return { share, over, top };
 }
 
-// Where the period ends up at this pace (the panel's 預估). `floor`: the
-// least time counted as gone (pacing counts three days at least).
+// Where the period ends up at the period's own pace (the panel's 預估, a
+// count at a time). `floor`: the least time counted as gone.
 export function projected(use, p, now, floor = DAY / 24) {
   const f = (p.end - p.from) / Math.max(floor, now - p.from);
   const out = {};
@@ -262,18 +274,62 @@ export function projected(use, p, now, floor = DAY / 24) {
   return out;
 }
 
-// The pace for a projection (each rate count's projected share; storage
-// isn't paced), with the last pace for the way down.
-export function paceFor(proj, last = 0) {
-  let top = 0;
-  for (const k of Object.keys(PLAN)) if (!/Bytes$/.test(k)) top = Math.max(top, (proj[k] || 0) / PLAN[k]);
+// The counts that pace (storage isn't paced: it doesn't run out in a month).
+const RATE_KEYS = Object.keys(PLAN).filter(k => !/Bytes$/.test(k));
+const r4 = x => Math.round(x * 1e4) / 1e4;
+// The marks the last days' rate is read from: a copy of the counts every
+// MARK_EVERY, none older than MARK_SPAN, none from another period.
+export const MARK_EVERY = 6 * 3_600_000;
+export const MARK_MIN = 12 * 3_600_000;
+export const MARK_SPAN = 3.5 * DAY;
+export function marksAfter(marks, use, now, newPeriod = false) {
+  const kept = newPeriod ? [] : (marks || []).filter(([at]) => now - at <= MARK_SPAN && at <= now);
+  if (!kept.length || now - kept[kept.length - 1][0] >= MARK_EVERY) kept.push([now, Object.fromEntries(RATE_KEYS.map(k => [k, Math.round(use[k] || 0)]))]);
+  return kept;
+}
+// Each count's rate of the last days (a ms): since the oldest mark at
+// least MARK_MIN old; with none, the period's own (three days at least).
+export function rateOf(use, marks, p, now) {
+  const m = (marks || []).find(([at]) => now - at >= MARK_MIN && now - at <= MARK_SPAN);
+  const out = {};
+  for (const k of RATE_KEYS) out[k] = m ? Math.max(0, ((use[k] || 0) - (m[1][k] || 0)) / (now - m[0])) : (use[k] || 0) / Math.max(3 * DAY, now - p.from);
+  return out;
+}
+
+// The pace for what's been used (`use`), at `rate` (a ms) for the `left` of
+// the period (ms), with the last pace for the way down. `why`: the count
+// that set it, its share used and where it would end.
+export function paceFor(use, { rate = {}, left = 0, last = 0, stopAt = STOP_AT } = {}) {
   let pace = 0;
-  for (let i = PACES.length - 1; i > 0; i--)
-    if (top >= PACES[i].at || (i <= last && top >= PACES[i].at - 0.1)) {
-      pace = i;
-      break;
+  let why = null;
+  for (const k of RATE_KEYS) {
+    const share = (use[k] || 0) / PLAN[k];
+    const end = ((use[k] || 0) + (rate[k] || 0) * Math.max(0, left)) / PLAN[k];
+    for (let i = PACES.length - 1; i > pace; i--) {
+      const held = i <= last;
+      if (share >= PACES[i].at - (held ? 0.05 : 0) && end >= stopAt - (held ? 0.1 : 0)) {
+        pace = i;
+        why = { key: k, share: r4(share), end: r4(end) };
+        break;
+      }
     }
-  return { pace, top };
+  }
+  return { pace, why };
+}
+
+// The panel's warning (never a pace): the count that ends the period
+// highest at the last days' rate, its share then, and when it would reach
+// the stop (null if it doesn't).
+export function forecastOf(use, rate, p, now, stopAt = STOP_AT) {
+  let top = null;
+  for (const k of RATE_KEYS) {
+    const end = ((use[k] || 0) + (rate[k] || 0) * Math.max(0, p.end - now)) / PLAN[k];
+    if (!top || end > top.end) top = { key: k, end };
+  }
+  if (!top) return null;
+  const r = rate[top.key] || 0;
+  const at = top.end >= stopAt && r > 0 ? Math.round(now + Math.max(0, PLAN[top.key] * stopAt - (use[top.key] || 0)) / r) : null;
+  return { key: top.key, end: r4(top.end), at, warn: top.end >= stopAt };
 }
 export const alertFor = share => ALERTS.filter(a => Object.values(share).some(v => v >= a)).length;
 
@@ -372,9 +428,13 @@ export async function guardRun(env, { fetcher = fetch, now = Date.now(), kv = en
     try {
       const { use, period: p, cpuWay, partial } = await readUse(env, fetcher, now);
       const j = judge(use, stopAt);
-      const newPeriod = prev.period && p.start > prev.period.start;
-      const pace = paceFor(projected(use, p, now, 3 * DAY), newPeriod ? 0 : prev.pace || 0);
-      Object.assign(state, { use, period: p, cpuWay, partial, share: j.share, top: j.top, projected: projected(use, p, now), pace: pace.pace, paceTop: pace.top, alert: alertFor(j.share), error: null, blindSince: null });
+      const newPeriod = !!prev.period && p.start > prev.period.start;
+      const marks = marksAfter(prev.marks, use, now, newPeriod);
+      const rate = rateOf(use, marks, p, now);
+      const pace = paceFor(use, { rate, left: p.end - now, last: newPeriod ? 0 : prev.pace || 0, stopAt });
+      const forecast = forecastOf(use, rate, p, now, stopAt);
+      // (`paceTop`, the panel's 推估到月底: the forecast's share at the period's end.)
+      Object.assign(state, { use, period: p, cpuWay, partial, share: j.share, top: j.top, projected: projected(use, p, now), marks, forecast, pace: pace.pace, paceWhy: pace.why, paceTop: forecast?.end ?? null, alert: alertFor(j.share), error: null, blindSince: null });
       if (j.over.length && !prev.stopped) state.stopped = { at: now, why: j.over, periodStart: p.start, saved: {} };
       else if (prev.stopped && p.start > prev.stopped.periodStart && !j.over.length) state.restart = true;
     } catch (e) {
@@ -411,7 +471,7 @@ export async function guardRun(env, { fetcher = fetch, now = Date.now(), kv = en
   // The pace for the proxy (pace.js), only when it changes.
   if ((state.pace || 0) !== (prev.pace || 0)) {
     state.paceSince = now;
-    await kv.put(PACE_KEY, JSON.stringify({ pace: state.pace || 0, ...PACES[state.pace || 0], at: now, top: state.paceTop }));
+    await kv.put(PACE_KEY, JSON.stringify({ pace: state.pace || 0, ...PACES[state.pace || 0], at: now, why: state.paceWhy || null }));
   }
   const changed = acts.length || !!prev.stopped !== !!state.stopped || prev.error !== state.error || prev.armed !== armed || (state.pace || 0) !== (prev.pace || 0) || (state.alert || 0) !== (prev.alert || 0) || state.account !== prev.account || prev.pace === undefined;
   if (changed || !prev.at || now - (prev.saved || 0) >= 3_600_000) {
