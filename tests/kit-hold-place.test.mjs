@@ -77,7 +77,7 @@ test('only a scroll the code asks for moves a held place; the browser\'s own is 
   // (The keeper's own moves go round the note: setTop.)
   assert.doesNotMatch(src.slice(src.indexOf('function place('), src.indexOf('function scrolledByCode(')), /s\.scrollTop = /);
   // A scroll nobody made, heard as it happens.
-  assert.match(src, /if \(st && !chains\.get\(s\) && !settle\.has\(s\)\) return restore\(s\);/);
+  assert.match(src, /if \(st && !chains\.get\(s\) && !settle\.has\(s\)\) \{[^}]*return restore\(s\);/);
   // The live game in WebKit is in the guard.
   const guard = readFileSync(new URL('../tools/live-scroll.mjs', import.meta.url), 'utf8');
   assert.match(guard, /--webkit/);
@@ -93,4 +93,24 @@ test('what was read, gone for a moment, is gone back to when it returns', () => 
   assert.match(src, /const LOST_MS = /);
   const fn = src.slice(src.indexOf('function restore('), src.indexOf('export function freshScreen'));
   assert.match(fn, /held\.get\(s\)\.anchors\.unshift\(\.\.\.lost\)/);
+});
+
+// Jay 2026-11-05: dragging iOS's scroll bar (the indicator grabbed at the
+// right edge) made the page "flicker badly up and down rapidly until I
+// release it": the bar moves the page with no finger the page hears, and the
+// keeper put every frame of it back as Safari's own move. Only a move just
+// after a redraw, once, is Safari's; a second straight after the put-back,
+// or one with no redraw before it, is the bar's, and its chain the person's.
+test("the scroll bar dragged moves the page; only Safari's own move after a redraw is put back", () => {
+  const src = kit('hold-place.mjs');
+  const scroll = src.slice(src.indexOf("addEventListener(\n    'scroll'"), src.indexOf('new MutationObserver(list'));
+  assert.match(scroll, /drawnAt\.get\(s\)[^\n]*< REDRAWN_MS && now - \(putBackAt\.get\(s\) \|\| 0\) > AGAIN_MS/);
+  assert.match(scroll, /chains\.set\(s, 'bar'\)/);
+  assert.match(scroll, /barAt\.get\(s\)[^\n]*< BAR_MS/, "the bar's next grab, still in hand, is the bar's");
+  assert.match(src, /touched\(s, list\) && drawnAt\.set\(s, Date\.now\(\)\)/, 'each redraw noted per scroller');
+  // In a browser (WebKit): live-scroll's "bar" drags it and checks Safari's own move is still held.
+  const guard = readFileSync(new URL('../tools/live-scroll.mjs', import.meta.url), 'utf8');
+  assert.match(guard, /const bar = async inSheet/);
+  assert.match(guard, /__rawTop/);
+  assert.match(guard, /b\.grabs\.some\(n => n > 1\) \|\| Math\.abs\(b\.own\) > 2/);
 });
