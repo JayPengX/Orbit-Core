@@ -867,7 +867,10 @@ button,
    down. What scrolls beneath fades towards the edge (iOS's scroll edge
    effect). A phone's frame on every screen (the column, below). ---- */
 :root {
-  --q-bar-gap: max(calc(env(safe-area-inset-bottom) - 14px), calc(var(--q-safe-bottom, 0px) - 14px), 12px);
+  /* (The bar stands just above the iPhone's home indicator, never inside its
+     strip: a swipe up to leave the app starts there, and a bar that dipped
+     into it took the swipe as a tap on a tab, Jay 2026-11-05.) */
+  --q-bar-gap: max(calc(env(safe-area-inset-bottom) + 4px), calc(var(--q-safe-bottom, 0px) + 4px), 12px);
   --q-nav: calc(62px + var(--q-bar-gap));
 }
 .q-appbar {
@@ -1011,17 +1014,22 @@ button,
   transform: scale(1.14);
   transition-duration: 0.14s;
 }
+/* (Small and tucked on the icon's corner, so it stays inside its tab and the
+   chosen tab's pill even with five tabs and the round action on a 320 phone:
+   a bigger one hung over the pill's edge, Jay 2026-11-05 "That's ugly".) */
 .q-tab-badge {
   position: absolute;
-  top: -2px;
-  left: calc(50% + 6px);
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 9px;
+  top: -3px;
+  left: calc(50% + 3px);
+  box-sizing: border-box;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
   background: var(--q-red);
   color: #ffffff;
-  font: 600 11px/18px var(--q-font);
+  font: 600 10px/16px var(--q-font);
+  letter-spacing: -0.2px;
   font-variant-numeric: tabular-nums;
   text-align: center;
   white-space: nowrap;
@@ -1035,7 +1043,7 @@ button,
 }
 .q-tab-badge.dot {
   top: 1px;
-  left: calc(50% + 10px);
+  left: calc(50% + 8px);
   min-width: 0;
   width: 10px;
   height: 10px;
