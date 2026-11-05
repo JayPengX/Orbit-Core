@@ -96,6 +96,15 @@ export async function hashFiles(texts, { refs, minify: shrink = true, finish = t
   };
   for (const p of paths) if (!index.has(p)) visit(p);
   const hashes = new Map();
+  // (A cycle's hash names its files by where they sit in the site, not on the
+  // machine that built it: built in another folder, the same files keep their
+  // address. The whole path went in, so a build elsewhere re-addressed them.)
+  const common = paths.reduce((a, p) => {
+    let i = 0;
+    while (i < a.length && a[i] === p[i]) i += 1;
+    return a.slice(0, i);
+  }, paths[0] || '');
+  const base = common.slice(0, common.lastIndexOf('/') + 1);
   // A text with its references to hashed files stamped (the rest left for later).
   const stamp = p => {
     const text = src.get(p);
@@ -111,7 +120,7 @@ export async function hashFiles(texts, { refs, minify: shrink = true, finish = t
   };
   for (const group of order) {
     // On its own: the hash of what's served. A cycle: one hash for all of them, of their texts with everything outside it stamped.
-    const h = group.length === 1 ? servedHash(stamp(group[0])) : hashOf(group.map(p => `${p}\n${stamp(p)}`).join('\n\0'));
+    const h = group.length === 1 ? servedHash(stamp(group[0])) : hashOf(group.map(p => `${p.slice(base.length)}\n${stamp(p)}`).join('\n\0'));
     for (const p of group) hashes.set(p, h);
     for (const p of group) out.set(p, stamp(p));
   }

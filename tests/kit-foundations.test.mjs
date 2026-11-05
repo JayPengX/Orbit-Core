@@ -364,6 +364,35 @@ test("an app's own routes: its data kept-first, its samples answered its way", a
   assert.ok(w.store.get('app-a-v2').has('https://x.test/App/data/a.json'));
 });
 
+test("the files a page lists are kept, never over a newer version kept for its update (each downloaded again, and the new page's too)", async () => {
+  const old = 'export const a = 1;';
+  const fresh = 'export const a = 2;';
+  const was = `https://x.test/App/app.mjs?v=${served(old)}`;
+  const now = `https://x.test/App/app.mjs?v=${served(fresh)}`;
+  const w = runWorker({ cache: 'app-a-v2' }, { '/App/app.mjs': n => (n === 1 ? old : fresh), '/App/x.json': '{}' });
+  const tell = async urls => {
+    let work;
+    w.listeners.message({ data: { type: 'cache', urls }, waitUntil: p => (work = p) });
+    await work;
+  };
+  const kept = () => [...w.store.get('app-a-v2').keys()].filter(k => k.includes('/App/app.mjs')).sort();
+  // A first visit: what the page loaded before the worker was in charge, kept (its reads through /api/ never).
+  await tell([was, 'https://x.test/App/x.json', 'https://x.test/api/data/x.json?qt=1']);
+  assert.deepEqual(kept(), [was]);
+  assert.ok(w.store.get('app-a-v2').has('https://x.test/App/x.json'));
+  assert.ok(!w.asked.some(a => a.path.startsWith('/api/')));
+  // The update fetches the new version (the old one dropped)…
+  assert.equal(await (await w.go(now)).text(), fresh);
+  assert.deepEqual(kept(), [now]);
+  const asked = w.asked.length;
+  // …and the page leaving for it lists the old one as it goes: left alone, nothing downloaded.
+  await tell([was]);
+  assert.deepEqual(kept(), [now]);
+  assert.equal(w.asked.length, asked);
+  // The page asks it of itself too, from the kit on.
+  assert.match(readFileSync(new URL('../kit/orbit.mjs', import.meta.url), 'utf8'), /const tell = reg => \{[^}]*?if \(globalThis\.__bootUpdating\) return;/);
+});
+
 test('format: SYMBOLS match stock-markets CURRENCIES', async () => {
   const { SYMBOLS } = await import('../kit/format.mjs');
   const { CURRENCIES } = await import('../kit/stock-markets.mjs');

@@ -8,7 +8,7 @@
 // 3G-like link by default (tools/speed/net.mjs: 400 kbps, 400 ms).
 //
 //   node tools/speed.mjs <app…|all> [--before main] [--after work] [--net 3g|4g|wifi]
-//        [--cpu 4] [--steps open,idle,tabs,scroll,away,reopen] [--idle 30] [--out dir] [--only before|after]
+//        [--cpu 4] [--steps open,idle,tabs,scroll,away,reopen,update] [--idle 30] [--out dir] [--only before|after]
 //        [--warm] [--at <ISO time>] [--refresh-after <regex>] [--verbose]
 //
 // Needs the app repos beside this one (as tools/test-apps.mjs), Chromium
@@ -191,6 +191,8 @@ async function step(name, page, cdp, dev, fn, { settle = true, max = 60_000 } = 
       workerCpu += WORKER_CPU[e.route] ?? WORKER_CPU[e.route.split(' ')[0]] ?? 3;
     }
   const long = r1.s.long.filter(([t]) => t >= (extra.pageT0 ?? pageT0));
+  // (A page the app swapped itself, an update: the counts start again with the new page, so they are its own.)
+  const since = k => ((r1.m[k] || 0) >= (r0.m[k] || 0) ? (r1.m[k] || 0) - (r0.m[k] || 0) : r1.m[k] || 0);
   const res = {
     name,
     // When the person has it: the first screen (the cover gone), or the last change drawn after the tap.
@@ -204,10 +206,10 @@ async function step(name, page, cdp, dev, fn, { settle = true, max = 60_000 } = 
     byKind: Object.fromEntries(['static', 'api', 'outside'].map(k => [k, +(log.filter(e => e.kind === k).reduce((s, e) => s + e.bytes, 0) / 1000).toFixed(1)])),
     api: routes,
     workerCpuMs: Math.round(workerCpu),
-    cpuMs: Math.round(((r1.m.TaskDuration || 0) - (r0.m.TaskDuration || 0)) * 1000),
-    scriptMs: Math.round(((r1.m.ScriptDuration || 0) - (r0.m.ScriptDuration || 0)) * 1000),
-    layouts: (r1.m.LayoutCount || 0) - (r0.m.LayoutCount || 0),
-    styles: (r1.m.RecalcStyleCount || 0) - (r0.m.RecalcStyleCount || 0),
+    cpuMs: Math.round(since('TaskDuration') * 1000),
+    scriptMs: Math.round(since('ScriptDuration') * 1000),
+    layouts: since('LayoutCount'),
+    styles: since('RecalcStyleCount'),
     mutations: r1.s.mut - (extra.resetMut ? 0 : r0.s.mut),
     longTasks: long.length,
     blockingMs: long.reduce((s, [, d]) => s + Math.max(0, d - 50), 0),
@@ -296,6 +298,25 @@ async function runApp(app, side, { prof = profile, rate = cpu, idle = idleS } = 
         }, visible);
       results.push(await step('away', page, cdp, dev, async () => (await show(false), { readyMs: 0 })));
       results.push(await step('back', page, cdp, dev, async () => void (await show(true))));
+    }
+    // A deploy while the app is open (the other side goes live: before's page
+    // updates to after's files, after's to before's, so each side's own update
+    // code is timed on the same change), and the person comes back to it: what
+    // the phone downloads until the new version is on screen, and how long.
+    if (steps.includes('update') && built.before && built.after) {
+      results.push(
+        await step('update', page, cdp, dev, async () => {
+          const t0 = now();
+          dev.side = built[side === 'before' ? 'after' : 'before'];
+          const moved = page.waitForNavigation({ timeout: 110_000, waitUntil: 'commit' }).catch(() => null);
+          await page.evaluate(() => (document.dispatchEvent(new Event('visibilitychange')), window.dispatchEvent(new Event('focus'))));
+          if (!(await moved)) return { readyMs: null, more: { updated: false } };
+          await waitReady(page);
+          const live = await page.evaluate(() => [document.querySelector('meta[name="build-version"]')?.content || '', window.ORBIT_KIT?.version || '']).catch(() => []);
+          return { readyMs: Math.round(now() - t0), resetMut: true, pageT0: 0, more: { updated: true, live } };
+        }, { max: 120_000 })
+      );
+      dev.side = built[side];
     }
     if (steps.includes('reopen')) {
       // The app closed (the browser gone, its service worker too) and opened

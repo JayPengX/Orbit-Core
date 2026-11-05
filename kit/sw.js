@@ -267,6 +267,14 @@ self.addEventListener('fetch', event => {
 // time) were all downloaded again here whenever the app went to the
 // background (a season's pack, a day's scores: hundreds of KB, and as many
 // requests to the proxy, for nothing anyone reads from this cache).
+// A file kept here already under another hash is left as it is: that one is
+// the newer version, fetched for an update while the page that lists the old
+// one was still open. A page leaving for its update listed the old version's
+// files as it went (its last look on going out of sight), and each was
+// downloaded again here and put back over the new version's, which the new
+// page then downloaded again too (an update on a 3G link: 130 KB more, and
+// the new page seconds later, Money 2026-11-05). A first visit has nothing
+// kept, so all of its files are kept as before.
 const ownFile = u => {
   try {
     const url = new URL(u);
@@ -278,11 +286,16 @@ const ownFile = u => {
 self.addEventListener('message', event => {
   if (event.data?.type !== 'cache') return;
   const urls = (event.data.urls || []).filter(ownFile);
+  const mine = caches.open(CACHE);
+  const another = async u => {
+    const url = new URL(u);
+    return Boolean(hashedAs(u) && SW.prune(url) && (await (await mine).keys(url.origin + url.pathname, { ignoreSearch: true })).length);
+  };
   event.waitUntil(
     Promise.all(
       urls.map(u =>
         caches.match(u).then(async hit => {
-          if (hit) return;
+          if (hit || (await another(u))) return;
           let res = hashedAs(u) ? await fetch(u, { cache: 'force-cache' }).catch(() => null) : null;
           if (!res || !(await isTrue(u, res))) res = await fetch(u).catch(() => null);
           if (res && (await isTrue(u, res))) await keep(new Request(u), res);

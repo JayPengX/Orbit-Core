@@ -4798,9 +4798,17 @@ watchNet();
 // time. Every app calls this in place of registering its own.
 export function keepOffline(path = './sw.js') {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator) || !globalThis.isSecureContext) return;
+  // (The page itself only when it didn't come through the worker, which
+  // keeps every page it answers: after an update's reload, its address under
+  // ?v= was downloaded again here each time.)
+  const page = navigator.serviceWorker.controller ? [] : [location.href.split('#')[0]];
   const tell = reg => {
+    // (Not from a page leaving for its update: its files are the old
+    // version's, and the worker downloaded each again over the new one's it
+    // had just kept. kit/sw.js leaves those alone too, for a page on an older kit.)
+    if (globalThis.__bootUpdating) return;
     // (The app's own files only: never its reads through /api/, which the worker would download again for nothing.)
-    const urls = [location.href.split('#')[0], ...performance.getEntriesByType('resource').map(e => e.name)].filter(u => u.startsWith(location.origin) && !u.startsWith(`${location.origin}/api/`) && !/version\.json/.test(u));
+    const urls = [...page, ...performance.getEntriesByType('resource').map(e => e.name)].filter(u => u.startsWith(location.origin) && !u.startsWith(`${location.origin}/api/`) && !/version\.json/.test(u));
     reg?.active?.postMessage({ type: 'cache', urls });
   };
   navigator.serviceWorker

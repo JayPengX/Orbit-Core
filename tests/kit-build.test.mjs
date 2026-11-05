@@ -29,6 +29,11 @@ test('files that import each other share one hash, and each points at it', async
   assert.equal(hashes.get('x.mjs'), hashes.get('y.mjs'));
   assert.equal(files.get('x.mjs'), `import y from './y.mjs?v=${hashes.get('y.mjs')}';`);
   assert.equal(files.get('top.mjs'), `import x from './x.mjs?v=${hashes.get('x.mjs')}';`);
+  // Built in another folder (another machine, another checkout), the same files keep their address.
+  const at = dir => hashFiles(new Map([[`${dir}/x.mjs`, "import y from './y.mjs';"], [`${dir}/y.mjs`, "import x from './x.mjs';"], [`${dir}/top.mjs`, "import x from './x.mjs';"]]), { refs: (text, path) => refs(text).map(r => ({ ...r, target: `${dir}/${r.target}` })), minify: false });
+  const [one, two] = [await at('/home/runner/work/App/public'), await at('/tmp/speed-before/App/public')];
+  assert.equal(one.hashes.get('/home/runner/work/App/public/x.mjs'), two.hashes.get('/tmp/speed-before/App/public/x.mjs'));
+  assert.equal(one.hashes.get('/home/runner/work/App/public/top.mjs'), two.hashes.get('/tmp/speed-before/App/public/top.mjs'));
 });
 
 test("an app's deploy: every reference stamped with its file's hash, the page's version and preloads in place", async () => {
