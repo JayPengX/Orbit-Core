@@ -162,7 +162,13 @@ export async function handleData(request, env, ctx, headers, ip, path) {
   const res = await readFile(env, ctx, file, request);
   const out = new Response(request.method === 'HEAD' ? null : res.body, res);
   for (const [k, v] of Object.entries(headers)) out.headers.set(k, v);
+  // A copy the phone already has: "not changed", nothing sent again. Compared
+  // the weak way: Cloudflare hands a phone W/"…" once it compresses the file,
+  // and the phone asks with that; compared as sent, no pack was ever answered
+  // 304 (each read past its time downloaded it whole: MLB's 409 KB, 2026-11-05).
   const tag = res.headers.get('ETag');
-  if (tag && request.headers.get('If-None-Match') === tag) return new Response(null, { status: 304, headers: out.headers });
+  if (tag && sameTag(request.headers.get('If-None-Match'), tag)) return new Response(null, { status: 304, headers: out.headers });
   return out;
 }
+const bareTag = t => t.trim().replace(/^W\//, '');
+export const sameTag = (asked, tag) => Boolean(asked) && (asked.trim() === '*' || asked.split(',').some(t => bareTag(t) === bareTag(tag)));

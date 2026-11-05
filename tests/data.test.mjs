@@ -72,6 +72,10 @@ test('push: only with the secret; files written and deleted; then read, with the
   const tag = res.headers.get('ETag');
   assert.ok(tag);
   assert.equal((await ask('/data/sports/index.json', { headers: { 'If-None-Match': tag } }, env)).status, 304);
+  // As a phone asks once Cloudflare compressed it (its ETag made weak), or among others: still 304.
+  assert.equal((await ask('/data/sports/index.json', { headers: { 'If-None-Match': `W/${tag}` } }, env)).status, 304);
+  assert.equal((await ask('/data/sports/index.json', { headers: { 'If-None-Match': `"other", W/${tag}` } }, env)).status, 304);
+  assert.equal((await ask('/data/sports/index.json', { headers: { 'If-None-Match': 'W/"other"' } }, env)).status, 200);
 
   const listed = await (await ask('/data/_list', { headers: { Authorization: 'Bearer s3cret' } }, env)).json();
   assert.deepEqual(listed.files.map(f => f[0]), ['sports/index.json']);
