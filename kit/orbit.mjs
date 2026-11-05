@@ -4815,6 +4815,8 @@ const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: re
 // sets search apart: always a thumb away, never one tab among the others.
 // With an id it's a screen of its own: select(id) lights it (aria-pressed)
 // and no tab.
+// The tab pill's slide (orbit.css .q-tabbar::before, --q-dur-snappy).
+const SLIDE_MS = 340;
 export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.getElementById('tabs'), label: ariaLabel = '', action = null } = {}) {
   const buttons = new Map();
   let downOn = null;
@@ -4866,15 +4868,21 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
   }
   // The chosen tab's pill (the bar's ::before) slides to it on a spring:
   // its place and width as CSS variables, set without a slide the first time.
+  // (Each tab's place, read when the bar is laid out, never on a tap: a read
+  // then laid the whole page out first, 30–120 ms on a mid-range phone.)
+  const at = new Map();
   const pill = (still = false, id = current) => {
     const b = buttons.get(id);
-    if (!b || b.hidden || !b.offsetWidth) return;
+    if (!b || b.hidden) return;
+    if (still || !at.has(id)) for (const [tid, x] of buttons) at.set(tid, { x: x.offsetLeft, y: x.offsetTop, w: x.offsetWidth, h: x.offsetHeight });
+    const p = at.get(id);
+    if (!p.w) return at.clear();
     if (still) nav.style.setProperty('transition', 'none');
-    nav.style.setProperty('--q-tab-x', `${b.offsetLeft}px`);
-    nav.style.setProperty('--q-tab-w', `${b.offsetWidth}px`);
+    nav.style.setProperty('--q-tab-x', `${p.x}px`);
+    nav.style.setProperty('--q-tab-w', `${p.w}px`);
     // (Down the side rail: its place from the top.)
-    nav.style.setProperty('--q-tab-y', `${b.offsetTop}px`);
-    nav.style.setProperty('--q-tab-h', `${b.offsetHeight}px`);
+    nav.style.setProperty('--q-tab-y', `${p.y}px`);
+    nav.style.setProperty('--q-tab-h', `${p.h}px`);
     if (still) requestAnimationFrame(() => requestAnimationFrame(() => nav.style.removeProperty('transition')));
   };
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => pill(true)).observe(nav);
@@ -4899,17 +4907,59 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
   };
   let pending = 0;
   let mend = 0;
+  let glide = 0;
+  // A tab already drawn once is shown at once, as it was left (its panel kept
+  // drawn, .q-tabpanel), and the app draws it again only once the pill has
+  // landed (Jay 2026-11-05: "switching tab animation look different or lag
+  // especially when that tab has more content"). Drawn in the pill's way, a
+  // tab's 0.1–0.5 s of drawing (轉播, 賽事 on a mid-range phone, measured)
+  // held the slide still and then jumped it to its end: in Chromium the
+  // slide doesn't start until the main thread is free, and in Safari a
+  // spring's linear() curve is run by the page, not the screen. A tab never
+  // drawn has nothing to show and is drawn at once, as before.
+  // (`early` is the tab shown ahead of the app; `prior` the one it replaced.)
+  let early = null;
+  let prior = null;
+  const show = (id, from) => {
+    if (from != null && from !== id) places[from] = globalThis.scrollY || 0;
+    for (const tid of buttons.keys()) {
+      const panel = document.getElementById(`panel-${tid}`);
+      if (panel && panel.hidden !== (tid !== id)) panel.hidden = tid !== id;
+    }
+    current = id;
+    try {
+      const h = hash(id);
+      if (h != null && location.hash !== h) history.replaceState(null, '', h || location.pathname + location.search);
+    } catch {}
+    globalThis.scrollTo?.(0, places[id] || 0);
+  };
   const choose = id => {
     lit(id);
     cancelAnimationFrame(pending);
     clearTimeout(mend);
-    // (After the next paint: a frame, then a task after it.)
-    pending = requestAnimationFrame(() => setTimeout(() => {
+    clearTimeout(glide);
+    const was = early ? prior : current;
+    const ready = id !== current && visited.has(id) && was != null && !reducedMotion() && document.getElementById(`panel-${id}`);
+    if (ready) {
+      prior = was;
+      early = id;
+      show(id, current);
+    } else early = prior = null;
+    const ask = () => {
       onSelect(id, { again: false });
       // (An app that didn't open it after all, a gate or a refusal: the bar
       // goes back to what's open.)
-      mend = setTimeout(() => current !== id && current != null && lit(current), 1500);
-    }, 0));
+      mend = setTimeout(() => {
+        if (early === id) {
+          const back = prior;
+          early = prior = null;
+          if (back != null) show(back, id), lit(back);
+        } else if (current !== id && current != null) lit(current);
+      }, 1500);
+    };
+    // (After the pill's slide, 0.34 s, or after the next paint: a frame, then a task after it.)
+    if (ready) glide = setTimeout(() => requestAnimationFrame(() => setTimeout(ask, 0)), SLIDE_MS);
+    else pending = requestAnimationFrame(() => setTimeout(ask, 0));
   };
   nav.addEventListener('keydown', event => {
     const shown = [...buttons].filter(([, b]) => !b.hidden).map(([id]) => id);
@@ -4926,6 +4976,15 @@ export function tabBar({ tabs, onSelect, hash = id => `#${id}`, nav = document.g
       return current;
     },
     select(id, { top = false } = {}) {
+      // (Shown already, ahead of the app: its place was put back then.)
+      // (The app's redraw of the tab it still thinks is open, in the moment
+      // before it's asked for the new one: it stays as the person chose.)
+      if (early != null && id === prior && id !== early) return;
+      const shownEarly = early === id;
+      if (shownEarly) {
+        early = prior = null;
+        if (top) globalThis.scrollTo?.(0, 0);
+      }
       const changed = current !== id;
       const first = current == null;
       if (changed && !first) places[current] = globalThis.scrollY || 0;

@@ -979,7 +979,9 @@ export const rubber = (dy, max = 90) => (dy > 0 ? max * (1 - Math.exp(-dy / max)
 export function pullToRefresh(onRefresh, { threshold = 70, disabled = () => false, root = typeof document === 'undefined' ? null : document } = {}) {
   if (!root || typeof onRefresh !== 'function') return () => {};
   const top = () => (root.scrollingElement || root.documentElement || {}).scrollTop || 0;
-  const skip = 'input, textarea, select, [contenteditable], .q-chips, .leaflet-container, [data-no-ptr]';
+  // (The tab bar too: a tab's touch read the page's layout here, in the frame
+  // its pill starts to slide.)
+  const skip = 'input, textarea, select, [contenteditable], .q-chips, .leaflet-container, [data-no-ptr], .q-tabbar, .q-tab-action';
   let y0 = 0;
   let x0 = 0;
   let live = false;
@@ -1010,8 +1012,8 @@ export function pullToRefresh(onRefresh, { threshold = 70, disabled = () => fals
   };
   const begin = e => {
     live = false;
-    if (busy || disabled() || e.touches.length !== 1 || top() > 0) return;
-    if (root.querySelector('dialog[open], #loading:not([hidden])') || e.target.closest?.(skip) || scrolledBox(e.target)) return;
+    if (busy || e.touches.length !== 1 || e.target.closest?.(skip) || disabled() || top() > 0) return;
+    if (root.querySelector('dialog[open], #loading:not([hidden])') || scrolledBox(e.target)) return;
     [x0, y0, live, pulling, armed] = [e.touches[0].clientX, e.touches[0].clientY, true, false, false];
   };
   const move = e => {
