@@ -2383,8 +2383,9 @@ function showMoved(s) {
 async function waitInLine(s, error, retry) {
   if (typeof document === 'undefined') return { offline: true, error };
   const en = s.lang === 'en';
-  const placeText = e => (e?.place ? (en ? `You're number ${e.place} in line.` : `你排在第 ${e.place} 位。`) : en ? 'You’re in line.' : '你在排隊中。');
-  const text = node('p', { class: 'q-moved-text', text: `${placeText(error)}${en ? ' It opens by itself when it’s your turn.' : '輪到你時會自動開啟。'}` });
+  // (One line on a 320 phone: 排第 12 位，輪到你會自動開啟。)
+  const lineText = e => (en ? `${e?.place ? `Number ${e.place} in line.` : 'In line.'} Opens on your turn.` : `${e?.place ? `排第 ${e.place} 位` : '排隊中'}，輪到你會自動開啟。`);
+  const text = node('p', { class: 'q-moved-text', text: lineText(error) });
   const box = node('dialog', { class: 'q-moved q-line', 'aria-modal': 'true', 'aria-live': 'polite' }, [node('div', { class: 'q-moved-box' }, [node('p', { class: 'q-moved-title', text: en ? 'Orbit is busy' : '現在人有點多' }), text])]);
   keepOnTop(box);
   globalThis.__bootStep?.('', 0.8);
@@ -2398,7 +2399,7 @@ async function waitInLine(s, error, retry) {
       } catch (e) {
         if (e?.code !== 'ORBIT_FULL') return { offline: true, error: e };
         last = e;
-        text.textContent = `${placeText(e)}${en ? ' It opens by itself when it’s your turn.' : '輪到你時會自動開啟。'}`;
+        text.textContent = lineText(e);
       }
     }
   } finally {
