@@ -938,7 +938,10 @@ button,
   border-radius: 999px;
   background: var(--q-glass-pick);
   transform: translateX(var(--q-tab-x, 0px));
-  transition: transform var(--q-dur-snappy) var(--q-spring-snappy), width var(--q-dur-snappy) var(--q-spring-snappy);
+  /* (The snappy spring as a cubic-bézier, within 3% of it at every point: a
+     curve Safari can hand to the screen to run, where a linear() one is run
+     by the page and stops while a tab is drawn.) */
+  transition: transform var(--q-dur-snappy) cubic-bezier(0.35, 0.65, 0.1, 1.05), width var(--q-dur-snappy) cubic-bezier(0.35, 0.65, 0.1, 1.05);
   pointer-events: none;
 }
 .q-tabbar.q-tabbar::after {
@@ -980,7 +983,7 @@ button,
   display: grid;
   place-items: center;
   height: 28px;
-  transition: transform var(--q-dur-bouncy) var(--q-spring-bouncy);
+  transition: transform var(--q-dur-bouncy) cubic-bezier(0.35, 0.8, 0, 1.15); /* (The bouncy spring as a bézier, as the pill's.) */
 }
 .q-tab svg {
   width: 25px;
@@ -5272,7 +5275,7 @@ html.q-tabrail .q-tabbar.q-tabbar::before {
   height: calc(var(--q-tab-h, 0px) - 4px);
   border-radius: 999px;
   transform: translateY(calc(var(--q-tab-y, 0px) + 2px));
-  transition: transform var(--q-dur-snappy) var(--q-spring-snappy), height var(--q-dur-snappy) var(--q-spring-snappy);
+  transition: transform var(--q-dur-snappy) cubic-bezier(0.35, 0.65, 0.1, 1.05), height var(--q-dur-snappy) cubic-bezier(0.35, 0.65, 0.1, 1.05);
 }
 html.q-tabrail .q-tabbar.q-tabbar::after {
   display: none;
