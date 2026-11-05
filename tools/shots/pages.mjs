@@ -52,6 +52,10 @@ export const PAGES = {
     // 首頁 past ELTA's list (11/22: Newcastle v Arsenal, the Lakers): the guessed channel, said 預估 (with --account fan).
     // 賽事 on Saturday 11/7, 英超: the day's 推薦 (a soft grey row, ★ 推薦), the rest plain (no 追蹤 marks: a followed league's games are all theirs).
     'matches-picks': { args: click('#tab-matches', '[data-league=epl]', wait(2500), "js:document.querySelector('.q-day-bar [data-day=\"2026-11-07\"]')?.click()", wait(6000)) },
+    // 賽事 on Sunday 11/8, every league (with --account fill): a followed league's pick (★ 推薦, lit grey) beside one only 填滿空檔 put in (outlined ☆ 推薦, unlit), scrolled to the first fill.
+    'matches-fill': { args: click('#tab-matches', '.all-chip', wait(2500), "js:[...document.querySelectorAll('[data-day=\"2026-11-08\"]')].filter(e=>e.matches('.q-chip.day')&&e.offsetParent).pop()?.click()", wait(9000), "js:document.querySelector('.event-row.fill-pick')?.scrollIntoView({block:'center'})", wait(1200)) },
+    // 首頁 on Sunday 11/8 (with --account fill): 我的比賽 with the games 填滿空檔 put in (a quiet line, a hollow star at its end), scrolled to the first.
+    'home-fill': { args: click(wait(3000), "js:document.querySelector('.q-day-bar [data-day=\"2026-11-08\"]')?.click()", wait(9000), "js:document.querySelector('.event-row.filled')?.scrollIntoView({block:'center'})", wait(1200)) },
     'home-far': { args: click(wait(3000), "js:document.querySelector('.q-day-bar [data-day=\"2026-11-22\"]')?.click()", wait(9000)) },
     // That game's page: 台灣轉播 with the guess (依愛爾達往例預估), scrolled to it.
     'game-far': { args: click("js:import('./lib/espn.mjs').then(async E=>{const l=await E.scoreboard('epl',['20261121']);const e=l.find(x=>/Arsenal/.test(x.away?.en||x.away?.name||''))||l.at(-1);(await import('./sheets.js')).openMatch(e)})", wait(10000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/台灣轉播|Watch in Taiwan/.test(c.textContent))?.scrollIntoView({block:'center'})", wait(1500)) },
