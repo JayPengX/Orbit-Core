@@ -45,7 +45,9 @@ test('a caller is an IPv4 address, or an IPv6 /64 (a guesser changing address wi
 
 test('gzipLines: gzip as it goes, read back whole by zlib; each write readable at once (a sync flush), before the next is written', async () => {
   const { gzipLines } = await import('../http.js');
-  const { gunzipSync, createGunzip } = await import('node:zlib');
+  const { gunzipSync, constants } = await import('node:zlib');
+  // (A stream cut off where it stands, read as far as it goes: what a phone's reader has from those bytes.)
+  const sofar = b => gunzipSync(b, { finishFlush: constants.Z_SYNC_FLUSH });
   const cat = parts => Buffer.concat(parts.map(p => Buffer.from(p)));
   let seed = 11;
   const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
@@ -71,22 +73,17 @@ test('gzipLines: gzip as it goes, read back whole by zlib; each write readable a
   const g = gzipLines();
   const one = line(1, 300);
   const first = g.write(one);
-  const un = createGunzip();
-  const got = [];
-  un.on('data', d => got.push(d));
-  un.write(first);
-  await new Promise(r => setTimeout(r, 20));
-  assert.deepEqual(Buffer.concat(got), Buffer.from(one));
+  assert.deepEqual(sofar(first), Buffer.from(one));
   const two = line(2, 300);
-  un.end(cat([g.write(two), g.end()]));
-  await new Promise(r => un.on('end', r));
-  assert.deepEqual(Buffer.concat(got), cat([one, two]));
+  const second = g.write(two);
+  assert.deepEqual(sofar(cat([first, second])), cat([one, two]));
+  assert.deepEqual(gunzipSync(cat([first, second, g.end()])), cat([one, two]));
   assert.ok(first.length < one.length / 3, `${first.length} of ${one.length}`);
 });
 
 test('lineAnswer: gzipped where the caller takes gzip, each line flushed as written; as it was where not', async () => {
   const { lineAnswer } = await import('../http.js');
-  const { gunzipSync, createGunzip } = await import('node:zlib');
+  const { gunzipSync, constants } = await import('node:zlib');
   const answer = async (accept, lines) => {
     const a = lineAnswer(new Request('https://w.example/', { headers: accept ? { 'Accept-Encoding': accept } : {} }), { Vary: 'Origin', 'X-A': '1' });
     const reading = (async () => {
@@ -110,13 +107,7 @@ test('lineAnswer: gzipped where the caller takes gzip, each line flushed as writ
   assert.match(zipped.res.headers.get('Content-Type'), /x-ndjson/);
   assert.equal(gunzipSync(Buffer.concat(zipped.parts)).toString(), lines.map(l => `${JSON.stringify(l)}\n`).join(''));
   // The first part alone: the first line, whole.
-  const un = createGunzip();
-  const got = [];
-  un.on('data', d => got.push(d));
-  un.write(zipped.parts[0]);
-  await new Promise(r => setTimeout(r, 20));
-  assert.equal(Buffer.concat(got).toString(), `${JSON.stringify(lines[0])}\n`);
-  un.destroy();
+  assert.equal(gunzipSync(zipped.parts[0], { finishFlush: constants.Z_SYNC_FLUSH }).toString(), `${JSON.stringify(lines[0])}\n`);
   const plain = await answer('', lines);
   assert.equal(plain.res.headers.get('Content-Encoding'), null);
   assert.equal(Buffer.concat(plain.parts).toString(), lines.map(l => `${JSON.stringify(l)}\n`).join(''));
