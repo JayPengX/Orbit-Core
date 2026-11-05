@@ -83,3 +83,14 @@ test('only a scroll the code asks for moves a held place; the browser\'s own is 
   assert.match(guard, /--webkit/);
   assert.match(guard, /async function liveGame\(/);
 });
+
+// A list being read drawn short for a moment, then whole again (live-scroll's
+// "jumped" on a finished game's 得分紀錄: the page ended 713px down, held to
+// whatever stood in its place meanwhile): what was read is looked for first
+// for a while, and the reader goes back to it.
+test('what was read, gone for a moment, is gone back to when it returns', () => {
+  const src = kit('hold-place.mjs');
+  assert.match(src, /const LOST_MS = /);
+  const fn = src.slice(src.indexOf('function restore('), src.indexOf('export function freshScreen'));
+  assert.match(fn, /held\.get\(s\)\.anchors\.unshift\(\.\.\.lost\)/);
+});

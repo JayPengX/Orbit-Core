@@ -140,16 +140,20 @@ function standIn(s, a, toggle = false) {
 // The anchor after a redraw: itself, or its stand-in; else the nearest ancestor still there.
 function findAnchor(s, st) {
   // (Only what's drawn: a hidden tab's row has no place to keep.)
-  for (const a of st.anchors) {
+  for (const [i, a] of st.anchors.entries()) {
     if (a.node.isConnected && s.contains(a.node)) {
-      if (shown(a.node)) return a;
+      if (shown(a.node)) return { ...a, lost: st.anchors.slice(0, i) };
       continue;
     }
     const n = standIn(s, a);
-    if (n) return { ...a, node: n };
+    if (n) return { ...a, node: n, lost: st.anchors.slice(0, i) };
   }
   return null;
 }
+// What was read, gone for a moment (a list drawn as a spinner, then whole
+// again): looked for first at every redraw for a while, so the reader goes
+// back to it when it's back, not to whatever stood in its place meanwhile.
+const LOST_MS = 10_000;
 
 // Room held at a scroller's end so a shorter page can't pull it up.
 function holdRoom(s, px) {
@@ -212,7 +216,10 @@ function restore(s) {
   // Where the anchor is in the scroller now (its place on screen, plus how far it's scrolled), so it sits where it sat.
   const a = findAnchor(s, st);
   place(s, Math.max(0, a ? a.node.getBoundingClientRect().top + s.scrollTop - a.y : st.top));
+  const now = Date.now();
+  const lost = (a ? a.lost : st.anchors).filter(x => !x.node.isConnected && now - (x.lostAt ||= now) < LOST_MS);
   anchor(s);
+  if (lost.length && held.has(s)) held.get(s).anchors.unshift(...lost);
 }
 
 // A new screen in the same page (a round started from a row far down the
