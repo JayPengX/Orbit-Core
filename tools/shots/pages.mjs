@@ -24,6 +24,9 @@ export const PAGES = {
     // 追蹤's 設定: the leagues and follows as rows, each with its ✕ and grip; then one league lifted mid-drag (with --account fan).
     settings: { args: click('#tab-following', wait(3000), "js:document.querySelector('.set-open').click()", wait(2500)) },
     'settings-drag': { args: click('#tab-following', wait(3000), "js:document.querySelector('.set-open').click()", wait(2500), lift('dialog[open] .set-order'), wait(700)) },
+    // 首頁's sport chips (with --account fan): 賽車 moves to a day F1 is on; then 全部 back on the day and place left (Jay 2026-11-05).
+    'sport-jump': { args: click('js:window.scrollTo({top:400})', wait(800), tap('賽車|Racing'), wait(5000)) },
+    'sport-back': { args: click('js:window.scrollTo({top:400})', wait(800), tap('賽車|Racing'), wait(5000), tap('全部|All'), wait(3000)) },
     // 賽事 on one league, each of its tabs (laid out wide on a tablet or a computer).
     'epl-table': { args: click('#tab-matches', '[data-league=epl]', wait(2500), tap('排名|Table'), wait(4000)) },
     // NBA 排名: the two conferences' tables (a pinned rank and name column, the stats beside it).
