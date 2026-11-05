@@ -5173,7 +5173,15 @@ html.q-kb .q-kb-docked {
 }
 .q-day-swipe.swiping > :not(.q-day-bar, .q-sheet-head, .q-day-still) {
   transform: translateX(var(--swipe, 0));
-  opacity: 0.85;
+  opacity: var(--swipe-fade, 1);
+}
+/* Let go short of a swipe (or with nothing beside): it glides home, never
+   snaps (ui.mjs daySwipe, SWIPE_BACK_MS). The slide in is the Web Animations
+   API's (slideIn); the classes below are the old way, for a browser without it. */
+.q-day-swipe.swipe-back > :not(.q-day-bar, .q-sheet-head, .q-day-still) {
+  transition:
+    transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .q-day-swipe.day-in-next > :not(.q-day-bar, .q-sheet-head, .q-day-still) {
   animation: q-day-in-next 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -5197,6 +5205,9 @@ html.q-kb .q-kb-docked {
   .q-day-swipe.day-in-next > *,
   .q-day-swipe.day-in-prev > * {
     animation: none;
+  }
+  .q-day-swipe.swipe-back > * {
+    transition: none;
   }
 }
 
