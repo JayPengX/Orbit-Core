@@ -132,8 +132,8 @@ export const DEV = {
   mirror: { def: true, group: 'data', zh: '使用每晚的資料副本', en: 'Use the nightly copies', note: '關掉：所有 App 都直接問代理（除錯用）' },
   // Each paid AI feature's calls a day, everyone together (the proxy's
   // routes named in `ai`; 0 pauses it, the app then says today's AI is used up).
-  aiClassPhoto: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['gemini'], zh: '課表照片匯入（Class）', en: 'Class photo import', note: '每個 Worker 各自計數；0 = 暫停' },
-  aiClassEdit: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['nl-edit'], zh: '課表 AI 修改（Class）', en: 'Class AI edit', note: '每個 Worker 各自計數；0 = 暫停' },
+  aiClassPhoto: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['gemini'], zh: '課表照片匯入（Class）', en: 'Class photo import', note: '0 = 暫停' },
+  aiClassEdit: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['nl-edit'], zh: '課表 AI 修改（Class）', en: 'Class AI edit', note: '0 = 暫停' },
   aiLaw: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['law-ask', 'law-chat'], zh: '法律 AI（Law）', en: 'Law AI', note: '白話解釋和問法律一起算；0 = 暫停' },
   aiMoneyRead: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['money-read'], zh: '拍照記帳（Money）', en: 'Money photo entries', note: '0 = 暫停' }
 };
