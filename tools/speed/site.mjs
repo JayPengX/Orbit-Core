@@ -214,6 +214,8 @@ function ecoAnswer(dev, body, method, url) {
   const now = Date.now();
   dev.wallet ||= { v: 1, created: now - 120 * 86_400_000, entries: [{ id: 'eco:start', t: now - 120 * 86_400_000, app: 'eco', kind: 'start', amount: 200000 }], snap: {}, settings: {}, apps: { [dev.appId]: { first: now - 60 * 86_400_000, last: now - 86_400_000 } }, inbox: {} };
   if (body?.op === 'write' && typeof body.payload === 'string') dev.payload = body.payload;
+  // (SPEED_ECO=1: what each Pass call carried, to see why an app writes.)
+  if (process.env.SPEED_ECO) console.log(`  eco ${dev.app} ${dev.sideName} ${method} ${body?.op || url.search} ${body ? Object.entries(body).filter(([k]) => !['qt', 'refresh'].includes(k)).map(([k, v]) => `${k}=${typeof v === 'string' ? v.length > 40 ? `${v.length}ch` : v : JSON.stringify(v)?.slice(0, 160)}`).join(' ') : ''}`);
   const reply = { token: 'preview', wallet: dev.wallet, active: true, live: { app: dev.appId } };
   if (method === 'POST' && ['refresh', 'login', 'redeem'].includes(body?.op)) Object.assign(reply, { payload: dev.payload ?? '', inbox: [] });
   if (method === 'GET' && url.searchParams.get('app')) Object.assign(reply, { payload: dev.payload ?? '', inbox: [] });

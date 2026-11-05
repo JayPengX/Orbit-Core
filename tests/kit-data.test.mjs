@@ -22,9 +22,9 @@ const local = new Map();
 globalThis.localStorage = { getItem: k => (local.has(k) ? local.get(k) : null), setItem: (k, v) => local.set(k, String(v)), removeItem: k => local.delete(k), key: i => [...local.keys()][i] ?? null, get length() { return local.size; } };
 let answer = () => new Response('{}');
 const asked = [];
-globalThis.fetch = async url => {
+globalThis.fetch = async (url, init) => {
   asked.push(String(url));
-  return answer(String(url));
+  return answer(String(url), init);
 };
 const kit = await import('../kit/orbit.mjs');
 const settle = () => new Promise(r => setTimeout(r, 5));
@@ -121,4 +121,31 @@ test('a Jolpica read the proxy is turned away from is read from the device at on
   asked.length = 0;
   await assert.rejects(kit.proxyJson('https://example.test/turned-away.json', { alone: true }));
   assert.ok(asked.every(u => !u.startsWith('https://example.test/')));
+});
+
+test("a big answer still coming on a slow link is read to its end; one that has gone quiet fails in its time", async () => {
+  // (Its pieces `gap` ms apart; the read's signal ends it.)
+  const trickle = (pieces, gap) => (url, init) =>
+    new Response(
+      new ReadableStream({
+        async start(c) {
+          init?.signal?.addEventListener('abort', () => c.error(init.signal.reason));
+          for (const p of pieces) {
+            await new Promise(r => setTimeout(r, gap));
+            if (init?.signal?.aborted) return;
+            c.enqueue(new TextEncoder().encode(p));
+          }
+          c.close();
+        }
+      })
+    );
+  const games = Array.from({ length: 13 }, (_, i) => i);
+  // 14 pieces 15 ms apart: 210 ms in all, over its 60 ms, never quiet that long (a season's pack on a busy 3G link).
+  answer = trickle(['{"games":[', ...games.slice(0, -1).map(g => `${g},`), '12]}'], 15);
+  assert.deepEqual(await kit.packJson('slow/big.json', { timeout: 60 }), { games });
+  // Quiet longer than its time: a failure, never left waiting.
+  answer = trickle(['{"games":[', '1]}'], 150);
+  const t = Date.now();
+  await assert.rejects(kit.packJson('slow/stalled.json', { timeout: 60 }), e => e?.name === 'TimeoutError');
+  assert.ok(Date.now() - t < 140, `failed in ${Date.now() - t} ms`);
 });

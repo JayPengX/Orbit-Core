@@ -593,6 +593,44 @@ async function dataToken(renew = false, read = false) {
   if (kept) return kept;
   return s.ensureToken({ renew }).catch(() => s.token || '');
 }
+// A read's time limit, `wait`: for its answer to start, then again for each
+// piece of it that comes. A limit on the whole read dropped a big answer on a
+// slow link while it was still coming (a season's pack or a batch of
+// scoreboards, hundreds of KB, on a busy 3G link: dropped near its end, then
+// asked again or read from another source, twice the download, 2026-11-05).
+// A connection that has gone quiet still fails in `wait`.
+function patient(wait) {
+  const ctl = new AbortController();
+  let timer = 0;
+  const arm = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => ctl.abort(new DOMException('The operation timed out.', 'TimeoutError')), wait);
+  };
+  arm();
+  const done = () => clearTimeout(timer);
+  return {
+    signal: ctl.signal,
+    arm,
+    done,
+    // The answer's text, each piece read giving it `wait` more.
+    async text(res) {
+      try {
+        const reader = res.body?.getReader?.();
+        if (!reader) return await res.text();
+        const decoder = new TextDecoder();
+        let out = '';
+        for (;;) {
+          arm();
+          const { done: end, value } = await reader.read();
+          if (end) return out + decoder.decode();
+          out += decoder.decode(value, { stream: true });
+        }
+      } finally {
+        done();
+      }
+    }
+  };
+}
 // A proxy ask with this app's token: turned away for it (401: a token signed
 // before the proxy's secret changed, or run out), asked once more with a new one.
 async function signedFetch(address, init) {
@@ -607,9 +645,18 @@ async function signedFetch(address, init) {
 export async function workerJson(path, query, { timeout = 8000, body = null, errors = false } = {}) {
   try {
     const init = body == null ? {} : { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body };
-    const res = await signedFetch(`${ECO_URL.replace(/\/eco$/, path)}?${query || 'v=1'}`, { ...init, signal: AbortSignal.timeout(timeout) });
-    if (!res.ok && errors) return { error: 'upstream', ...(await res.json().catch(() => ({}))), status: res.status };
-    return res.ok ? await res.json() : null;
+    const wait = patient(timeout);
+    const res = await signedFetch(`${ECO_URL.replace(/\/eco$/, path)}?${query || 'v=1'}`, { ...init, signal: wait.signal }).catch(error => (wait.done(), Promise.reject(error)));
+    const text = await wait.text(res);
+    const json = () => {
+      try {
+        return JSON.parse(text);
+      } catch {
+        return {};
+      }
+    };
+    if (!res.ok && errors) return { error: 'upstream', ...json(), status: res.status };
+    return res.ok ? JSON.parse(text) : null;
   } catch {
     return null;
   }
@@ -621,9 +668,10 @@ const proxyAddress = (url, trim) => `${PROXY_URL}?url=${encodeURIComponent(url)}
 async function fetchOne(url, trim, timeout, extra = '') {
   for (let attempt = 0; ; attempt++) {
     try {
-      const res = await signedFetch(`${proxyAddress(url, trim)}${extra}`, { signal: AbortSignal.timeout(timeout) });
-      if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
-      return await res.text();
+      const wait = patient(timeout);
+      const res = await signedFetch(`${proxyAddress(url, trim)}${extra}`, { signal: wait.signal }).catch(error => (wait.done(), Promise.reject(error)));
+      if (!res.ok) throw (wait.done(), Object.assign(new Error(`HTTP ${res.status}`), { status: res.status }));
+      return await wait.text(res);
     } catch (error) {
       // Too many asks (429) is never asked again at once: that only keeps the limit hit.
       if (attempt >= 1 || (error.status >= 400 && error.status < 500)) throw error;
@@ -661,18 +709,22 @@ async function flush() {
     else if (got?.s >= 500 || !got) one(item);
     else item.reject(Object.assign(new Error(`HTTP ${got.s}`), { status: got.s }));
   };
+  let wait = null;
   try {
     const u = items.map(i => `&u=${encodeURIComponent(i.trim ? `${i.trim}!${i.url}` : i.url)}`).join('');
     // `lines`: the proxy writes each item the moment it's in, a line of its
     // own ({ i, s, b }), taken here as it comes: a batch answered whole
     // waited on its slowest item. (A proxy from before answers whole: { r }.)
-    const res = await signedFetch(`${PROXY_URL}?batch=1&lines=1${u}${appParam()}`, { signal: AbortSignal.timeout(Math.max(...items.map(i => i.timeout))) });
+    wait = patient(Math.max(...items.map(i => i.timeout)));
+    const res = await signedFetch(`${PROXY_URL}?batch=1&lines=1${u}${appParam()}`, { signal: wait.signal });
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let text = '';
     let whole = false;
     for (;;) {
+      // (Each piece that comes gives the batch its time again: a slow link is never cut off mid-answer.)
+      wait.arm();
       const { done: end, value } = await reader.read();
       // (A line ends only in what just came: a 2 MB line isn't searched again at each piece of it.)
       let from = text.length;
@@ -694,6 +746,8 @@ async function flush() {
     // Over the limit: each asked again alone would only count against it more.
     if (error?.status === 429 || error?.status === 401) items.forEach(item => item.reject(error));
     else items.forEach((item, i) => settle(i, null));
+  } finally {
+    wait?.done();
   }
 }
 // A read that failed, in the 除錯紀錄 (where, and why; never the token).
@@ -750,9 +804,10 @@ const isDirect = url => {
   }
 };
 async function fetchDirect(url, timeout) {
-  const res = await fetch(url, { signal: AbortSignal.timeout(timeout) });
-  if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
-  return res.text();
+  const wait = patient(timeout);
+  const res = await fetch(url, { signal: wait.signal }).catch(error => (wait.done(), Promise.reject(error)));
+  if (!res.ok) throw (wait.done(), Object.assign(new Error(`HTTP ${res.status}`), { status: res.status }));
+  return wait.text(res);
 }
 // Jolpica (F1's results) answers a phone itself too, but turns the proxy
 // away whenever Cloudflare's shared addresses have used its allowance (it
@@ -800,9 +855,10 @@ const PACKS_KEY = 'https://jaypengx.github.io/Shared-Data/';
 export function packJson(path, { ttl = 3 * 3_600_000, timeout = 30_000 } = {}) {
   const url = `${PACKS_URL}${path}`;
   return keptJson(url, dataKey(`${PACKS_KEY}${path}`, ''), { ttl, keep: true }, async () => {
-    const res = await fetch(url, { signal: AbortSignal.timeout(timeout) });
-    if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
-    return res.text();
+    const wait = patient(timeout);
+    const res = await fetch(url, { signal: wait.signal }).catch(error => (wait.done(), Promise.reject(error)));
+    if (!res.ok) throw (wait.done(), Object.assign(new Error(`HTTP ${res.status}`), { status: res.status }));
+    return wait.text(res);
   });
 }
 // A live read (asked every few seconds) is kept on the device at most once a
