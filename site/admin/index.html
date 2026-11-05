@@ -329,13 +329,19 @@
   details.note summary { color: var(--q-muted); font-size: 14px; cursor: pointer; }
   /* 工具 */
   .tool { margin-top: 12px; }
+  .gift-when { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+  .gift-when label, .gift-more label { display: grid; gap: 4px; min-width: 0; font-size: 13px; color: var(--q-muted); }
+  .gift-when input, .gift-more input { width: 100%; box-sizing: border-box; }
+  .gift-more { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+  .gift-link { margin-top: 12px; padding: 10px 14px; border-radius: var(--q-r-cell); background: var(--q-fill-4); font: 600 15px ui-monospace, monospace; overflow-wrap: anywhere; }
+  @media (max-width: 520px) { .gift-when { grid-template-columns: minmax(0, 1fr); } }
   .tool-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
   .tool-head > div { flex: 1 1 0; min-width: 0; }
   .tool-head h3 { margin: 2px 0 2px; }
   .tool-head p { margin: 0; }
   .tool-head i { --t: var(--q-accent); display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(160deg, color-mix(in srgb, var(--t) 82%, #fff), var(--t) 60%); color: #fff; }
   .tool-head i svg { width: 22px; height: 22px; }
-  .tool-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+  .tool-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
   [hidden] { display: none !important; }
   /* Secondary lines (a label, a sub-line, a note) wrap onto a second line on a narrow screen, never cut with an ellipsis; names and figures stay on one line. */
   .tile small, .tile em, .kpi small, .kpi em, .hcell small, .hit small, .stats-strip small, .q-ritem-text > small { white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
@@ -532,6 +538,26 @@
     <!-- 工具 -->
     <section data-pane="tools" hidden>
       <div class="tool-grid" id="tool-grid"></div>
+      <div class="card tool" id="tool-gift">
+        <div class="tool-head"><i data-ic="send" style="--t:#4f46e5"></i><div><h3>公開領取</h3><p class="muted">打開連結就能領一組，一台裝置一組。沒登入的到時收回。</p></div><button class="q-switch" type="button" role="switch" aria-checked="false" aria-label="開放領取" id="gift-on"></button></div>
+        <div class="tiles" id="gift-tiles"></div>
+        <div class="row" style="margin-top:12px"><input id="gift-total" type="number" min="0" max="5000" value="50" aria-label="數量" /><span class="muted">組</span></div>
+        <div class="gift-when">
+          <label>開始（空白是現在）<input id="gift-opens" type="datetime-local" /></label>
+          <label>結束（空白是不限）<input id="gift-closes" type="datetime-local" /></label>
+        </div>
+        <div class="chips" id="gift-for" style="margin-top:10px"><button type="button" data-min="15">開 15 分鐘</button><button type="button" data-min="60">開 1 小時</button><button type="button" data-min="day">到今天結束</button><button type="button" data-min="0">不限</button></div>
+        <details class="note"><summary>防濫用</summary>
+          <div class="gift-more">
+            <label>每個網路每分鐘<input id="gift-rate" type="number" min="1" max="600" /></label>
+            <label>沒登入幾小時收回（0 不收）<input id="gift-hold" type="number" min="0" max="720" /></label>
+          </div>
+        </details>
+        <div class="row spread" style="margin-top:12px"><span id="gift-state" class="muted"></span><button id="gift-save" class="primary">儲存</button></div>
+        <p id="gift-error" class="error"></p>
+        <div class="gift-link" id="gift-url"></div>
+        <div class="row" style="margin-top:10px"><button id="gift-copy" class="small">複製連結</button><button id="gift-qr" class="small">QR code</button><button id="gift-round" class="small">新一輪</button></div>
+      </div>
       <div class="card tool" id="tool-issue">
         <div class="tool-head"><i data-ic="ticket" style="--t:#2563eb"></i><div><h3>發放 Orbit Pass</h3><p class="muted">誰先登入就是誰的。這裡只顯示這一次，先複製或下載。</p></div></div>
         <div class="row"><input id="count" type="number" min="1" max="500" value="10" /><span class="muted">組</span><button id="issue" class="primary">發放</button></div>
@@ -606,6 +632,7 @@ const KINDS = { start: '開戶金', pay: '週薪', rank: '財富等級獎勵', r
 const kindName = k => KINDS[k] || k;
 
 const WHY = {
+  GIFT_TIMES: '結束要比開始晚。',
   FORBIDDEN: '管理金鑰不對（或還沒部署好，等一分鐘再試）。',
   ECO_PAIR_NOT_FOUND: '找不到這個帳戶代號（或對到不只一個，多貼幾碼）。',
   SYNC_PASSCODE_NOT_FOUND: '找不到這組 Orbit Pass。',
@@ -711,7 +738,7 @@ const VIEWS = {
   health: () => Promise.all([loadSystem(), loadHealth(), loadErrors()]),
   usage: () => Promise.all([loadBilling(), loadUsage()]),
   dev: () => loadDev(),
-  tools: () => Promise.all([loadPushes(), loadBackups()])
+  tools: () => Promise.all([loadGift(), loadPushes(), loadBackups()])
 };
 const loaded = new Set();
 let view = 'overview';
@@ -1053,6 +1080,7 @@ const PLACES = [
   ['健康', 'health', 'live', '#16a34a', '系統 排程 資料來源 部署 金鑰 r2 d1 帳單保護 節流 health cron'],
   ['用量', 'usage', 'chart', '#7c3aed', 'google 帳單 tdx 額度 usage billing'],
   ['設定', 'dev', 'target', '#64748b', '速度 開發 容量 dev config'],
+  ['公開領取', 'tools', 'send', '#4f46e5', '領取 發送 公開 學校 qr giveaway key', 'tool-gift'],
   ['發放 Orbit Pass', 'tools', 'ticket', '#2563eb', '發 pass 新帳戶 issue', 'tool-issue'],
   ['找回帳戶', 'tools', 'lock', '#0d9488', '裝置代碼 遺失 recover', 'tool-recover'],
   ['廣播通知', 'tools', 'bell', '#ea580c', '通知 推播 broadcast push', 'tool-notify'],
@@ -1532,6 +1560,96 @@ async function loadMoney() {
 }
 
 // ---- 通知與來源 ----
+// ---- 公開領取 (gift.js): the public giveaway at orbit.<domain>/key/ ----
+const GIFT_URL = `https://orbit.${DOMAIN}/key/`;
+let gift = null;
+const localTime = t => {
+  if (!t) return '';
+  const d = new Date(t - new Date(t).getTimezoneOffset() * 60_000);
+  return d.toISOString().slice(0, 16);
+};
+const fromLocal = v => (v ? new Date(v).getTime() || 0 : 0);
+function giftSay(g) {
+  const now = Date.now();
+  if (!g.live) return '關閉中';
+  if (g.closes && now >= g.closes) return `已結束（${fmt(g.closes)}）`;
+  if (g.opens && now < g.opens) return `${fmt(g.opens)} 開放`;
+  if (g.claimed >= g.total) return '領完了';
+  return g.closes ? `開放中，${fmt(g.closes)} 結束` : '開放中';
+}
+function drawGift(g) {
+  gift = g;
+  $('gift-on').setAttribute('aria-checked', String(!!g.live));
+  $('gift-tiles').replaceChildren(
+    tile('已領', g.claimed.toLocaleString(), g.hour ? `這小時 ${g.hour}` : ''),
+    tile('剩下', g.left.toLocaleString(), `共 ${g.total.toLocaleString()} 組`),
+    tile('已換成自己的', g.done.toLocaleString(), g.started ? `登入了還沒換 ${g.started}` : ''),
+    tile('收回', g.back.toLocaleString(), g.hold ? `${g.hold} 小時沒登入` : '不收回')
+  );
+  $('gift-total').value = g.total;
+  $('gift-opens').value = localTime(g.opens);
+  $('gift-closes').value = localTime(g.closes);
+  $('gift-rate').value = g.rate;
+  $('gift-hold').value = g.hold;
+  $('gift-state').textContent = giftSay(g);
+  $('gift-url').textContent = GIFT_URL.replace('https://', '');
+}
+async function loadGift() {
+  try {
+    drawGift((await admin('gift')).gift);
+  } catch (e) {
+    $('gift-error').textContent = e.message;
+  }
+}
+async function giftSet(extra = {}) {
+  $('gift-error').textContent = '';
+  $('gift-save').disabled = true;
+  try {
+    drawGift((await admin('gift-set', { total: Number($('gift-total').value) || 0, opens: fromLocal($('gift-opens').value), closes: fromLocal($('gift-closes').value), rate: Number($('gift-rate').value) || 20, hold: Number($('gift-hold').value) || 0, ...extra })).gift);
+  } catch (e) {
+    $('gift-error').textContent = e.message;
+  }
+  $('gift-save').disabled = false;
+}
+$('gift-save').onclick = () => giftSet();
+// The switch saves at once (the times and count as they stand in the form).
+$('gift-on').onclick = () => {
+  const on = $('gift-on').getAttribute('aria-checked') !== 'true';
+  $('gift-on').setAttribute('aria-checked', String(on));
+  giftSet({ live: on });
+};
+$('gift-for').onclick = e => {
+  const b = e.target.closest('button[data-min]');
+  if (!b) return;
+  const start = fromLocal($('gift-opens').value) || Date.now();
+  const m = b.dataset.min;
+  const end = m === '0' ? 0 : m === 'day' ? new Date(new Date(start).setHours(23, 59, 0, 0)).getTime() : start + Number(m) * 60_000;
+  $('gift-closes').value = localTime(end);
+};
+$('gift-copy').onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(GIFT_URL);
+    $('gift-copy').textContent = '已複製';
+    setTimeout(() => ($('gift-copy').textContent = '複製連結'), 1500);
+  } catch {}
+};
+$('gift-qr').onclick = async () => {
+  try {
+    const share = await import('../kit/share.mjs');
+    share.shareSheet?.({ url: GIFT_URL, title: '領一組 Orbit Pass', app: 'pass' });
+  } catch (e) {
+    $('gift-error').textContent = e.message;
+  }
+};
+$('gift-round').onclick = async () => {
+  if (!confirm('開新的一輪？已領的不受影響，每台裝置可以再領一組，數字從 0 算起。')) return;
+  try {
+    drawGift((await admin('gift-round')).gift);
+  } catch (e) {
+    $('gift-error').textContent = e.message;
+  }
+};
+
 async function loadPushes() {
   $('push-error').textContent = '';
   try {

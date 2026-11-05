@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="zh-Hant" data-look="native">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>領一組 Orbit Pass</title>
+<meta name="description" content="免費領一組 Orbit Pass，所有 Orbit App 共用。" />
+<link rel="icon" href="/pass/brand/pass.svg" type="image/svg+xml" />
+<link rel="icon" href="/pass/icons/favicon-32.png" sizes="32x32" type="image/png" />
+<link rel="apple-touch-icon" href="/pass/icons/apple-touch-icon.png" />
+<meta property="og:type" content="website" /><meta property="og:site_name" content="Orbit" /><meta property="og:title" content="領一組 Orbit Pass" /><meta property="og:description" content="一組通行碼，所有 Orbit App 共用。" /><meta property="og:image" content="https://orbit.jaypengx.com/pass/brand/pass-og.jpg" />
+<link rel="stylesheet" href="/Orbit-Core/kit/orbit.css" />
+<script>(()=>{let l;try{l=localStorage.getItem('orbit.lang')}catch{}if(l!=='zh'&&l!=='en'){const n=navigator.languages||[navigator.language||'zh-TW'];l=n.some(x=>/^zh/i.test(x))||!n.some(x=>/^en/i.test(x))?'zh':'en'}if(l==='en')document.documentElement.lang='en'})()</script>
+<style>
+  /* The public giveaway (Orbit-Core gift.js): one card, centred, on the kit's tokens. */
+  :root { --q-accent: #4f46e5; --q-accent-ink: #fff; }
+  @media (prefers-color-scheme: dark) { :root { --q-accent: #818cf8; --q-accent-ink: #0b0b1a; } }
+  html, body { min-height: 100%; }
+  body { margin: 0; background: var(--q-page); color: var(--q-label); font-family: var(--q-font); -webkit-text-size-adjust: 100%; }
+  main { box-sizing: border-box; min-height: 100svh; display: grid; place-items: center; padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom)); }
+  .wrap { width: 100%; max-width: 420px; display: grid; gap: 16px; }
+  header { display: flex; align-items: center; gap: 12px; padding: 0 4px; }
+  header img { width: 44px; height: 44px; flex: none; }
+  header h1 { margin: 0; font: 700 24px/1.2 var(--nv-display, var(--q-font)); letter-spacing: -0.02em; }
+  .card { background: var(--nv-card, var(--q-surface)); box-shadow: inset 0 0 0 1px var(--nv-edge, transparent), var(--nv-lift, none); border-radius: var(--q-r-card); padding: 24px 20px; display: grid; gap: 16px; text-align: center; }
+  .label { margin: 0; color: var(--q-label-2); font-size: 15px; }
+  .big { margin: 0; font: 300 56px/1 var(--nv-display, var(--q-font)); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .title { margin: 0; font: 600 22px/1.3 var(--nv-display, var(--q-font)); letter-spacing: -0.01em; }
+  .sub { margin: 0; color: var(--q-label-2); font-size: 15px; line-height: 1.45; text-wrap: balance; }
+  .code { margin: 0; font: 600 30px/1.2 ui-monospace, 'SF Mono', Menlo, monospace; letter-spacing: 0.08em; user-select: all; -webkit-user-select: all; white-space: nowrap; }
+  .q-btn { width: 100%; }
+  .apps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .app { display: grid; justify-items: center; gap: 6px; padding: 12px 4px 10px; border-radius: var(--q-r-cell); background: var(--q-fill-4); color: var(--q-label); text-decoration: none; font-size: 13px; border: 0; font-family: inherit; cursor: pointer; transition: transform var(--q-dur-snappy) var(--q-spring-snappy); }
+  .app:active { transform: scale(0.96); }
+  .app img { width: 44px; height: 44px; border-radius: 11px; }
+  .app[aria-busy='true'] { opacity: 0.5; }
+  .skel { height: 168px; border-radius: var(--q-r-cell); }
+  .foot { display: flex; justify-content: center; gap: 16px; }
+  .foot a, .foot button { background: none; border: 0; padding: 8px; color: var(--q-label-2); font: 500 13px/1.2 var(--q-font); text-decoration: none; cursor: pointer; }
+  .side { display: grid; gap: 16px; }
+  @media (min-width: 640px) {
+    .wrap.two { max-width: 760px; }
+    .card.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 24px; }
+  }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="wrap">
+    <header><img src="/pass/brand/pass.svg" alt="" /><h1 id="h1">領一組 Orbit Pass</h1></header>
+    <section class="card" id="card" aria-live="polite"><div class="skel q-skel"></div></section>
+    <div class="foot"><a href="/pass/" id="what">有哪些 App</a><button type="button" id="lang">English</button></div>
+  </div>
+</main>
+<script type="module">
+const API = /(^|\.)jaypengx\.com$/.test(location.hostname) ? '/api' : 'https://api.jaypengx.com';
+const APPS = [
+  ['match', 'sports', 'Sports'], ['transit', 'transit', 'Transit'], ['weather', 'weather', 'Weather'],
+  ['orbit', 'class', 'Class'], ['money', 'money', 'Money'], ['vocab', 'words', 'Words'],
+  ['beats', 'beats', 'Beats'], ['law', 'law', 'Law'], ['stock', 'securities', 'Securities']
+];
+const card = document.getElementById('card');
+let lang = document.documentElement.lang === 'en' ? 'en' : 'zh';
+const W = (zh, en) => (lang === 'en' ? en : zh);
+let last = null;
+let timer = 0;
+let ticker = 0;
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const when = t => new Date(t).toLocaleString(lang === 'en' ? 'en-US' : 'zh-TW', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const left = ms => {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}` : `${m}:${String(x).padStart(2, '0')}`;
+};
+const pretty = c => `${c.slice(0, 5)} ${c.slice(5)}`;
+const appsHtml = go => `<div class="apps">${APPS.map(([id, path, name]) => `<${go ? 'button type="button"' : 'a'} class="app" ${go ? `data-go="${path}"` : `href="/${path}/"`}><img src="/pass/brand/${id}.svg" alt="" width="44" height="44">${name}</${go ? 'button' : 'a'}>`).join('')}</div>`;
+
+async function call(method, body) {
+  const res = await fetch(`${API}/gift`, { method, credentials: 'include', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  return { status: res.status, data };
+}
+
+function draw(g, note = '') {
+  last = g;
+  clearInterval(ticker);
+  const mine = g.mine;
+  if (mine?.state === 'ready' || mine?.state === 'started' || mine?.state === 'making') {
+    card.innerHTML = mine.code
+      ? `<div class="side"><p class="label">${W('你的通行碼', 'Your pass')}</p><p class="code" id="code">${esc(pretty(mine.code))}</p>
+         <button type="button" class="q-btn" id="copy">${W('複製', 'Copy')}</button>
+         <p class="sub">${W('點一個 App 開始，先換成自己的通行碼。', 'Pick an app to start. You’ll set your own pass first.')}</p></div>${appsHtml(true)}`
+      : `<div class="side"><p class="title">${W('你已經領過了', 'You already have one')}</p>
+         <p class="sub">${W('點一個 App 繼續，先換成自己的通行碼。', 'Pick an app to go on. You’ll set your own pass first.')}</p></div>${appsHtml(true)}`;
+  } else if (mine?.state === 'done') {
+    card.innerHTML = `<div class="side"><p class="title">${W('你已經領過了', 'You already have one')}</p>
+      <p class="sub">${W('用你自己設定的通行碼登入。', 'Sign in with the pass you set.')}</p></div>${appsHtml(false)}`;
+  } else if (g.state === 'open') {
+    card.innerHTML = `<p class="label">${W('還剩', 'Left')}</p><p class="big">${g.left}</p>
+      <button type="button" class="q-btn primary" id="claim">${W('領取', 'Claim')}</button>
+      <p class="sub" id="note">${esc(note || W('一台裝置一組', 'One per device'))}</p>`;
+  } else if (g.state === 'soon') {
+    card.innerHTML = `<p class="title">${esc(W(`${when(g.opens)} 開放`, `Opens ${when(g.opens)}`))}</p><p class="big" id="count"></p>`;
+    const skew = Date.now() - (g.now || Date.now());
+    const tick = () => {
+      const ms = g.opens - (Date.now() - skew);
+      const c = document.getElementById('count');
+      if (c) c.textContent = left(ms);
+      if (ms <= 0) {
+        clearInterval(ticker);
+        // Everyone at once: spread over two seconds.
+        setTimeout(load, Math.random() * 2000);
+      }
+    };
+    tick();
+    ticker = setInterval(tick, 1000);
+  } else {
+    const say = { off: W('現在沒有開放領取', 'Not open right now'), gone: W('全部領完了', 'All taken'), over: W('已經結束了', 'This has ended') }[g.state] || W('現在沒有開放領取', 'Not open right now');
+    card.innerHTML = `<p class="title">${say}</p>`;
+  }
+  // With the apps: side by side where there's room (a phone on its side, a computer).
+  const two = !!card.querySelector('.apps');
+  card.classList.toggle('two', two);
+  document.querySelector('.wrap').classList.toggle('two', two);
+  wire();
+}
+
+function wire() {
+  document.getElementById('copy')?.addEventListener('click', async e => {
+    try {
+      await navigator.clipboard.writeText(last.mine.code);
+      e.target.textContent = W('已複製', 'Copied');
+    } catch {
+      getSelection().selectAllChildren(document.getElementById('code'));
+    }
+  });
+  document.getElementById('claim')?.addEventListener('click', claim);
+  for (const b of card.querySelectorAll('[data-go]')) b.addEventListener('click', () => go(b));
+}
+
+async function claim() {
+  const b = document.getElementById('claim');
+  b.disabled = true;
+  b.textContent = W('領取中…', 'Claiming…');
+  try {
+    const { status, data } = await call('POST', { op: 'claim' });
+    if (status === 200) return draw(data);
+    if (status === 429) {
+      draw({ ...last, ...data, mine: null }, W('人有點多，馬上再試…', 'Busy, trying again…'));
+      const again = document.getElementById('claim');
+      if (again) again.disabled = true;
+      clearTimeout(timer);
+      timer = setTimeout(claim, 3000 + Math.random() * 4000);
+      return;
+    }
+    if (data.state) return draw({ ...data, mine: null });
+    throw new Error(data.code || status);
+  } catch {
+    draw(last, W('連不上，再按一次', 'Couldn’t connect. Try again.'));
+  }
+}
+
+async function go(b) {
+  b.setAttribute('aria-busy', 'true');
+  const path = `/${b.dataset.go}/`;
+  try {
+    const { status, data } = await call('POST', { op: 'go' });
+    if (status === 200 && data.handoff) return location.assign(`${path}#qh=${encodeURIComponent(data.handoff)}`);
+  } catch {}
+  location.assign(path);
+}
+
+async function load() {
+  try {
+    const { status, data } = await call('GET');
+    if (status !== 200 || !data.state) throw new Error(status);
+    draw(data);
+  } catch {
+    card.innerHTML = `<p class="title">${W('連不上', 'Couldn’t connect')}</p><button type="button" class="q-btn" id="retry">${W('再試一次', 'Try again')}</button>`;
+    document.getElementById('retry').onclick = () => ((card.innerHTML = '<div class="skel q-skel"></div>'), load());
+  }
+}
+
+function words() {
+  document.documentElement.lang = lang === 'en' ? 'en' : 'zh-Hant';
+  document.title = W('領一組 Orbit Pass', 'Get an Orbit Pass');
+  document.getElementById('h1').textContent = W('領一組 Orbit Pass', 'Get an Orbit Pass');
+  document.getElementById('what').textContent = W('有哪些 App', 'The apps');
+  document.getElementById('lang').textContent = W('English', '中文');
+}
+document.getElementById('lang').onclick = () => {
+  lang = lang === 'en' ? 'zh' : 'en';
+  try { localStorage.setItem('orbit.lang', lang); } catch {}
+  words();
+  if (last) draw(last);
+};
+// Back to the page later (another tab, the phone asleep): what's true now.
+document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && last && !last.mine && last.state !== 'open' && load());
+words();
+load();
+</script>
+</body>
+</html>

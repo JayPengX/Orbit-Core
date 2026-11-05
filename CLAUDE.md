@@ -54,7 +54,7 @@ orbit-workers-proxy (worker.js, near each caller): every route in §4
  ├─ orbit-law (Orbit Law's site), service LAW_SITE: its data read by the proxy
  └─ quota-guard, service GUARD: reads the bill every 5 minutes (a DO alarm),
      paces, then stops the proxy at 90% of the $5 plan
-orbit-site (site.js): the domain's three hosts as custom domains; Longshot's notice
+orbit-site (site.js): the domain's hosts as custom domains
 ```
 
 ## 2. The apps
@@ -106,11 +106,9 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 - **Updates.** An open app swaps once the new version's files are on the
   phone (`updateReady`; `sw.js versionFirst` opens it);
   `sw.js` never refuses `boot.js`, which mends an unfinished update.
-- **A phone may run an older kit.** A new export is used with a fallback
-  (`kitUI.newThing?.(…)` through a namespace import), never imported by name,
-  or the whole app stops on a phone that still has the old kit.
-- **Kit CSS loads after the app's**: an override needs higher specificity,
-  and should be rare (TRUTH §4).
+- **A phone may run an older kit:** a new export is read with a fallback
+  (`kitUI.newThing?.(…)`, a namespace import), never imported by name.
+- **Kit CSS loads after the app's**: an override (rare) needs higher specificity.
 
 ### 3.2 Modules
 
@@ -213,6 +211,7 @@ w;dur=` (the Worker's own time), which the 除錯紀錄 notes with a slow read.
 | `/law-live` | `law-live.js` | What 立法院's IVOD streams now (`{at, rooms}`), read on demand, 60 s at the edge, the last good read kept 30 minutes; our pages only, no Pass |
 | `/money-read` | `money-read.js` | Orbit Money's 拍照記帳: one picture → `{ buys, left }`, read by Gemini (Flash-Lite, through the relay) and checked; only on a tap; 30 a day a Pass, 300 in all |
 | `/flight` | `flight.js`, `kit/flight.mjs` | Orbit Class's 專注飛行: real planes landing in about N minutes, then one followed |
+| `/gift` | `gift.js` | 公開領取 at `/key/` (`site/key/`): the admin panel sets it (on, count, times); one a device (a cookie, D1 `gift_claim`), minted fresh, `op: 'go'` a `#qh=` into an app; unused ones back after `hold` hours |
 | `/showcase/pass` | `showcase.js` | The showcase's short pass for its live demos: reads only, per-address and daily caps, from the showcase's address only |
 | `/data/…` | `data.js` | R2, public reads (§5.5); `/data/build` (POST, Bearer `DATA_PUSH_SECRET`, `build.yml`) runs a builder now |
 | `/config` | `worker.js`, `kit/devconfig.mjs` | The live speeds (`DEV`), a minute in Cloudflare's cache |
@@ -223,9 +222,8 @@ w;dur=` (the Worker's own time), which the 除錯紀錄 notes with a slow read.
 - **The gate:** every route needs a Pass session (`qt=`), counted per
   session and app in memory (600 a minute on the data proxy). Public routes
   (`/sports-today`, `/law-live`) answer our pages' origins only.
-- **Same origin:** a page on the domain calls `orbit.jaypengx.com/api/…`
-  (`kit/domain.mjs` `API`; `viaSite` in worker.js takes `/api` off): one
-  connection, no CORS preflight. `api.jaypengx.com` and workers.dev answer too.
+- **Same origin:** a page calls `orbit.jaypengx.com/api/…` (`kit/domain.mjs`
+  `API`; worker.js `viaSite` takes `/api` off). `api.` and workers.dev answer too.
 - **Dev doors:** a request with `Origin: http://localhost:<port>` and no
   pass gets a dev session on `/sports-proxy`, `/transit`, `/weather` and
   `/flight` (counted per address). `tools/preview.mjs --live` uses them.
@@ -279,7 +277,7 @@ OpenF1's tables (`openF1Raw`) and kept in R2 for good.
 | --- | --- | --- |
 | `quota-guard` | `guard-worker.js`, `guard.js`, `wrangler.guard.toml` | The bill's guard (§9); DO `GuardClock` (its 5-minute alarm), KV for its state; `/errors`, `/hours` (7 days hourly) for the panel |
 | `gemini-relay` | `gemini-relay.js`, `wrangler.gemini.toml` | Gemini's calls from Taiwan (placement `gcp:asia-east1`) |
-| `orbit-site` | `site.js`, `site-closed.js`, `wrangler.site.toml` | The domain's custom domains; Longshot's shutdown notice |
+| `orbit-site` | `site.js`, `site-closed.js`, `wrangler.site.toml` | The custom domains; Longshot's closed notice |
 | `orbit-<slug>`, `orbit-pass`, `orbit-home` | `deploy/cf-site.mjs` | Each repo's static site, an assets-only Worker on routes of its paths (§10) |
 
 ## 5. Data and sync
@@ -321,7 +319,7 @@ A read (`kit proxyJson`) goes down these until one answers:
 
 | Store | Binding | What's in it |
 | --- | --- | --- |
-| D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data, the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced (§5.3); `gemini_call`: every Gemini call (`gemini-use.js`); `law_day`: Law's and Money's AI counts a day; `beats`: each job's last run and failures (`ops.js`) |
+| D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data, the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced (§5.3); `gemini_call`: every Gemini call (`gemini-use.js`); `law_day`: Law's and Money's AI counts a day; `gift`, `gift_claim`: the giveaway (`gift.js`); `beats`: each job's last run and failures (`ops.js`) |
 | R2 `orbit-data` | `DATA` | Public: the builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `where.json`), the proxy's kept reads (`mirror/`). Never served: `private/` (the nightly store backups `private/store/<day>.jsonl.gz`, Firestore's last copy) |
 | KV | `RATE_LIMIT_KV` | Counters (sign-ins, per-address limits); the guard's state, pace and alerts (`guard:*`); push's devices, prefs and due notices (`push:*`); Google Weather's shared cells and its calls a day (`weather:g:*`, `weather:google:<day>`); TDX's last good reads and its month's meter (`tdx:warm:*`, `transit:use:<month>`); Law's kept plans and answers (`law:*`); the showcase's passes a day (`showcase:passes:*`); `ops:data-folders` |
 | Durable Objects | `F1_LOG`, `CLOCK` | `F1Log`: F1's laps as they're driven; `GuardClock`: the guard's alarm |
@@ -462,13 +460,12 @@ can be turned off on its own.
   (an assets-only Worker on routes of its paths: free to serve; routes win
   over the custom domains): `orbit.<DOMAIN>/<slug>/` every app (`slug`,
   `SHORT` in `kit/brand.mjs`; one origin, so one Pass sign-in), `orbit-pass`
-  for `/`, `/pass/`, `/Orbit-Core/` and the old `/Shared-Proxy/`,
+  for `/`, `/pass/`, `/key/`, `/Orbit-Core/` and the old `/Shared-Proxy/`,
   `orbit-home` for `<DOMAIN>/` (Orbit-Showcase: Jay's homepage, `/showcase/`).
   Paths behave as a plain static site (`/law` moves to `/law/`). Mail to
   `*@<DOMAIN>` reaches the proxy by Email Routing's catch-all. `deploy.yml`
   attaches the hostnames (the deploy token needs the zone, and Account · D1 ·
   Edit); the guard takes them off with the proxy.
-- Longshot is shut down.
 
 ## 11. Tools and tests
 
@@ -485,8 +482,7 @@ can be turned off on its own.
 
 The rest (leagues, Securities' lists, ESPN's shapes, passes, accent colours): `tools/README.md`.
 
-`npm test` covers every Worker route, the builders, the guard, the kit, and
-this map (`tests/claude-map.test.mjs`).
+`npm test` covers the Workers, kit and this map.
 
 ## 12. If you change…
 

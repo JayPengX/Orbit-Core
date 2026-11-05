@@ -15,7 +15,7 @@
 // SHA-256; the token itself is never in the repo). Without the secret, no one gets in.
 
 import { systemReport, alertAccount, tell, OPS_DOC } from './ops.js';
-import { newPasscode, passAccount, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet } from './eco.js';
+import { passAccount, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet } from './eco.js';
 import { sendPush, dueLists } from './push.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, tdxPoints, tdxGuard, tdxUse } from './transit.js';
 import { aiUse } from './gemini-use.js';
@@ -29,6 +29,7 @@ import { STATE_KEY as GUARD_STATE } from './guard.js';
 import { govOf } from './kit/gov.mjs';
 import { listBackups, fromBackup } from './store-backup.js';
 import { PASSKEY_COLLECTION, passkeySummary, removePasskey } from './passkey.js';
+import { GIFT_TOOLS, mintPass } from './gift.js';
 
 // The developer settings (kit/devconfig.mjs), one document; GET /config
 // answers them to everyone (worker.js), the panel's 開發 changes them.
@@ -140,13 +141,10 @@ export async function handleAdmin({ env, deps, headers, request, ip, body }) {
   // signed in on them yet) and answers their codes, once.
   if (body.action === 'issue') {
     const count = Math.max(1, Math.min(100, Math.floor(Number(body.count) || 0)));
-    const now = deps.now();
     const passes = [];
     for (let i = 0; i < count; i++) {
-      const { passcode, docId } = await newPasscode(env, deps);
       // (Fresh: its first sign-in replaces it, eco.js freshPass.)
-      await updateWallet(env, deps, docId, w => ({ ...w, v2: now, sec: { fresh: true } }), { create: true });
-      passes.push(passcode);
+      passes.push((await mintPass(env, deps)).passcode);
     }
     return deps.json({ passes }, 200, headers);
   }
@@ -159,9 +157,11 @@ export async function handleAdmin({ env, deps, headers, request, ip, body }) {
   // The panel's other views and tools (adminTools below): an overview,
   // one account in full, money by hand, signing an account out,
   // a never-used pass removed, notices, the sources' health.
-  if (ADMIN_TOOLS[body.action]) {
+  // (The public giveaway's settings and counts are gift.js's: looked up here, as the two import each other.)
+  const tool = ADMIN_TOOLS[body.action] || GIFT_TOOLS[body.action];
+  if (tool) {
     try {
-      const out = await ADMIN_TOOLS[body.action]({ env, deps, body });
+      const out = await tool({ env, deps, body });
       return out.error ? deps.errorJson(out.error, out.status || 400, headers, request) : deps.json(out, 200, headers);
     } catch (error) {
       return deps.errorJson(error?.message === 'wallet busy, try again' ? 'ECO_BUSY' : 'ADMIN_FAILED', 500, headers, request);
