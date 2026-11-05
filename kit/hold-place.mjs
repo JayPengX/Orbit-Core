@@ -198,6 +198,16 @@ function place(s, want) {
 // (Each scroller by itself: a chip row centring its chip sideways at every
 // refresh is no scroll of the page or sheet it sits in.)
 const CODE_MS = 120;
+// Safari's own move of a scroller comes within this of a redraw in it; one
+// nobody made again within AGAIN_MS of the keeper's put-back, or with no
+// redraw before it, is the scroll bar dragged, and the bar's next grab
+// within BAR_MS of its last move is the bar's too.
+const REDRAWN_MS = 1500;
+const AGAIN_MS = 400;
+const BAR_MS = 2000;
+const drawnAt = new WeakMap();
+const putBackAt = new WeakMap();
+const barAt = new WeakMap();
 let anyAt = 0;
 const codeAt = new WeakMap();
 const codeScrolled = s => Date.now() - Math.max(anyAt, codeAt.get(s) || 0) < CODE_MS;
@@ -374,9 +384,25 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
       // to the top a moment after its refresh, Jay 2026-11-05): the place put
       // back at once. A scroll is someone's when it starts with a finger, a
       // wheel, a key or the code (a fling runs on from there).
-      const quiet = Date.now() - lastScroll > SCROLL_IDLE_MS;
-      if (quiet || !chains.has(s)) chains.set(s, theirs() || touching > 0 || codeScrolled(s));
-      if (st && !chains.get(s) && !settle.has(s)) return restore(s);
+      //
+      // But the scroll bar dragged (iOS's scroll indicator, grabbed at the
+      // right edge) moves the page with no finger the page hears either:
+      // put back at every frame, it flickered up and down until let go (Jay
+      // 2026-11-05). Safari's own move comes just after a redraw, once; so a
+      // move with no redraw just before it, or one again straight after the
+      // keeper put the place back, is the person's: the bar's drag, its
+      // chain theirs, and its next grab too while it's still in hand.
+      const now = Date.now();
+      const quiet = now - lastScroll > SCROLL_IDLE_MS;
+      if (quiet || !chains.has(s)) chains.set(s, theirs() || touching > 0 || codeScrolled(s) || (now - (barAt.get(s) || 0) < BAR_MS && 'bar'));
+      if (st && !chains.get(s) && !settle.has(s)) {
+        if (now - (drawnAt.get(s) || 0) < REDRAWN_MS && now - (putBackAt.get(s) || 0) > AGAIN_MS) {
+          putBackAt.set(s, now);
+          return restore(s);
+        }
+        chains.set(s, 'bar');
+      }
+      if (chains.get(s) === 'bar') barAt.set(s, now);
       // (The code's own jump, no finger: held from where it landed at once,
       // not once it settles; a redraw just after it is kept too.)
       if (!theirs() && !touching && codeScrolled(s)) {
@@ -405,6 +431,8 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
     const t = tapLive() ? tap : null;
     if (t && !settle.has(t.s) && touched(t.s, list)) keepTap(t);
     if (!held.size) return;
+    // (When each held scroller was last drawn in: Safari's own move follows that.)
+    for (const s of held.keys()) touched(s, list) && drawnAt.set(s, Date.now());
     if (theirs() || touching) {
       for (const s of held.keys()) (t && s === t.s) || settle.has(s) || (s.isConnected ? anchor(s) : held.delete(s));
       return;

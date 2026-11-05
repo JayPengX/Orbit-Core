@@ -13,7 +13,16 @@
 //     page left short: a segment with less in it) or what's above it — the
 //     button stays under the finger;
 //   shrank (a sheet): a sheet sized to its content shows less (a day with
-//     fewer rows) — it keeps its height while open.
+//     fewer rows) — it keeps its height while open;
+//   bar: the scroll bar dragged (iOS's scroll indicator, grabbed at the
+//     right edge and pulled: the page moves with no finger, wheel or code
+//     the page hears), down and back up, held still a moment between, a
+//     live redraw just before each grab — it goes where it's dragged, never
+//     put back frame after frame (Jay 2026-11-05: "it flicker badly up and
+//     down rapidly until I release it"). At most one frame a grab may be
+//     put back: right after a redraw, Safari's own move of the page looks
+//     the same as a grab's first frame. And Safari's own move (once, just
+//     after a redraw, nobody's) is still put back.
 // And before any of that, as each loads, untouched:
 //   late: the page once its loading screen lifts, and a sheet once open —
 //     nothing drawn on screen moves on its own while the rest is read (a
@@ -441,6 +450,59 @@ async function taps(page, inSheet) {
   return out;
 }
 
+// In the page: the scroll bar dragged. The browser's own move, with no
+// finger, wheel or code the keeper hears: the scrollTop setter as it was
+// before the kit noted it (__rawTop, put there before the page loads).
+const bar = async inSheet => {
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const se = inSheet ? [...document.querySelectorAll('dialog[open]')].pop() : document.scrollingElement;
+  if (!se) return { skipped: 'no sheet open' };
+  const room = se.scrollHeight - se.clientHeight;
+  if (room < 400) return { skipped: `too short to scroll (${room}px)` };
+  const host = inSheet ? se : document.querySelector('[id^=panel-]:not([hidden]), main, #app') || document.body;
+  // A live redraw in what's scrolled (a score, a clock).
+  const redraw = async () => {
+    const n = document.createElement('div');
+    host.append(n);
+    await frame();
+    n.remove();
+  };
+  await wait(1200);
+  const lo = 60;
+  const hi = Math.min(room - 40, lo + 1400);
+  const grabs = [[], []];
+  for (let i = 0; i <= 30; i++) grabs[0].push(Math.round(lo + ((hi - lo) * i) / 30));
+  for (let i = 0; i <= 30; i++) grabs[1].push(Math.round(hi - ((hi - lo) * i) / 30));
+  const out = { frames: 0, putBack: 0, worst: 0, grabs: [] };
+  // First Safari's own move, once, just after a redraw (a live game's page
+  // sent up, 2026-11-05): that one is still put back.
+  se.scrollTop = hi;
+  await wait(2500);
+  const at = Math.round(se.scrollTop);
+  await redraw();
+  globalThis.__rawTop(se, lo);
+  await wait(300);
+  out.own = Math.round(se.scrollTop) - at;
+  await wait(1200);
+  for (const path of grabs) {
+    await redraw();
+    let back = 0;
+    for (const want of path) {
+      globalThis.__rawTop(se, want);
+      await frame();
+      const off = Math.round(se.scrollTop - Math.min(want, se.scrollHeight - se.clientHeight));
+      out.frames++;
+      if (Math.abs(off) > 2) back++, (out.worst = Math.max(out.worst, Math.abs(off)));
+    }
+    out.grabs.push(back);
+    out.putBack += back;
+    // (Held still, the finger still on the bar, then pulled back up.)
+    await wait(700);
+  }
+  return out;
+};
+
 let faults = 0;
 for (const app of list) {
   const port = 8300 + Math.floor(Math.random() * 500);
@@ -465,6 +527,11 @@ for (const app of list) {
     // Safari's way: no scroll anchoring anywhere.
     await page.addInitScript(() => document.addEventListener('DOMContentLoaded', () => document.head.append(Object.assign(document.createElement('style'), { textContent: '*{overflow-anchor:none!important}' }))));
     if (without) await page.addInitScript(() => (globalThis.__orbitHoldPlace = true));
+    // (The browser's own scroll, for the scroll bar's drag: the setter before the kit notes it.)
+    await page.addInitScript(() => {
+      const d = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
+      globalThis.__rawTop = (s, v) => d.set.call(s, v);
+    });
     // A phone's link, not the cloud's: each read through the data proxy
     // answers a round trip later, and more for how much it carries (a batch
     // of 24 leagues' pages lands after one of 6), so a part read alongside
@@ -495,7 +562,7 @@ for (const app of list) {
       if (liveOnly) continue;
     } else if (liveOnly) continue;
     const pageLate = await page.evaluate(late, [false, LATE_MS, ROWS[app]]);
-    const results = { page: { late: pageLate, ...(await page.evaluate(check, false)), tap: await taps(page, false) } };
+    const results = { page: { late: pageLate, ...(await page.evaluate(check, false)), tap: await taps(page, false), bar: await page.evaluate(bar, false) } };
     for (const [name, js] of daysOf(app)) {
       await page.evaluate(js);
       results[name] = { late: await page.evaluate(late, [false, LATE_MS, ROWS[app]]), skipped: 'a day picked on the strip' };
@@ -503,13 +570,14 @@ for (const app of list) {
     for (const [name, js] of sheetsOf(app)) {
       await page.evaluate(js);
       const sheetLate = await page.evaluate(late, [true, LATE_MS]);
-      results[name] = { late: sheetLate, ...(await page.evaluate(check, true)), tap: await taps(page, true) };
+      results[name] = { late: sheetLate, ...(await page.evaluate(check, true)), tap: await taps(page, true), bar: await page.evaluate(bar, true) };
     }
     for (const [where, r] of Object.entries(results)) {
       const t = r.tap || {};
-      const bad = (!r.skipped && (Math.abs(r.moved) > 2 || Math.abs(r.jumped) > 40 || r.drawing > 2 || Math.abs(t.below ?? 0) > 2 || Math.abs(t.above ?? 0) > 2)) || r.shrank > 2 || r.late.length > 0;
+      const b = r.bar && !r.bar.skipped ? r.bar : null;
+      const bad = (b && (b.grabs.some(n => n > 1) || Math.abs(b.own) > 2)) || (!r.skipped && (Math.abs(r.moved) > 2 || Math.abs(r.jumped) > 40 || r.drawing > 2 || Math.abs(t.below ?? 0) > 2 || Math.abs(t.above ?? 0) > 2)) || r.shrank > 2 || r.late.length > 0;
       if (bad) faults++;
-      const said = [`what was read moved ${r.moved}px`, `the page jumped ${r.jumped}px`, `a moving drawing pulled it ${r.drawing}px`, t.below != null ? `a tap folding below moved the button ${t.below}px` : '', t.above != null ? `folding above ${t.above}px` : '', r.shrank != null ? `the sheet shrank ${r.shrank}px` : ''];
+      const said = [`what was read moved ${r.moved}px`, `the page jumped ${r.jumped}px`, `a moving drawing pulled it ${r.drawing}px`, t.below != null ? `a tap folding below moved the button ${t.below}px` : '', t.above != null ? `folding above ${t.above}px` : '', r.shrank != null ? `the sheet shrank ${r.shrank}px` : '', b ? `Safari's own move left it ${b.own}px off, the scroll bar dragged: put back ${b.putBack} of ${b.frames} frames${b.putBack ? ` (up to ${b.worst}px)` : ''}` : ''];
       const lateSaid = r.late.length ? `moved as it loaded: ${[...new Set(r.late)].slice(0, 6).join('; ')}` : 'nothing moved as it loaded';
       console.log(`${bad ? '✗' : '✓'} ${app} ${where}: ${lateSaid}, ${r.drawingLost ? '(drawing lost) ' : ''}${r.skipped ? [r.skipped, r.shrank != null ? `the sheet shrank ${r.shrank}px` : ''].filter(Boolean).join(', ') : said.filter(Boolean).join(', ')}`);
     }
