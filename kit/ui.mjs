@@ -255,9 +255,18 @@ export function daySwipe(panel, step) {
     return null;
   };
   const canScroll = (n, dx) => (dx < 0 ? n.scrollLeft + n.clientWidth < n.scrollWidth - 2 : n.scrollLeft > 2);
-  const settle = () => {
+  // Let go: the page goes back under the finger's drag the same way every
+  // time, gliding home (`back`: a swipe too short, or nothing beside), never
+  // snapping (Jay 2026-11-05, Weather: "swipe animation is inconsistent").
+  const settle = (back = false) => {
+    if (back && panel.classList.contains('swiping') && !reduced()) {
+      panel.classList.add('swipe-back');
+      clearTimeout(panel.backTimer);
+      panel.backTimer = setTimeout(() => panel.classList.remove('swipe-back'), SWIPE_BACK_MS + 40);
+    }
     panel.classList.remove('swiping');
     panel.style.removeProperty('--swipe');
+    panel.style.removeProperty('--swipe-fade');
   };
   panel.addEventListener('touchstart', ev => {
     // (Not under a sheet: one open over the page has the finger; a panel inside that sheet swipes.)
@@ -272,25 +281,74 @@ export function daySwipe(panel, step) {
     if (start.lock == null && Math.hypot(dx, dy) > 10) start.lock = Math.abs(dx) > Math.abs(dy) * 1.3 && !(start.box && canScroll(start.box, dx)) ? 'x' : 'y';
     if (start.lock !== 'x') return;
     ev.preventDefault();
+    // (A slide still running lets go of the page: the finger has it now.)
+    if (!panel.classList.contains('swiping')) stopSlide(panel);
+    panel.classList.remove('swipe-back');
     panel.classList.add('swiping');
     panel.style.setProperty('--swipe', `${Math.round(dx * 0.45)}px`);
+    // (Fading as it goes, never a step down the moment the drag starts.)
+    panel.style.setProperty('--swipe-fade', String(Math.round((1 - Math.min(Math.abs(dx) / 600, 0.2)) * 100) / 100));
   }, { passive: false });
   panel.addEventListener('touchend', ev => {
     const s = start;
     start = null;
-    if (!s || s.lock !== 'x') return settle();
+    if (!s || s.lock !== 'x') return settle(true);
     const dx = (ev.changedTouches?.[0]?.clientX ?? s.x) - s.x;
     const fast = Math.abs(dx) > 30 && Date.now() - s.at < 250;
     const dir = Math.abs(dx) > 70 || fast ? (dx < 0 ? 1 : -1) : 0;
+    // (Drawn while the drag still holds it, in the same moment: nothing painted between.)
+    if (!dir || !step(dir)) return settle(true);
     settle();
-    if (!dir || !step(dir)) return;
+    slideIn(panel, dir);
+  }, { passive: true });
+  panel.addEventListener('touchcancel', () => ((start = null), settle(true)), { passive: true });
+}
+// The new day or place comes in from the side the finger sent it, the same
+// slide every time: started on the parts drawn by step(); a part drawn again
+// while it runs (an answer landing) carries on from the same moment instead
+// of starting over, and parts drawn after it stand still.
+export const SWIPE_IN_MS = 280;
+export const SWIPE_BACK_MS = 240;
+const DAY_STILL = '.q-day-bar, .q-sheet-head, .q-day-still';
+function stopSlide(panel) {
+  panel.slideStop?.();
+  for (const a of panel.slides || []) a.cancel?.();
+  panel.slides = [];
+}
+function slideIn(panel, dir) {
+  stopSlide(panel);
+  if (reduced()) return;
+  // (No Web Animations: the old way, by class.)
+  if (typeof panel.animate !== 'function') {
     panel.classList.remove('day-in-next', 'day-in-prev');
     void panel.offsetWidth;
     panel.classList.add(dir > 0 ? 'day-in-next' : 'day-in-prev');
     clearTimeout(panel.swipeTimer);
-    panel.swipeTimer = setTimeout(() => panel.classList.remove('day-in-next', 'day-in-prev'), 320);
-  }, { passive: true });
-  panel.addEventListener('touchcancel', () => ((start = null), settle()), { passive: true });
+    panel.swipeTimer = setTimeout(() => panel.classList.remove('day-in-next', 'day-in-prev'), SWIPE_IN_MS + 40);
+    return;
+  }
+  const frames = [{ transform: `translateX(${dir * 36}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }];
+  const t0 = globalThis.performance?.now?.() ?? Date.now();
+  const go = (el, done = 0) => {
+    if (el.nodeType !== 1 || el.matches?.(DAY_STILL)) return;
+    const a = el.animate(frames, { duration: SWIPE_IN_MS, delay: -done, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+    panel.slides.push(a);
+  };
+  for (const el of [...panel.children]) go(el);
+  const watch = typeof MutationObserver === 'function'
+    ? new MutationObserver(list => {
+        const done = (globalThis.performance?.now?.() ?? Date.now()) - t0;
+        if (done >= SWIPE_IN_MS) return panel.slideStop?.();
+        for (const m of list) for (const n of m.addedNodes) if (n.parentNode === panel) go(n, done);
+      })
+    : null;
+  watch?.observe(panel, { childList: true });
+  const timer = setTimeout(() => panel.slideStop?.(), SWIPE_IN_MS + 40);
+  panel.slideStop = () => {
+    watch?.disconnect();
+    clearTimeout(timer);
+    panel.slideStop = null;
+  };
 }
 // A day bar stuck under the status bar takes the page's colour (.stuck); at
 // rest it has none. Every .q-day-bar, nothing to call.
