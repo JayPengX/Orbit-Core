@@ -210,16 +210,32 @@ export function accountOf(key) {
   const f = join(CORE, 'tools/shots/accounts', `${a.account}.txt`);
   return existsSync(f) ? readFileSync(f, 'utf8') : '';
 }
+// The Pass as the Worker keeps it (eco.js), as far as an app's sync can
+// tell: the app's data has a version (updateTime) and a read `since` it
+// answers `unchanged`; a write over another version (`base`) is refused; the
+// wallet's settings are merged, newest wins per key. (Without these, an app
+// that writes "when the Pass's copy differs" wrote at every opening here,
+// as it never does live.)
 function ecoAnswer(dev, body, method, url) {
   const now = Date.now();
   dev.wallet ||= { v: 1, created: now - 120 * 86_400_000, entries: [{ id: 'eco:start', t: now - 120 * 86_400_000, app: 'eco', kind: 'start', amount: 200000 }], snap: {}, settings: {}, apps: { [dev.appId]: { first: now - 60 * 86_400_000, last: now - 86_400_000 } }, inbox: {} };
-  if (body?.op === 'write' && typeof body.payload === 'string') dev.payload = body.payload;
+  dev.payloadAt ??= dev.payload ? 'v0' : '';
   // (SPEED_ECO=1: what each Pass call carried, to see why an app writes.)
-  if (process.env.SPEED_ECO) console.log(`  eco ${dev.app} ${dev.sideName} ${method} ${body?.op || url.search} ${body ? Object.entries(body).filter(([k]) => !['qt', 'refresh'].includes(k)).map(([k, v]) => `${k}=${typeof v === 'string' ? v.length > 40 ? `${v.length}ch` : v : JSON.stringify(v)?.slice(0, 160)}`).join(' ') : ''}`);
+  if (process.env.SPEED_ECO) console.log(`  eco ${dev.app} ${dev.sideName} ${method} ${body?.op || url.search} ${body ? Object.entries(body).filter(([k]) => !['qt', 'refresh'].includes(k)).map(([k, v]) => `${k}=${typeof v === 'string' ? (v.length > 40 ? `${v.length}ch` : v) : JSON.stringify(v)?.slice(0, 160)}`).join(' ') : ''}`);
   const reply = { token: 'preview', wallet: dev.wallet, active: true, live: { app: dev.appId } };
-  if (method === 'POST' && ['refresh', 'login', 'redeem'].includes(body?.op)) Object.assign(reply, { payload: dev.payload ?? '', inbox: [] });
-  if (method === 'GET' && url.searchParams.get('app')) Object.assign(reply, { payload: dev.payload ?? '', inbox: [] });
-  return reply;
+  if (body?.op === 'write') {
+    if (typeof body.payload === 'string') {
+      if (body.base && body.base !== dev.payloadAt) return { status: 409, body: { error: { code: 'ECO_DATA_CHANGED', message: 'ECO_DATA_CHANGED' }, updateTime: dev.payloadAt } };
+      dev.payload = body.payload;
+      dev.payloadAt = `v${(dev.writes = (dev.writes || 0) + 1)}`;
+      reply.updateTime = dev.payloadAt;
+    }
+    for (const [k, v] of Object.entries(body.wallet?.settings || {})) if (!(dev.wallet.settings[k]?.t > v?.t)) dev.wallet.settings[k] = v;
+  }
+  const data = since => (since && since === dev.payloadAt ? { unchanged: true, updateTime: dev.payloadAt, inbox: [] } : { payload: dev.payload ?? '', updateTime: dev.payloadAt, inbox: [] });
+  if (method === 'POST' && ['refresh', 'login', 'redeem'].includes(body?.op)) Object.assign(reply, data(body.since));
+  if (method === 'GET' && url.searchParams.get('app')) Object.assign(reply, data(url.searchParams.get('since')));
+  return { status: 200, body: reply };
 }
 
 // The API's routes that would spend (Gemini) or need a real Pass: never asked live.
@@ -262,7 +278,8 @@ export function siteHandler({ rec }) {
           try {
             body = req.body.length ? JSON.parse(req.body.toString()) : null;
           } catch {}
-          return { ...json(200, ecoAnswer(dev, body, method, url)), route: `/eco ${body?.op || (url.searchParams.get('app') ? 'read' : method.toLowerCase())}`, serverMs: 25 };
+          const answer = ecoAnswer(dev, body, method, url);
+          return { ...json(answer.status, answer.body), route: `/eco ${body?.op || (url.searchParams.get('app') ? 'read' : method.toLowerCase())}`, serverMs: 25 };
         }
         if (route.startsWith('/push')) return { ...json(200, route === '/push/key' ? { key: 'BJAq2pf1eAmgD3fRzfyXE5dXeDlg2qUZDyIzQ-1SHCNkWr3UQvUtaHgtZ1eQPMl00SAGgejtNE5jkRQCS2Zi6lE' } : { ok: true }), route: '/push' };
         if (NEVER.test(route)) return { ...json(503, { error: 'not in speed runs' }), route: route.split('/').slice(0, 2).join('/') };
