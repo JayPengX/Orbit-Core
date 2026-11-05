@@ -342,14 +342,8 @@ test('/weather?lines=1 to a phone that takes gzip: the same two lines, gzipped, 
   assert.equal(lines[0].more, true);
   assert.ok(!lines[1].more && lines[1].air.hourly.length === 96);
   // The first part alone holds the whole first line.
-  const { createGunzip } = await import('node:zlib');
-  const un = createGunzip();
-  const got = [];
-  un.on('data', d => got.push(d));
-  un.write(parts[0]);
-  await new Promise(done => setTimeout(done, 20));
-  assert.deepEqual(JSON.parse(Buffer.concat(got).toString()), lines[0]);
-  un.destroy();
+  const { constants } = await import('node:zlib');
+  assert.deepEqual(JSON.parse(gunzipSync(parts[0], { finishFlush: constants.Z_SYNC_FLUSH }).toString()), lines[0]);
   await Promise.all(waits);
 });
 
