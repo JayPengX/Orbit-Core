@@ -4793,7 +4793,8 @@ watchNet();
 export function keepOffline(path = './sw.js') {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator) || !globalThis.isSecureContext) return;
   const tell = reg => {
-    const urls = [location.href.split('#')[0], ...performance.getEntriesByType('resource').map(e => e.name)].filter(u => u.startsWith(location.origin) && !/version\.json/.test(u));
+    // (The app's own files only: never its reads through /api/, which the worker would download again for nothing.)
+    const urls = [location.href.split('#')[0], ...performance.getEntriesByType('resource').map(e => e.name)].filter(u => u.startsWith(location.origin) && !u.startsWith(`${location.origin}/api/`) && !/version\.json/.test(u));
     reg?.active?.postMessage({ type: 'cache', urls });
   };
   navigator.serviceWorker
