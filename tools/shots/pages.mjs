@@ -106,6 +106,9 @@ export const PAGES = {
     // A soccer game at half-time today (賽事 · 全部): its row's 中場休息 countdown, then its page's header (only while one is on).
     'halftime-list': { args: click('#tab-matches', wait(4000), "js:[...document.querySelectorAll('.event-row')].find(e=>e.offsetParent&&/中場休息|Half-time/.test(e.textContent))?.scrollIntoView({block:'center'})", wait(4000)) },
     'halftime-game': { args: click('#tab-matches', wait(4000), "js:[...document.querySelectorAll('.event-row')].find(e=>e.offsetParent&&/中場休息|Half-time/.test(e.textContent))?.click()", wait(8000)) },
+    // A basketball game in a timeout today (賽事 · 全部): its row's period and clock, then 暫停 and its countdown; then its page's header (the game clock, each side's timeouts left); timeout-game opens a basketball game on now when none is in a timeout.
+    'timeout-list': { args: click('#tab-matches', wait(4000), "js:[...document.querySelectorAll('.event-row')].find(e=>e.offsetParent&&/暫停|Timeout/.test(e.textContent))?.scrollIntoView({block:'center'})", wait(3000)) },
+    'timeout-game': { args: click('#tab-matches', wait(4000), "js:(r=>(r.find(e=>/暫停|Timeout/.test(e.textContent))||r.find(e=>/第\\d節|Q\\d/.test(e.textContent)))?.click())([...document.querySelectorAll('.event-row')].filter(e=>e.offsetParent))", wait(7000)) },
     'f1-weekend': { args: click('#tab-matches', '[data-league=f1]', tap('Ended|已結束'), "js:document.querySelector('.wk-card.done')?.click()", wait(4000)) },
     // F1's 賽程, 已結束: each weekend over, its race's winner.
     'f1-past': { args: click('#tab-matches', '[data-league=f1]', tap('Ended|已結束'), wait(3000)) },
