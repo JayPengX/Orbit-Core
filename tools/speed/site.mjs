@@ -10,8 +10,8 @@
 // (tools/shots/accounts); nothing paid is ever asked (Gemini's routes answer
 // 503 here).
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, statSync, appendFileSync, symlinkSync } from 'node:fs';
-import { join, extname } from 'node:path';
+import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync, statSync, appendFileSync, symlinkSync } from 'node:fs';
+import { dirname, join, extname, relative } from 'node:path';
 import { brotliCompressSync, constants as Z } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
@@ -59,7 +59,14 @@ function take(repo, ref, paths, to) {
 
 // One side (`name`): the kit and every app asked for, built as deployed, into `dir`.
 // `ref`: a git ref for every repo (each its own), or 'work'; `refs`: per repo.
-export async function buildSide({ name, ref = 'work', refs = {}, apps, dir }) {
+// `next`: the same code with a push's worth of change (a line added to the
+// kit's orbit.mjs and to each app's entry module), the deploy an open app
+// updates to in the update step.
+const NEXT = '\n;globalThis.__speedNext = 1;\n';
+export async function buildSide({ name, ref = 'work', refs = {}, apps, dir: final, next = false }) {
+  // (Every side built in one folder, then moved: the deploys build in the same
+  // place each time, and a file's address must not change with where it was built.)
+  const dir = join(dirname(final), 'stage');
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   const at = repo => refs[repo] || ref;
@@ -69,10 +76,13 @@ export async function buildSide({ name, ref = 'work', refs = {}, apps, dir }) {
   // How this side's proxy sends an answer a line at a time (http.js lineAnswer: gzipped, each line
   // flushed, from 2026-11-05; before that as it was): the recorded lines are sent as it would.
   made.gzipLines = existsSync(join(dir, 'Orbit-Core/http.js')) ? (await import(pathToFileURL(join(dir, 'Orbit-Core/http.js')).href + `?${name}`)).gzipLines || null : null;
+  if (next) appendFileSync(join(dir, 'Orbit-Core/kit/orbit.mjs'), NEXT);
   sh(process.execPath, [join(dir, 'Orbit-Core/kit/stamp.mjs'), join(dir, 'kit-out'), `speed-${name}`]);
   const kitVersion = JSON.parse(readFileSync(join(dir, 'kit-out/kit/version.json'), 'utf8'));
   made.kit = { version: kitVersion.version, files: kitVersion.files };
-  const { stampApp } = await import(pathToFileURL(join(dir, 'Orbit-Core/kit/stamp-app.mjs')).href + `?${name}`);
+  // (In its own process: every side is built in the same folder, and a module imported once is
+  // that one for good, its own imports (hash.mjs) too.)
+  const stampApp = opts => sh(process.execPath, ['--input-type=module', '-e', `const { stampApp } = await import(${JSON.stringify(pathToFileURL(join(dir, 'Orbit-Core/kit/stamp-app.mjs')).href)}); await stampApp(JSON.parse(process.argv[1]));`, JSON.stringify(opts)]);
   for (const key of apps) {
     const a = APPS[key];
     const to = join(dir, a.repo);
@@ -88,10 +98,18 @@ export async function buildSide({ name, ref = 'work', refs = {}, apps, dir }) {
       continue;
     }
     const sha = take(a.repo, at(a.repo), ['public'], to);
-    await stampApp({ root: join(to, 'public'), version: `speed-${name}-${sha}`, kitDir: join(dir, 'Orbit-Core/kit'), kit: made.kit });
+    if (next) {
+      const entry = /<script type="module" src="\.\/([^"?]+)"/.exec(readFileSync(join(to, 'public/index.html'), 'utf8'))?.[1];
+      if (entry) appendFileSync(join(to, 'public', entry), NEXT);
+    }
+    stampApp({ root: join(to, 'public'), version: `speed-${name}-${sha}`, kitDir: join(dir, 'Orbit-Core/kit'), kit: made.kit });
     made.apps[key] = { site: join(to, 'public'), sha };
   }
-  writeFileSync(join(dir, 'side.json'), JSON.stringify(made, null, 1));
+  rmSync(final, { recursive: true, force: true });
+  renameSync(dir, final);
+  made.dir = final;
+  for (const a of Object.values(made.apps)) a.site = join(final, relative(dir, a.site));
+  writeFileSync(join(final, 'side.json'), JSON.stringify(made, null, 1));
   return made;
 }
 

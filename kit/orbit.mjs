@@ -3560,7 +3560,8 @@ async function kitLatest() {
   const kit = KIT();
   if (!kit?.base) return null;
   try {
-    const res = await fetch(`${kit.base}version.json?t=${Date.now()}`, { cache: 'no-store' });
+    // (Asked of the server every time, as the watch's own: a 304 when nothing changed.)
+    const res = await fetch(`${kit.base}version.json`, { cache: 'no-cache' });
     const got = res.ok ? await res.json() : null;
     const latest = got?.version;
     if (!latest) return null;
@@ -3728,7 +3729,11 @@ export function watchUpdates({ current, key, every = 15_000 } = {}) {
     checking = true;
     lastAt = Date.now();
     try {
-      const [res, kitNew] = await Promise.all([fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' }), kitLatest()]);
+      // (Checked with the server each time, never a copy the browser kept,
+      // and answered "not changed" (a 304, no body) when it's the same: each
+      // check downloaded both files whole, the kit's every hash among them,
+      // about 1 KB every 15 s while an app was open, 270 KB an hour.)
+      const [res, kitNew] = await Promise.all([fetch('./version.json', { cache: 'no-cache' }), kitLatest()]);
       const appNew = res.ok ? (await res.json())?.version : null;
       const latest = appNew && appNew !== current ? appNew : kitNew;
       if (!latest) return;
