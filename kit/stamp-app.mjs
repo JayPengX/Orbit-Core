@@ -41,6 +41,12 @@ async function files(dir) {
 // module imported unstamped by one file and stamped by another is two
 // modules, each with its own state.)
 const LOCAL = /((?:from|import\(|\bimport|src=|href=|new URL\()\s*['"])(\.{1,2}\/[^'"?]+\.(?:m?js|css))(['"])/g;
+// A data file read as written, fetch('./data/x.json') (from a file beside the
+// page: fetch goes by the page's address) or new URL('./x.json',
+// import.meta.url): stamped with its own hash too, so a deploy that didn't
+// change it leaves the phone's copy as it is (Words' word lists, 466 KB, took
+// the build's version and were downloaded again after every deploy, 2026-11-05).
+const DATA = /((?:fetch\(|new URL\()\s*['"])(\.{1,2}\/[^'"?]+\.json)(['"])/g;
 // The page's static import graph (read before minifying, as written).
 const STATIC = /(?:^|[\s;])(?:import|export)\s[^'"]*?from\s*['"](\.{1,2}\/[^'"?]+)['"]|(?:^|[\s;])import\s*['"](\.{1,2}\/[^'"?]+)['"]/g;
 async function graph(file, seen = new Set()) {
@@ -74,8 +80,16 @@ export async function stampApp({ root, version, kitDir, minify = true, kit = und
 
   const texts = new Map();
   for (const path of await files(root)) texts.set(path, await readFile(path, 'utf8'));
+  // The data files read so (only those: Law's 60 MB of data is read by addresses made as it goes).
+  for (const [path, text] of [...texts]) for (const m of text.matchAll(DATA)) {
+    const target = join(dirname(path), m[2]);
+    if (!texts.has(target)) {
+      const data = await readFile(target, 'utf8').catch(() => null);
+      if (data != null) texts.set(target, data);
+    }
+  }
   const refs = (text, path) =>
-    [...text.matchAll(LOCAL)].map(m => ({ start: m.index, end: m.index + m[1].length + m[2].length, target: join(dirname(path), m[2]) }));
+    [...text.matchAll(LOCAL), ...(path.endsWith('.json') ? [] : text.matchAll(DATA))].map(m => ({ start: m.index, end: m.index + m[1].length + m[2].length, target: join(dirname(path), m[2]) }));
   // (The pages themselves aren't minified (kit/hash.mjs): only what they load.)
   const { files: stamped, hashes } = await hashFiles(texts, { refs, minify });
   for (const [path, text] of stamped) if (text !== texts.get(path)) await writeFile(path, text);

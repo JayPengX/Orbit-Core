@@ -2517,12 +2517,18 @@ export function warmPass() {
   passing ||= import('./pass.mjs').catch(e => ((passing = null), Promise.reject(e)));
   return passing;
 }
+// Not before the first screen is up (the loading cover gone), and the
+// guides (help.mjs, 38 KB) only once the sheet is opened: fetched while the
+// app sat idle 4 s in, they took a second of a 3G link from the first
+// screen's own reads in every app (tools/speed.mjs, 2026-11-05).
 let passWarmed = false;
 function warmPassLater() {
   if (passWarmed) return;
   passWarmed = true;
   const idle = f => (globalThis.requestIdleCallback ? globalThis.requestIdleCallback(f, { timeout: 4000 }) : setTimeout(f, 2000));
-  idle(() => warmPass().then(m => idle(() => m.loadHelp?.().catch(() => {}))).catch(() => {}));
+  const up = () => !globalThis.document?.getElementById('loading') || document.getElementById('loading').hidden;
+  const when = () => (up() ? idle(() => warmPass().catch(() => {})) : setTimeout(when, 1000));
+  setTimeout(when, 1000);
 }
 export async function accountSheet(s, { extra = null, tab = 'pass', help = null } = {}) {
   const { openPass } = await warmPass();

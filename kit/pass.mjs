@@ -145,6 +145,8 @@ const svgUrl = svg => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg
 
 let open = null;
 export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
+  // The guides from the moment the sheet opens, ready for its 說明 tab.
+  loadHelp().catch(() => {});
   const locale = s.lang === 'en' ? 'en' : 'zh';
   const dict = STRINGS[locale];
   const t = (key, vars = {}) => String(dict[key] ?? STRINGS.zh[key] ?? key).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');

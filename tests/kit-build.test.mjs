@@ -58,6 +58,30 @@ test("an app's deploy: every reference stamped with its file's hash, the page's 
   assert.ok(page.includes(`./app.mjs?v=${servedHash(app)}`), "app.mjs's address is its served text's hash");
 });
 
+test("a data file read as written is stamped with its own hash: a deploy that didn't change it keeps the phone's copy", async () => {
+  const stamped = async words => {
+    const root = await mkdtemp(join(tmpdir(), 'stamp-data-'));
+    await mkdir(join(root, 'data'));
+    await mkdir(join(root, 'views'));
+    await writeFile(join(root, 'index.html'), `<meta name="build-version" content="dev"><script type="module" src="./app.mjs"></script></head>`);
+    await writeFile(join(root, 'app.mjs'), "const w = fetch('./data/words.json');\nconst m = new URL('./data/more.json', import.meta.url);\nconst made = name => fetch(`./data/${name}.json`);\n");
+    await writeFile(join(root, 'views/v.mjs'), "fetch('./data/words.json');\n");
+    await writeFile(join(root, 'data/words.json'), words);
+    await writeFile(join(root, 'data/more.json'), '{"m":1}');
+    await stampApp({ root, version: `build-${words.length}`, kit: null });
+    return { app: await readFile(join(root, 'app.mjs'), 'utf8'), view: await readFile(join(root, 'views/v.mjs'), 'utf8'), data: await readFile(join(root, 'data/words.json'), 'utf8') };
+  };
+  const one = await stamped('{"w":[1]}');
+  assert.ok(one.app.includes(`./data/words.json?v=${servedHash('{"w":[1]}')}`), one.app);
+  assert.ok(one.app.includes(`./data/more.json?v=${servedHash('{"m":1}')}`), one.app);
+  assert.ok(one.app.includes('`./data/${name}.json`'), 'an address made as it goes is left as it is');
+  assert.ok(!/\?v=/.test(one.view), "fetch from a file not beside the page: its address isn't the file's own");
+  assert.equal(one.data, '{"w":[1]}', 'the data itself as it was');
+  const two = await stamped('{"w":[1,2]}');
+  assert.ok(two.app.includes(`./data/words.json?v=${servedHash('{"w":[1,2]}')}`));
+  assert.ok(two.app.includes(`./data/more.json?v=${servedHash('{"m":1}')}`), 'the one unchanged keeps its address');
+});
+
 test("the built kit: minified, its files import each other through the map, every file's hash listed", async () => {
   const out = await mkdtemp(join(tmpdir(), 'kit-build-'));
   execFileSync(process.execPath, [new URL('../kit/stamp.mjs', import.meta.url).pathname, out, 'v1'], { stdio: 'ignore' });
