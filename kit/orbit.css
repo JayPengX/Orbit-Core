@@ -4164,9 +4164,10 @@ div.q-ritem {
   height: 56px;
   margin: 0 auto 14px;
   border-radius: 16px;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--t) 82%, #fff), var(--t) 60%);
   font-size: 0;
 }
+/* (Its colours are the tile's own: a background set here without the glyph's colour put
+   Native's tinted glyph on a full colour fill, washed out (Jay 2026-11-05, 換匯's ⇄).) */
 .q-ask.pro.danger .q-ask-icon.q-tile {
   --t: var(--q-red);
 }

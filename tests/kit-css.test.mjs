@@ -35,3 +35,13 @@ test('sheets never scroll sideways, and date fields fit their box', () => {
     assert.match(b, /max-width:\s*100%/, t);
   }
 });
+
+// An icon tile's fill and its glyph's colour are set together: a rule that
+// filled the dialog's tile but left the glyph to Native's tint drew an orange
+// ⇄ on an orange square, washed out (Jay 2026-11-05, Securities' 換匯).
+test('an icon tile never gets a fill without its glyph colour', () => {
+  for (const [, sel, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!sel.includes('.q-tile') || !/(^|;)\s*background(-color|-image)?\s*:/.test(body)) continue;
+    assert.match(body, /(^|;)\s*color\s*:/, `${sel.trim()} sets a fill, so it sets the glyph's colour too`);
+  }
+});
