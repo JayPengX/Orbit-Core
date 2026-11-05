@@ -240,6 +240,40 @@ export function tdxRequest(raw) {
   return { path, query: out.join('&'), rule };
 }
 
+// ---- A day's trains, as the phone reads them ------------------------------------------
+
+// A whole day's timetable (台鐵's: 4.4 MB, 900 trains; 高鐵's) keeps only
+// what Orbit Transit reads (its lib/rail.mjs traTrips and hsrTrips): each
+// train's number, type, headsign, line, note and bike flag, each stop's
+// station and times, names in Chinese and English. Stations' names, flags
+// and other languages go (台鐵's day 4.1 MB to 1.6 MB, 237 KB to 143 KB
+// sent), and so does a train 台鐵 says won't run (the phone drops it). Kept
+// so, in the cache too. (A new field read there is added here; Transit's
+// tests/rail-trim.test.mjs reads a real day both ways.)
+const DAY_TRA = /^basic\/v3\/Rail\/TRA\/DailyTrainTimetable\/TrainDate\//;
+const DAY_HSR = /^basic\/v2\/Rail\/THSR\/DailyTimetable\/TrainDate\//;
+const TRA_INFO = ['TrainNo', 'TrainDate', 'TrainTypeCode', 'TrainTypeName', 'TripHeadSign', 'EndingStationName', 'TripLine', 'Note', 'BikeFlag'];
+const HSR_INFO = ['TrainNo', 'EndingStationName', 'Note'];
+const named = v => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(['Zh_tw', 'En'].filter(k => v[k] != null).map(k => [k, v[k]])) : v);
+const pick = (o, keys) => Object.fromEntries(keys.filter(k => o?.[k] !== undefined).map(k => [k, named(o[k])]));
+const stopOf = s => ({ ...pick(s, ['StationID', 'ArrivalTime', 'DepartureTime']), ...(s?.SuspendedFlag === 1 ? { SuspendedFlag: 1 } : {}) });
+export function tdxTrim(path, text) {
+  const tra = DAY_TRA.test(path);
+  if (!tra && !DAY_HSR.test(path)) return text;
+  let j;
+  try {
+    j = JSON.parse(text);
+  } catch {
+    return text;
+  }
+  if (tra && Array.isArray(j?.TrainTimetables)) {
+    const trains = j.TrainTimetables.filter(t => t?.TrainInfo && t.TrainInfo.SuspendedFlag !== 1);
+    return JSON.stringify({ TrainDate: j.TrainDate, TrainTimetables: trains.map(t => ({ TrainInfo: pick(t.TrainInfo, TRA_INFO), StopTimes: (t.StopTimes || []).map(stopOf) })) });
+  }
+  if (!tra && Array.isArray(j)) return JSON.stringify(j.map(t => ({ TrainDate: t?.TrainDate, DailyTrainInfo: pick(t?.DailyTrainInfo || {}, HSR_INFO), StopTimes: (t?.StopTimes || []).map(stopOf) })));
+  return text;
+}
+
 // ---- Which buses are on the road ------------------------------------------------------
 
 // A city's estimates (TDX N1, every stop of every route) → { RouteUID: n }:
@@ -624,7 +658,7 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
         else await put;
       }
       if (!res.ok) return { status: res.status, state: 'error', why: (await res.text().catch(() => '')).slice(0, 160) };
-      const text = await res.text();
+      const text = tdxTrim(req.path, await res.text());
       const puts = [];
       if (cache) puts.push(cache.put(key, new Response(text, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'X-Fetched-At': String(now), 'Cache-Control': `public, max-age=${Math.ceil(keptFor(req.rule) / 1000)}` } })).catch(() => {}));
       if (keepWarm) puts.push(warmWrite(env, req, text, now));

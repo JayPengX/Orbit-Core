@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   tdxRequest, tdxGet, warmBikes, SLOW_MS, tdxAccess, resetTdxToken, resetPace, resetTurns, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
-  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta
+  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta, tdxTrim
 } from '../transit.js';
 
 const NOW = Date.parse('2026-10-03T01:00:00Z');
@@ -824,4 +824,36 @@ test('buses due: one TDX call for a whole city, every ask answered with its own 
   assert.equal((await tdxGet(env, path, { fetchFn, cache, now: NOW })).status, 502);
   assert.equal((await tdxGet(env, path, { fetchFn, cache, now: NOW + 60_000 })).status, 502);
   assert.equal(log.filter(u => u.includes('S2STravelTime')).length, 1, 'refused once, never asked again that day');
+});
+
+test("a day's trains keep only what the phone reads (台鐵's 4 MB day to 40%): each train's number, type, headsign, line, note and bike flag, each stop's station and times, names in Chinese and English; a train that won't run left out; kept so", async () => {
+  fresh();
+  const name = (zh, en) => ({ Zh_tw: zh, En: en, Ja: zh, Kr: '타이베이' });
+  const stop = (id, t, more = {}) => ({ StopSequence: 1, StationID: id, StationName: name('臺北', 'Taipei'), ArrivalTime: t, DepartureTime: t, SuspendedFlag: 0, ...more });
+  const train = (no, more = {}) => ({
+    TrainInfo: { TrainNo: no, Direction: 0, TrainTypeID: '1132', TrainTypeCode: '10', TrainTypeName: name('區間快', 'Fast Local Train'), TripHeadSign: '往七堵', StartingStationID: '5050', StartingStationName: name('潮州', 'Chaozhou'), EndingStationID: '0930', EndingStationName: name('七堵', 'Qidu'), TripLine: 2, WheelChairFlag: 0, BikeFlag: 1, DailyFlag: 1, SuspendedFlag: 0, ServiceType: 1, Note: '每日行駛。', ...more },
+    StopTimes: [stop('5050', '06:37'), stop('4400', '07:10', { SuspendedFlag: 1 }), stop('0930', '11:02')]
+  });
+  const tra = { UpdateTime: 'x', UpdateInterval: 1440, SrcUpdateTime: 'x', SrcUpdateInterval: 1440, TrainDate: '2026-11-05', TrainTimetables: [train('1006'), train('1008', { SuspendedFlag: 1 })] };
+  const path = 'basic/v3/Rail/TRA/DailyTrainTimetable/TrainDate/2026-11-05';
+  const lean = JSON.parse(tdxTrim(path, JSON.stringify(tra)));
+  assert.deepEqual(lean, {
+    TrainDate: '2026-11-05',
+    TrainTimetables: [{
+      TrainInfo: { TrainNo: '1006', TrainTypeCode: '10', TrainTypeName: { Zh_tw: '區間快', En: 'Fast Local Train' }, TripHeadSign: '往七堵', EndingStationName: { Zh_tw: '七堵', En: 'Qidu' }, TripLine: 2, Note: '每日行駛。', BikeFlag: 1 },
+      StopTimes: [{ StationID: '5050', ArrivalTime: '06:37', DepartureTime: '06:37' }, { StationID: '4400', ArrivalTime: '07:10', DepartureTime: '07:10', SuspendedFlag: 1 }, { StationID: '0930', ArrivalTime: '11:02', DepartureTime: '11:02' }]
+    }]
+  });
+  assert.equal(tdxTrim(path, JSON.stringify(lean)), JSON.stringify(lean), 'trimmed twice: the same');
+  const hsr = [{ TrainDate: '2026-11-05', DailyTrainInfo: { TrainNo: '0108', Direction: 1, StartingStationID: '1070', StartingStationName: name('左營', 'Zuoying'), EndingStationID: '0990', EndingStationName: { Zh_tw: '南港', En: 'Nangang', Ja: null, Ko: null }, Note: {}, Overnight: false }, StopTimes: [{ StopSequence: 1, StationID: '1070', StationName: name('左營', 'Zuoying'), DepartureTime: '07:55' }, { StopSequence: 2, StationID: '0990', StationName: name('南港', 'Nangang'), ArrivalTime: '09:40', DepartureTime: '09:40' }] }];
+  assert.deepEqual(JSON.parse(tdxTrim('basic/v2/Rail/THSR/DailyTimetable/TrainDate/2026-11-05', JSON.stringify(hsr))), [{ TrainDate: '2026-11-05', DailyTrainInfo: { TrainNo: '0108', EndingStationName: { Zh_tw: '南港', En: 'Nangang' }, Note: {} }, StopTimes: [{ StationID: '1070', DepartureTime: '07:55' }, { StationID: '0990', ArrivalTime: '09:40', DepartureTime: '09:40' }] }]);
+  // Anything else, or an answer not in TDX's shape, as it came.
+  for (const [p, t] of [['basic/v2/Bike/Availability/City/Hsinchu', '[{"a":1}]'], [path, 'not json'], [path, '{"Message":"x"}'], ['basic/v3/Rail/TRA/DailyTrainTimetable/OD/1000/to/1210/2026-11-05', JSON.stringify(tra)]]) assert.equal(tdxTrim(p, t), t);
+  // Through the shared cache: what's kept and sent is the trimmed day.
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 'secret', RATE_LIMIT_KV: memKv() };
+  const cache = memCache();
+  const fetchFn = async url => (url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : json(tra));
+  const got = await tdxGet(env, path, { fetchFn, cache, now: NOW });
+  assert.deepEqual(JSON.parse(got.body), lean);
+  assert.deepEqual(JSON.parse((await tdxGet(env, path, { fetchFn: () => assert.fail('cached'), cache, now: NOW + 1000 })).body), lean);
 });
