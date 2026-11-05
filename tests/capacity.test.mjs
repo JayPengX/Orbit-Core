@@ -92,7 +92,7 @@ test('quotas: people held = this week\'s × room after the fixed part ÷ what pe
   const capDay = (PLAN.cpuMs * 0.9) / days;
   assert.equal(cpu.measured, true);
   assert.equal(cpu.holds, Math.floor((40 * (capDay - 20_000 * 24)) / (10_000 * 16)));
-  assert.equal(cpu.slows, Math.floor((40 * ((PLAN.cpuMs * 0.6) / days - 20_000 * 24)) / (10_000 * 16)));
+  assert.equal(cpu.slows, undefined, 'nobody is slowed before the people held: the guard paces only a count that would reach the stop');
   // R2 (no hours): all of it counted as people's, from the period's pace.
   const r2 = q.rows.find(r => r.key === 'cf:r2ClassA');
   assert.equal(r2.measured, false);

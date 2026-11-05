@@ -8,7 +8,7 @@ import {
   airForecast, parseGoogleAir, googleAirBody,
   weatherStatus, handleWeather, scrub, cellOf, nearestStation, townIds, airArea, parseCwaTown, cwaAt, parseGoogleDay, parseGoogleHour,
   blend, buildCell, GOOGLE_DAILY_CALLS, parseVillage, whereIs, addAirReading, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, FRESH_WAIT_MS, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
-, popStep, keepJson, keptJson, KV_EVERY_MS, googleAllowed, googlePace, gridOf, keepPast } from '../weather.js';
+, popStep, keepJson, keptJson, KV_EVERY_MS, googleAllowed, googlePace, gridOf, keepPast, googleDayCap, googleToday, GOOGLE_MONTH_CALLS } from '../weather.js';
 import { STATIONS } from '../weather-stations.js';
 import { twDay } from '../kit/format.mjs';
 import { upstream as fixtureUpstream } from './fixtures/weather/upstream.mjs';
@@ -370,6 +370,22 @@ test("Google's extras keep to the day's pace; a forecast refresh may use the who
   kv.store.set('weather:google:2026-10-03', String(googlePace(morning)));
   assert.equal(await googleAllowed(e, morning, 1, null, true), false, 'an extra waits for the pace');
   assert.equal(await googleAllowed(e, morning, 4), true, 'a forecast still asked');
+});
+
+test("Google's free month: the day's whole cap until 70% of it is used, then what's left spread over the days left, never past it (the owner, 2026-11-05: a busy day early on slows nothing)", async () => {
+  assert.ok(GOOGLE_MONTH_CALLS + GOOGLE_DAILY_CALLS < 10_000, "a Pacific month (Taiwan's, 16 hours late) stays inside Google's free 10,000");
+  assert.equal(googleDayCap(0, 30), GOOGLE_DAILY_CALLS);
+  assert.equal(googleDayCap(5_000, 20), GOOGLE_DAILY_CALLS, 'a busy start: still the whole day');
+  assert.equal(googleDayCap(6_000, 10), 250, '2,500 left over 10 days');
+  assert.equal(googleDayCap(8_400, 1), 100);
+  assert.equal(googleDayCap(8_500, 3), 0);
+  const kv = memKv();
+  for (let d = 1; d <= 20; d++) kv.store.set(`weather:google:2026-10-${String(d).padStart(2, '0')}`, '300');
+  const noon = Date.parse('2026-10-21T04:00:00Z'); // noon in Taipei on the 21st
+  assert.deepEqual(await googleToday({ RATE_LIMIT_KV: kv }, noon), { before: 6_000, daysLeft: 11, cap: 227 });
+  kv.store.set('weather:google:2026-10-21', '226');
+  assert.equal(await googleAllowed({ RATE_LIMIT_KV: kv }, noon, 1), true);
+  assert.equal(await googleAllowed({ RATE_LIMIT_KV: kv }, noon, 1), false, "the day's share of what's left is spent");
 });
 
 test('the township list for the picker', async () => {

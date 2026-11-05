@@ -19,7 +19,7 @@ import { passAccount, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, 
 import { sendPush, dueLists } from './push.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, tdxPoints, tdxGuard, tdxUse } from './transit.js';
 import { aiUse } from './gemini-use.js';
-import { twDate, GOOGLE_DAILY_CALLS } from './weather.js';
+import { twDate, googleToday, GOOGLE_MONTH_CALLS } from './weather.js';
 import { cleanDev, DEV } from './kit/devconfig.mjs';
 import { BRANDS } from './kit/brand.mjs';
 import { SITE } from './kit/domain.mjs';
@@ -59,7 +59,7 @@ async function capacityNow(env, deps, base, inUse = base) {
   const guard = env.RATE_LIMIT_KV ? JSON.parse((await env.RATE_LIMIT_KV.get(GUARD_STATE).catch(() => null)) || 'null') : null;
   // The last 7 days hour by hour (the guard's /hours, kept an hour): the crons' floor apart from people's part.
   const hours = env.GUARD ? await env.GUARD.fetch('https://quota-guard/hours').then(r => r.json()).catch(() => null) : null;
-  return { ...capacityPlan({ users, base, inUse, usage, guard, hours: hours?.hours ? hours : null, now }), hours: hours && { at: hours.at, n: hours.hours?.length || 0, error: hours.error || null, off: !!hours.off }, guard: guard && { at: guard.at, armed: guard.armed, error: guard.error, stopAt: guard.stopAt, plan: guard.plan, use: guard.use, share: guard.share, projected: guard.projected, period: guard.period, cpuWay: guard.cpuWay, partial: guard.partial, stopped: guard.stopped ? { at: guard.stopped.at, why: guard.stopped.why } : null } };
+  return { ...capacityPlan({ users, base, inUse, usage, guard, hours: hours?.hours ? hours : null, now }), hours: hours && { at: hours.at, n: hours.hours?.length || 0, error: hours.error || null, off: !!hours.off }, guard: guard && { at: guard.at, armed: guard.armed, error: guard.error, stopAt: guard.stopAt, plan: guard.plan, use: guard.use, share: guard.share, projected: guard.projected, forecast: guard.forecast || null, pace: guard.pace || 0, period: guard.period, cpuWay: guard.cpuWay, partial: guard.partial, stopped: guard.stopped ? { at: guard.stopped.at, why: guard.stopped.why } : null } };
 }
 async function writeDev(env, deps, base, p) {
   const applied = base.autoScale && p ? cleanDev(p.applied) : base;
@@ -715,7 +715,7 @@ export const ADMIN_TOOLS = {
       google: use ? { day: use.googleDay, resets: use.googleResets, models: use.google } : null,
       // (The meter keeps errors too: the panel's 錯誤, not Transit's.)
       transit: Object.fromEntries(Object.entries(transit).filter(([k]) => !/^(tdx|gem[df]?|err)(:|$)/.test(k)).map(([k, n]) => [k, { used: n, cap: TRANSIT_CAPS[k] ?? null }])),
-      weather: { googleToday: weatherCalls, cap: GOOGLE_DAILY_CALLS }
+      weather: { googleToday: weatherCalls, ...(await googleToday(env, now).then(m => ({ cap: m.cap, monthBefore: m.before, monthCap: GOOGLE_MONTH_CALLS })).catch(() => ({ cap: null }))) }
     };
   },
   // The sources the apps read, each asked once: answered, how fast.

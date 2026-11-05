@@ -20,7 +20,8 @@
 //
 // Orbit Weather is a Orbit app: /weather and /weather/where need a Orbit
 // Pass session (worker.js), 30 a minute a session. Google is asked at most
-// GOOGLE_DAILY_CALLS times a day in all (under the key's 500-a-day quota):
+// GOOGLE_DAILY_CALLS times a day in all (under the key's 500-a-day quota),
+// and the month is kept inside Google's free 10,000 (googleDayCap):
 // a refresh is 4 calls (now, 48 hours in 2 pages, 10 days), but only 1 (now)
 // while the forecast is under 30 minutes old (Google's own forecast refresh,
 // GOOGLE_FC_MS), and every 6 hours 8 more for hours 49–240; past the cap a cell is built without
@@ -80,7 +81,24 @@ export const gridOf = (lat, lon) => `${(Math.round(lat / GOOGLE_GRID) * GOOGLE_G
 // day, so a busy morning leaves the evening its forecasts. A forecast
 // refresh itself may use the whole cap.
 export const GOOGLE_SPARE_START = 0.25;
-export const googlePace = now => Math.floor(GOOGLE_DAILY_CALLS * (GOOGLE_SPARE_START + (1 - GOOGLE_SPARE_START) * (((now + 8 * HOUR) % 86_400_000) / 86_400_000)));
+export const googlePace = (now, cap = GOOGLE_DAILY_CALLS) => Math.floor(cap * (GOOGLE_SPARE_START + (1 - GOOGLE_SPARE_START) * (((now + 8 * HOUR) % 86_400_000) / 86_400_000)));
+// Google's free month: the Weather API is one SKU ("Weather Usage"), 10,000
+// calls a calendar month on Pacific time free, US$0.15 per 1,000 past it
+// (read 2026-11-05; the bill comes out of the owner's prepaid balance).
+// Kept under GOOGLE_MONTH_CALLS by Taiwan's month: a Pacific month is
+// Taiwan's less its first 16 hours plus the next one's first 16, so it
+// never passes GOOGLE_MONTH_CALLS + a day's cap, and the rest of the 10,000
+// is room for counts two Workers wrote over each other. Spent freely (the
+// day's own cap) until GOOGLE_MONTH_FREELY of it is used; past that, what's
+// left is spread over the month's days left (the owner, 2026-11-05: a busy
+// day with the month ahead slows nothing; only real use near the limit does).
+export const GOOGLE_MONTH_CALLS = 8_500;
+export const GOOGLE_MONTH_FREELY = 0.7;
+export function googleDayCap(usedBefore, daysLeft) {
+  const left = Math.max(0, GOOGLE_MONTH_CALLS - usedBefore);
+  if (usedBefore < GOOGLE_MONTH_CALLS * GOOGLE_MONTH_FREELY) return Math.min(GOOGLE_DAILY_CALLS, left);
+  return Math.min(GOOGLE_DAILY_CALLS, Math.floor(left / Math.max(1, daysLeft)));
+}
 export const DEFAULT_WEIGHTS = { pop: { google: 0.6, cwa: 0.4 }, temp: { google: 0.6, cwa: 0.4 } };
 
 export function googleUrl(env, path, lat, lon, extra = '', units = true) {
@@ -675,6 +693,24 @@ async function shared(env, key, freshMs, make, now, defer = null) {
   return job;
 }
 
+// Today's cap from the month so far: the calls of Taiwan's month before
+// today (each day's count in KV, added up once a day an isolate) and the
+// month's days left, today included.
+const months = new WeakMap(); // the KV namespace → { day, before }
+export async function googleToday(env, now) {
+  const day = twDay(now);
+  const [y, m, d] = day.split('-').map(Number);
+  const daysLeft = new Date(Date.UTC(y, m, 0)).getUTCDate() - d + 1;
+  const kv = env.RATE_LIMIT_KV;
+  let before = kv && months.get(kv)?.day === day ? months.get(kv).before : null;
+  if (before == null) {
+    const days = Array.from({ length: d - 1 }, (_, i) => `${day.slice(0, 8)}${String(i + 1).padStart(2, '0')}`);
+    before = (await Promise.all(days.map(x => kvJson(env, `weather:google:${x}`)))).reduce((a, n) => a + (Number(n) || 0), 0);
+    if (kv) months.set(kv, { day, before });
+  }
+  return { before, daysLeft, cap: googleDayCap(before, daysLeft) };
+}
+
 // Today's Google calls, counted in KV: true while `calls` more fit under
 // the cap, or the day's pace for an extra (`spare`), and counts them. The count is also kept here (a KV write takes
 // a moment to be read back): two asks of one refresh, side by side, each
@@ -683,11 +719,11 @@ async function shared(env, key, freshMs, make, now, defer = null) {
 const tallies = new WeakMap(); // the KV namespace → { key, n, put }
 export async function googleAllowed(env, now, calls = 4, defer = null, spare = false) {
   const key = `weather:google:${twDay(now)}`;
-  const read = Number(await kvJson(env, key)) || 0;
+  const [read, { cap }] = await Promise.all([kvJson(env, key), googleToday(env, now)]);
   const kv = env.RATE_LIMIT_KV;
   const mine = kv && tallies.get(kv)?.key === key ? tallies.get(kv) : null;
-  const n = Math.max(read, mine?.n || 0);
-  if (n + calls > (spare ? Math.min(GOOGLE_DAILY_CALLS, googlePace(now)) : GOOGLE_DAILY_CALLS)) return false;
+  const n = Math.max(Number(read) || 0, mine?.n || 0);
+  if (n + calls > (spare ? Math.min(cap, googlePace(now, cap)) : cap)) return false;
   // Kept 40 days: the admin panel's Google 帳單 adds a month of them (Weather is billed past 10,000 a month).
   if (!kv) return true;
   const t = { key, n: n + calls };
@@ -1563,7 +1599,8 @@ export async function cellsReport(env, now) {
     const steps = hours.slice(1).map((h, i) => h.t - hours[i].t).filter(d => d !== HOUR).length;
     cells.push({ ageMin: Math.round((now - hit.at) / MIN), sources: hit.sources, hours: hours.length, first: hours[0] ? new Date(hours[0].t).toISOString() : null, notHourly: steps, blank: Object.fromEntries(Object.entries(blank).map(([k, v]) => [k, `${v.length}: ${v.slice(0, 12).join(',')}`])), days: (hit.resp.days || []).length, airHourly: hit.resp.air?.hourly?.length ?? null, airHistory: hit.resp.air?.history?.length ?? null, far: hit.parts?.far ? Math.round((now - hit.parts.far.at) / MIN) : null, farHours: hit.parts?.far?.v?.length ?? null, farPartial: Boolean(hit.parts?.far?.partial), farError: hit.parts?.far?.error || null, last: hours.length ? new Date(hours[hours.length - 1].t).toISOString() : null });
   }
-  return { at: now, googleCallsToday: Number(await kvJson(env, `weather:google:${twDay(now)}`)) || 0, cap: GOOGLE_DAILY_CALLS, cells };
+  const month = await googleToday(env, now);
+  return { at: now, googleCallsToday: Number(await kvJson(env, `weather:google:${twDay(now)}`)) || 0, cap: month.cap, monthBefore: month.before, monthCap: GOOGLE_MONTH_CALLS, cells };
 }
 
 // The status page and its samples: Cloudflare's cache only (KV without one).

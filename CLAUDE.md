@@ -253,8 +253,8 @@ OpenF1's tables (`openF1Raw`) and kept in R2 for good.
 - **Batches** (`?batch=1&u=…&lines=1`): up to 24 reads in one request,
   each written as it's ready. A slow item answers 504 and is asked alone.
 - **Edge cache tiers** (`sports.js` `CACHE_*`): each has `fresh` (served as
-  is) and `stale`. Just past fresh (up to as long again, a minute at least)
-  the copy is served while it's read again behind it (stale-while-revalidate);
+  is) and `stale`. Just past fresh (as long again, a minute at least) it's
+  served while read again behind it (stale-while-revalidate);
   older but inside `stale`, it's read now and the old copy answers only if
   that takes over 2 s or fails. Live 2–10 s, odds 10 s, quotes 30 s and F1
   live 4 s never serve stale; final 24 h; schedule 10 min (+1 day);
@@ -307,10 +307,9 @@ A read (`kit proxyJson`) goes down these until one answers:
   copy of any age and is asked again soon. A batch item that fails is that
   item's failure alone.
 - Two sources answer the phone itself (open to any page): ESPN's core API
-  is always read from the device (it refuses the proxy); Jolpica through
-  the proxy, but a read the proxy can't get (Jolpica counts per address,
-  and Cloudflare's are shared) is read from the device at once, and from
-  the device for ten minutes after (`proxyJson`, `SELF_TOO`).
+  always (it refuses the proxy); Jolpica when the proxy can't get it
+  (it counts per address, and Cloudflare's are shared), at once and for
+  ten minutes after (`proxyJson`, `SELF_TOO`).
 - On top of these, apps put live knowledge over slower copies: Sports'
   `liveTable` counts results before ESPN does; F1's own timing calls a
   session over at the flag; MLB's postseason comes from MLB itself.
@@ -319,7 +318,7 @@ A read (`kit proxyJson`) goes down these until one answers:
 
 | Store | Binding | What's in it |
 | --- | --- | --- |
-| D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data, the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced (§5.3); `gemini_call`: every Gemini call (`gemini-use.js`); `law_day`: Law's and Money's AI counts a day; `gift`, `gift_claim`: the giveaway (`gift.js`); `beats`: each job's last run and failures (`ops.js`) |
+| D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data, the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced (§5.3); `gemini_call`: every Gemini call (`gemini-use.js`); `law_day`: the AI caps' counts a day; `gift`, `gift_claim`: the giveaway (`gift.js`); `beats`: each job's last run and failures (`ops.js`) |
 | R2 `orbit-data` | `DATA` | Public: the builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `where.json`), the proxy's kept reads (`mirror/`). Never served: `private/` (the nightly store backups `private/store/<day>.jsonl.gz`, Firestore's last copy) |
 | KV | `RATE_LIMIT_KV` | Counters (sign-ins, per-address limits); the guard's state, pace and alerts (`guard:*`); push's devices, prefs and due notices (`push:*`); Google Weather's shared cells and its calls a day (`weather:g:*`, `weather:google:<day>`); TDX's last good reads and its month's meter (`tdx:warm:*`, `transit:use:<month>`); Law's kept plans and answers (`law:*`); the showcase's passes a day (`showcase:passes:*`); `ops:data-folders` |
 | Durable Objects | `F1_LOG`, `CLOCK` | `F1Log`: F1's laps as they're driven; `GuardClock`: the guard's alarm |
@@ -424,18 +423,21 @@ can be turned off on its own.
   panel, served by `/config`): `sportsList`, `sportsGame`, `f1*`,
   `playLive`, `tdx*`, `transit*`. `autoScale` slows them together as the
   family grows (`capacity.js`).
-- **AI caps** are settings too (`DEV ai*`): calls a day for everyone, 0
-  pauses the feature (`worker.js aiCap`). Every Gemini call is a row in D1
-  `gemini_call` (`gemini-use.js`). Gemini runs only behind a person's tap.
+- **AI caps** are settings too (`DEV ai*`): calls a day for everyone, one
+  count in D1 `law_day`, 0 pauses (`worker.js aiCap`). Every Gemini call is
+  a row in `gemini_call` (`gemini-use.js`), only behind a person's tap.
 - **Errors**: each route's 5xx tallied (`err:<route>:<day>`); the guard's
   `/errors`; the panel's 部署 runs workflows with `GH_ACTIONS_TOKEN`.
 - **容量** (`capacity.js` `quotas`): each quota's people held = this
   week's × (room past the fixed part ÷ people's use), the fewest named;
   Workers' fixed part from the guard's `/hours`.
-- **`quota-guard`** (`guard.js`, every 5 minutes) reads the account's use
-  against `PLAN` (Workers, CPU, KV, DO, R2, D1), paces from 60% (`pace.js`:
-  slower refreshes, builders parked), tells the owner at 50/75/90%
-  (`ops.js`), and at 90% of any count turns the proxy off until the next period.
+- **`quota-guard`** (`guard.js`, every 5 minutes) reads the use against
+  `PLAN` (Workers, CPU, KV, DO, R2, D1), paces on real use only (`paceFor`:
+  past 60/75/85% used with the last days' rate reaching the stop; 85%
+  `newcomers: false`; `pace.js`), a forecast only warns (`forecastOf`),
+  tells the owner at 50/75/90% (`ops.js`), and at 90% turns the proxy off
+  until the next period. Google: Maps stops at 90% of each SKU's free
+  month, Weather under 8,500 a month (`googleDayCap`).
 - **Each toml caps CPU** (`[limits]`) and samples logs.
 
 ## 10. Deploying, secrets and the domain
@@ -457,15 +459,14 @@ can be turned off on its own.
   - The proxy: Google's keys, `CWA_KEY`, `MOENV_KEY`, `TDX_CLIENT_*`.
 - **The domain:** `kit/domain.mjs` `DOMAIN` (jaypengx.com), the one place
   it is set. Each repo publishes its built site with `deploy/cf-site.mjs`
-  (an assets-only Worker on routes of its paths: free to serve; routes win
-  over the custom domains): `orbit.<DOMAIN>/<slug>/` every app (`slug`,
+  (an assets-only Worker on routes of its paths, free to serve): `orbit.<DOMAIN>/<slug>/` every app (`slug`,
   `SHORT` in `kit/brand.mjs`; one origin, so one Pass sign-in), `orbit-pass`
   for `/`, `/pass/`, `/key/`, `/Orbit-Core/` and the old `/Shared-Proxy/`,
   `orbit-home` for `<DOMAIN>/` (Orbit-Showcase: Jay's homepage, `/showcase/`).
   Paths behave as a plain static site (`/law` moves to `/law/`). Mail to
   `*@<DOMAIN>` reaches the proxy by Email Routing's catch-all. `deploy.yml`
-  attaches the hostnames (the deploy token needs the zone, and Account · D1 ·
-  Edit); the guard takes them off with the proxy.
+  attaches the hostnames (its token needs the zone and D1 Edit); the guard
+  takes them off with the proxy.
 
 ## 11. Tools and tests
 
@@ -475,7 +476,7 @@ can be turned off on its own.
 | `node tools/shots.mjs <app> [page…]` | Every screenshot a change needs (five screens × light/dark, live data, signed in), a contact sheet, faults, `--before main` diff; pages in `tools/shots/pages.mjs` |
 | `node tools/preview.mjs <app>` | The app with real data (`--live`, `--width`, `--timing`, `--requests`, `--profile`, `--webkit`, `--reopen`…); prints `wraps:`, `cut:`, `scrolls sideways:` |
 | `node tools/gate.mjs [app…]` | The family quality gate (`tools/gate-page.js`): lift, stalls, dead taps, wraps, cuts, letters, white, mixed language… on every tab |
-| `node tools/f1-replay.mjs --start <UTC> --at <UTC>` | An F1 session as F1's live feed had it at any moment of a recorded one (OpenF1's tables), as the preview's `--fixture`s: shots of a red flag or a safety car with no session on (`shots.mjs sports f1-live … -- $(cat <out>/args.txt)`) |
+| `node tools/f1-replay.mjs --start <UTC> --at <UTC>` | An F1 session as its live feed had it at any moment (OpenF1's tables), as the preview's `--fixture`s: a red flag or safety car shot with no session on (`shots.mjs sports f1-live … -- $(cat <out>/args.txt)`) |
 | `node tools/live-scroll.mjs [app…] [--webkit]` | Nothing jumps: a live game through 4 refreshes; pages as they load (`late`), then scrolled: a refresh above, a tab drawn short, a moving drawing, taps folding below and above, a sheet showing less |
 | `node tools/store-shots.mjs <app>` | The README's and Showcase's screenshot set, both languages |
 | `node tools/test-apps.mjs [app…]` | Every app's tests against this kit (checkouts beside this one) |

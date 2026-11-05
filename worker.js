@@ -28,7 +28,7 @@
 // runs in Taiwan ([placement], wrangler.toml), where the people and most
 // sources are. The Orbit Pass is the only way anything is saved.
 
-import { handleLawAsk, useLawSite } from './law.js';
+import { handleLawAsk, useLawSite, addOne, twDay } from './law.js';
 import { handleLawChat, lawChatTimes } from './law-chat.js';
 import { DEV, aiSettingOf } from './kit/brand.mjs';
 import { handleLawPage } from './law-page.js';
@@ -191,12 +191,15 @@ async function rateLimitResponse(env, ip, feature, limit, headers, request) {
 }
 
 // A ceiling on TOTAL calls to a billed Gemini route a day across every
-// caller, not per IP. It is counted per isolate, so the true ceiling is
-// this many per running isolate (a handful, with the Worker placed in one
-// region). The origin gate below and Google's own billing cap on the
-// key are the other halves.
-async function isDailyGlobalCapped(env, feature, limit) {
-  return isRateLimited(env, 'global', `daily-cap:${feature}`, limit, DAY_WINDOW_MS);
+// caller, as the admin panel's 設定 has it (aiCap): one count a feature and
+// Taiwan's day in D1 (law.js addOne, the table Law's and Money's caps use),
+// so it holds whichever Worker answers (it was counted in each isolate's
+// memory, a cap per running copy: the owner, 2026-11-05, never a cent
+// past what he set). Counted before the call; unreadable, it's capped.
+export async function isDailyCapped(env, ctx, feature) {
+  const cap = await aiCap(env, ctx, feature);
+  if (!(cap > 0)) return true;
+  return (await addOne(env, `${feature}:g`, twDay())) > cap;
 }
 // A 5xx counted by its route ('/transit/tdx' → '/transit') and Taiwan's day:
 // the admin panel's 錯誤 (one tally in the usage meter, flushed with it).
@@ -244,7 +247,7 @@ async function aiCap(env, ctx, feature) {
 // a public, open-source repo) can trivially copy the allowed Origin value
 // verbatim. This gate stops opportunistic/naive abuse (URL scanners,
 // another site's page silently spending your quota through its visitors'
-// browsers) and, combined with isDailyGlobalCapped above, hard-bounds the
+// browsers) and, combined with isDailyCapped above, hard-bounds the
 // worst case even against someone who does spoof it. It is NOT real
 // authentication - this app has no user accounts to authenticate, and no
 // client-side secret can ever be genuinely secret in a fully public static
@@ -784,9 +787,7 @@ async function handleGeminiRequest(request, env, headers, ip, ctx, session = nul
   // Signed in with a Orbit Pass (required): counted per session in memory.
   if (!session) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
   if (sessionLimited(`g:${session.s}`, GEMINI_RATE_LIMIT, 3_600_000)) return errorJson('RATE_LIMITED', 429, headers, request);
-  if (await isDailyGlobalCapped(env, 'gemini', await aiCap(env, ctx, 'gemini'))) {
-    return errorJson('DAILY_QUOTA_EXCEEDED', 429, headers, request);
-  }
+  if (await isDailyCapped(env, ctx, 'gemini')) return errorJson('DAILY_QUOTA_EXCEEDED', 429, headers, request);
 
   const body = await readJsonBody(request, MAX_TOTAL_BASE64_LENGTH + 1_000_000);
   if (body === INVALID_BODY) return errorJson('INVALID_JSON', 400, headers, request);
@@ -1086,9 +1087,7 @@ async function handleNlEditRequest(request, env, headers, ip, ctx, session = nul
 
   if (!session) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
   if (sessionLimited(`n:${session.s}`, NL_EDIT_RATE_LIMIT, 3_600_000)) return errorJson('RATE_LIMITED', 429, headers, request);
-  if (await isDailyGlobalCapped(env, 'nl-edit', await aiCap(env, ctx, 'nl-edit'))) {
-    return errorJson('DAILY_QUOTA_EXCEEDED', 429, headers, request);
-  }
+  if (await isDailyCapped(env, ctx, 'nl-edit')) return errorJson('DAILY_QUOTA_EXCEEDED', 429, headers, request);
 
   const body = await readJsonBody(request);
   if (body === INVALID_BODY) return errorJson('INVALID_JSON', 400, headers, request);
@@ -1297,7 +1296,7 @@ async function route(request, env, ctx, headers, origin) {
   // each count's share of the $5 plan, stopped or not. No key or token.
   if (path === '/guard' && request.method === 'GET') {
     const g = JSON.parse((await env.RATE_LIMIT_KV?.get(GUARD_STATE).catch(() => null)) || 'null');
-    return json(g ? { at: g.at, armed: g.armed, error: g.error || null, partial: g.partial || null, cpuWay: g.cpuWay || null, stopAt: g.stopAt, share: g.share || null, stopped: g.stopped ? { at: g.stopped.at, why: g.stopped.why } : null, period: g.period || null, pace: g.pace || 0, paceTop: g.paceTop ?? null, alert: g.alert || 0, accountFound: !!g.account } : { ran: false }, 200, headers);
+    return json(g ? { at: g.at, armed: g.armed, error: g.error || null, partial: g.partial || null, cpuWay: g.cpuWay || null, stopAt: g.stopAt, share: g.share || null, stopped: g.stopped ? { at: g.stopped.at, why: g.stopped.why } : null, period: g.period || null, pace: g.pace || 0, paceTop: g.paceTop ?? null, forecast: g.forecast || null, alert: g.alert || 0, accountFound: !!g.account } : { ran: false }, 200, headers);
   }
   // The Pass's store (doc-store.js): each collection's count (no
   // document), from a localhost page (the dev door).
