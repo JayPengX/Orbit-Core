@@ -27,7 +27,7 @@ function setup() {
   };
   const env = { STORE: fakeD1(SCHEMA), ECO_TOKEN_SECRET: 'test-secret', ECO_ADMIN_TOKEN: 'o'.repeat(40) };
   const admin = (action, extra = {}) => handleEcoRequest({ method: 'POST', url: 'https://w/eco', body: { op: 'admin', token: 'o'.repeat(40), action, ...extra } }, env, {}, '1.1.1.1', deps).then(r => r.data);
-  const eco = body => handleEcoRequest({ method: 'POST', url: 'https://w/eco', body }, env, {}, '1.1.1.1', deps);
+  const eco = (body, query = '') => handleEcoRequest({ method: 'POST', url: `https://w/eco${query}`, body }, env, {}, '1.1.1.1', deps);
   // A browser: its own cookies, its own address.
   const device = (ip = '1.2.3.4', origin = 'https://orbit.jaypengx.com') => {
     const jar = new Map();
@@ -108,12 +108,19 @@ test('a pass nobody signed in with comes back to the pool after the hold; one us
   await b();
   const lost = (await a('POST', { op: 'claim' })).data.mine.code;
   await b('POST', { op: 'claim' });
-  assert.equal((await t.eco({ op: 'login', passcode: (await b()).data.mine.code, app: 'law' })).status, 200);
+  // b signs in and sets its own pass; c signs in and leaves it at 先換掉 (a fresh session opens no app).
+  const c = t.device('3.3.3.3');
+  await c();
+  await t.admin('gift-set', { total: 3 });
+  await c('POST', { op: 'claim' });
+  const inB = await t.eco({ op: 'login', passcode: (await b()).data.mine.code, app: 'law' });
+  assert.equal((await t.eco({ op: 'rotate', qt: inB.data.token })).status, 200);
+  assert.equal((await t.eco({ op: 'login', passcode: (await c()).data.mine.code, app: 'law' })).data.fresh, true);
   t.advance(2 * 3_600_000);
   const v = (await t.admin('gift')).gift;
   assert.equal(v.claimed, 1);
-  assert.equal(v.back, 1);
-  assert.equal(v.left, 1);
+  assert.equal(v.back, 2);
+  assert.equal(v.left, 2);
   // The pass taken back no longer signs in; its device may claim again.
   assert.equal((await t.eco({ op: 'login', passcode: lost, app: 'law' })).status, 404);
   assert.equal((await a()).data.mine, null);
@@ -156,4 +163,41 @@ test('a new round counts afresh and lets each device claim once more', async () 
   assert.equal((await a()).data.mine, null);
   const second = (await a('POST', { op: 'claim' })).data.mine.code;
   assert.notEqual(second, first);
+});
+
+test('empty giveaway accounts are cleared only when the owner turns it on, after the days set; real use, passkeys and hand-issued passes stay', async () => {
+  const t = setup();
+  await t.admin('gift-set', { live: true, total: 10 });
+  const own = async ip => {
+    const d = t.device(ip);
+    await d();
+    const code = (await d('POST', { op: 'claim' })).data.mine.code;
+    const signed = await t.eco({ op: 'login', passcode: code, app: 'law' });
+    const rot = await t.eco({ op: 'rotate', qt: signed.data.token });
+    assert.equal(rot.status, 200);
+    return rot.data;
+  };
+  const idle = await own('1.0.0.1');
+  const busy = await own('1.0.0.2');
+  // busy keeps real data: more than settings.
+  assert.equal((await t.eco({ op: 'write', qt: busy.token, payload: JSON.stringify({ notes: 'x'.repeat(3000) }) }, '?app=law')).status, 200);
+  // A pass the owner issued by hand, never used since: never the cleaner's.
+  const [issued] = (await t.admin('issue', { count: 1 })).passes;
+  const byHand = await t.eco({ op: 'login', passcode: issued, app: 'law' });
+  await t.eco({ op: 'rotate', qt: byHand.data.token });
+  t.advance(40 * 86_400_000);
+  let v = await t.admin('gift');
+  assert.equal(v.empty.on, false);
+  assert.equal(v.empty.count, 1);
+  // Off: the night clears nothing.
+  const { giftNight } = await import('../gift.js');
+  assert.equal((await giftNight(t.env, t.deps)).cleared, 0);
+  await t.admin('gift-clean-set', { clean: true, days: 30 });
+  assert.equal((await giftNight(t.env, t.deps)).cleared, 1);
+  assert.equal((await t.eco({ op: 'login', passcode: idle.passcode, app: 'law' })).status, 404);
+  assert.equal((await t.eco({ op: 'login', passcode: busy.passcode, app: 'law' })).status, 200);
+  v = await t.admin('gift');
+  assert.equal(v.empty.count, 0);
+  // Days below 7 aren't taken.
+  assert.equal((await t.admin('gift-clean-set', { days: 1 })).empty.days, 7);
 });

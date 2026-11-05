@@ -208,7 +208,7 @@ w;dur=` (the Worker's own time), which the 除錯紀錄 notes with a slow read.
 | `/law-live` | `law-live.js` | What 立法院's IVOD streams now (`{at, rooms}`), read on demand, 60 s at the edge, the last good read kept 30 minutes; our pages only, no Pass |
 | `/money-read` | `money-read.js` | Orbit Money's 拍照記帳: one picture → `{ buys, left }`, read by Gemini (Flash-Lite, through the relay) and checked; only on a tap; 30 a day a Pass, 300 in all |
 | `/flight` | `flight.js`, `kit/flight.mjs` | Orbit Class's 專注飛行: real planes landing in about N minutes, then one followed |
-| `/gift` | `gift.js` | 公開領取 at `/key/` (`site/key/`): the admin panel sets it (on, count, times); one a device (a cookie, D1 `gift_claim`), minted fresh, `op: 'go'` a `#qh=` into an app; unused ones back after `hold` hours |
+| `/gift` | `gift.js` | 公開領取 at `/key/` (`site/key/`), set in the admin panel; one a device (a cookie, D1 `gift_claim`), `op: 'go'` a `#qh=` into an app; unreplaced passes back after `hold` hours; empty ones (wallet `gift`) cleared nightly if on |
 | `/showcase/pass` | `showcase.js` | The showcase's short pass for its live demos: reads only, per-address and daily caps, from the showcase's address only |
 | `/data/…` | `data.js` | R2, public reads (§5.5); `/data/build` (POST, Bearer `DATA_PUSH_SECRET`, `build.yml`) runs a builder now |
 | `/config` | `worker.js`, `kit/devconfig.mjs` | The live speeds (`DEV`), a minute in Cloudflare's cache |
@@ -225,7 +225,7 @@ w;dur=` (the Worker's own time), which the 除錯紀錄 notes with a slow read.
   `/config` 2×/3×. Priority passes (`sec.priority`, token `p: 1`) skip
   every per-session limit (`limitOf`).
 - **Same origin:** a page calls `orbit.jaypengx.com/api/…` (`kit/domain.mjs`
-  `API`; worker.js `viaSite` takes `/api` off). `api.` and workers.dev answer too.
+  `API`; worker.js `viaSite` takes `/api` off). `api.`, workers.dev answer too.
 - **Dev doors:** a request with `Origin: http://localhost:<port>` and no
   pass gets a dev session on `/sports-proxy`, `/transit`, `/weather` and
   `/flight` (counted per address): `tools/preview.mjs --live`, or `curl -H

@@ -304,7 +304,9 @@ export function mergeWallet(a, b) {
     ...(base.live ? { live: base.live } : {}),
     ...(base.sec ? { sec: base.sec } : {}),
     ...(base.passkeys ? { passkeys: base.passkeys } : {}),
-    ...(base.merged ? { merged: base.merged } : {})
+    ...(base.merged ? { merged: base.merged } : {}),
+    // (A giveaway's account: when it was claimed, gift.js; the only ones ever cleared.)
+    ...(base.gift ? { gift: base.gift } : {})
   };
 }
 

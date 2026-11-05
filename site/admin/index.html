@@ -341,6 +341,17 @@
   .gift-when label, .gift-more label { display: grid; gap: 4px; min-width: 0; font-size: 13px; color: var(--q-muted); }
   .gift-when input, .gift-more input { width: 100%; box-sizing: border-box; }
   .gift-more { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+  .gift-clean { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--q-sep); }
+  #gift-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (min-width: 700px) { #gift-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .gift-acts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+  .gift-acts button { padding-inline: 8px; }
+  .clean-head { display: flex; align-items: flex-start; gap: 12px; }
+  .clean-head > div { flex: 1 1 0; min-width: 0; }
+  .clean-head .q-switch { flex: none; }
+  .clean-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13.5px; }
+  .clean-list li { display: flex; justify-content: space-between; gap: 10px; }
+  .clean-list .mono { font-family: ui-monospace, monospace; }
   .gift-link { margin-top: 12px; padding: 10px 14px; border-radius: var(--q-r-cell); background: var(--q-fill-4); font: 600 15px ui-monospace, monospace; overflow-wrap: anywhere; }
   @media (max-width: 520px) { .gift-when { grid-template-columns: minmax(0, 1fr); } }
   .tool-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
@@ -555,7 +566,7 @@
     <section data-pane="tools" hidden>
       <div class="tool-grid" id="tool-grid"></div>
       <div class="card tool" id="tool-gift">
-        <div class="tool-head"><i data-ic="send" style="--t:#4f46e5"></i><div><h3>公開領取</h3><p class="muted">打開連結就能領一組，一台裝置一組。沒登入的到時收回。</p></div><button class="q-switch" type="button" role="switch" aria-checked="false" aria-label="開放領取" id="gift-on"></button></div>
+        <div class="tool-head"><i data-ic="send" style="--t:#4f46e5"></i><div><h3>公開領取</h3><p class="muted">一台裝置一組，沒換通行碼的到時收回。</p></div><button class="q-switch" type="button" role="switch" aria-checked="false" aria-label="開放領取" id="gift-on"></button></div>
         <div class="tiles" id="gift-tiles"></div>
         <div class="row" style="margin-top:12px"><input id="gift-total" type="number" min="0" max="5000" value="50" aria-label="數量" /><span class="muted">組</span></div>
         <div class="gift-when">
@@ -566,13 +577,18 @@
         <details class="note"><summary>防濫用</summary>
           <div class="gift-more">
             <label>每個網路每分鐘<input id="gift-rate" type="number" min="1" max="600" /></label>
-            <label>沒登入幾小時收回（0 不收）<input id="gift-hold" type="number" min="0" max="720" /></label>
+            <label>幾小時沒換通行碼就收回（0 不收）<input id="gift-hold" type="number" min="0" max="720" /></label>
           </div>
         </details>
         <div class="row spread" style="margin-top:12px"><span id="gift-state" class="muted"></span><button id="gift-save" class="primary">儲存</button></div>
         <p id="gift-error" class="error"></p>
         <div class="gift-link" id="gift-url"></div>
-        <div class="row" style="margin-top:10px"><button id="gift-copy" class="small">複製連結</button><button id="gift-qr" class="small">QR code</button><button id="gift-round" class="small">新一輪</button></div>
+        <div class="gift-acts"><button id="gift-copy" class="small">複製連結</button><button id="gift-qr" class="small">QR code</button><button id="gift-round" class="small">新一輪</button></div>
+        <div class="gift-clean">
+          <div class="clean-head"><div><strong>清掉空帳戶</strong><p class="muted" style="margin:2px 0 0">領來的帳戶，久沒用又沒資料就清掉。</p></div><button class="q-switch" type="button" role="switch" aria-checked="false" aria-label="清掉空帳戶" id="clean-on"></button></div>
+          <div class="row" style="margin-top:10px"><input id="clean-days" type="number" min="7" max="365" aria-label="天數" /><span class="muted">天沒用就清</span></div>
+          <details class="note"><summary id="clean-sum"></summary><ul class="clean-list" id="clean-list"></ul><div class="row" style="margin-top:8px"><button id="clean-run" class="small">現在清理</button></div></details>
+        </div>
       </div>
       <div class="card tool" id="tool-issue">
         <div class="tool-head"><i data-ic="ticket" style="--t:#2563eb"></i><div><h3>發放 Orbit Pass</h3><p class="muted">誰先登入就是誰的。這裡只顯示這一次，先複製或下載。</p></div></div>
@@ -1602,14 +1618,44 @@ function giftSay(g) {
   if (g.claimed >= g.total) return '領完了';
   return g.closes ? `開放中，${fmt(g.closes)} 結束` : '開放中';
 }
-function drawGift(g) {
+function drawClean(e) {
+  if (!e) return;
+  $('clean-on').setAttribute('aria-checked', String(!!e.on));
+  if (document.activeElement !== $('clean-days')) $('clean-days').value = e.days;
+  $('clean-sum').textContent = e.count ? `現在會清掉 ${e.count} 個` : '現在沒有要清的';
+  $('clean-list').replaceChildren(...e.first.map(a => el('li', {}, [el('span', { class: 'mono', text: a.ref }), el('span', { class: 'muted', text: `${fmt(a.last)} 最後用` })])));
+  $('clean-run').hidden = !e.count;
+}
+async function cleanCall(action, extra = {}) {
+  $('gift-error').textContent = '';
+  try {
+    const out = await admin(action, extra);
+    drawGift(out.gift, out.empty);
+    return out;
+  } catch (e) {
+    $('gift-error').textContent = e.message;
+  }
+}
+$('clean-on').onclick = () => {
+  const on = $('clean-on').getAttribute('aria-checked') !== 'true';
+  $('clean-on').setAttribute('aria-checked', String(on));
+  cleanCall('gift-clean-set', { clean: on, days: Number($('clean-days').value) || 30 });
+};
+$('clean-days').onchange = () => cleanCall('gift-clean-set', { days: Number($('clean-days').value) || 30 });
+$('clean-run').onclick = async () => {
+  if (!confirm(`現在清掉 ${$('clean-sum').textContent.replace(/\D/g, '')} 個空帳戶？30 天內可以在備份與復原救回。`)) return;
+  const out = await cleanCall('gift-clean-run');
+  if (out) $('gift-state').textContent = `清掉了 ${out.cleared} 個`;
+};
+function drawGift(g, empty) {
+  drawClean(empty);
   gift = g;
   $('gift-on').setAttribute('aria-checked', String(!!g.live));
   $('gift-tiles').replaceChildren(
     tile('已領', g.claimed.toLocaleString(), g.hour ? `這小時 ${g.hour}` : ''),
     tile('剩下', g.left.toLocaleString(), `共 ${g.total.toLocaleString()} 組`),
     tile('已換成自己的', g.done.toLocaleString(), g.started ? `登入了還沒換 ${g.started}` : ''),
-    tile('收回', g.back.toLocaleString(), g.hold ? `${g.hold} 小時沒登入` : '不收回')
+    tile('收回', g.back.toLocaleString(), g.hold ? `${g.hold} 小時沒換` : '不收回')
   );
   $('gift-total').value = g.total;
   $('gift-opens').value = localTime(g.opens);
@@ -1621,7 +1667,8 @@ function drawGift(g) {
 }
 async function loadGift() {
   try {
-    drawGift((await admin('gift')).gift);
+    const out = await admin('gift');
+    drawGift(out.gift, out.empty);
   } catch (e) {
     $('gift-error').textContent = e.message;
   }
@@ -1630,7 +1677,8 @@ async function giftSet(extra = {}) {
   $('gift-error').textContent = '';
   $('gift-save').disabled = true;
   try {
-    drawGift((await admin('gift-set', { total: Number($('gift-total').value) || 0, opens: fromLocal($('gift-opens').value), closes: fromLocal($('gift-closes').value), rate: Number($('gift-rate').value) || 20, hold: Number($('gift-hold').value) || 0, ...extra })).gift);
+    const out = await admin('gift-set', { total: Number($('gift-total').value) || 0, opens: fromLocal($('gift-opens').value), closes: fromLocal($('gift-closes').value), rate: Number($('gift-rate').value) || 20, hold: Number($('gift-hold').value) || 0, ...extra });
+    drawGift(out.gift, out.empty);
   } catch (e) {
     $('gift-error').textContent = e.message;
   }
@@ -1669,7 +1717,8 @@ $('gift-qr').onclick = async () => {
 $('gift-round').onclick = async () => {
   if (!confirm('開新的一輪？已領的不受影響，每台裝置可以再領一組，數字從 0 算起。')) return;
   try {
-    drawGift((await admin('gift-round')).gift);
+    const out = await admin('gift-round');
+    drawGift(out.gift, out.empty);
   } catch (e) {
     $('gift-error').textContent = e.message;
   }
