@@ -56,6 +56,7 @@
 import { retire } from './money.js';
 import { storeReady } from './doc-store.js';
 import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './orbit-token.js';
+import { admit, seenNow, limitOf, fullBody } from './door.js';
 import { handleAdmin } from './eco-admin.js';
 import { passkeyBegin, passkeyLogin, passkeyAddBegin, passkeyAdd, passkeyRemove, passkeySummary, pointPasskeys, dropIndex, passkeyIds } from './passkey.js';
 import { PAY_WEEK, weekStart, mondayId, reliefCheck, reliefEntry } from './kit/pay.mjs';
@@ -380,7 +381,7 @@ const OPS = {
   'passkey-remove': passkeyRemove
 };
 
-export async function handleEcoRequest(request, env, headers, ip, deps) {
+export async function handleEcoRequest(request, env, headers, ip, deps, waitUntil = null) {
   const { json, errorJson, upstreamFailed } = deps;
   if (!['GET', 'POST', 'PATCH', 'DELETE'].includes(request.method)) return errorJson('SYNC_METHOD_NOT_ALLOWED', 405, headers, request);
   if (!storeReady(env)) return errorJson('MISSING_STORE', 500, headers, request);
@@ -406,14 +407,14 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
       else {
         const run = OPS[body.op];
         if (!run) return errorJson('ECO_UNKNOWN_OP', 400, headers, request);
-        return await run({ request, env, headers, ip, deps, body, app: app || str(body.app, 12) || '', secret });
+        return await run({ request, env, headers, ip, deps, body, app: app || str(body.app, 12) || '', secret, waitUntil });
       }
     }
 
     // Everything else needs a session.
     const claims = await readToken(secret, (method !== request.method && str(body.qt, 4096)) || url.searchParams.get('qt'), 'ses', deps.now());
     if (!claims) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
-    if (sessionLimited(`${app}:${claims.s}`, TOKEN_LIMIT, 60_000, deps.now())) return errorJson('RATE_LIMITED', 429, headers, request);
+    if (sessionLimited(`${app}:${claims.s}`, limitOf(claims, TOKEN_LIMIT), 60_000, deps.now())) return errorJson('RATE_LIMITED', 429, headers, request);
     const docId = claims.d;
 
     if (method === 'GET') {
@@ -427,7 +428,8 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
           const paid = await updateWallet(env, deps, docId, w => mergeWallet(w, { entries: paydayEntries(w, deps.now()) }));
           if (paid) ({ wallet, updateTime: walletTime } = paid);
         }
-        out.token = await sessionToken(secret, claims, deps.now());
+        out.token = await sessionToken(secret, { ...claims, p: priorityPass(wallet) }, deps.now());
+        seenNow(env, { id: docId, pri: priorityPass(wallet), waitUntil });
       }
       Object.assign(out, { wallet: publicWallet(wallet), walletTime, pool: poolBalance(wallet), updateTime: '', payload: '' });
       sameWallet(out, url.searchParams.get('w'));
@@ -484,7 +486,8 @@ export async function handleEcoRequest(request, env, headers, ip, deps) {
       );
       if (!result) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
       if (refused) return json({ error: { code: refused, message: refused }, live: liveOf(result.wallet, claims.a) }, refused === 'ECO_SIGNED_OUT' ? 401 : 409, headers);
-      const out = { wallet: publicWallet(result.wallet), walletTime: result.updateTime, pool: poolBalance(result.wallet), token: await sessionToken(secret, claims, now) };
+      const out = { wallet: publicWallet(result.wallet), walletTime: result.updateTime, pool: poolBalance(result.wallet), token: await sessionToken(secret, { ...claims, p: priorityPass(result.wallet) }, now) };
+      seenNow(env, { id: docId, pri: priorityPass(result.wallet), waitUntil });
       // (A save that left the wallet as the device holds it: not sent back.)
       if (body.w && body.w === result.updateTime) {
         delete out.wallet;
@@ -556,7 +559,15 @@ async function readInbox(env, deps, wallet, app) {
 // (A session on a fresh pass is of its own kind, 'new': every route that
 // reads a session ('ses') turns it away by itself; only `rotate`, which
 // replaces the pass, takes it.)
-const sessionToken = (secret, c, now) => signToken(secret, { k: c.f ? 'new' : 'ses', d: c.d, a: c.a, s: c.s, g: c.g, e: now + SESSION_MS });
+// (`p`: a priority pass, door.js: no per-session limits, never turned away.)
+const sessionToken = (secret, c, now) => signToken(secret, { k: c.f ? 'new' : 'ses', d: c.d, a: c.a, s: c.s, g: c.g, e: now + SESSION_MS, ...(c.p ? { p: 1 } : {}) });
+export const priorityPass = w => Boolean(w?.sec?.priority);
+// Through the door (door.js) before a session is handed out: { ok: true },
+// or the 503 to send with the place in line.
+async function doorFor(ctx, id, wallet) {
+  const out = await admit(ctx.env, { id, pri: priorityPass(wallet), waitUntil: ctx.waitUntil });
+  return out.ok ? null : ctx.deps.json(fullBody(out), 503, ctx.headers);
+}
 
 // ---- A fresh pass: replaced before anything else -------------------------------------
 //
@@ -586,7 +597,9 @@ export async function signIn(ctx, docId, { passcode = null } = {}) {
   // on a pass never used marks it fresh before the app's use is noted.)
   const result = await updateWallet(env, deps, docId, w => goLive(touchApp(mergeWallet(passcode ? w : markFresh(w), { entries: paydayEntries(w, now) }), app, now), app, sid, now));
   if (!result) return null;
-  const c = { d: docId, s: sid, a: app, g: gen(result.wallet), f: freshPass(result.wallet) };
+  const turned = await doorFor(ctx, docId, result.wallet);
+  if (turned) return turned;
+  const c = { d: docId, s: sid, a: app, g: gen(result.wallet), f: freshPass(result.wallet), p: priorityPass(result.wallet) };
   const out = await sessionReply(env, deps, secret, result, c, now, { app: c.f ? '' : app, inbox: !c.f && body.inbox });
   out.refresh = await refreshToken(secret, c, now);
   if (passcode) out.passcode = passcode;
@@ -670,14 +683,16 @@ async function ecoRefresh(ctx) {
   const c = await readToken(secret, body.refresh, 'ref', now);
   if (!c) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
   if (!ECO_APPS[app]) return errorJson('ECO_UNKNOWN_APP', 400, headers, request);
-  if (sessionLimited(`r:${c.s}`, 30, 60_000, now)) return errorJson('RATE_LIMITED', 429, headers, request);
   const doc = await deps.fsGet(env, WALLET_COLLECTION, c.d);
   const wallet = doc.exists ? parseWallet(doc.payload) : null;
   if (!wallet || gen(wallet) !== c.g) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
-  const claims = { d: c.d, s: c.s, a: app, g: c.g, f: freshPass(wallet) };
+  if (sessionLimited(`r:${c.s}`, limitOf({ p: priorityPass(wallet) }, 30), 60_000, now)) return errorJson('RATE_LIMITED', 429, headers, request);
+  const claims = { d: c.d, s: c.s, a: app, g: c.g, f: freshPass(wallet), p: priorityPass(wallet) };
   const live = isActive(wallet, claims);
   const w = str(body.w, 100);
   if (!live && !body.claim) return json(sameWallet({ active: false, live: liveOf(wallet, app), wallet: publicWallet(wallet), walletTime: doc.updateTime, pool: poolBalance(wallet) }, w), 200, headers);
+  const turned = await doorFor(ctx, c.d, wallet);
+  if (turned) return turned;
   let result = { wallet, updateTime: doc.updateTime };
   if (!live || paydayEntries(wallet, now).length) {
     result = await updateWallet(env, deps, c.d, w => goLive(touchApp(mergeWallet(w, { entries: paydayEntries(w, now) }), app, now), app, c.s, now));
@@ -713,7 +728,7 @@ async function walletOp(ctx, limitKey, change) {
   const now = deps.now();
   const c = await readToken(secret, body.qt, 'ses', now);
   if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
-  if (sessionLimited(`${limitKey}:${c.s}`, 10, 60_000, now)) return deps.errorJson('RATE_LIMITED', 429, headers, request);
+  if (sessionLimited(`${limitKey}:${c.s}`, limitOf(c, 10), 60_000, now)) return deps.errorJson('RATE_LIMITED', 429, headers, request);
   let refused = null;
   let extra = {};
   const result = await updateWallet(

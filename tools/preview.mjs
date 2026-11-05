@@ -792,7 +792,7 @@ if (key === 'admin') {
     ];
     // (Taxes as Securities reports them, on every other account.)
     const snap = i % 2 ? {} : { stock: { gov: { trade: 450 + i * 37, withheld: i % 3 ? 0 : 1_350, nhi: i === 4 ? 422 : 0 } } };
-    const w = { v: 1, v2: made, created: made, entries, snap, settings: {}, apps, inbox: {} };
+    const w = { v: 1, v2: made, created: made, entries, snap, settings: {}, apps, inbox: {}, ...(i === 2 || i === 7 ? { sec: { priority: true } } : {}) };
     docs.set(`${WALLET_COLLECTION}/${createHash('sha256').update(`PREVIEW${i}`).digest('hex')}`, { payload: JSON.stringify(w), updateTime: new Date(made).toISOString() });
   }
   const kv = new Map();
@@ -815,6 +815,18 @@ if (key === 'admin') {
       hours.push([t, Math.round(520 + 1150 * busy), Math.round(6500 + 11500 * busy)]);
     }
     env.GUARD = { fetch: async () => new Response(JSON.stringify({ at: now - 600_000, hours })) };
+  }
+  // (The door, door.js, made up: 184 people in of 200 (busy), 3 priority, a peak and some turned away today.)
+  {
+    const { Door } = await import('../door.js');
+    const kept = new Map();
+    const door = new Door({ storage: { get: async k => kept.get(k), put: async (k, v) => void kept.set(k, v) } }, env);
+    const book = (await door.load());
+    book.max = 200;
+    for (let i = 0; i < 184; i++) book.seats[`p${i}`] = now - (i % 14) * 60_000;
+    for (let i = 0; i < 3; i++) book.pri[`v${i}`] = now - i * 60_000;
+    Object.assign(book, { day: new Date(now + 8 * 3_600_000).toISOString().slice(0, 10), peak: { n: 200, at: now - 2 * 3_600_000 }, turned: 37 });
+    env.DOOR = { idFromName: () => 'door', get: () => ({ fetch: (url, init) => door.fetch(new Request(url, init)) }) };
   }
   // (Made-up Gemini calls over the week, the panel's AI 今天 and Google's day: D1 over node:sqlite.)
   // (The docs table too: 公開領取 counts its claims' accounts from it, gift.js.)

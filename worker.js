@@ -63,6 +63,9 @@ import { handleFlight } from './flight.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
 // The F1 lap log's Durable Object (f1-live.js), bound as F1_LOG.
 export { F1Log } from './f1-live.js';
+// The door's Durable Object (door.js), bound as DOOR: who gets in when too many come at once.
+export { Door } from './door.js';
+import { doorOf, doorSlow, limitOf, graceShut, fullBody } from './door.js';
 
 // ---- Bilingual error responses ----------------------------------------
 //
@@ -786,7 +789,7 @@ async function handleGeminiRequest(request, env, headers, ip, ctx, session = nul
 
   // Signed in with a Orbit Pass (required): counted per session in memory.
   if (!session) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
-  if (sessionLimited(`g:${session.s}`, GEMINI_RATE_LIMIT, 3_600_000)) return errorJson('RATE_LIMITED', 429, headers, request);
+  if (sessionLimited(`g:${session.s}`, limitOf(session, GEMINI_RATE_LIMIT), 3_600_000)) return errorJson('RATE_LIMITED', 429, headers, request);
   if (await isDailyCapped(env, ctx, 'gemini')) return errorJson('DAILY_QUOTA_EXCEEDED', 429, headers, request);
 
   const body = await readJsonBody(request, MAX_TOTAL_BASE64_LENGTH + 1_000_000);
@@ -1086,7 +1089,7 @@ async function handleNlEditRequest(request, env, headers, ip, ctx, session = nul
   if (request.method !== 'POST') return errorJson('POST_ONLY', 405, headers, request);
 
   if (!session) return errorJson('ECO_TOKEN_INVALID', 401, headers, request);
-  if (sessionLimited(`n:${session.s}`, NL_EDIT_RATE_LIMIT, 3_600_000)) return errorJson('RATE_LIMITED', 429, headers, request);
+  if (sessionLimited(`n:${session.s}`, limitOf(session, NL_EDIT_RATE_LIMIT), 3_600_000)) return errorJson('RATE_LIMITED', 429, headers, request);
   if (await isDailyCapped(env, ctx, 'nl-edit')) return errorJson('DAILY_QUOTA_EXCEEDED', 429, headers, request);
 
   const body = await readJsonBody(request);
@@ -1222,8 +1225,12 @@ async function devBody(env, ctx) {
   if (hit) return hit.text();
   // Paced by the bill's guard (pace.js): every live refresh `slow` times slower.
   const pace = await paceOf(env);
+  // Or by the door (door.js) while too many are in at once: the larger of
+  // the two, never both, so everyone in keeps the same steady baseline.
+  const { state } = await doorOf(env);
+  const slow = Math.max(pace.slow || 1, doorSlow(state));
   const dev = await readDev(env, ECO_DEPS);
-  const body = JSON.stringify(pace.slow > 1 ? { ...applyScale(dev, pace.slow), pace: pace.pace } : dev);
+  const body = JSON.stringify(slow > 1 ? { ...applyScale(dev, slow), pace: pace.pace, ...(state !== 'open' ? { door: state } : {}) } : dev);
   ctx.waitUntil(caches.default.put(key, new Response(body, { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } })));
   return body;
 }
@@ -1254,7 +1261,7 @@ async function route(request, env, ctx, headers, origin) {
     const session = await sessionOf(request, env);
     return path === '/gemini' ? handleGeminiRequest(request, env, headers, ip, ctx, session) : handleNlEditRequest(request, env, headers, ip, ctx, session);
   }
-  if (path === '/eco') return handleEcoRequest(request, env, headers, ip, ECO_DEPS);
+  if (path === '/eco') return handleEcoRequest(request, env, headers, ip, ECO_DEPS, p => ctx.waitUntil(p));
   // The data proxy for Sports and Securities (sports.js): its own
   // session gate and per-app limits.
   if (path === '/sports-proxy') return handleSports(request, env, ctx, headers, ip);
@@ -1344,13 +1351,13 @@ async function route(request, env, ctx, headers, origin) {
   // Orbit Securities' orders filled here (stock-fill.js): a Securities session.
   if (path === '/stock') {
     const session = await sessionOf(request, env);
-    if (session && sessionLimited(`st:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
+    if (session && sessionLimited(`st:${session.s}`, limitOf(session, 30))) return errorJson('RATE_LIMITED', 429, headers, request);
     return handleStock(request, env, headers, session, { json, errorJson, fsGet: DOCS.get, fsWrite: DOCS.write, now: () => Date.now(), read: url => stockReads(env)(url) });
   }
   // Web Push (push.js): here, where the Orbit Pass tokens can be read.
   if (path.startsWith('/push/')) {
     const session = await sessionOf(request, env);
-    if (session && sessionLimited(`p:${session.s}`, 30)) return errorJson('RATE_LIMITED', 429, headers, request);
+    if (session && sessionLimited(`p:${session.s}`, limitOf(session, 30))) return errorJson('RATE_LIMITED', 429, headers, request);
     return handlePush(request, env, headers, session, path);
   }
   // Orbit Weather (weather.js): a Orbit Pass session for the forecast and
@@ -1366,7 +1373,8 @@ async function route(request, env, ctx, headers, origin) {
     // (or the showcase's live demo, showcase.js: a showcase pass, its own asks a minute)
     const show = !signed && !dev && (await showcaseOf(request, env, { ip, origin }));
     const session = signed || (dev ? { s: 'dev', dev: true } : null) || show || null;
-    return handleWeather(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `w:dev:${ip}` : `w:${session?.s}`, show ? 10 : 30) });
+    if (await graceShut(env, signed)) return json(fullBody(), 503, headers);
+    return handleWeather(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `w:dev:${ip}` : `w:${session?.s}`, show ? 10 : limitOf(session, 30)) });
   }
   // Orbit Transit (transit.js): a Orbit Pass session for everything but
   // the usage page. Or a local dev page (localhost, http or https: the
@@ -1380,7 +1388,8 @@ async function route(request, env, ctx, headers, origin) {
     // (or the showcase's live demo, showcase.js: its paid asks from their own share, transit.js)
     const show = !signed && !dev && (await showcaseOf(request, env, { ip, origin }));
     const session = signed || (dev ? { s: 'dev', dev: true } : null) || show || null;
-    return handleTransit(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `t:dev:${ip}` : `t:${session?.s}`, dev ? 300 : show ? SHOW_PER_MIN : 90) });
+    if (await graceShut(env, signed)) return json(fullBody(), 503, headers);
+    return handleTransit(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `t:dev:${ip}` : `t:${session?.s}`, dev ? 300 : show ? SHOW_PER_MIN : limitOf(session, 90)) });
   }
   // Orbit Class's 專注飛行 (flight.js): real planes landing in about N
   // minutes, then one followed. A Pass session, or the dev door as Transit's.
@@ -1388,7 +1397,7 @@ async function route(request, env, ctx, headers, origin) {
     const signed = await sessionOf(request, env, READ_GRACE_MS);
     const dev = !signed && LOCAL_ORIGIN.test(origin);
     const session = signed || (dev ? { s: 'dev', dev: true } : null);
-    return handleFlight(request, headers, { session, ctx, colo: request.cf?.colo || '', limited: () => sessionLimited(dev ? `f:dev:${ip}` : `f:${session?.s}`, 30) });
+    return handleFlight(request, headers, { session, ctx, colo: request.cf?.colo || '', limited: () => sessionLimited(dev ? `f:dev:${ip}` : `f:${session?.s}`, limitOf(session, 30)) });
   }
   return errorJson('NOT_FOUND', 404, headers, request);
 }

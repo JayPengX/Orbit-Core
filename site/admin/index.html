@@ -87,6 +87,14 @@
   .flow li.sum .nm, .flow li.sum .v { font-weight: 800; }
   .flow.stack .nm small { display: block; margin: 2px 0 0; white-space: nowrap; overflow: hidden; }
   #cap .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #door .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (min-width: 900px) { #door .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .tile strong.warn { color: var(--q-warn, #c77700); }
+  .door-set { margin-top: 10px; align-items: center; gap: 8px; flex-wrap: nowrap; }
+  .door-set label { white-space: nowrap; }
+  .door-set input { width: 110px; }
+  .door-set button { margin-left: auto; }
+  button.link { background: none; padding: 0; border: 0; font: inherit; font-weight: 600; color: var(--q-text); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
   .flow .bar i.warn { background: var(--q-warn, #c77700); }
   .flow .v.warn { color: var(--q-warn, #c77700); }
   .flow .v small { display: block; margin-top: 1px; font-size: 12px; font-weight: 500; color: var(--q-muted); }
@@ -521,6 +529,14 @@
       <div class="card">
         <strong>比賽進行中，比 ESPN 晚多久</strong>
         <div class="lag" id="dev-lag"></div>
+      </div>
+      <div class="card" id="door">
+        <div class="row spread"><strong>入場：同時在用的人</strong><button id="door-load" class="small">重新整理</button></div>
+        <p id="door-error" class="error"></p>
+        <div class="tiles" id="door-tiles"></div>
+        <div class="row door-set"><label for="door-max">同時最多</label><input id="door-max" type="number" min="0" step="10" inputmode="numeric" placeholder="不限" /><span class="muted">人</span><button id="door-save" class="small primary">套用</button></div>
+        <ul class="flow stack" id="door-pri" style="margin-top:8px"></ul>
+        <details class="note"><summary>說明</summary><p class="muted" style="margin:8px 0 0">在用＝15 分鐘內開過 App。到 80% 時，即時資料放慢一倍；額滿時再慢一點，新來的人排隊（App 顯示第幾位，每 20 秒再試），已經在用的人不受影響。帳單保護到「先顧基本」時也不再放新的人進來。優先通行的 Pass 不受限制、不占位置，到帳戶裡設定。0＝不限。</p></details>
       </div>
       <div class="card" id="cap">
         <div class="row spread"><strong>容量：人數和額度</strong><button id="cap-load" class="small">重新估算</button></div>
@@ -1182,7 +1198,7 @@ const kindIc = k => KIND_IC[k] || ['list', '#94a3b8'];
 const REC_FILTERS = { all: ['全部', () => true], in: ['進', e => e.amount > 0], out: ['出', e => e.amount < 0], eco: ['Orbit', e => e.app === 'eco'] };
 function drawAccount(a) {
   const reload = () => openAccount(a.ref);
-  const tags = [a.balance < 0 ? '透支' : '', a.reliefs ? `紓困 ×${a.reliefs}` : '', a.lastUsed ? '' : '未使用'].filter(Boolean);
+  const tags = [a.priority ? '優先' : '', a.balance < 0 ? '透支' : '', a.reliefs ? `紓困 ×${a.reliefs}` : '', a.lastUsed ? '' : '未使用'].filter(Boolean);
   const hero = el('div', { class: 'acct-hero' });
   hero.innerHTML = heroCardHtml({ eyebrow: '餘額', icon: ic('wallet'), big: money(a.balance), sub: a.apps.length ? `${a.apps.length} 個 App · ${ago(a.lastUsed)}用過` : '還沒用過', color: refColor(a.ref) }, tags.length ? `<div class="hero-chips">${tags.map(t => `<button type="button" tabindex="-1">${escHtml(t)}</button>`).join('')}</div>` : '');
   const facts = el('div', { class: 'facts' });
@@ -1281,7 +1297,16 @@ function drawAccount(a) {
     return `已刪除帳戶 ${r.ref}${r.pushes ? `、${r.pushes} 個通知訂閱` : ''}${r.shares ? `、${r.shares} 個分享碼` : ''}`;
   });
   delBtn.onclick = () => del.run(delBtn);
+  // 優先: never held to a per-session limit, always let in (door.js), from its next session.
+  const priBtn = el('button', { class: a.priority ? '' : 'primary', text: a.priority ? '取消優先' : '設為優先' });
+  const priority = action(a.priority ? '優先通行' : '設為優先通行', '不受限制，額滿也能進。', [priBtn], async () => {
+    const r = await admin('priority', { wallet: a.ref, on: !a.priority });
+    setTimeout(reload, 700);
+    return r.priority ? '已設為優先' : '已取消優先';
+  });
+  priBtn.onclick = () => priority.run(priBtn);
   const ACTS = [
+    ['優先', 'star', '#ca8a04', priority],
     ['調整金額', 'pencil', '#2563eb', grant],
     ['裝置代碼', 'key', '#0d9488', recover],
     ['登出裝置', 'lock', '#64748b', signout],
@@ -1854,11 +1879,53 @@ async function loadDev() {
     devNow = got.now ? cleanDev(got.now) : null;
     devDraft = cleanDev(devSaved);
     drawDev();
+    loadDoor();
     loadCapacity();
   } catch (e) {
     $('dev-error').textContent = e.message;
   }
 }
+// ---- 入場 (door.js) ----
+const DOOR_ZH = { open: ['開放', 'pos'], busy: ['忙碌', 'warn'], full: ['額滿', 'neg'] };
+async function loadDoor() {
+  $('door-error').textContent = '';
+  try {
+    const { door: d, priority = [] } = await admin('door');
+    if (!d) {
+      $('door-tiles').replaceChildren(tile('狀態', '—', '還沒部署'));
+      return;
+    }
+    const [state, tone] = DOOR_ZH[d.state] || DOOR_ZH.open;
+    const st = tile('狀態', state, d.closed ? '帳單保護：不放新的人' : d.seats ? `最多 ${n0(d.seats)} 人` : '不限人數');
+    st.querySelector('strong').className = tone;
+    $('door-tiles').replaceChildren(
+      tile('在用', `${n0(d.n)} 人`, d.pri ? `另有優先 ${d.pri} 人` : '15 分鐘內'),
+      st,
+      tile('排隊', `${n0(d.line)} 人`, d.turned ? `今天排過 ${n0(d.turned)} 人` : '今天沒人排'),
+      tile('今天最多', `${n0(d.peak?.n)} 人`, d.peak?.at ? fmtShort(d.peak.at) : '—')
+    );
+    if (document.activeElement !== $('door-max')) $('door-max').value = d.max || '';
+    $('door-pri').replaceChildren(
+      ...(priority.length
+        ? priority.map(p => el('li', {}, [el('span', { class: 'nm' }, [el('button', { class: 'link', text: p.ref, onclick: () => openAccount(p.ref) }), el('small', { text: p.last ? `${ago(p.last)}用過` : '還沒用過' })]), el('span', { class: 'v', text: '優先' })]))
+        : [el('li', {}, [el('span', { class: 'nm' }, ['優先通行', el('small', { text: '還沒有：到帳戶裡設定' })])])])
+    );
+  } catch (e) {
+    $('door-error').textContent = e.message;
+  }
+}
+$('door-load').onclick = () => busy($('door-load'), loadDoor);
+$('door-save').onclick = () =>
+  busy($('door-save'), async () => {
+    $('door-error').textContent = '';
+    try {
+      await admin('door-set', { max: Math.max(0, Math.floor(Number($('door-max').value) || 0)) });
+      $('door-max').blur();
+      await loadDoor();
+    } catch (e) {
+      $('door-error').textContent = e.message;
+    }
+  });
 // ---- 容量 (capacity.js) ----
 const n0 = v => Math.round(v || 0).toLocaleString();
 const SKU_ZH = { maps: '地圖載入', autocomplete: '地點搜尋', details: '地點位置', detailsPro: '地點名稱', textSearch: '搜尋補充', routes: '路線規劃', matrix: '步行時間' };

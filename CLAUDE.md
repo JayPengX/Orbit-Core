@@ -17,10 +17,9 @@ cron's work, a workflow. `npm test` fails on your machine when a kit file,
 Worker file, route, binding, D1 table, builder or workflow isn't named here
 (`tests/claude-map.test.mjs`; on GitHub only a warning). An app's own structure goes in its `MAP.md`.
 
-**Look before you write.** Before writing a helper, a component or a style,
-find what the kit has: `node tools/kit-find.mjs <word…>` lists the kit's
-exports and CSS classes whose name or comment matches. Use it, extend it, or
-move your own into the kit (TRUTH §4); never a second copy in an app.
+**Look before you write.** Before a helper, a component or a style, run
+`node tools/kit-find.mjs <word…>` (the kit's exports and CSS classes). Use
+it, extend it, or move yours into the kit (TRUTH §4); never a second copy.
 
 ## Working here
 
@@ -46,7 +45,7 @@ phone: a home-screen app at orbit.jaypengx.com/<slug>/
  └─ /api/… on the same origin (a route to the proxy; api.jaypengx.com answers too)
         ▼
 orbit-workers-proxy (worker.js, near each caller): every route in §4
- │  edge cache (Cache API, by tier) · D1 STORE · R2 DATA · KV RATE_LIMIT_KV · DO F1_LOG
+ │  edge cache (Cache API, by tier) · D1 STORE · R2 DATA · KV RATE_LIMIT_KV · DO F1_LOG, DOOR
  │  crons: even and odd minutes (builders, notices, weather scoring, capacity, F1 laps)
  ├─ upstreams: ESPN, MLB, Jolpica, F1 timing, OpenF1, Polymarket, Yahoo, TDX,
  │   Google, CWA, MOENV, 立法院 and IVOD, 司法院, NCDR, TAIFEX, SITCA…
@@ -59,7 +58,7 @@ orbit-site (site.js): the domain's hosts as custom domains
 
 ## 2. The apps
 
-| App | Kit id (stores under) | Address `orbit.jaypengx.com/…` | Repo | Its data on the Pass (D1 collection) |
+| App | Kit id | Address `orbit.jaypengx.com/…` | Repo | D1 collection |
 | --- | --- | --- | --- | --- |
 | Orbit Sports | `match` | `/sports/` | Orbit-Sports | `match-find-settings` |
 | Orbit Transit | `transit` | `/transit/` | Orbit-Transit | `orbit-transit` |
@@ -98,11 +97,9 @@ modules for modulepreload. `node kit/apps.mjs` refreshes the snippets in every
 app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for tests.
 
 - **Addresses by content.** The kit's deploy (`kit/stamp.mjs`) and every
-  app's (`kit/stamp-app.mjs`) minify each file and address it by its own
-  content hash (`?v=<hash>`, `kit/hash.mjs`), so a phone downloads only the
-  files a push changed; the kit's `version.json` lists every hash, the
-  device notes them (`orbit.kitFiles`), and a push that changes no kit file
-  is no update.
+  app's (`kit/stamp-app.mjs`) minify each file and address it by its hash
+  (`?v=<hash>`, `kit/hash.mjs`): a phone downloads only what a push changed;
+  `version.json` lists every hash (the device's `orbit.kitFiles`).
 - **Updates.** An open app swaps once the new version's files are on the
   phone (`updateReady`; `sw.js versionFirst` opens it);
   `sw.js` never refuses `boot.js`, which mends an unfinished update.
@@ -222,15 +219,17 @@ w;dur=` (the Worker's own time), which the 除錯紀錄 notes with a slow read.
 - **The gate:** every route needs a Pass session (`qt=`), counted per
   session and app in memory (600 a minute on the data proxy). Public routes
   (`/sports-today`, `/law-live`) answer our pages' origins only.
+- **The door** (`door.js`, DO `Door`): asked only as `/eco` hands out a
+  session. Past the most at once (admin 入場) or `pace.newcomers === false`:
+  503 `ORBIT_FULL`, a place in line (kit `waitInLine`); busy/full slow
+  `/config` 2×/3×. Priority passes (`sec.priority`, token `p: 1`) skip
+  every per-session limit (`limitOf`).
 - **Same origin:** a page calls `orbit.jaypengx.com/api/…` (`kit/domain.mjs`
   `API`; worker.js `viaSite` takes `/api` off). `api.` and workers.dev answer too.
 - **Dev doors:** a request with `Origin: http://localhost:<port>` and no
   pass gets a dev session on `/sports-proxy`, `/transit`, `/weather` and
-  `/flight` (counted per address). `tools/preview.mjs --live` uses them.
-
-  ```bash
-  curl -H 'Origin: http://localhost:8123' 'https://api.jaypengx.com/sports-proxy?url=<encoded>&app=match'
-  ```
+  `/flight` (counted per address): `tools/preview.mjs --live`, or `curl -H
+  'Origin: http://localhost:8123' '…/sports-proxy?url=<encoded>&app=match'`.
 
 - **Crons:** even minutes (notices, builders at :16 and on, weather
   scoring, capacity); F1's laps on both. Add work to these (or a Durable
@@ -298,14 +297,13 @@ A read (`kit proxyJson`) goes down these until one answers:
    anyone reads it;
 7. the upstream.
 
-- On the device, a copy past its `ttl` is read again and the page waits for
-  that read; the old copy is the answer only if the read fails. To paint at
+- On the device, a copy past its `ttl` is read again, the old copy the
+  answer only if that fails. To paint at
   once on what the phone has, an app asks `peekJson(url)` (the last copy of
   any age) first and draws the fresh one when it lands.
 - Reads made within a few milliseconds go to the proxy as one batch.
-- A failed read is a failure, never "nothing there". It answers the device's
-  copy of any age and is asked again soon. A batch item that fails is that
-  item's failure alone.
+- A failed read is a failure, never "nothing there": the device's copy of
+  any age answers, asked again soon; a failed batch item fails alone.
 - Two sources answer the phone itself (open to any page): ESPN's core API
   always (it refuses the proxy); Jolpica when the proxy can't get it
   (it counts per address, and Cloudflare's are shared), at once and for
@@ -320,8 +318,8 @@ A read (`kit proxyJson`) goes down these until one answers:
 | --- | --- | --- |
 | D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data, the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced (§5.3); `gemini_call`: every Gemini call (`gemini-use.js`); `law_day`: the AI caps' counts a day; `gift`, `gift_claim`: the giveaway (`gift.js`); `beats`: each job's last run and failures (`ops.js`) |
 | R2 `orbit-data` | `DATA` | Public: the builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `where.json`), the proxy's kept reads (`mirror/`). Never served: `private/` (the nightly store backups `private/store/<day>.jsonl.gz`, Firestore's last copy) |
-| KV | `RATE_LIMIT_KV` | Counters (sign-ins, per-address limits); the guard's state, pace and alerts (`guard:*`); push's devices, prefs and due notices (`push:*`); Google Weather's shared cells and its calls a day (`weather:g:*`, `weather:google:<day>`); TDX's last good reads and its month's meter (`tdx:warm:*`, `transit:use:<month>`); Law's kept plans and answers (`law:*`); the showcase's passes a day (`showcase:passes:*`); `ops:data-folders` |
-| Durable Objects | `F1_LOG`, `CLOCK` | `F1Log`: F1's laps as they're driven; `GuardClock`: the guard's alarm |
+| KV | `RATE_LIMIT_KV` | Counters (sign-ins, per-address limits); the guard's state, pace and alerts (`guard:*`); push's devices, prefs and due notices (`push:*`); Google Weather's shared cells and its calls a day (`weather:g:*`, `weather:google:<day>`); TDX's last good reads and its month's meter (`tdx:warm:*`, `transit:use:<month>`); Law's kept plans and answers (`law:*`); the showcase's passes a day (`showcase:passes:*`); the door's state (`door:state`); `ops:data-folders` |
+| Durable Objects | `F1_LOG`, `DOOR`, `CLOCK` | `F1Log`: F1's laps as they're driven; `Door`: seats and the line; `GuardClock`: the guard's alarm |
 | Edge cache | (Cache API) | The data proxy's answers by tier (§4.1), `/sports-today`, TDX's reads and routes (`transit.js`), the weather blend's cells (`weather.js`), `/law-live`, `/law-page`, `/config` |
 | Services | `GEMINI_RELAY`, `LAW_SITE`, `GUARD` | The relay; Orbit Law's site (its data, read by the proxy); the guard's `/errors` |
 
@@ -330,13 +328,13 @@ A new Cloudflare product goes into `guard.js` `PLAN` in the same change.
 
 ### 5.3 The Pass and each app's data (sync)
 
-- **Session:** `orbitSession(app)` (orbit.mjs) signs in (the gate), makes
-  this app the live one, and gives `q.read({ data, inbox })`,
+- **Session:** `orbitSession(app)` signs in, makes this app live, and
+  gives `q.read({ data, inbox })`,
   `q.write({ payload, wallet })` (only while live), `q.claim()`, events
   (`wallet`, `active`, `claim`, `signedout`), and a heartbeat every 2 minutes.
   One app runs in one place at a time; others get `409 ECO_SESSION_MOVED`.
 - **The wallet** (`eco-wallets`) is merged by the Worker (`mergeWallet`):
-  `entries` (fixed ids, so one sent twice counts once), `snap` (each app's
+  `entries` (fixed ids: sent twice counts once), `snap` (each app's
   figures, newest wins), `settings` (newest wins per key), `apps`, `inbox`,
   `live`, `sec`.
 - **Each app's data** is one document in its own collection (§2), under the
@@ -463,7 +461,7 @@ can be turned off on its own.
   `SHORT` in `kit/brand.mjs`; one origin, so one Pass sign-in), `orbit-pass`
   for `/`, `/pass/`, `/key/`, `/Orbit-Core/` and the old `/Shared-Proxy/`,
   `orbit-home` for `<DOMAIN>/` (Orbit-Showcase: Jay's homepage, `/showcase/`).
-  Paths behave as a plain static site (`/law` moves to `/law/`). Mail to
+  Plain static paths (`/law` → `/law/`). Mail to
   `*@<DOMAIN>` reaches the proxy by Email Routing's catch-all. `deploy.yml`
   attaches the hostnames (its token needs the zone and D1 Edit); the guard
   takes them off with the proxy.
@@ -472,7 +470,7 @@ can be turned off on its own.
 
 | Tool | What |
 | --- | --- |
-| `node tools/kit-find.mjs <word…>` | The kit's exports and CSS classes whose name or comment matches: look here before writing a helper or a style |
+| `node tools/kit-find.mjs <word…>` | The kit's exports and CSS classes matching: look before writing a helper or a style |
 | `node tools/shots.mjs <app> [page…]` | Every screenshot a change needs (five screens × light/dark, live data, signed in), a contact sheet, faults, `--before main` diff; pages in `tools/shots/pages.mjs` |
 | `node tools/preview.mjs <app>` | The app with real data (`--live`, `--width`, `--timing`, `--requests`, `--profile`, `--webkit`, `--reopen`…); prints `wraps:`, `cut:`, `scrolls sideways:` |
 | `node tools/gate.mjs [app…]` | The family quality gate (`tools/gate-page.js`): lift, stalls, dead taps, wraps, cuts, letters, white, mixed language… on every tab |

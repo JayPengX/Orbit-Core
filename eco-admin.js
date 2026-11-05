@@ -14,6 +14,7 @@
 // The token is checked against the Worker's secret ECO_ADMIN_TOKEN (by its
 // SHA-256; the token itself is never in the repo). Without the secret, no one gets in.
 
+import { doorReport, doorSet } from './door.js';
 import { systemReport, alertAccount, tell, OPS_DOC } from './ops.js';
 import { passAccount, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet } from './eco.js';
 import { sendPush, dueLists } from './push.js';
@@ -243,6 +244,7 @@ async function walletList(env, deps) {
       balance: wallet ? poolBalance(wallet) : null,
       gen: wallet ? gen(wallet) : null,
       passkeys: wallet?.passkeys?.keys?.length || 0,
+      priority: Boolean(wallet?.sec?.priority),
       ...creditOf(wallet),
       updateTime: w.updateTime
     };
@@ -496,9 +498,38 @@ export const ADMIN_TOOLS = {
       inbox: Object.fromEntries(Object.entries(wallet.inbox || {}).map(([k, v]) => [k, v.length])),
       pushes,
       passkeys: passkeySummary(wallet),
+      priority: Boolean(wallet.sec?.priority),
       ...creditOf(wallet),
       gov: govOf(wallet)
     };
+  },
+  // The door (door.js): the people in now, the line, the state and the most
+  // at once; the priority passes.
+  async door({ env, deps }) {
+    const [now, list] = await Promise.all([doorReport(env).catch(() => null), deps.fsList(env, WALLET_COLLECTION, 300)]);
+    const priority = list
+      .map(w => ({ id: w.id, w: parseWallet(w.payload) }))
+      .filter(x => x.w?.sec?.priority)
+      .map(x => ({ ref: x.id.slice(0, 8), last: lastUsed(x.w) || null }));
+    return { door: now, priority };
+  },
+  async 'door-set'({ env, body }) {
+    const out = await doorSet(env, body.max);
+    return out ? { door: out } : { error: 'ADMIN_NO_DOOR', status: 503 };
+  },
+  // A pass made priority, or not: never held to a per-session limit, always
+  // let in (from its next session, within 2 minutes).
+  async priority({ env, deps, body }) {
+    const hit = await findWallet(env, deps, body.wallet);
+    if (!hit) return notFound;
+    const on = Boolean(body.on);
+    const res = await updateWallet(env, deps, hit.id, w => {
+      const sec = { ...(w.sec || {}) };
+      if (on) sec.priority = true;
+      else delete sec.priority;
+      return { ...w, sec };
+    });
+    return { ok: true, priority: Boolean(res?.wallet?.sec?.priority) };
   },
   // Money by hand (a correction, a prize): an 'eco' entry, kind 'admin', with its reason.
   async grant({ env, deps, body }) {
