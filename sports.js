@@ -12,6 +12,7 @@
 // (from /eco), checked with ECO_TOKEN_SECRET and counted per session and app
 // in this isolate's memory, never in KV. A localhost page without one is let
 // in by the dev door (SPORTS_DEV).
+import { graceShut, limitOf, fullBody } from './door.js';
 import { paceOf } from './pace.js';
 import { readToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
 import { BRANDS } from './kit/brand.mjs';
@@ -1545,8 +1546,10 @@ async function checkSession(env, requestParams, headers, weight = 1, request = n
   }
   const session = await readToken(env.ECO_TOKEN_SECRET, requestParams.get('qt') || '', 'ses', Date.now() - READ_GRACE_MS);
   if (!session) return { error: json({ error: { code: 'ORBIT_PASS_REQUIRED', message: 'Sign in with a Orbit Pass.' } }, 401, headers) };
-  // (Paced by the bill's guard: a share of the usual, pace.js.)
-  const limit = Math.max(60, Math.round(SESSION_RATE_LIMIT * (await paceOf(env)).reads));
+  // (A session run out, without a seat, while the door is full: door.js.)
+  if (await graceShut(env, session)) return { error: json(fullBody(), 503, headers) };
+  // (Paced by the bill's guard: a share of the usual, pace.js; none for a priority pass.)
+  const limit = limitOf(session, Math.max(60, Math.round(SESSION_RATE_LIMIT * (await paceOf(env)).reads)));
   for (let i = 0; i < weight; i++) if (sessionLimited(`${app}:${session.s}`, limit)) return { error: tooMany(headers) };
   return { session };
 }

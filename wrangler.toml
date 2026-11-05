@@ -111,6 +111,16 @@ class_name = "F1Log"
 tag = "f1-log-main"
 new_sqlite_classes = ["F1Log"]
 
+# The door (door.js): who's using Orbit now, seats and a line when too many
+# come at once; asked only when a session is handed out.
+[[durable_objects.bindings]]
+name = "DOOR"
+class_name = "Door"
+
+[[migrations]]
+tag = "door-main"
+new_sqlite_classes = ["Door"]
+
 # Two crons, the even minutes and the odd: every minute between them. New
 # crons added on 2026-10-13 (F1's minute, the builders' hour, the guard's
 # five) were registered and never run (a known fault of new crons that

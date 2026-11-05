@@ -860,3 +860,18 @@ test('a lazy logo off the page is made eager by the rescue, not only one on it',
   assert.match(rescue, /img\.loading === 'lazy'\) img\.loading = 'eager'/);
   assert.doesNotMatch(rescue, /lazy' && picture\.isConnected/);
 });
+
+test('Orbit full (door.js): the refusal carries the place in line, never read as signed out', async () => {
+  store.clear();
+  const claims = Buffer.from(JSON.stringify({ k: 'ref', d: 'abcdef0123456789abcdef', s: 'S', g: 0, e: 9e15 })).toString('base64url');
+  store.set('orbit.refresh', `${claims}.sig`);
+  store.set('orbit.account', 'abcdef0123456789');
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: { code: 'ORBIT_FULL', message: 'ORBIT_FULL', place: 3, of: 9, again: 20 } }), { status: 503 });
+  const s = kit.orbitSession('weather', { heartbeat: 1e9 });
+  const error = await s.claim().catch(e => e);
+  assert.equal(error.code, 'ORBIT_FULL');
+  assert.equal(error.place, 3);
+  assert.equal(error.again, 20);
+  assert.equal(store.get('orbit.account'), 'abcdef0123456789', 'still signed in');
+  assert.match(kit.errorText(error, 'zh'), /人有點多/);
+});

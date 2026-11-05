@@ -458,7 +458,7 @@ async function call(method, query = '', body) {
     error.status = res.status;
     error.live = data?.live || null;
     if (data?.error?.index != null) error.index = data.error.index;
-    for (const k of ['why', 'max', 'until', 'need']) if (data?.error?.[k] != null) error[k] = data.error[k];
+    for (const k of ['why', 'max', 'until', 'need', 'place', 'of', 'again']) if (data?.error?.[k] != null) error[k] = data.error[k];
     throw error;
   }
   return data;
@@ -1754,8 +1754,10 @@ function makeSession(app, { lang, heartbeat }) {
         if (first?.signedOut) first = null;
       }
     } catch (error) {
-      // Offline: the cached wallet stands in until the next try.
-      first = { offline: true, error };
+      // Too many in at once (the Worker's door, door.js): a place in line,
+      // asked again until a seat frees up. Otherwise offline: the cached
+      // wallet stands in until the next try.
+      first = error?.code === 'ORBIT_FULL' ? await waitInLine(s, error, () => refresh({ claim: true, data })) : { offline: true, error };
     }
     if (!first) first = await signInGate(s);
     // A pass someone handed over: replaced before the app opens (the
@@ -2041,6 +2043,7 @@ const ERR = {
   ECO_CREATE_CLOSED: ['Orbit Pass 由擁有者發放，請向分享給你的人索取。', 'Orbit Passes are handed out by their owner: ask the person who shared Orbit with you.'],
   ECO_PAIR_NOT_FOUND: ['這組裝置代碼無效或已過期（10 分鐘內、只能用一次）。', 'That device code isn’t valid or has expired (10 minutes, once).'],
   RATE_LIMITED: ['嘗試太多次，請稍後再試。', 'Too many tries. Please wait a little.'],
+  ORBIT_FULL: ['現在人有點多，請過一兩分鐘再試。', 'Orbit is busy. Try again in a minute or two.'],
   ECO_RELIEF_REFUSED: ['目前不符合急難紓困資格。', 'You don’t qualify for relief right now.'],
   ECO_SESSION_MOVED: ['這個 App 已在別處開啟，回到這裡後再試一次。', 'This app is open somewhere else. Come back here and try again.'],
   ECO_PASSKEY_UNKNOWN: ['這個通行密鑰已不在任何 Orbit Pass 上，請用通行碼登入。', 'This passkey isn’t on any Orbit Pass any more. Sign in with your pass.'],
@@ -2374,6 +2377,33 @@ function showMoved(s) {
     ])
   ]);
   keepOnTop(movedEl);
+}
+// Orbit is full (door.js): the person's place in line, asked again every
+// `again` seconds until in (or offline: the cached wallet, as ever).
+async function waitInLine(s, error, retry) {
+  if (typeof document === 'undefined') return { offline: true, error };
+  const en = s.lang === 'en';
+  const placeText = e => (e?.place ? (en ? `You're number ${e.place} in line.` : `你排在第 ${e.place} 位。`) : en ? 'You’re in line.' : '你在排隊中。');
+  const text = node('p', { class: 'q-moved-text', text: `${placeText(error)}${en ? ' It opens by itself when it’s your turn.' : '輪到你時會自動開啟。'}` });
+  const box = node('dialog', { class: 'q-moved q-line', 'aria-modal': 'true', 'aria-live': 'polite' }, [node('div', { class: 'q-moved-box' }, [node('p', { class: 'q-moved-title', text: en ? 'Orbit is busy' : '現在人有點多' }), text])]);
+  keepOnTop(box);
+  globalThis.__bootStep?.('', 0.8);
+  let last = error;
+  try {
+    for (;;) {
+      await new Promise(done => setTimeout(done, Math.max(10, Math.min(60, Number(last?.again) || 20)) * 1000));
+      try {
+        const got = await retry();
+        return got?.signedOut ? null : got;
+      } catch (e) {
+        if (e?.code !== 'ORBIT_FULL') return { offline: true, error: e };
+        last = e;
+        text.textContent = `${placeText(e)}${en ? ' It opens by itself when it’s your turn.' : '輪到你時會自動開啟。'}`;
+      }
+    }
+  } finally {
+    dropFromTop(box);
+  }
 }
 function hideMoved() {
   dropFromTop(movedEl);

@@ -345,5 +345,5 @@ export const PAGES = {
     orders: { args: click('#tab-history', "js:document.querySelector('[data-action=hview][data-view=orders]')?.click()", wait(2500)) },
     stats: { args: click('#tab-history', "js:document.querySelector('[data-action=hview][data-view=stats]')?.click()", wait(2500)) }
   },
-  admin: { default: ['overview', 'accounts', 'money', 'health'], overview: { hash: 'overview' }, accounts: { hash: 'accounts' }, money: { hash: 'money' }, health: { hash: 'health' } }
+  admin: { default: ['overview', 'accounts', 'money', 'health'], overview: { hash: 'overview' }, accounts: { hash: 'accounts' }, money: { hash: 'money' }, health: { hash: 'health' }, dev: { hash: 'dev' }, account: { hash: 'accounts', args: click(wait(1500), card('beedc1a9'), wait(1500), "js:[...document.querySelectorAll('[data-act]')].find(b=>/優先/.test(b.textContent))?.click()", wait(800)) } }
 };
