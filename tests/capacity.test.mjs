@@ -144,7 +144,7 @@ test('quotas, few people: Google and TDX at a typical person\'s month, the fewes
   const days = 30; // November
   const tdx = q.rows.find(r => r.key === 'tdx:points');
   // A stop card a quarter hour, the map a quarter hour and a trip, on half the days.
-  assert.ok(Math.abs(TYPICAL_DAY['tdx:points'] - (0.25 * 0.83 + 0.25 * 0.39 + 0.02)) < 1e-9);
+  assert.ok(Math.abs(TYPICAL_DAY['tdx:points'] - (2 * 0.0187 + (13 / 60) * 0.54 + (15 / 60) * 0.2 + 0.02)) < 1e-9);
   assert.equal(tdx.holds, Math.floor((200 - tdx.fixedMonth) / (TYPICAL_DAY['tdx:points'] * ACTIVE * days)));
   const walks = q.rows.find(r => r.key === 'maps:matrix');
   assert.equal(walks.holds, Math.floor((9000 - 2000) / (5 * ACTIVE * days)));

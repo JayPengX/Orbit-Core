@@ -159,8 +159,10 @@ export function splitHours(h, now = Date.now()) {
 //   CPU: a session 28–491 ms (three 0.47 s), a stop card 6.7 s an hour,
 //     Transit's map 1.2 s, a live game nothing (ESPN from the phone);
 //   requests: a session ~30, a stop card ~30 a minute, the map ~15;
-//   TDX: a stop card 0.83 points an hour, the map 0.39, a planned trip 0.02
-//     (TDX's reads aren't shared here: one person's alone, so it errs low);
+//   TDX: an opening of Transit and a stop card 0.0187 points (stations,
+//     operators' notices, each city's first asks), then a stop card 0.54
+//     points an hour, the map 0.20, a planned trip 0.02 (TDX's reads aren't
+//     shared here: one person's alone, so it errs low);
 //   Google: an opening of Transit a map load; a search 3 asks as it's typed
 //     (each one Autocomplete and Text Search, the place picked 1 Place
 //     Details); a Google place tapped on the map its name (Pro); a trip 2
@@ -182,7 +184,7 @@ export const TYPICAL_DAY = {
   'maps:detailsPro': 0.5,
   'maps:routes': 2,
   'maps:matrix': 5,
-  'tdx:points': 0.25 * 0.83 + 0.25 * 0.39 + 0.02
+  'tdx:points': 2 * 0.0187 + (13 / 60) * 0.54 + (15 / 60) * 0.2 + 0.02
 };
 // (A week's person, a day: 1.2 s of CPU.)
 export const TYPICAL_CPU_MS = TYPICAL_DAY['cf:cpuMs'] * ACTIVE;
