@@ -109,11 +109,15 @@ export function applyScale(base, scale) {
 // (room left after the fixed part ÷ what people use now). The fewest is the
 // family's limit, and the quota that sets it is named.
 
-// The steady floor of Workers' requests and CPU: the last 7 days hour by hour
-// (guard.js useByHour); the quietest tenth of the hours is what runs with
-// nobody there (crons a minute; hourly builders included), × 24 a day.
-// What people add is at least a tenth of the day (never ~0 from a busy cron
-// week), so the people it holds err low. Under 5 days of hours: unknown.
+// Workers' requests and CPU a day, what people use and the rest: the last 7
+// days hour by hour (guard.js useByHour). People's: the requests answered
+// near Taiwan, where the family's phones come in; the rest is there whoever
+// comes (the crons, the builders, our own tools and checks, which run on
+// machines in the US: 2026-11-06, most of the week's CPU), so it's fixed.
+// Without people's part read (`near` false: an older guard, analytics without
+// it), the steady floor: the quietest tenth of the hours is what runs with
+// nobody there, × 24 a day, and what people add at least a tenth of the day,
+// so the people it holds err low. Under 5 days of hours: unknown.
 export const QUIET = 0.1;
 export function splitHours(h, now = Date.now()) {
   const rows = h?.hours;
@@ -122,14 +126,20 @@ export function splitHours(h, now = Date.now()) {
   const from = end - 7 * DAY;
   const seen = rows.filter(r => r[0] >= from && r[0] < end);
   if (seen.length < 5 * 24) return null;
+  const near = h.people === true && seen.every(r => r.length >= 5);
   const out = {};
   for (const [i, k] of [[1, 'requests'], [2, 'cpuMs']]) {
     const v = new Array(7 * 24).fill(0);
     for (const r of seen) v[Math.floor((r[0] - from) / HOUR)] = r[i] || 0;
     const day = v.reduce((a, b) => a + b, 0) / 7;
+    if (near) {
+      const people = Math.min(day, seen.reduce((a, r) => a + (r[i + 2] || 0), 0) / 7);
+      out[k] = { day, fixed: day - people, people, near: true };
+      continue;
+    }
     const quiet = [...v].sort((a, b) => a - b)[Math.floor(v.length * QUIET)];
     const fixed = Math.min(day, quiet * 24);
-    out[k] = { day, fixed, people: Math.max(day - fixed, day * 0.1) };
+    out[k] = { day, fixed, people: Math.max(day - fixed, day * 0.1), near: false };
   }
   return out;
 }
@@ -165,7 +175,7 @@ export function quotas({ users = {}, guard = null, hours = null, usage = {}, map
       const capDay = cap / pdays;
       // (Nobody is slowed before this many either: guard.js paces only a
       // count that would reach the stop before the period ends.)
-      rows.push({ key: `cf:${k}`, kind: 'cf', count: k, by: 'people', measured: !!s, used: guard.use[k] || 0, projected: guard.projected?.[k] ?? null, cap, day, capDay, fixedDay, perPerson: week ? people / week : null, holds: holdsOf(week, capDay - fixedDay, people) });
+      rows.push({ key: `cf:${k}`, kind: 'cf', count: k, by: 'people', measured: !!s, near: !!s?.near, used: guard.use[k] || 0, projected: guard.projected?.[k] ?? null, cap, day, capDay, fixedDay, peopleDay: people, perPerson: week ? people / week : null, holds: holdsOf(week, capDay - fixedDay, people) });
     }
   }
   // Gemini: each feature's cap a day against its busiest day of the week.
@@ -191,7 +201,8 @@ export function quotas({ users = {}, guard = null, hours = null, usage = {}, map
   }
   const least = f => rows.filter(r => r.by === 'people' && r[f] != null && !r.paused).reduce((a, r) => (!a || r[f] < a[f] ? r : a), null);
   const h = least('holds');
-  return { rows, week, holds: h ? { people: h.holds, key: h.key } : null, measured: !!splitHours(hours, now) };
+  const split = splitHours(hours, now);
+  return { rows, week, holds: h ? { people: h.holds, key: h.key } : null, measured: !!split, near: !!split?.cpuMs?.near };
 }
 
 // What the panel shows and the cron applies: people, each budget against

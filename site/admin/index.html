@@ -2028,7 +2028,7 @@ async function loadCapacity() {
       if (r.kind === 'cf' && r.by === 'store') return `存了 ${big(r.count, r.used)} / ${big(r.count, r.cap)}`;
       if (r.kind === 'cf') {
         const fixed = r.day ? Math.round((r.fixedDay / r.day) * 100) : 0;
-        return `每天 ${big(r.count, r.day).replace(/ 秒$/, '')} / ${big(r.count, r.capDay)}${r.measured ? ` · 排程 ${fixed}%` : ''}`;
+        return `每天 ${big(r.count, r.day).replace(/ 秒$/, '')} / ${big(r.count, r.capDay)}${r.measured ? ` · ${r.near ? '排程和開發' : '排程'} ${fixed}%` : ''}`;
       }
       if (r.kind === 'ai') return r.paused ? 'Gemini · 已暫停' : `Gemini · 最多一天 ${n0(r.top)} / ${n0(r.cap)}`;
       if (r.kind === 'maps') return `本月預估 ${n0(r.month)} / ${n0(r.cap)} 免費`;
@@ -2058,7 +2058,9 @@ async function loadCapacity() {
     $('cap-plans').replaceChildren(...rows);
     const on = devSaved?.autoScale;
     const slow = p.scale == null ? '最慢也不夠：要減少即時功能，否則會碰到 $5 方案的上限而停' : p.scale > 1 ? `即時更新要放慢 ×${p.scale}` : '不用放慢';
-    const how = (q.holds ? `撐得住＝最先滿的那一項（${quotaName(q.holds.key)}）撐的人數，這個人數以內不會放慢：Cloudflare 只有實際用到 60% 以上、而且照最近幾天的速度撐不到週期結束才放慢。` : '') + (q.measured
+    const how = (q.holds ? `撐得住＝最先滿的那一項（${quotaName(q.holds.key)}）撐的人數，這個人數以內不會放慢：Cloudflare 只有實際用到 60% 以上、而且照最近幾天的速度撐不到週期結束才放慢。` : '') + (q.near
+      ? '每一項的「撐 N 人」＝本週活躍人數 ×（上限扣掉固定用量）÷ 現在大家用掉的。Cloudflare 的人用量暫時照地點估：近 7 天台灣附近機房收到的請求；其餘算固定用量：排程、建置，和我們自己的開發工具與檢查（在美國的機器上跑，開發多的那週就多）。帳單保護的權杖加上 Workers Observability 權限後，改成看是誰呼叫（App 本身還是工具），不分國家。其他項目全部算成人用的，所以只會估少。'
+      : q.measured
       ? '每一項的「撐 N 人」＝本週活躍人數 ×（上限扣掉固定用量）÷ 現在大家用掉的。Cloudflare 的固定用量是近 7 天最安靜的一成小時 × 24（排程、建置、帳單保護，沒人用也在跑）；其他項目全部算成人用的，所以只會估少。'
       : `每一項的「撐 N 人」＝本週活躍人數 × 上限 ÷ 現在用掉的；${p.hours?.error ? `近 7 天的逐時用量讀不到（${p.hours.error}），` : '還沒有近 7 天的逐時用量，'}排程的固定用量也算成人用的，所以只會估少。`);
     $('cap-note').textContent = `${how}Gemini 看一週裡最忙的一天；Google 地圖、TDX 看本月照這速度到月底。30 天後 ${u.expected} 人：${slow}。${on ? '「依人數自動調整」開著，每 6 小時照這個套用（下面的數字是你的設定，也是最快的）。' : p.scale > 1 || p.scale == null ? '打開下面的「依人數自動調整」就會自動套用。' : ''}${fmt(p.at)} 估算。`;
