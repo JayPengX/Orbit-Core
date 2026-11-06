@@ -192,9 +192,14 @@ export function quotas({ users = {}, guard = null, hours = null, usage = {}, map
     const top = days.length ? Math.max(...days) : 0;
     rows.push({ key: `ai:${a.key}`, kind: 'ai', count: a.key, by: 'people', used: days.at(-1) || 0, top, cap: a.cap || 0, paused: !a.cap, perPerson: week ? top / week : null, holds: a.cap ? holdsOf(week, a.cap, top) : null });
   }
-  // Google Maps (Transit): each SKU's free month against this month carried to its end.
+  // Google Maps (Transit): each SKU's free month against this month carried to its end,
+  // what our tools and the showcase's demo spent of it (`fixed`) taken off first.
   // (The showcase's own shares are its demo's, not people's: left out.)
-  for (const [k, m] of Object.entries(maps)) if (!k.startsWith('showcase')) rows.push({ key: `maps:${k}`, kind: 'maps', count: k, by: 'people', used: m.used, month: m.month, cap: m.cap, perPerson: week ? m.month / week : null, holds: holdsOf(week, m.cap, m.month) });
+  for (const [k, m] of Object.entries(maps)) {
+    if (k.startsWith('showcase')) continue;
+    const fixed = Math.min(m.month, m.fixed || 0);
+    rows.push({ key: `maps:${k}`, kind: 'maps', count: k, by: 'people', used: m.used, month: m.month, fixedMonth: fixed, cap: m.cap, perPerson: week ? (m.month - fixed) / week : null, holds: holdsOf(week, m.cap - fixed, m.month - fixed) });
+  }
   // Google Weather: shared by area (a 5 km square), not by person.
   if (usage.weather?.cap) rows.push({ key: 'weather:google', kind: 'weather', by: 'place', used: usage.weather.googleToday || 0, cap: usage.weather.cap });
   // TDX's month of points, carried to its end (Taiwan's month).
@@ -204,8 +209,11 @@ export function quotas({ users = {}, guard = null, hours = null, usage = {}, map
     const dayOf = tw.getUTCDate() - 1 + tw.getUTCHours() / 24 + tw.getUTCMinutes() / 1440;
     const monthDays = new Date(Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth() + 1, 0)).getUTCDate();
     // (The first day's hours alone say too little: a day at least.)
-    const month = ((tdx.points || 0) / Math.max(1, dayOf)) * monthDays;
-    rows.push({ key: 'tdx:points', kind: 'tdx', by: 'people', used: tdx.points || 0, month, cap: tdx.plan.month, slowed: !!tdx.guard?.why, perPerson: week ? month / week : null, holds: holdsOf(week, tdx.plan.month, month) });
+    const carried = n => (n / Math.max(1, dayOf)) * monthDays;
+    const month = carried(tdx.points || 0);
+    // (Our tools' and the showcase's points, taken off as Maps' are.)
+    const fixed = Math.min(month, carried((tdx.devPoints || 0) + (tdx.showPoints || 0)));
+    rows.push({ key: 'tdx:points', kind: 'tdx', by: 'people', used: tdx.points || 0, month, fixedMonth: fixed, cap: tdx.plan.month, slowed: !!tdx.guard?.why, perPerson: week ? (month - fixed) / week : null, holds: holdsOf(week, tdx.plan.month - fixed, month - fixed) });
   }
   const least = f => rows.filter(r => r.by === 'people' && r[f] != null && !r.paused).reduce((a, r) => (!a || r[f] < a[f] ? r : a), null);
   const h = least('holds');
@@ -237,7 +245,10 @@ export function plan({ users, base, inUse = base, usage = {}, guard = null, hour
   for (const [k, v] of Object.entries(usage.transit || {})) {
     if (!v?.cap) continue;
     const month = (v.used / Math.max(1, dayOf)) * monthDays;
-    maps[k] = { used: v.used, cap: v.cap, month: Math.round(month), expected: Math.round(month * users.growth), holds: users.apps?.transit && month ? Math.floor((v.cap / month) * users.apps.transit) : null };
+    // (What our tools and the showcase's demo spent: not people's.)
+    const fixed = Math.min(month, (((v.dev || 0) + (v.show || 0)) / Math.max(1, dayOf)) * monthDays);
+    const people = month - fixed;
+    maps[k] = { used: v.used, cap: v.cap, month: Math.round(month), fixed: Math.round(fixed), expected: Math.round(fixed + people * users.growth), holds: users.apps?.transit && people ? Math.floor(((v.cap - fixed) / people) * users.apps.transit) : null };
   }
   const weather = usage.weather?.cap ? { today: usage.weather.googleToday || 0, cap: usage.weather.cap } : null;
   return {
@@ -249,7 +260,7 @@ export function plan({ users, base, inUse = base, usage = {}, guard = null, hour
     applied,
     maps,
     weather,
-    tdx: usage.tdx ? { month: usage.tdx.points, plan: usage.tdx.plan?.month, guard: usage.tdx.guard } : null,
+    tdx: usage.tdx ? { month: usage.tdx.points, ours: (usage.tdx.devPoints || 0) + (usage.tdx.showPoints || 0), plan: usage.tdx.plan?.month, guard: usage.tdx.guard } : null,
     // Every quota from what was really used, and the people each holds.
     quotas: quotas({ users, guard, hours, usage, maps, now })
   };

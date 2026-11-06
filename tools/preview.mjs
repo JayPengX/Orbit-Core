@@ -80,6 +80,7 @@ import { readPage, pageUrl } from '../law-page.js';
 import { request as httpsRequest } from 'node:https';
 import { constants as cryptoConstants } from 'node:crypto';
 import { upstream as transitFixtures } from '../tests/fixtures/transit/upstream.mjs';
+import { liveKeep } from './live-keep.mjs';
 
 const require = createRequire(import.meta.url);
 // The container's global one, or a Mac's in ~/.local/opt/playwright.
@@ -694,6 +695,22 @@ const realTransit = Boolean(dotEnv.TDX_CLIENT_ID && dotEnv.TDX_CLIENT_SECRET);
 const transitEnv = { ...(realTransit ? dotEnv : { TDX_CLIENT_ID: 'preview', TDX_CLIENT_SECRET: 'preview' }), TDX_PER_MIN: '10000', RATE_LIMIT_KV: { get: async k => weatherKv.get(k) ?? null, put: async (k, v) => void weatherKv.set(k, v) } };
 const transitFetch = realTransit ? (url, init) => fetch(url, init) : transitFixtures();
 if (realTransit) console.log('Orbit Transit: real TDX' + (dotEnv.GOOGLE_MAPS_KEY ? ' and Google' : '') + ' (keys from .env)');
+// A live read of our Workers in a batch of runs (shots.mjs, ORBIT_LIVE_KEEP):
+// through the batch's keep (tools/live-keep.mjs), each address asked once
+// for every browser of the batch; the pass's token left off (the dev doors
+// let a localhost page in without one).
+const keptAnswer = async (route, url = route.request().url()) => {
+  const req = route.request();
+  const u = new URL(url);
+  u.searchParams.delete('qt');
+  liveKeep.tally('p');
+  const post = req.postData();
+  const r = await liveKeep.liveFetch(u.toString(), { method: req.method(), headers: { Origin: req.headers?.().origin || `http://localhost:${port}`, ...(post ? { 'Content-Type': req.headers?.()['content-type'] || 'application/json' } : {}) }, body: post || undefined }).catch(() => null);
+  if (!r) return route.abort();
+  return route.fulfill({ status: r.status, headers: { ...r.headers, 'Access-Control-Allow-Origin': '*' }, body: r.body });
+};
+// (--live: Transit's and Weather's dev doors, the batch's keep when there is one; else the browser asks them itself.)
+if (live && liveKeep.on) await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(transit|weather)([/?]|$)/, route => keptAnswer(route));
 if (!live) await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/transit/, async route => {
   const req = route.request();
   const u = new URL(req.url());
@@ -818,6 +835,10 @@ if (key === 'admin') {
       hours.push([t, Math.round(520 + 1150 * busy), Math.round(6500 + 11500 * busy), Math.round(90 * busy), Math.round(1500 * busy)]);
     }
     env.GUARD = { fetch: async () => new Response(JSON.stringify({ at: now - 600_000, people: true, hours })) };
+    // (Transit's month of Google and TDX, made up: a share of each spent by our tools, counted apart.)
+    const { billingMonth } = await import('../transit.js');
+    const twToday = new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
+    kv.set(`transit:use:${billingMonth(now)}`, JSON.stringify({ maps: 420, autocomplete: 380, details: 40, textSearch: 60, routes: 260, matrix: 700, drive: 520, 'dev:maps': 90, 'dev:routes': 110, 'dev:matrix': 380, 'dev:drive': 300, [`tdx:b:${twToday}`]: 9000, [`tdx:a:${twToday}`]: 900, [`dev:tdx:a:${twToday}`]: 400 }));
   }
   // (The door, door.js, made up: 184 people in of 200 (busy), 3 priority, a peak and some turned away today.)
   {
@@ -865,8 +886,51 @@ const SPORTS = /^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/sports-p
 // Every item asked of the proxy (its time): the busiest minute is printed at
 // the end, against a signed-in session's limit (the dev door's is higher).
 const liveAsks = [];
+// (In a batch of runs, a batch's items each kept on their own: the pages of
+// the batch group their reads differently, so a whole batch's address rarely
+// comes twice. The items still missing go as one smaller batch.)
+const keptSports = async route => {
+  const u = new URL(route.request().url());
+  u.searchParams.delete('qt');
+  if (!u.searchParams.has('batch')) return keptAnswer(route, u.toString());
+  liveKeep.tally('p');
+  const items = u.searchParams.getAll('u');
+  const rest = new URLSearchParams([...u.searchParams].filter(([k]) => k !== 'u' && k !== 'lines'));
+  const keyOf = item => `sports ${rest} ${item}`;
+  const out = items.map(item => liveKeep.kept(keyOf(item)));
+  const missing = () => out.flatMap((x, i) => (x ? [] : [i]));
+  // (The missing items asked as one batch, each kept on its own.)
+  const ask = async todo => {
+    const q = new URL(`${u.origin}${u.pathname}`);
+    for (const [k, v] of rest) q.searchParams.append(k, v);
+    for (const i of todo) q.searchParams.append('u', items[i]);
+    const r = await liveKeep.liveFetch(q.toString(), { headers: { Origin: route.request().headers?.().origin || `http://localhost:${port}` }, keep: false }).catch(() => null);
+    let got = [];
+    try {
+      got = JSON.parse(r.body.toString()).r || [];
+    } catch {}
+    todo.forEach((i, j) => {
+      out[i] = got[j] || { s: 502 };
+      if (out[i].s === 200) liveKeep.keep(keyOf(items[i]), out[i]);
+    });
+  };
+  if (!missing().length) liveKeep.tally('k');
+  else {
+    // (Another browser of the batch asking an item now: its answer, rather than asking again.)
+    const mine = missing().filter(i => liveKeep.claim(keyOf(items[i])));
+    try {
+      if (mine.length) await ask(mine);
+    } finally {
+      for (const i of mine) liveKeep.release(keyOf(items[i]));
+    }
+    for (const i of missing()) await liveKeep.settled(keyOf(items[i])), (out[i] = liveKeep.kept(keyOf(items[i])));
+    if (missing().length) await ask(missing());
+  }
+  return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ r: out }) });
+};
 if (live) {
   await context.route(SPORTS, route => {
+    if (liveKeep.on) return keptSports(route);
     const u = new URL(route.request().url());
     u.searchParams.delete('qt');
     return route.continue({ url: u.toString() });
@@ -910,6 +974,7 @@ if (!live) await context.route(SPORTS, async route => {
 await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/flight/, async route => {
   const cors = { 'Access-Control-Allow-Origin': '*' };
   if (!live) return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: '{"flights":[]}' });
+  if (liveKeep.on) return keptAnswer(route);
   const url = route.request().url().replace(/[?&]qt=[^&]*/, '');
   const body = await new Promise(resolve => execFile('curl', ['-s', '-m', '30', '-H', `Origin: http://localhost:${port}`, url], (err, out) => resolve(err ? '' : out)));
   await route.fulfill({ status: body ? 200 : 502, contentType: 'application/json', headers: cors, body: body || '{}' });
@@ -1005,6 +1070,7 @@ if (googleMap) {
 }
 // The family's data (the proxy's /data/, R2): the real files, as a phone reads them.
 await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/data\//, async route => {
+  if (liveKeep.on) return keptAnswer(route);
   const body = await curlBin(route.request().url());
   if (!body) return route.fulfill({ status: 404, headers: { 'Access-Control-Allow-Origin': '*' }, body: '' });
   await route.fulfill({ status: 200, contentType: /\.gz$/.test(route.request().url()) ? 'application/gzip' : 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body });

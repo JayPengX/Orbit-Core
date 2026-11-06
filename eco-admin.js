@@ -729,6 +729,9 @@ export const ADMIN_TOOLS = {
     }
     for (const d of Object.values(days)) d.points = d.basic / TDX_POINTS.basic + d.advanced / TDX_POINTS.advanced;
     const pts = tdxPoints(tdx, now);
+    // (Ours of them: our tools' (the dev door) and the showcase demo's, counted apart since 2026-11-06.)
+    const oursOf = async prefix => tdxPoints(await tdxUse(env, now, prefix).catch(() => ({})), now).month;
+    const [devPoints, showPoints] = await Promise.all([oursOf('dev:'), oursOf('show:')]);
     const tw = new Date(now + 8 * 3_600_000);
     // (When TDX starts the next month: 00:00 on the 1st in Taiwan.)
     const resets = Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth() + 1, 1) - 8 * 3_600_000;
@@ -741,11 +744,12 @@ export const ADMIN_TOOLS = {
       .map(([key, d]) => ({ key, cap: dev[key], days: (use?.week || []).map(day => d.ai.reduce((n, f) => n + (use.byFeature[f]?.[day] || 0), 0)) }));
     return {
       at: now,
-      tdx: { days, points: pts.month, today: pts.today, guard: tdxGuard(pts, now), plan: TDX_POINTS, total, resets },
+      tdx: { days, points: pts.month, devPoints, showPoints, today: pts.today, guard: tdxGuard(pts, now), plan: TDX_POINTS, total, resets },
       ai,
       google: use ? { day: use.googleDay, resets: use.googleResets, models: use.google } : null,
-      // (The meter keeps errors too: the panel's 錯誤, not Transit's.)
-      transit: Object.fromEntries(Object.entries(transit).filter(([k]) => !/^(tdx|gem[df]?|err)(:|$)/.test(k)).map(([k, n]) => [k, { used: n, cap: TRANSIT_CAPS[k] ?? null }])),
+      // (The meter keeps errors too: the panel's 錯誤, not Transit's. Each
+      // count's share spent by our tools and the showcase's demo beside it.)
+      transit: Object.fromEntries(Object.entries(transit).filter(([k]) => !/^(tdx|gem[df]?|err|dev|show)(:|$)/.test(k)).map(([k, n]) => [k, { used: n, cap: TRANSIT_CAPS[k] ?? null, dev: transit[`dev:${k}`] || 0, show: transit[`show:${k}`] || 0 }])),
       weather: { googleToday: weatherCalls, ...(await googleToday(env, now).then(m => ({ cap: m.cap, monthBefore: m.before, monthCap: GOOGLE_MONTH_CALLS })).catch(() => ({ cap: null }))) }
     };
   },

@@ -47,6 +47,17 @@ tools/shots/accounts/<app>-<name>.txt --click …` saves what the app wrote
 (follows, a watchlist, a timetable). A new account with nothing in it is a
 real state too (its welcome sheet): shoot that when it's what you changed.
 
+**One read for all its browsers.** A run opens the app in dozens of
+browsers, and each used to ask our Workers for everything again: our own
+screenshots were most of the Workers' CPU (2026-11-06). Now the run's
+browsers share what the Workers answered (`tools/live-keep.mjs`, a folder
+in the run's `ORBIT_LIVE_KEEP`): each address, or a data-proxy batch's
+item, is asked once in 90 s (`ORBIT_LIVE_KEEP_S`), so a before and its
+after also see the same data. The run ends with `our Workers: N reads by
+the pages, M sent`. Only a 200 is kept. The other tools (`preview.mjs`
+alone, `live-scroll.mjs`, `gate.mjs`) still ask fresh each time:
+live-scroll and the gate watch live data change.
+
 ## `node tools/live-scroll.mjs [app…] [--sheet "<js>"] [--account <name>] [--fast] [--no-days] [--webkit] [--live-only]`: nothing jumps
 
 **Run it with `--webkit` too.** Safari moves a scroller by itself when what's in it is
