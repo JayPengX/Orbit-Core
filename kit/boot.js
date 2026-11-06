@@ -46,8 +46,8 @@
   try {
     saved = localStorage.getItem('orbit.lang') || '';
   } catch (e) {}
-  var langs = navigator.languages || [navigator.language || 'zh-TW'];
-  var zh = saved === 'zh' || (saved !== 'en' && (langs.some(function (l) { return /^zh/i.test(l); }) || !langs.some(function (l) { return /^en/i.test(l); })));
+  var langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'zh-TW'];
+  var zh = saved === 'zh' || (saved !== 'en' && langs.some(function (l) { return /^zh/i.test(l); }));
   document.documentElement.lang = zh ? 'zh-Hant' : 'en';
   var box = document.getElementById('loading');
   if (!box) return;

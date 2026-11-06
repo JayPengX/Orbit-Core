@@ -112,7 +112,7 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | Module | What |
 | --- | --- |
 | `orbit.mjs` | The core: the session, data reads and device storage (§5), the economy's tables, looks and milestones, notices, the frame (`tabBar`, `topActions`, `accountButton`, `ask`/`tell`), screens, fitting, live beats and break countdowns, recommendations (`rank`, `affinity`), the 除錯紀錄 (`rec`); on import it stops pinch zoom, lifts sheets over the keyboard (`watchKeyboard`), holds the lift for pictures, presses only when pressed; `switchGlide` |
-| `orbit.css` | The design system: iOS 27's tokens (colour, type, space, radius, Liquid Glass, springs) and every `q-` component; the apps' accent colours (`tools/accent-css.mjs`); at its end Orbit's own look, on every app's page (`data-look="native"`, DESIGN §11) |
+| `orbit.css` | The design system: iOS 27's tokens (colour, type, space, radius, Liquid Glass, springs) and every `q-` component; the apps' accents (`tools/accent-css.mjs`); at its end Orbit's own look (`data-look="native"`, DESIGN §11) |
 | `ui.mjs` | The builders (§3.3) and their HTML-string twins (`…Html`) for apps that draw with template strings; loads `hold-place.mjs` |
 | `hold-place.mjs` | A redraw never moves the page, a sheet or a panel: one the person didn't make holds what they read; only the code's scrolls move it; a tap holds the control under the finger; never a drawing (`loose`); a content-sized sheet keeps its height (`--q-sheet-floor`); `scrollBusy()` holds `everyDev`'s beats under a finger; `freshScreen()`: a new screen at the top; `letGo()`: a drag carries its grip away |
 | `steady-pics.mjs` | A picture drawn again is eager and decoded at once |
@@ -123,7 +123,7 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `passkey.mjs` | Passkeys in the browser: made, used, named (`passkeyHere()` false where a browser can't) |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs` is qrcode-generator 2.0.4 (MIT), vendored |
-| `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's date), `addDays` |
+| `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays` |
 | `feedback.mjs` | Every app's picks, one engine: `shown`, `picked`, `passed`, `did` → weights per key (30-day half-life); `scorer`, `lifter`, `chance`, `whyOf` (常看), `hitRate`; on the Pass: `fb:<app>` |
 | `holidays.mjs`, `dayoff.mjs` | Taiwan's days off; typhoon days off (停班停課) by the place that decides them for each app |
 | `catalog.mjs`, `logos.mjs`, `names.mjs`, `photos.mjs`, `photo-urls.mjs` | Sports' leagues once; logos (ESPN, TheSportsDB, flags, F1, old names); teams in Chinese; studio headshots; photos' addresses alone |
@@ -225,6 +225,7 @@ w;dur=` (the Worker's own time), which the 除錯紀錄 notes with a slow read.
   503 `ORBIT_FULL`, a place in line (kit `waitInLine`); busy/full slow
   `/config` 2×/3×. Priority passes (`sec.priority`, token `p: 1`) skip
   every per-session limit (`limitOf`).
+- **Taiwan only:** abroad (Cloudflare's country; not unknown, dev, showcase) `/transit/…` is 403 `TW_ONLY` (`http.js twOnlyRefused`); `/eco`'s sessions carry `country`; kit `abroad()`/`twOnlyCheck` show Transit's card.
 - **Same origin:** a page calls `orbit.jaypengx.com/api/…` (`kit/domain.mjs`
   `API`; worker.js `viaSite` takes `/api` off). `api.`, workers.dev answer too.
 - **Dev doors:** a request with `Origin: http://localhost:<port>` and no
@@ -247,9 +248,9 @@ on `SPORTS_PROXY_ALLOWED_HOSTS`. Two hosts are not real: `asia-baseball.orbit`
 `now.json`, `session.json`, `laps.json`, `circuit.json`; `/about.json` and
 `/face.json` for drivers the F1 sites don't know, `f1-people.js`; the DO
 `F1Log` logs laps). A finished session is F1's archive's, else rebuilt from
-OpenF1's tables (`openF1Raw`) and kept in R2 for good.
+OpenF1's tables (`openF1Raw`), kept in R2.
 
-- **Trims** (`&trim=`) return only what an app reads (ESPN's heavy pages, Polymarket, Jolpica, FotMob, ELTA, YouTube, formula1.com).
+- **Trims** (`&trim=`) return only what an app reads (ESPN, Polymarket, Jolpica, FotMob, ELTA, YouTube, F1).
 - **Batches** (`?batch=1&u=…&lines=1`): up to 24 reads in one request,
   each written as it's ready. A slow item answers 504 and is asked alone.
 - **Edge cache tiers** (`sports.js` `CACHE_*`): each has `fresh` (served as
@@ -341,9 +342,8 @@ A new Cloudflare product goes into `guard.js` `PLAN` in the same change.
   precondition; a lost race throws). `pass-sync.mjs` (`passSync`) reads and
   merges the Pass's copy before any write whenever another device may have
   written, never writes an older copy over a newer one, and never writes
-  over a copy it couldn't read: Weather, Words, Money and Law use it; Sports,
-  Transit, Class, Beats and Securities write their payload through the
-  session themselves.
+  over a copy it couldn't read: Weather, Words, Money, Law; the rest write
+  through the session.
 - **Nothing lost:** a save is refused if it would turn JSON data into
   anything else or was merged over an older copy (`base`). Every version a
   write or delete replaces goes to D1's `history` (whole 2 days, daily 30),
@@ -396,8 +396,7 @@ included), then wiped whole. `private/` is never served.
 - **Devices never keep the pass:** a refresh token (60 days) and a short
   session token (`orbit-token.js`, HMAC under `ECO_TOKEN_SECRET`).
 - **Ops:** login, refresh, read/patch/delete, device codes (`eco-pairs`),
-  `#qh=` hand-offs, sign out everywhere, rotate, merge passes (`eco-inbox`),
-  Class's share keys (`eco-shares`), admin.
+  `#qh=`, sign out everywhere, rotate, merge (`eco-inbox`), share keys (`eco-shares`), admin.
 
 ## 7. The economy
 
@@ -479,7 +478,7 @@ can be turned off on its own.
 | `node tools/store-shots.mjs <app>` | The README's and Showcase's screenshot set, both languages |
 | `node tools/test-apps.mjs [app…]` | Every app's tests against this kit (checkouts beside this one) |
 
-The rest (F1 replays, leagues, Securities' lists, ESPN's shapes, passes, accent colours): `tools/README.md`.
+The rest: `tools/README.md`.
 
 `npm test` covers the Workers, kit and this map.
 
