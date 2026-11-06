@@ -882,6 +882,28 @@ test('buses due: a quiet city asks its stops (or routes) alone; a busy one is re
   assert.equal(log.filter(u => u.includes('S2STravelTime')).length, 1, 'refused once, never asked again that day');
 });
 
+test("buses due, fresh=1 (a phone's beat): past its fresh time the copy is read again now, not answered with and read behind; a young copy still answers", async () => {
+  fresh();
+  resetEta();
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 'secret', RATE_LIMIT_KV: memKv(), TDX_PER_MIN: '100' };
+  const cache = memCache();
+  let n = 0;
+  const fetchFn = async url => (url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : json([{ StopUID: 'HSZ1', RouteUID: 'HSZ10', EstimateTime: 600 - 30 * n++ }]));
+  const ask = async (qs, now) => (await handleTransit(new Request(`https://w/transit/eta?${qs}`), env, {}, '/transit/eta', { session: { s: 'S' }, fetchFn, now, cache })).json();
+  const est = rows => rows.map(r => r.EstimateTime);
+  assert.deepEqual(est(await ask('city=Hsinchu&stops=HSZ1', NOW)), [600]);
+  // Past its fresh time (10 s): without fresh=1 the copy answers at once (TDX read behind it)…
+  assert.deepEqual(est(await ask('city=Hsinchu&stops=HSZ1', NOW + 15_000)), [600]);
+  await new Promise(r => setTimeout(r, 0));
+  // …with it, TDX's latest; and a copy younger than that answers as it is, no read.
+  assert.deepEqual(est(await ask('city=Hsinchu&stops=HSZ1&fresh=1', NOW + 40_000)), [540]);
+  assert.deepEqual(est(await ask('city=Hsinchu&stops=HSZ1&fresh=1', NOW + 45_000)), [540]);
+  assert.equal(n, 3);
+  // 公路客運's and a plan's routes too.
+  assert.deepEqual(est(await ask('city=InterCity&routes=THB5700,THB5900', NOW)), [510]);
+  assert.deepEqual(est(await ask('city=InterCity&routes=THB5700,THB5900&fresh=1', NOW + 15_000)), [480]);
+});
+
 test("a day's trains keep only what the phone reads (台鐵's 4 MB day to 40%): each train's number, type, headsign, line, note and bike flag, each stop's station and times, names in Chinese and English; a train that won't run left out; kept so", async () => {
   fresh();
   const name = (zh, en) => ({ Zh_tw: zh, En: en, Ja: zh, Kr: '타이베이' });

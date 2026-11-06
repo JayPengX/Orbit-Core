@@ -433,7 +433,13 @@ export async function etaRows(env, q, deps = {}) {
   const stops = (q.get('stops') || '').split(',').filter(u => UID.test(u)).slice(0, 400);
   const routes = [...new Set([q.get('route') || '', ...(q.get('routes') || '').split(',')].filter(u => UID.test(u)))].slice(0, 40);
   if (!stops.length && !routes.length) return { status: 400, body: { code: 'BAD_STOPS' } };
-  if (city === 'InterCity') return etaAsked(env, city, stops, routes, deps);
+  // (`fresh=1`, a phone's beat after its first look: TDX's latest when the
+  // copy here is past its fresh time, not that copy with a read behind it:
+  // a phone asking alone saw each estimate a beat late, and the one that
+  // asks only when a new one can be there (Transit api.mjs busEta) would
+  // have seen it a step late. The same reads either way, only sooner.)
+  const filtered = q.get('fresh') === '1' ? { ...deps, stale: 0 } : deps;
+  if (city === 'InterCity') return etaAsked(env, city, stops, routes, filtered);
   const now = deps.now ?? Date.now();
   const pick = got => ({ status: 200, body: stops.length ? stops.flatMap(u => got.idx.stops.get(u) || []) : routes.flatMap(u => got.idx.routes.get(u) || []), age: got.age });
   const hot = hotCity(city, now);
@@ -441,7 +447,7 @@ export async function etaRows(env, q, deps = {}) {
   if (idx && now - idx.at < (await freshOf(TDX_RULES[0], null))) return pick({ idx, age: now - idx.at });
   if (!hot) {
     // (A quiet city here: these stops' own read; the copy here, if young enough, when TDX fails.)
-    const own = await etaAsked(env, city, stops, routes, deps);
+    const own = await etaAsked(env, city, stops, routes, filtered);
     return own.status !== 200 && idx && now - idx.at < ETA_STALE ? pick({ idx, age: now - idx.at }) : own;
   }
   const whole = cityEta(env, city, deps);
@@ -452,7 +458,7 @@ export async function etaRows(env, q, deps = {}) {
   // No copy young enough here (the city's first ask in a while): these stops'
   // own ask beside the city's, whichever answers first; the city's goes on
   // for the next ask (a stop's card waited 3 s for a whole city it needed 10 rows of).
-  const own = etaAsked(env, city, stops, routes, deps);
+  const own = etaAsked(env, city, stops, routes, filtered);
   const young = got => got.idx && now - got.idx.at < ETA_STALE;
   const first = await Promise.any([whole.then(g => (young(g) ? pick(g) : Promise.reject())), own.then(g => (g.status === 200 ? g : Promise.reject()))]).catch(() => null);
   if (deps.ctx?.waitUntil) deps.ctx.waitUntil(whole.catch(() => {}));
