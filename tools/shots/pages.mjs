@@ -94,6 +94,31 @@ export const PAGES = {
     'team-nash': { args: click("js:import('./sheets.js').then(m=>m.openTeam('mls','18986'))", wait(9000)) },
     'team-nash-stats': { args: click("js:import('./sheets.js').then(m=>m.openTeam('mls','18986'))", wait(9000), "js:[...document.querySelectorAll('dialog.q-sheet[open] button,dialog.q-sheet[open] [role=tab]')].find(b=>/^(數據|Stats)$/.test(b.textContent.trim()))?.click()", wait(4000)) },
     'team-nash-pick': { args: click("js:import('./sheets.js').then(m=>m.openTeam('mls','18986'))", wait(9000), "js:[...document.querySelectorAll('dialog.q-sheet[open] button,dialog.q-sheet[open] [role=tab]')].find(b=>/^(數據|Stats)$/.test(b.textContent.trim()))?.click()", wait(4000), "js:document.querySelector('dialog.q-sheet[open] .lb-team')?.scrollIntoView({block:'start'})", wait(800), "js:[...document.querySelectorAll('dialog.q-sheet[open] .lb-team button,dialog.q-sheet[open] .lb-team [role=tab]')].find(b=>/^(助攻|Assists)$/.test(b.textContent.trim()))?.click()", wait(5000)) },
+    // A team's and a player's every tab (Jay 2026-11-06, an iPad: 本場 a sliver in the middle, 賽程 half empty, 陣容 out of order, 排名 narrow).
+    // Julian Hall opened from Nashville 3–2 Red Bulls (11/1): 本場 first; then each tab. Nashville, the Brewers, the Lakers: each tab.
+    ...Object.fromEntries(
+      [['', ''], ['-overview', '概況|Overview'], ['-games', '賽程|Games'], ['-stats', '數據|Stats'], ['-bio', '資料|Bio']].map(([k, t]) => [
+        `player-hall${k}`,
+        { args: click("js:import('./lib/espn.mjs').then(async E=>{const l=await E.scoreboard('mls',['20261101']);const e=l.find(x=>/Nashville/.test(x.home?.en||x.home?.name||''))||l[0];(await import('./sheets.js')).openMatch(e)})", wait(8000), "js:import('./sheets.js').then(m=>m.openPlayer('mls','288041'))", wait(8000), ...(t ? [`js:[...document.querySelectorAll('dialog.q-sheet[open] button,dialog.q-sheet[open] [role=tab]')].filter(b=>b.offsetParent&&/^(${t})$/.test(b.textContent.trim())).pop()?.click()`, wait(3000)] : [])) }
+      ])
+    ),
+    ...Object.fromEntries(
+      [['nash', 'mls', '18986'], ['brewers', 'mlb', '8'], ['lakers', 'nba', '13'], ['arsenal', 'epl', '359']].flatMap(([n, l, id]) =>
+        [['overview', ''], ['games', '賽程|Games'], ['stats', '數據|Stats'], ['roster', '陣容|Roster'], ['table', '排名|Table']].map(([k, t]) => [
+          `tabs-${n}-${k}`,
+          { args: click(`js:import('./sheets.js').then(m=>m.openTeam('${l}','${id}'))`, wait(9000), ...(t ? [`js:[...document.querySelectorAll('dialog.q-sheet[open] button,dialog.q-sheet[open] [role=tab]')].filter(b=>b.offsetParent&&/^(${t})$/.test(b.textContent.trim())).pop()?.click()`, wait(4000)] : [])) }
+        ])
+      )
+    ),
+    // Each league's player on each tab: Saka, Ohtani, LeBron, Leclerc.
+    ...Object.fromEntries(
+      [['saka', 'epl', '280555'], ['ohtani', 'mlb', '39832'], ['lebron', 'nba', '1966'], ['leclerc', 'f1', '5498']].flatMap(([n, l, id]) =>
+        [['overview', ''], ['games', '賽程|Games'], ['stats', '數據|Stats'], ['bio', '資料|Bio']].map(([k, t]) => [
+          `player-${n}-${k}`,
+          { args: click(`js:import('./sheets.js').then(m=>m.openPlayer('${l}','${id}'))`, wait(9000), ...(t ? [`js:[...document.querySelectorAll('dialog.q-sheet[open] button,dialog.q-sheet[open] [role=tab]')].filter(b=>b.offsetParent&&/^(${t})$/.test(b.textContent.trim())).pop()?.click()`, wait(4000)] : [])) }
+        ])
+      )
+    ),
     // Leclerc (F1) on 資料: 生涯車隊 (Sauber's logo, 2018).
     'f1-driver-bio': { args: click("js:import('./sheets.js').then(m=>m.openPlayer('f1','5498'))", wait(9000), "js:[...document.querySelectorAll('dialog.q-sheet[open] button,dialog.q-sheet[open] [role=tab]')].find(b=>/^(資料|Bio)$/.test(b.textContent.trim()))?.click()", wait(4000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/生涯車隊|Teams/.test(c.textContent))?.scrollIntoView({block:'center'})", wait(1500)) },
     'team-nba': { args: click("js:import('./sheets.js').then(m=>m.openTeam('nba','13'))", wait(7000)) },
