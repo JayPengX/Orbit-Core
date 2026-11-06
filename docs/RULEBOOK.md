@@ -147,6 +147,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-23 附近 must load; on a "nothing running" day it still works and just says what's stopped.
 - 10-27 A trip's legs fit one line (tighten, never wrap); 查時刻 is visual (journey bar, live 準點/晚, next train lit), not text.
 - 10-29 偏好電輔車 is a per-trip choice on the plans card: of stations about as near, the one with 電輔車, ridden at their pace.
+- 11-06 Trip results never change under the person ("it update the trip in front of me which is bad"; "Make sure it mean the first show is the final result you meant to deliver"): the plans card and 交通's trips show the whole plan once (the skeleton, or a trip's last ways, until then); after that a way shown keeps its place and labels and only its times update; a way found later joins quietly at the end (Transit `lib/steady.mjs`).
 - 11-04 偏好電輔車 is also a setting in 我的 › 規劃, off by default ("prefer Electric Ubike off by default"): on, every trip starts with it on (the plans card's ⚡ still turns it off for one search) and station cards count 電輔車 first; off, nothing changes.
 - 10-29 換附近的站 while navigating is asked only when a station runs low (2 or fewer bikes or docks; no 電輔車 for an e-bike ride); otherwise the count is a quiet tap.
 - 11-03 Buses run early or late, trains on time ("leave maybe 5 minutes earlier for bus, train will be fine"): a plan has you at a bus stop 5 minutes before its timetable time, 2 before a bus TDX sees coming; trains as timed. Ranking unchanged, only the leave time.
