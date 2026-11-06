@@ -131,7 +131,7 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `flight.mjs` | A real plane in the air, on a sphere: the proxy's `/flight` and Class's 專注飛行 |
 | `domain.mjs`, `devconfig.mjs`, `mirror.mjs` | The family's domain (one place); `DEV` for the Workers; the nightly mirror's addresses |
 | `sw.js`, `sw-images.js` | The one service worker every app imports (page and own pictures kept first, refreshed behind; `?v=` files from the cache, checked against their hash); other sites' pictures in one cache all apps share |
-| `apps.mjs`, `link.mjs`, `preload.mjs`, `stamp.mjs`, `stamp-app.mjs`, `hash.mjs` | Build tools, never served: the apps' snippets; `.kit` links; first-screen modulepreload; the kit's and each app's content-hashed build |
+| `apps.mjs`, `link.mjs`, `preload.mjs`, `stamp.mjs`, `stamp-app.mjs`, `hash.mjs`, `frame-guard.mjs` | Build tools, never served: the apps' snippets; `.kit` links; first-screen modulepreload; the kit's and each app's content-hashed build; `frameFaults` (apps' tests: only colours on the tab bar) |
 | `img/` | The kit's own pictures (the Premier League's mark, light and dark) |
 
 ### 3.3 Component patterns: what to use for what
@@ -141,7 +141,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 
 | Need | Use |
 | --- | --- |
-| Tabs | `tabBar({ tabs, onSelect, onShow })` (orbit.mjs): the floating capsule on a phone, a rail on a phone on its side (slim) and a computer; an in-progress bar is a `.q-accessory` pill above it |
+| Tabs | `tabBar({ tabs, onSelect, onShow })` (orbit.mjs): the floating capsule on a phone, a rail on a phone on its side (slim) and a computer; on the rail one column, one width (`--q-tabrail-cw`); apps set only its colours; an in-progress bar is a `.q-accessory` pill above it |
 | The top line | `topActions`, `accountButton` (the account pill and at most one action) |
 | A tab's title | `navTitle` / `navTitleHtml` + `wireNavTitles` (the 34 pt large title), `pageHead` |
 | Switching a view | `view()` (cross-faded with View Transitions); `segmented` / `segHtml` + `settleSegs` for a whole tab's view (at most 4); a single-choice filter row is `.q-chips.q-texttabs` (text tabs) |

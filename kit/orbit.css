@@ -908,6 +908,9 @@ button,
   display: none;
 }
 .q-tabbar.q-tabbar {
+  /* (Its own box-sizing, never the app's: four apps set none and drew the
+     bar 8 wider than the rest, Law's iPad rail beside Sports', Jay 2026-11-06.) */
+  box-sizing: border-box;
   position: fixed;
   z-index: 60;
   left: var(--q-mid, 50%);
@@ -957,6 +960,7 @@ button,
   pointer-events: none;
 }
 .q-tab {
+  box-sizing: border-box;
   position: relative;
   z-index: 1;
   display: flex;
@@ -1062,6 +1066,7 @@ button,
   transform: none;
 }
 .q-tab-action {
+  box-sizing: border-box;
   position: fixed;
   z-index: 60;
   left: calc(var(--q-mid, 50%) + (var(--q-tb-w, 0px) + var(--q-act-room)) / 2 - var(--q-act));
@@ -5264,6 +5269,8 @@ html.q-tabrail {
   /* (Beside the page, never stranded at the far edge of a big screen.) */
   --q-tabrail-x: max(calc(var(--q-inset-l) + 10px), calc(var(--q-col-l) - var(--q-tabrail-bw) - 20px));
   --q-tabrail-tab: 54px;
+  /* (The capsule itself: what the action and the account centre on.) */
+  --q-tabrail-cw: calc(var(--q-tabrail-bw) - 8px);
   --q-tabrail-h: calc(var(--q-tabs, 4) * var(--q-tabrail-tab) + 8px);
   /* (At the top, beside the page's first line, as iPad's sidebar: not
      floating in the middle of a tall screen, Jay 2026-11-01.) */
@@ -5274,6 +5281,10 @@ html.q-tabrail {
 @media (max-height: 430px) {
   html.q-tabrail {
     --q-tabrail-tab: 50px;
+    /* (Five tabs, the action and the account fit a phone on its side.) */
+    --q-tabrail-act-h: 44px;
+    --q-tabrail-foot: 40px;
+    --q-tabrail-face: 32px;
   }
 }
 /* A tablet or a computer (the rail with room above and below it, q-float):
@@ -5307,7 +5318,7 @@ html.q-tabrail .q-tabbar.q-tabbar {
   grid-auto-flow: row;
   grid-auto-columns: auto;
   grid-auto-rows: var(--q-tabrail-tab);
-  width: calc(var(--q-tabrail-bw) - 8px);
+  width: var(--q-tabrail-cw);
   max-height: calc(100dvh - 16px);
   transform: none;
 }
@@ -5340,13 +5351,27 @@ html.q-tabrail .q-tab svg {
 html.q-tabrail .q-tabbar.q-tabbar.q-tabbar-act {
   top: var(--q-tabrail-top);
   left: var(--q-tabrail-x);
-  width: calc(var(--q-tabrail-bw) - 8px);
+  width: var(--q-tabrail-cw);
   transform: none;
 }
+/* The rail is one column: the tabs' capsule, the app's action under it and
+   the account at the foot, all the capsule's width, so none reads smaller or
+   off to one side (Jay 2026-11-06, iPad: "the tab buttons and the orbit pass
+   button the size is not the same"). */
 html.q-tabrail .q-tab-action {
   top: calc(var(--q-tabrail-top) + var(--q-tabrail-h) + 10px);
   bottom: auto;
-  left: calc(var(--q-tabrail-x) + (var(--q-tabrail-bw) - var(--q-act)) / 2);
+  left: var(--q-tabrail-x);
+  width: var(--q-tabrail-cw);
+  height: var(--q-tabrail-act-h, 48px);
+  border-radius: 999px;
+}
+html.q-tabrail.q-float {
+  --q-tabrail-act-h: 56px;
+}
+html.q-tabrail.q-float .q-tab-action svg {
+  width: 26px;
+  height: 26px;
 }
 /* A phone on its side is short: the large titles a size down, as iOS's;
    the sign-in screens without their big mark. */
@@ -5378,15 +5403,58 @@ html.q-tabrail .q-appbar .q-appbar-inner {
   overflow: visible;
 }
 html.q-tabrail .q-appbar .q-actions {
+  box-sizing: border-box;
   position: fixed;
   z-index: 60;
-  left: calc(var(--q-tabrail-x) + (var(--q-tabrail-bw) - 44px) / 2);
+  left: var(--q-tabrail-x);
   bottom: max(12px, env(safe-area-inset-bottom, 0px));
   flex-direction: column;
+  gap: 0;
+  width: var(--q-tabrail-cw);
   margin: 0;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--q-glass);
+  -webkit-backdrop-filter: var(--q-glass-blur);
+  backdrop-filter: var(--q-glass-blur);
+  box-shadow: var(--q-glass-rim), var(--q-glass-drop);
 }
-html.q-tabrail .q-appbar .q-actions:has(> :nth-child(2)) {
-  padding: 2px 0;
+/* Each a tab's height, its mark a tab's mark; the face the size of one. */
+html.q-tabrail .q-appbar .q-actions > :is(.q-icon-btn, .q-account:not(.q-framed)) {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--q-tabrail-foot, 44px);
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+html.q-tabrail .q-appbar .q-actions > .q-icon-btn svg {
+  width: 22px;
+  height: 22px;
+}
+html.q-tabrail .q-appbar .q-actions > .q-account:not(.q-framed) .q-avatar {
+  height: var(--q-tabrail-face, 36px);
+}
+html.q-tabrail .q-appbar .q-actions > .q-account.q-framed {
+  box-sizing: border-box;
+  width: var(--q-tabrail-face, 36px);
+  height: var(--q-tabrail-face, 36px);
+  margin: calc((var(--q-tabrail-foot, 44px) - var(--q-tabrail-face, 36px)) / 2) auto;
+}
+html.q-tabrail .q-appbar .q-actions > .q-account:not(.q-framed) .q-account-dot {
+  right: calc(50% - var(--q-tabrail-face, 36px) / 2 + 1px);
+  bottom: calc((var(--q-tabrail-foot, 44px) - var(--q-tabrail-face, 36px)) / 2 + 1px);
+}
+html.q-tabrail.q-float {
+  --q-tabrail-foot: 60px;
+  --q-tabrail-face: 46px;
+}
+html.q-tabrail.q-float .q-appbar .q-actions > .q-icon-btn svg {
+  width: 27px;
+  height: 27px;
 }
 html.q-tabrail .q-day-bar:not(.flat) {
   padding-top: 4px;
