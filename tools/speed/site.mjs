@@ -312,7 +312,9 @@ export function siteHandler({ rec }) {
           u.searchParams.delete('qt');
           return fetch(u, { method, headers: { Origin: 'http://localhost:8123', ...(req.body.length ? { 'Content-Type': req.headers['content-type'] || 'text/plain' } : {}) }, body: method === 'GET' || method === 'HEAD' ? undefined : req.body, signal: AbortSignal.timeout(30_000) });
         });
-        return { ...replay(r, req, 'api', dev), route: route.split('/').slice(0, 2).join('/') + (route.startsWith('/sports-proxy') && url.searchParams.has('batch') ? ' batch' : '') };
+        // (Transit's by its own route: its bus times cost far more than its TDX reads.)
+        const sub = route.startsWith('/sports-proxy') && url.searchParams.has('batch') ? ' batch' : route.startsWith('/transit/') ? ` ${route.split('/')[2]}` : '';
+        return { ...replay(r, req, 'api', dev), route: route.split('/').slice(0, 2).join('/') + sub };
       }
       if (path.startsWith('/Orbit-Core/kit/')) {
         const file = join(side.dir, 'kit-out/kit', path.slice('/Orbit-Core/kit/'.length));
