@@ -149,6 +149,8 @@ export const PAGES = {
     'plans-far': { args: ['--google-map', ...click('#tab-map', wait(2500), "js:(()=>{const q=document.querySelector('#q');q.focus();q.value=document.documentElement.lang==='en'?'Tainan Station':'臺南車站';q.dispatchEvent(new Event('input',{bubbles:true}))})()", wait(8000), '.ot-res', "js:document.querySelector('[data-card=go]')?.click()", wait(12000))] },
     // 地圖 on Google's map as the site gets it: Google's places (restaurants, temples, the city hall) beside our stops and bikes.
     map: { args: ['--google-map', ...click('#tab-map', wait(7000))] },
+    // A place's card (新竹市政府, found by search): its name, 路線, the YouBike near it.
+    place: { args: ['--google-map', ...click('#tab-map', wait(2500), "js:(()=>{const q=document.querySelector('#q');q.focus();q.value=document.documentElement.lang==='en'?'Hsinchu City Government':'新竹市政府';q.dispatchEvent(new Event('input',{bubbles:true}))})()", wait(6000), '.ot-res', wait(5000))] },
     // 地圖's 搜尋地點, the field tapped (取消 beside it, your recents under it); then the keyboard put
     // away with nothing typed (取消 gone, the field the whole row).
     search: { args: click('#tab-map', wait(3000), "js:document.querySelector('#q').focus()", wait(1500)) },

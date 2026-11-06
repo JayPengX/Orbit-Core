@@ -2,7 +2,7 @@
 // without a Orbit Pass: a quick look (screenshots) after a change.
 //
 //   node tools/preview.mjs <app> [hash…] [--out dir] [--width 390] [--height 844]
-//                          [--full] [--lang zh|en] [--dark] [--wait ms] [--click selector]
+//                          [--full] [--lang zh|en] [--dark] [--wait ms] [--click selector|js:code|xy:x,y]
 //                          [--type 'selector=text']  (fills a field after the clicks)
 //                          [--store 'key=value']  (a localStorage entry to start with)
 //                          [--geo lat,lon]  (where the phone is; Transit's default 新竹車站)
@@ -1350,7 +1350,11 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
   for (const sel of [...(key === 'admin' && hash ? [`[data-view="${hash}"]`] : []), ...clicks]) {
     // ('js:<code>': run on the page instead, e.g. a click on something the tab bar covers.)
     if (sel.startsWith('js:')) await page.evaluate(sel.slice(3)).catch(e => errors.push(`click ${sel}: ${e.message.split('\n')[0]}`));
-    else await page.click(sel).catch(e => errors.push(`click ${sel}: ${e.message.split('\n')[0]}`));
+    // ('xy:<x>,<y>': a finger's tap at that point of the page, e.g. on a map.)
+    else if (sel.startsWith('xy:')) {
+      const [x, y] = sel.slice(3).split(',').map(Number);
+      await page.touchscreen.tap(x, y).catch(() => page.mouse.click(x, y)).catch(e => errors.push(`click ${sel}: ${e.message.split('\n')[0]}`));
+    } else await page.click(sel).catch(e => errors.push(`click ${sel}: ${e.message.split('\n')[0]}`));
     await page.waitForTimeout(2500);
   }
   if (cdp && clicks.length) await stopProfile();
