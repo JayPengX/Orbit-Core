@@ -8,7 +8,7 @@ import {
   airForecast, parseGoogleAir, googleAirBody,
   weatherStatus, handleWeather, scrub, cellOf, nearestStation, townIds, airArea, parseCwaTown, cwaAt, parseGoogleDay, parseGoogleHour,
   blend, buildCell, GOOGLE_DAILY_CALLS, parseVillage, whereIs, addAirReading, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, FRESH_WAIT_MS, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
-, popStep, keepJson, keptJson, KV_EVERY_MS, googleAllowed, googlePace, gridOf, keepPast, googleDayCap, googleToday, GOOGLE_MONTH_CALLS } from '../weather.js';
+, popStep, keepJson, keptJson, KV_EVERY_MS, googleAllowed, googlePace, gridOf, keepPast, googleDayCap, googleToday, GOOGLE_MONTH_CALLS, aqfDays, parseAir } from '../weather.js';
 import { STATIONS } from '../weather-stations.js';
 import { twDay } from '../kit/format.mjs';
 import { upstream as fixtureUpstream } from './fixtures/weather/upstream.mjs';
@@ -768,4 +768,85 @@ test('the place abroad: OpenStreetMap city and country, by language, cached', as
   await whereIs(34.05, -118.25, { fetchFn, cache, lang: 'en' });
   assert.equal(urls.filter(u => u.includes('nominatim')).length, 2, 'each language asked once');
   assert.equal(urls.filter(u => u.includes('nlsc')).length, 1, "NLSC's empty answer kept too");
+});
+
+// MOENV's AQI forecast (AQF_P_01) changes on 2026-11-10: a timeperiod field
+// (全日, 上午, 下午), 4 days not 3, and the first day in three rows. Both
+// shapes read the same, and the first day is its 全日 row, never counted again.
+const aqfRow = (publishtime, forecastdate, aqi, extra = {}) => ({ area: '北部', publishtime, forecastdate, aqi: String(aqi), majorpollutant: '細懸浮微粒', ...extra });
+const aqfOld = [
+  aqfRow('2026-11-09 10:30', '2026-11-09', 45),
+  aqfRow('2026-11-09 10:30', '2026-11-10', 60, { majorpollutant: '臭氧八小時' }),
+  aqfRow('2026-11-09 10:30', '2026-11-11', 70),
+  { ...aqfRow('2026-11-09 10:30', '2026-11-09', 120), area: '中部' }
+];
+const aqfNew = [
+  aqfRow('2026-11-10 10:30', '2026-11-10', 85, { timeperiod: '全日', majorpollutant: '臭氧八小時' }),
+  aqfRow('2026-11-10 10:30', '2026-11-10', 40, { timeperiod: '上午' }),
+  aqfRow('2026-11-10 10:30', '2026-11-10', 85, { timeperiod: '下午', majorpollutant: '臭氧八小時' }),
+  aqfRow('2026-11-10 10:30', '2026-11-11', 55, { timeperiod: '全日' }),
+  aqfRow('2026-11-10 10:30', '2026-11-12', 50, { timeperiod: '全日' }),
+  aqfRow('2026-11-10 10:30', '2026-11-13', 65, { timeperiod: '全日' }),
+  { ...aqfRow('2026-11-10 10:30', '2026-11-10', 130, { timeperiod: '全日' }), area: '中部' }
+];
+const aqfSeen = m => Object.fromEntries([...m].map(([d, v]) => [d, v.aqi]));
+
+test('AQI forecast, the old shape (until 2026-11-10): one row a day, 3 days', () => {
+  assert.deepEqual(aqfSeen(aqfDays(aqfOld, '北部')), { '2026-11-09': 45, '2026-11-10': 60, '2026-11-11': 70 });
+  assert.deepEqual(aqfDays(aqfOld, '北部').get('2026-11-10'), { aqi: 60, level: '普通', main: '臭氧八小時' });
+  // A copy kept before the change (no publishtime, no timeperiod) reads the same.
+  const kept = aqfOld.map(({ publishtime, ...r }) => r);
+  assert.deepEqual(aqfSeen(aqfDays(kept, '北部')), aqfSeen(aqfDays(aqfOld, '北部')));
+});
+
+test('AQI forecast, the new shape (from 2026-11-10): 4 days, the first is its 全日 row', () => {
+  const m = aqfDays(aqfNew, '北部');
+  assert.deepEqual(aqfSeen(m), { '2026-11-10': 85, '2026-11-11': 55, '2026-11-12': 50, '2026-11-13': 65 });
+  assert.equal(m.size, 4, 'one entry a day: 上午 and 下午 are not days of their own');
+  assert.deepEqual(m.get('2026-11-10'), { aqi: 85, level: '普通', main: '臭氧八小時' });
+  // Whichever order MOENV lists the three rows in, the day is the 全日 one.
+  const shuffled = [aqfNew[1], aqfNew[2], aqfNew[0], ...aqfNew.slice(3)];
+  assert.equal(aqfDays(shuffled, '北部').get('2026-11-10').aqi, 85);
+  const lowWhole = aqfNew.map(r => (r.timeperiod === '全日' && r.forecastdate === '2026-11-10' && r.area === '北部' ? { ...r, aqi: '75' } : r));
+  assert.equal(aqfDays([lowWhole[1], lowWhole[2], lowWhole[0]], '北部').get('2026-11-10').aqi, 75, 'MOENV\'s 全日 stands, even under a half');
+  // No 全日 row (a cut-off list): the day's worst half, still one entry.
+  assert.deepEqual(aqfDays([aqfNew[1], aqfNew[2]], '北部').get('2026-11-10'), { aqi: 85, level: '普通', main: '臭氧八小時' });
+  assert.equal(aqfDays([aqfNew[1]], '北部').get('2026-11-10').aqi, 40);
+  // Another area's rows never mix in.
+  assert.deepEqual(aqfSeen(aqfDays(aqfNew, '中部')), { '2026-11-10': 130 });
+});
+
+test('AQI forecast across the change: the newest issue has the day, the older fills today', () => {
+  // An evening issue starts tomorrow; the morning's (in the old shape) still has today.
+  const evening = [
+    aqfRow('2026-11-10 16:30', '2026-11-11', 58, { timeperiod: '全日' }),
+    aqfRow('2026-11-10 16:30', '2026-11-11', 30, { timeperiod: '上午' }),
+    aqfRow('2026-11-10 16:30', '2026-11-11', 58, { timeperiod: '下午' }),
+    aqfRow('2026-11-10 16:30', '2026-11-12', 52, { timeperiod: '全日' })
+  ];
+  const morningOld = [aqfRow('2026-11-10 10:30', '2026-11-10', 80), aqfRow('2026-11-10 10:30', '2026-11-11', 66)];
+  assert.deepEqual(aqfSeen(aqfDays([...evening, ...morningOld], '北部')), { '2026-11-10': 80, '2026-11-11': 58, '2026-11-12': 52 });
+  // Listed oldest first, the newest issue still wins.
+  assert.deepEqual(aqfSeen(aqfDays([...morningOld, ...evening], '北部')), { '2026-11-10': 80, '2026-11-11': 58, '2026-11-12': 52 });
+});
+
+test('the air card\'s forecast reads the new shape: 4 days, no day twice', () => {
+  const sites = fx('moenv-aqi');
+  const s = sites.find(x => x.county === '臺北市');
+  const now = Date.parse('2026-11-10T11:00:00+08:00');
+  const realNow = Date.now;
+  Date.now = () => now;
+  try {
+    const air = parseAir(sites, aqfNew, num(s.latitude), num(s.longitude), '臺北市');
+    assert.equal(air.forecast.area, '北部');
+    assert.deepEqual(air.forecast.days.map(d => [d.date, d.aqi]), [['2026-11-10', 85], ['2026-11-11', 55], ['2026-11-12', 50], ['2026-11-13', 65]]);
+    assert.equal(air.forecast.today.aqi, 85);
+    assert.equal(air.forecast.tomorrow.aqi, 55);
+    // Blended with no Google hours: MOENV's 4 days as they are.
+    assert.deepEqual(airForecast(air, null, now).days.map(d => d.aqi), [85, 55, 50, 65]);
+    const old = parseAir(sites, aqfOld, num(s.latitude), num(s.longitude), '臺北市');
+    assert.deepEqual(old.forecast.days.map(d => [d.date, d.aqi]), [['2026-11-09', 45], ['2026-11-10', 60], ['2026-11-11', 70]]);
+  } finally {
+    Date.now = realNow;
+  }
 });
