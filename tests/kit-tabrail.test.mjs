@@ -38,8 +38,9 @@ test('the app’s action is a true circle, on the bar and on the rail', () => {
     assert.ok(w && w === h, `${sel}: width (${w}) is its height (${h})`);
     assert.match(body, /border-radius:\s*50%/, `${sel} is round`);
   }
-  // (Nothing later gives it a width or height of its own.)
-  const later = rules(css).filter(r => /\.q-tab-action(?![\w-])/.test(r.sel) && !/svg|::|:active|\[aria-pressed/.test(r.sel) && r.sel !== '.q-tab-action' && r.sel !== 'html.q-tabrail .q-tab-action');
+  // (Nothing else gives it a width or height of its own; a computer's side bar,
+  // q-desk, alone draws it as a labelled row, as its tabs.)
+  const later = rules(css).filter(r => /\.q-tab-action(?![\w-])/.test(r.sel) && !/svg|::|:active|\[aria-pressed|q-desk/.test(r.sel) && r.sel !== '.q-tab-action' && r.sel !== 'html.q-tabrail .q-tab-action');
   for (const r of later) assert.doesNotMatch(r.body, /(?:^|[;\s])(?:width|height|border-radius):/, `${r.sel} reshapes the action`);
 });
 
