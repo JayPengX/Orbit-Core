@@ -160,7 +160,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | Icons | `ICONS` (orbit.mjs) / `icons` (ui.mjs): one drawing per idea; new ones read as `kitUI.icons?.x` |
 | Live data | `everyDev(key, fn)` beats at the owner's speeds (they wait while a finger is down); `data-q-live` + `liveChanged` pop a number that changed; patch in place (the same nodes), never rebuild what didn't change; `hold-place.mjs` keeps the reader's place by itself; `steady-pics.mjs` the pictures |
 | Fitting | `fitNames` (`.q-fit`, `.q-fit-wrap`), `fitNumbers` / `watchFit`, `balanceRows` (`.q-balance`), `fullRows` (`.q-rows-full`/`-keep`), `.q-even` / `.q-even3` |
-| Every screen | `screenFit()` / `onScreen(fn)` mark `html.q-tabrail`, `q-float`, `q-desk`, `q-wide`, `q-w3`; `--q-page-max`, `--q-vw`; `.q-cols`; `.q-flow` + `flowColumns(root)` for columns of even height (DESIGN §10) |
+| Every screen | `screenFit()` / `onScreen(fn)` mark `html.q-tabrail`, `q-float`, `q-desk`, `q-wide`, `q-w3`; `--q-page-max`, `--q-vw`. By their own width, anywhere (a page, a sheet, a pane): `.q-cols`, `.q-flow` + `flowColumns(root)` (columns of even height), `.q-grid` (cards), `.q-split` (list beside detail) (DESIGN §10) |
 | Pull to refresh, taps | `pullToRefresh`; `haptic()` / `tick()`; `PRESS_DELAY` / `pressSelector` |
 | Offline | `onlineOnly` (live apps: Securities, Transit, Sports), `keepOffline` (the rest open on what they kept), `netState` / `netVerdict` |
 | Picks for you | `rank` + `feedback.mjs` (`lifter`, `shown`, `picked`, `did`, `keep`); measured: `tools/picks-backtest.mjs` |
@@ -468,12 +468,12 @@ can be turned off on its own.
 | Tool | What |
 | --- | --- |
 | `node tools/kit-find.mjs <word…>` | The kit's exports and CSS classes matching: look before writing a helper or a style |
-| `node tools/shots.mjs <app> [page…]` | Every screenshot a change needs (five screens × light/dark, live data read once for all, `live-keep.mjs`, signed in), a contact sheet, faults, `--before main` diff; pages in `tools/shots/pages.mjs` |
+| `node tools/shots.mjs <app> [page…]` | Every screenshot a change needs (screens × light/dark, live data, signed in), a contact sheet, faults, `--before main` diff; pages in `tools/shots/pages.mjs` |
+| `node tools/layout-check.mjs <app…>` | Every tab and `check` page at 320, iPad, laptop: a narrow band, a half empty, overflow (`layout-faults.mjs`); `push.sh` runs it |
 | `node tools/preview.mjs <app>` | The app with real data (`--live`, `--width`, `--timing`, `--requests`, `--profile`, `--webkit`, `--reopen`…); prints `wraps:`, `cut:`, `scrolls sideways:` |
-| `node tools/gate.mjs [app…]` | The family quality gate (`tools/gate-page.js`): lift, stalls, dead taps, wraps, cuts, letters, white, mixed language… on every tab |
-| `node tools/speed.mjs <app…>` | Before vs after (3G, CPU ×4, answers replayed): each step's time, KB, requests, CPU, redraws, memory, proxy calls and CPU |
-| `node tools/live-scroll.mjs [app…] [--webkit]` | Nothing jumps: a live game through 4 refreshes; pages as they load (`late`), then scrolled: a refresh above, a tab drawn short, a moving drawing, taps folding below and above, a sheet showing less |
-| `node tools/store-shots.mjs <app>` | The README's and Showcase's screenshot set, both languages |
+| `node tools/gate.mjs [app…]` | The quality gate (`gate-page.js`) on every tab: lift, stalls, dead taps, wraps, cuts, white, mixed language… |
+| `node tools/speed.mjs <app…>` | Before vs after (3G, CPU ×4, answers replayed): time, KB, requests, CPU, redraws, memory, proxy calls |
+| `node tools/live-scroll.mjs [app…] [--webkit]` | Nothing jumps: a live game's refreshes, pages as they load and scrolled, taps folding, a sheet showing less |
 | `node tools/test-apps.mjs [app…]` | Every app's tests against this kit (checkouts beside this one) |
 
 The rest: `tools/README.md`.

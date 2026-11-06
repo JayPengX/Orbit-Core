@@ -5740,37 +5740,71 @@ html.q-kb.q-float dialog.q-sheet[open] {
 }
 
 /* Wide layouts an app can use: a page's sections in two (three) columns,
-   each of them a phone's column. .q-cols holds them; .q-span runs across. */
-.q-cols {
+   each of them a phone's column. .q-cols holds them; .q-span runs across.
+   By its own width, wherever it is (a page, a wide sheet, one side of a
+   split): two once each is 290 wide, three (.q-cols-3) the same. (:is(…)
+   matches every page: the weight these had when they were q-wide's.) */
+:is(:root.q-wide, :root:not(.q-wide)) .q-cols {
+  --q-cols-gap: var(--q-s-5, 24px);
   display: grid;
-  gap: 0 var(--q-s-5, 24px);
+  gap: 0 var(--q-cols-gap);
   align-items: start;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(290px, calc((100% - var(--q-cols-gap)) / 2))), 1fr));
+}
+:is(:root.q-wide, :root:not(.q-wide)) .q-cols.q-cols-3 {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(290px, calc((100% - 2 * var(--q-cols-gap)) / 3))), 1fr));
 }
 .q-cols > * {
   min-width: 0;
 }
-:root.q-wide .q-cols {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-:root.q-w3 .q-cols.q-cols-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-:root.q-wide .q-cols > .q-span {
+:is(:root.q-wide, :root:not(.q-wide)) .q-cols > .q-span {
   grid-column: 1 / -1;
 }
+/* A grid of like cards (.q-grid): as many as fit, none under --q-grid-min
+   (240), by its own width; the same on a phone, an iPad and a computer. */
+.q-grid {
+  display: grid;
+  gap: var(--q-grid-gap, 12px);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--q-grid-min, 240px)), 1fr));
+  align-items: start;
+}
+.q-grid > * {
+  min-width: 0;
+  margin: 0;
+}
+/* A list beside its detail (.q-split > .q-split-list + .q-split-main): side
+   by side once both fit (the list 300, the rest the detail's, 420 at least),
+   one over the other when they don't, by its own width. */
+.q-split {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--q-s-5, 24px);
+  align-items: flex-start;
+}
+.q-split > .q-split-list {
+  flex: 1 1 300px;
+  max-width: 100%;
+  min-width: 0;
+}
+.q-split > .q-split-main {
+  flex: 999 1 420px;
+  min-width: min(100%, 420px);
+}
 /* A page's sections dealt into columns (ui.mjs flowColumns): .q-flow,
-   laid as .q-flow-laid > .q-flow-col on q-wide (in a wide sheet, by its width). */
-:is(:root.q-wide, dialog.q-sheet-wide) .q-flow:is(.q-flow-laid, .q-flow-measure) {
+   laid as .q-flow-laid > .q-flow-col by its own width, wherever it is.
+   (Every page matches :is(…): the weight these rules had when they were
+   for q-wide only, so the apps' own section margins still give way.) */
+:is(:root.q-wide, :root:not(.q-wide)) .q-flow:is(.q-flow-laid, .q-flow-measure) {
   display: grid;
   grid-template-columns: repeat(var(--q-flow-n, 2), minmax(0, 1fr));
   gap: 0 var(--q-s-5, 24px);
   align-items: start;
 }
-:is(:root.q-wide, dialog.q-sheet-wide) .q-flow.q-flow-measure > * {
+:is(:root.q-wide, :root:not(.q-wide)) .q-flow.q-flow-measure > * {
   grid-column: 1;
 }
-:is(:root.q-wide, dialog.q-sheet-wide) .q-flow-col > :first-child,
-:is(:root.q-wide, dialog.q-sheet-wide) .q-flow.q-flow-measure > :first-child {
+:is(:root.q-wide, :root:not(.q-wide)) .q-flow-col > :first-child,
+:is(:root.q-wide, :root:not(.q-wide)) .q-flow.q-flow-measure > :first-child {
   margin-top: 0;
 }
 /* (In a sheet, the columns as close as its cards: 12, as .q-sheet-cols.) */
@@ -5788,7 +5822,7 @@ html.q-kb.q-float dialog.q-sheet[open] {
    tablet or a computer up to 1080. It's a size container (q-sheet), so
    what's in it lays out by the sheet's own width, never the screen's:
    .q-sheet-cols puts its cards in two columns from 600, three from 1000,
-   read top to bottom then across (the phone's order); .q-sheet-pair sets
+   in rows (a grid: for the phone's order, .q-flow); .q-sheet-pair sets
    two things side by side (each side's line-up, two tables). A phone
    upright is under 600: one column, as before. */
 html.q-tabrail:not(.q-float) dialog.q-sheet.q-sheet-wide {
@@ -5801,14 +5835,18 @@ dialog.q-sheet.q-sheet-wide {
   container: q-sheet / inline-size;
 }
 @container q-sheet (min-width: 600px) {
+  /* (A grid, never CSS columns: Safari put every card of a two-column
+     sheet in the left one (Sports, 2026-11-06). For even ends, deal them
+     with .q-flow + flowColumns.) */
   .q-sheet-cols.q-sheet-cols {
-    display: block;
-    columns: 2;
-    column-gap: 12px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    align-items: start;
   }
   .q-sheet-cols.q-sheet-cols > * {
-    break-inside: avoid;
-    margin: 0 0 12px;
+    margin: 0;
+    min-width: 0;
   }
   .q-sheet-pair.q-sheet-pair {
     display: grid;
@@ -5822,7 +5860,7 @@ dialog.q-sheet.q-sheet-wide {
 }
 @container q-sheet (min-width: 1000px) {
   .q-sheet-cols.q-sheet-cols:not(.q-sheet-cols-2) {
-    columns: 3;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 /* A phone on its side is short: a sheet's head and handle tighter, so the

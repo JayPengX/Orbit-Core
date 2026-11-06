@@ -184,7 +184,7 @@ async function buildClass(dir) {
 }
 
 // ---- One preview.mjs run: one page, one screen ----
-const FAULTS = /^(wraps|cut|scrolls sideways|console errors):/;
+const FAULTS = /^(wraps|cut|scrolls sideways|console errors|layout):/;
 function readFaults(text) {
   const faults = [];
   let block = null;
@@ -227,7 +227,7 @@ async function pagesWanted() {
     else if (name.startsWith('#')) pages.push({ name: name.slice(1).replace(/[^\p{L}\p{N}]+/gu, '_'), hash: name.slice(1) });
     // (Anything else: a tab's id, e.g. `week`; a wrong one shows as a click error.)
     else if (/^[\w-]+$/.test(name)) pages.push({ name, args: ['--click', `js:document.getElementById('tab-${name}').click()`] });
-    else throw new Error(`no page "${name}" for ${key}: ${['tabs', 'start', ...Object.keys(book).filter(k => k !== 'default')].join(' ')}, a tab's id, or #hash`);
+    else throw new Error(`no page "${name}" for ${key}: ${['tabs', 'start', ...Object.keys(book).filter(k => k !== 'default' && k !== 'check')].join(' ')}, a tab's id, or #hash`);
   }
   return pages.filter((p, i) => pages.findIndex(q => q.name === p.name) === i);
 }

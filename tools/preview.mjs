@@ -56,6 +56,7 @@
 //   - writes <out>/<app>-<hash>[-en][-<click>].png and prints the page's console errors.
 //
 // Needs Playwright (global in the container: /opt/node22/lib/node_modules).
+import { layoutFaults } from './layout-faults.mjs';
 import { createServer } from 'node:http';
 import { createSecureServer } from 'node:http2';
 import { execFile, execFileSync } from 'node:child_process';
@@ -1523,6 +1524,13 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
     scrollTo(before, scrollY);
     return moved ? `${document.documentElement.scrollWidth}px wide, scrolls ${moved}px sideways` : '';
   });
+  // A wide screen's layout (an iPad, a computer: 900 px or more beside the
+  // tabs): the page in a narrow band down the middle, or one half of it
+  // empty while the other is full (Jay 2026-11-06, his laptop: "the first
+  // time I open on my laptop is like this"). An open wide sheet is read the
+  // same way inside itself. (tools/layout-check.mjs blocks a push on these.)
+  const layout = await page.evaluate(layoutFaults);
+  if (layout.length) console.log(`layout:\n  ${layout.join('\n  ')}`);
   if (flakyNow.on) console.log(`  ${flakyNow.failed} answers failed on purpose`);
   flakyNow.failed = 0;
   console.log(file, wide.length ? `| wider than the screen: ${wide.join(', ')}` : '', sideways ? `| PAGE ${sideways}` : '');
