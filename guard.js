@@ -504,17 +504,26 @@ export async function workerErrors(env, { fetcher = fetch, now = Date.now(), kv 
 }
 
 // The last 7 days hour by hour (every Worker of the account, as the plan
-// counts them): [hour start (ms), requests, CPU ms], for capacity.js to
-// tell the crons' steady floor from what people add. Kept an hour in KV
-// (the panel and the proxy's 6-hourly check ask; analytics is asked once).
+// counts them): [hour start (ms), requests, CPU ms, people's requests,
+// people's CPU ms], for capacity.js to tell what people use from the rest.
+// People's: requests (not crons) answered in Cloudflare's colos in and near
+// Taiwan, where the family's phones come in; the rest is the crons and the
+// builders, and our own tools and checks, which run on machines in the US
+// (2026-11-06, the last 7 days: Taiwan's colo 4% of the CPU, Ashburn's 52%).
+// Kept an hour in KV (the panel and the proxy's 6-hourly check ask;
+// analytics is asked once).
 export const HOURS_KEY = 'guard:hours';
-const HOURS_Q = cpu => `query($a: string!, $s: Time!, $e: Time!) { viewer { accounts(filter: { accountTag: $a }) {
-  x: workersInvocationsAdaptive(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e }) { sum { requests${cpu ? ' cpuTimeUs' : ''} } ${cpu ? '' : 'quantiles { cpuTimeP99 } '}dimensions { datetimeHour scriptName } }
+export const NEAR_TAIWAN = ['TPE', 'KHH', 'RMQ', 'HKG', 'MFM', 'NRT', 'KIX', 'FUK', 'OKA', 'ICN', 'PUS', 'SIN', 'KUL', 'BKK', 'MNL', 'CGK', 'SGN', 'HAN'];
+// (People's part by hour and kind, near Taiwan only: crons are left out by
+// their kind, which analytics has named only since 2026-11-04, "unknown" before.)
+const HOURS_Q = (cpu, people = false) => `query($a: string!, $s: Time!, $e: Time!) { viewer { accounts(filter: { accountTag: $a }) {
+  x: workersInvocationsAdaptive(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e${people ? `, coloCode_in: ${JSON.stringify(NEAR_TAIWAN)}` : ''} }) { sum { requests${cpu ? ' cpuTimeUs' : ''} } ${cpu ? '' : 'quantiles { cpuTimeP99 } '}dimensions { datetimeHour ${people ? 'eventType' : 'scriptName'} } }
 } } }`;
 export async function useByHour(env, { fetcher = fetch, now = Date.now(), kv = env.RATE_LIMIT_KV } = {}) {
   if (!env.CF_GUARD_TOKEN) return { off: true };
   const kept = JSON.parse((await kv?.get(HOURS_KEY).catch(() => null)) || 'null');
-  if (kept?.at && now - kept.at < 3_600_000) return kept;
+  // (A copy kept before people's part was read is read again.)
+  if (kept?.at && now - kept.at < 3_600_000 && 'people' in kept) return kept;
   const state = JSON.parse((await kv?.get(STATE_KEY).catch(() => null)) || 'null') || {};
   const a = env.CF_ACCOUNT_ID || state.account || (await accountOf(env, fetcher));
   const end = Math.floor(now / 3_600_000) * 3_600_000;
@@ -528,17 +537,24 @@ export async function useByHour(env, { fetcher = fetch, now = Date.now(), kv = e
     cpuWay = 'p99';
     acc = await graphql(env, fetcher, HOURS_Q(false), vars);
   }
+  // (People's part asked apart: without it, every hour's use counts as theirs.)
+  let peopleError = null;
+  const near = await graphql(env, fetcher, HOURS_Q(cpuWay === 'sum', true), vars).catch(err => ((peopleError = err.message), null));
   const by = new Map();
-  for (const r of acc.x || []) {
-    const t = Date.parse(r.dimensions?.datetimeHour);
-    if (!Number.isFinite(t)) continue;
-    const n = r.sum?.requests || 0;
-    const row = by.get(t) || [t, 0, 0];
-    row[1] += n;
-    row[2] += cpuWay === 'sum' ? (r.sum?.cpuTimeUs || 0) / 1000 : (n * (r.quantiles?.cpuTimeP99 || 0)) / 1000;
-    by.set(t, row);
-  }
-  const out = { at: now, from: end - 7 * DAY, to: end, cpuWay, hours: [...by.values()].sort((x, y) => x[0] - y[0]).map(([t, n, c]) => [t, n, Math.round(c)]) };
+  const add = (rows, at) => {
+    for (const r of rows || []) {
+      const t = Date.parse(r.dimensions?.datetimeHour);
+      if (!Number.isFinite(t) || r.dimensions?.eventType === 'cron') continue;
+      const n = r.sum?.requests || 0;
+      const row = by.get(t) || [t, 0, 0, 0, 0];
+      row[at] += n;
+      row[at + 1] += cpuWay === 'sum' ? (r.sum?.cpuTimeUs || 0) / 1000 : (n * (r.quantiles?.cpuTimeP99 || 0)) / 1000;
+      by.set(t, row);
+    }
+  };
+  add(acc.x, 1);
+  if (near) add(near.x, 3);
+  const out = { at: now, from: end - 7 * DAY, to: end, cpuWay, people: !!near, ...(peopleError && { peopleError: peopleError.slice(0, 200) }), hours: [...by.values()].sort((x, y) => x[0] - y[0]).map(([t, n, c, pn, pc]) => (near ? [t, n, Math.round(c), pn, Math.round(pc)] : [t, n, Math.round(c)])) };
   await kv?.put(HOURS_KEY, JSON.stringify(out)).catch(() => {});
   return out;
 }

@@ -358,33 +358,50 @@ test("each Worker's errors in 24 hours: the family's Workers only, a status apar
   assert.deepEqual(await workerErrors({}), { off: true });
 });
 
-test('the last 7 days hour by hour: every Worker summed per hour, kept an hour, the p99 way where the API has no cpuTimeUs', async () => {
-  const { useByHour, HOURS_KEY } = await import('../guard.js');
+test('the last 7 days hour by hour: every Worker summed per hour, people\'s part (requests near Taiwan) apart, kept an hour, the p99 way where the API has no cpuTimeUs', async () => {
+  const { useByHour, HOURS_KEY, NEAR_TAIWAN } = await import('../guard.js');
   const rows = [
     { sum: { requests: 100, cpuTimeUs: 2_000_000 }, dimensions: { datetimeHour: '2026-11-03T05:00:00Z', scriptName: 'orbit-workers-proxy' } },
     { sum: { requests: 12, cpuTimeUs: 500_000 }, dimensions: { datetimeHour: '2026-11-03T05:00:00Z', scriptName: 'quota-guard' } },
     { sum: { requests: 80, cpuTimeUs: 1_000_000 }, dimensions: { datetimeHour: '2026-11-03T04:00:00Z', scriptName: 'orbit-workers-proxy' } }
   ];
+  // (Near Taiwan: part of 05:00, none at 04:00; its cron left out, requests of either name counted.)
+  const near = [
+    { sum: { requests: 20, cpuTimeUs: 300_000 }, dimensions: { datetimeHour: '2026-11-03T05:00:00Z', eventType: 'unknown' } },
+    { sum: { requests: 10, cpuTimeUs: 100_000 }, dimensions: { datetimeHour: '2026-11-03T05:00:00Z', eventType: 'fetch' } },
+    { sum: { requests: 5, cpuTimeUs: 900_000 }, dimensions: { datetimeHour: '2026-11-03T05:00:00Z', eventType: 'cron' } }
+  ];
   const kv = new Map();
+  // (A copy kept by the guard before people's part was read: read again.)
+  kv.set(HOURS_KEY, JSON.stringify({ at: Date.parse('2026-11-03T06:10:00Z'), hours: [] }));
   const store = { get: async k => kv.get(k) ?? null, put: async (k, v) => void kv.set(k, v) };
   let asks = 0;
   let vars = null;
+  let peopleQuery = '';
   const fetcher = async (url, init) => {
     asks++;
-    vars = JSON.parse(init.body).variables;
+    const body = JSON.parse(init.body);
+    if (body.query.includes('coloCode_in')) {
+      peopleQuery = body.query;
+      return new Response(JSON.stringify({ data: { viewer: { accounts: [{ x: near }] } } }));
+    }
+    vars = body.variables;
     return new Response(JSON.stringify({ data: { viewer: { accounts: [{ x: rows }] } } }));
   };
   const now = Date.parse('2026-11-03T06:30:00Z');
   const r = await useByHour({ CF_GUARD_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, { fetcher, now, kv: store });
   assert.equal(vars.s, '2026-10-27T06:00:00Z');
+  assert.ok(NEAR_TAIWAN.every(c => peopleQuery.includes(`"${c}"`)));
+  assert.ok(NEAR_TAIWAN.includes('TPE') && !NEAR_TAIWAN.includes('IAD'));
+  assert.equal(r.people, true);
   assert.deepEqual(r.hours, [
-    [Date.parse('2026-11-03T04:00:00Z'), 80, 1000],
-    [Date.parse('2026-11-03T05:00:00Z'), 112, 2500]
+    [Date.parse('2026-11-03T04:00:00Z'), 80, 1000, 0, 0],
+    [Date.parse('2026-11-03T05:00:00Z'), 112, 2500, 30, 400]
   ]);
   assert.ok(kv.has(HOURS_KEY));
   // Asked again within the hour: the kept copy, analytics not asked.
   await useByHour({ CF_GUARD_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, { fetcher, now: now + 30 * 60_000, kv: store });
-  assert.equal(asks, 1);
+  assert.equal(asks, 2);
   // No cpuTimeUs: each Worker's hour as requests × its 99th percentile.
   let n = 0;
   const old = async () => {
@@ -394,6 +411,12 @@ test('the last 7 days hour by hour: every Worker summed per hour, kept an hour, 
   };
   const p = await useByHour({ CF_GUARD_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, { fetcher: old, now, kv: null });
   assert.equal(p.cpuWay, 'p99');
-  assert.deepEqual(p.hours, [[Date.parse('2026-11-03T05:00:00Z'), 10, 30]]);
+  assert.deepEqual(p.hours, [[Date.parse('2026-11-03T05:00:00Z'), 10, 30, 10, 30]]);
+  // People's part unread: the totals alone, as before.
+  const noNear = async (url, init) => (JSON.parse(init.body).query.includes('coloCode_in') ? new Response(JSON.stringify({ errors: [{ message: 'unknown filter coloCode_in' }] })) : new Response(JSON.stringify({ data: { viewer: { accounts: [{ x: rows }] } } })));
+  const q = await useByHour({ CF_GUARD_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, { fetcher: noNear, now, kv: null });
+  assert.equal(q.people, false);
+  assert.match(q.peopleError, /coloCode_in/);
+  assert.deepEqual(q.hours[1], [Date.parse('2026-11-03T05:00:00Z'), 112, 2500]);
   assert.deepEqual(await useByHour({}), { off: true });
 });

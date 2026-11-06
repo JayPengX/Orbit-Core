@@ -84,6 +84,33 @@ test('splitHours: a week that is nearly all crons still leaves people a tenth (t
   assert.equal(s.requests.people, s.requests.day * 0.1);
 });
 
+test('splitHours: with people\'s part read (requests near Taiwan), that is what people use and the rest (crons, builders, our tools abroad) is fixed', () => {
+  // The same week, with our tools abroad 3,000 requests and 20,000 CPU ms in every working hour of Taiwan's day.
+  const mixed = { people: true, hours: week.hours.map(([t, n, c]) => {
+    const tw = new Date(t + 8 * HOUR).getUTCHours();
+    const busy = tw >= 8;
+    const tools = tw >= 9 && tw < 18;
+    return [t, n + (tools ? 3000 : 0), c + (tools ? 20_000 : 0), busy ? 1000 : 0, busy ? 10_000 : 0];
+  }) };
+  const s = splitHours(mixed, NOW);
+  assert.equal(s.cpuMs.near, true);
+  assert.equal(s.cpuMs.people, 10_000 * 16);
+  assert.equal(s.cpuMs.day, 20_000 * 24 + 10_000 * 16 + 20_000 * 9);
+  assert.equal(s.cpuMs.fixed, 20_000 * 24 + 20_000 * 9);
+  assert.equal(s.requests.people, 1000 * 16);
+  // The quiet-hour way would have counted the tools as people's.
+  const old = splitHours({ hours: mixed.hours.map(r => r.slice(0, 3)) }, NOW);
+  assert.equal(old.cpuMs.near, false);
+  assert.equal(old.cpuMs.people, 10_000 * 16 + 20_000 * 9);
+  const q = quotas({ users: { week: 40 }, guard: guardOf({ cpuMs: 0.2 }), hours: mixed, now: NOW });
+  const cpu = q.rows.find(r => r.key === 'cf:cpuMs');
+  const capDay = (PLAN.cpuMs * 0.9) / 32;
+  assert.equal(cpu.near, true);
+  assert.equal(cpu.holds, Math.floor((40 * (capDay - (20_000 * 24 + 20_000 * 9))) / (10_000 * 16)));
+  assert.ok(cpu.holds > 40);
+  assert.equal(q.near, true);
+});
+
 test('quotas: people held = this week\'s × room after the fixed part ÷ what people use; the fewest is named', () => {
   const users = { week: 40 };
   const q = quotas({ users, guard: guardOf({ requests: 0.05, cpuMs: 0.2, r2ClassA: 0.07 }), hours: week, now: NOW });

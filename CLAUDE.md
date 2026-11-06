@@ -266,9 +266,9 @@ OpenF1's tables (`openF1Raw`) and kept in R2 for good.
   with its season (`builders/kept.js`).
 - **A day in one answer** (`GET /sports-today?day=YYYY-MM-DD`,
   `sports-today.js`): Sports' first screen, built on demand from ESPN's
-  pages (`readThrough`, parsed by the kit's `sports-espn.mjs`); 60 s at the
-  edge for today and tomorrow, longer for older days, 10 s when a league was
-  missed; from pace 2, 503 `{error: 'paced'}` and the phone reads as before.
+  pages (`readThrough`, the kit's `sports-espn.mjs`); 60 s at the edge for
+  today and tomorrow, longer for older days, 10 s when a league was missed;
+  from pace 2, 503 `{error: 'paced'}`, the phone reads as before.
 
 ### 4.2 The other Workers
 
@@ -302,12 +302,11 @@ A read (`kit proxyJson`) goes down these until one answers:
 - Reads made within a few milliseconds go to the proxy as one batch.
 - A failed read is a failure, never "nothing there": the device's copy of
   any age answers, asked again soon; a failed batch item fails alone.
-- The phone reads some sources itself (open to any page), no Worker
-  request: ESPN's core API always (it refuses the proxy); ESPN's site API
-  and MLB's statsapi untrimmed (`DEVICE_FIRST`; one the device can't get
-  goes to the proxy, its host for ten minutes); Jolpica when the proxy
-  can't get it (it counts per address; Cloudflare's are shared), then for
-  ten minutes (`SELF_TOO`).
+- The phone reads some sources itself, no Worker request: ESPN's core
+  API always (it refuses the proxy); ESPN's site API and MLB's statsapi
+  untrimmed (`DEVICE_FIRST`; failing, the proxy, that host for ten
+  minutes); Jolpica when the proxy can't get it (it counts per address;
+  Cloudflare's are shared), then 10 minutes (`SELF_TOO`).
 - On top of these, apps put live knowledge over slower copies: Sports'
   `liveTable` counts results before ESPN does; F1's own timing calls a
   session over at the flag; MLB's postseason comes from MLB itself.
@@ -428,7 +427,8 @@ can be turned off on its own.
   `/errors`; the panel's 部署 runs workflows with `GH_ACTIONS_TOKEN`.
 - **容量** (`capacity.js` `quotas`): each quota's people held = this
   week's × (room past the fixed part ÷ people's use), the fewest named;
-  Workers' fixed part from the guard's `/hours`.
+  Workers' people's use: the guard's `/hours` near Taiwan (`NEAR_TAIWAN`),
+  the rest fixed (crons, builders, our US tools).
 - **`quota-guard`** (`guard.js`, every 5 minutes) reads the use against
   `PLAN` (Workers, CPU, KV, DO, R2, D1), paces on real use only (`paceFor`:
   past 60/75/85% used with the last days' rate reaching the stop; 85%
