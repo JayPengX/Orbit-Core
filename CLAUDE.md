@@ -189,7 +189,7 @@ the `q-` components; they don't restyle them.
 `lineAnswer`: lines gzipped, each flushed). No
 placement: it runs near each caller; only Gemini goes through
 `gemini-relay.js`, pinned to Taiwan. Every answer carries `Server-Timing:
-w;dur=` (the Worker's own time), which the 除錯紀錄 notes with a slow read.
+w;dur=` (the Worker's own time), noted by the 除錯紀錄 with a slow read.
 
 | Route | File | What |
 | --- | --- | --- |
@@ -314,14 +314,14 @@ A read (`kit proxyJson`) goes down these until one answers:
 | Store | Binding | What's in it |
 | --- | --- | --- |
 | D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data, the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced (§5.3); `gemini_call`: every Gemini call (`gemini-use.js`); `law_day`: the AI caps' counts a day; `gift`, `gift_claim`: the giveaway (`gift.js`); `beats`: each job's last run and failures (`ops.js`) |
-| R2 `orbit-data` | `DATA` | Public: the builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `where.json`), the proxy's kept reads (`mirror/`). Never served: `private/` (the nightly store backups `private/store/<day>.jsonl.gz`, Firestore's last copy) |
+| R2 `orbit-data` | `DATA` | Public: the builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `station/`, `where.json`), the proxy's kept reads (`mirror/`). Never served: `private/` (nightly backups `private/store/<day>.jsonl.gz`, Firestore's last copy) |
 | KV | `RATE_LIMIT_KV` | Counters (sign-ins, per-address limits); the guard's state, pace and alerts (`guard:*`); push's devices, prefs and due notices (`push:*`); Google Weather's shared cells and its calls a day (`weather:g:*`, `weather:google:<day>`); TDX's last good reads and its month's meter (`tdx:warm:*`, `transit:use:<month>`); Law's kept plans and answers (`law:*`); the showcase's passes a day (`showcase:passes:*`); the door's state (`door:state`); `ops:data-folders` |
 | Durable Objects | `F1_LOG`, `DOOR`, `CLOCK` | `F1Log`: F1's laps as they're driven; `Door`: seats and the line; `GuardClock`: the guard's alarm |
 | Edge cache | (Cache API) | The data proxy's answers by tier (§4.1), `/sports-today`, TDX's reads and routes (`transit.js`), the weather blend's cells (`weather.js`), `/law-live`, `/law-page`, `/config` |
 | Services | `GEMINI_RELAY`, `LAW_SITE`, `GUARD` | The relay; Orbit Law's site (its data, read by the proxy); the guard's `/errors` |
 
 D1 and R2 are bound at deploy (`deploy.yml` adds them to `wrangler.toml`).
-A new Cloudflare product goes into `guard.js` `PLAN` in the same change.
+A new Cloudflare product goes into `guard.js` `PLAN` with it.
 
 ### 5.3 The Pass and each app's data (sync)
 
@@ -372,7 +372,7 @@ changes, writing a file only when it changed (`builders/store.js`):
 | `watch.js` | `sports/watch.json`, the season archive | hourly / daily 20:00 |
 | `winprob.js` | `winprob/…` | daily 23:00 |
 | `photos.js`, `official-photos.js` | photo lists, cutouts, official headshots | hourly / daily 18:00 |
-| `buses.js` | `bus/…`, `shape/…`, `where.json` | a city once a week |
+| `buses.js` | `bus/…`, `shape/…`, `station/…`, `where.json` | a city once a week |
 | `asia.js`, `cpbl.js` | CPBL's month and standings | daily 15:00 |
 | `f1kept.js` | each finished F1 session's 數據 and laps, kept before anyone opens them (via the proxy: OpenF1 refuses quick askers) | :06, :26, :46 |
 | `kept.js` | wipes the proxy's kept copies (`mirror/`) from before a league's first askable day | daily 17:00 |

@@ -1,5 +1,5 @@
 // Taiwan's bus routes and timetables (one compact pack a city), each line's
-// shape and where.json (which packs and YouBike cities are near each point),
+// shape, the stations and where.json (which packs and YouBike cities are near each point),
 // for Orbit Transit to work out a trip's buses on the phone. Built by the
 // proxy (builders/run.js) into the family's data (R2).
 //
@@ -12,8 +12,10 @@
 //
 // → bus/<City>.json, bus/InterCity/<lat>_<lon>.json (the 公路客運 in 0.25°
 // squares), shape/bus/<City>.json, shape/bus/InterCity/<sq>.json,
-// shape/rail.json, where.json, index.json ({ built, cities: { City: {
-// routes, bytes, built } }, squares, shapes }). A pack: { v, city, built,
+// shape/rail.json, where.json, station/<City>/<lat>_<lon>.json (a city's bus
+// stations in 0.05° tiles: cityStations), station/index.json, index.json ({
+// built, cities: { City: { routes, bytes, built } }, squares, shapes,
+// stations: { City: { stations, tiles, built } } }). A pack: { v, city, built,
 // stops: { uid: [name, lat, lon] }, routes: [{ uid, name, ways: [[sub,
 // subName, dir, [stopUid…]]], sched: [[sub, dir, [stopUid…], trips, freq]] }] }
 // where a trip is [days (7 bits, bit 0 Sunday), times, special?].
@@ -117,6 +119,47 @@ export function squares(p) {
     out[k] = { ...p, square: k, stops: Object.fromEntries([...used].map(u => [u, p.stops[u]])), routes };
   }
   return out;
+}
+
+// A city's bus stations (TDX's Station list: what its NearBy search gives),
+// in 0.05° tiles: the map's stops and the stops near a point are read on
+// the phone from here (Transit packs.mjs stationRows), never from TDX's
+// search around each spot (an advanced ask, 7.5 basic ones' points, at each
+// new ~200 m; 2026-11-06). A tile: { routes: { RouteUID: [zh, en] },
+// stations: [[StationUID, StationID, zh, en, lat, lon, cityCode, bearing,
+// [[StopUID, RouteUID]…]]] }, each in order (a week's rebuild of the same
+// stations is the same bytes: not written, phones keep theirs).
+export const TILE = 0.05;
+export const tileOf = (lat, lon) => `${(Math.floor(lat / TILE) * TILE).toFixed(2)}_${(Math.floor(lon / TILE) * TILE).toFixed(2)}`;
+export const STATION_SELECT = 'StationUID,StationID,StationName,StationPosition,Stops,LocationCityCode,Bearing';
+const enOf = x => (x && typeof x === 'object' && x.En) || '';
+const byFirst = (a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
+export async function cityStations(tdx, city) {
+  const scope = city === 'InterCity' ? 'InterCity' : `City/${city}`;
+  const tiles = {};
+  let stations = 0;
+  await tdx.pages(`basic/v2/Bus/Station/${scope}?$select=${STATION_SELECT}`, 1000, rows => {
+    for (const s of rows) {
+      const lat = r5(s.StationPosition?.PositionLat);
+      const lon = r5(s.StationPosition?.PositionLon);
+      // (No place, or TDX's 0,0: on no one's map.)
+      if (!s.StationUID || !(lat > 0) || !(lon > 0)) continue;
+      const t = (tiles[tileOf(lat, lon)] ||= { routes: {}, stations: [] });
+      const stops = [];
+      for (const x of s.Stops || []) {
+        if (!x.StopUID || !x.RouteUID) continue;
+        stops.push([x.StopUID, x.RouteUID]);
+        t.routes[x.RouteUID] ||= [zh(x.RouteName), enOf(x.RouteName)];
+      }
+      t.stations.push([s.StationUID, s.StationID || '', zh(s.StationName), enOf(s.StationName), lat, lon, s.LocationCityCode || '', s.Bearing || '', stops.sort((a, b) => byFirst(a, b) || (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0))]);
+      stations++;
+    }
+  });
+  for (const t of Object.values(tiles)) {
+    t.stations.sort(byFirst);
+    t.routes = Object.fromEntries(Object.entries(t.routes).sort(byFirst));
+  }
+  return { stations, tiles };
 }
 
 // "LINESTRING(lon lat, …)" → [[lat, lon]…]; "MULTILINESTRING((…),(…))" its
@@ -273,7 +316,8 @@ export async function buildWhere(store, tdx, index, built) {
 }
 
 // The run: the cities whose pack is over six days old, rebuilt until `until`;
-// the rail lines' shapes weekly too; where.json once every city is fresh.
+// the rail lines' shapes weekly too; where.json once every city is fresh;
+// then each city's stations over six days old, in the time left.
 export async function runBuses({ store, env, now = Date.now(), until = now + 8 * 60_000, tdx = tdxClient(env) }) {
   const index = (await store.json('index.json')) || { cities: {} };
   const built = new Date(now).toISOString();
@@ -314,9 +358,29 @@ export async function runBuses({ store, env, now = Date.now(), until = now + 8 *
     }
     index.built = built;
     index.shapes = (await store.list('shape/')).sort();
-    await store.put('index.json', index);
-    // Every city fresh this week: where.json, from them.
-    if (!CITIES.some(c => age(c) > WEEK && !done.includes(c))) await buildWhere(store, tdx, index, built);
   }
-  return { stale: stale.length, built: done };
+  // The stations, each city's once a week on their own (the time left).
+  const stationAge = k => now - (Date.parse(index.stations?.[k]?.built || '') || 0);
+  const stations = [];
+  for (const city of CITIES.filter(c => stationAge(c) > WEEK)) {
+    if (Date.now() >= until) break;
+    try {
+      const got = await cityStations(tdx, city);
+      // (None, or under half what it had: a read gone wrong, the tiles there stay.)
+      const had = index.stations?.[city]?.stations || 0;
+      if (!got.stations || got.stations < had / 2) throw new Error(`${city}: ${got.stations} stations, had ${had}`);
+      for (const [k, t] of Object.entries(got.tiles)) await store.put(`station/${city}/${k}.json`, { v: 1, city, tile: k, built, ...t });
+      (index.stations ||= {})[city] = { stations: got.stations, tiles: Object.keys(got.tiles).sort(), built };
+      stations.push(city);
+    } catch {
+      // Left as they were; tried again next run.
+    }
+  }
+  if (done.length || stations.length) await store.put('index.json', index);
+  // Every city fresh this week: where.json, from them.
+  if (done.length && !CITIES.some(c => age(c) > WEEK && !done.includes(c))) await buildWhere(store, tdx, index, built);
+  // The phone's list of every city's tiles, once every city has its stations
+  // (one missing would leave its stops off the map: TDX is asked till then).
+  if (stations.length && CITIES.every(c => index.stations?.[c])) await store.put('station/index.json', { v: 1, built, tile: TILE, cities: Object.fromEntries(CITIES.map(c => [c, index.stations[c].tiles])) });
+  return { stale: stale.length, built: done, stations };
 }
