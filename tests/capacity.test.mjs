@@ -144,7 +144,7 @@ test('quotas, few people: Google and TDX at a typical person\'s month, the fewes
   const days = 30; // November
   const tdx = q.rows.find(r => r.key === 'tdx:points');
   // A stop card a quarter hour, the map a quarter hour and a trip, on half the days.
-  assert.ok(Math.abs(TYPICAL_DAY['tdx:points'] - (2 * (0.0187 + 5 / 1500) + (13 / 60) * 0.54 + (15 / 60) * 0.2 + 0.02)) < 1e-9);
+  assert.ok(Math.abs(TYPICAL_DAY['tdx:points'] - (2 * (0.0203 + 5 * (1 / 1500 + 64 / 1024 / 150)) + (13 / 60) * 0.575 + (15 / 60) * 0.27 + 0.028 + 0.016)) < 1e-9);
   assert.equal(tdx.holds, Math.floor((200 - tdx.fixedMonth) / (TYPICAL_DAY['tdx:points'] * ACTIVE * days)));
   const walks = q.rows.find(r => r.key === 'maps:matrix');
   assert.equal(walks.holds, Math.floor((9000 - 2000) / (5 * ACTIVE * days)));
@@ -207,10 +207,10 @@ test('plan carries the quotas', () => {
   assert.ok(p.quotas.rows.some(r => r.key === 'cf:cpuMs' && r.holds > 0));
 });
 
-test("quotas: Maps' and TDX's spends by our tools and the showcase's demo are taken off before people's", () => {
+test("quotas: Maps' and TDX's spends by our tools, the showcase's demo and the bus build are taken off before people's", () => {
   const users = { week: 20 };
   const maps = { matrix: { used: 600, month: 3000, fixed: 2000, cap: 3000 } };
-  const usage = { tdx: { points: 30, devPoints: 6, showPoints: 0, plan: { month: 200 }, guard: { why: '' } } };
+  const usage = { tdx: { points: 30, devPoints: 4, showPoints: 0, buildPoints: 2, plan: { month: 200 }, guard: { why: '' } } };
   const q = quotas({ users, usage, maps, now: NOW });
   const walks = q.rows.find(r => r.key === 'maps:matrix');
   assert.equal(walks.fixedMonth, 2000);

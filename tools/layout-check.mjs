@@ -18,6 +18,7 @@
 import { execFile } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { PAGES } from './shots/pages.mjs';
 
 const HERE = new URL('.', import.meta.url).pathname;
@@ -36,7 +37,12 @@ const ACCOUNT = { sports: 'fan', words: 'demo', money: 'demo', securities: 'demo
 const BLOCKS = new Set(['layout', 'wide', 'scrolls sideways']);
 const apps = args.length ? args : ['sports', 'transit', 'weather', 'orbit', 'money', 'words', 'beats', 'law', 'securities'];
 
-const run = argv => new Promise(ok => execFile(process.execPath, argv, { cwd: join(HERE, '..'), maxBuffer: 64 << 20 }, (e, stdout, stderr) => ok({ code: e?.code || 0, text: `${stdout}${stderr}` })));
+// (Every push's check shares what our Workers answered in the last 15
+// minutes, one keep for all of them (tools/live-keep.mjs), not one a run: a
+// layout needs no newer data, and our tools were most of TDX's calls on
+// 2026-11-06. The proxy gives them 10-minute copies of TDX's besides.)
+const env = { ...process.env, ORBIT_LIVE_KEEP: process.env.ORBIT_LIVE_KEEP || join(tmpdir(), 'orbit-live-keep'), ORBIT_LIVE_KEEP_S: process.env.ORBIT_LIVE_KEEP_S || '900' };
+const run = argv => new Promise(ok => execFile(process.execPath, argv, { cwd: join(HERE, '..'), env, maxBuffer: 64 << 20 }, (e, stdout, stderr) => ok({ code: e?.code || 0, text: `${stdout}${stderr}` })));
 
 let bad = 0;
 for (const app of apps) {

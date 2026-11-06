@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   tdxRequest, tdxGet, warmBikes, SLOW_MS, tdxAccess, resetTdxToken, resetPace, resetTurns, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
-  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta, tdxTrim, tdxUse, DEV_SHARE, HOT_ASKS, SMALL_ETA, SMALL_ROWS, together
+  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta, tdxTrim, tdxUse, DEV_SHARE, ETA_ROWS, wholeAt, together, DEV_TDX_DAY, DEV_OLDEST
 } from '../transit.js';
 
 const NOW = Date.parse('2026-10-03T01:00:00Z');
@@ -717,9 +717,44 @@ test("our tools' spends (the dev door) and the showcase's counted apart for the 
   await tdxGet(tdxEnv, 'basic/v2/Bus/Route/City/Taipei', { fetchFn: tdxFetch, cache: memCache(), now: NOW });
   const all = await tdxUse(tdxEnv, NOW);
   const ours = await tdxUse(tdxEnv, NOW, 'dev:');
-  assert.deepEqual(Object.values(all), [2]);
-  assert.deepEqual(ours, { [Object.keys(all)[0]]: 1 });
-  assert.equal(tdxPoints(ours, NOW).month, 1 / 1500);
+  const day = Object.keys(all)[0].slice(-10);
+  // (Each call and the bytes it brought: `[]`, 2 bytes each.)
+  assert.deepEqual(all, { [`tdx:b:${day}`]: 2, [`tdx:vb:${day}`]: 4 });
+  assert.deepEqual(ours, { [`tdx:b:${day}`]: 1, [`tdx:vb:${day}`]: 2 });
+  assert.equal(tdxPoints(ours, NOW).month, 1 / 1500 + 2 / (150 * 2 ** 20));
+});
+
+test("our tools (the dev door) yield TDX's month to people: a copy up to 10 minutes old as it is, no YouBike kept warm for them, and past half a point a Taiwan day copies only", async () => {
+  fresh();
+  const kv = memKv();
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', RATE_LIMIT_KV: kv, TDX_PER_MIN: '100' };
+  const cache = memCache();
+  let calls = 0;
+  const fetchFn = async url => (url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : (calls++, json([{ n: calls }])));
+  const get = (path, now, by = 'dev') => tdxGet(env, path, { fetchFn, cache, now, by });
+  const bikes = 'basic/v2/Bike/Availability/City/Keelung';
+  assert.equal(DEV_OLDEST, 10 * 60_000);
+  assert.equal((await get(bikes, NOW)).state, 'miss');
+  // Nine minutes on: ours the copy as it is (a person's would read TDX); eleven: TDX.
+  assert.equal((await get(bikes, NOW + 9 * 60_000)).state, 'hit');
+  assert.equal(calls, 1);
+  assert.equal((await get(bikes, NOW + 11 * 60_000)).state, 'miss');
+  assert.equal(calls, 2);
+  await new Promise(r => setTimeout(r, 0));
+  assert.equal(kv.store.has('tdx:warm:active'), false, 'never kept warm for our tools');
+  // Past half a point today (750 basic calls): ours get copies only, however old; none, DEV_TDX_CAP. People's go on.
+  fresh();
+  await kv.put(`transit:use:${billingMonth(NOW)}`, JSON.stringify({ 'dev:tdx:b:2026-10-03': DEV_TDX_DAY * 1500 }));
+  const old = await get(bikes, NOW + 60 * 60_000);
+  assert.deepEqual([old.state, JSON.parse(old.body)[0].n, calls], ['stale', 2, 2]);
+  const none = await get('basic/v2/Bike/Availability/City/Yilan', NOW + 60 * 60_000);
+  assert.deepEqual([none.status, JSON.parse(none.body).code, calls], [429, 'DEV_TDX_CAP', 2]);
+  assert.equal((await get('basic/v2/Bike/Availability/City/Yilan', NOW + 60 * 60_000, '')).state, 'miss');
+  assert.equal(calls, 3);
+  // (A person's ask keeps their city warm, as before.)
+  await get(bikes, NOW + 61 * 60_000, '');
+  await new Promise(r => setTimeout(r, 0));
+  assert.ok(JSON.parse(kv.store.get('tdx:warm:active') || '{}')[bikes]);
 });
 
 test("a sample spends a real ask: none without a session or past the limit (a stranger can't use up the month's Google routes or TDX's points)", async () => {
@@ -779,8 +814,8 @@ test("TDX's month is Taiwan's: the first hours of a Taiwan month don't count las
   for (let d = 1; d <= 31; d++) used[`tdx:a:2026-10-${String(d).padStart(2, '0')}`] = 1239;
   used.tdx = Object.values(used).reduce((a, b) => a + b, 0);
   const now = Date.parse('2026-10-31T17:00:00Z'); // 2026-11-01 01:00 in Taiwan, still October's meter
-  assert.equal(tdxPoints(used, now).month, 0);
-  assert.equal(tdxGuard(tdxPoints(used, now), now).why, '');
+  assert.equal(tdxPoints(used, now, {}).month, 0);
+  assert.equal(tdxGuard(tdxPoints(used, now, {}), now).why, '');
   assert.ok(tdxPoints(used, Date.parse('2026-10-31T03:00:00Z')).month > 190, 'October itself still counts');
 });
 
@@ -800,10 +835,11 @@ test("TDX's plans: a metro exit's doubled station said once (台北車站 M1, no
   for (const n of ['高高屏', '新竹', '台北車站', '屏東屏東']) assert.equal(onceName(n), n === '屏東屏東' ? '屏東' : n);
 });
 
-test('buses due: a quiet city asks its stops (or routes) alone; a busy one is read whole once and every ask answered from it, the running list kept at the edge; a path TDX refuses is not asked again', async () => {
+test("buses due: a city's stops (or routes) asked alone, a big one never whole however busy; which routes run from the city's buses' places, kept 10 minutes at the edge; a path TDX refuses is not asked again", async () => {
   fresh();
   resetEta();
-  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 'secret', RATE_LIMIT_KV: memKv(), TDX_PER_MIN: '100' };
+  const index = { cities: { Taipei: { routes: 416 }, InterCity: { routes: 485 } } };
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 'secret', RATE_LIMIT_KV: memKv(), TDX_PER_MIN: '100', DATA: { get: async k => (k === 'index.json' ? { json: async () => index } : null) } };
   const cache = memCache();
   const log = [];
   const all = [
@@ -812,48 +848,57 @@ test('buses due: a quiet city asks its stops (or routes) alone; a busy one is re
     { StopUID: 'TPE2', RouteUID: 'TPE10', EstimateTime: 120 },
     { StopUID: 'TPE3', RouteUID: 'TPE12', StopStatus: 1 }
   ];
+  const buses = [{ RouteUID: 'TPE10', PlateNumb: 'A' }, { RouteUID: 'TPE10', PlateNumb: 'B' }, { RouteUID: 'TPE11', PlateNumb: 'C' }];
   // (TDX's filter: the rows of the stops or routes it names.)
   const fetchFn = async url => {
     if (url.includes('token')) return json({ access_token: 'T', expires_in: 86400 });
     log.push(url);
     if (url.includes('S2STravelTime')) return new Response('{"Message":"RailSystem: \'TRTCMG\' is not accepted"}', { status: 400 });
+    if (url.includes('RealTimeByFrequency')) return json(buses);
     const named = [...decodeURIComponent(url).matchAll(/(StopUID|RouteUID) eq '([^']+)'/g)];
     return json(named.length ? all.filter(r => named.some(([, f, v]) => r[f] === v)) : all);
   };
   const ask = (qs, now = NOW) => handleTransit(new Request(`https://w/transit/eta?${qs}`), env, {}, '/transit/eta', { session: { s: 'S' }, fetchFn, now, cache });
+  const runningAt = (city, now) => handleTransit(new Request(`https://w/transit/running?city=${city}`), env, {}, '/transit/running', { session: { s: 'S' }, fetchFn, now, cache }).then(r => r.json());
   const a = await (await ask('city=Taipei&stops=TPE1,TPE3')).json();
   assert.deepEqual(a.map(r => r.RouteUID), ['TPE10', 'TPE11', 'TPE12']);
   assert.equal(log.length, 1, 'a quiet city: these stops alone, not the whole city');
   assert.match(decodeURIComponent(log[0]), /City\/Taipei\?\$filter=StopUID eq 'TPE1' or StopUID eq 'TPE3'&\$select=/);
-  // Busy here (HOT_ASKS asks in half a minute): the whole city once, every ask after from it.
-  for (let i = 1; i < HOT_ASKS; i++) await ask(`city=Taipei&stops=TPE${i}`, NOW + i * 1000);
-  assert.ok(log.some(u => /EstimatedTimeOfArrival\/City\/Taipei\?\$select=StopUID,.*&\$top=60000/.test(decodeURIComponent(u))), 'busy: the whole city read');
+  // Busy here (twenty stop lists in twenty seconds): still each its own read,
+  // 台北's whole list (10 MB, a point every 150 MB) costing more than them.
+  for (let i = 1; i < 20; i++) await ask(`city=Taipei&stops=TPE${i}`, NOW + i * 1000);
+  assert.ok(!log.some(u => /\$top=60000/.test(decodeURIComponent(u))), 'never the whole city');
+  assert.equal(wholeAt('Taipei'), Infinity);
+  // Which routes have buses on the road: the city's buses' places (A1), the city's routes from the packs' index.
   const n = log.length;
-  const b = await (await ask('city=Taipei&route=TPE10', NOW + 20_000)).json();
-  assert.deepEqual(b.map(r => r.StopUID), ['TPE1', 'TPE2']);
-  const run = await (await handleTransit(new Request('https://w/transit/running?city=Taipei'), env, {}, '/transit/running', { session: { s: 'S' }, fetchFn, now: NOW + 20_500, cache })).json();
-  assert.deepEqual(run.routes, { TPE10: 2, TPE11: 1, TPE12: 0 });
-  // A plan's routes in one ask, from the copy.
-  const both = await (await ask('city=Taipei&routes=TPE10,TPE12,nope', NOW + 20_800)).json();
-  assert.deepEqual(both.map(r => `${r.RouteUID} ${r.StopUID}`), ['TPE10 TPE1', 'TPE10 TPE2', 'TPE12 TPE3']);
-  assert.equal(log.length, n, 'then every stop, every route and the running list from the one call');
-  // The running list from this colo's cache in another isolate (none of its own): no TDX call, no city read.
-  resetEta();
-  const shared = await (await handleTransit(new Request('https://w/transit/running?city=Taipei'), env, {}, '/transit/running', { session: { s: 'S' }, fetchFn, now: NOW + 30_000, cache })).json();
-  assert.deepEqual(shared.routes, run.routes);
-  assert.equal(log.length, n, 'kept at the edge');
-  // A quiet city's running list: its own slim read (three fields), not the whole estimates.
-  const quiet = await (await handleTransit(new Request('https://w/transit/running?city=Hsinchu'), env, {}, '/transit/running', { session: { s: 'S' }, fetchFn, now: NOW + 30_000, cache })).json();
-  assert.equal(Object.keys(quiet.routes).length, 3);
-  assert.match(decodeURIComponent(log.at(-1)), /EstimatedTimeOfArrival\/City\/Hsinchu\?\$select=RouteUID,StopStatus,EstimateTime&\$top=60000/);
+  const run = await runningAt('Taipei', NOW + 20_500);
+  assert.deepEqual(run.routes, { TPE10: 2, TPE11: 1 });
+  assert.equal(run.total, 416);
   assert.equal(log.length, n + 1);
+  assert.match(decodeURIComponent(log.at(-1)), /RealTimeByFrequency\/City\/Taipei\?\$select=RouteUID,/);
+  // The running list from this colo's cache in another isolate (none of its own): no TDX call.
+  resetEta();
+  assert.deepEqual((await runningAt('Taipei', NOW + 30_000)).routes, run.routes);
+  // Nine minutes on, still that one; past ten, read again.
+  resetEta();
+  await runningAt('Taipei', NOW + 20_500 + 9 * 60_000);
+  assert.equal(log.length, n + 1, 'kept 10 minutes');
+  resetEta();
+  await runningAt('Taipei', NOW + 20_500 + 11 * 60_000);
+  assert.equal(log.length, n + 2);
+  // 公路客運's: its buses' places, all Taiwan (725 KB a read, where every stop's estimates were 14.7 MB).
+  const inter = await runningAt('InterCity', NOW + 30_000);
+  assert.equal(inter.total, 485);
+  assert.match(decodeURIComponent(log.at(-1)), /RealTimeByFrequency\/InterCity\?\$select=RouteUID,/);
+  assert.ok(!log.some(u => /EstimatedTimeOfArrival\/InterCity\?\$select/.test(decodeURIComponent(u))));
   assert.equal((await ask('city=Taipei&stops=nope')).status, 400);
   // 公路客運 (all Taiwan, too big to keep whole): its stops' own ask.
+  const m = log.length;
   const many = Array.from({ length: 50 }, (_, i) => `THB${100 + i}`);
   await ask(`city=InterCity&stops=${many.join(',')}`);
-  const inter = log.slice(n + 1).map(decodeURIComponent);
-  assert.equal(inter.length, 2, '40 stops a call');
-  assert.ok(inter.every(u => /InterCity\?\$filter=StopUID eq 'THB\d+'( or StopUID eq 'THB\d+')*&\$select=/.test(u)));
+  const asked = log.slice(m).map(decodeURIComponent);
+  assert.equal(asked.length, 2, '40 stops a call');
+  assert.ok(asked.every(u => /InterCity\?\$filter=StopUID eq 'THB\d+'( or StopUID eq 'THB\d+')*&\$select=/.test(u)));
   await ask('city=InterCity&routes=THB5700,THB5900');
   assert.match(decodeURIComponent(log.at(-1)), /InterCity\?\$filter=RouteUID eq 'THB5700' or RouteUID eq 'THB5900'&\$select=/);
   await ask('city=InterCity&route=THB5608');
@@ -891,8 +936,8 @@ test("buses due, had=<s> (the phone's copy that old): a copy here no newer is re
 
 // A small city's whole list for a crowd at its own stops (a school's students
 // before and after class): one TDX read each time its estimates change, for
-// every stop and phone, where each stop was its own read each 30 s.
-test("buses due in a small city (新竹市): two stop lists asked within a minute read its whole list once for every stop and phone; one alone its own; had= on the whole list; a big city or a grown list by its stops", async () => {
+// every stop and phone, once that costs less than the stops' own reads.
+test("buses due in a small city (新竹市): its whole list read once more stop lists are asked within a minute than it costs (7), for every stop and phone; fewer each their own; had= on the whole list; a big city never", async () => {
   fresh();
   resetEta();
   const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 'secret', RATE_LIMIT_KV: memKv(), TDX_PER_MIN: '100' };
@@ -900,13 +945,10 @@ test("buses due in a small city (新竹市): two stop lists asked within a minut
   const log = [];
   let made = 0;
   const all = t => [
-    { StopUID: 'HSZ1', RouteUID: 'HSZ10', EstimateTime: 60, DataTime: `t${t}` },
-    { StopUID: 'HSZ2', RouteUID: 'HSZ10', EstimateTime: 120, DataTime: `t${t}` },
-    { StopUID: 'HSZ3', RouteUID: 'HSZ20', EstimateTime: 300, DataTime: `t${t}` },
+    ...Array.from({ length: 8 }, (_, i) => ({ StopUID: `HSZ${i + 1}`, RouteUID: i < 4 ? 'HSZ10' : 'HSZ20', EstimateTime: 60 * (i + 1), DataTime: `t${t}` })),
     { StopUID: 'TPE1', RouteUID: 'TPE10', EstimateTime: 90, DataTime: `t${t}` },
     { StopUID: 'TPE2', RouteUID: 'TPE10', EstimateTime: 30, DataTime: `t${t}` }
   ];
-  let big = false;
   const fetchFn = async url => {
     if (url.includes('token')) return json({ access_token: 'T', expires_in: 86400 });
     const u = decodeURIComponent(url);
@@ -914,54 +956,44 @@ test("buses due in a small city (新竹市): two stop lists asked within a minut
     const t = made++;
     const named = [...u.matchAll(/(StopUID|RouteUID) eq '([^']+)'/g)];
     if (named.length) return json(all(t).filter(r => named.some(([, f, v]) => r[f] === v)));
-    return json(big ? Array.from({ length: SMALL_ROWS + 1 }, (_, i) => ({ StopUID: `KEE${i}`, RouteUID: 'KEE1', EstimateTime: 60 })) : all(t));
+    // (The whole list as big as 新竹市's: 590 KB.)
+    return new Response(JSON.stringify(all(t)).padEnd(590_000, ' '), { headers: { 'Content-Type': 'application/json' } });
   };
   const ask = async (qs, now) => {
     const res = await handleTransit(new Request(`https://w/transit/eta?${qs}`), env, {}, '/transit/eta', { session: { s: 'S' }, fetchFn, now, cache });
     return { stops: (await res.json()).map(r => `${r.StopUID} ${r.DataTime}`), age: Number(res.headers.get('X-Transit-Age')) };
   };
   const whole = u => /EstimatedTimeOfArrival\/City\/\w+\?\$select=StopUID,[^&]*&\$top=60000(&|$)/.test(u);
-  assert.ok(SMALL_ETA.has('Hsinchu') && SMALL_ETA.has('HsinchuCounty') && !SMALL_ETA.has('Taipei') && !SMALL_ETA.has('NewTaipei'));
-  // One stop card alone: its own stops' read, as before.
-  assert.deepEqual((await ask('city=Hsinchu&stops=HSZ1', NOW)).stops, ['HSZ1 t0']);
-  assert.equal(log.length, 1);
-  assert.doesNotMatch(log[0], /\$top=60000/);
-  // A second stop list within the minute (another phone, or this one's shelf): the city's whole list.
-  assert.deepEqual((await ask('city=Hsinchu&stops=HSZ2,HSZ3', NOW + 5_000)).stops.map(s => s.split(' ')[0]), ['HSZ2', 'HSZ3']);
+  assert.equal(wholeAt('Hsinchu'), 7, '1,766 rows, 590 KB: worth seven stop lists');
+  assert.equal(wholeAt('MiaoliCounty'), 2);
+  assert.ok(wholeAt('Keelung') > 20 && wholeAt('Taipei') === Infinity);
+  assert.equal(ETA_ROWS.HsinchuCounty, 3078);
+  // Six stop lists within the minute (phones at six stops): each its own read.
+  for (let i = 1; i <= 6; i++) assert.deepEqual((await ask(`city=Hsinchu&stops=HSZ${i}`, NOW + i * 1000)).stops.map(s => s.split(' ')[0]), [`HSZ${i}`]);
+  assert.equal(log.length, 6);
+  assert.ok(!log.some(whole));
+  // A seventh: the city's whole list.
+  assert.deepEqual((await ask('city=Hsinchu&stops=HSZ7,HSZ8', NOW + 7_000)).stops.map(s => s.split(' ')[0]), ['HSZ7', 'HSZ8']);
   assert.ok(log.some(whole), 'the whole city read');
   const n = log.length;
+  const at = log.findIndex(whole);
   // Then every stop list and a plan's routes from it, no read: a phone whose copy (6 s) is older than it (1 s).
-  assert.deepEqual(await ask('city=Hsinchu&stops=HSZ1&had=6', NOW + 6_000), { stops: [`HSZ1 t${log.findIndex(whole)}`], age: 1 });
-  assert.deepEqual((await ask('city=Hsinchu&routes=HSZ10,HSZ20', NOW + 7_000)).stops.map(s => s.split(' ')[0]), ['HSZ1', 'HSZ2', 'HSZ3']);
-  assert.deepEqual((await ask('city=Hsinchu&stops=HSZ3', NOW + 8_000)).stops.map(s => s.split(' ')[0]), ['HSZ3']);
+  assert.deepEqual(await ask('city=Hsinchu&stops=HSZ1&had=6', NOW + 8_000), { stops: [`HSZ1 t${at}`], age: 1 });
+  assert.deepEqual((await ask('city=Hsinchu&routes=HSZ10', NOW + 9_000)).stops.map(s => s.split(' ')[0]), ['HSZ1', 'HSZ2', 'HSZ3', 'HSZ4']);
   assert.equal(log.length, n, 'one read for every stop list');
-  // A phone whose copy is as old as the city's here (35 s): the whole list read again now, not its own stops.
-  const later = await ask('city=Hsinchu&stops=HSZ2,HSZ3&had=35', NOW + 40_000);
+  // A phone whose copy is as old as the city's here (13 s), the crowd still about: the whole list read again now.
+  const later = await ask('city=Hsinchu&stops=HSZ2,HSZ3&had=13', NOW + 20_000);
   assert.equal(later.age, 0);
-  assert.equal(log.length, n + 1);
   assert.ok(whole(log.at(-1)), 'the whole list again');
-  // ...and the next phone's (older) copy is answered from it as it is.
-  assert.deepEqual((await ask('city=Hsinchu&stops=HSZ1&had=31', NOW + 41_000)).age, 1);
   assert.equal(log.length, n + 1);
   // Long after, one stop list alone again: its own read.
   await ask('city=Hsinchu&stops=HSZ1', NOW + 300_000);
-  assert.doesNotMatch(log.at(-1), /\$top=60000/);
-  // A big city (台北, 9 MB): two stop lists are still their own reads.
+  assert.ok(!whole(log.at(-1)));
+  // A big city (台北, 10 MB): many stop lists are still their own reads.
   const m = log.length;
-  await ask('city=Taipei&stops=TPE1', NOW + 300_000);
-  await ask('city=Taipei&stops=TPE2', NOW + 301_000);
-  assert.equal(log.length, m + 2);
+  for (let i = 1; i <= 8; i++) await ask(`city=Taipei&stops=TPE${i}`, NOW + 300_000 + i);
+  assert.equal(log.length, m + 8);
   assert.ok(!log.slice(m).some(whole));
-  // A small city whose list grew past SMALL_ROWS: asked by its stops again.
-  big = true;
-  await ask('city=Keelung&stops=KEE1', NOW + 302_000);
-  await ask('city=Keelung&stops=KEE2', NOW + 303_000);
-  assert.ok(whole(log.at(-1)) || log.slice(-2).some(whole), 'read whole once');
-  const k = log.length;
-  await ask('city=Keelung&stops=KEE3', NOW + 400_000);
-  await ask('city=Keelung&stops=KEE4', NOW + 401_000);
-  assert.equal(log.length, k + 2);
-  assert.ok(!log.slice(k).some(whole), 'then by its stops');
 });
 
 // 公路客運 (all Taiwan, never read whole): a crowd at its own stops asked

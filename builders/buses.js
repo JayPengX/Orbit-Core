@@ -20,6 +20,8 @@
 // subName, dir, [stopUid…]]], sched: [[sub, dir, [stopUid…], trips, freq]] }] }
 // where a trip is [days (7 bits, bit 0 Sunday), times, special?].
 
+import { tdxBody, tallyTdx } from '../transit.js';
+
 const TDX = 'https://tdx.transportdata.tw/api/';
 const AUTH = 'https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token';
 export const CITIES = ['Taipei', 'NewTaipei', 'Taoyuan', 'Taichung', 'Tainan', 'Kaohsiung', 'Keelung', 'Hsinchu', 'HsinchuCounty', 'MiaoliCounty', 'ChanghuaCounty', 'NantouCounty', 'YunlinCounty', 'Chiayi', 'ChiayiCounty', 'PingtungCounty', 'YilanCounty', 'HualienCounty', 'TaitungCounty', 'KinmenCounty', 'PenghuCounty', 'LienchiangCounty', 'InterCity'];
@@ -39,7 +41,10 @@ const daysOf = sd => (sd ? DAYS.reduce((a, d, i) => a | (Number(sd[d]) === 1 ? 1
 const r5 = x => Math.round(Number(x) * 1e5) / 1e5;
 
 // TDX with the Worker's own key, two asks a second, each page handed on as it comes.
-export function tdxClient(env, { get = fetch, sleep = ms => new Promise(r => setTimeout(r, ms)), gap = 500 } = {}) {
+// Each call counted in the proxy's meter as TDX bills it (transit.js
+// tallyTdx: the call and its bytes), as the builders' (`build:`): until
+// 2026-11-06 they weren't counted at all.
+export function tdxClient(env, { get = fetch, sleep = ms => new Promise(r => setTimeout(r, ms)), gap = 500, count = (path, read) => tallyTdx(env, path, Date.now(), null, 'build', read) } = {}) {
   let token = null;
   const auth = async () => {
     const res = await get(AUTH, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'client_credentials', client_id: env.TDX_CLIENT_ID || '', client_secret: env.TDX_CLIENT_SECRET || '' }) });
@@ -50,8 +55,12 @@ export function tdxClient(env, { get = fetch, sleep = ms => new Promise(r => set
     if (!token) await auth();
     for (let tries = 0; ; tries++) {
       await sleep(gap);
-      const res = await get(`${TDX}${path}${path.includes('?') ? '&' : '?'}$format=JSON`, { headers: { Authorization: `Bearer ${token}`, 'Accept-Encoding': 'gzip' } }).catch(e => ({ ok: false, status: String(e) }));
-      if (res.ok) return res.json();
+      const res = await get(`${TDX}${path}${path.includes('?') ? '&' : '?'}$format=JSON`, { headers: { Authorization: `Bearer ${token}`, 'Accept-Encoding': 'br, gzip' } }).catch(e => ({ ok: false, status: String(e) }));
+      const read = await tdxBody(res);
+      try {
+        await count(path, read);
+      } catch {}
+      if (res.ok) return JSON.parse(read.text);
       if (res.status === 401) await auth();
       // (Refused, 400 or 404: what TDX doesn't have, never asked again four times.)
       if (tries >= 4 || res.status === 400 || res.status === 404) throw Object.assign(new Error(`${path}: ${res.status}`), { status: res.status });

@@ -131,7 +131,7 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `flight.mjs` | A real plane in the air, on a sphere: the proxy's `/flight` and Class's 專注飛行 |
 | `domain.mjs`, `devconfig.mjs`, `mirror.mjs` | The family's domain (one place); `DEV` for the Workers; the nightly mirror's addresses |
 | `sw.js`, `sw-images.js` | The one service worker every app imports (page and own pictures kept first, refreshed behind; `?v=` files from the cache, checked against their hash); other sites' pictures in one cache all apps share |
-| `apps.mjs`, `link.mjs`, `preload.mjs`, `stamp.mjs`, `stamp-app.mjs`, `hash.mjs`, `frame-guard.mjs` | Build tools, never served: the apps' snippets; `.kit` links; first-screen modulepreload; the kit's and each app's content-hashed build; `frameFaults` (apps' tests: only colours on the tab bar) |
+| `apps.mjs`, `link.mjs`, `preload.mjs`, `stamp.mjs`, `stamp-app.mjs`, `hash.mjs`, `frame-guard.mjs`, `no-net.mjs` | Build tools, never served: the apps' snippets; `.kit` links; first-screen modulepreload; the kit's and each app's content-hashed build; `frameFaults` (apps' tests: only colours on the tab bar); tests offline |
 | `img/` | The kit's own pictures (the Premier League's mark, light and dark) |
 
 ### 3.3 Component patterns: what to use for what
@@ -227,11 +227,12 @@ w;dur=` (the Worker's own time), noted by the 除錯紀錄 with a slow read.
   `API`; worker.js `viaSite` takes `/api` off). `api.`, workers.dev answer too.
 - **Dev doors:** a request with `Origin: http://localhost:<port>` and no
   pass gets a dev session on `/sports-proxy`, `/transit`, `/weather` and
-  `/flight` (per address; Google's as `dev:<sku>` too, half a free month at most): `tools/preview.mjs --live`, or `curl -H
-  'Origin: http://localhost:8123' '…/sports-proxy?url=<encoded>&app=match'`.
+  `/flight` (per address; Google's as `dev:<sku>`, half a free month at most;
+  TDX's copies 10 minutes old, `DEV_TDX_DAY` points a day): `tools/preview.mjs --live`,
+  or `curl -H 'Origin: http://localhost:8123' '…/sports-proxy?url=…'`.
 
 - **Crons:** even minutes (notices, builders at :16 and on, weather
-  scoring, capacity); F1's laps on both. Add work to these (or a Durable
+  scoring, capacity, the meter's copy); F1's laps on both. Add work to these (or a Durable
   Object alarm), never new Cron Triggers: ones registered since October 2026 never ran.
 - **The proxy is the only one adding money:** `eco.js appEntries` takes only
   spending from apps, dated by the Worker; Securities' cash and cost are the
@@ -313,9 +314,9 @@ A read (`kit proxyJson`) goes down these until one answers:
 
 | Store | Binding | What's in it |
 | --- | --- | --- |
-| D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data, the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced (§5.3); `gemini_call`: every Gemini call (`gemini-use.js`); `law_day`: the AI caps' counts a day; `gift`, `gift_claim`: the giveaway (`gift.js`); `beats`: each job's last run and failures (`ops.js`) |
+| D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data, the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced (§5.3); `gemini_call`: every Gemini call (`gemini-use.js`); `law_day`: the AI caps' counts a day; `gift`, `gift_claim`: the giveaway (`gift.js`); `beats`: each job's last run and failures (`ops.js`); `meter`: Google's and TDX's counts a month (`transit.js`) |
 | R2 `orbit-data` | `DATA` | Public: the builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `station/`, `where.json`), the proxy's kept reads (`mirror/`). Never served: `private/` (nightly backups `private/store/<day>.jsonl.gz`, Firestore's last copy) |
-| KV | `RATE_LIMIT_KV` | Counters (sign-ins, per-address limits); the guard's state, pace and alerts (`guard:*`); push's devices, prefs and due notices (`push:*`); Google Weather's shared cells and its calls a day (`weather:g:*`, `weather:google:<day>`); TDX's last good reads and its month's meter (`tdx:warm:*`, `transit:use:<month>`); Law's kept plans and answers (`law:*`); the showcase's passes a day (`showcase:passes:*`); the door's state (`door:state`); `ops:data-folders` |
+| KV | `RATE_LIMIT_KV` | Counters (sign-ins, per-address limits); the guard's state, pace and alerts (`guard:*`); push's devices, prefs and due notices (`push:*`); Google Weather's shared cells and its calls a day (`weather:g:*`, `weather:google:<day>`); TDX's last good reads (`tdx:warm:*`); the meter's copy (`transit:use:<month>`); Law's kept plans and answers (`law:*`); the showcase's passes a day (`showcase:passes:*`); the door's state (`door:state`); `ops:data-folders` |
 | Durable Objects | `F1_LOG`, `DOOR`, `CLOCK` | `F1Log`: F1's laps as they're driven; `Door`: seats and the line; `GuardClock`: the guard's alarm |
 | Edge cache | (Cache API) | The data proxy's answers by tier (§4.1), `/sports-today`, TDX's reads and routes (`transit.js`), the weather blend's cells (`weather.js`), `/law-live`, `/law-page`, `/config` |
 | Services | `GEMINI_RELAY`, `LAW_SITE`, `GUARD` | The relay; Orbit Law's site (its data, read by the proxy); the guard's `/errors` |
@@ -337,11 +338,9 @@ A new Cloudflare product goes into `guard.js` `PLAN` with it.
   `live`, `sec`.
 - **Each app's data** is one document in its own collection (§2), under the
   account's id, written only if it's still the version read (`updated`, a
-  precondition; a lost race throws). `pass-sync.mjs` (`passSync`) reads and
-  merges the Pass's copy before any write whenever another device may have
-  written, never writes an older copy over a newer one, and never writes
-  over a copy it couldn't read: Weather, Words, Money, Law; the rest write
-  through the session.
+  precondition; a lost race throws). `passSync` (§3.2) merges the Pass's
+  copy before any write, never over a copy it couldn't read: Weather,
+  Words, Money, Law; the rest write through the session.
 - **Nothing lost:** a save is refused if it would turn JSON data into
   anything else or was merged over an older copy (`base`). Every version a
   write or delete replaces goes to D1's `history` (whole 2 days, daily 30),
@@ -453,7 +452,7 @@ can be turned off on its own.
   - The proxy: Google's keys, `CWA_KEY`, `MOENV_KEY`, `TDX_CLIENT_*`.
 - **The domain:** `kit/domain.mjs` `DOMAIN` (jaypengx.com), the one place
   it is set. Each repo publishes its built site with `deploy/cf-site.mjs`
-  (an assets-only Worker on routes of its paths, free to serve): `orbit.<DOMAIN>/<slug>/` every app (`slug`,
+  (an assets-only Worker on routes of its paths): `orbit.<DOMAIN>/<slug>/` every app (`slug`,
   `SHORT` in `kit/brand.mjs`; one origin, so one Pass sign-in), `orbit-pass`
   for `/`, `/pass/`, `/key/`, `/Orbit-Core/` and the old `/Shared-Proxy/`,
   `orbit-home` for `<DOMAIN>/` (Orbit-Showcase: Jay's homepage, `/showcase/`).

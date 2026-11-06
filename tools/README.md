@@ -58,6 +58,14 @@ the pages, M sent`. Only a 200 is kept. The other tools (`preview.mjs`
 alone, `live-scroll.mjs`, `gate.mjs`) still ask fresh each time:
 live-scroll and the gate watch live data change.
 
+**TDX's month is people's.** Every tool's live read reaches TDX through the
+dev door, and on 2026-11-06 our tools made six of every seven TDX calls. So
+the proxy answers the dev door with any copy of TDX's up to 10 minutes old
+(a bus time 10 minutes old: say so if a shot shows one), never keeps YouBike
+warm for it, and past half a point a Taiwan day (`transit.js DEV_TDX_DAY`)
+gives it copies only (`DEV_TDX_CAP` where there's none). `npm test` reaches
+nothing off the machine (`kit/no-net.mjs`).
+
 ## `node tools/layout-check.mjs <app…> [--screens 320,ipad,laptop]`: the layout a push must pass
 
 Every tab and the app's `check` pages (`tools/shots/pages.mjs`) at 320, an
@@ -67,7 +75,8 @@ full one (`tools/layout-faults.mjs`, also in an open wide sheet), and
 anything wider than the screen or sliding sideways. A shot that can't be
 taken (no network) is skipped, never a failure. `push.sh` runs it for an app
 whose visible files changed, and for every app on a change to the kit's
-CSS or frame. `shots.mjs` prints the same `layout` faults.
+CSS or frame. Every run shares one keep of the Workers' answers, 15 minutes
+(`/tmp/orbit-live-keep`). `shots.mjs` prints the same `layout` faults.
 
 ## `node tools/live-scroll.mjs [app…] [--sheet "<js>"] [--account <name>] [--fast] [--no-days] [--webkit] [--live-only]`: nothing jumps
 

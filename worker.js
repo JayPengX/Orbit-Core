@@ -43,7 +43,7 @@ import { handleShowcasePass, showcaseOf, SHOW_PER_MIN, SHOWCASE_ORIGINS } from '
 import { handlePush, sendDue } from './push.js';
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
-import { handleTransit, tally, warmBikes } from './transit.js';
+import { handleTransit, tally, warmBikes, mirrorMeter } from './transit.js';
 import { readDev, capacityCron, CONFIG_COLLECTION, ADMIN_TOOLS } from './eco-admin.js';
 import { PASSKEY_COLLECTION } from './passkey.js';
 import { backupStore } from './store-backup.js';
@@ -1491,6 +1491,9 @@ export default {
     // Orbit Weather's scoring, once an hour (weather-skill.js).
     if (!pace && min === 10) run('weather-skill', () => weatherCron(env));
     if (!storeReady(env)) return;
+    // The month's counts (Google's calls, TDX's points: transit.js), added in
+    // D1, copied to KV for every isolate's reads.
+    run('meter', () => mirrorMeter(env, tick.getTime()), r => (r.seeded ? r : null));
     // The Pass's store kept safe each night, 04:30 Taiwan: old versions
     // thinned (doc-store.js), then the whole store copied to R2 (store-backup.js).
     // The giveaway's (gift.js): passes never replaced back to the pool, and its empty accounts cleared if the owner turned that on, 03:50 Taiwan.

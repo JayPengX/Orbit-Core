@@ -159,13 +159,21 @@ export function splitHours(h, now = Date.now()) {
 //   CPU: a session 28–491 ms (three 0.47 s), a stop card 6.7 s an hour,
 //     Transit's map 1.2 s, a live game nothing (ESPN from the phone);
 //   requests: a session ~30, a stop card ~30 a minute, the map ~15;
-//   TDX: an opening of Transit and a stop card 0.0187 points (stations,
-//     operators' notices, each city's first asks) and the city's YouBike
-//     counts the Worker keeps warm for 10 minutes after (5 reads, 0.0033;
-//     transit.js WARM_FOR), then a stop card 0.54 points an hour, the map
-//     0.20, a planned trip 0.02 (TDX's reads aren't shared here: one
-//     person's alone, so it errs low). The map's bus stops are the weekly
-//     station tiles' (no TDX search around each spot since 2026-11-06);
+//   TDX: each call and the bytes it sends (TDX bills both: transit.js
+//     TDX_POINTS; the calls as measured that morning, each read's bytes
+//     measured that evening: a city's YouBike counts 62–66 KB, 公路客運's
+//     notices 112 KB, a stop's bus times a few KB, a city's bus places
+//     14–23 KB, a planned trip's answer ~80 KB): an opening of Transit and
+//     a stop card 0.0203 points (stations, operators' notices, each city's
+//     first asks) and the city's YouBike counts the Worker keeps warm for 10
+//     minutes after (5 reads, 0.0054; transit.js WARM_FOR), then a stop card
+//     0.575 points an hour, the map 0.27, a planned trip 0.028, and which
+//     routes run (公路客運's bus places, 725 KB, each 10 minutes Transit is
+//     open: 0.016 a day). TDX's reads aren't shared here: one person's
+//     alone, so it errs low. A day 0.288 points: the whole month 46 people,
+//     fewer by what our tools and the weekly bus build spend (without the
+//     bytes, before 2026-11-06 evening, 0.231: 57). The map's bus stops are
+//     the weekly station tiles' (no TDX search around each spot);
 //   Google: an opening of Transit a map load; a search 3 asks as it's typed
 //     (each one Autocomplete and Text Search, the place picked 1 Place
 //     Details); a Google place tapped on the map its name (Pro); a trip 2
@@ -187,7 +195,7 @@ export const TYPICAL_DAY = {
   'maps:detailsPro': 0.5,
   'maps:routes': 2,
   'maps:matrix': 5,
-  'tdx:points': 2 * (0.0187 + 5 / 1500) + (13 / 60) * 0.54 + (15 / 60) * 0.2 + 0.02
+  'tdx:points': 2 * (0.0203 + 5 * (1 / 1500 + 64 / 1024 / 150)) + (13 / 60) * 0.575 + (15 / 60) * 0.27 + 0.028 + 0.016
 };
 // (A week's person, a day: 1.2 s of CPU.)
 export const TYPICAL_CPU_MS = TYPICAL_DAY['cf:cpuMs'] * ACTIVE;
@@ -265,8 +273,8 @@ export function quotas({ users = {}, guard = null, hours = null, usage = {}, map
     // (The first day's hours alone say too little: a day at least.)
     const carried = n => (n / Math.max(1, dayOf)) * monthDays;
     const month = carried(tdx.points || 0);
-    // (Our tools' and the showcase's points, taken off as Maps' are.)
-    const fixed = Math.min(month, carried((tdx.devPoints || 0) + (tdx.showPoints || 0)));
+    // (Our tools', the showcase's and the weekly bus build's points, taken off as Maps' are.)
+    const fixed = Math.min(month, carried((tdx.devPoints || 0) + (tdx.showPoints || 0) + (tdx.buildPoints || 0)));
     const typical = typicalOf('tdx:points');
     rows.push({ key: 'tdx:points', kind: 'tdx', by: 'people', used: tdx.points || 0, month, fixedMonth: fixed, cap: tdx.plan.month, slowed: !!tdx.guard?.why, perPerson: week ? (month - fixed) / week : null, holds: holdsOf(week, tdx.plan.month - fixed, month - fixed), typical, typicalHolds: holdsBy(tdx.plan.month - fixed, typical * monthDays) });
   }

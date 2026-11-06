@@ -81,23 +81,36 @@ export const billingMonth = (now = Date.now()) => new Date(now - 8 * HOUR).toISO
 
 // ---- The monthly meter ----------------------------------------------------------------
 //
-// The stored count is read at most once a minute; what this isolate used
-// since is added on top and written back once 10 calls have gathered or 2
-// minutes have passed. A lost batch undercounts a little: the caps leave
-// 10% under Google's free tier for that.
+// Every count is added in D1 (STORE, table `meter`: a row a month and key)
+// by D1 itself (INSERT … ON CONFLICT DO UPDATE SET n = n + …), an isolate's
+// counts of 2 s in one statement: none held, none written over. Until
+// 2026-11-06 each isolate held its counts (TDX's until a call came 10 minutes
+// later) and wrote KV's copy by reading, adding and writing it: the counts of
+// an isolate that went quiet or was replaced by a deploy were lost, and two
+// isolates writing at once kept one's (TDX's own page said 41 points for the
+// month's first five days, the meter 17).
+// Reads stay on KV's copy (transit:use:<month>, read at most once a minute),
+// written from D1 by the cron each 2 minutes (mirrorMeter: one writer), with
+// what D1 answered this isolate's own adds on top. With no D1 (the tests, the
+// preview) KV's copy is the meter, written as before.
 
-const meter = { month: '', stored: null, readAt: 0, pending: {}, flushedAt: 0 };
+const meter = { month: '', stored: null, readAt: 0, pending: {}, flushedAt: 0, timer: null, timerAt: 0 };
 export function resetMeter() {
-  Object.assign(meter, { month: '', stored: null, readAt: 0, pending: {}, flushedAt: 0 });
+  Object.assign(meter, { month: '', stored: null, readAt: 0, pending: {}, flushedAt: 0, timer: null, timerAt: 0 });
   Object.assign(lastMeter, { month: '', stored: null, readAt: 0 });
 }
 const meterKey = month => `transit:use:${month}`;
+const FLUSH_MS = 2000;
 
 async function readUse(env, now) {
   const month = billingMonth(now);
-  if (meter.month !== month) Object.assign(meter, { month, stored: null, readAt: 0, pending: {}, flushedAt: now });
+  // (A new month: counts not yet written go to it, never dropped.)
+  if (meter.month !== month) Object.assign(meter, { month, stored: null, readAt: 0, flushedAt: now });
   if (!meter.stored || now - meter.readAt > MIN) {
-    meter.stored = (await kvJson(env, meterKey(month))) || {};
+    const kv = (await kvJson(env, meterKey(month))) || {};
+    // (KV's copy can be behind what D1 answered this isolate's adds: each count the larger.)
+    for (const [k, v] of Object.entries(meter.stored || {})) if (!(kv[k] >= v)) kv[k] = v;
+    meter.stored = kv;
     meter.readAt = now;
   }
   return meter;
@@ -110,77 +123,195 @@ export async function usage(env, now = Date.now()) {
   for (const k of Object.keys(m.pending)) if (!(k in out)) out[k] = m.pending[k];
   return out;
 }
-// True (and counted) while `sku` has room for `n` more this month.
-// A count only (`tally`) waits 10 minutes before it's written: it is for the
-// status page and TDX's points, and writing TDX's every 10 calls ran KV out
-// of writes (a write each 10 minutes an isolate: under 150 a day).
-// `by`: who spent it when it isn't a person: 'dev' (our own tools, the dev
-// door) or 'show' (the showcase's demo), also counted as `dev:<sku>` /
-// `show:<sku>`, so the admin panel's 容量 counts people's use without ours
-// (capacity.js). Our tools yield to people: none past half of a free month
-// (DEV_SHARE), the rest is theirs.
-export const DEV_SHARE = 0.5;
-export async function spend(env, sku, n = 1, now = Date.now(), ctx = null, { countOnly = false, by = '' } = {}) {
-  const used = await usage(env, now);
-  if (CAPS[sku] != null && used[sku] + n > CAPS[sku] * (by === 'dev' ? DEV_SHARE : 1)) return false;
-  meter.pending[sku] = (meter.pending[sku] || 0) + n;
-  if (by) meter.pending[`${by}:${sku}`] = (meter.pending[`${by}:${sku}`] || 0) + n;
+// Counts added (none checked). With D1: written within FLUSH_MS, one
+// statement for all this isolate's (behind the request, or at once when
+// there's none to wait on: a cron's, a builder's). Without: KV's copy as
+// before, a count only (`countOnly`) each 10 minutes, a capped one each 10
+// calls or 2 minutes.
+async function meterAdd(env, adds, now, ctx, countOnly) {
+  for (const [k, v] of Object.entries(adds)) if (v) meter.pending[k] = (meter.pending[k] || 0) + v;
+  if (env?.STORE) {
+    if (!ctx?.waitUntil) return flushUse(env, now);
+    // (A flush asked for and not done within 30 s died with its request: another.)
+    if (meter.timer && now - meter.timerAt < 30_000) return;
+    const p = sleep(FLUSH_MS).then(() => flushUse(env, Date.now()));
+    Object.assign(meter, { timer: p, timerAt: now });
+    ctx.waitUntil(p.catch(() => {}).finally(() => meter.timer === p && (meter.timer = null)));
+    return;
+  }
   const gathered = Object.entries(meter.pending).reduce((a, [k, v]) => a + (CAPS[k] != null ? v : 0), 0);
   if (countOnly ? now - meter.flushedAt > 10 * MIN : gathered >= 10 || now - meter.flushedAt > 2 * MIN) {
     const p = flushUse(env, now);
     if (ctx?.waitUntil) ctx.waitUntil(p);
     else await p;
   }
+}
+// True (and counted) while `sku` has room for `n` more this month.
+// `by`: who spent it when it isn't a person: 'dev' (our own tools, the dev
+// door), 'show' (the showcase's demo) or 'build' (the builders), also counted
+// as `dev:<sku>`, …, so the admin panel's 容量 counts people's use without
+// ours (capacity.js). Our tools yield to people: none past half of a free
+// month (DEV_SHARE), the rest is theirs.
+export const DEV_SHARE = 0.5;
+export async function spend(env, sku, n = 1, now = Date.now(), ctx = null, { countOnly = false, by = '' } = {}) {
+  const used = await usage(env, now);
+  if (CAPS[sku] != null && used[sku] + n > CAPS[sku] * (by === 'dev' ? DEV_SHARE : 1)) return false;
+  await meterAdd(env, { [sku]: n, ...(by ? { [`${by}:${sku}`]: n } : {}) }, now, ctx, countOnly);
   return true;
 }
-// Counted only (TDX calls, for the status page): no cap.
+// Counted only (errors, for the panel): no cap.
 export const tally = (env, key, n = 1, now = Date.now(), ctx = null) => spend(env, key, n, now, ctx, { countOnly: true });
-// TDX's plan is points: 200 a month, a point per 1,500 basic calls
-// (basic/…) or per 200 advanced ones (advanced/…, the planner maas/…).
-// Each call counted by kind and Taiwan's day, beside the month's total:
-// `tdx:b:2026-10-11`, `tdx:a:2026-10-11` (the admin panel's 用量).
-export const TDX_POINTS = { month: 200, basic: 1500, advanced: 200 };
-export const tdxKind = path => (String(path).startsWith('basic/') ? 'b' : 'a');
-export async function tallyTdx(env, path, now = Date.now(), ctx = null, by = '') {
-  await tally(env, `tdx:${tdxKind(path)}:${twDay(now)}`, 1, now, ctx);
-  if (by) await tally(env, `${by}:tdx:${tdxKind(path)}:${twDay(now)}`, 1, now, ctx);
+// TDX's plan is points: 200 a month. TDX bills each call, a point per 1,500
+// basic ones (basic/…) or per 200 advanced (advanced/…), and what it sends
+// besides, a point per 150 MB (basic) or 20 MB (advanced), the two added
+// (TDX's 資料服務定價, each API's 計費方式). The planner (maas/…) TDX doesn't
+// price: counted as advanced. Each call counted by kind and Taiwan's day
+// (`tdx:b:2026-11-06`, `tdx:a:…`, `tdx:m:…`) and its bytes as read
+// (`tdx:vb:…`, `tdx:va:…`, `tdx:vm:…`; the admin panel's 用量, beside TDX's
+// own page). Until 2026-11-06 the bytes weren't counted: a fifth of the
+// points, and most where a city's whole list was read.
+// (How the bytes travelled, to learn what TDX bills of them: `tdx:gz:…`
+// the calls TDX answered compressed, `tdx:z:…` the bytes it said it sent,
+// Content-Length, of `tdx:zn:…` calls that said.)
+export const TDX_POINTS = { month: 200, basic: 1500, advanced: 200, basicMB: 150, advancedMB: 20 };
+// (TDX's MB is 1,024 KB: its own 明細, 2026-11-06, each row exactly: 921
+// advanced calls and 3,267 KB 4.765 points = 921/200 + 3,267/1,024/20; 公路客運's
+// 1,527 basic calls and 73,530 KB 1.497 = 1,527/1,500 + 73,530/1,024/150.)
+const MB = 1024 * 1024;
+export const tdxKind = path => (String(path).startsWith('basic/') ? 'b' : String(path).startsWith('maas/') ? 'm' : 'a');
+const TDX_RATE = { b: 1 / TDX_POINTS.basic, a: 1 / TDX_POINTS.advanced, m: 1 / TDX_POINTS.advanced, vb: 1 / (TDX_POINTS.basicMB * MB), va: 1 / (TDX_POINTS.advancedMB * MB), vm: 1 / (TDX_POINTS.advancedMB * MB) };
+// A TDX answer read: its text, its bytes, and how it travelled.
+export async function tdxBody(res) {
+  let text = '';
+  let bytes = 0;
+  try {
+    if (typeof res.arrayBuffer === 'function') {
+      const buf = await res.arrayBuffer();
+      bytes = buf.byteLength;
+      text = new TextDecoder().decode(buf);
+    } else {
+      text = String(await res.text());
+      bytes = new TextEncoder().encode(text).length;
+    }
+  } catch {}
+  const header = name => (typeof res.headers?.get === 'function' ? res.headers.get(name) || '' : '');
+  return { text, bytes, zipped: /gzip|br|deflate/i.test(header('content-encoding')), sent: Number(header('content-length')) || 0 };
 }
-// TDX's calls this Taiwan month, by kind and day. TDX's month starts at
+export async function tallyTdx(env, path, now = Date.now(), ctx = null, by = '', read = null) {
+  const kind = tdxKind(path);
+  const day = twDay(now);
+  const adds = { [`tdx:${kind}:${day}`]: 1, [`tdx:v${kind}:${day}`]: read?.bytes || 0, [`tdx:gz:${day}`]: read?.zipped ? 1 : 0, [`tdx:z:${day}`]: read?.sent || 0, [`tdx:zn:${day}`]: read?.sent ? 1 : 0 };
+  if (by) Object.assign(adds, { [`${by}:tdx:${kind}:${day}`]: 1, [`${by}:tdx:v${kind}:${day}`]: read?.bytes || 0 });
+  await meterAdd(env, adds, now, ctx, true);
+}
+// Our own tools (the dev door: previews, screenshots, the layout check each
+// push runs) yield TDX's month to people: a copy up to 10 minutes old
+// answers them as it is (DEV_OLDEST; a live answer is kept that long), they
+// never keep YouBike warm, and past DEV_TDX_DAY points a Taiwan day they get
+// copies only (TDX_BUSY's cousin, DEV_TDX_CAP, where there's none). On
+// 2026-11-06 they made six of every seven calls the meter counted.
+export const DEV_TDX_DAY = 0.5;
+export const DEV_OLDEST = 10 * MIN;
+const DEV_TDX = /^dev:tdx:(v?[bam]):(\d{4}-\d{2}-\d{2})$/;
+export async function devTdxRoom(env, now = Date.now()) {
+  const day = twDay(now);
+  let points = 0;
+  for (const [k, n] of Object.entries(await usage(env, now))) {
+    const m = DEV_TDX.exec(k);
+    if (m && m[2] === day) points += n * TDX_RATE[m[1]];
+  }
+  return points < DEV_TDX_DAY;
+}
+// TDX's counts this Taiwan month, by kind and day. TDX's month starts at
 // 00:00 on the 1st in Taiwan; the meter's (Google's, Pacific) 16 hours
 // later, so the 1st's first 16 hours sit in last month's meter: read too
 // (once a minute), or they dropped out of the month at 16:00 on the 1st.
 const lastMeter = { month: '', stored: null, readAt: 0 };
 const prevMonth = month => new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7) - 2, 1)).toISOString().slice(0, 7);
-// (`prefix` 'dev:' or 'show:': ours alone, by the same keys without it.)
+const TDX_KEY = /^tdx:(v?[bam]|gz|zn?):(\d{4}-\d{2})-\d{2}$/;
+// (`prefix` 'dev:', 'show:' or 'build:': ours alone, by the same keys without it.)
 export async function tdxUse(env, now = Date.now(), prefix = '') {
   const month = twDay(now).slice(0, 7);
   const out = {};
-  const add = from => {
+  const take = from => {
     for (const [k, n] of Object.entries(from || {})) {
       if (!k.startsWith(prefix)) continue;
       const key = k.slice(prefix.length);
-      if (/^tdx:[ab]:/.test(key) && key.slice(6, 13) === month) out[key] = (out[key] || 0) + n;
+      if (TDX_KEY.exec(key)?.[2] === month) out[key] = (out[key] || 0) + n;
     }
   };
-  add(await usage(env, now));
+  take(await usage(env, now));
   if (billingMonth(now) === month) {
     const last = prevMonth(month);
     if (lastMeter.month !== last || now - lastMeter.readAt > MIN) Object.assign(lastMeter, { month: last, stored: (await kvJson(env, meterKey(last))) || {}, readAt: now });
-    add(lastMeter.stored);
+    take(lastMeter.stored);
   }
   return out;
+}
+const METER_TABLE = 'CREATE TABLE IF NOT EXISTS meter (month TEXT NOT NULL, k TEXT NOT NULL, n REAL NOT NULL, PRIMARY KEY (month, k))';
+const METER_ADD = "INSERT INTO meter (month, k, n) SELECT ?1, key, value FROM json_each(?2) WHERE type IN ('integer', 'real') ON CONFLICT (month, k) DO UPDATE SET n = n + excluded.n";
+const meterReady = new WeakSet();
+async function meterTable(env) {
+  if (meterReady.has(env.STORE)) return;
+  await env.STORE.prepare(METER_TABLE).run();
+  meterReady.add(env.STORE);
 }
 export async function flushUse(env, now = Date.now()) {
   const pending = meter.pending;
   if (!Object.keys(pending).length) return;
   meter.pending = {};
   meter.flushedAt = now;
-  const key = meterKey(meter.month || billingMonth(now));
+  const month = meter.month || billingMonth(now);
+  if (env?.STORE) {
+    try {
+      await meterTable(env);
+      const { results } = await env.STORE.prepare(`${METER_ADD} RETURNING k, n`).bind(month, JSON.stringify(pending)).all();
+      // (Each count as D1 holds it now, everyone's adds in: this isolate's at
+      // once, before the cron's copy reaches KV. KV's still read when due.)
+      if (!meter.month || meter.month === month) {
+        meter.month = month;
+        meter.stored ||= {};
+        for (const r of results || []) meter.stored[r.k] = Math.max(meter.stored[r.k] || 0, Number(r.n) || 0);
+      }
+    } catch {
+      // (D1 failing: the counts wait for the next flush.)
+      for (const [k, v] of Object.entries(pending)) meter.pending[k] = (meter.pending[k] || 0) + v;
+    }
+    return;
+  }
+  const key = meterKey(month);
   const fresh = (await kvJson(env, key)) || {};
   for (const [k, v] of Object.entries(pending)) fresh[k] = (fresh[k] || 0) + v;
   await kvPut(env, key, fresh, 62 * 86_400);
   meter.stored = fresh;
   meter.readAt = now;
+}
+// The cron's, each 2 minutes: KV's copy of the month (and of the month just
+// ended, its last adds, for its first two hours) written from D1. A month
+// first seen here gets KV's counts from before D1 kept them added in, once
+// (`_seeded`, in the same transaction as the adds).
+export async function mirrorMeter(env, now = Date.now()) {
+  if (!env?.STORE || !env.RATE_LIMIT_KV) return { off: true };
+  await meterTable(env);
+  const out = {};
+  for (const month of new Set([billingMonth(now), billingMonth(now - 2 * HOUR)])) {
+    const seeded = await env.STORE.prepare("SELECT n FROM meter WHERE month = ?1 AND k = '_seeded'").bind(month).first();
+    if (!seeded) {
+      const old = (await kvJson(env, meterKey(month))) || {};
+      await env.STORE.batch([
+        env.STORE.prepare(METER_ADD.replace('WHERE', "WHERE NOT EXISTS (SELECT 1 FROM meter WHERE month = ?1 AND k = '_seeded') AND")).bind(month, JSON.stringify(old)),
+        env.STORE.prepare("INSERT INTO meter (month, k, n) VALUES (?1, '_seeded', 1) ON CONFLICT (month, k) DO NOTHING").bind(month)
+      ]);
+      out.seeded = month;
+    }
+    const { results } = await env.STORE.prepare("SELECT k, n FROM meter WHERE month = ?1 AND k != '_seeded'").bind(month).all();
+    const doc = Object.fromEntries((results || []).map(r => [r.k, Number(r.n) || 0]));
+    await kvPut(env, meterKey(month), doc, 62 * 86_400);
+    out[month] = Object.keys(doc).length;
+  }
+  // (Months past the last three gone.)
+  await env.STORE.prepare('DELETE FROM meter WHERE month < ?1').bind(prevMonth(prevMonth(billingMonth(now)))).run();
+  return out;
 }
 
 // ---- KV ------------------------------------------------------------------------------
@@ -300,9 +431,7 @@ export function tdxTrim(path, text) {
 
 // A city's estimates (TDX N1, every stop of every route) → { RouteUID: n }:
 // how many of its stops have a bus coming now (0: none on the road), -1 when
-// TDX says 今日未營運 at every stop. A phone reads this (a few KB) instead of
-// the city's whole answer, to tell a route that isn't running (a typhoon,
-// most of 新竹's buses on 2026-10-23) from one between its buses.
+// TDX says 今日未營運 at every stop.
 export function runningOf(rows) {
   const out = {};
   const off = {};
@@ -318,13 +447,41 @@ export function runningOf(rows) {
   for (const uid of Object.keys(out)) if (!out[uid] && off[uid]) out[uid] = -1;
   return out;
 }
+// A city's buses on the road (TDX A1, each bus's place) → { RouteUID: buses }.
+export function runningOfGps(rows) {
+  const out = {};
+  for (const r of Array.isArray(rows) ? rows : []) if (r?.RouteUID) out[r.RouteUID] = (out[r.RouteUID] || 0) + 1;
+  return out;
+}
 const RUN_CITY = /^(InterCity|[A-Z][A-Za-z]+)$/;
 const runMemo = new Map();
-// The list (a few KB) is kept in this colo's cache too, 50 s: reading it
-// meant reading the whole city's estimates (up to 9 MB; 公路客運's 60,000
-// rows) in each isolate asked, 48 ms of CPU an ask on 2026-11-06.
-const RUN_FRESH = 50e3;
+// GET /transit/running?city=: { at, routes, total }, which of a city's routes
+// have buses on the road, to tell a route that isn't running (a typhoon, most
+// of 新竹's buses on 2026-10-23) from one between its buses: a phone reads
+// this (a few KB) instead of the city's whole answer. It changes in hours,
+// not seconds: read again each 10 minutes at most, from the city's buses'
+// places (TDX A1: 新竹市's 23 KB, 台北's 425 KB, 公路客運's 725 KB; the same
+// read as /transit/gps's), `total` its routes (the weekly packs' index), the
+// share on the road out of. Until 2026-11-06 it was every stop's estimate,
+// read each minute: 公路客運's 14.7 MB a read (TDX bills what it sends: a
+// tenth of a point each), a city's up to 8 MB. A busy city's whole estimates
+// here, when young: from them (every route, TDX's 今日未營運 too).
+const RUN_FRESH = 10 * MIN;
 const runKey = city => new Request(`https://transit-cache.orbit/running/${city}`);
+const routesKept = { at: 0, cities: null };
+async function routesOf(env, city, now) {
+  if (!env?.DATA) return null;
+  if (!routesKept.cities || now - routesKept.at > 6 * HOUR) {
+    try {
+      const obj = await env.DATA.get('index.json');
+      routesKept.cities = obj ? (await obj.json())?.cities || {} : {};
+    } catch {
+      routesKept.cities ||= {};
+    }
+    routesKept.at = now;
+  }
+  return Number(routesKept.cities[city]?.routes) || null;
+}
 export async function running(env, city, deps = {}) {
   if (!RUN_CITY.test(city)) return { status: 400, body: { code: 'BAD_CITY' } };
   const now = deps.now ?? Date.now();
@@ -343,22 +500,23 @@ export async function running(env, city, deps = {}) {
     const put = cache.put(runKey(city), new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${Math.ceil(RUN_FRESH / 1000)}` } })).catch(() => {});
     if (deps.ctx?.waitUntil) deps.ctx.waitUntil(put);
   };
+  const total = await routesOf(env, city, now);
   // A busy city's whole copy here, when young: from it.
   const idx = etaIndex.get(city);
   if (idx && now - idx.at < (await freshOf(TDX_RULES[0], null))) {
-    const body = { at: idx.at, routes: (idx.running ||= runningOf(idx.rows)) };
+    const body = { at: idx.at, routes: (idx.running ||= runningOf(idx.rows)), ...(total ? { total } : {}) };
     share(body);
     return { status: 200, body };
   }
-  // Else its own slim read: three fields of every stop (公路客運's whole list, 60,000 rows, 24 MB, is never kept whole).
-  const scope = city === 'InterCity' ? 'InterCity' : `City/${city}`;
-  const got = await tdxGet(env, `basic/v2/Bus/EstimatedTimeOfArrival/${scope}?$select=RouteUID,StopStatus,EstimateTime&$top=60000`, deps);
+  // Else its buses' places: a copy up to 10 minutes old as it is.
+  const path = city === 'InterCity' ? `basic/v2/Bus/RealTimeByFrequency/InterCity?$select=${GPS_SELECT}` : cityGpsPath(city);
+  const got = await tdxGet(env, path, { ...deps, oldest: RUN_FRESH });
   let rows = null;
   try {
     rows = got.status === 200 && got.body != null ? JSON.parse(got.body) : null;
   } catch {}
   if (!Array.isArray(rows)) return kept ? { status: 200, body: kept } : { status: got.status || 502, body: { code: 'TDX_FAILED' } };
-  const body = { at: now - (got.age || 0), routes: runningOf(rows) };
+  const body = { at: now - (got.age || 0), routes: runningOfGps(rows), ...(total ? { total } : {}), by: 'gps' };
   share(body);
   return { status: 200, body };
 }
@@ -374,53 +532,43 @@ export async function running(env, city, deps = {}) {
 // Kept a little longer than one stop's (2 minutes at once, refreshed behind):
 // each row says when it was estimated, and the phone counts from then.
 // 公路客運 (InterCity, all Taiwan: 60,000 rows) is asked by its stops instead.
-// Read whole only for a city asked often here (HOT_ASKS in HOT_MS): reading
-// it is up to 9 MB of JSON, tens of ms of CPU in each isolate each time its
-// copy is old, and with a few people about an isolate read it for one or two
-// asks (/transit/eta, 61 ms of CPU an ask on 2026-11-06); a quiet city's ask
-// is its own stops' (routes') filtered read, a few KB, kept at the edge.
-// A small city (SMALL_ETA: its whole list 10,000 rows at most; 新竹市's 1,766,
-// 590 KB, 1.8 ms to read; 新竹縣's 3,078, 1 MB, 2.8 ms; 2026-11-06) is read
-// whole once two stop lists (or a plan's routes) are asked here within a
-// minute (SPREAD_MS): one TDX read each time the city's estimates change, for
-// every stop and phone in it. Each stop was its own read: a crowd at its own
-// stops (a school's students before and after class) as many reads, each
-// stop's every 30 s. One stop list alone stays its own read (the whole list
-// is CPU for nothing then). A small city's list grown past SMALL_ROWS is
-// asked by its stops again.
+// A city's whole list is read only when it costs less than the reads it
+// replaces: TDX bills each read's bytes besides the call (a point per 150 MB
+// and per 1,500 calls), and the whole list is 334 bytes a row as TDX sends it
+// (新竹市's 1,766 rows 590 KB, 新竹縣's 3,078 1 MB, 2026-11-06), a stop list's
+// own read a call and a few KB. So the whole is read once 1 + KB/100 stop
+// lists (or a plan's routes) are asked here within a minute (wholeAt,
+// SPREAD_MS; 苗栗 2, 新竹市 7, 新竹縣 12): one TDX read each time the city's
+// estimates change, for every stop and phone in it, a crowd at its own stops
+// (a school's students before and after class). Below that each list is its
+// own filtered read, kept at the edge; a big city (台北, 新北: 30,000 rows,
+// 10 MB) always (until 2026-11-06 two lists in a small city, twenty asks in
+// a big one, read the whole: each a few hundred stop lists' worth of points).
 export const ETA_SELECT = 'StopUID,RouteUID,RouteName,Direction,EstimateTime,StopStatus,NextBusTime,PlateNumb,IsLastBus,Estimates,StopCountDown,DataTime';
 const ETA_STALE = 2 * MIN;
 export const cityEtaPath = city => `basic/v2/Bus/EstimatedTimeOfArrival/${city === 'InterCity' ? 'InterCity' : `City/${city}`}?$select=${ETA_SELECT}&$top=60000`;
 const etaIndex = new Map(); // city → { at, rows, stops: Map(uid → rows), routes: Map(uid → rows), running }
-export const resetEta = () => (etaIndex.clear(), runMemo.clear(), etaDemand.clear(), etaLists.clear(), grown.clear());
-export const HOT_ASKS = 20;
-const HOT_MS = 30_000;
-const etaDemand = new Map(); // city → this isolate's last asks (ms)
-function hotCity(city, now) {
-  const list = (etaDemand.get(city) || []).filter(t => now - t < HOT_MS);
-  list.push(now);
-  etaDemand.set(city, list.slice(-HOT_ASKS));
-  return list.length >= HOT_ASKS;
-}
-// (Measured 2026-11-06, each city's whole list in rows: 基隆 6,955, 新竹市
-// 1,766, 新竹縣 3,078, 苗栗 132, 彰化 1,030, 南投 807, 雲林 518, 嘉義縣 1,698,
-// 嘉義市 633, 屏東 5,464, 宜蘭 6,394, 花蓮 516, 台東 126, 金門 4,762, 澎湖
-// 8,709, 連江 1,081, 台南 9,065. 桃園's 29,006, 台中's 37,444, 高雄's 19,281,
-// 台北's and 新北's past 30,000 are read whole only when hot.)
-export const SMALL_ETA = new Set(['Keelung', 'Hsinchu', 'HsinchuCounty', 'MiaoliCounty', 'ChanghuaCounty', 'NantouCounty', 'YunlinCounty', 'ChiayiCounty', 'Chiayi', 'PingtungCounty', 'YilanCounty', 'HualienCounty', 'TaitungCounty', 'KinmenCounty', 'PenghuCounty', 'LienchiangCounty', 'Tainan']);
-export const SMALL_ROWS = 12_000;
+export const resetEta = () => (etaIndex.clear(), runMemo.clear(), etaLists.clear(), etaBytes.clear(), Object.assign(routesKept, { at: 0, cities: null }));
+// (Measured 2026-11-06, each city's whole list in rows: 桃園 29,006, 台中
+// 37,444, 高雄 19,281; 台北's and 新北's past 30,000.)
+export const ETA_ROWS = { Keelung: 6955, Hsinchu: 1766, HsinchuCounty: 3078, MiaoliCounty: 132, ChanghuaCounty: 1030, NantouCounty: 807, YunlinCounty: 518, ChiayiCounty: 1698, Chiayi: 633, PingtungCounty: 5464, YilanCounty: 6394, HualienCounty: 516, TaitungCounty: 126, KinmenCounty: 4762, PenghuCounty: 8709, LienchiangCounty: 1081, Tainan: 9065 };
+const etaBytes = new Map(); // city → its whole list's bytes, as last read here
+export const wholeAt = city => {
+  const bytes = etaBytes.get(city) ?? (ETA_ROWS[city] ? ETA_ROWS[city] * 334 : Infinity);
+  return Math.ceil(1 + bytes / 100_000);
+};
 const SPREAD_MS = 60_000;
 const etaLists = new Map(); // city → Map(a stop list or routes asked → when, ms)
-const grown = new Set(); // small cities whose list came back past SMALL_ROWS here
 function spreadCity(city, list, now) {
-  if (!SMALL_ETA.has(city) || grown.has(city)) return false;
+  const need = wholeAt(city);
+  if (need > 20) return false;
   const seen = etaLists.get(city) || new Map();
   etaLists.set(city, seen);
   seen.delete(list);
   seen.set(list, now);
   for (const [k, t] of seen) if (now - t >= SPREAD_MS) seen.delete(k);
   while (seen.size > 20) seen.delete(seen.keys().next().value);
-  return seen.size >= 2;
+  return seen.size >= need;
 }
 function indexEta(rows, at) {
   const stops = new Map();
@@ -452,7 +600,7 @@ export async function cityEta(env, city, deps = {}) {
     return idx ? { idx, age: now - idx.at } : { status: 502 };
   }
   if (!Array.isArray(rows)) return idx ? { idx, age: now - idx.at } : { status: 502 };
-  if (SMALL_ETA.has(city) && rows.length > SMALL_ROWS) grown.add(city);
+  etaBytes.set(city, got.body.length);
   const next = indexEta(rows, at);
   etaIndex.delete(city);
   etaIndex.set(city, next);
@@ -494,12 +642,11 @@ export async function etaRows(env, q, deps = {}) {
     return etaAsked(env, city, stops, routes, filtered);
   }
   const pick = got => ({ status: 200, body: stops.length ? stops.flatMap(u => got.idx.stops.get(u) || []) : routes.flatMap(u => got.idx.routes.get(u) || []), age: got.age });
-  const hot = hotCity(city, now);
   // (Every list counted, the busy and the answered-from-a-copy too: a minute's spread.)
   const spread = spreadCity(city, stops.length ? stops.join(',') : `r:${routes.join(',')}`, now);
   const idx = etaIndex.get(city);
   if (idx && now - idx.at < Math.min(await freshOf(TDX_RULES[0], null), mine ?? Infinity)) return pick({ idx, age: now - idx.at });
-  if (!hot && !spread) {
+  if (!spread) {
     // (A quiet city here: these stops' own read; the copy here, if young enough, when TDX fails.)
     const own = await etaAsked(env, city, stops, routes, filtered);
     return own.status !== 200 && idx && now - idx.at < ETA_STALE ? pick({ idx, age: now - idx.at }) : own;
@@ -713,20 +860,34 @@ async function devNow() {
   } catch {}
   return devT.v;
 }
-// TDX's month in points (TDX_POINTS) from the counts: each day's by kind;
-// calls from before the days were counted (2026-10-11), at the share of
-// advanced ones seen since (half when none yet).
-export function tdxPoints(used, now = Date.now()) {
+// TDX's own numbers (its 會員中心, the owner's page, 2026-11-06) for the days
+// the meter counted short (calls lost, bytes not counted): those days are
+// TDX's, not the meter's, in the month's points (the guard, 容量).
+export const TDX_BOOK = {
+  '2026-11-01': { calls: 3953, kb: 218826, points: 5.658 },
+  '2026-11-02': { calls: 931, kb: 32696, points: 1.402 },
+  '2026-11-03': { calls: 16810, kb: 650334, points: 20.009 },
+  '2026-11-04': { calls: 4385, kb: 169494, points: 5.353 },
+  '2026-11-05': { calls: 8010, kb: 432885, points: 8.649 }
+};
+// TDX's month in points (TDX_POINTS) from the counts: each day's calls by
+// kind and the bytes they brought (a day in TDX_BOOK: TDX's own).
+export function tdxPoints(used, now = Date.now(), book = TDX_BOOK) {
   const today = twDay(now);
   // (TDX's month is Taiwan's: a day of another month in `used` never counts in this one.)
   const thisMonth = today.slice(0, 7);
   let month = 0, todayPts = 0;
   for (const [k, n] of Object.entries(used || {})) {
-    const m = /^tdx:([ab]):(\d{4}-\d{2}-\d{2})$/.exec(k);
-    if (!m || !m[2].startsWith(thisMonth)) continue;
-    const p = n / (m[1] === 'b' ? TDX_POINTS.basic : TDX_POINTS.advanced);
+    const m = /^tdx:(v?[bam]):(\d{4}-\d{2}-\d{2})$/.exec(k);
+    if (!m || !m[2].startsWith(thisMonth) || book[m[2]]) continue;
+    const p = n * TDX_RATE[m[1]];
     month += p;
     if (m[2] === today) todayPts += p;
+  }
+  for (const [day, b] of Object.entries(book || {})) {
+    if (!day.startsWith(thisMonth) || day > today) continue;
+    month += b.points;
+    if (day === today) todayPts += b.points;
   }
   return { month, today: todayPts };
 }
@@ -828,7 +989,7 @@ export async function warmBikes(env, deps = {}) {
 // One TDX answer, from the shared cache when it's fresh enough.
 // → { status, body (text), age (ms), state: 'hit' | 'miss' | 'stale' | 'busy' | 'error' }
 // `warm` (the cron's): refreshed when its copy is past its fresh time, else 'warm'.
-export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.caches?.default, ctx = null, now = Date.now(), warm = false, stale = null, young = null, by = '' } = {}) {
+export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.caches?.default, ctx = null, now = Date.now(), warm = false, stale = null, young = null, oldest = 0, by = '' } = {}) {
   const req = tdxRequest(raw);
   // (`stale`: served at once that long, instead of the rule's.)
   const staleMs = stale ?? req?.rule.stale;
@@ -836,8 +997,9 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
   const url = `${TDX_BASE}${req.path}?${req.query}`;
   const key = new Request(`https://transit-cache.orbit/${req.path}?${req.query}`);
   const keepWarm = WARM.test(req.path);
+  const dev = by === 'dev';
   const later = p => (ctx?.waitUntil ? ctx.waitUntil(p.catch(() => {})) : p.catch(() => {}));
-  if (keepWarm && !warm) later(warmMark(env, raw, now));
+  if (keepWarm && !warm && !dev) later(warmMark(env, raw, now));
   // (A path TDX refused (400, 404: a system it doesn't have, 'TRTCMG' for S2STravelTime) is refused here for a day, never asked again at each launch.)
   const refusedKey = new Request(`https://transit-cache.orbit/refused/${req.path}?${req.query}`);
   let hit = null;
@@ -854,24 +1016,27 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
     if (w && (body == null || w.at > at)) [body, at] = [w.body, w.at];
   }
   const age = now - at;
-  // (`young`: a copy fresh only that young at most, the asker's own being older.)
-  const fresh = Math.min(await freshOf(req.rule, env, req.path, now), young ?? Infinity);
+  // (`young`: a copy fresh only that young at most, the asker's own being older;
+  // `oldest`: one up to that old as it is, the asker needing no newer; our tools' DEV_OLDEST.)
+  const fresh = Math.max(oldest, dev ? DEV_OLDEST : 0, Math.min(await freshOf(req.rule, env, req.path, now), young ?? Infinity));
   if (warm && body != null && age < Math.max(fresh, 90_000)) return { status: 200, age, state: 'warm' };
   if (!warm && body != null && age < fresh) return { status: 200, body, age, state: 'hit' };
   const refresh = async () => {
     if (inflight.has(url)) return inflight.get(url);
     const p = (async () => {
+      if (dev && !(await devTdxRoom(env, now))) return { status: 429, state: 'devcap' };
       if (!paced(env, now)) return { status: 429, state: 'busy' };
       const token = await tdxAccess(env, fetchFn, now);
       if (!token) return { status: 503, state: 'nokey' };
-      let res;
+      let res, read;
       // Another isolate may share the second: a 429 waits a moment and asks again (twice).
       for (let tries = 0; ; tries++) {
         if (!(await myTurn(env))) return { status: 429, state: 'busy' };
         // TDX sometimes hangs or answers 5xx for a moment: 12 s at most, and
         // one more try (the app said 暫時無法取得資料 for these).
         res = await fetchFn(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Accept-Encoding': 'br, gzip' }, signal: timeout(12_000) }).catch(err => ({ ok: false, status: 504, text: async () => String(err?.name || err) }));
-        await tallyTdx(env, req.path, now, ctx, by);
+        read = await tdxBody(res);
+        await tallyTdx(env, req.path, now, ctx, by, read);
         if (res.status >= 500 && tries < 1) continue;
         if (res.status !== 429 || tries >= 2 || !Number(env.TDX_PER_SEC)) break;
         turn.next = Math.max(turn.next, Date.now() + 1100);
@@ -884,8 +1049,8 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
         if (ctx?.waitUntil) ctx.waitUntil(put);
         else await put;
       }
-      if (!res.ok) return { status: res.status, state: 'error', why: (await res.text().catch(() => '')).slice(0, 160) };
-      const text = tdxTrim(req.path, await res.text());
+      if (!res.ok) return { status: res.status, state: 'error', why: read.text.slice(0, 160) };
+      const text = tdxTrim(req.path, read.text);
       const puts = [];
       if (cache) puts.push(cache.put(key, new Response(text, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'X-Fetched-At': String(now), 'Cache-Control': `public, max-age=${Math.ceil(keptFor(req.rule) / 1000)}` } })).catch(() => {}));
       if (keepWarm) puts.push(warmWrite(env, req, text, now));
@@ -926,7 +1091,7 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
   if (got.status === 200) return got;
   // TDX busy or failing: the last copy, however old the cache (or KV) still has it.
   if (body != null) return { status: 200, body, age, state: 'stale' };
-  const code = got.state === 'nokey' ? 'TDX_NO_KEY' : got.state === 'busy' || got.status === 429 ? 'TDX_BUSY' : 'TDX_FAILED';
+  const code = got.state === 'nokey' ? 'TDX_NO_KEY' : got.state === 'devcap' ? 'DEV_TDX_CAP' : got.state === 'busy' || got.status === 429 ? 'TDX_BUSY' : 'TDX_FAILED';
   return { status: got.state === 'nokey' ? 503 : got.status === 429 || got.state === 'busy' ? 429 : 502, body: JSON.stringify({ code, upstream: got.status, why: got.why || '' }), state: got.state || 'error' };
 }
 
@@ -1453,14 +1618,16 @@ async function routes(env, q, { fetchFn, ctx, now, cache, by: who }) {
       const params = new URLSearchParams({ origin: `${from.lat},${from.lon}`, destination: `${to.lat},${to.lon}`, gc: '1.0', top: '5', transit: tdxTransit(modes), transfer_time: '0,60', first_mile_mode: mile, first_mile_time: minutes, last_mile_mode: mile, last_mile_time: minutes });
       params.set(by === 'arrive' ? 'arrival' : 'depart', twIso(at + (by === 'arrive' ? 0 : MIN)));
       return (async () => {
+        if (who === 'dev' && !(await devTdxRoom(env, now))) return ((sources[key] = 'devcap'), []);
         if (!paced(env, now)) return ((sources[key] = 'busy'), []);
         if (!(await myTurn(env))) return ((sources[key] = 'busy'), []);
         const token = await tdxAccess(env, fetchFn, now);
         if (!token) return ((sources[key] = 'nokey'), []);
-        const r = await fetchFn(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, signal: timeout(15_000) });
-        await tallyTdx(env, 'maas/routing', now, ctx, who);
+        const r = await fetchFn(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Accept-Encoding': 'br, gzip' }, signal: timeout(15_000) });
+        const read = await tdxBody(r);
+        await tallyTdx(env, 'maas/routing', now, ctx, who, read);
         sources[key] = r.ok ? 'ok' : `http ${r.status}`;
-        return r.ok ? parseTdxRoutes(await r.json()).map(p => ({ ...p, src: key === 'tdx' ? 'tdx' : 'tdx-bike' })) : [];
+        return r.ok ? parseTdxRoutes(JSON.parse(read.text)).map(p => ({ ...p, src: key === 'tdx' ? 'tdx' : 'tdx-bike' })) : [];
       })().catch(() => ((sources[key] = 'error'), []));
     };
     if (railOrBus) jobs.push(timed('tdx', ask('tdx', '0', '15')));
@@ -1528,15 +1695,17 @@ async function statusSample(env, name, dependencies) {
   if (name === 'maas' || name === 'maas-local') {
     const token = await tdxAccess(env, deps.fetchFn, deps.now);
     if (!token) return { name, status: 503, body: 'no TDX key' };
+    if (deps.by === 'dev' && !(await devTdxRoom(env, deps.now))) return { name, status: 429, body: 'DEV_TDX_CAP' };
     if (!paced(env, deps.now) || !(await myTurn(env))) return { name, status: 429, body: 'busy' };
     // maas-local: across Hsinchu (新竹車站 → 竹北 光明六路), where buses do the work.
     const to = name === 'maas' ? TO : { lat: 24.839, lon: 121.008 };
     // transit=: which of TDX's transit codes to allow (to learn what each one is).
     const codes = /^[0-9](,[0-9]){0,9}$/.test(deps.transit || '') ? deps.transit : '3,4,5,6,7,8,9';
     const params = new URLSearchParams({ origin: `${AT.lat},${AT.lon}`, destination: `${to.lat},${to.lon}`, gc: '1.0', top: '5', transit: codes, transfer_time: '0,60', first_mile_mode: '0', first_mile_time: '15', last_mile_mode: '0', last_mile_time: '15' });
-    const r = await fetchOf(deps)(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, signal: timeout(15_000) });
-    await tallyTdx(env, 'maas/routing', deps.now, deps.ctx, deps.by);
-    const text = await r.text();
+    const r = await fetchOf(deps)(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Accept-Encoding': 'br, gzip' }, signal: timeout(15_000) });
+    const read = await tdxBody(r);
+    await tallyTdx(env, 'maas/routing', deps.now, deps.ctx, deps.by, read);
+    const text = read.text;
     let parsed = null;
     try {
       parsed = parseTdxRoutes(JSON.parse(text)).map(p => ({ dur: p.dur, legs: p.legs.map(l => `${l.mode}:${l.short || l.name}:${l.from.name}>${l.to.name}`) }));
