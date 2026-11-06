@@ -480,8 +480,19 @@ export async function etaRows(env, q, deps = {}) {
   const had = Number(q.get('had')) || 0;
   const mine = had > 0 ? Math.max(0, had * 1000 - 1500) : null;
   const filtered = mine != null ? { ...deps, stale: 0, young: mine } : deps;
-  if (city === 'InterCity') return etaAsked(env, city, stops, routes, filtered);
   const now = deps.now ?? Date.now();
+  if (city === 'InterCity') {
+    // (Its stops asked together with every other stop asked here this minute: the same reads for every phone.)
+    const groups = stops.length ? await together('eta', stops, 40, deps, now) : null;
+    if (groups) {
+      const all = await Promise.all(groups.map(g => etaAsked(env, city, g, [], filtered)));
+      if (all.every(g => g.status === 200)) {
+        const want = new Set(stops);
+        return { status: 200, body: all.flatMap(g => g.body).filter(r => want.has(r?.StopUID)), age: Math.max(...all.map(g => g.age || 0)) };
+      }
+    }
+    return etaAsked(env, city, stops, routes, filtered);
+  }
   const pick = got => ({ status: 200, body: stops.length ? stops.flatMap(u => got.idx.stops.get(u) || []) : routes.flatMap(u => got.idx.routes.get(u) || []), age: got.age });
   const hot = hotCity(city, now);
   // (Every list counted, the busy and the answered-from-a-copy too: a minute's spread.)
@@ -527,6 +538,71 @@ async function etaAsked(env, city, stops, routes, deps) {
   }
 }
 
+// ---- 公路客運's asks together ------------------------------------------------------------
+//
+// 公路客運 (InterCity: all Taiwan, 60,000 estimates, 24 MB; 1,848 buses) is
+// never read whole, so each stop card was its own read of its stops' times
+// (each 30 s) and its lagging routes' places (each 20 s): a crowd at its own
+// stops as many reads (竹東's: 13 of the 17 buses within 4 km were
+// 公路客運's, 2026-11-06). The stops (routes) this colo was asked within
+// SPREAD_MS are kept at the edge, one small list each (`kind`), split into
+// groups by a hash of each id (2, 4, 8… as the list grows, about `per`
+// each), and an ask reads the whole groups its ids are in, each in one
+// order: every phone and isolate here asks TDX the same few reads, and a
+// stop coming or going changes only its own group's. Nothing else asked
+// here: null (its own read, as before).
+const TOGETHER = kind => new Request(`https://transit-cache.orbit/together/${kind}`);
+const TOGETHER_BEAT = 20_000; // (an id's time written again at most this often: fewer writes)
+const TOGETHER_MAX = 2000;
+const fnv = s => {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+  return h;
+};
+export async function together(kind, ids, per, deps = {}, now = Date.now()) {
+  const cache = deps.cache === undefined ? globalThis.caches?.default : deps.cache;
+  const mine = [...new Set(ids)];
+  if (!cache || !mine.length) return null;
+  let seen = {};
+  try {
+    const hit = await cache.match(TOGETHER(kind));
+    const got = hit ? await hit.json() : null;
+    if (got && typeof got === 'object' && !Array.isArray(got)) seen = got;
+  } catch {}
+  let changed = false;
+  for (const [id, t] of Object.entries(seen)) {
+    if (now - t < SPREAD_MS && UID.test(id)) continue;
+    delete seen[id];
+    changed = true;
+  }
+  for (const id of mine) {
+    if (now - (seen[id] ?? -Infinity) < TOGETHER_BEAT) continue;
+    seen[id] = now;
+    changed = true;
+  }
+  let all = Object.keys(seen);
+  if (all.length > TOGETHER_MAX) {
+    for (const id of all.sort((a, b) => seen[a] - seen[b]).slice(0, all.length - TOGETHER_MAX)) delete seen[id];
+    all = Object.keys(seen);
+  }
+  if (changed) {
+    const put = cache.put(TOGETHER(kind), new Response(JSON.stringify(seen), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${Math.ceil((2 * SPREAD_MS) / 1000)}` } })).catch(() => {});
+    if (deps.ctx?.waitUntil) deps.ctx.waitUntil(put);
+    else await put;
+  }
+  if (all.length <= mine.length) return null;
+  const n = all.length <= per ? 1 : 2 ** Math.ceil(Math.log2(all.length / (per * 0.75)));
+  const want = new Set(mine.map(id => fnv(id) % n));
+  const groups = new Map();
+  for (const id of all.sort()) {
+    const g = fnv(id) % n;
+    if (!want.has(g)) continue;
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(id);
+  }
+  return [...groups.values()];
+}
+
 // ---- Where routes' buses are, one TDX read a city -----------------------------------------
 //
 // GET /transit/gps?city=<TDX city | InterCity>&routes=<RouteUID,…>[&had=<s>]:
@@ -536,7 +612,8 @@ async function etaAsked(env, city, stops, routes, deps) {
 // 14 KB; 2026-11-06), so every route and every phone in the city shares it:
 // each stop card asked its own lagging routes, a TDX read a stop each 20 s,
 // a crowd at different stops as many. 公路客運's (InterCity: all Taiwan,
-// 1,848 buses, 714 KB) by its routes, as before. `had=`: as /transit/eta's.
+// 1,848 buses, 714 KB) by its routes, asked together with the other routes
+// asked here (together()). `had=`: as /transit/eta's.
 export const GPS_SELECT = 'RouteUID,PlateNumb,Direction,BusPosition,GPSTime';
 export const cityGpsPath = city => `basic/v2/Bus/RealTimeByFrequency/City/${city}?$select=${GPS_SELECT}`;
 export async function gpsRows(env, q, deps = {}) {
@@ -546,18 +623,26 @@ export async function gpsRows(env, q, deps = {}) {
   if (!routes.length) return { status: 400, body: { code: 'BAD_ROUTES' } };
   const had = Number(q.get('had')) || 0;
   const d = had > 0 ? { ...deps, stale: 0, young: Math.max(0, had * 1000 - 1500) } : deps;
-  const path = city === 'InterCity' ? `basic/v2/Bus/RealTimeByFrequency/InterCity?$filter=${routes.map(u => `RouteUID eq '${u}'`).join(' or ')}&$select=${GPS_SELECT}` : cityGpsPath(city);
-  const got = await tdxGet(env, path, d);
-  if (got.status !== 200 || got.body == null) return { status: got.status === 429 ? 429 : 502, body: { code: got.status === 429 ? 'TDX_BUSY' : 'TDX_FAILED' } };
-  let rows;
+  // (公路客運's routes asked together with every other route asked here this minute: the same reads for every phone.)
+  const icity = city === 'InterCity' ? ((await together('gps', routes, 20, deps, deps.now ?? Date.now())) || [routes]).flatMap(g => Array.from({ length: Math.ceil(g.length / 40) }, (_, i) => g.slice(i * 40, i * 40 + 40))) : null;
+  const paths = icity ? icity.map(g => `basic/v2/Bus/RealTimeByFrequency/InterCity?$filter=${g.map(u => `RouteUID eq '${u}'`).join(' or ')}&$select=${GPS_SELECT}`) : [cityGpsPath(city)];
+  const gots = await Promise.all(paths.map(p => tdxGet(env, p, d)));
+  const bad = gots.find(g => g.status !== 200 || g.body == null);
+  if (bad) return { status: bad.status === 429 ? 429 : 502, body: { code: bad.status === 429 ? 'TDX_BUSY' : 'TDX_FAILED' } };
+  const rows = [];
   try {
-    rows = JSON.parse(got.body);
-  } catch {}
-  if (!Array.isArray(rows)) return { status: 502, body: { code: 'TDX_FAILED' } };
+    for (const g of gots) {
+      const list = JSON.parse(g.body);
+      if (!Array.isArray(list)) throw new Error('not a list');
+      rows.push(...list);
+    }
+  } catch {
+    return { status: 502, body: { code: 'TDX_FAILED' } };
+  }
   // (Only what the phone reads: TDX sends each bus's speed, heading, statuses and times too, ~390 bytes a bus.)
   const want = new Set(routes);
   const slim = r => ({ RouteUID: r.RouteUID, PlateNumb: r.PlateNumb, Direction: r.Direction, BusPosition: r.BusPosition ? { PositionLat: r.BusPosition.PositionLat, PositionLon: r.BusPosition.PositionLon } : null, GPSTime: r.GPSTime });
-  return { status: 200, body: rows.filter(r => want.has(r?.RouteUID)).map(slim), age: got.age || 0, state: got.state };
+  return { status: 200, body: rows.filter(r => want.has(r?.RouteUID)).map(slim), age: Math.max(...gots.map(g => g.age || 0)), state: gots[0].state };
 }
 
 // The access token (a day long): kept in memory and KV, asked for again an
