@@ -60,6 +60,8 @@ live-scroll and the gate watch live data change.
 
 ## `node tools/live-scroll.mjs [app…] [--sheet "<js>"] [--account <name>] [--fast] [--no-days] [--webkit] [--live-only]`: nothing jumps
 
+All nine apps by default; Orbit Class (`class` or `orbit`) is built first from the checkout beside this one.
+
 **Run it with `--webkit` too.** Safari moves a scroller by itself when what's in it is
 drawn anew, and Chromium never does: a live game's page went to the top on every refresh
 on Jay's iPhone (2026-11-05, the third time) while this passed in Chromium. In the cloud,
