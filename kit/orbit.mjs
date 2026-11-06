@@ -1539,7 +1539,8 @@ function measureScreen() {
   const insets = cs ? (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) : 0;
   const rail = (w > h && h <= 520) || w >= 1100;
   const float = w >= 600 && h > 520;
-  const width = Math.round(w - insets - (rail ? 92 : 0));
+  // (The rail's room: the slim one on a phone on its side, a tablet's wider; orbit.css --q-tabrail-w + 12.)
+  const width = Math.round(w - insets - (rail ? (w >= 600 && h > 520 ? 112 : 92) : 0));
   const now = { rail, float, wide: width >= 640, w3: width >= 1000, width };
   const sbw = Math.max(0, Math.round((globalThis.innerWidth || w) - w));
   if (root.style.getPropertyValue('--q-sbw') !== `${sbw}px`) root.style.setProperty('--q-sbw', `${sbw}px`);

@@ -5276,6 +5276,30 @@ html.q-tabrail {
     --q-tabrail-tab: 50px;
   }
 }
+/* A tablet or a computer (the rail with room above and below it, q-float):
+   a rail as easy to hit as the phone's bar, never smaller (Jay 2026-11-06,
+   an iPad: "even way smaller than my iPhone's"). An iPad's point is about
+   the iPhone's in size, and the slim rail's 52-wide capsule, 22 marks and
+   10-point names were smaller than the phone bar's 25 and its 92-wide tabs.
+   Here: a 72-wide capsule, 66-tall tabs, 27 marks, 12-point names. A phone
+   on its side keeps the slim one: it has no height to spare. */
+html.q-tabrail.q-float {
+  --q-tabrail-bw: 80px;
+  --q-tabrail-tab: 66px;
+}
+html.q-tabrail.q-float .q-tab {
+  padding: 6px 2px 7px;
+  gap: 3px;
+  font-size: 12px;
+  line-height: 15px;
+}
+html.q-tabrail.q-float .q-tab-icon {
+  height: 30px;
+}
+html.q-tabrail.q-float .q-tab svg {
+  width: 27px;
+  height: 27px;
+}
 html.q-tabrail .q-tabbar.q-tabbar {
   left: var(--q-tabrail-x);
   top: var(--q-tabrail-top);
