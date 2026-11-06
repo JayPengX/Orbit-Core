@@ -28,7 +28,7 @@
 //                          for any symbol, for when Yahoo answers 429)
 //
 //   app   sports | securities | words | orbit | weather | transit | beats | law | money (or the repo's folder name)
-//         | admin [overview accounts money health usage dev tools]  (the admin panel, made-up accounts; money: the 證券的錢 sheet)
+//         | admin [overview accounts money health usage dev tools]  (the admin panel, made-up accounts, --people n of them; money: the 證券的錢 sheet)
 //
 // Orbit Transit: /transit is answered by transit.js itself on made-up TDX
 // answers around 新竹車站 (tests/fixtures/transit; until the TDX key is set no
@@ -128,6 +128,8 @@ const height = Number(opt('height', (SIZES[device] || SIZES.iphone)[1]));
 const lang = opt('lang', 'zh');
 // --snap '{json}': the wallet's snap (each app's figures).
 const snapStart = JSON.parse(opt('snap', '{}'));
+// --people n: admin only, its made-up accounts (12).
+const adminPeople = Number(opt('people', 12));
 const wait = Number(opt('wait', 6000));
 const payloadFile = opt('payload', '');
 // --keep-account file: what the app saves to its account during the run
@@ -797,8 +799,8 @@ if (key === 'admin') {
   const docs = new Map();
   const DAY = 86_400_000;
   const APPS_USED = ['stock', 'match', 'vocab', 'orbit', 'weather', 'transit'];
-  // Twelve accounts: made over the last 40 days, a few apps each, and pay.
-  for (let i = 0; i < 12; i++) {
+  // Twelve accounts (--people n: that many, e.g. 2 for 容量's few-people view): made over the last 40 days, a few apps each, and pay.
+  for (let i = 0; i < adminPeople; i++) {
     const made = now - (40 - i * 3) * DAY;
     const apps = Object.fromEntries(APPS_USED.filter((a, j) => (i + j) % 3 !== 0).map((a, j) => [a, { first: made, last: now - ((i * 7 + j) % 9) * DAY - i * 3_600_000 }]));
     // (Relief for two; one overdrawn.)

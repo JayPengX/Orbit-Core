@@ -146,24 +146,63 @@ export function splitHours(h, now = Date.now()) {
 }
 
 // Too few people a week to tell what one uses (FEW: the owner and a friend,
-// testing everything, ~17 s of CPU a day each on 2026-11-06): the plan's
-// people then by typical use instead, a week's person about 1.2 s of CPU
-// a day: three apps' whole sessions on a day they open Orbit (0.47 s; one
-// is 28–491 ms, measured 2026-11-06 with tools/speed.mjs) and 45 minutes of
-// live screens (a third each: a bus stop card 6.7 s an hour, Transit's map
-// 1.2 s, a live Sports game nothing: ESPN from the phone), on about half
-// the days. (The same recipe on 2026-11-05 morning's code: 13.5 s.)
+// testing everything, ~17 s of CPU a day each on 2026-11-06): every quota's
+// people then by a typical person's use instead (TYPICAL_DAY), the headline the
+// fewest of them, named. One recipe for every quota: on about half the days
+// (ACTIVE) a person opens Orbit, and that day uses three apps' whole sessions
+// (Transit opened twice), 45 minutes of live screens (a bus stop's card,
+// Transit's map, a live game: a third each), plans a trip, and every other
+// such day searches a place. What each of those costs was measured on the
+// live Worker on 2026-11-06 (tools/speed.mjs, tools/preview.mjs --live
+// --requests, at 新竹車站, whose stops have three cities' buses: a quieter
+// stop costs less, so the people held err low):
+//   CPU: a session 28–491 ms (three 0.47 s), a stop card 6.7 s an hour,
+//     Transit's map 1.2 s, a live game nothing (ESPN from the phone);
+//   requests: a session ~30, a stop card ~30 a minute, the map ~15;
+//   TDX: a stop card 0.83 points an hour, the map 0.39, a planned trip 0.02
+//     (TDX's reads aren't shared here: one person's alone, so it errs low);
+//   Google: an opening of Transit a map load; a search 3 asks as it's typed
+//     (each one Autocomplete and Text Search, the place picked 1 Place
+//     Details); a Google place tapped on the map its name (Pro); a trip 2
+//     route asks; walks from a spot not walked from before 5 (a known
+//     spot's are kept a month: none).
+// Cloudflare's other counts move with the requests (kept use, the crons' own):
+// each at its own rate a request. Gemini is behind a tap and the owner's
+// own cap a day: shown at the use seen, never the headline here.
 export const FEW = 10;
-export const TYPICAL_CPU_MS = 1200;
+export const ACTIVE = 0.5;
+// A person's use on a day they open Orbit.
+export const TYPICAL_DAY = {
+  'cf:cpuMs': 2400,
+  'cf:requests': 800,
+  'maps:maps': 2,
+  'maps:autocomplete': 1.5,
+  'maps:textSearch': 1.5,
+  'maps:details': 0.5,
+  'maps:detailsPro': 0.5,
+  'maps:routes': 2,
+  'maps:matrix': 5,
+  'tdx:points': 0.25 * 0.83 + 0.25 * 0.39 + 0.02
+};
+// (A week's person, a day: 1.2 s of CPU.)
+export const TYPICAL_CPU_MS = TYPICAL_DAY['cf:cpuMs'] * ACTIVE;
 // The people a quota holds: this week's × room ÷ use (null with nobody yet or nothing used).
 const holdsOf = (week, room, use) => (week > 0 && use > 0 ? Math.max(0, Math.floor((week * room) / use)) : null);
+// …and at a typical person's use (`one`: theirs over the same span as `room`).
+const holdsBy = (room, one) => (one > 0 ? Math.max(0, Math.floor(room / one)) : null);
 
 // Every quota as a row: { key, kind, name, used, cap, day, fixedDay,
 // perPerson, holds, by }. `by`: 'people' (grows with them),
 // 'place' (Google Weather: by area), 'store' (what's kept).
 export function quotas({ users = {}, guard = null, hours = null, usage = {}, maps = {}, now = Date.now() }) {
   const week = users.week || 0;
+  // (Too few this week to tell what one uses: by a typical person's, TYPICAL_DAY.)
+  const few = week > 0 && week < FEW;
   const rows = [];
+  const tw = new Date(now + 8 * HOUR);
+  const monthDays = new Date(Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth() + 1, 0)).getUTCDate();
+  // A typical person's use of a quota, a day (the week's days averaged).
+  const typicalOf = key => (TYPICAL_DAY[key] != null ? TYPICAL_DAY[key] * ACTIVE : null);
   // Cloudflare's $5 plan (the guard's last read of the bill).
   if (guard?.use) {
     const planOf = guard.plan || PLAN;
@@ -171,6 +210,11 @@ export function quotas({ users = {}, guard = null, hours = null, usage = {}, map
     const p = guard.period;
     const pdays = p ? (p.end - p.from) / DAY : 31;
     const split = splitHours(hours, now);
+    // (The counts read only as the period's total move with the requests: the
+    // part that's people's is the requests' share from who called, and a
+    // person's is their requests' worth of it.)
+    const req = split?.requests;
+    const reqDay = req ? req.day : (guard.projected?.requests ?? guard.use.requests ?? 0) / pdays;
     for (const k of Object.keys(PLAN)) {
       if (planOf[k] == null) continue;
       const cap = planOf[k] * stop;
@@ -181,12 +225,15 @@ export function quotas({ users = {}, guard = null, hours = null, usage = {}, map
       const s = split?.[k];
       // A day's use: the last 7 days' where they were read, else the period's pace.
       const day = s ? s.day : (guard.projected?.[k] ?? guard.use[k] ?? 0) / pdays;
-      const fixedDay = s ? s.fixed : 0;
-      const people = s ? s.people : day;
+      const via = !s && req?.near && req.day > 0;
+      const fixedDay = s ? s.fixed : via ? (day * req.fixed) / req.day : 0;
+      const people = day - fixedDay;
       const capDay = cap / pdays;
+      const typical = typicalOf(`cf:${k}`) ?? (reqDay > 0 ? (day / reqDay) * typicalOf('cf:requests') : null);
+      // (A typical person on top of today's use when its fixed part isn't known: all of it counted fixed, erring low.)
       // (Nobody is slowed before this many either: guard.js paces only a
       // count that would reach the stop before the period ends.)
-      rows.push({ key: `cf:${k}`, kind: 'cf', count: k, by: 'people', measured: !!s, near: !!s?.near, used: guard.use[k] || 0, projected: guard.projected?.[k] ?? null, cap, day, capDay, fixedDay, peopleDay: people, perPerson: week ? people / week : null, holds: holdsOf(week, capDay - fixedDay, people) });
+      rows.push({ key: `cf:${k}`, kind: 'cf', count: k, by: 'people', measured: s ? true : via ? 'requests' : false, near: !!s?.near, used: guard.use[k] || 0, projected: guard.projected?.[k] ?? null, cap, day, capDay, fixedDay, peopleDay: people, perPerson: week ? people / week : null, holds: holdsOf(week, capDay - fixedDay, people), typical, typicalHolds: holdsBy(capDay - (s || via ? fixedDay : day), typical) });
     }
   }
   // Gemini: each feature's cap a day against its busiest day of the week.
@@ -201,29 +248,32 @@ export function quotas({ users = {}, guard = null, hours = null, usage = {}, map
   for (const [k, m] of Object.entries(maps)) {
     if (k.startsWith('showcase')) continue;
     const fixed = Math.min(m.month, m.fixed || 0);
-    rows.push({ key: `maps:${k}`, kind: 'maps', count: k, by: 'people', used: m.used, month: m.month, fixedMonth: fixed, cap: m.cap, perPerson: week ? (m.month - fixed) / week : null, holds: holdsOf(week, m.cap - fixed, m.month - fixed) });
+    const typical = typicalOf(`maps:${k}`);
+    rows.push({ key: `maps:${k}`, kind: 'maps', count: k, by: 'people', used: m.used, month: m.month, fixedMonth: fixed, cap: m.cap, perPerson: week ? (m.month - fixed) / week : null, holds: holdsOf(week, m.cap - fixed, m.month - fixed), typical, typicalHolds: typical == null ? null : holdsBy(m.cap - fixed, typical * monthDays) });
   }
   // Google Weather: shared by area (a 5 km square), not by person.
   if (usage.weather?.cap) rows.push({ key: 'weather:google', kind: 'weather', by: 'place', used: usage.weather.googleToday || 0, cap: usage.weather.cap });
   // TDX's month of points, carried to its end (Taiwan's month).
   const tdx = usage.tdx;
   if (tdx?.plan?.month) {
-    const tw = new Date(now + 8 * HOUR);
     const dayOf = tw.getUTCDate() - 1 + tw.getUTCHours() / 24 + tw.getUTCMinutes() / 1440;
-    const monthDays = new Date(Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth() + 1, 0)).getUTCDate();
     // (The first day's hours alone say too little: a day at least.)
     const carried = n => (n / Math.max(1, dayOf)) * monthDays;
     const month = carried(tdx.points || 0);
     // (Our tools' and the showcase's points, taken off as Maps' are.)
     const fixed = Math.min(month, carried((tdx.devPoints || 0) + (tdx.showPoints || 0)));
-    rows.push({ key: 'tdx:points', kind: 'tdx', by: 'people', used: tdx.points || 0, month, fixedMonth: fixed, cap: tdx.plan.month, slowed: !!tdx.guard?.why, perPerson: week ? (month - fixed) / week : null, holds: holdsOf(week, tdx.plan.month - fixed, month - fixed) });
+    const typical = typicalOf('tdx:points');
+    rows.push({ key: 'tdx:points', kind: 'tdx', by: 'people', used: tdx.points || 0, month, fixedMonth: fixed, cap: tdx.plan.month, slowed: !!tdx.guard?.why, perPerson: week ? (month - fixed) / week : null, holds: holdsOf(week, tdx.plan.month - fixed, month - fixed), typical, typicalHolds: holdsBy(tdx.plan.month - fixed, typical * monthDays) });
   }
-  const least = f => rows.filter(r => r.by === 'people' && r[f] != null && !r.paused).reduce((a, r) => (!a || r[f] < a[f] ? r : a), null);
-  const h = least('holds');
+  // Few people: each quota's people at a typical person's use (what this
+  // week's few used: `seen`); Gemini's (no typical use) not the headline.
+  if (few) for (const r of rows) if (r.typical != null) Object.assign(r, { seen: r.holds, holds: r.typicalHolds, byTypical: true });
+  const least = (f, ok = () => true) => rows.filter(r => r.by === 'people' && r[f] != null && !r.paused && ok(r)).reduce((a, r) => (!a || r[f] < a[f] ? r : a), null);
+  const h = least('holds', r => !few || r.byTypical);
+  const t = least('typicalHolds');
   const split = splitHours(hours, now);
-  // (By typical use: the CPU a day past the fixed part, a second a person.)
-  const cpu = split && rows.find(r => r.key === 'cf:cpuMs');
-  const typical = cpu ? { people: Math.max(0, Math.floor((cpu.capDay - cpu.fixedDay) / TYPICAL_CPU_MS)), ms: TYPICAL_CPU_MS, few: week < FEW } : null;
+  // (By typical use, every quota: the fewest people, and which.)
+  const typical = t ? { people: t.typicalHolds, key: t.key, ms: TYPICAL_CPU_MS, few } : null;
   return { rows, week, holds: h ? { people: h.holds, key: h.key } : null, typical, measured: !!split, near: !!split?.cpuMs?.near, who: split?.cpuMs?.who || null };
 }
 
