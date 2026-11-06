@@ -111,7 +111,7 @@ test('splitHours: with people\'s part read (requests near Taiwan), that is what 
   assert.equal(q.near, true);
   // Enough people to tell what one uses: no typical-use stand-in needed.
   assert.equal(q.typical.few, false);
-  // Two people a week (the owner testing): the plan's people by typical use, a second of CPU a day each.
+  // Two people a week (the owner testing): the plan's people by typical use, about 1.2 s of CPU a day each.
   const two = quotas({ users: { week: 2 }, guard: guardOf({ cpuMs: 0.2 }), hours: mixed, now: NOW });
   assert.equal(two.typical.few, true);
   assert.equal(two.typical.ms, TYPICAL_CPU_MS);
