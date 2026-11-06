@@ -33,7 +33,9 @@ export function abroad(request) {
   const c = request?.cf?.country;
   if (!(typeof c === 'string' && /^[A-Z]{2}$/.test(c) && c !== 'TW' && c !== 'XX')) return false;
   try {
-    return new URL(request.url).searchParams.get('tz') !== 'Asia/Taipei';
+    // (`tw=1`: the phone's own fix is in Taiwan, Transit's say: a visitor on a roaming address.)
+    const q = new URL(request.url).searchParams;
+    return q.get('tz') !== 'Asia/Taipei' && q.get('tw') !== '1';
   } catch {
     return true;
   }
