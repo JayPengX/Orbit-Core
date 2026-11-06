@@ -49,7 +49,8 @@
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { readdirSync } from 'node:fs';
+import { readdirSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
 const args = process.argv.slice(2);
@@ -189,7 +190,8 @@ const apps = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--she
 const accountName = opt('account');
 // (How long each is watched as it loads.)
 const LATE_MS = 9000;
-const list = apps.length ? apps : ['sports', 'transit', 'weather', 'securities', 'law', 'words', 'money', 'beats'];
+// (Orbit Class by either name: the family's `class`, its kit id `orbit`.)
+const list = (apps.length ? apps : ['sports', 'transit', 'weather', 'class', 'securities', 'law', 'words', 'money', 'beats']).map(a => (a === 'orbit' ? 'class' : a));
 const require = createRequire(import.meta.url);
 const pw = require(process.env.PLAYWRIGHT || 'playwright');
 const webkit = args.includes('--webkit');
@@ -307,7 +309,12 @@ const check = async inSheet => {
   se.scrollTop = Math.min(Math.round(room * 0.8), 700);
   await wait(400);
   const r = se === document.scrollingElement ? { top: 0, height: innerHeight, left: 0, width: innerWidth } : se.getBoundingClientRect();
-  const a = document.elementFromPoint(r.left + r.width / 2, r.top + r.height * 0.4);
+  // (What's read: a box that starts inside the view. A point in the gap
+  // between two cards hits their container, whose top is far above the view:
+  // a card put above, in a grid with a gap, moved it 136px, its height and the
+  // gap, while every card in view stayed put; Sports' game to come, 2026-11-06.)
+  const hits = [0.4, 0.5, 0.6, 0.3].map(f => document.elementFromPoint(r.left + r.width / 2, r.top + r.height * f));
+  const a = hits.find(n => n && n.getBoundingClientRect().top >= r.top - 1) || hits[0];
   const y = a.getBoundingClientRect().top;
   const extra = document.createElement('div');
   extra.style.height = '120px';
@@ -503,11 +510,32 @@ const bar = async inSheet => {
   return out;
 };
 
+// Orbit Class is the one Vite app: preview serves its built dist/, so it's
+// built here first, from the checkout beside this one (it was never in the
+// list and, asked for, "preview exited": no dist/, and `class` wasn't a name
+// preview knew).
+function buildClass() {
+  const dir = fileURLToPath(new URL('../../Orbit-Class/', import.meta.url));
+  if (!existsSync(dir)) throw new Error('no Orbit-Class checkout beside Orbit-Core');
+  if (!existsSync(join(dir, 'node_modules'))) execFileSync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: dir, stdio: 'ignore' });
+  execFileSync('npx', ['vite', 'build', '--logLevel', 'error'], { cwd: dir, stdio: 'ignore' });
+}
+
 let faults = 0;
 for (const app of list) {
+  if (app === 'class') {
+    try {
+      buildClass();
+    } catch (e) {
+      console.log(`class: the build failed (${e.message.split('\n')[0]})`);
+      faults++;
+      continue;
+    }
+  }
   const port = 8300 + Math.floor(Math.random() * 500);
   // (Signed in to the app's demo account where it has one: a fan's 首頁 is long enough to scroll.)
-  const demo = readdirSync(accounts).find(f => (accountName ? f === `${app}-${accountName}.txt` : f.startsWith(`${app}-`)) && f.endsWith('.txt'));
+  const own = app === 'class' ? 'orbit' : app;
+  const demo = readdirSync(accounts).find(f => (accountName ? f === `${own}-${accountName}.txt` : f.startsWith(`${own}-`)) && f.endsWith('.txt'));
   const srv = spawn(process.execPath, [preview, app, '--live', '--serve', '--port', String(port), ...(demo ? ['--payload', join(accounts, demo)] : [])], { stdio: ['ignore', 'pipe', 'pipe'] });
   const url = await new Promise((res, rej) => {
     const t = setTimeout(() => rej(new Error('preview did not start')), 30_000);
@@ -515,7 +543,9 @@ for (const app of list) {
       const m = String(d).match(/http:\/\/localhost:\d+\/[^/\s]+\//);
       if (m) clearTimeout(t), res(m[0]);
     });
-    srv.on('exit', () => rej(new Error('preview exited')));
+    let said = '';
+    srv.stderr.on('data', d => (said += d));
+    srv.on('exit', () => rej(new Error(`preview exited${said ? `: ${said.trim().split('\n').filter(l => /Error/.test(l))[0] || said.trim().split('\n').pop()}` : ''}`)));
   }).catch(e => (console.log(`${app}: ${e.message}`), null));
   if (!url) {
     faults++;

@@ -306,7 +306,7 @@ const APPS = { sports: ['Orbit-Sports', 'match'], securities: ['Orbit-Securities
 // The admin panel's key in a preview: the run's own, never the owner's.
 const ADMIN_KEY = 'preview-admin-key-0123456789abcdef0123456789';
 // The old names still work.
-const ALIAS = { fixtures: 'sports', hub: 'words' };
+const ALIAS = { fixtures: 'sports', hub: 'words', class: 'orbit' };
 const key = Object.keys(APPS).find(k => k === (ALIAS[appArg] || appArg) || APPS[k][0].toLowerCase() === String(appArg).toLowerCase());
 if (!key) throw new Error(`usage: node tools/preview.mjs <${Object.keys(APPS).join('|')}> [hash…]`);
 const [repo, appId] = APPS[key];
