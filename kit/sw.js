@@ -157,17 +157,85 @@ async function networkFirstNow(request, later) {
   }
 }
 
-// Opening the app: the page kept here at once (no wait for the network,
-// even on a poor connection), refreshed in the background for next time.
-// After a deploy, the copy kept here is the new page (refreshed behind the
-// last opening, its files downloaded by the kit's watch), so the next
-// opening is the new version, at once.
+// Opening the app: the server's page (an update's, or a cheap check that
+// nothing changed) when it comes within PAGE_WAIT_MS, the kit's newest
+// version read beside it and noted into the page for its loader; else the
+// page kept here (a poor or no connection), refreshed behind for next time.
+// It was the kept page every time: after a deploy the old version started,
+// boot.js found the new one and reloaded onto it, so the app ran twice and
+// its reads shared the link with the new files (Sports on 3G: 12 s on the
+// loading screen; Jay 2026-11-06: "Always stuck here so long after an
+// update", and he wants the new version on that same opening).
+// Only on a link that answered the last opening's check quickly (QUICK_MS):
+// on a slow one (3G) that wait is a round trip or three added to every
+// opening, so the kept page answers at once, as before, and boot.js loads
+// a newer version behind the cover.
+const PAGE_WAIT_MS = 1200;
+const QUICK_MS = 700;
+const KIT_BASE = /\}\('([^']*Orbit-Core\/kit\/)',/;
+// How long the last check took (kept across the worker's restarts; shared by the apps, one site, one link).
+const LINK = { ms: null, key: '/__orbit/page-check-ms', cache: 'orbit-sw-link' };
+async function lastCheckMs() {
+  if (LINK.ms != null) return LINK.ms;
+  try {
+    const r = await (await caches.open(LINK.cache)).match(LINK.key);
+    LINK.ms = r ? Number(await r.text()) || 0 : 0;
+  } catch {
+    LINK.ms = 0;
+  }
+  return LINK.ms;
+}
+function noteCheckMs(ms) {
+  LINK.ms = ms;
+  return caches.open(LINK.cache).then(c => c.put(LINK.key, new Response(String(Math.round(ms))))).catch(() => {});
+}
 async function pageFirst(request, later) {
   const kept = await caches.match(request, { ignoreSearch: true });
-  const fresh = networkFirst(request, later);
-  if (!kept) return fresh;
-  later(fresh);
-  return kept;
+  if (!kept) return networkFirst(request, later);
+  // (The page checked with the server, a cheap 304 when unchanged; kept for next time.)
+  const t0 = Date.now();
+  const net = fetchSure(request.url, { cache: 'no-cache', credentials: 'same-origin', redirect: 'manual' }).then(r => {
+    later(noteCheckMs(Date.now() - t0));
+    if (r.status === 200 && r.type !== 'opaqueredirect') later(keep(request, r.clone()));
+    return r;
+  });
+  later(net.catch(() => noteCheckMs(PAGE_WAIT_MS * 2)));
+  if ((await lastCheckMs()) > QUICK_MS) return kept;
+  let base = null;
+  try {
+    const m = KIT_BASE.exec(await kept.clone().text());
+    base = m ? new URL(m[1], request.url).href : null;
+  } catch {}
+  const kit = base
+    ? fetchOnce(`${base}version.json`, { cache: 'no-cache', credentials: 'same-origin' })
+        .then(r => (r.ok ? r.json() : null))
+        .catch(() => null)
+    : Promise.resolve(null);
+  // (fetchSure's answer is one it built from the body: type 'default', not 'basic'.)
+  const page = net.then(r => (r.status === 200 && r.type !== 'opaqueredirect' ? r : null), () => null);
+  const got = await Promise.race([Promise.all([page, kit]), new Promise(done => setTimeout(() => done(null), PAGE_WAIT_MS))]);
+  if (!got?.[0]) return kept;
+  try {
+    return await freshPage(got[0], got[1]);
+  } catch {
+    return kept;
+  }
+}
+// The server's page with a note for boot.js (window.__orbitFresh: this is
+// the newest, nothing to reload for) and the kit's newest files for its
+// loader (orbit.kit, orbit.kitFiles), so a kit deploy opens on the new kit too.
+async function freshPage(res, kit) {
+  const html = await res.clone().text();
+  const ok = kit?.version && kit.files;
+  const note = `<script>window.__orbitFresh=${Date.now()};${
+    ok ? `try{localStorage.setItem('orbit.kit',${JSON.stringify(kit.version)});localStorage.setItem('orbit.kitFiles',${JSON.stringify(JSON.stringify({ version: kit.version, files: kit.files }))})}catch(e){}` : ''
+  }</script>`;
+  const at = html.indexOf('<head>');
+  if (at < 0) return res;
+  const headers = new Headers(res.headers);
+  headers.delete('content-length');
+  headers.delete('content-encoding');
+  return new Response(html.slice(0, at + 6) + note + html.slice(at + 6), { status: 200, statusText: res.statusText, headers });
 }
 
 // An update's reload (watchUpdates, boot.js: the page under ?v=<its
