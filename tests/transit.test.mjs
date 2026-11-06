@@ -885,6 +885,37 @@ test("buses due, had=<s> (the phone's copy that old): a copy here no newer is re
   assert.deepEqual((await ask('city=InterCity&routes=THB5700,THB5900&had=8', NOW + 9_000)).est, [480]);
 });
 
+test("a route's buses' places, had=<s>: a copy here no newer than the phone's is read again now (a bus sends its place each 20 s); operators' notices kept 10 minutes", async () => {
+  fresh();
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 'secret', RATE_LIMIT_KV: memKv(), TDX_PER_MIN: '100' };
+  const cache = memCache();
+  let n = 0;
+  const fetchFn = async url => (url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : json([{ PlateNumb: 'KKA-1', GPSTime: `t${n++}` }]));
+  const gps = encodeURIComponent("basic/v2/Bus/RealTimeByFrequency/City/Hsinchu?$filter=RouteUID eq 'HSZ10' or RouteUID eq 'HSZ20'&$select=RouteUID,PlateNumb,Direction,BusPosition,GPSTime");
+  const ask = async (qs, now) => {
+    const res = await handleTransit(new Request(`https://w/transit/tdx?${qs}`), env, {}, '/transit/tdx', { session: { s: 'S' }, fetchFn, now, cache });
+    return { at: (await res.json())[0]?.GPSTime, state: res.headers.get('X-Transit-Cache') };
+  };
+  assert.deepEqual(await ask(`p=${gps}`, NOW), { at: 't0', state: 'miss' });
+  // 20 s on, asked plainly: the copy (20 s old) at once, TDX read behind it…
+  assert.deepEqual(await ask(`p=${gps}`, NOW + 20_000), { at: 't0', state: 'stale' });
+  await new Promise(r => setTimeout(r, 0));
+  // …by a phone whose copy is 20 s old: the copy here (from 20 s on) is no newer, so TDX now.
+  assert.deepEqual(await ask(`p=${gps}&had=20`, NOW + 40_000), { at: 't2', state: 'miss' });
+  // A phone whose copy is older than this one: it answers as it is.
+  assert.deepEqual(await ask(`p=${gps}&had=30`, NOW + 45_000), { at: 't2', state: 'hit' });
+  assert.equal(n, 3);
+  // Notices: read once, kept 10 minutes.
+  for (const p of ['basic/v2/Bus/Alert/City/Hsinchu', 'basic/v2/Bus/News/InterCity', 'basic/v3/Rail/TRA/Alert', 'basic/v2/Rail/THSR/AlertInfo', 'basic/v2/Rail/Metro/Alert/TRTC']) {
+    const was = n;
+    assert.equal((await ask(`p=${encodeURIComponent(p)}`, NOW)).state, 'miss');
+    assert.equal((await ask(`p=${encodeURIComponent(p)}`, NOW + 9 * 60_000)).state, 'hit', p);
+    assert.equal(n, was + 1);
+  }
+  // (台鐵's boards stay live.)
+  assert.equal(tdxRequest('basic/v3/Rail/TRA/StationLiveBoard/Station/1210').rule.fresh, 50e3);
+});
+
 test("a day's trains keep only what the phone reads (台鐵's 4 MB day to 40%): each train's number, type, headsign, line, note and bike flag, each stop's station and times, names in Chinese and English; a train that won't run left out; kept so", async () => {
   fresh();
   const name = (zh, en) => ({ Zh_tw: zh, En: en, Ja: zh, Kr: '타이베이' });
