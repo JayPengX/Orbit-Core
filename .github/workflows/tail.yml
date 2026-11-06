@@ -49,6 +49,40 @@ jobs:
           done
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # (cpu only) The last 7 days by where Cloudflare answered: phones in Taiwan
+      # come through its colos there, our own tools (cloud machines abroad) and
+      # crons elsewhere. The dimensions the dataset has are listed first.
+      - name: The last 7 days by colo
+        if: inputs.cpu
+        run: |
+          node -e '
+            const q = (query, variables = {}) => fetch("https://api.cloudflare.com/client/v4/graphql", { method: "POST", headers: { Authorization: `Bearer ${process.env.CF_GUARD_TOKEN}`, "Content-Type": "application/json" }, body: JSON.stringify({ query, variables }) }).then(r => r.json());
+            (async () => {
+              const s = await q("{ __schema { types { name fields { name } } } }");
+              const dims = (s.data?.__schema?.types || []).filter(t => /^AccountWorkersInvocationsAdaptive.*Dimensions$/.test(t.name));
+              for (const t of dims) console.log(t.name + ":", (t.fields || []).map(f => f.name).join(" "));
+              if (!dims.length) console.log("introspection:", JSON.stringify(s).slice(0, 400));
+              const has = new Set(dims.flatMap(t => (t.fields || []).map(f => f.name)));
+              const by = has.has("coloCode") ? "coloCode" : has.has("colo") ? "colo" : null;
+              if (!by) return console.log("no colo dimension");
+              const end = Math.floor(Date.now() / 3_600_000) * 3_600_000;
+              const iso = t => new Date(t).toISOString().replace(/\.\d+Z$/, "Z");
+              const r = await q(`query($a: string!, $s: Time!, $e: Time!) { viewer { accounts(filter: { accountTag: $a }) { x: workersInvocationsAdaptive(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e }) { sum { requests cpuTimeUs } dimensions { ${by} scriptName date } } } } }`, { a: process.env.CLOUDFLARE_ACCOUNT_ID, s: iso(end - 7 * 86_400_000), e: iso(end - 1000) });
+              if (r.errors) console.log("errors:", JSON.stringify(r.errors).slice(0, 600));
+              const rows = r.data?.viewer?.accounts?.[0]?.x || [];
+              const sum = (key, pick) => { const m = {}; for (const x of rows) { const k = pick(x.dimensions); const v = (m[k] ||= { n: 0, cpu: 0 }); v.n += x.sum.requests; v.cpu += x.sum.cpuTimeUs / 1000; } return Object.entries(m).sort((a, b) => b[1].cpu - a[1].cpu); };
+              const all = rows.reduce((t, x) => t + x.sum.cpuTimeUs / 1000, 0);
+              console.log(`7 days: ${rows.reduce((t, x) => t + x.sum.requests, 0)} requests, ${Math.round(all)} cpu ms`);
+              console.log("== by colo (cpu ms, requests, share of cpu)");
+              for (const [k, v] of sum(by, d => d[by])) console.log(String(Math.round(v.cpu)).padStart(10), String(v.n).padStart(9), (v.cpu / all * 100).toFixed(1).padStart(6) + "%", k);
+              console.log("== by colo and Worker");
+              for (const [k, v] of sum(by, d => `${d[by]} ${d.scriptName}`).slice(0, 40)) console.log(String(Math.round(v.cpu)).padStart(10), String(v.n).padStart(9), k);
+              console.log("== by day and colo (top 3 a day)");
+              const days = {}; for (const x of rows) { const d = x.dimensions.date; const k = x.dimensions[by]; ((days[d] ||= {})[k] ||= { n: 0, cpu: 0 }); days[d][k].n += x.sum.requests; days[d][k].cpu += x.sum.cpuTimeUs / 1000; }
+              for (const d of Object.keys(days).sort()) console.log(d, Object.entries(days[d]).sort((a, b) => b[1].cpu - a[1].cpu).slice(0, 3).map(([k, v]) => `${k} ${Math.round(v.cpu)} ms/${v.n}`).join(" · "), "· all", Math.round(Object.values(days[d]).reduce((t, v) => t + v.cpu, 0)));
+            })().catch(e => console.log("failed:", e.message));'
+        env:
+          CF_GUARD_TOKEN: ${{ secrets.CF_GUARD_TOKEN }}
       - name: Listen
         run: |
           if [ "$CPU" != "true" ]; then timeout "$(( ${MINUTES:-6} * 60 ))" npx --yes wrangler@4 tail "$WORKER" --format pretty || true; exit 0; fi
