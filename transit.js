@@ -433,12 +433,14 @@ export async function etaRows(env, q, deps = {}) {
   const stops = (q.get('stops') || '').split(',').filter(u => UID.test(u)).slice(0, 400);
   const routes = [...new Set([q.get('route') || '', ...(q.get('routes') || '').split(',')].filter(u => UID.test(u)))].slice(0, 40);
   if (!stops.length && !routes.length) return { status: 400, body: { code: 'BAD_STOPS' } };
-  // (`fresh=1`, a phone's beat after its first look: TDX's latest when the
-  // copy here is past its fresh time, not that copy with a read behind it:
-  // a phone asking alone saw each estimate a beat late, and the one that
-  // asks only when a new one can be there (Transit api.mjs busEta) would
-  // have seen it a step late. The same reads either way, only sooner.)
-  const filtered = q.get('fresh') === '1' ? { ...deps, stale: 0 } : deps;
+  // (`had=<s>`: the phone's copy is that many seconds old, so a copy here no
+  // newer is no use to it: TDX is read then (given 3 s, then the copy as
+  // before), not that copy answered with a read behind it. A phone asking
+  // alone saw each estimate a beat late, and one that asks only when a new
+  // one can be there (Transit api.mjs busEta) would have seen it a step
+  // late. A newer copy, another phone's read, answers as it is.)
+  const had = Number(q.get('had')) || 0;
+  const filtered = had > 0 ? { ...deps, stale: 0, young: Math.max(0, had * 1000 - 1500) } : deps;
   if (city === 'InterCity') return etaAsked(env, city, stops, routes, filtered);
   const now = deps.now ?? Date.now();
   const pick = got => ({ status: 200, body: stops.length ? stops.flatMap(u => got.idx.stops.get(u) || []) : routes.flatMap(u => got.idx.routes.get(u) || []), age: got.age });
@@ -664,7 +666,7 @@ export async function warmBikes(env, deps = {}) {
 // One TDX answer, from the shared cache when it's fresh enough.
 // → { status, body (text), age (ms), state: 'hit' | 'miss' | 'stale' | 'busy' | 'error' }
 // `warm` (the cron's): refreshed when its copy is past its fresh time, else 'warm'.
-export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.caches?.default, ctx = null, now = Date.now(), warm = false, stale = null, by = '' } = {}) {
+export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.caches?.default, ctx = null, now = Date.now(), warm = false, stale = null, young = null, by = '' } = {}) {
   const req = tdxRequest(raw);
   // (`stale`: served at once that long, instead of the rule's.)
   const staleMs = stale ?? req?.rule.stale;
@@ -690,7 +692,8 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
     if (w && (body == null || w.at > at)) [body, at] = [w.body, w.at];
   }
   const age = now - at;
-  const fresh = await freshOf(req.rule, env, req.path, now);
+  // (`young`: a copy fresh only that young at most, the asker's own being older.)
+  const fresh = Math.min(await freshOf(req.rule, env, req.path, now), young ?? Infinity);
   if (warm && body != null && age < Math.max(fresh, 90_000)) return { status: 200, age, state: 'warm' };
   if (!warm && body != null && age < fresh) return { status: 200, body, age, state: 'hit' };
   const refresh = async () => {
@@ -1557,7 +1560,8 @@ async function transitRoute(request, env, headers, path, { session = null, limit
   }
   if (path === '/transit/eta') {
     const got = await etaRows(env, q, deps);
-    return send(got.body, got.status, got.age != null ? { 'X-Transit-Age': String(Math.round(got.age / 1000)) } : {});
+    // (Its age to a tenth of a second: the phone learns from it when each estimate can be read.)
+    return send(got.body, got.status, got.age != null ? { 'X-Transit-Age': String(Math.round(got.age / 100) / 10) } : {});
   }
   if (path === '/transit/tdx') {
     const got = await tdxGet(env, q.get('p') || '', deps);
