@@ -532,8 +532,8 @@ for (const app of list) {
       const d = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
       globalThis.__rawTop = (s, v) => d.set.call(s, v);
     });
-    // A phone's link, not the cloud's: each read through the data proxy
-    // answers a round trip later, and more for how much it carries (a batch
+    // A phone's link, not the cloud's: each read through the data proxy (or
+    // ESPN's and MLB's own, which the page reads itself) answers a round trip later, and more for how much it carries (a batch
     // of 24 leagues' pages lands after one of 6), so a part read alongside
     // comes in after the rest, as on Jay's iPhone (--fast: the cloud's own speed).
     // And one league whose pages don't answer for 3 s from their first ask
@@ -544,7 +544,7 @@ for (const app of list) {
     // without it to have it come in 4 s later.
     const firstAsked = new Map();
     if (!args.includes('--fast'))
-      await page.route(/sports-proxy/, async route => {
+      await page.route(/sports-proxy|site\.api\.espn\.com|site\.web\.api\.espn\.com|statsapi\.mlb\.com/, async route => {
         const url = decodeURIComponent(route.request().url());
         await new Promise(r => setTimeout(r, 250 + 30 * Math.max(1, (url.match(/[?&]u=/g) || []).length)));
         const flaky = FLAKY[app] ? url.match(FLAKY[app]) || [] : [];

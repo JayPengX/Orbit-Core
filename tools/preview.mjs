@@ -369,7 +369,9 @@ async function external(req, res) {
     }
   });
 }
-const pointFetch = `(()=>{const f=window.fetch;window.fetch=(i,o={})=>{const u=typeof i==='string'?i:i.url;return /^https:\\/\\/(orbit-workers-proxy|sports-proxy)\\.pengzjay\\.workers\\.dev\\//.test(u)${live ? "&&!/orbit-workers-proxy\\.pengzjay\\.workers\\.dev\\/(transit|weather)/.test(u)" : ''}?f('/__ext?u='+encodeURIComponent(u),{method:o.method||i.method||'GET',body:o.body,headers:o.headers}):f(i,o)}})();`;
+// (ESPN's and MLB's own data, which the page reads itself (kit DEVICE_FIRST), comes through here
+// too: a browser of a tool's own, live-scroll's, has no way out but this server.)
+const pointFetch = `(()=>{const f=window.fetch;window.fetch=(i,o={})=>{const u=typeof i==='string'?i:i.url;return (/^https:\\/\\/(orbit-workers-proxy|sports-proxy)\\.pengzjay\\.workers\\.dev\\//.test(u)${live ? "&&!/orbit-workers-proxy\\.pengzjay\\.workers\\.dev\\/(transit|weather)/.test(u)" : ''})||/^https:\\/\\/(site\\.api\\.espn\\.com|site\\.web\\.api\\.espn\\.com|statsapi\\.mlb\\.com)\\//.test(u)?f('/__ext?u='+encodeURIComponent(u),{method:o.method||i.method||'GET',body:o.body,headers:o.headers}):f(i,o)}})();`;
 const h2Cert = () => {
   const dir = join(tmpdir(), `orbit-h2-${process.pid}`);
   mkdirSync(dir, { recursive: true });
@@ -948,9 +950,14 @@ const fromNpm = url => {
 // (Each address fetched once, as a phone's cache keeps a logo drawn again: here
 // every request is routed, so the browser's own cache never sees it.)
 const outside = new Map();
+// (ESPN's and MLB's own data, read by the page itself (kit DEVICE_FIRST): a
+// live game's read again every few seconds, as their CDNs keep it 1-9 s.)
+const LIVE_OUTSIDE = /^https:\/\/(site\.api\.espn\.com|site\.web\.api\.espn\.com|statsapi\.mlb\.com)\//;
+const outsideAt = new Map();
 await context.route(/^https:\/\/(?!orbit-workers-proxy|sports-proxy|localhost[:/])/, async route => {
   const url = route.request().url();
-  if (!outside.has(url)) outside.set(url, Promise.resolve(curlBin(url)).then(async b => b || (await fromNpm(url))));
+  if (LIVE_OUTSIDE.test(url) && Date.now() - (outsideAt.get(url) || 0) > 2_000) outside.delete(url);
+  if (!outside.has(url)) outsideAt.set(url, Date.now()), outside.set(url, Promise.resolve(curlBin(url)).then(async b => b || (await fromNpm(url))));
   const body = await outside.get(url);
   if (!body) {
     if (DEBUG) console.log('failed', url.slice(0, 140));

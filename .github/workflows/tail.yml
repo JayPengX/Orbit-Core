@@ -58,7 +58,9 @@ jobs:
             const add = e => {
               const r = e.event?.request, c = e.event?.cron;
               const u = r ? new URL(r.url) : null;
-              const key = c ? `cron ${c}` : u ? `${r.method} ${u.pathname}${u.pathname === "/sports-proxy" ? (u.searchParams.has("batch") ? " batch" : " " + (u.searchParams.get("url") || "").split("/")[2]) : ""}` : (e.eventType || "other");
+              // (A phone asks on the domain, /api/…; our own tools on api. or workers.dev. A data read by its app.)
+              const sp = u && /^(\/api)?\/sports-proxy$/.test(u.pathname);
+              const key = c ? `cron ${c}` : u ? `${r.method} ${u.pathname}${sp ? (u.searchParams.has("batch") ? " batch" : " " + (u.searchParams.get("url") || "").split("/")[2]) + " " + (u.searchParams.get("app") || "?") : ""}` : (e.eventType || "other");
               const k = (by[key] ||= { n: 0, cpu: 0, wall: 0 });
               k.n++; k.cpu += e.cpuTime || 0; k.wall += e.wallTime || 0;
             };

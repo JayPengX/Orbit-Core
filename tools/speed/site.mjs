@@ -157,10 +157,32 @@ export function recorder(file, { live = true } = {}) {
     }
   const pending = new Map();
   const stats = { replayed: 0, recorded: 0, missed: 0 };
+  // Each source's answer as the proxy gave it (a read alone, or an item of a
+  // batch), by its own address: a read the app now makes from the device
+  // (kit DEVICE_FIRST) replays what the other side was given through the proxy.
+  const upstream = new Map();
+  const noteUpstream = r => {
+    if (!r.key.startsWith('GET https://api.jaypengx.com/sports-proxy?') || r.status !== 200) return;
+    const u = new URL(r.key.slice(4));
+    const body = Buffer.from(r.body, 'base64').toString();
+    if (u.searchParams.has('url') && !u.searchParams.get('trim')) return void upstream.set(u.searchParams.get('url'), body);
+    if (!u.searchParams.has('batch')) return;
+    const items = u.searchParams.getAll('u');
+    for (const line of body.startsWith('{"r":') ? (JSON.parse(body).r || []).map((x, i) => JSON.stringify({ i, ...x })) : body.split('\n'))
+      try {
+        if (!line) continue;
+        const got = JSON.parse(line);
+        const item = items[got.i];
+        // (A trimmed item, `trim!url`, is another answer. An item's body is the source's JSON itself.)
+        if (got.s === 200 && item && /^https?:/.test(item) && got.b != null) upstream.set(item, typeof got.b === 'string' ? got.b : JSON.stringify(got.b));
+      } catch {}
+  };
+  for (const r of map.values()) noteUpstream(r);
   // `fetchFn(url, init)` → the live answer; kept with the Worker's own time (Server-Timing w;dur).
   const get = async (method, url, body, fetchLive) => {
     const key = keyOf(method, url, body);
     if (map.has(key)) return (stats.replayed++, map.get(key));
+    if (method === 'GET' && upstream.has(url)) return (stats.replayed++, { key, status: 200, headers: { 'content-type': 'application/json;charset=UTF-8', 'access-control-allow-origin': '*' }, body: Buffer.from(upstream.get(url)).toString('base64'), ms: 0 });
     if (!live) return (stats.missed++, null);
     if (!pending.has(key))
       pending.set(
@@ -181,6 +203,7 @@ export function recorder(file, { live = true } = {}) {
           // (A failure isn't kept: asked again next time.)
           if (r.status < 500 && r.status !== 429) {
             map.set(key, rec);
+            noteUpstream(rec);
             appendFileSync(file, JSON.stringify(rec) + '\n');
             stats.recorded++;
           }

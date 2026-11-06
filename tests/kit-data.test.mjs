@@ -123,6 +123,50 @@ test('a Jolpica read the proxy is turned away from is read from the device at on
   assert.ok(asked.every(u => !u.startsWith('https://example.test/')));
 });
 
+// ESPN's site API and MLB's own answer any page (2026-11-06): read from the
+// device, no trip through the proxy; a trimmed read stays the proxy's (its
+// trim saves the phone's data); a read the device can't get is the proxy's
+// at once, and that host's reads the proxy's for a while; a 404 is the source's.
+test("ESPN's site API and MLB's are read from the device; the proxy only for a trim or what the device can't get", async () => {
+  const sb = 'https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/1/stats';
+  asked.length = 0;
+  answer = () => new Response('{"ok":1}');
+  assert.deepEqual(await kit.proxyJson(sb, { ttl: 1 }), { ok: 1 });
+  assert.deepEqual(asked, [sb], 'straight from ESPN');
+  // A trimmed read is the proxy's.
+  asked.length = 0;
+  const roster = 'https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/teams/1/roster';
+  assert.deepEqual(await kit.proxyJson(roster, { ttl: 1, trim: 'espn-roster', alone: true }), { ok: 1 });
+  assert.equal(asked.length, 1);
+  assert.ok(asked[0].includes(encodeURIComponent(roster)) && asked[0].includes('trim=espn-roster'));
+  // Not there: ESPN's own answer, never asked of the proxy.
+  asked.length = 0;
+  answer = () => new Response('', { status: 404 });
+  const gone = 'https://statsapi.mlb.com/api/v1/game/1/boxscore';
+  await assert.rejects(kit.proxyJson(gone, { ttl: 1 }), /404/);
+  assert.deepEqual(asked, [gone]);
+  // A network that keeps the host out (a block page, no answer, turned away):
+  // the proxy at once, then that host's reads the proxy's.
+  const cases = [
+    ['https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates=20261105', () => new Response('<html>blocked</html>')],
+    ['https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=2026-10-30', () => Promise.reject(new TypeError('Failed to fetch'))],
+    ['https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/2/stats', () => new Response('', { status: 403 })]
+  ];
+  for (const [url, blocked] of cases) {
+    const host = new URL(url).hostname;
+    asked.length = 0;
+    answer = u => (u.startsWith(`https://${host}/`) ? blocked() : new Response('{"events":[]}'));
+    assert.deepEqual(await kit.proxyJson(url, { ttl: 1, alone: true }), { events: [] });
+    assert.equal(asked[0], url, 'the device first');
+    assert.ok(asked[1].includes(encodeURIComponent(url)), 'then the proxy');
+    const next = `${url}&next=1`;
+    asked.length = 0;
+    assert.deepEqual(await kit.proxyJson(next, { ttl: 1, alone: true }), { events: [] });
+    assert.deepEqual(asked.length, 1);
+    assert.ok(asked[0].includes(encodeURIComponent(next)) && !asked[0].startsWith(`https://${host}/`), 'the proxy at once');
+  }
+});
+
 test("a big answer still coming on a slow link is read to its end; one that has gone quiet fails in its time", async () => {
   // (Its pieces `gap` ms apart; the read's signal ends it.)
   const trickle = (pieces, gap) => (url, init) =>
