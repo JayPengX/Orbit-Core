@@ -20,7 +20,7 @@ import { join, dirname, resolve, basename } from 'node:path';
 
 // The kit's build and dev tools: in the folder, never served (stamp.mjs
 // leaves them out of the site) nor in an app's import map (apps.mjs).
-export const KIT_TOOLS = ['apps.mjs', 'hash.mjs', 'link.mjs', 'loader.html', 'preload.mjs', 'stamp-app.mjs', 'stamp.mjs'];
+export const KIT_TOOLS = ['apps.mjs', 'frame-guard.mjs', 'hash.mjs', 'link.mjs', 'loader.html', 'preload.mjs', 'stamp-app.mjs', 'stamp.mjs'];
 
 const STATIC = /(?:^|[\s;}])(?:import|export)\s[^'"]*?from\s*['"]([^'"?]+)['"]|(?:^|[\s;])import\s*['"]([^'"?]+)['"]/g;
 const DYNAMIC_KIT = /\bimport\(\s*['"](#kit\/[^'"?]+)['"]\s*\)/g;
