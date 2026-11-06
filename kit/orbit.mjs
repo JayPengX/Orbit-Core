@@ -3375,6 +3375,22 @@ function notifyRows(s, note) {
   ];
 }
 
+// Where a notice's tap points (its #hash), in the open page: a new hash as
+// any link, the same one told again (hashchange), so the app opens that
+// game, pin or tab even when its sheet was closed since. Another app's
+// address (or another page) is navigated to.
+export function goNotice(url) {
+  if (typeof location === 'undefined') return;
+  let to;
+  try {
+    to = new URL(url, location.href);
+  } catch {
+    return;
+  }
+  if (to.origin !== location.origin || to.pathname !== location.pathname) return void location.assign(to.href);
+  if (to.hash && to.hash !== location.hash) return void (location.hash = to.hash);
+  if (to.hash) globalThis.dispatchEvent?.(new HashChangeEvent('hashchange', { oldURL: location.href, newURL: location.href }));
+}
 const shown = new Set();
 export async function notify(s, { title, body = '', tag = '', hash = '', kind = '' }) {
   if (!kindOn(s.app, kind)) return;
@@ -3393,7 +3409,7 @@ export async function notify(s, { title, body = '', tag = '', hash = '', kind = 
     const n = new Notification(title, options);
     n.onclick = () => {
       globalThis.focus?.();
-      if (hash) location.hash = hash;
+      if (hash) goNotice(`#${hash}`);
       n.close();
     };
   } catch {}
@@ -3432,7 +3448,7 @@ function banner(s, { title, body, hash, more = [] }) {
       el.append(node('ul', { class: 'q-banner-more' }, more.map(n => node('li', {}, [node('strong', { text: n.title }), n.body ? node('span', { text: n.body }) : null]))));
       return;
     }
-    if (hash) location.hash = hash;
+    if (hash) goNotice(`#${hash}`);
     gone();
   });
   document.body.append(el);
@@ -5633,6 +5649,12 @@ if (typeof window !== 'undefined') {
   window.addEventListener('error', e => recOn() && rec('error', { message: e.message, at: `${e.filename || ''}:${e.lineno || 0}:${e.colno || 0}`, stack: String(e.error?.stack || '').slice(0, 1500) }));
   window.addEventListener('unhandledrejection', e => recOn() && rec('error', { message: String(e.reason?.message || e.reason), stack: String(e.reason?.stack || '').slice(0, 1500) }));
   window.addEventListener('hashchange', () => recOn() && rec('screen', { hash: location.hash }));
+  // A notice tapped while the app is open (sw.js notificationclick): to where it points, here.
+  globalThis.navigator?.serviceWorker?.addEventListener?.('message', e => {
+    if (e.data?.type !== 'orbit-notice') return;
+    e.ports?.[0]?.postMessage('ok');
+    goNotice(e.data.url);
+  });
   if (document.documentElement) recMark();
 }
 function recRows(s, note) {

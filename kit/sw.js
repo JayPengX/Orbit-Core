@@ -373,15 +373,33 @@ self.addEventListener('message', event => {
   );
 });
 
-// A tap on a Orbit notice (orbit.mjs notify): opens (or focuses) the app where it points.
+// A tap on an Orbit notice (orbit.mjs notify, push.js): opens the app where it
+// points (#game=…, #pin=…, a tab). An app already open is handed the address
+// (orbit.mjs goNotice): it goes there in place, even to the address it is on
+// already (a sheet closed since); a page that doesn't answer in a second (an
+// older kit) is navigated, and none open gets a new window there.
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   const url = new URL(event.notification.data?.url || './', self.registration.scope).href;
+  const told = c =>
+    new Promise(done => {
+      const ch = new MessageChannel();
+      const end = ok => (clearTimeout(t), ch.port1.close(), done(ok));
+      const t = setTimeout(() => end(false), 1000);
+      ch.port1.onmessage = () => end(true);
+      try {
+        c.postMessage({ type: 'orbit-notice', url }, [ch.port2]);
+      } catch {
+        end(false);
+      }
+    });
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async list => {
       const open = list.find(c => c.url.startsWith(self.registration.scope));
       if (!open) return self.clients.openWindow(url);
-      return open.focus().then(c => (url !== c.url && 'navigate' in c ? c.navigate(url) : c));
+      const c = await open.focus().catch(() => open);
+      if (await told(c || open)) return c;
+      return url !== (c || open).url && 'navigate' in (c || open) ? (c || open).navigate(url) : c;
     })
   );
 });
