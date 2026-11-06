@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   tdxRequest, tdxGet, warmBikes, SLOW_MS, tdxAccess, resetTdxToken, resetPace, resetTurns, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
-  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta, tdxTrim, tdxUse, DEV_SHARE, HOT_ASKS
+  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta, tdxTrim, tdxUse, DEV_SHARE, HOT_ASKS, SMALL_ETA, SMALL_ROWS
 } from '../transit.js';
 
 const NOW = Date.parse('2026-10-03T01:00:00Z');
@@ -883,6 +883,81 @@ test("buses due, had=<s> (the phone's copy that old): a copy here no newer is re
   // 公路客運's and a plan's routes too.
   assert.deepEqual((await ask('city=InterCity&routes=THB5700,THB5900', NOW)).est, [510]);
   assert.deepEqual((await ask('city=InterCity&routes=THB5700,THB5900&had=8', NOW + 9_000)).est, [480]);
+});
+
+// A small city's whole list for a crowd at its own stops (a school's students
+// before and after class): one TDX read each time its estimates change, for
+// every stop and phone, where each stop was its own read each 30 s.
+test("buses due in a small city (新竹市): two stop lists asked within a minute read its whole list once for every stop and phone; one alone its own; had= on the whole list; a big city or a grown list by its stops", async () => {
+  fresh();
+  resetEta();
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 'secret', RATE_LIMIT_KV: memKv(), TDX_PER_MIN: '100' };
+  const cache = memCache();
+  const log = [];
+  let made = 0;
+  const all = t => [
+    { StopUID: 'HSZ1', RouteUID: 'HSZ10', EstimateTime: 60, DataTime: `t${t}` },
+    { StopUID: 'HSZ2', RouteUID: 'HSZ10', EstimateTime: 120, DataTime: `t${t}` },
+    { StopUID: 'HSZ3', RouteUID: 'HSZ20', EstimateTime: 300, DataTime: `t${t}` },
+    { StopUID: 'TPE1', RouteUID: 'TPE10', EstimateTime: 90, DataTime: `t${t}` },
+    { StopUID: 'TPE2', RouteUID: 'TPE10', EstimateTime: 30, DataTime: `t${t}` }
+  ];
+  let big = false;
+  const fetchFn = async url => {
+    if (url.includes('token')) return json({ access_token: 'T', expires_in: 86400 });
+    const u = decodeURIComponent(url);
+    log.push(u);
+    const t = made++;
+    const named = [...u.matchAll(/(StopUID|RouteUID) eq '([^']+)'/g)];
+    if (named.length) return json(all(t).filter(r => named.some(([, f, v]) => r[f] === v)));
+    return json(big ? Array.from({ length: SMALL_ROWS + 1 }, (_, i) => ({ StopUID: `KEE${i}`, RouteUID: 'KEE1', EstimateTime: 60 })) : all(t));
+  };
+  const ask = async (qs, now) => {
+    const res = await handleTransit(new Request(`https://w/transit/eta?${qs}`), env, {}, '/transit/eta', { session: { s: 'S' }, fetchFn, now, cache });
+    return { stops: (await res.json()).map(r => `${r.StopUID} ${r.DataTime}`), age: Number(res.headers.get('X-Transit-Age')) };
+  };
+  const whole = u => /EstimatedTimeOfArrival\/City\/\w+\?\$select=StopUID,[^&]*&\$top=60000(&|$)/.test(u);
+  assert.ok(SMALL_ETA.has('Hsinchu') && SMALL_ETA.has('HsinchuCounty') && !SMALL_ETA.has('Taipei') && !SMALL_ETA.has('NewTaipei'));
+  // One stop card alone: its own stops' read, as before.
+  assert.deepEqual((await ask('city=Hsinchu&stops=HSZ1', NOW)).stops, ['HSZ1 t0']);
+  assert.equal(log.length, 1);
+  assert.doesNotMatch(log[0], /\$top=60000/);
+  // A second stop list within the minute (another phone, or this one's shelf): the city's whole list.
+  assert.deepEqual((await ask('city=Hsinchu&stops=HSZ2,HSZ3', NOW + 5_000)).stops.map(s => s.split(' ')[0]), ['HSZ2', 'HSZ3']);
+  assert.ok(log.some(whole), 'the whole city read');
+  const n = log.length;
+  // Then every stop list and a plan's routes from it, no read: a phone whose copy (6 s) is older than it (1 s).
+  assert.deepEqual(await ask('city=Hsinchu&stops=HSZ1&had=6', NOW + 6_000), { stops: [`HSZ1 t${log.findIndex(whole)}`], age: 1 });
+  assert.deepEqual((await ask('city=Hsinchu&routes=HSZ10,HSZ20', NOW + 7_000)).stops.map(s => s.split(' ')[0]), ['HSZ1', 'HSZ2', 'HSZ3']);
+  assert.deepEqual((await ask('city=Hsinchu&stops=HSZ3', NOW + 8_000)).stops.map(s => s.split(' ')[0]), ['HSZ3']);
+  assert.equal(log.length, n, 'one read for every stop list');
+  // A phone whose copy is as old as the city's here (35 s): the whole list read again now, not its own stops.
+  const later = await ask('city=Hsinchu&stops=HSZ2,HSZ3&had=35', NOW + 40_000);
+  assert.equal(later.age, 0);
+  assert.equal(log.length, n + 1);
+  assert.ok(whole(log.at(-1)), 'the whole list again');
+  // ...and the next phone's (older) copy is answered from it as it is.
+  assert.deepEqual((await ask('city=Hsinchu&stops=HSZ1&had=31', NOW + 41_000)).age, 1);
+  assert.equal(log.length, n + 1);
+  // Long after, one stop list alone again: its own read.
+  await ask('city=Hsinchu&stops=HSZ1', NOW + 300_000);
+  assert.doesNotMatch(log.at(-1), /\$top=60000/);
+  // A big city (台北, 9 MB): two stop lists are still their own reads.
+  const m = log.length;
+  await ask('city=Taipei&stops=TPE1', NOW + 300_000);
+  await ask('city=Taipei&stops=TPE2', NOW + 301_000);
+  assert.equal(log.length, m + 2);
+  assert.ok(!log.slice(m).some(whole));
+  // A small city whose list grew past SMALL_ROWS: asked by its stops again.
+  big = true;
+  await ask('city=Keelung&stops=KEE1', NOW + 302_000);
+  await ask('city=Keelung&stops=KEE2', NOW + 303_000);
+  assert.ok(whole(log.at(-1)) || log.slice(-2).some(whole), 'read whole once');
+  const k = log.length;
+  await ask('city=Keelung&stops=KEE3', NOW + 400_000);
+  await ask('city=Keelung&stops=KEE4', NOW + 401_000);
+  assert.equal(log.length, k + 2);
+  assert.ok(!log.slice(k).some(whole), 'then by its stops');
 });
 
 test("a route's buses' places, had=<s>: a copy here no newer than the phone's is read again now (a bus sends its place each 20 s); operators' notices kept 10 minutes", async () => {

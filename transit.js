@@ -379,11 +379,20 @@ export async function running(env, city, deps = {}) {
 // copy is old, and with a few people about an isolate read it for one or two
 // asks (/transit/eta, 61 ms of CPU an ask on 2026-11-06); a quiet city's ask
 // is its own stops' (routes') filtered read, a few KB, kept at the edge.
+// A small city (SMALL_ETA: its whole list 10,000 rows at most; 新竹市's 1,766,
+// 590 KB, 1.8 ms to read; 新竹縣's 3,078, 1 MB, 2.8 ms; 2026-11-06) is read
+// whole once two stop lists (or a plan's routes) are asked here within a
+// minute (SPREAD_MS): one TDX read each time the city's estimates change, for
+// every stop and phone in it. Each stop was its own read: a crowd at its own
+// stops (a school's students before and after class) as many reads, each
+// stop's every 30 s. One stop list alone stays its own read (the whole list
+// is CPU for nothing then). A small city's list grown past SMALL_ROWS is
+// asked by its stops again.
 export const ETA_SELECT = 'StopUID,RouteUID,RouteName,Direction,EstimateTime,StopStatus,NextBusTime,PlateNumb,IsLastBus,Estimates,StopCountDown,DataTime';
 const ETA_STALE = 2 * MIN;
 export const cityEtaPath = city => `basic/v2/Bus/EstimatedTimeOfArrival/${city === 'InterCity' ? 'InterCity' : `City/${city}`}?$select=${ETA_SELECT}&$top=60000`;
 const etaIndex = new Map(); // city → { at, rows, stops: Map(uid → rows), routes: Map(uid → rows), running }
-export const resetEta = () => (etaIndex.clear(), runMemo.clear(), etaDemand.clear());
+export const resetEta = () => (etaIndex.clear(), runMemo.clear(), etaDemand.clear(), etaLists.clear(), grown.clear());
 export const HOT_ASKS = 20;
 const HOT_MS = 30_000;
 const etaDemand = new Map(); // city → this isolate's last asks (ms)
@@ -392,6 +401,26 @@ function hotCity(city, now) {
   list.push(now);
   etaDemand.set(city, list.slice(-HOT_ASKS));
   return list.length >= HOT_ASKS;
+}
+// (Measured 2026-11-06, each city's whole list in rows: 基隆 6,955, 新竹市
+// 1,766, 新竹縣 3,078, 苗栗 132, 彰化 1,030, 南投 807, 雲林 518, 嘉義縣 1,698,
+// 嘉義市 633, 屏東 5,464, 宜蘭 6,394, 花蓮 516, 台東 126, 金門 4,762, 澎湖
+// 8,709, 連江 1,081, 台南 9,065. 桃園's 29,006, 台中's 37,444, 高雄's 19,281,
+// 台北's and 新北's past 30,000 are read whole only when hot.)
+export const SMALL_ETA = new Set(['Keelung', 'Hsinchu', 'HsinchuCounty', 'MiaoliCounty', 'ChanghuaCounty', 'NantouCounty', 'YunlinCounty', 'ChiayiCounty', 'Chiayi', 'PingtungCounty', 'YilanCounty', 'HualienCounty', 'TaitungCounty', 'KinmenCounty', 'PenghuCounty', 'LienchiangCounty', 'Tainan']);
+export const SMALL_ROWS = 12_000;
+const SPREAD_MS = 60_000;
+const etaLists = new Map(); // city → Map(a stop list or routes asked → when, ms)
+const grown = new Set(); // small cities whose list came back past SMALL_ROWS here
+function spreadCity(city, list, now) {
+  if (!SMALL_ETA.has(city) || grown.has(city)) return false;
+  const seen = etaLists.get(city) || new Map();
+  etaLists.set(city, seen);
+  seen.delete(list);
+  seen.set(list, now);
+  for (const [k, t] of seen) if (now - t >= SPREAD_MS) seen.delete(k);
+  while (seen.size > 20) seen.delete(seen.keys().next().value);
+  return seen.size >= 2;
 }
 function indexEta(rows, at) {
   const stops = new Map();
@@ -405,13 +434,14 @@ function indexEta(rows, at) {
   }
   return { at, rows, stops, routes, running: null };
 }
-// → { idx } or { status } when there's no copy at all.
+// → { idx } or { status } when there's no copy at all. `young` (the phone's
+// copy that old, less a moment): a copy here no newer is read again now.
 export async function cityEta(env, city, deps = {}) {
   const now = deps.now ?? Date.now();
   const idx = etaIndex.get(city);
   // (This isolate's copy while it's fresh: the 9 MB never read again for each ask.)
-  if (idx && now - idx.at < (await freshOf(TDX_RULES[0], null))) return { idx, age: now - idx.at };
-  const got = await tdxGet(env, cityEtaPath(city), { ...deps, stale: ETA_STALE });
+  if (idx && now - idx.at < Math.min(await freshOf(TDX_RULES[0], null), deps.young ?? Infinity)) return { idx, age: now - idx.at };
+  const got = await tdxGet(env, cityEtaPath(city), { ...deps, stale: deps.young != null ? 0 : ETA_STALE });
   if (got.status !== 200 || got.body == null) return idx ? { idx, age: now - idx.at } : { status: got.status || 502 };
   const at = now - (got.age || 0);
   if (idx?.at === at) return { idx, age: got.age || 0 };
@@ -422,6 +452,7 @@ export async function cityEta(env, city, deps = {}) {
     return idx ? { idx, age: now - idx.at } : { status: 502 };
   }
   if (!Array.isArray(rows)) return idx ? { idx, age: now - idx.at } : { status: 502 };
+  if (SMALL_ETA.has(city) && rows.length > SMALL_ROWS) grown.add(city);
   const next = indexEta(rows, at);
   etaIndex.delete(city);
   etaIndex.set(city, next);
@@ -447,19 +478,22 @@ export async function etaRows(env, q, deps = {}) {
   // one can be there (Transit api.mjs busEta) would have seen it a step
   // late. A newer copy, another phone's read, answers as it is.)
   const had = Number(q.get('had')) || 0;
-  const filtered = had > 0 ? { ...deps, stale: 0, young: Math.max(0, had * 1000 - 1500) } : deps;
+  const mine = had > 0 ? Math.max(0, had * 1000 - 1500) : null;
+  const filtered = mine != null ? { ...deps, stale: 0, young: mine } : deps;
   if (city === 'InterCity') return etaAsked(env, city, stops, routes, filtered);
   const now = deps.now ?? Date.now();
   const pick = got => ({ status: 200, body: stops.length ? stops.flatMap(u => got.idx.stops.get(u) || []) : routes.flatMap(u => got.idx.routes.get(u) || []), age: got.age });
   const hot = hotCity(city, now);
+  // (Every list counted, the busy and the answered-from-a-copy too: a minute's spread.)
+  const spread = spreadCity(city, stops.length ? stops.join(',') : `r:${routes.join(',')}`, now);
   const idx = etaIndex.get(city);
-  if (idx && now - idx.at < (await freshOf(TDX_RULES[0], null))) return pick({ idx, age: now - idx.at });
-  if (!hot) {
+  if (idx && now - idx.at < Math.min(await freshOf(TDX_RULES[0], null), mine ?? Infinity)) return pick({ idx, age: now - idx.at });
+  if (!hot && !spread) {
     // (A quiet city here: these stops' own read; the copy here, if young enough, when TDX fails.)
     const own = await etaAsked(env, city, stops, routes, filtered);
     return own.status !== 200 && idx && now - idx.at < ETA_STALE ? pick({ idx, age: now - idx.at }) : own;
   }
-  const whole = cityEta(env, city, deps);
+  const whole = cityEta(env, city, mine != null ? { ...deps, young: mine } : deps);
   if (idx && now - idx.at < ETA_STALE) {
     const got = await whole;
     return got.idx ? pick(got) : { status: 502, body: { code: 'TDX_FAILED' } };
