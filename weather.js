@@ -1741,8 +1741,15 @@ export async function handleWeather(request, env, headers, path, { session = nul
       // Where the IP says: a city's middle, good enough for a first look.
       lat = Number(cf?.latitude);
       lon = Number(cf?.longitude);
-      if (!cf?.latitude || !cf?.longitude) return send({ code: 'NO_LOCATION' }, 404);
-      located = { by: 'ip', city: cf.city || null };
+      // A phone whose clock is Taiwan's on an address abroad (a VPN, Jay
+      // 2026-11-06): the address's city is wrong, Taipei is the first look.
+      if (q.get('tz') === 'Asia/Taipei' && cf?.country && cf.country !== 'TW') {
+        ({ lat, lon } = TAIPEI);
+        located = { by: 'zone', city: 'Taipei' };
+      } else {
+        if (!cf?.latitude || !cf?.longitude) return send({ code: 'NO_LOCATION' }, 404);
+        located = { by: 'ip', city: cf.city || null };
+      }
     } else if (!q.get('lat') || !q.get('lon')) return send({ code: 'BAD_LOCATION' }, 400);
     if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180)) return send({ code: 'BAD_LOCATION' }, 400);
     const where = { located, lat: Math.round(lat * 100) / 100, lon: Math.round(lon * 100) / 100 };

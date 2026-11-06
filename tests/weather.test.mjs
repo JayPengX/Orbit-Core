@@ -303,6 +303,10 @@ test('/weather: a Orbit Pass session, a place or where the IP says', async () =>
   assert.deepEqual(byIp.located, { by: 'ip', city: 'Taipei' });
   assert.equal(byIp.place.town, '信義區');
   assert.equal((await get('?auto=1', { cf: {} })).status, 404);
+  // A phone on Taiwan's clock behind a VPN abroad (2026-11-06): Taipei, never the VPN's city.
+  const vpn = await (await get('?auto=1&tz=Asia%2FTaipei', { cf: { country: 'US', latitude: '37.77', longitude: '-122.42', city: 'San Francisco' } })).json();
+  assert.deepEqual(vpn.located, { by: 'zone', city: 'Taipei' });
+  assert.equal(vpn.place.town, '信義區');
 });
 
 test('/weather?lines=1: the quick answer, then the whole one on the same request; a whole cell, one line', async () => {

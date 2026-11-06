@@ -26,10 +26,17 @@ export function ipBucket(ip) {
 // using Taiwan only service outright"): the country Cloudflare reads from the
 // caller's address (a phone roaming on its Taiwan SIM still reads TW). Only a
 // real country code that isn't Taiwan's; unknown ('XX'), Tor ('T1') or none
-// (a test, a local run) counts as here, never turned away.
+// (a test, a local run) counts as here, never turned away. Nor does a phone
+// whose clock is Taiwan's (`tz=Asia/Taipei`, sent by Transit): someone in
+// Taiwan on a VPN abroad (Jay 2026-11-06) is still in Taiwan.
 export function abroad(request) {
   const c = request?.cf?.country;
-  return typeof c === 'string' && /^[A-Z]{2}$/.test(c) && c !== 'TW' && c !== 'XX';
+  if (!(typeof c === 'string' && /^[A-Z]{2}$/.test(c) && c !== 'TW' && c !== 'XX')) return false;
+  try {
+    return new URL(request.url).searchParams.get('tz') !== 'Asia/Taipei';
+  } catch {
+    return true;
+  }
 }
 // The routes of the Taiwan-only services: Orbit Transit's (TDX, Taiwan's
 // map). Not Law: foreigners study Taiwan's law in it (its English texts; Jay 2026-11-06).
