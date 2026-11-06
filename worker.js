@@ -44,7 +44,7 @@ import { handlePush, sendDue } from './push.js';
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
 import { handleTransit, tally, warmBikes } from './transit.js';
-import { readDev, capacityCron, CONFIG_COLLECTION } from './eco-admin.js';
+import { readDev, capacityCron, CONFIG_COLLECTION, ADMIN_TOOLS } from './eco-admin.js';
 import { PASSKEY_COLLECTION } from './passkey.js';
 import { backupStore } from './store-backup.js';
 import { paceOf } from './pace.js';
@@ -1313,7 +1313,8 @@ async function route(request, env, ctx, headers, origin) {
     return json({ d1: true, collections: await DOCS.count(env) }, 200, headers);
   }
   // The repo's own checks (Orbit-Core's build.yml), Bearer DATA_PUSH_SECRET:
-  // ?check=gemini (one tiny call through the relay) or system (ops.js).
+  // ?check=gemini (one tiny call through the relay), system (ops.js) or
+  // capacity (the panel's 容量).
   if (path === '/ops' && request.method === 'POST') {
     if (!env.DATA_PUSH_SECRET || request.headers.get('Authorization') !== `Bearer ${env.DATA_PUSH_SECRET}`) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
     const check = new URL(request.url).searchParams.get('check');
@@ -1321,6 +1322,9 @@ async function route(request, env, ctx, headers, origin) {
     // 問法律's steps timed on real questions, nothing kept read or written (law-chat.js).
     if (check === 'law-chat') return json(await lawChatTimes(env, ctx, headers, lawGemini('law-chat'), new URL(request.url).searchParams.get('try') || ''), 200, headers);
     if (check === 'system') return json(await systemReport(env, ECO_DEPS), 200, headers);
+    // The admin panel's 容量 (capacity.js): people (counts only), every quota
+    // and how many people it holds.
+    if (check === 'capacity') return json(await ADMIN_TOOLS.capacity({ env, deps: ECO_DEPS }), 200, headers);
     // Orbit Money's mail-in, removed 2026-10-27 (Jay: too privacy-invading): its
     // stored boxes and invoices deleted, once (build.yml purge-money-mail).
     if (check === 'purge-money-mail') {
@@ -1328,7 +1332,7 @@ async function route(request, env, ctx, headers, origin) {
       for (const d of docs) await DOCS.delete(env, 'orbit-money-mail', d.id);
       return json({ deleted: docs.length }, 200, headers);
     }
-    return json({ error: { message: 'check=gemini|system|purge-money-mail' } }, 400, headers);
+    return json({ error: { message: 'check=gemini|system|capacity|purge-money-mail' } }, 400, headers);
   }
   // A builder's job now (builders/run.js), by hand: Bearer DATA_PUSH_SECRET
   // (Orbit-Core's build.yml). ?job=watch|cutouts|buses, or
