@@ -778,12 +778,15 @@ const timeout = ms => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout
 // and a city's list missing from a colo's cache meant waiting on TDX, which
 // sometimes hangs: a trip held 30 s and more. So a city's stations and counts
 // are also kept in KV (one copy for every colo, with when it's from), and
-// the cron refreshes the counts of every city asked in the last half hour
+// the cron refreshes the counts of every city asked in the last 10 minutes
 // each 2 minutes (the stations daily). An ask finds a copy at once; TDX is
-// asked behind it.
+// asked behind it. (Half an hour before 2026-11-06: after a person's last
+// look, up to 15 reads of their city that no one saw, a fifth of what a
+// typical day's map costs. Back later, the phone shows its own counts at
+// once and the proxy reads TDX within SLOW_MS, as before.)
 const WARM = /^basic\/v2\/Bike\/(Station|Availability)\/City\/[A-Za-z]+$/;
 const WARM_ACTIVE = 'tdx:warm:active';
-export const WARM_FOR = 30 * MIN;
+export const WARM_FOR = 10 * MIN;
 const warmKey = req => `tdx:warm:${req.path}?${req.query}`;
 const warmMarked = new Map(); // raw path → when this isolate last marked it
 async function warmRead(env, req) {
@@ -799,7 +802,7 @@ async function warmWrite(env, req, body, at) {
     await env.RATE_LIMIT_KV?.put(warmKey(req), body, { metadata: { at }, expirationTtl: req.rule.tier === 'live' ? 2 * 86_400 : 14 * 86_400 });
   } catch {}
 }
-// (A city asked: kept warm for the next half hour. Once each 5 minutes an isolate.)
+// (A city asked: kept warm for the next 10 minutes. Once each 5 minutes an isolate.)
 async function warmMark(env, raw, now) {
   if (now - (warmMarked.get(raw) || 0) < 5 * MIN) return;
   warmMarked.set(raw, now);
