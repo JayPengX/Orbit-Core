@@ -364,7 +364,7 @@ test('clean-up: only Orbit data stays, and wallets lose retired settings', async
   assert.equal((await t.call('POST', '', { op: 'admin', token: 'wrong', action: 'scan' })).status, 403);
   const again = tidyWallet(plan.tidy[0].wallet, t.deps.now());
   assert.deepEqual(again.wallet, plan.tidy[0].wallet);
-  assert.deepEqual(again.gone, { entries: 0, money: 0, settings: 0, looks: 0 });
+  assert.deepEqual(again.gone, { entries: 0, money: 0, settings: 0, looks: 0, apps: 0 });
 });
 
 test('the clean retires what no app writes any more: Hub entries (their money kept), voucher markers, settings (looks stay: they’re free)', () => {
@@ -406,7 +406,7 @@ test('the clean retires what no app writes any more: Hub entries (their money ke
   // A Plus month bought with points is a month like any.
   assert.equal(clean.entries[1].note, undefined);
   assert.deepEqual(Object.keys(clean.settings).sort(), ['aff:stock', 'avatar', 'frame', 'plus']);
-  assert.deepEqual(gone, { entries: 10, money: -1_550, settings: 4, looks: 0 });
+  assert.deepEqual(gone, { entries: 10, money: -1_550, settings: 4, looks: 0, apps: 0 });
   // A second clean changes nothing.
   assert.deepEqual(tidyWallet(clean, now).wallet, clean);
 });
@@ -421,10 +421,29 @@ test('admin scan reports what the clean would retire before changing a wallet', 
   wallet.entries.push({ id: 'vocab:g:old', t: 1, app: 'vocab', kind: 'game', amount: 0, xp: 20 }, { id: 'vocab:shop:boost:a', t: 2, app: 'vocab', kind: 'shop', amount: -150 });
   await t.deps.fsWrite(env, WALLET_COLLECTION, doc.id, JSON.stringify(wallet));
   const plan = await planClean(env, t.deps);
-  assert.deepEqual(plan.retired, { entries: 2, money: -150, settings: 1, looks: 0 });
+  assert.deepEqual(plan.retired, { entries: 2, money: -150, settings: 1, looks: 0, apps: 0 });
   assert.equal(plan.tidy.length, 1);
   assert.equal(plan.tidy[0].wallet.entries.some(e => e.app === 'vocab'), false);
   assert.equal(JSON.parse((await t.deps.fsList(env, WALLET_COLLECTION))[0].payload).entries.some(e => e.app === 'vocab'), true);
+});
+
+test('a gone app (Slips: apps.slip) never shows in the admin panel, and the clean takes it out (Jay 2026-11-06)', async () => {
+  const t = setup();
+  await newPass(t);
+  const env = {};
+  const [doc] = await t.deps.fsList(env, WALLET_COLLECTION);
+  const wallet = JSON.parse(doc.payload);
+  wallet.apps = { ...wallet.apps, slip: { first: 1, last: t.deps.now() } };
+  await t.deps.fsWrite(env, WALLET_COLLECTION, doc.id, JSON.stringify(wallet));
+  const admin = action => t.call('POST', '', { op: 'admin', token: 'o'.repeat(40), action });
+  const [row] = (await admin('wallets')).data.wallets;
+  assert.equal(row.apps.includes('slip'), false);
+  assert.ok(row.apps.length, 'the real apps stay');
+  assert.equal('slip' in (await admin('overview')).data.apps, false);
+  const plan = await planClean(env, t.deps);
+  assert.equal(plan.retired.apps, 1);
+  assert.equal('slip' in plan.tidy[0].wallet.apps, false);
+  assert.deepEqual(Object.keys(plan.tidy[0].wallet.apps), Object.keys(wallet.apps).filter(a => a !== 'slip'));
 });
 
 test('the pay is fixed, like a salary: the same however much the account holds', () => {

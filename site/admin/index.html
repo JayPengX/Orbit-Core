@@ -115,6 +115,8 @@
   /* The account sheet */
   dialog.sheet { width: min(720px, 100vw); max-width: 100vw; max-height: 92vh; margin: auto auto 0; border: 0; padding: 0; border-radius: 22px 22px 0 0; background: var(--q-page); color: var(--q-text); box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.3); }
   @media (min-width: 760px) { dialog.sheet { margin: auto; border-radius: 22px; } }
+  dialog.sheet.wide { width: min(980px, 100vw); }
+  #mo-tiles { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
   dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.45); }
   .sheet-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px; background: var(--q-page); border-bottom: 1px solid var(--q-divider); }
   .sheet-head h2 { margin: 0; font-size: 19px; }
@@ -213,7 +215,7 @@
   .hit:hover, .hit.on { background: var(--q-fill-3); }
   .omni-out .empty { padding: 14px 10px; color: var(--q-muted); }
   /* A phone: the views in a tab bar at the bottom, icon over name. */
-  .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); padding: 6px 4px calc(env(safe-area-inset-bottom) + 6px); background: color-mix(in srgb, var(--q-page) 88%, transparent); -webkit-backdrop-filter: saturate(1.8) blur(20px); backdrop-filter: saturate(1.8) blur(20px); border-top: 0.5px solid var(--q-divider); }
+  .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 6px 4px calc(env(safe-area-inset-bottom) + 6px); background: color-mix(in srgb, var(--q-page) 88%, transparent); -webkit-backdrop-filter: saturate(1.8) blur(20px); backdrop-filter: saturate(1.8) blur(20px); border-top: 0.5px solid var(--q-divider); }
   .tabs button { position: relative; display: grid; justify-items: center; gap: 3px; padding: 4px 0; border-radius: 10px; background: none; color: var(--q-muted); font-size: 10.5px; font-weight: 600; }
   .tabs button i { display: block; width: 24px; height: 24px; }
   .tabs button i svg { width: 24px; height: 24px; }
@@ -387,7 +389,6 @@
     <nav class="tabs" id="tabs">
       <button data-view="overview" aria-pressed="true"><i data-ic="grid"></i><span>總覽</span></button>
       <button data-view="accounts" aria-pressed="false"><i data-ic="user"></i><span>帳戶</span></button>
-      <button data-view="money" aria-pressed="false"><i data-ic="coin"></i><span>金流</span></button>
       <button data-view="health" aria-pressed="false"><i data-ic="live"></i><span>健康</span><b class="badge" id="health-badge" hidden></b></button>
       <button data-view="usage" aria-pressed="false"><i data-ic="chart"></i><span>用量</span></button>
       <button data-view="dev" aria-pressed="false"><i data-ic="target"></i><span>設定</span></button>
@@ -405,7 +406,7 @@
         <div id="ov-attn"></div>
         <div class="sec-head"><h2>健康</h2><button class="more" data-go="health">全部</button></div>
         <div class="health-grid" id="ov-health"></div>
-        <div class="sec-head"><h2>這週的錢</h2><button class="more" data-go="money">金流</button></div>
+        <div class="sec-head"><h2>這週的錢</h2><button class="more" data-go="money">明細</button></div>
         <div class="card">
           <div class="econ-top" id="ov-econ-top"></div>
           <div class="spark-wrap"><svg id="ov-flow" class="chart" viewBox="0 0 700 120" role="img" aria-label="每天流入和流出"></svg></div>
@@ -439,29 +440,6 @@
       <p id="wallets-error" class="error"></p>
       <div id="wallets" class="acct-list"></div>
       <div class="row foot-row"><button id="csv" class="small">下載 CSV</button></div>
-    </section>
-
-    <!-- 金流 -->
-    <section data-pane="money" hidden>
-      <div class="pane-head"><div><h2>金流</h2><p class="muted">系統發的、Orbit 賺的、政府收的和發的、市場賺賠的，四方加起來就是流通中的錢。</p></div></div>
-      <p id="mo-error" class="error"></p>
-      <div id="mo" hidden>
-        <div class="tiles" id="mo-tiles"></div>
-        <p class="eq" id="mo-eq"></p>
-        <div class="twocol" style="margin-top:6px">
-          <div><h3>四方對帳</h3><div class="card"><ul class="flow" id="mo-where"></ul></div></div>
-          <div><h3>系統</h3><div class="card"><ul class="flow" id="mo-given"></ul></div></div>
-        </div>
-        <div class="twocol">
-          <div><h3>Orbit：透支利息</h3><div class="card"><ul class="flow" id="mo-orbit"></ul></div></div>
-          <div><h3>市場：玩家投資賺的</h3><div class="card"><ul class="flow" id="mo-own"></ul></div></div>
-        </div>
-        <div class="twocol">
-          <div><h3>政府：稅和補助</h3><div class="card"><ul class="flow" id="mo-gov"></ul></div></div>
-          <div><h3>繳稅最多的帳戶</h3><div id="mo-taxed"></div></div>
-        </div>
-        <details class="note"><summary>怎麼算</summary><p class="muted" id="mo-note"></p></details>
-      </div>
     </section>
 
     <!-- 健康 -->
@@ -645,6 +623,32 @@
   <div class="sheet-body" id="acct-body"></div>
 </dialog>
 
+<!-- 證券的錢: Securities' whole economy (the four sides), opened from 總覽's 這週的錢 and 政府. -->
+<dialog id="money" class="sheet wide" aria-labelledby="money-title">
+  <div class="sheet-head"><h2 id="money-title">證券的錢</h2><button id="money-close" class="icon-btn" aria-label="關閉"></button></div>
+  <div class="sheet-body">
+    <p class="muted">系統發的、Orbit 賺的、政府收和發的、市場賺賠的，加起來就是流通中的錢。</p>
+    <p id="mo-error" class="error"></p>
+    <div id="mo" hidden>
+      <div class="tiles" id="mo-tiles"></div>
+      <p class="eq" id="mo-eq"></p>
+      <div class="twocol" style="margin-top:6px">
+        <div><h3>四方對帳</h3><div class="card"><ul class="flow" id="mo-where"></ul></div></div>
+        <div><h3>系統</h3><div class="card"><ul class="flow" id="mo-given"></ul></div></div>
+      </div>
+      <div class="twocol">
+        <div><h3>Orbit：透支利息</h3><div class="card"><ul class="flow" id="mo-orbit"></ul></div></div>
+        <div><h3>市場：玩家投資賺的</h3><div class="card"><ul class="flow" id="mo-own"></ul></div></div>
+      </div>
+      <div class="twocol">
+        <div><h3>政府：稅和補助</h3><div class="card"><ul class="flow" id="mo-gov"></ul></div></div>
+        <div><h3>繳稅最多的帳戶</h3><div id="mo-taxed"></div></div>
+      </div>
+      <details class="note"><summary>怎麼算</summary><p class="muted" id="mo-note"></p></details>
+    </div>
+  </div>
+</dialog>
+
 <!-- The built kit's modules import each other as #kit/… (kit/stamp.mjs). -->
 <script type="importmap">{"imports":{"#kit/":"../kit/"}}</script>
 <script type="module">
@@ -728,7 +732,7 @@ for (const i of document.querySelectorAll('i[data-ic]')) i.innerHTML = ic(i.data
 $('mark').innerHTML = $('gate-mark').innerHTML = `<img src="${svgUrl(familyMark())}" alt="">`;
 $('omni-ic').innerHTML = $('search-ic').innerHTML = ic('search');
 $('refresh').innerHTML = ic('history');
-$('acct-close').innerHTML = ic('x');
+$('acct-close').innerHTML = $('money-close').innerHTML = ic('x');
 // A line of values as a small chart (its area under it), for a figure's trend.
 function spark(values, color = 'var(--q-accent)') {
   const v = values.length ? values : [0];
@@ -744,6 +748,7 @@ function open() {
   $('panel').hidden = false;
   const want = location.hash.slice(1);
   show(VIEWS[want] ? want : 'overview');
+  if (want === 'money') openMoney();
 }
 $('gate-form').onsubmit = async event => {
   event.preventDefault();
@@ -766,7 +771,6 @@ $('forget').onclick = () => {
 const VIEWS = {
   overview: () => loadOverview(),
   accounts: () => loadWallets(),
-  money: () => loadMoney(),
   health: () => Promise.all([loadSystem(), loadHealth(), loadErrors()]),
   usage: () => Promise.all([loadBilling(), loadUsage()]),
   dev: () => loadDev(),
@@ -801,6 +805,7 @@ document.addEventListener('click', e => {
   const a = e.target.closest('[data-acct]');
   if (a) return openAccount(a.dataset.acct);
   const g = e.target.closest('[data-go]');
+  if (g?.dataset.go === 'money') return openMoney(g.dataset.to);
   if (g) {
     // (A part drawn once the view has loaded is scrolled to then.)
     const shown = show(g.dataset.go);
@@ -1108,7 +1113,7 @@ $('csv').onclick = () => {
 const PLACES = [
   ['總覽', 'overview', 'grid', '#2563eb', '首頁 狀態 overview'],
   ['帳戶', 'accounts', 'user', '#2563eb', '使用者 accounts users'],
-  ['金流', 'money', 'coin', '#d97706', '錢 經濟 對帳 money economy'],
+  ['證券的錢', 'money', 'coin', '#d97706', '金流 錢 經濟 對帳 稅 money economy'],
   ['健康', 'health', 'live', '#16a34a', '系統 排程 資料來源 部署 金鑰 r2 d1 帳單保護 節流 health cron'],
   ['用量', 'usage', 'chart', '#7c3aed', 'google 帳單 tdx 額度 usage billing'],
   ['設定', 'dev', 'target', '#64748b', '速度 開發 容量 dev config'],
@@ -1135,7 +1140,7 @@ async function omniDraw() {
   if (accts.length > 6) hits.push({ group: '帳戶', html: `${tileHtml(ic('list'), '#64748b', 'sm')}<span>全部 ${accts.length} 個符合的帳戶</span>`, run: () => (show('accounts'), ($('search').value = raw), drawWallets()) });
   if (/^[0-9a-f]{6,8}$/.test(q) && !accts.length) hits.push({ group: '帳戶', html: `${tileHtml(ic('user'), '#64748b', 'sm')}<span>打開帳戶 ${escHtml(q)}</span>`, run: () => openAccount(q) });
   for (const [k, n] of Object.entries(APPS)) if (n.toLowerCase().includes(q) || k.includes(q)) hits.push({ group: 'App', html: `${appIc(k).replace('app-ic', 'app-ic" style="width:32px;height:32px')}<span>${escHtml(n)} 的帳戶<small>${wallets.filter(w => w.apps.includes(k)).length} 個用過</small></span>`, run: () => (show('accounts'), ($('search').value = n), drawWallets()) });
-  for (const [name, go, icon, color, words, to] of [...PLACES].sort((a, b) => b[0].toLowerCase().includes(q) - a[0].toLowerCase().includes(q))) if (name.toLowerCase().includes(q) || words.includes(q)) hits.push({ group: '功能', html: `${tileHtml(ic(icon), color, 'sm')}<span>${escHtml(name)}</span>`, run: () => { show(go); const t = to && $(to); t ? setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50) : scrollTo({ top: 0 }); } });
+  for (const [name, go, icon, color, words, to] of [...PLACES].sort((a, b) => b[0].toLowerCase().includes(q) - a[0].toLowerCase().includes(q))) if (name.toLowerCase().includes(q) || words.includes(q)) hits.push({ group: '功能', html: `${tileHtml(ic(icon), color, 'sm')}<span>${escHtml(name)}</span>`, run: () => { if (go === 'money') return openMoney(to); show(go); const t = to && $(to); t ? setTimeout(() => t.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50) : scrollTo({ top: 0 }); } });
   omniHits = hits;
   omniOn = 0;
   let group = '';
@@ -1561,6 +1566,15 @@ function byMarket(map, whole, names, rest) {
   if (Math.round(left)) rows.push([rest[0], left, rest[1]]);
   return rows;
 }
+// 金流 is a sheet over 總覽, not a tab: it's Securities' money alone. Read
+// each time it opens (one admin call); `to` scrolls to a part (mo-gov).
+async function openMoney(to) {
+  const d = $('money');
+  if (!d.open) d.showModal();
+  await loadMoney();
+  if (to) $(to)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+$('money-close').onclick = () => $('money').close();
 async function loadMoney() {
   $('mo-error').textContent = '';
   try {
@@ -1855,7 +1869,7 @@ $('scan').onclick = () =>
       $('scan-out').hidden = false;
       $('scan-out').querySelector('tbody').replaceChildren(...names.map(n => el('tr', {}, [el('td', { text: n }), el('td', { class: 'right', text: s.counts[n] ?? '—' }), el('td', { class: `right ${s.wouldDelete[n] ? 'neg' : ''}`, text: s.wouldDelete[n] || 0 })])));
       const del = Object.values(s.wouldDelete).reduce((a, b) => a + b, 0);
-      $('scan-more').textContent = `會刪除 ${del} 份文件、整理 ${s.wouldTidyWallets} 個錢包（移除 ${s.wouldRetire.entries} 筆舊紀錄、${s.wouldRetire.settings} 個舊設定）。${s.unknown.length ? `不認得的集合（不會動）：${s.unknown.join('、')}` : ''}`;
+      $('scan-more').textContent = `會刪除 ${del} 份文件、整理 ${s.wouldTidyWallets} 個錢包（移除 ${s.wouldRetire.entries} 筆舊紀錄、${s.wouldRetire.settings} 個舊設定${s.wouldRetire.apps ? `、${s.wouldRetire.apps} 個舊 App` : ''}）。${s.unknown.length ? `不認得的集合（不會動）：${s.unknown.join('、')}` : ''}`;
       $('clean').disabled = !(del || s.wouldTidyWallets);
     } catch (e) {
       $('clean-error').textContent = e.message;
