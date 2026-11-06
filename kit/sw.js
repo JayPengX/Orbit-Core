@@ -159,9 +159,9 @@ async function networkFirstNow(request, later) {
 
 // Opening the app: the page kept here at once (no wait for the network,
 // even on a poor connection), refreshed in the background for next time.
-// A newer deploy is caught by the kit's version check (boot.js,
-// watchUpdates), which reloads under a ?v= address: that one always asks
-// the network.
+// After a deploy, the copy kept here is the new page (refreshed behind the
+// last opening, its files downloaded by the kit's watch), so the next
+// opening is the new version, at once.
 async function pageFirst(request, later) {
   const kept = await caches.match(request, { ignoreSearch: true });
   const fresh = networkFirst(request, later);

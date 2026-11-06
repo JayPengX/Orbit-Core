@@ -7,14 +7,14 @@
 //   data-title, a progress line and what it's doing), so every app opens
 //   the same way.
 // - Checks version.json (the app's and the kit's) while the app's files
-//   load: a newer deploy than this page (meta build-version) or a newer kit
-//   is loaded straight away in one reload, before anything starts.
-//   The cover waits for that answer: an app that's ready first (its kept
-//   files and data, instant offline-capable openings) hides #loading as
-//   always, but the cover stays drawn (q-boot-hold) until the check has
-//   answered, 3 s at most past the app's own lift. It lifted before, so the
-//   old version showed and was swapped under the person's finger seconds
-//   later (Jay 2026-11-03). The kit's watchUpdates keeps the page current after.
+//   load, and notes the kit's newest files for the next opening. A newer
+//   deploy never holds up an opening (Jay 2026-11-06: "Always stuck here so
+//   long after an update"): the app opens at once on the version the phone
+//   has, the new one downloads behind it (the kit's watchUpdates) and is what
+//   the next opening shows. Until then the cover waited for this check and
+//   reloaded onto the new version first: the app started twice and fetched
+//   the new files before anything showed (Sports on 3G: 12 s, against a
+//   reopen's 5), and an iPad sat on 載入中 for as long as that took.
 // - When the app fails to start (an error, a script that didn't come, or
 //   15 s with nothing more arriving), asks whether the network is there.
 //   Offline: says so. Online, it's an update that didn't finish (GitHub's
@@ -77,45 +77,9 @@
   q('[data-act=reload]').textContent = L('重新整理', 'Reload');
   q('[data-act=skip]').textContent = L('直接開啟', 'Open anyway');
   q('[data-act=skip]').onclick = function () {
-    // (Opened now: the kit doesn't hold it for pictures, nor for the update check.)
+    // (Opened now: the kit doesn't hold it for pictures.)
     box.setAttribute('data-now', '1');
-    release();
     box.hidden = true;
-  };
-
-  // ---- Held for the update check ----
-  // While the first update check is out, the cover stays drawn even once the
-  // app has hidden it (its `hidden` stays as the app set it, so the app's own
-  // logic and the kit's watchers read it as lifted). Let go when the check
-  // answers, HOLD_MS after the app asked to lift, or offline.
-  var HOLD_MS = 3000;
-  var holding = false;
-  var held = document.createElement('style');
-  held.textContent = '#loading.q-boot-hold,#loading.q-boot-hold[hidden],#loading.q-boot-hold.q-lift{display:grid!important;opacity:1!important;pointer-events:auto!important}';
-  var hold = function () {
-    if (holding || navigator.onLine === false) return;
-    holding = true;
-    document.head.appendChild(held);
-    box.classList.add('q-boot-hold');
-    // (The app asked to lift while the check is still out: at most HOLD_MS more.)
-    var asked = new MutationObserver(function () {
-      if (!box.hidden) return;
-      asked.disconnect();
-      if (!holding) return;
-      step.textContent = L('檢查更新…', 'Checking for updates…');
-      setTimeout(release, HOLD_MS);
-    });
-    asked.observe(box, { attributes: true, attributeFilter: ['hidden'] });
-    window.addEventListener('offline', release);
-  };
-  var release = function () {
-    if (!holding) return;
-    holding = false;
-    box.classList.remove('q-boot-hold');
-  };
-  // (Whether the person can see the app: hidden and not held.)
-  var lifted = function () {
-    return box.hidden && !holding;
   };
 
   // The progress line follows what has really loaded: the app's own files
@@ -380,20 +344,10 @@
     fail();
   };
   setTimeout(stuck, 15000);
-  // A reload under way that never happened (the new page didn't come): the way out, after 30 s.
-  var going = function () {
-    setTimeout(function () {
-      if (started() || box.hidden) return;
-      window.__bootUpdating = false;
-      fail();
-    }, 30000);
-  };
-
-  // A newer deploy than this page (or a newer kit): load it now, before the
-  // app starts, both in one reload (the kit's version and file hashes noted
-  // for the loader, orbit.kit and orbit.kitFiles). A reload that came back
-  // on the old page (the CDN a moment behind) is tried again, up to 3 times a
-  // session.
+  // The newest versions, noted (the kit's version and file hashes, for the
+  // loader at the next opening: orbit.kit and orbit.kitFiles). A newer one
+  // is the kit's watch's to download behind the app; this page is never
+  // reloaded for it (see the top).
   var meta = document.querySelector('meta[name="build-version"]');
   var current = meta && meta.content;
   if (!current || current === 'dev' || !window.fetch) return;
@@ -415,23 +369,16 @@
       });
   };
   // (The kit's watch skips its own first check, this one just made, and
-  // waits for its answer: __bootCheck says 'boot' when this reload is under
-  // way, 'none' when both versions were read and nothing is newer, 'watch'
-  // otherwise: a newer one found with the app already on screen, or a version
-  // not read. Then the watch looks again at once, so the first opening after
-  // a deploy gets it, not the next one.)
+  // waits for its answer: __bootCheck says 'none' when both versions were
+  // read and nothing is newer, 'watch' otherwise: a newer one found, or a
+  // version not read. Never 'boot' any more: kit/orbit.mjs updateChecked
+  // still reads it, from pages of before.)
   window.__bootChecked = Date.now();
-  hold();
   window.__bootCheck = Promise.all([read('./version.json'), kit.base ? read(kit.base + 'version.json') : null]).then(function (got) {
     var latest = got[0] && got[0].version;
     var kitLatest = got[1] && got[1].version;
     var appNew = latest && latest !== current;
-    // A kit newer than this page's (the first one seen on a device is only
-    // noted: it's what loaded, or close to it, the hashes the app's deploy
-    // baked in).
     var kitNew = kitLatest && kit.version && kit.noted !== false && kitLatest !== kit.version;
-    // Noted for the next opening: the version and each file's hash (the
-    // loader's addresses, so only the files that changed are fetched).
     if (kitLatest) {
       try {
         if (localStorage.getItem('orbit.kit') !== kitLatest) localStorage.setItem('orbit.kit', kitLatest);
@@ -440,34 +387,6 @@
       } catch (e) {}
     }
     if (!appNew && !kitNew) return got[0] && (got[1] || !kit.base) ? 'none' : 'watch';
-    // (An app already on screen leaves it to the watch; one still behind
-    // this loading screen, held or not yet lifted, is reloaded now, before
-    // anything shows.)
-    if (lifted()) return 'watch';
-    var flag = 'orbit.bootTo:' + location.pathname;
-    var want = (appNew ? latest : current) + '|' + (kitLatest || '');
-    var was = String(sessionStorage.getItem(flag) || '').split('#');
-    var tries = was[0] === want ? Number(was[1]) || 0 : 0;
-    if (tries >= 3) return 'none';
-    sessionStorage.setItem(flag, want + '#' + (tries + 1));
-    // (Noted for the new page: how it came, and when, for the 除錯紀錄.)
-    try {
-      sessionStorage.setItem('orbit.updating', JSON.stringify({ how: 'boot', at: Date.now(), path: location.pathname }));
-    } catch (e) {}
-    window.__bootUpdating = true;
-    going();
-    // (The files the phone kept stay: each is kept under its own hash, so
-    // the new page fetches only what changed. They were all dropped here
-    // first, and every update downloaded the whole app again.)
-    if (appNew) location.replace(location.pathname + '?v=' + encodeURIComponent(latest) + (tries ? '&r=' + tries : '') + location.hash);
-    else location.reload();
-    return 'boot';
+    return 'watch';
   });
-  window.__bootCheck.then(
-    function (r) {
-      // (A reload under way: the cover stays until the new page is up.)
-      if (r !== 'boot') release();
-    },
-    release
-  );
 })();

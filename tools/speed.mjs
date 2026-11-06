@@ -8,7 +8,7 @@
 // 3G-like link by default (tools/speed/net.mjs: 400 kbps, 400 ms).
 //
 //   node tools/speed.mjs <app…|all> [--before main] [--after work] [--net 3g|4g|wifi]
-//        [--cpu 4] [--steps open,idle,tabs,scroll,away,reopen,update] [--idle 30] [--out dir] [--only before|after]
+//        [--cpu 4] [--steps open,idle,tabs,scroll,away,reopen,update,relaunch] [--idle 30] [--out dir] [--only before|after]
 //        [--warm] [--at <ISO time>] [--refresh-after <regex>] [--verbose]
 //
 // Needs the app repos beside this one (as tools/test-apps.mjs), Chromium
@@ -74,7 +74,7 @@ for (const [name, ref] of sides) {
   built[name] = await buildSide({ name, ref, apps, dir: join(work, name) });
   console.log(`built ${name} (${ref}): kit ${built[name].kit.version}, ${apps.map(a => `${a} ${built[name].apps[a].sha}`).join(', ')} in ${Math.round((Date.now() - t) / 1000)} s`);
   // The deploy the update step lands: this side's code with a push's worth of change.
-  if (steps.includes('update')) built[`${name}-next`] = await buildSide({ name: `${name}-next`, ref, apps, dir: join(work, `${name}-next`), next: true });
+  if (steps.includes('update') || steps.includes('relaunch')) built[`${name}-next`] = await buildSide({ name: `${name}-next`, ref, apps, dir: join(work, `${name}-next`), next: true });
 }
 
 // ---- The server ----
@@ -317,7 +317,8 @@ async function runApp(app, side, { prof = profile, rate = cpu, idle = idleS } = 
         await step('update', page, cdp, dev, async () => {
           const t0 = now();
           dev.side = built[`${side}-next`];
-          const moved = page.waitForNavigation({ timeout: 110_000, waitUntil: 'commit' }).catch(() => null);
+          // (Since 11-06 an open page isn't swapped in front of the person: the update downloads behind it, and no load comes.)
+          const moved = page.waitForNavigation({ timeout: 20_000, waitUntil: 'commit' }).catch(() => null);
           await page.evaluate(() => (document.dispatchEvent(new Event('visibilitychange')), window.dispatchEvent(new Event('focus'))));
           if (!(await moved)) return { readyMs: null, more: { updated: false } };
           await waitReady(page);
@@ -326,6 +327,40 @@ async function runApp(app, side, { prof = profile, rate = cpu, idle = idleS } = 
         }, { max: 120_000 })
       );
       // (The steps after it run on the version it landed: a reopen is the updated app's.)
+    }
+    // The person opens the app from the home screen after a deploy that came
+    // while it was closed (Jay 2026-11-06: "always stuck here so long after an
+    // update"): the phone has the old version kept; the time until a screen is
+    // up (the cover gone for good), the version it shows, and what it took.
+    if (steps.includes('relaunch') && built[`${side}-next`] && dev.side !== built[`${side}-next`]) {
+      await ctx.close();
+      for (let t = Date.now(); dev.inflight > 0 && Date.now() - t < 30_000; ) await new Promise(r => setTimeout(r, 100));
+      dev.side = built[`${side}-next`];
+      ctx = await launch(REOPEN_AFTER);
+      ({ page, cdp } = await openPage(ctx, rate));
+      page.on('pageerror', e => errors.push(String(e.message || e).slice(0, 160)));
+      results.push(
+        await step('relaunch', page, cdp, dev, async () => {
+          const t0 = now();
+          let loads = 0;
+          page.on('framenavigated', f => f === page.mainFrame() && loads++);
+          await page.goto(url, { waitUntil: 'commit', timeout: 120_000 });
+          // Up for good: the cover gone and no reload under way (the page the person then uses).
+          let shownAt = null;
+          let version = '';
+          for (const end = Date.now() + 90_000; Date.now() < end; ) {
+            const r = await page.evaluate(() => [window.__speed?.ready, document.querySelector('meta[name="build-version"]')?.content || '', Boolean(window.__bootUpdating)]).catch(() => [null, '', true]);
+            if (r[0] != null && !r[2]) {
+              if (shownAt == null) shownAt = now();
+              version = r[1];
+              // (Still up 3 s later on the same page: that's the screen the person has.)
+              if (now() - shownAt > 3000) break;
+            } else shownAt = null;
+            await new Promise(res => setTimeout(res, 100));
+          }
+          return { readyMs: shownAt == null ? null : Math.round(shownAt - t0), resetMut: true, pageT0: 0, more: { loads, version, newest: /-next-/.test(version) } };
+        }, { max: 120_000 })
+      );
     }
     if (steps.includes('reopen')) {
       // The app closed (the browser gone, its service worker too) and opened
@@ -339,7 +374,8 @@ async function runApp(app, side, { prof = profile, rate = cpu, idle = idleS } = 
         await step('reopen', page, cdp, dev, async () => {
           await page.goto(url, { waitUntil: 'commit', timeout: 120_000 });
           const ready = await waitReady(page);
-          return { readyMs: ready, resetMut: true, pageT0: 0 };
+          const version = await page.evaluate(() => document.querySelector('meta[name="build-version"]')?.content || '').catch(() => '');
+          return { readyMs: ready, resetMut: true, pageT0: 0, more: { version } };
         }, { max: 90_000 })
       );
     }
