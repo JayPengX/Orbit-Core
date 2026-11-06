@@ -182,6 +182,7 @@
   .links a:hover { background: var(--q-sunken); }
   .twocol { display: grid; gap: 12px; }
   .twocol > * { min-width: 0; }
+  .twocol:has(> [hidden]) { grid-template-columns: 1fr !important; }
   @media (min-width: 760px) { .twocol { grid-template-columns: 1fr 1fr; align-items: start; } }
   .prices { display: grid; gap: 8px; margin-top: 10px; }
   .price { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--q-surface-2); }
@@ -394,7 +395,7 @@
       <button data-view="overview" aria-pressed="true"><i data-ic="grid"></i><span>總覽</span></button>
       <button data-view="accounts" aria-pressed="false"><i data-ic="user"></i><span>帳戶</span></button>
       <button data-view="health" aria-pressed="false"><i data-ic="live"></i><span>健康</span><b class="badge" id="health-badge" hidden></b></button>
-      <button data-view="usage" aria-pressed="false"><i data-ic="chart"></i><span>用量</span></button>
+      <button data-view="usage" aria-pressed="false"><i data-ic="chart"></i><span>額度</span></button>
       <button data-view="dev" aria-pressed="false"><i data-ic="target"></i><span>設定</span></button>
       <button data-view="tools" aria-pressed="false"><i data-ic="key"></i><span>工具</span></button>
     </nav>
@@ -406,32 +407,36 @@
       <div id="ov" class="ov" hidden>
         <div id="ov-hero"></div>
         <div class="kpis" id="ov-kpis"></div>
-        <div class="sec-head"><h2>需要注意</h2><span class="count" id="ov-attn-n"></span></div>
-        <div id="ov-attn"></div>
-        <div class="sec-head"><h2>健康</h2><button class="more" data-go="health">全部</button></div>
+        <div class="sec-head"><h2>系統</h2><button class="more" data-go="health">全部</button></div>
         <div class="health-grid" id="ov-health"></div>
-        <div class="sec-head"><h2>這週的錢</h2><button class="more" data-go="money">明細</button></div>
+        <div class="sec-head"><h2>各 App</h2></div>
+        <div class="app-grid" id="ov-apps"></div>
+        <div class="sec-head"><h2>最近 14 天</h2><span class="legend"><span><i style="background:var(--q-accent)"></i>新帳戶</span><span><i style="background:var(--q-good)"></i>最後使用</span></span></div>
+        <div class="card"><svg id="ov-chart" class="chart" viewBox="0 0 700 200" role="img" aria-label="最近 14 天的新帳戶和最後使用"></svg></div>
+        <div class="sec-head"><h2>證券的錢・這週</h2><button class="more" data-go="money">明細</button></div>
         <div class="card">
           <div class="econ-top" id="ov-econ-top"></div>
           <div class="spark-wrap"><svg id="ov-flow" class="chart" viewBox="0 0 700 120" role="img" aria-label="每天流入和流出"></svg></div>
           <ul class="econ" id="ov-econ"></ul>
         </div>
         <div class="credit" id="ov-credit"></div>
-        <div class="sec-head"><h2>政府</h2><button class="more" data-go="money" data-to="mo-gov">明細</button></div>
-        <div class="kpis two" id="ov-gov"></div>
-        <div class="sec-head"><h2>各 App</h2></div>
-        <div class="app-grid" id="ov-apps"></div>
-        <div class="sec-head"><h2>最近 14 天</h2><span class="legend"><span><i style="background:var(--q-accent)"></i>新帳戶</span><span><i style="background:var(--q-good)"></i>最後使用</span></span></div>
-        <div class="card"><svg id="ov-chart" class="chart" viewBox="0 0 700 200" role="img" aria-label="最近 14 天的新帳戶和最後使用"></svg></div>
         <div class="twocol">
-          <div><div class="sec-head"><h2>錢最多</h2></div><div id="ov-rich"></div></div>
-          <div><div class="sec-head"><h2>最新帳戶</h2></div><div id="ov-new"></div></div>
+          <div id="ov-attn-wrap"><div class="sec-head"><h2>透支中</h2><span class="count" id="ov-attn-n"></span></div><div id="ov-attn"></div></div>
+          <div><div class="sec-head"><h2>最新帳戶</h2><button class="more" data-go="accounts">全部</button></div><div id="ov-new"></div></div>
         </div>
       </div>
     </section>
 
     <!-- 帳戶 -->
     <section data-pane="accounts" hidden>
+      <div class="card" id="door" style="margin-top:16px">
+        <div class="row spread"><strong>現在在用</strong><button id="door-load" class="small">重新整理</button></div>
+        <p id="door-error" class="error"></p>
+        <div class="tiles" id="door-tiles"></div>
+        <div class="row door-set"><label for="door-max">同時最多</label><input id="door-max" type="number" min="0" step="10" inputmode="numeric" placeholder="不限" /><span class="muted">人</span><button id="door-save" class="small primary">套用</button></div>
+        <ul class="flow stack" id="door-pri" style="margin-top:8px"></ul>
+        <details class="note"><summary>說明</summary><p class="muted" style="margin:8px 0 0">在用＝15 分鐘內開過 App。到 80% 時，即時資料放慢一倍；額滿時再慢一點，新來的人排隊（App 顯示第幾位，每 20 秒再試），已經在用的人不受影響。帳單保護到「先顧基本」時也不再放新的人進來。優先通行的 Pass 不受限制、不占位置，到帳戶裡設定。0＝不限。</p></details>
+      </div>
       <div class="acct-tools">
         <label class="field-search"><span id="search-ic" aria-hidden="true"></span><input id="search" type="search" placeholder="代號、App 或 Pass" autocomplete="off" spellcheck="false" enterkeyhint="search" /></label>
         <div class="seg" id="sort" role="group" aria-label="排序">
@@ -449,10 +454,6 @@
     <!-- 健康 -->
     <section data-pane="health" hidden>
       <div class="attn" id="health-attn" hidden></div>
-      <div class="pane-head"><div><h2>帳單與節流</h2><p class="muted">Cloudflare $5 方案：只看實際用掉的。用到 60%、75%、85%，而且照最近幾天的速度撐不到週期結束，才逐步放慢；預估只是提醒。任何一項用到 90% 就停代理到下個週期。</p></div></div>
-      <p id="sys-error" class="error"></p>
-      <div class="tiles" id="sys-tiles"></div>
-      <p class="muted" id="sys-pace" style="margin:10px 0 0"></p>
       <div class="pane-head"><div><h2>資料來源</h2></div><button id="health-load" class="small">檢查</button></div>
       <p id="health-error" class="error"></p>
       <ul id="health" class="checks"></ul>
@@ -473,22 +474,35 @@
       </div>
       <div class="pane-head"><div><h2>金鑰與綁定</h2><p class="muted">只看有沒有設定。</p></div></div>
       <ul class="checks" id="secrets"></ul>
-      <div class="card" style="margin-top:18px">
-        <strong>警示通知</strong>
-        <p class="muted" id="alert-note" style="margin:6px 0 10px"></p>
-        <div class="row"><input id="alert-pass" placeholder="你的 Orbit Pass" autocomplete="off" spellcheck="false" style="flex:1 1 0;min-width:0" /><button id="alert-save" class="small" style="flex:none">設定</button><button id="alert-test" class="small" style="flex:none">測試</button></div>
-        <p id="alert-ok" class="ok"></p>
-      </div>
       <div class="pane-head"><div><h2>連結</h2></div></div>
       <div class="links" id="links"></div>
     </section>
 
     <!-- 用量 -->
     <section data-pane="usage" hidden>
+      <div class="pane-head"><div><h2>撐得住多少人</h2><p class="muted">每一項額度照現在的用法能撐的人數，最少的那項就是上限。</p></div></div>
+      <div class="card" id="cap">
+        <div class="row spread"><strong>容量</strong><button id="cap-load" class="small">重新估算</button></div>
+        <p id="cap-error" class="error"></p>
+        <div class="tiles" id="cap-tiles"></div>
+        <ul class="flow stack" id="cap-plans" style="margin-top:8px"></ul>
+        <details class="note" id="cap-idle-wrap" hidden><summary id="cap-idle-sum"></summary><ul class="flow stack" id="cap-idle" style="margin-top:8px"></ul></details>
+        <details class="note"><summary>說明</summary><p class="muted" id="cap-note" style="margin:8px 0 0"></p><p class="muted" id="cap-bill" style="margin:8px 0 0"></p></details>
+      </div>
+      <div class="pane-head" id="bill-guard"><div><h2>Cloudflare 帳單</h2><p class="muted">$5 方案。真的用到 60%、75%、85% 而且照這幾天的速度會超過，才慢慢放慢；用到 90% 就停到下個週期。</p></div></div>
+      <p id="sys-error" class="error"></p>
+      <div class="tiles" id="sys-tiles"></div>
+      <p class="muted" id="sys-pace" style="margin:10px 0 0"></p>
+      <div class="card" style="margin-top:12px">
+        <strong>帳單警示</strong>
+        <p class="muted" id="alert-note" style="margin:6px 0 10px"></p>
+        <div class="row"><input id="alert-pass" placeholder="你的 Orbit Pass" autocomplete="off" spellcheck="false" style="flex:1 1 0;min-width:0" /><button id="alert-save" class="small" style="flex:none">設定</button><button id="alert-test" class="small" style="flex:none">測試</button></div>
+        <p id="alert-ok" class="ok"></p>
+      </div>
       <div class="pane-head"><div><h2>AI 今天</h2><p class="muted">每個功能全部人一天加起來的次數（台灣的一天）。上限和暫停在設定。</p></div><button class="small" data-go="dev" data-to="set-ai">上限</button></div>
       <p id="ai-error" class="error"></p>
       <ul class="checks" id="ai-use"></ul>
-      <div class="pane-head"><div><h2>Gemini 在 Google 的今天</h2><p class="muted" id="google-note">Google 的每日額度照美國太平洋時間重置。</p></div></div>
+      <div class="pane-head"><div><h2>Gemini 今天</h2><p class="muted" id="google-note">Google 的每日額度照美國太平洋時間重置。</p></div></div>
       <ul class="checks" id="google-use"></ul>
       <div class="pane-head"><div><h2>Google 帳單</h2><p class="muted">Google 沒有預付餘額的 API：每次加值後輸入一次餘額，花費依下面的價格估算。</p></div></div>
       <p id="bill-error" class="error"></p>
@@ -502,11 +516,10 @@
           <div class="row" style="margin-top:10px"><span class="muted">1 USD =</span><input id="bill-rate" type="number" min="1" step="0.1" style="width:90px" /><span class="muted">NT$</span><button id="bill-prices-save" class="small">儲存價格</button></div>
         </details>
       </div>
-      <div class="pane-head"><div><h2>Worker 額度</h2></div></div>
+      <div class="pane-head"><div><h2>TDX</h2></div></div>
       <p id="use-error" class="error"></p>
-      <div class="tiles" id="use-tiles"></div>
-      <div class="card" style="margin-top:12px">
-        <div><strong>TDX 點數（每月 200 點）</strong><p class="muted" style="margin:2px 0 0">基本 1,500 次 1 點 · 進階 200 次 1 點</p></div>
+      <div class="card">
+        <div><strong>點數（每月 200 點）</strong><p class="muted" style="margin:2px 0 0">基本 1,500 次 1 點 · 進階 200 次 1 點</p></div>
         <div class="tiles" id="tdx-tiles" style="margin-top:10px"></div>
         <svg id="tdx-chart" class="chart" viewBox="0 0 360 150" role="img" aria-label="每天的 TDX 點數" style="margin-top:12px"></svg>
         <details class="note"><summary>每天的明細</summary>
@@ -523,22 +536,6 @@
       <div class="card">
         <strong>比賽進行中，比 ESPN 晚多久</strong>
         <div class="lag" id="dev-lag"></div>
-      </div>
-      <div class="card" id="door">
-        <div class="row spread"><strong>入場：同時在用的人</strong><button id="door-load" class="small">重新整理</button></div>
-        <p id="door-error" class="error"></p>
-        <div class="tiles" id="door-tiles"></div>
-        <div class="row door-set"><label for="door-max">同時最多</label><input id="door-max" type="number" min="0" step="10" inputmode="numeric" placeholder="不限" /><span class="muted">人</span><button id="door-save" class="small primary">套用</button></div>
-        <ul class="flow stack" id="door-pri" style="margin-top:8px"></ul>
-        <details class="note"><summary>說明</summary><p class="muted" style="margin:8px 0 0">在用＝15 分鐘內開過 App。到 80% 時，即時資料放慢一倍；額滿時再慢一點，新來的人排隊（App 顯示第幾位，每 20 秒再試），已經在用的人不受影響。帳單保護到「先顧基本」時也不再放新的人進來。優先通行的 Pass 不受限制、不占位置，到帳戶裡設定。0＝不限。</p></details>
-      </div>
-      <div class="card" id="cap">
-        <div class="row spread"><strong>容量：人數和額度</strong><button id="cap-load" class="small">重新估算</button></div>
-        <p id="cap-error" class="error"></p>
-        <div class="tiles" id="cap-tiles"></div>
-        <ul class="flow stack" id="cap-plans" style="margin-top:8px"></ul>
-        <details class="note" id="cap-idle-wrap" hidden><summary id="cap-idle-sum"></summary><ul class="flow stack" id="cap-idle" style="margin-top:8px"></ul></details>
-        <details class="note"><summary>說明</summary><p class="muted" id="cap-note" style="margin:8px 0 0"></p><p class="muted" id="cap-bill" style="margin:8px 0 0"></p></details>
       </div>
       <div id="dev-sets"></div>
       <div class="savebar"><span id="dev-state" class="muted">載入中…</span><div class="row"><button id="dev-defaults" class="small">恢復預設</button><button id="dev-save" class="primary" disabled>儲存</button></div></div>
@@ -771,9 +768,9 @@ $('forget').onclick = () => {
 // ---- Views (the address keeps the one open: #health opens on it) ----
 const VIEWS = {
   overview: () => loadOverview(),
-  accounts: () => loadWallets(),
+  accounts: () => Promise.all([loadWallets(), loadDoor()]),
   health: () => Promise.all([loadSystem(), loadHealth(), loadErrors()]),
-  usage: () => Promise.all([loadBilling(), loadUsage()]),
+  usage: () => Promise.all([loadCapacity(), loadSystem(), loadBilling(), loadUsage()]),
   dev: () => loadDev(),
   tools: () => Promise.all([loadGift(), loadPushes(), loadBackups()])
 };
@@ -890,13 +887,6 @@ function drawEcon(o) {
     kpi({ icon: 'flag', color: '#dc2626', label: '透支中', value: `${o.money?.overdrawn || 0} 個帳戶`, sub: o.money?.overdrawn ? '每月計息 1%' : '沒有', go: 'accounts' }),
     kpi({ icon: 'spark', color: '#db2777', label: '急難紓困（30 天）', value: `${R.month || 0} 次`, sub: `共 ${R.total || 0} 次 · ${big(R.paid || 0)}` })
   ].join('');
-  // 政府, all time: what it took (its biggest tax named) and its net.
-  const G = o.gov || {};
-  const topTax = GOV_ROWS.filter(r => r[2] === 'paid').sort((a, b) => (G.paid?.[b[0]] || 0) - (G.paid?.[a[0]] || 0))[0];
-  $('ov-gov').innerHTML = [
-    kpi({ icon: 'bank', color: '#475569', label: '繳給政府', value: big(G.paidTotal || 0), sub: G.paidTotal ? `最多是${topTax[4]}` : 'Securities 同步後', go: 'money' }),
-    kpi({ icon: 'exchange', color: '#475569', label: '政府淨收', value: big(-(G.net || 0)), sub: `發出紓困 ${big(G.gotTotal || 0)}`, go: 'money' })
-  ].join('');
 }
 // The health of everything behind the apps, as cells; each problem also a chip on the status card.
 const health = { cells: {}, issues: [] };
@@ -911,11 +901,11 @@ const HEALTH_CELLS = [
   ['ai', 'AI 今天', 'spark']
 ];
 // Where each cell's problem is shown (a part of 健康, or 用量 for AI).
-const HEALTH_AT = { guard: 'sys-tiles', pace: 'sys-tiles', jobs: 'beats', sources: 'health', deploys: 'deploys', secrets: 'secrets', errors: 'errs', ai: 'ai-use' };
+const HEALTH_AT = { guard: 'bill-guard', pace: 'bill-guard', jobs: 'beats', sources: 'health', deploys: 'deploys', secrets: 'secrets', errors: 'errs', ai: 'ai-use' };
 const healthIssues = () =>
   HEALTH_CELLS.map(([k, name]) => [k, name, health.cells[k]])
     .filter(([, , c]) => c && (c.tone === 'bad' || c.tone === 'warn'))
-    .map(([k, name, c]) => ({ tone: c.tone, text: c.issue || `${name}：${c.value}`, go: k === 'ai' ? 'usage' : 'health', to: HEALTH_AT[k] }));
+    .map(([k, name, c]) => ({ tone: c.tone, text: c.issue || `${name}：${c.value}`, go: ['guard', 'pace', 'ai'].includes(k) ? 'usage' : 'health', to: HEALTH_AT[k] }));
 const TONE = { ok: 'var(--q-good)', warn: '#d97706', bad: 'var(--q-bad)', wait: '#94a3b8' };
 function setHealth(k, tone, value, issue = '') {
   health.cells[k] = { tone, value, issue };
@@ -924,7 +914,7 @@ function setHealth(k, tone, value, issue = '') {
 function drawHealth() {
   $('ov-health').innerHTML = HEALTH_CELLS.map(([k, name, icon]) => {
     const c = health.cells[k] || { tone: 'wait', value: '檢查中…' };
-    return `<button type="button" class="hcell" data-go="${k === 'ai' ? 'usage' : 'health'}"><span class="st ${c.tone}">${tileHtml(ic(icon), TONE[c.tone], 'sm')}</span><span><b>${escHtml(name)}</b><small>${escHtml(c.value)}</small></span></button>`;
+    return `<button type="button" class="hcell" data-go="${['guard', 'pace', 'ai'].includes(k) ? 'usage' : 'health'}"><span class="st ${c.tone}">${tileHtml(ic(icon), TONE[c.tone], 'sm')}</span><span><b>${escHtml(name)}</b><small>${escHtml(c.value)}</small></span></button>`;
   }).join('');
   // The badge counts exactly the chips at 健康's top, so every number has its line.
   const bad = healthIssues();
@@ -940,11 +930,11 @@ function drawHero() {
   if (!o) return;
   const chips = [
     ...healthIssues().map(c => [c.text, c.go, c.tone, c.to]),
-    ...(o.attention.length ? [[`${o.attention.length} 個帳戶要處理`, 'overview', 'warn', 'ov-attn']] : [])
+    ...(o.attention.length ? [[`${o.attention.length} 個帳戶透支`, 'overview', 'warn', 'ov-attn']] : [])
   ];
   const tone = chips.some(c => c[2] === 'bad') ? 'bad' : chips.length ? 'warn' : 'ok';
   const waiting = Object.keys(health.cells).length < HEALTH_CELLS.length;
-  const html = heroCardHtml({ eyebrow: waiting ? '檢查中' : tone === 'ok' ? '一切正常' : '要注意', icon: ic(tone === 'ok' ? 'check' : 'bell'), title: tone === 'ok' ? (waiting ? '帳戶和金流都正常' : '所有系統都正常運作') : `${chips.length} 件事要注意`, sub: `${o.accounts.toLocaleString()} 個帳戶 · 今天 ${o.active.day} 人使用 · 流通 ${big(o.money.total)}` }, chips.length ? `<div class="hero-chips">${chips.map(([t, go, , to]) => `<button type="button" data-go="${go}"${to ? ` data-to="${to}"` : ''}>${escHtml(t)}</button>`).join('')}</div>` : '');
+  const html = heroCardHtml({ eyebrow: waiting ? '檢查中' : tone === 'ok' ? '一切正常' : '要注意', icon: ic(tone === 'ok' ? 'check' : 'bell'), title: tone === 'ok' ? (waiting ? '檢查中…' : '一切正常') : `${chips.length} 件事要注意`, sub: `${o.accounts.toLocaleString()} 個帳戶 · 今天 ${o.active.day} 人用過` }, chips.length ? `<div class="hero-chips">${chips.map(([t, go, , to]) => `<button type="button" data-go="${go}"${to ? ` data-to="${to}"` : ''}>${escHtml(t)}</button>`).join('')}</div>` : '');
   $('ov-hero').innerHTML = html;
   $('ov-hero').firstElementChild.classList.add(tone);
 }
@@ -959,16 +949,16 @@ async function loadOverview() {
     $('ov-kpis').innerHTML = [
       kpi({ icon: 'user', color: '#2563eb', label: '帳戶', value: o.accounts.toLocaleString(), sub: o.newWeek ? `這週 +${o.newWeek}` : `${o.used} 個用過`, up: o.newWeek > 0, trend: o.signups, go: 'accounts' }),
       kpi({ icon: 'live', color: '#16a34a', label: '今天使用', value: o.active.day.toLocaleString(), sub: `7 天 ${o.active.week} · 30 天 ${o.active.month}`, trend: o.lastSeen }),
-      kpi({ icon: 'coin', color: '#d97706', label: '流通中的錢', value: big(o.money.total), sub: `最多 ${big(o.money.top)}`, go: 'money' }),
-      kpi({ icon: 'exchange', color: weekIn >= 0 ? '#0d9488' : '#dc2626', label: '這週淨流入', value: big(weekIn), sub: o.money.overdrawn ? `${o.money.overdrawn} 個透支` : '沒有透支', trend: o.days.map((_, i) => Math.max(0, o.daily.in[i] - o.daily.out[i])), go: 'money' })
+      kpi({ icon: 'coin', color: '#d97706', label: '大家的錢', value: big(o.money.total), sub: `最多 ${big(o.money.top)}`, go: 'money' }),
+      kpi({ icon: 'exchange', color: weekIn >= 0 ? '#0d9488' : '#dc2626', label: '這週進出', value: big(weekIn), sub: o.money.overdrawn ? `${o.money.overdrawn} 個透支` : '沒有透支', trend: o.days.map((_, i) => Math.max(0, o.daily.in[i] - o.daily.out[i])), go: 'money' })
     ].join('');
     $('ov-attn-n').textContent = o.attention.length || '';
-    $('ov-attn').innerHTML = o.attention.length ? acctCard(o.attention) : emptyCard('check', '沒有透支、逾期或催收的帳戶');
+    $('ov-attn-wrap').hidden = !o.attention.length;
+    $('ov-attn').innerHTML = o.attention.length ? acctCard(o.attention, { compact: true }) : '';
     drawEcon(o);
     const appRows = Object.entries(o.apps).sort((a, b) => b[1].users - a[1].users);
     $('ov-apps').innerHTML = appRows.map(([a, v]) => `<div class="app-card" style="--c:${BRANDS[a]?.color || 'var(--q-accent)'}">${appIc(a)}<b>${escHtml(BRANDS[a]?.short || appName(a))}</b><small>${v.users} 人 · 這週 ${v.week}</small><span class="meter"><i style="width:${v.users ? Math.max(3, (v.week / v.users) * 100) : 0}%"></i></span></div>`).join('');
     drawChart(o);
-    $('ov-rich').innerHTML = acctCard(o.richest, { compact: true });
     $('ov-new').innerHTML = acctCard(o.newest.map(w => ({ ...w, shown: fmtDay(w.created) })), { compact: true, sub: null });
     fitAll($('ov'));
     drawHealth();
@@ -1124,9 +1114,10 @@ const PLACES = [
   ['總覽', 'overview', 'grid', '#2563eb', '首頁 狀態 overview'],
   ['帳戶', 'accounts', 'user', '#2563eb', '使用者 accounts users'],
   ['證券的錢', 'money', 'coin', '#d97706', '金流 錢 經濟 對帳 稅 money economy'],
-  ['健康', 'health', 'live', '#16a34a', '系統 排程 資料來源 部署 金鑰 r2 d1 帳單保護 節流 health cron'],
-  ['用量', 'usage', 'chart', '#7c3aed', 'google 帳單 tdx 額度 usage billing'],
-  ['設定', 'dev', 'target', '#64748b', '速度 開發 容量 dev config'],
+  ['健康', 'health', 'live', '#16a34a', '系統 排程 資料來源 部署 金鑰 r2 d1 錯誤 health cron'],
+  ['額度', 'usage', 'chart', '#7c3aed', '容量 人數 帳單 cloudflare google gemini ai tdx 節流 quota usage billing'],
+  ['現在在用', 'accounts', 'user', '#16a34a', '入場 排隊 同時 優先 door', 'door'],
+  ['設定', 'dev', 'target', '#64748b', '速度 開發 ai 上限 dev config'],
   ['公開領取', 'tools', 'send', '#4f46e5', '領取 發送 公開 學校 qr giveaway key', 'tool-gift'],
   ['發放 Orbit Pass', 'tools', 'ticket', '#2563eb', '發 pass 新帳戶 issue', 'tool-issue'],
   ['找回帳戶', 'tools', 'lock', '#0d9488', '裝置代碼 遺失 recover', 'tool-recover'],
@@ -1781,11 +1772,6 @@ async function loadUsage() {
     drawAi(u.ai);
     drawGoogle(u.google);
     drawTdx(u.tdx, u.at);
-    const share = (n, cap) => (cap ? `${Math.round((n / cap) * 100)}% · 上限 ${cap.toLocaleString()}` : '只計數');
-    $('use-tiles').replaceChildren(
-      tile('天氣 Google（今天）', u.weather.googleToday == null ? '—' : u.weather.googleToday.toLocaleString(), share(u.weather.googleToday || 0, u.weather.cap)),
-      ...Object.entries(u.transit).map(([k, v]) => tile(`交通 ${SKU[k] || k}（本月）`, v.used.toLocaleString(), share(v.used, v.cap)))
-    );
   } catch (e) {
     $('use-error').textContent = e.message;
   }
@@ -1950,8 +1936,6 @@ async function loadDev() {
     devNow = got.now ? cleanDev(got.now) : null;
     devDraft = cleanDev(devSaved);
     drawDev();
-    loadDoor();
-    loadCapacity();
   } catch (e) {
     $('dev-error').textContent = e.message;
   }
@@ -2014,6 +1998,8 @@ const quotaName = key => {
 async function loadCapacity() {
   $('cap-error').textContent = '';
   try {
+    // (Its note says whether 依人數自動調整 is on: the settings, read once when 設定 wasn't opened.)
+    if (!devSaved) await admin('config').then(got => { if (!devSaved) devSaved = { ...cleanDev(got), at: got.at || 0 }; }).catch(() => {});
     const p = await admin('capacity');
     const u = p.users;
     const q = p.quotas || { rows: [] };
@@ -2350,12 +2336,13 @@ $('links').replaceChildren(...LINKS.map(([n, href]) => el('a', { href, target: '
 const BILL_DEFAULTS = {
   rate: 32,
   prices: {
-    maps: { free: 10000, per: 7 }, autocomplete: { free: 10000, per: 2.83 }, details: { free: 10000, per: 5 }, detailsPro: { free: 5000, per: 17 }, textSearch: { free: 5000, per: 32 }, routes: { free: 10000, per: 5 },
+    maps: { free: 10000, per: 7 }, autocomplete: { free: 10000, per: 2.83 }, details: { free: 10000, per: 5 }, detailsPro: { free: 5000, per: 17 }, textSearch: { free: 5000, per: 32 }, routes: { free: 10000, per: 5 }, matrix: { free: 10000, per: 5 }, drive: { free: 5000, per: 10 },
     weather: { free: 10000, per: 0.15 },
     'gemini-3.5-flash-lite': { in: 0.3, cached: 0.03, out: 2.5 }, 'gemini-3.7-flash': { in: 0.75, cached: 0.075, out: 3.75 }
   }
 };
-const BILL_NAMES = { maps: '地圖載入（Transit）', autocomplete: '地點搜尋', details: '地點詳細', detailsPro: '地點名稱（Pro）', textSearch: '地點搜尋（補充）', routes: '路線規劃', weather: '天氣 API' };
+// The same names as 容量's (SKU_ZH); the showcase's shares are inside these, never billed apart.
+const BILL_NAMES = { maps: '地圖載入', autocomplete: '地點搜尋', details: '地點位置', detailsPro: '地點名稱', textSearch: '搜尋補充', routes: '路線規劃', matrix: '步行時間', drive: '公車車流', weather: 'Google 天氣' };
 // Each Gemini route, by what the person sees.
 const GEMINI_FEATURES = { gemini: '課表照片匯入（Class）', 'nl-edit': '課表 AI 修改（Class）', 'law-ask': '白話解釋（Law）', 'law-chat': '問法律（Law）', 'money-read': '拍照記帳（Money）', check: '管理面板的檢查' };
 let bill = null;
@@ -2370,7 +2357,7 @@ function billCosts() {
   const p = billPrices();
   const rate = bill.saved?.rate || BILL_DEFAULTS.rate;
   const rows = [];
-  for (const [k, n] of Object.entries(bill.maps)) rows.push({ k, name: BILL_NAMES[k] || k, used: n.toLocaleString(), free: p[k]?.free, ntd: Math.max(0, n - (p[k]?.free || 0)) * (p[k]?.per || 0) / 1000 * rate });
+  for (const [k, n] of Object.entries(bill.maps)) if (!k.startsWith('showcase')) rows.push({ k, name: BILL_NAMES[k] || k, used: n.toLocaleString(), free: p[k]?.free, ntd: Math.max(0, n - (p[k]?.free || 0)) * (p[k]?.per || 0) / 1000 * rate });
   const w = Object.values(bill.weather).reduce((a, b) => a + b, 0);
   rows.push({ k: 'weather', name: BILL_NAMES.weather, used: w.toLocaleString(), free: p.weather.free, ntd: Math.max(0, w - p.weather.free) * p.weather.per / 1000 * rate });
   // (Weather's days were kept 2 days until 2026-10-11: October's count is its last days only.)
