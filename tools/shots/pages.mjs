@@ -50,6 +50,8 @@ export const PAGES = {
     'epl-leaders': { args: click('#tab-matches', '[data-league=epl]', wait(2500), tap('數據|Stats'), wait(8000)) },
     'epl-team-stats': { args: click('#tab-matches', '[data-league=epl]', wait(2500), tap('數據|Stats'), wait(6000), tap('球隊|Teams'), wait(6000)) },
     'nba-team-stats': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('數據|Stats'), wait(6000), tap('球隊|Teams'), wait(5000)) },
+    // F1's teams by the drivers' numbers (Jay 2026-11-06: "like other sport should have team").
+    'f1-team-stats': { args: click('#tab-matches', '[data-league=f1]', wait(3000), tap('數據|Stats'), wait(6000), tap('車隊|Teams'), wait(2000)) },
     'nba-bracket': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('季後賽|Playoffs'), wait(5000)) },
     'f1-season': { args: click('#tab-matches', '[data-league=f1]', wait(4000)) },
     // 轉播's 愛爾達節目表 (full height whatever the day), then swiped a finger left across it: the next day.
