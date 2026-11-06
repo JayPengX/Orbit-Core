@@ -75,6 +75,40 @@ test('a read within its ttl is answered from memory; a failed one is held, not a
   assert.equal(asked.length, m, 'held, not asked again at once');
 });
 
+test('a phone whose Cache Storage never answers still reads; a read that never ends is asked anew after a while, not waited on for good', async () => {
+  // Cache Storage that never answers (iOS, now and then): the read goes on after a moment.
+  const open = globalThis.caches.open;
+  globalThis.caches.open = async () => ({ match: () => new Promise(() => {}), put: async () => {}, keys: async () => [], delete: async () => false });
+  try {
+    answer = () => new Response('{"ok":1}');
+    const t = Date.now();
+    assert.deepEqual(await kit.proxyJson('https://example.test/stuck-cache.json', { alone: true }), { ok: 1 });
+    assert.ok(Date.now() - t < 3000, 'not held by the device');
+    assert.equal(await kit.peekJson('https://example.test/stuck-cache.json'), null);
+  } finally {
+    globalThis.caches.open = open;
+  }
+  // A read that never ends: later asks share it for a while, then ask anew.
+  const url = 'https://example.test/hangs.json';
+  answer = () => new Promise(() => {});
+  kit.proxyJson(url, { alone: true, ttl: 86_400_000, timeout: 50 }).catch(() => {});
+  await settle();
+  const n = asked.length;
+  kit.proxyJson(url, { alone: true, ttl: 86_400_000, timeout: 50 }).catch(() => {});
+  await settle();
+  assert.equal(asked.length, n, 'shared while on its way');
+  const now = Date.now;
+  const later = now() + 46_000;
+  Date.now = () => later;
+  try {
+    answer = () => new Response('{"back":1}');
+    assert.deepEqual(await kit.proxyJson(url, { alone: true, ttl: 86_400_000, timeout: 50 }), { back: 1 });
+    assert.equal(asked.length, n + 1, 'asked anew');
+  } finally {
+    Date.now = now;
+  }
+});
+
 test("the family's packs: read from R2, kept under their old address, a missing pack a failure", async () => {
   answer = url => (url.endsWith('/sports/mlb/2026.json') ? new Response('{"season":2026}') : new Response('', { status: 404 }));
   assert.deepEqual(await kit.packJson('sports/mlb/2026.json'), { season: 2026 });

@@ -584,6 +584,11 @@ async function persisted(key) {
     return null;
   }
 }
+// (Cache Storage on a phone now and then never answers: its copy is waited
+// on PERSIST_WAIT_MS at most, a read never held up for good behind it, as
+// Transit's own copies are.)
+const PERSIST_WAIT_MS = 1500;
+const persistedSoon = key => Promise.race([persisted(key), new Promise(r => setTimeout(r, PERSIST_WAIT_MS, null))]);
 async function persist(key, text) {
   if (!hasCaches()) return;
   try {
@@ -661,7 +666,7 @@ export function wipeDevice() {
   clearData();
 }
 // The last copy kept on this device, of any age: { at, data } or null.
-export const peekJson = (url, { trim = '' } = {}) => persisted(dataKey(url, trim));
+export const peekJson = (url, { trim = '' } = {}) => persistedSoon(dataKey(url, trim));
 
 // (`read`: a data proxy read, which takes a session run out up to 6 hours
 // (orbit-token.js READ_GRACE_MS): the token kept on the device goes at once,
@@ -973,13 +978,17 @@ export function packJson(path, { ttl = 3 * 3_600_000, timeout = 30_000 } = {}) {
 // minute: each copy is a whole answer's write (an MLB game's is 0.9 MB).
 const LIVE_KEEP_MS = 60_000;
 const keptAt = new Map(); // key → when it was last written to the device
+// A read on its way this long is taken for lost (a network that swallowed it,
+// a body that never ended): asked anew, never waited on by every later ask.
+const PENDING_MAX_MS = 45_000;
 function keptJson(url, key, { ttl, keep }, read) {
   const hit = memory.get(key);
-  if (hit && Date.now() - hit.at < (hit.failed ? Math.min(ttl, hit.hold) : hit.stale ? Math.min(ttl, RETRY_MS) : ttl)) return hit.promise;
-  // A read still on its way is that read, however long it's taking: never a
-  // second one alongside it (on a slow link a page asked every 2 s was being
-  // downloaded two and three times over).
-  if (hit?.pending) return hit.promise;
+  const lost = hit?.pending && Date.now() - hit.at >= PENDING_MAX_MS;
+  if (hit && !lost && Date.now() - hit.at < (hit.failed ? Math.min(ttl, hit.hold) : hit.stale ? Math.min(ttl, RETRY_MS) : ttl)) return hit.promise;
+  // A read still on its way is that read, however long it's taking (up to
+  // PENDING_MAX_MS): never a second one alongside it (on a slow link a page
+  // asked every 2 s was being downloaded two and three times over).
+  if (hit?.pending && !lost) return hit.promise;
   // (The entry is there before its read starts: an answer this page already
   // had, young enough, is handed back at once, and it was set on an entry
   // not made yet, 2026-11-06: the read failed and its day was taken for
@@ -988,7 +997,7 @@ function keptJson(url, key, { ttl, keep }, read) {
   const promise = (entry.promise = (async () => {
     // The last answer this page had is the copy to fall back on: the
     // device's is read (and parsed) only for a key's first read here.
-    const saved = keep ? (hit?.data !== undefined ? { at: hit.dataAt, data: hit.data } : await persisted(key)) : null;
+    const saved = keep ? (hit?.data !== undefined ? { at: hit.dataAt, data: hit.data } : await persistedSoon(key)) : null;
     if (saved && Date.now() - saved.at < ttl) return ((entry.data = saved.data), (entry.dataAt = saved.at), saved.data);
     let got;
     let data;
