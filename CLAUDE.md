@@ -165,7 +165,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | Offline | `onlineOnly` (live apps: Securities, Transit, Sports), `keepOffline` (the rest open on what they kept), `netState` / `netVerdict` |
 | Picks for you | `rank` + `feedback.mjs` (`lifter`, `shown`, `picked`, `did`, `keep`); measured: `tools/picks-backtest.mjs` |
 | Language | `W`, `makeT`, `place` (lang.mjs): every page in one language |
-| Notices | `schedulePush([{ at, title, body, tag, kind, check }])`, `NOTICE_KINDS`, `notifyOn`, `enablePush` |
+| Notices | `schedulePush([{ at, title, body, tag, hash, kind, check }])` (tap: `hash`), `NOTICE_KINDS`, `notifyOn`, `enablePush` |
 | A bug report | `rec(kind, data)` into the Pass sheet's 除錯紀錄 |
 
 ### 3.4 Tokens (`orbit.css`)
@@ -407,8 +407,7 @@ Securities' broker rules (`stock-access.mjs`, `stock-credit.mjs`): its MAP.md.
 ## 8. Notices (`/push`)
 
 Apps hand the Worker their coming notices (`schedulePush`); it sends them by
-Web Push (WebCrypto) and can check first (an ESPN final, a Yahoo price, the
-weather, a bus). One device per person per app; every kind in `NOTICE_KINDS`
+Web Push and can check first (an ESPN final, a price, weather, a bus). One device per person per app; every kind in `NOTICE_KINDS`
 can be turned off on its own.
 
 ## 9. Speeds, capacity and the bill
