@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   tdxRequest, tdxGet, warmBikes, SLOW_MS, tdxAccess, resetTdxToken, resetPace, resetTurns, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
-  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta, tdxTrim, tdxUse, DEV_SHARE
+  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta, tdxTrim, tdxUse, DEV_SHARE, HOT_ASKS
 } from '../transit.js';
 
 const NOW = Date.parse('2026-10-03T01:00:00Z');
@@ -805,6 +805,8 @@ test("TDX's month is Taiwan's: the first hours of a Taiwan month don't count las
 test('the TDX allowlist takes no "." or ".." (read a level up, past the rule)', () => {
   for (const p of ['basic/v2/Bus/Route/InterCity/..', 'basic/v2/Bus/Schedule/City/Taipei/%2E%2E', 'basic/v2/Bus/Route/City/./Hsinchu']) assert.equal(tdxRequest(p), null, p);
   assert.ok(tdxRequest('basic/v2/Bus/Route/City/Hsinchu'));
+  // (A plan's buses' places, several routes in one ask.)
+  for (const scope of ['City/HsinchuCounty', 'InterCity']) assert.ok(tdxRequest(`basic/v2/Bus/RealTimeByFrequency/${scope}?$filter=RouteUID eq 'HSQ0747' or RouteUID eq 'HSQ0748'&$select=RouteUID,PlateNumb,Direction,BusPosition,GPSTime`), scope);
 });
 
 test("TDX's plans: a metro exit's doubled station said once (台北車站 M1, not 台北車站台北車站 M1); a walk of no length is a wait, no step", () => {
@@ -816,40 +818,64 @@ test("TDX's plans: a metro exit's doubled station said once (台北車站 M1, no
   for (const n of ['高高屏', '新竹', '台北車站', '屏東屏東']) assert.equal(onceName(n), n === '屏東屏東' ? '屏東' : n);
 });
 
-test('buses due: one TDX call for a whole city, every ask answered with its own stops (or route) from it; a path TDX refuses is not asked again', async () => {
+test('buses due: a quiet city asks its stops (or routes) alone; a busy one is read whole once and every ask answered from it, the running list kept at the edge; a path TDX refuses is not asked again', async () => {
   fresh();
   resetEta();
   const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 'secret', RATE_LIMIT_KV: memKv(), TDX_PER_MIN: '100' };
   const cache = memCache();
   const log = [];
+  const all = [
+    { StopUID: 'TPE1', RouteUID: 'TPE10', EstimateTime: 60 },
+    { StopUID: 'TPE1', RouteUID: 'TPE11', EstimateTime: 300 },
+    { StopUID: 'TPE2', RouteUID: 'TPE10', EstimateTime: 120 },
+    { StopUID: 'TPE3', RouteUID: 'TPE12', StopStatus: 1 }
+  ];
+  // (TDX's filter: the rows of the stops or routes it names.)
   const fetchFn = async url => {
     if (url.includes('token')) return json({ access_token: 'T', expires_in: 86400 });
     log.push(url);
     if (url.includes('S2STravelTime')) return new Response('{"Message":"RailSystem: \'TRTCMG\' is not accepted"}', { status: 400 });
-    return json([
-      { StopUID: 'TPE1', RouteUID: 'TPE10', EstimateTime: 60 },
-      { StopUID: 'TPE1', RouteUID: 'TPE11', EstimateTime: 300 },
-      { StopUID: 'TPE2', RouteUID: 'TPE10', EstimateTime: 120 },
-      { StopUID: 'TPE3', RouteUID: 'TPE12', StopStatus: 1 }
-    ]);
+    const named = [...decodeURIComponent(url).matchAll(/(StopUID|RouteUID) eq '([^']+)'/g)];
+    return json(named.length ? all.filter(r => named.some(([, f, v]) => r[f] === v)) : all);
   };
   const ask = (qs, now = NOW) => handleTransit(new Request(`https://w/transit/eta?${qs}`), env, {}, '/transit/eta', { session: { s: 'S' }, fetchFn, now, cache });
   const a = await (await ask('city=Taipei&stops=TPE1,TPE3')).json();
   assert.deepEqual(a.map(r => r.RouteUID), ['TPE10', 'TPE11', 'TPE12']);
-  assert.equal(log.length, 2, 'a city’s first ask: the whole city, and these stops beside it');
-  assert.ok(log.some(u => /EstimatedTimeOfArrival\/City\/Taipei\?\$select=StopUID,.*&\$top=60000/.test(decodeURIComponent(u))));
-  const b = await (await ask('city=Taipei&route=TPE10', NOW + 5000)).json();
+  assert.equal(log.length, 1, 'a quiet city: these stops alone, not the whole city');
+  assert.match(decodeURIComponent(log[0]), /City\/Taipei\?\$filter=StopUID eq 'TPE1' or StopUID eq 'TPE3'&\$select=/);
+  // Busy here (HOT_ASKS asks in half a minute): the whole city once, every ask after from it.
+  for (let i = 1; i < HOT_ASKS; i++) await ask(`city=Taipei&stops=TPE${i}`, NOW + i * 1000);
+  assert.ok(log.some(u => /EstimatedTimeOfArrival\/City\/Taipei\?\$select=StopUID,.*&\$top=60000/.test(decodeURIComponent(u))), 'busy: the whole city read');
+  const n = log.length;
+  const b = await (await ask('city=Taipei&route=TPE10', NOW + 20_000)).json();
   assert.deepEqual(b.map(r => r.StopUID), ['TPE1', 'TPE2']);
-  const run = await (await handleTransit(new Request('https://w/transit/running?city=Taipei'), env, {}, '/transit/running', { session: { s: 'S' }, fetchFn, now: NOW + 6000, cache })).json();
+  const run = await (await handleTransit(new Request('https://w/transit/running?city=Taipei'), env, {}, '/transit/running', { session: { s: 'S' }, fetchFn, now: NOW + 20_500, cache })).json();
   assert.deepEqual(run.routes, { TPE10: 2, TPE11: 1, TPE12: 0 });
-  assert.equal(log.length, 2, 'then every stop, every route and the running list from the one call');
+  // A plan's routes in one ask, from the copy.
+  const both = await (await ask('city=Taipei&routes=TPE10,TPE12,nope', NOW + 20_800)).json();
+  assert.deepEqual(both.map(r => `${r.RouteUID} ${r.StopUID}`), ['TPE10 TPE1', 'TPE10 TPE2', 'TPE12 TPE3']);
+  assert.equal(log.length, n, 'then every stop, every route and the running list from the one call');
+  // The running list from this colo's cache in another isolate (none of its own): no TDX call, no city read.
+  resetEta();
+  const shared = await (await handleTransit(new Request('https://w/transit/running?city=Taipei'), env, {}, '/transit/running', { session: { s: 'S' }, fetchFn, now: NOW + 30_000, cache })).json();
+  assert.deepEqual(shared.routes, run.routes);
+  assert.equal(log.length, n, 'kept at the edge');
+  // A quiet city's running list: its own slim read (three fields), not the whole estimates.
+  const quiet = await (await handleTransit(new Request('https://w/transit/running?city=Hsinchu'), env, {}, '/transit/running', { session: { s: 'S' }, fetchFn, now: NOW + 30_000, cache })).json();
+  assert.equal(Object.keys(quiet.routes).length, 3);
+  assert.match(decodeURIComponent(log.at(-1)), /EstimatedTimeOfArrival\/City\/Hsinchu\?\$select=RouteUID,StopStatus,EstimateTime&\$top=60000/);
+  assert.equal(log.length, n + 1);
   assert.equal((await ask('city=Taipei&stops=nope')).status, 400);
   // 公路客運 (all Taiwan, too big to keep whole): its stops' own ask.
   const many = Array.from({ length: 50 }, (_, i) => `THB${100 + i}`);
   await ask(`city=InterCity&stops=${many.join(',')}`);
-  const inter = log.slice(2).map(decodeURIComponent);
+  const inter = log.slice(n + 1).map(decodeURIComponent);
   assert.equal(inter.length, 2, '40 stops a call');
   assert.ok(inter.every(u => /InterCity\?\$filter=StopUID eq 'THB\d+'( or StopUID eq 'THB\d+')*&\$select=/.test(u)));
+  await ask('city=InterCity&routes=THB5700,THB5900');
+  assert.match(decodeURIComponent(log.at(-1)), /InterCity\?\$filter=RouteUID eq 'THB5700' or RouteUID eq 'THB5900'&\$select=/);
+  await ask('city=InterCity&route=THB5608');
+  assert.match(decodeURIComponent(log.at(-1)), /InterCity\?\$filter=RouteUID eq 'THB5608'&\$select=/, 'one route asked as before');
   const path = 'basic/v2/Rail/Metro/S2STravelTime/TRTCMG';
   assert.equal((await tdxGet(env, path, { fetchFn, cache, now: NOW })).status, 502);
   assert.equal((await tdxGet(env, path, { fetchFn, cache, now: NOW + 60_000 })).status, 502);
