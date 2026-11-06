@@ -392,6 +392,7 @@ test('the last 7 days hour by hour: every Worker summed per hour, people\'s part
   const r = await useByHour({ CF_GUARD_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, { fetcher, now, kv: store });
   assert.equal(vars.s, '2026-10-27T06:00:00Z');
   assert.ok(NEAR_TAIWAN.every(c => peopleQuery.includes(`"${c}"`)));
+  assert.match(peopleQuery, /scriptName: "orbit-workers-proxy"/, 'the proxy alone: phones call nothing else');
   assert.ok(NEAR_TAIWAN.includes('TPE') && !NEAR_TAIWAN.includes('IAD'));
   assert.equal(r.people, true);
   assert.deepEqual(r.hours, [

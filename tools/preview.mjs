@@ -814,9 +814,10 @@ if (key === 'admin') {
     for (let t = end - 7 * DAY; t < end; t += 3_600_000) {
       const tw = new Date(t + 8 * 3_600_000).getUTCHours();
       const busy = tw >= 7 ? (tw >= 18 ? 1.6 : 1) : 0.15;
-      hours.push([t, Math.round(520 + 1150 * busy), Math.round(6500 + 11500 * busy)]);
+      // (People's part, the proxy's near Taiwan: a tenth of the CPU, as on 2026-11-06; the rest our tools and the crons.)
+      hours.push([t, Math.round(520 + 1150 * busy), Math.round(6500 + 11500 * busy), Math.round(90 * busy), Math.round(1500 * busy)]);
     }
-    env.GUARD = { fetch: async () => new Response(JSON.stringify({ at: now - 600_000, hours })) };
+    env.GUARD = { fetch: async () => new Response(JSON.stringify({ at: now - 600_000, people: true, hours })) };
   }
   // (The door, door.js, made up: 184 people in of 200 (busy), 3 priority, a peak and some turned away today.)
   {

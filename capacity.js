@@ -144,6 +144,14 @@ export function splitHours(h, now = Date.now()) {
   return out;
 }
 
+// Too few people a week to tell what one uses (FEW: the owner and a friend,
+// testing everything, ~17 s of CPU a day each on 2026-11-06): the plan's
+// people then by typical use instead, a week's person about a second of CPU
+// a day: three apps' whole sessions on a day they open Orbit (0.6 s; one is
+// 30–750 ms, measured 2026-11-05) and a live screen left open a while
+// (Transit, 1.9 s an hour), on about half the days (DAILY).
+export const FEW = 10;
+export const TYPICAL_CPU_MS = 1000;
 // The people a quota holds: this week's × room ÷ use (null with nobody yet or nothing used).
 const holdsOf = (week, room, use) => (week > 0 && use > 0 ? Math.max(0, Math.floor((week * room) / use)) : null);
 
@@ -202,7 +210,10 @@ export function quotas({ users = {}, guard = null, hours = null, usage = {}, map
   const least = f => rows.filter(r => r.by === 'people' && r[f] != null && !r.paused).reduce((a, r) => (!a || r[f] < a[f] ? r : a), null);
   const h = least('holds');
   const split = splitHours(hours, now);
-  return { rows, week, holds: h ? { people: h.holds, key: h.key } : null, measured: !!split, near: !!split?.cpuMs?.near };
+  // (By typical use: the CPU a day past the fixed part, a second a person.)
+  const cpu = split && rows.find(r => r.key === 'cf:cpuMs');
+  const typical = cpu ? { people: Math.max(0, Math.floor((cpu.capDay - cpu.fixedDay) / TYPICAL_CPU_MS)), ms: TYPICAL_CPU_MS, few: week < FEW } : null;
+  return { rows, week, holds: h ? { people: h.holds, key: h.key } : null, typical, measured: !!split, near: !!split?.cpuMs?.near };
 }
 
 // What the panel shows and the cron applies: people, each budget against
