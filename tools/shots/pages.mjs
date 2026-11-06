@@ -24,6 +24,8 @@ const swipeAt = dx => `js:(async()=>{const x=innerWidth*0.6,y=innerHeight-30;con
 export const PAGES = {
   sports: {
     default: ['tabs'],
+    // (What tools/layout-check.mjs looks at beside every tab: the sheets that matter.)
+    check: ['settings', 'epl-table', 'team-nba', 'player-nba', 'nba-game', 'f1-weekend'],
     // 追蹤's 設定: the leagues and follows as rows, each with its ✕ and grip; then one league lifted mid-drag (with --account fan).
     settings: { args: click('#tab-following', wait(3000), "js:document.querySelector('.set-open').click()", wait(2500)) },
     'settings-drag': { args: click('#tab-following', wait(3000), "js:document.querySelector('.set-open').click()", wait(2500), lift('dialog[open] .set-order'), wait(700)) },
@@ -196,6 +198,8 @@ export const PAGES = {
   },
   transit: {
     default: ['tabs', 'trip'],
+    // (What tools/layout-check.mjs looks at beside every tab: the sheets that matter.)
+    check: ['plans', 'place', 'search', 'ticket'],
     // A real trip from where the phone is (新竹車站) to 臺北車站: the plans card, then the first plan.
     trip: { args: ['--google-map', ...click('#tab-map', wait(2500), "js:(()=>{const q=document.querySelector('#q');q.focus();q.value=document.documentElement.lang==='en'?'Taipei Main Station':'臺北車站';q.dispatchEvent(new Event('input',{bubbles:true}))})()", wait(8000), '.ot-res', "js:document.querySelector('[data-card=go]')?.click()", wait(8000), "js:document.querySelector('.ot-plan[data-plan=\"0\"]')?.click()", wait(5000))] },
     // The same trip's 路線 card, the ways listed (none opened).
@@ -239,6 +243,8 @@ export const PAGES = {
   },
   weather: {
     default: ['tabs'],
+    // (What tools/layout-check.mjs looks at beside every tab: the sheets that matter.)
+    check: ['day', 'search'],
     // (The new 天氣's readings first, today's panels after, so a --before main diff finds both.)
     rain: { args: click('.ot-g[data-metric="rain"], .q-panel[data-open="rain"]', '[data-range="rain:10d"]') },
     air: { args: click('.ot-g[data-metric="air"], .q-panel[data-open="air"]') },
@@ -253,6 +259,8 @@ export const PAGES = {
   },
   orbit: {
     default: ['tabs'],
+    // (What tools/layout-check.mjs looks at beside every tab: the sheets that matter.)
+    check: ['class', 'editor'],
     // 今天 one scroll down: the day's classes and the countdowns.
     lower: { args: click(wait(2000), 'js:scrollTo(0, innerHeight * 0.8)', wait(800)) },
     // (Class needs a timetable: --account demo, or -- --store classFocusData=….)
@@ -272,6 +280,8 @@ export const PAGES = {
   },
   money: {
     default: ['tabs'],
+    // (What tools/layout-check.mjs looks at beside every tab: the sheets that matter.)
+    check: ['stats', 'entry', 'cats'],
     // 統計's card on each scale (日 週 月 年), a past month picked from its bars, the period's menu, 自訂期間.
     stats: { hash: 'stats', args: click(wait(800)) },
     'stats-day': { hash: 'stats', args: click(wait(800), "js:document.querySelectorAll('.mn-range button')[0].click()", wait(800)) },
@@ -300,6 +310,8 @@ export const PAGES = {
   },
   words: {
     default: ['tabs'],
+    // (What tools/layout-check.mjs looks at beside every tab: the sheets that matter.)
+    check: ['quiz', 'word', 'contest'],
     // 今天 one scroll down: where to pick up, the ways to practise, the rest.
     lower: { args: click(wait(2500), 'js:scrollTo(0, innerHeight * 0.8)', wait(800)) },
     quiz: { args: click('.hero .q-hc-btn', wait(2000)) },
@@ -323,6 +335,8 @@ export const PAGES = {
   },
   beats: {
     default: ['tabs'],
+    // (What tools/layout-check.mjs looks at beside every tab: the sheets that matter.)
+    check: ['studio', 'now-playing'],
     // 首頁 playing (the player card, its part lit), and further down. (Each also runs on the
     // home before Orbit's own look, 2026-11-03, for --before: its first ▶ and its mini bar.)
     'home-playing': { args: click("js:(document.querySelector('.bt-play')||[...document.querySelectorAll('button')].find(b=>b.offsetParent&&/play|播放/i.test(b.getAttribute('aria-label')||''))).click()", wait(12000)) },
@@ -337,6 +351,8 @@ export const PAGES = {
   },
   law: {
     default: ['tabs'],
+    // (What tools/layout-check.mjs looks at beside every tab: the sheets that matter.)
+    check: ['article', 'ruling', 'bill-diff', 'card'],
     // 我的 with what a person follows (`--account follows`: two bills, two 立委, a law), and a 立委 and a bill tapped there: each a sheet over 我的.
     mine: { hash: 'tab=mine', args: click(wait(5000)) },
     'mine-person': { hash: 'tab=mine', args: click(wait(5000), '#mine-people .lw-track-head', wait(2500)) },
@@ -384,6 +400,8 @@ export const PAGES = {
   },
   securities: {
     default: ['tabs'],
+    // (What tools/layout-check.mjs looks at beside every tab: the sheets that matter.)
+    check: ['stock', 'ticket', 'more'],
     // 台股 › 上市, the list; 台積電's page (candles, 6 months), its order ticket; the tool sheets.
     list: { args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(3000)) },
     stock: { args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(2500), "js:[...document.querySelectorAll('[data-action=open][data-symbol=\"2330.TW\"]')].find(e => e.offsetParent).click()", wait(3000), '[data-action=chart-style][data-v=candle]', '[data-action=range][data-range="6mo"]', wait(4000)) },

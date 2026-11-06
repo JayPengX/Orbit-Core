@@ -205,20 +205,29 @@ column), centred. Fixed things use `--q-vw` (the page's width), `--q-col-l`
 and `--q-col-r` (beside it), `--q-mid` (its middle); never `100vw`.
 
 **Laying a page out wide.** An app that lays out raises its own
-`--q-page-max` (`:root.q-wide { --q-page-max: 1180px }`) and then:
+`--q-page-max` (`:root.q-wide { --q-page-max: var(--q-wide-max, 1180px) }`) and then:
+
+- **Pieces that fit their own width** (Jay 2026-11-06: "such a work to
+  adjust UI design constantly over three kind of devices"). `.q-cols`,
+  `.q-flow`, `.q-grid` and `.q-split` read the box they are in, never the
+  screen, so one layout holds on a phone, an iPad, a computer, in a sheet
+  and in one side of a split. Build a wide page from them, not from
+  `q-wide` rules of your own.
 
 - **Keeps the phone's order.** Reading left to right, top to bottom gives
   the same order as the phone's one column. The focus stays first: top
   left, or across the top.
 - **Two columns of phone width, not one wide one.** The tab's answer and
   its list on the left; what goes with it (related lists, tools, the next
-  thing) on the right. `.q-cols` (two, `.q-cols-3` three on `q-w3`, `.q-span`
+  thing) on the right. `.q-cols` (two once each is 290 wide, `.q-cols-3` three, `.q-span`
   runs across). Each column is laid out as on a phone, so nothing inside
   needs a wide version.
 - **A list and what it opens, side by side** where a tab is a list of
   things that each open a page (games, laws, entries): on a wide screen
-  the opened one can fill the right pane instead of a sheet.
-- **Like cards become a grid** (`repeat(auto-fill, minmax(300px, 1fr))`),
+  the opened one can fill the right pane instead of a sheet: `.q-split` >
+  `.q-split-list` (300) + `.q-split-main` (420 at least), one over the
+  other when both don't fit.
+- **Like cards become a grid** (`.q-grid`, `--q-grid-min` 240 by default),
   never a list row 1200 px long. A sideways rail of cards shows more cards,
   never a lone half card at the end.
 - **Reading stays narrow.** Running text (a law, a ruling, a word's
@@ -238,8 +247,8 @@ and `--q-col-r` (beside it), `--q-mid` (its middle); never `100vw`.
   on `onScreen()`): each, at a column's width, to the shortest column so far,
   so the tops read in the phone's order and no column is left one shelf long
   beside a long one. A small one (a link row) stays under the one before it.
-  In a `.q-sheet-wide` it goes by the sheet's width (two from 600, three
-  from 1000), so a game's 概況 has level tops and even ends (CSS columns
+  It goes by its own width (two from 600, three from 960, `.q-flow-2` two
+  at most) and deals itself again when that crosses one, so a game's 概況 has level tops and even ends (CSS columns
   left one side a card lower: Jay 2026-11-01).
 - **A phone on its side shows more**: heads, day strips and rows a size
   tighter so the first cards are on the first screen; nothing a hero.

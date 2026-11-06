@@ -1470,27 +1470,42 @@ export function tag(text, tone = '', color = '') {
 // Cards that scroll sideways to the screen's edge.
 // ---- A page's sections in columns (docs/DESIGN.md §10) ----
 // flowColumns(root): every .q-flow under root (or root itself) has its
-// children (a tab's sections, in the phone's order) dealt into two columns
-// on q-wide, three on q-w3 (.q-flow-2: two at most): each, measured at a
+// children (a tab's sections, in the phone's order) dealt into columns by
+// its own width (flowCount below): each, measured at a
 // column's width, to the shortest column so far, so the tops read left to
 // right in the phone's order and no column is left short (Jay 2026-11-01, an
-// iPad: one column long, the other one shelf, half the screen empty). In a
-// wide sheet (.q-sheet-wide) by the sheet's width instead. One
+// iPad: one column long, the other one shelf, half the screen empty). One
 // under 100px (a link row) stays under the one before it. Upright: one
 // column, as it was. Call it after drawing, and again on onScreen().
+// (By its own width, wherever it is: a page, a wide sheet (.q-sheet-wide), one side of a
+// split. Two from 600, three from 960 (q-flow-2: two at most), each column a
+// phone's. It deals itself again when its width crosses one of those.)
+export function flowCount(w, two = false) {
+  return w >= 960 && !two ? 3 : w >= 600 ? 2 : 1;
+}
+let flowSeen = null;
+function watchFlow(f) {
+  if (typeof ResizeObserver === 'undefined') return;
+  flowSeen ||= new ResizeObserver(rows => {
+    for (const { target: f } of rows) {
+      if (!f.isConnected || !f.getClientRects().length) continue;
+      if (flowCount(f.clientWidth, f.classList.contains('q-flow-2')) !== (f.__qFlowN || 1)) flowColumns(f);
+    }
+  });
+  if (!f.__qFlowWatched) {
+    f.__qFlowWatched = true;
+    flowSeen.observe(f);
+  }
+}
 export function flowColumns(root = document) {
   if (typeof document === 'undefined') return;
-  const html = document.documentElement.classList;
   const list = root?.classList?.contains('q-flow') ? [root] : [...(root?.querySelectorAll?.('.q-flow') || [])];
   for (const f of list) {
     // (Not shown, it has no size: dealt when it's drawn again shown.)
     if (!f.getClientRects().length) continue;
-    // (In a wide sheet, by the sheet's own width, as its .q-sheet-cols: two
-    // from 600, three from 1000; elsewhere by the page's, q-wide and q-w3.)
-    const box = f.closest?.('dialog.q-sheet-wide');
-    const bw = box ? box.clientWidth - (parseFloat(getComputedStyle(box).paddingLeft) || 0) - (parseFloat(getComputedStyle(box).paddingRight) || 0) : 0;
-    const w3 = box ? bw >= 1000 : html.contains('q-w3');
-    const n = w3 && !f.classList.contains('q-flow-2') ? 3 : (box ? bw >= 600 : html.contains('q-wide')) ? 2 : 1;
+    watchFlow(f);
+    const n = flowCount(f.clientWidth, f.classList.contains('q-flow-2'));
+    f.__qFlowN = n;
     const items = f.__qItems?.every(i => i.parentNode?.parentNode === f || i.parentNode === f) ? f.__qItems : [...f.children].flatMap(c => (c.classList.contains('q-flow-col') ? [...c.children] : [c]));
     f.__qItems = items;
     // (Dealt again while read (a live game every few seconds): the page and its

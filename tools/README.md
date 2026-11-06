@@ -58,6 +58,17 @@ the pages, M sent`. Only a 200 is kept. The other tools (`preview.mjs`
 alone, `live-scroll.mjs`, `gate.mjs`) still ask fresh each time:
 live-scroll and the gate watch live data change.
 
+## `node tools/layout-check.mjs <app…> [--screens 320,ipad,laptop]`: the layout a push must pass
+
+Every tab and the app's `check` pages (`tools/shots/pages.mjs`) at 320, an
+iPad on its side (touch) and a laptop (a mouse), dark, live data. Fails on a
+wide screen's page in a narrow band down the middle, one half empty beside a
+full one (`tools/layout-faults.mjs`, also in an open wide sheet), and
+anything wider than the screen or sliding sideways. A shot that can't be
+taken (no network) is skipped, never a failure. `push.sh` runs it for an app
+whose visible files changed, and for every app on a change to the kit's
+CSS or frame. `shots.mjs` prints the same `layout` faults.
+
 ## `node tools/live-scroll.mjs [app…] [--sheet "<js>"] [--account <name>] [--fast] [--no-days] [--webkit] [--live-only]`: nothing jumps
 
 All nine apps by default; Orbit Class (`class` or `orbit`) is built first from the checkout beside this one.
