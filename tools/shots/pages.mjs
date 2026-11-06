@@ -42,6 +42,12 @@ export const PAGES = {
     'mls-playoffs': { args: click('#tab-matches', '[data-league=mls]', wait(2500), tap('季後賽|Playoffs'), wait(6000)) },
     'mls-key': { args: click('#tab-matches', '[data-league=mls]', wait(2500), tap('排名|Table'), wait(9000), "js:[...document.querySelectorAll('.zone-legend')].pop()?.scrollIntoView({block:'center'})", wait(1500)) },
     'nba-leaders': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('數據|Stats'), wait(5000)) },
+    // 數據 of each kind of league (laid out wide: the stats down the side, the chosen one's ranking beside them).
+    'f1-leaders': { args: click('#tab-matches', '[data-league=f1]', wait(3000), tap('數據|Stats'), wait(6000)) },
+    'mlb-leaders': { args: click('#tab-matches', '[data-league=mlb]', wait(2500), tap('數據|Stats'), wait(6000)) },
+    'epl-leaders': { args: click('#tab-matches', '[data-league=epl]', wait(2500), tap('數據|Stats'), wait(8000)) },
+    'epl-team-stats': { args: click('#tab-matches', '[data-league=epl]', wait(2500), tap('數據|Stats'), wait(6000), tap('球隊|Teams'), wait(6000)) },
+    'nba-team-stats': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('數據|Stats'), wait(6000), tap('球隊|Teams'), wait(5000)) },
     'nba-bracket': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('季後賽|Playoffs'), wait(5000)) },
     'f1-season': { args: click('#tab-matches', '[data-league=f1]', wait(4000)) },
     // 轉播's 愛爾達節目表 (full height whatever the day), then swiped a finger left across it: the next day.

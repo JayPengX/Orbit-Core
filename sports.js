@@ -634,8 +634,10 @@ export function trimEspnCareer(data) {
     categories: [{ name: c.name, displayName: c.displayName, labels: c.labels, names: c.names, displayNames: c.displayNames, statistics: (c.statistics || []).map(x => ({ season: x?.season, teamId: x?.teamId, teamSlug: x?.teamSlug, stats: x?.stats })) }]
   };
 }
-// One of FotMob's stat lists (always): its name and the top hundred, each
-// with his club and games. ~140 KB to ~25 KB.
+// One of FotMob's stat lists (always): its name and everyone in it, each
+// with his club and games (a team's page picks its own players out of the
+// league's list: cut to the league's top hundred, Nashville's 14 scorers
+// were 3, Jay 2026-11-06). ~140 KB to ~55 KB (~12 KB gzipped).
 const TRIM_FOTMOB_STAT = 'fotmob-stat';
 export function trimFotmobStat(data) {
   const t = data?.TopLists?.[0];
@@ -645,7 +647,7 @@ export function trimFotmobStat(data) {
     title: t.Title,
     format: t.StatFormat,
     decimals: t.StatDecimals,
-    list: (t.StatList || []).slice(0, 100).map(x => ({ id: x.ParticiantId ?? x.ParticipantId, name: x.ParticipantName, teamId: x.TeamId, teamName: x.TeamName, value: x.StatValue, sub: x.SubStatValue, games: x.MatchesPlayed, mins: x.MinutesPlayed, rank: x.Rank }))
+    list: (t.StatList || []).slice(0, 1000).map(x => ({ id: x.ParticiantId ?? x.ParticipantId, name: x.ParticipantName, teamId: x.TeamId, teamName: x.TeamName, value: x.StatValue, sub: x.SubStatValue, games: x.MatchesPlayed, mins: x.MinutesPlayed, rank: x.Rank }))
   };
 }
 
