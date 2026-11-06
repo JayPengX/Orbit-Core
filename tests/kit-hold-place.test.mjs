@@ -114,3 +114,73 @@ test("the scroll bar dragged moves the page; only Safari's own move after a redr
   assert.match(guard, /__rawTop/);
   assert.match(guard, /b\.grabs\.some\(n => n > 1\) \|\| Math\.abs\(b\.own\) > 2/);
 });
+
+// Jay 2026-11-06, iPad, Sports' 搜尋: one word typed, then deleted, and the
+// sheet went blank (its title and ✕ only) until delete was pressed again.
+// With the keys up a sheet sits on the screen's foot and is as tall as what's
+// in it: the results cleared, it shrank down the screen, and the keeper held
+// the field typed in at its old place on the screen, by scrolling it up out
+// of a sheet it kept tall with room at its end. A place is kept within its
+// scroller's view, never on the screen.
+test('a place is kept within its scroller\'s view, never on the screen', () => {
+  const src = kit('hold-place.mjs');
+  assert.match(src, /const atView = \(s, n\) => n\.getBoundingClientRect\(\)\.top - viewTop\(s\);/);
+  assert.match(src, /y: r\.top - viewTop\(s\), top: s\.scrollTop/, 'anchors from the view\'s top');
+  assert.match(src, /tap = \{ s, node: n, sig: sigOf\(n\), y: r\.top - viewTop\(s\)/, 'the tapped control from the view\'s top');
+  for (const fn of ['function keepTap(', 'function restore(', 'function standIn(']) {
+    const body = src.slice(src.indexOf(fn), src.indexOf('\n}\n', src.indexOf(fn)));
+    assert.doesNotMatch(body, /getBoundingClientRect\(\)\.top \+ s\.scrollTop|scrollTop \+ n\.getBoundingClientRect\(\)\.top/, `${fn} measures on the screen`);
+  }
+});
+
+// The same in a browser, where there is one (Playwright's Chromium: on Jay's
+// machine and in the cloud; skipped where it isn't installed).
+test('in a browser: a search sheet on the foot keeps its field after the results clear', async t => {
+  let chromium;
+  try {
+    ({ chromium } = (await import('node:module')).createRequire(import.meta.url)('playwright'));
+  } catch {
+    return t.skip('no Playwright here');
+  }
+  const { createServer } = await import('node:http');
+  const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width"><style>
+    body { margin: 0; height: 100vh; }
+    dialog { width: 600px; max-height: calc(100vh - 8px); height: fit-content; margin: auto auto 0; padding: 0 16px 400px; overflow-y: auto; border: 0; box-sizing: border-box; }
+    .head { position: sticky; top: 0; height: 60px; background: #fff; z-index: 2; }
+    .q-hold-room::after { content: ''; display: block; height: var(--q-hold-room, 0); }
+    .row { height: 56px; }
+    input { width: 100%; height: 40px; }
+  </style></head><body>
+  <dialog id="d"><div class="head">搜尋</div><label><input id="i" type="search"></label><div id="out"></div></dialog>
+  <script type="module">
+    import '/hold-place.mjs';
+    const d = document.getElementById('d'), i = document.getElementById('i'), out = document.getElementById('out');
+    d.showModal(); i.focus();
+    let timer = 0;
+    i.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => out.replaceChildren(...(i.value ? Array.from({ length: 20 }, (_, k) => Object.assign(document.createElement('div'), { className: 'row', textContent: 'Row ' + k + ' ' + i.value })) : [])), 300); });
+  </script></body></html>`;
+  const server = createServer((req, res) => {
+    if (req.url === '/hold-place.mjs') return res.writeHead(200, { 'content-type': 'text/javascript' }).end(kit('hold-place.mjs'));
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(page);
+  });
+  await new Promise(r => server.listen(0, r));
+  let browser;
+  try {
+    browser = await chromium.launch();
+    const p = await browser.newPage({ viewport: { width: 1180, height: 820 } });
+    await p.goto(`http://localhost:${server.address().port}/`);
+    await p.waitForTimeout(200);
+    const at = () => p.evaluate(() => ({ top: document.getElementById('d').scrollTop, field: document.getElementById('i').getBoundingClientRect().top - document.getElementById('d').getBoundingClientRect().top }));
+    const before = await at();
+    await p.keyboard.type('a');
+    await p.waitForTimeout(500);
+    await p.keyboard.press('Backspace');
+    await p.waitForTimeout(500);
+    const after = await at();
+    assert.equal(after.top, 0, 'the sheet is at its top');
+    assert.equal(Math.round(after.field), Math.round(before.field), 'the field shows where it was in the sheet');
+  } finally {
+    await browser?.close();
+    server.close();
+  }
+});

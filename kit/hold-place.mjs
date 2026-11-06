@@ -63,6 +63,13 @@ const looseNode = n => loose(n.ownerSVGElement != null, getComputedStyle(n).posi
 
 const rootOf = s => (s === document.scrollingElement || s === document.documentElement || s === document.body ? document.scrollingElement : s);
 const viewTop = s => (s === document.scrollingElement ? 0 : s.getBoundingClientRect().top);
+// Where a box sits in its scroller's view (from the view's top, not the
+// screen's): a sheet anchored at the screen's foot moves on the screen as
+// its content grows or shrinks (above the keys, iPad's search: the results
+// cleared, the sheet shrank down, the field "kept" at its old screen place
+// was scrolled up out of a sheet held tall, and the sheet went blank, Jay
+// 2026-11-06). Only the scroll moves a box within its view.
+const atView = (s, n) => n.getBoundingClientRect().top - viewTop(s);
 const isPage = s => s === document.scrollingElement;
 const hostOf = s => (isPage(s) ? document.body : s);
 const roomOf = s => parseFloat(hostOf(s).style.getPropertyValue('--q-hold-room')) || 0;
@@ -83,7 +90,7 @@ function anchorsAt(s, n) {
     }
     const r = k.getBoundingClientRect();
     if (r.height < 8) continue;
-    anchors.push({ node: k, sig: sigOf(k), y: r.top, top: s.scrollTop });
+    anchors.push({ node: k, sig: sigOf(k), y: r.top - viewTop(s), top: s.scrollTop });
   }
   return anchors;
 }
@@ -103,7 +110,7 @@ function anchor(s) {
     const got = anchorsAt(s, n);
     if (!got.length) continue;
     anchors ||= got;
-    if (got[0].y >= top - 1) {
+    if (got[0].y >= -1) {
       anchors = got;
       break;
     }
@@ -132,7 +139,7 @@ function standIn(s, a, toggle = false) {
   // page: the place "kept" was the top. Jay 2026-11-05.)
   const was = a.y + (a.top ?? s.scrollTop);
   for (const n of same) {
-    const d = Math.abs(n.getBoundingClientRect().top + s.scrollTop - was);
+    const d = Math.abs(atView(s, n) + s.scrollTop - was);
     if (d < gap) (gap = d), (best = n);
   }
   return best;
@@ -225,7 +232,7 @@ function restore(s) {
   if (scrolledByCode(s, st.top)) return anchor(s);
   // Where the anchor is in the scroller now (its place on screen, plus how far it's scrolled), so it sits where it sat.
   const a = findAnchor(s, st);
-  place(s, Math.max(0, a ? a.node.getBoundingClientRect().top + s.scrollTop - a.y : st.top));
+  place(s, Math.max(0, a ? atView(s, a.node) + s.scrollTop - a.y : st.top));
   const now = Date.now();
   const lost = (a ? a.lost : st.anchors).filter(x => !x.node.isConnected && now - (x.lostAt ||= now) < LOST_MS);
   anchor(s);
@@ -267,7 +274,7 @@ function noteTap(target) {
   for (let k = n; k && k !== s && k !== document.body; k = k.parentElement) if (looseNode(k)) return void (s.scrollTop > 0 && anchor(s));
   const r = n.getBoundingClientRect();
   if (!r.height) return;
-  tap = { s, node: n, sig: sigOf(n), y: r.top, off: r.top - viewTop(s) + s.scrollTop, top: s.scrollTop, at: Date.now() };
+  tap = { s, node: n, sig: sigOf(n), y: r.top - viewTop(s), off: r.top - viewTop(s) + s.scrollTop, top: s.scrollTop, at: Date.now() };
   // (And the view's own anchor, read now: a change above the control keeps that instead.)
   if (s.scrollTop > 0) anchor(s);
 }
@@ -280,13 +287,13 @@ function keepTap(t) {
   }
   const n = t.node.isConnected && shown(t.node) ? t.node : standIn(s, { node: t.node, sig: t.sig, y: t.y, top: t.top }, true);
   // Gone (a part with no such control), or grown above it (a list opened over its 再看): the view's place.
-  const off = n ? n.getBoundingClientRect().top - viewTop(s) + s.scrollTop : 0;
+  const off = n ? atView(s, n) + s.scrollTop : 0;
   if (!n || off > t.off + 1) {
     if (held.has(s)) restore(s);
     return;
   }
   t.node = n;
-  place(s, Math.max(0, s.scrollTop + n.getBoundingClientRect().top - t.y));
+  place(s, Math.max(0, s.scrollTop + atView(s, n) - t.y));
   t.top = s.scrollTop;
   if (s.scrollTop > 0) anchor(s);
 }
