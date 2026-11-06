@@ -1193,7 +1193,15 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
       at.set(r, call);
       calls.push(call);
     });
-    page.on('requestfinished', r => at.has(r) && (at.get(r).took = `${Date.now() - started - at.get(r).t} ms`));
+    page.on('requestfinished', async r => {
+      if (!at.has(r)) return;
+      const call = at.get(r);
+      call.took = `${Date.now() - started - call.t} ms`;
+      // (The proxy's own word on it: its copy or a fresh upstream read, and how old.)
+      const h = (await r.response().catch(() => null))?.headers() || {};
+      const said = [h['x-transit-cache'] || h['x-sports-proxy-cache'], h['x-transit-age'] != null ? `age ${h['x-transit-age']}` : ''].filter(Boolean).join(' ');
+      if (said) call.text += `  [${said}]`;
+    });
     page.on('requestfailed', r => at.has(r) && (at.get(r).took = 'failed'));
   }
   const cdp = profile && engine !== 'webkit' ? await context.newCDPSession(page) : null;

@@ -146,12 +146,14 @@ export function splitHours(h, now = Date.now()) {
 
 // Too few people a week to tell what one uses (FEW: the owner and a friend,
 // testing everything, ~17 s of CPU a day each on 2026-11-06): the plan's
-// people then by typical use instead, a week's person about a second of CPU
-// a day: three apps' whole sessions on a day they open Orbit (0.6 s; one is
-// 30–750 ms, measured 2026-11-05) and a live screen left open a while
-// (Transit, 1.9 s an hour), on about half the days (DAILY).
+// people then by typical use instead, a week's person about 1.2 s of CPU
+// a day: three apps' whole sessions on a day they open Orbit (0.47 s; one
+// is 28–491 ms, measured 2026-11-06 with tools/speed.mjs) and 45 minutes of
+// live screens (a third each: a bus stop card 6.7 s an hour, Transit's map
+// 1.2 s, a live Sports game nothing: ESPN from the phone), on about half
+// the days. (The same recipe on 2026-11-05 morning's code: 13.5 s.)
 export const FEW = 10;
-export const TYPICAL_CPU_MS = 1000;
+export const TYPICAL_CPU_MS = 1200;
 // The people a quota holds: this week's × room ÷ use (null with nobody yet or nothing used).
 const holdsOf = (week, room, use) => (week > 0 && use > 0 ? Math.max(0, Math.floor((week * room) / use)) : null);
 

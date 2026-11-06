@@ -2004,7 +2004,7 @@ async function loadCapacity() {
     $('cap-tiles').replaceChildren(
       tile('本週活躍', `${u.week} 人`, `今天 ${u.day} · 本月 ${u.month}`),
       tile('30 天後預估', `${u.expected} 人`, `近兩週新開 ${u.newWeek + u.newPrev} 個`),
-      // (Too few people this week to tell what one uses: by typical use, about a second of CPU a day each.)
+      // (Too few people this week to tell what one uses: by typical use, about 1.2 s of CPU a day each.)
       q.typical?.few
         ? tile('撐得住', `${n0(q.typical.people)} 人`, '照一般用法估')
         : tile('撐得住', q.holds ? `${n0(q.holds.people)} 人` : '—', q.holds ? `${quotaName(q.holds.key).replace(/^Google (?=\S)/, '')} ${Math.round(fillOf(q.rows.find(r => r.key === q.holds.key)) * 100)}%` : '還沒有人用'),
@@ -2064,7 +2064,7 @@ async function loadCapacity() {
     $('cap-plans').replaceChildren(...rows);
     const on = devSaved?.autoScale;
     const slow = p.scale == null ? '最慢也不夠：要減少即時功能，否則會碰到 $5 方案的上限而停' : p.scale > 1 ? `即時更新要放慢 ×${p.scale}` : '不用放慢';
-    const few = q.typical?.few ? `本週只有 ${u.week} 人，多半是你自己在測試，下面各項的「撐 N 人」照你們的用量算，會估少；所以「撐得住」改照一般用法估：每人每天約 ${q.typical.ms / 1000} 秒 CPU（一個 App 用完一輪 0.03–0.75 秒，11-05 實測，再加上開著即時畫面一陣子），也就是每天的上限扣掉固定用量，除以 ${q.typical.ms / 1000} 秒。人多了就改回照實際用量算。` : '';
+    const few = q.typical?.few ? `本週只有 ${u.week} 人，多半是你自己在測試，下面各項的「撐 N 人」照你們的用量算，會估少；所以「撐得住」改照一般用法估：每人每天約 ${q.typical.ms / 1000} 秒 CPU（一天用三個 App、各用完一輪，共 0.47 秒，11-06 實測；加上即時畫面開 45 分鐘，公車站牌、地圖、比賽直播各三分之一，約 2 秒；大約隔天用一次），也就是每天的上限扣掉固定用量，除以 ${q.typical.ms / 1000} 秒。人多了就改回照實際用量算。` : '';
     const how = few + (!q.typical?.few && q.holds ? `撐得住＝最先滿的那一項（${quotaName(q.holds.key)}）撐的人數，這個人數以內不會放慢：Cloudflare 只有實際用到 60% 以上、而且照最近幾天的速度撐不到週期結束才放慢。` : '') + (q.near
       ? '每一項的「撐 N 人」＝本週活躍人數 ×（上限扣掉固定用量）÷ 現在大家用掉的。Cloudflare 的人用量暫時照地點估：近 7 天台灣附近機房收到的請求；其餘算固定用量：排程、建置，和我們自己的開發工具與檢查（在美國的機器上跑，開發多的那週就多）。帳單保護的權杖加上 Workers Observability 權限後，改成看是誰呼叫（App 本身還是工具），不分國家。Google 地圖和 TDX 扣掉我們的工具和展示頁用的（11-06 起分開算，工具最多用到每項免費額度的一半）；其他項目全部算成人用的，所以只會估少。'
       : q.measured
