@@ -84,3 +84,27 @@ test('the proxy turns Transit away abroad, never the dev door, the showcase or a
   for (const path of ['/law-chat', '/law-ask', '/law-page', '/law-live', '/weather', '/sports-proxy', '/eco', '/transitx']) assert.equal(twOnlyRefused(req('US'), path, page, show), false, path);
   assert.ok(TW_ONLY_PATH.test('/transit/tdx'));
 });
+
+// Someone in Taiwan on a VPN abroad (Jay 2026-11-06): the address says US,
+// the phone's clock says Taiwan, so they're in. A phone abroad takes the
+// place's zone by itself; location permission plays no part.
+test("a VPN abroad from Taiwan: the phone's Taiwan clock keeps it in", () => {
+  const was = process.env.TZ;
+  try {
+    store.set('orbit.country', 'US');
+    process.env.TZ = 'Asia/Taipei';
+    assert.equal(kit.phoneZone(), 'Asia/Taipei');
+    assert.equal(kit.abroad(), false);
+    assert.equal(kit.twOnlyCheck('transit'), false);
+    process.env.TZ = 'America/New_York';
+    assert.equal(kit.abroad(), true);
+  } finally {
+    process.env.TZ = was;
+    store.delete('orbit.country');
+  }
+  const page = 'https://orbit.jaypengx.com';
+  const req = (country, tz) => ({ cf: { country }, url: `https://api.jaypengx.com/transit/route?qt=x${tz ? `&tz=${encodeURIComponent(tz)}` : ''}` });
+  assert.equal(twOnlyRefused(req('US', 'Asia/Taipei'), '/transit/route', page), false, 'a Taiwan clock on a US address');
+  assert.equal(twOnlyRefused(req('US', 'America/New_York'), '/transit/route', page), true);
+  assert.equal(twOnlyRefused(req('US'), '/transit/route', page), true, 'an older Transit, no zone');
+});

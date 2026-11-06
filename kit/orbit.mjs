@@ -337,7 +337,18 @@ export const country = () => {
   const c = readStore(COUNTRY_KEY) || '';
   return /^[A-Z0-9]{2}$/.test(c) ? c : '';
 };
-export const abroad = () => /^[A-Z]{2}$/.test(country()) && country() !== 'TW' && country() !== 'XX';
+// The phone's clock set to Taiwan's zone: in Taiwan whatever its address says
+// (Jay 2026-11-06: someone in Taiwan on a US VPN is still here; a VPN moves
+// the address, never the phone's time zone, and a phone abroad takes the
+// place's zone by itself). Sent with Transit's asks as `tz` (http.js abroad).
+export const phoneZone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  } catch {
+    return '';
+  }
+};
+export const abroad = () => phoneZone() !== 'Asia/Taipei' && /^[A-Z]{2}$/.test(country()) && country() !== 'TW' && country() !== 'XX';
 // (Kept on the device's own: told again with each session.)
 const noteCountry = c => /^[A-Z0-9]{2}$/.test(c || '') && c !== readStore(COUNTRY_KEY) && writeStore(COUNTRY_KEY, c);
 let abroadEl = null;

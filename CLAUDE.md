@@ -224,7 +224,7 @@ w;dur=` (the Worker's own time), which the 除錯紀錄 notes with a slow read.
   503 `ORBIT_FULL`, a place in line (kit `waitInLine`); busy/full slow
   `/config` 2×/3×. Priority passes (`sec.priority`, token `p: 1`) skip
   every per-session limit (`limitOf`).
-- **Taiwan only:** abroad (Cloudflare's country; not unknown, dev, showcase) `/transit/…` is 403 `TW_ONLY` (`http.js twOnlyRefused`); `/eco`'s sessions carry `country`; kit `abroad()`/`twOnlyCheck` show Transit's card.
+- **Taiwan only:** abroad (Cloudflare's country; not unknown, dev, showcase, a Taiwan `tz`) `/transit/…` is 403 `TW_ONLY` (`http.js twOnlyRefused`); `/eco`'s sessions carry `country`; kit `abroad()`/`twOnlyCheck` show Transit's card.
 - **Same origin:** a page calls `orbit.jaypengx.com/api/…` (`kit/domain.mjs`
   `API`; worker.js `viaSite` takes `/api` off). `api.`, workers.dev answer too.
 - **Dev doors:** a request with `Origin: http://localhost:<port>` and no
@@ -252,7 +252,7 @@ OpenF1's tables (`openF1Raw`), kept in R2.
 - **Trims** (`&trim=`) return only what an app reads (ESPN, Polymarket, Jolpica, FotMob, ELTA, YouTube, F1).
 - **Batches** (`?batch=1&u=…&lines=1`): up to 24 reads in one request,
   each written as it's ready. A slow item answers 504 and is asked alone.
-- **Edge cache tiers** (`sports.js` `CACHE_*`): each has `fresh` (served as
+- **Edge cache tiers** (`sports.js` `CACHE_*`): each has `fresh` (as
   is) and `stale`. Just past fresh (as long again, a minute at least) it's
   served while read again behind it (stale-while-revalidate);
   older but inside `stale`, it's read now and the old copy answers only if
@@ -375,7 +375,7 @@ changes, writing a file only when it changed (`builders/store.js`):
 | `photos.js`, `official-photos.js` | photo lists, cutouts, official headshots | hourly / daily 18:00 |
 | `buses.js` | `bus/…`, `shape/…`, `where.json` | a city once a week |
 | `asia.js`, `cpbl.js` | CPBL's month and standings | daily 15:00 |
-| `f1kept.js` | each finished F1 session's 數據 and laps, kept before anyone opens them (through the proxy; OpenF1 turns quick askers away) | :06, :26, :46 |
+| `f1kept.js` | each finished F1 session's 數據 and laps, kept before anyone opens them (via the proxy: OpenF1 refuses quick askers) | :06, :26, :46 |
 | `kept.js` | wipes the proxy's kept copies (`mirror/`) from before a league's first askable day | daily 17:00 |
 
 A season is kept whole until the next season's first game (preseason
