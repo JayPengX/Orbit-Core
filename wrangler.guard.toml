@@ -5,7 +5,8 @@
 #
 # CI deploys it when its own files change (.github/workflows/deploy-guard.yml),
 # with one secret from the repo's: CF_GUARD_TOKEN (an API token the owner
-# makes: Account Analytics Read + Workers Scripts Edit); the account is the
+# makes: Account Analytics Read + Workers Scripts Edit, and Workers Observability
+# Edit for who calls, the panel's 容量); the account is the
 # token's own. Manual deploy:
 #   npx wrangler deploy -c wrangler.guard.toml
 name = "quota-guard"

@@ -66,9 +66,11 @@
 // (worker.js, the account set in the admin panel).
 //
 // Needs CF_GUARD_TOKEN (an API token: Account Analytics Read, Workers Scripts
-// Edit), set by deploy-guard.yml from the repo's secret; the account is the
+// Edit; Workers Observability Edit for who calls, useByHour), set by deploy-guard.yml from the repo's secret; the account is the
 // one the token belongs to (asked once, kept in the state). Without the
 // token it is unarmed and says so (the admin panel's 容量).
+
+import { DOMAIN } from './kit/domain.mjs';
 
 export const PLAN = {
   requests: 10_000_000,
@@ -514,18 +516,54 @@ export async function workerErrors(env, { fetcher = fetch, now = Date.now(), kv 
 // analytics is asked once).
 export const HOURS_KEY = 'guard:hours';
 export const NEAR_TAIWAN = ['TPE', 'KHH', 'RMQ', 'HKG', 'MFM', 'NRT', 'KIX', 'FUK', 'OKA', 'ICN', 'PUS', 'SIN', 'KUL', 'BKK', 'MNL', 'CGK', 'SGN', 'HAN'];
-// (People's part by hour and kind, the proxy's near Taiwan only: phones call
-// nothing else, and a Durable Object's alarm (the guard's own clock) answers
-// where it lives; crons are left out by their kind, which analytics has named
+// (People's part by hour and kind, the proxy's only (phones call nothing
+// else): 'near', its colos near Taiwan; 'proxy', all of it, for the share its
+// pages called. Crons are left out by their kind, which analytics has named
 // only since 2026-11-04, "unknown" before.)
-const HOURS_Q = (cpu, people = false) => `query($a: string!, $s: Time!, $e: Time!) { viewer { accounts(filter: { accountTag: $a }) {
-  x: workersInvocationsAdaptive(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e${people ? `, scriptName: "${WORKERS[0]}", coloCode_in: ${JSON.stringify(NEAR_TAIWAN)}` : ''} }) { sum { requests${cpu ? ' cpuTimeUs' : ''} } ${cpu ? '' : 'quantiles { cpuTimeP99 } '}dimensions { datetimeHour ${people ? 'eventType' : 'scriptName'} } }
+const HOURS_Q = (cpu, part = '') => `query($a: string!, $s: Time!, $e: Time!) { viewer { accounts(filter: { accountTag: $a }) {
+  x: workersInvocationsAdaptive(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e${part ? `, scriptName: "${WORKERS[0]}"` : ''}${part === 'near' ? `, coloCode_in: ${JSON.stringify(NEAR_TAIWAN)}` : ''} }) { sum { requests${cpu ? ' cpuTimeUs' : ''} } ${cpu ? '' : 'quantiles { cpuTimeP99 } '}dimensions { datetimeHour ${part ? 'eventType' : 'scriptName'} } }
 } } }`;
+
+// People's share of the proxy by who called (the Workers Logs, the same 7
+// days): a page on the family's domain (orbit.<DOMAIN>/api/…, the showcase's
+// <DOMAIN>/api/…) is a person, in any country; any other host (our own tools
+// and checks on api.<DOMAIN> or workers.dev) is not, nor is a cron. The logs
+// are a sample (the proxy's head_sampling_rate), so only the share is taken
+// from them and analytics has the counts. Needs Workers Observability Edit on
+// the token (the query API takes nothing less); without it, by place.
+export const PAGE_HOSTS = [`orbit.${DOMAIN}`, DOMAIN];
+export async function pageShare(env, fetcher, account, from, to) {
+  const res = await fetcher(`${API}/accounts/${account}/workers/observability/telemetry/query`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.CF_GUARD_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      queryId: 'orbit-page-share',
+      timeframe: { from, to },
+      view: 'calculations',
+      limit: 200,
+      parameters: {
+        calculations: [{ operator: 'sum', key: '$workers.cpuTimeMs', keyType: 'number', alias: 'cpu' }],
+        filters: [{ key: '$workers.scriptName', operation: 'eq', type: 'string', value: WORKERS[0] }],
+        groupBys: [{ type: 'string', value: '$workers.event.request.headers.host' }],
+        limit: 200
+      }
+    })
+  });
+  const j = await res.json().catch(() => null);
+  if (!res.ok || !j?.success) throw new Error(`logs ${res.status}: ${(j?.errors || []).map(e => e.message).join('; ').slice(0, 200)}`);
+  const rows = (j.result?.calculations?.find(c => c.alias === 'cpu')?.aggregates || []).map(r => ({ host: String(r.groups?.[0]?.value ?? r.groupKey ?? '').toLowerCase(), cpu: Number(r.value) || 0, n: Number(r.count) || 0 })).filter(r => r.host);
+  const sum = (list, f) => list.reduce((t, r) => t + r[f], 0);
+  const pages = rows.filter(r => PAGE_HOSTS.includes(r.host));
+  const cpu = sum(rows, 'cpu');
+  const n = sum(rows, 'n');
+  if (!(cpu > 0 && n > 0)) throw new Error('logs: no request logged');
+  return { cpu: sum(pages, 'cpu') / cpu, n: sum(pages, 'n') / n, hosts: rows.sort((x, y) => y.cpu - x.cpu).slice(0, 8).map(r => [r.host, Math.round(r.cpu), r.n]) };
+}
 export async function useByHour(env, { fetcher = fetch, now = Date.now(), kv = env.RATE_LIMIT_KV } = {}) {
   if (!env.CF_GUARD_TOKEN) return { off: true };
   const kept = JSON.parse((await kv?.get(HOURS_KEY).catch(() => null)) || 'null');
-  // (A copy kept before people's part was read is read again.)
-  if (kept?.at && now - kept.at < 3_600_000 && 'people' in kept) return kept;
+  // (A copy kept before people's part was read by who called is read again.)
+  if (kept?.at && now - kept.at < 3_600_000 && 'who' in kept) return kept;
   const state = JSON.parse((await kv?.get(STATE_KEY).catch(() => null)) || 'null') || {};
   const a = env.CF_ACCOUNT_ID || state.account || (await accountOf(env, fetcher));
   const end = Math.floor(now / 3_600_000) * 3_600_000;
@@ -539,24 +577,29 @@ export async function useByHour(env, { fetcher = fetch, now = Date.now(), kv = e
     cpuWay = 'p99';
     acc = await graphql(env, fetcher, HOURS_Q(false), vars);
   }
-  // (People's part asked apart: without it, every hour's use counts as theirs.)
-  let peopleError = null;
-  const near = await graphql(env, fetcher, HOURS_Q(cpuWay === 'sum', true), vars).catch(err => ((peopleError = err.message), null));
+  // (People's part asked apart: without it, every hour's use counts as theirs.
+  // By who called where the logs answer: the proxy's hours × the share its
+  // pages called; else by place: the proxy's hours in the colos near Taiwan.)
+  const errors = [];
+  const share = await pageShare(env, fetcher, a, end - 7 * DAY, end).catch(err => (errors.push(err.message), null));
+  const who = share ? 'caller' : 'place';
+  const near = await graphql(env, fetcher, HOURS_Q(cpuWay === 'sum', share ? 'proxy' : 'near'), vars).catch(err => (errors.push(err.message), null));
   const by = new Map();
-  const add = (rows, at) => {
+  const add = (rows, at, part = { n: 1, cpu: 1 }) => {
     for (const r of rows || []) {
       const t = Date.parse(r.dimensions?.datetimeHour);
       if (!Number.isFinite(t) || r.dimensions?.eventType === 'cron') continue;
       const n = r.sum?.requests || 0;
       const row = by.get(t) || [t, 0, 0, 0, 0];
-      row[at] += n;
-      row[at + 1] += cpuWay === 'sum' ? (r.sum?.cpuTimeUs || 0) / 1000 : (n * (r.quantiles?.cpuTimeP99 || 0)) / 1000;
+      row[at] += n * part.n;
+      row[at + 1] += (cpuWay === 'sum' ? (r.sum?.cpuTimeUs || 0) / 1000 : (n * (r.quantiles?.cpuTimeP99 || 0)) / 1000) * part.cpu;
       by.set(t, row);
     }
   };
   add(acc.x, 1);
-  if (near) add(near.x, 3);
-  const out = { at: now, from: end - 7 * DAY, to: end, cpuWay, people: !!near, ...(peopleError && { peopleError: peopleError.slice(0, 200) }), hours: [...by.values()].sort((x, y) => x[0] - y[0]).map(([t, n, c, pn, pc]) => (near ? [t, n, Math.round(c), pn, Math.round(pc)] : [t, n, Math.round(c)])) };
+  if (near) add(near.x, 3, share || undefined);
+  const peopleError = errors.join('; ');
+  const out = { at: now, from: end - 7 * DAY, to: end, cpuWay, people: !!near, who, ...(share && { share }), ...(peopleError && { peopleError: peopleError.slice(0, 300) }), hours: [...by.values()].sort((x, y) => x[0] - y[0]).map(([t, n, c, pn, pc]) => (near ? [t, n, Math.round(c), Math.round(pn), Math.round(pc)] : [t, n, Math.round(c)])) };
   await kv?.put(HOURS_KEY, JSON.stringify(out)).catch(() => {});
   return out;
 }

@@ -400,9 +400,11 @@ test('the last 7 days hour by hour: every Worker summed per hour, people\'s part
     [Date.parse('2026-11-03T05:00:00Z'), 112, 2500, 30, 400]
   ]);
   assert.ok(kv.has(HOURS_KEY));
+  // (The logs unread, as with a token without Workers Observability: by place.)
+  assert.equal(r.who, 'place');
   // Asked again within the hour: the kept copy, analytics not asked.
   await useByHour({ CF_GUARD_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, { fetcher, now: now + 30 * 60_000, kv: store });
-  assert.equal(asks, 2);
+  assert.equal(asks, 3);
   // No cpuTimeUs: each Worker's hour as requests × its 99th percentile.
   let n = 0;
   const old = async () => {
@@ -414,10 +416,55 @@ test('the last 7 days hour by hour: every Worker summed per hour, people\'s part
   assert.equal(p.cpuWay, 'p99');
   assert.deepEqual(p.hours, [[Date.parse('2026-11-03T05:00:00Z'), 10, 30, 10, 30]]);
   // People's part unread: the totals alone, as before.
-  const noNear = async (url, init) => (JSON.parse(init.body).query.includes('coloCode_in') ? new Response(JSON.stringify({ errors: [{ message: 'unknown filter coloCode_in' }] })) : new Response(JSON.stringify({ data: { viewer: { accounts: [{ x: rows }] } } })));
+  const noNear = async (url, init) => (url.includes('/telemetry/') ? new Response('{"success":false,"errors":[{"message":"Authentication error"}]}', { status: 403 }) : JSON.parse(init.body).query.includes('coloCode_in') ? new Response(JSON.stringify({ errors: [{ message: 'unknown filter coloCode_in' }] })) : new Response(JSON.stringify({ data: { viewer: { accounts: [{ x: rows }] } } })));
   const q = await useByHour({ CF_GUARD_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, { fetcher: noNear, now, kv: null });
   assert.equal(q.people, false);
-  assert.match(q.peopleError, /coloCode_in/);
+  assert.match(q.peopleError, /logs 403: Authentication error; .*coloCode_in/);
   assert.deepEqual(q.hours[1], [Date.parse('2026-11-03T05:00:00Z'), 112, 2500]);
   assert.deepEqual(await useByHour({}), { off: true });
+});
+
+test('who calls: with the Workers Logs, people are the proxy\'s hours × the share its pages on the domain called, in any country; crons and our tools fixed', async () => {
+  const { useByHour, PAGE_HOSTS } = await import('../guard.js');
+  assert.deepEqual(PAGE_HOSTS, ['orbit.jaypengx.com', 'jaypengx.com']);
+  const all = [
+    { sum: { requests: 100, cpuTimeUs: 2_000_000 }, dimensions: { datetimeHour: '2026-11-03T05:00:00Z', scriptName: 'orbit-workers-proxy' } },
+    { sum: { requests: 12, cpuTimeUs: 500_000 }, dimensions: { datetimeHour: '2026-11-03T05:00:00Z', scriptName: 'quota-guard' } }
+  ];
+  const proxy = [
+    { sum: { requests: 90, cpuTimeUs: 1_600_000 }, dimensions: { datetimeHour: '2026-11-03T05:00:00Z', eventType: 'fetch' } },
+    { sum: { requests: 10, cpuTimeUs: 400_000 }, dimensions: { datetimeHour: '2026-11-03T05:00:00Z', eventType: 'cron' } }
+  ];
+  // (The logs: pages a quarter of the CPU and half the requests; a cron has no host.)
+  const hosts = [
+    { groups: [{ key: '$workers.event.request.headers.host', value: 'orbit-workers-proxy.pengzjay.workers.dev' }], value: 600, count: 400 },
+    { groups: [{ key: '$workers.event.request.headers.host', value: 'orbit.jaypengx.com' }], value: 180, count: 350 },
+    { groups: [{ key: '$workers.event.request.headers.host', value: 'jaypengx.com' }], value: 20, count: 50 },
+    { groups: [{ key: '$workers.event.request.headers.host', value: '' }], value: 900, count: 40 }
+  ];
+  let logs = null;
+  let proxyQuery = '';
+  const fetcher = async (url, init) => {
+    const body = JSON.parse(init.body);
+    if (url.includes('/workers/observability/telemetry/query')) {
+      logs = body;
+      return new Response(JSON.stringify({ success: true, result: { calculations: [{ alias: 'cpu', aggregates: hosts }] } }));
+    }
+    if (body.query.includes('eventType')) {
+      proxyQuery = body.query;
+      return new Response(JSON.stringify({ data: { viewer: { accounts: [{ x: proxy }] } } }));
+    }
+    return new Response(JSON.stringify({ data: { viewer: { accounts: [{ x: all }] } } }));
+  };
+  const now = Date.parse('2026-11-03T06:30:00Z');
+  const r = await useByHour({ CF_GUARD_TOKEN: 't', CF_ACCOUNT_ID: 'acc' }, { fetcher, now, kv: null });
+  assert.match(logs.parameters.filters[0].value, /orbit-workers-proxy/);
+  assert.equal(logs.parameters.groupBys[0].value, '$workers.event.request.headers.host');
+  assert.equal(logs.timeframe.to - logs.timeframe.from, 7 * DAY);
+  assert.match(proxyQuery, /scriptName: "orbit-workers-proxy"/);
+  assert.doesNotMatch(proxyQuery, /coloCode_in/, 'every country');
+  assert.equal(r.who, 'caller');
+  assert.deepEqual([r.share.cpu, r.share.n], [0.25, 0.5]);
+  // 05:00: everything 112 requests and 2,500 ms; people the proxy's fetches (its cron left out) × the pages' share.
+  assert.deepEqual(r.hours, [[Date.parse('2026-11-03T05:00:00Z'), 112, 2500, 45, 400]]);
 });
