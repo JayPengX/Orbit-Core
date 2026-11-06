@@ -223,7 +223,6 @@ w;dur=` (the Worker's own time), which the 除錯紀錄 notes with a slow read.
   503 `ORBIT_FULL`, a place in line (kit `waitInLine`); busy/full slow
   `/config` 2×/3×. Priority passes (`sec.priority`, token `p: 1`) skip
   every per-session limit (`limitOf`).
-- **Taiwan only:** abroad (a fix, `notePlace`/`tw=1`, else a Taiwan `tz`, else `/eco`'s `country`; dev, showcase pass) `/transit/…` is 403 `TW_ONLY` (`http.js twOnlyRefused`); kit `abroad()`/`twOnlyCheck`: Transit's card.
 - **Same origin:** a page calls `orbit.jaypengx.com/api/…` (`kit/domain.mjs`
   `API`; worker.js `viaSite` takes `/api` off). `api.`, workers.dev answer too.
 - **Dev doors:** a request with `Origin: http://localhost:<port>` and no

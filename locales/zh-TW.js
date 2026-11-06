@@ -21,7 +21,6 @@ export default {
   MISSING_PAYLOAD: '缺少或無效的內容資料。',
   SYNC_PASSCODE_NOT_FOUND: '找不到這組同步密碼。',
   FORBIDDEN_ORIGIN: '不允許的來源。',
-  TW_ONLY: '這個 Orbit App 只在台灣提供。',
   ECO_UNKNOWN_APP: '未知的應用程式',
   ECO_UNKNOWN_OP: '未知的操作',
   ECO_INVALID_SOURCES: '請列出 1 到 12 組要合併的代碼。',

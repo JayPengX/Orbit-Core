@@ -384,12 +384,6 @@ const OPS = {
 };
 
 export async function handleEcoRequest(request, env, headers, ip, deps, waitUntil = null) {
-  // Every answer that hands out a session also says the caller's country
-  // (Cloudflare's, from the address): the kit keeps it on the device, so a
-  // Taiwan-only app knows it's abroad without a request of its own (orbit.mjs abroad).
-  const country = request.cf?.country;
-  const given = deps;
-  if (typeof country === 'string' && /^[A-Z0-9]{2}$/.test(country)) deps = { ...given, json: (body, ...rest) => given.json(body && typeof body === 'object' && body.token ? { ...body, country } : body, ...rest) };
   const { json, errorJson, upstreamFailed } = deps;
   if (!['GET', 'POST', 'PATCH', 'DELETE'].includes(request.method)) return errorJson('SYNC_METHOD_NOT_ALLOWED', 405, headers, request);
   if (!storeReady(env)) return errorJson('MISSING_STORE', 500, headers, request);
