@@ -31,3 +31,13 @@ test('admin: the money sheet in plain words, none of the old jargon (Jay 2026-11
   const parts = page.slice(page.indexOf('<dialog id="money"'), page.indexOf('</dialog>', page.indexOf('<dialog id="money"'))) + page.slice(at, page.indexOf('\n}\n', at + 4000));
   for (const word of ['四方', '對帳', 'Orbit 賺', '玩家', '系統淨', '政府淨收']) assert.equal(parts.includes(word), false, word);
 });
+
+test('admin: 健康’s badge counts the problems listed at the top of 健康, each a tap to its part (Jay 2026-11-06: "what is the red dot 1 for")', () => {
+  assert.match(page, /<div class="attn" id="health-attn"/);
+  assert.match(page, /const bad = healthIssues\(\);\n\s*\$\('health-badge'\)\.hidden = !bad\.length;/);
+  assert.match(page, /\$\('health-attn'\)\.innerHTML = bad\.map/);
+  // Every cell has a place to point at, and that place is on the page.
+  const at = page.match(/const HEALTH_AT = \{([^}]*)\}/)[1];
+  for (const [, k, id] of at.matchAll(/(\w+): '([\w-]+)'/g)) assert.ok(page.includes(`id="${id}"`), `${k} → ${id}`);
+  for (const k of [...page.matchAll(/\['(\w+)', '[^']+', '\w+'\]/g)].map(m => m[1]).filter(k => ['guard', 'pace', 'jobs', 'sources', 'deploys', 'secrets', 'errors', 'ai'].includes(k))) assert.match(at, new RegExp(`\\b${k}:`));
+});
