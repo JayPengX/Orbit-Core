@@ -74,6 +74,8 @@ export const PAGES = {
     // Leclerc (F1) on 資料: 生涯車隊 (Sauber's logo, 2018).
     'f1-driver-bio': { args: click("js:import('./sheets.js').then(m=>m.openPlayer('f1','5498'))", wait(9000), "js:[...document.querySelectorAll('dialog.q-sheet[open] button,dialog.q-sheet[open] [role=tab]')].find(b=>/^(資料|Bio)$/.test(b.textContent.trim()))?.click()", wait(4000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/生涯車隊|Teams/.test(c.textContent))?.scrollIntoView({block:'center'})", wait(1500)) },
     'team-nba': { args: click("js:import('./sheets.js').then(m=>m.openTeam('nba','13'))", wait(7000)) },
+    // The Rockets' 概況 after 賽程 and back: 下一場 with both logos (Jay 2026-11-05: gone after the switch).
+    'team-nba-back': { args: click("js:import('./sheets.js').then(m=>m.openTeam('nba','10'))", wait(8000), "js:[...document.querySelectorAll('dialog.q-sheet[open] button,dialog.q-sheet[open] [role=tab]')].find(b=>/^(賽程|Games)$/.test(b.textContent.trim()))?.click()", wait(2500), "js:[...document.querySelectorAll('dialog.q-sheet[open] button,dialog.q-sheet[open] [role=tab]')].find(b=>/^(概況|Overview)$/.test(b.textContent.trim()))?.click()", wait(2000)) },
     // A player ESPN lists with an all-star side (Carles Gil: MLS All-Stars), shown with his club (New England).
     'player-allstar': { args: click("js:import('./sheets.js').then(m=>m.openPlayer('mls','152168'))", wait(9000)) },
     // Raptors at Lakers, 2026-11-02: 勝率走勢's run told where it ended (Lakers 28-8 at 14-31, never at 6-9).
