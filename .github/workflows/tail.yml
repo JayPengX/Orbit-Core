@@ -18,6 +18,9 @@ on:
         description: Instead of the logs, each route's and cron's count and CPU (ms) summed
         type: boolean
         default: false
+      find:
+        description: "(cpu) Who called addresses holding this, 7 days, e.g. /transit/drive"
+        default: ''
 jobs:
   tail:
     runs-on: ubuntu-latest
@@ -127,10 +130,18 @@ jobs:
               console.log(`== pages (orbit.${domain}), by country`); await ask([proxy, host(`orbit.${domain}`)], ["$workers.event.request.cf.country"]);
               console.log("== not pages, by network"); await ask([proxy, notHost(`orbit.${domain}`), notHost(domain)], ["$workers.event.request.cf.asOrganization"]);
               console.log("== not pages, by host and country"); await ask([proxy, notHost(`orbit.${domain}`), notHost(domain)], ["$workers.event.request.headers.host", "$workers.event.request.cf.country"]);
+              const find = process.env.FIND;
+              if (find) {
+                const has = { key: "$workers.event.request.url", operation: "includes", type: "string", value: find };
+                console.log(`== ${find}: by host and origin`); await ask([proxy, has], ["$workers.event.request.headers.host", "$workers.event.request.headers.origin"]);
+                console.log(`== ${find}: by host and network`); await ask([proxy, has], ["$workers.event.request.headers.host", "$workers.event.request.cf.asOrganization"]);
+                console.log(`== ${find}: by host and referer`); await ask([proxy, has], ["$workers.event.request.headers.host", "$workers.event.request.headers.referer"]);
+              }
             })().catch(e => console.log("failed:", e.message));'
         env:
           CF_GUARD_TOKEN: ${{ secrets.CF_GUARD_TOKEN }}
           DOMAIN: jaypengx.com
+          FIND: ${{ inputs.find }}
       - name: Listen
         run: |
           if [ "$CPU" != "true" ]; then timeout "$(( ${MINUTES:-6} * 60 ))" npx --yes wrangler@4 tail "$WORKER" --format pretty || true; exit 0; fi
