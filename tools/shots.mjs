@@ -75,7 +75,10 @@ const list = (name, fallback) => String(opt(name, fallback)).split(',').filter(B
 // The screens: a phone upright (its width: 320, 390, 440), a phone on its
 // side (land, 844×390), a tablet (820×1180, an iPad) and a computer
 // (1440×900), or any WxH. Every app works on all of them (Jay 2026-10-31).
-const SCREENS = { land: { w: 844, h: 390 }, tablet: { w: 820, h: 1180, device: 'ipad' }, desktop: { w: 1440, h: 900, device: 'pc' } };
+// Computers too, each with a mouse (Jay 2026-11-06, his laptop: "the first time I open on my
+// laptop is like this"): laptop 1280×800, desktop 1440×900, hd 1920×1080, big 2560×1440, short
+// (a laptop's window half the screen's height, 1120×560); ipad, Jay's own on its side (1180×820).
+const SCREENS = { land: { w: 844, h: 390 }, tablet: { w: 820, h: 1180, device: 'ipad' }, ipad: { w: 1180, h: 820, device: 'ipad' }, laptop: { w: 1280, h: 800, device: 'pc' }, desktop: { w: 1440, h: 900, device: 'pc' }, hd: { w: 1920, h: 1080, device: 'pc' }, big: { w: 2560, h: 1440, device: 'pc' }, short: { w: 1120, h: 560, device: 'pc' } };
 const widths = list('widths', list('screens', '320,390,land,tablet,desktop').join(','));
 const screenOf = name => SCREENS[name] || (/^\d+x\d+$/.test(name) ? { w: Number(name.split('x')[0]), h: Number(name.split('x')[1]) } : { w: Number(name), h: Number(height) });
 // (How wide a shot is drawn on the contact sheet.)

@@ -5246,6 +5246,9 @@ html.q-wide .q-day-bar .q-day-strip {
   --q-left: calc(var(--q-inset-l) + var(--q-tabrail-w));
   --q-right: var(--q-inset-r);
   --q-page-max: 720px;
+  /* (What an app that lays out in columns raises the page to: `:root.q-wide
+     { --q-page-max: var(--q-wide-max, 1180px) }`; more on a big computer.) */
+  --q-wide-max: 1180px;
   --q-avail: calc(100vw - var(--q-sbw, 0px) - var(--q-left) - var(--q-right));
   --q-vw: min(var(--q-avail), var(--q-page-max));
   --q-col-l: calc(var(--q-left) + (var(--q-avail) - var(--q-vw)) / 2);
@@ -5463,6 +5466,199 @@ html.q-tabrail.q-float {
 html.q-tabrail.q-float .q-appbar .q-actions > .q-icon-btn svg {
   width: 27px;
   height: 27px;
+}
+/* A computer (q-desk: a mouse or a trackpad, 1000 px and up). The rail is
+   the page's side bar: one panel down the whole left edge, the app's mark
+   and name at its top, the tabs as rows (mark and name side by side), the
+   app's action a row under them and the account at its foot, the page
+   beside it. Jay 2026-11-06, his laptop: the rail a pill floating beside a
+   narrow page, the account a second pill stranded at the foot, "you make it
+   good on phone and ipad, then the first time I open on my laptop is like
+   this". A tablet (touch first) keeps the rail above. */
+html.q-tabrail.q-desk {
+  --q-desk-w: 224px;
+  --q-desk-bg: color-mix(in srgb, var(--q-label) 4%, var(--q-page));
+  --q-desk-edge: color-mix(in srgb, var(--q-label) 10%, transparent);
+  /* (The tabs start under the app's name.) */
+  --q-desk-top: calc(var(--q-top) + 76px);
+  --q-tabrail-x: 0px;
+  /* (The side bar and a gutter: where the page starts.) */
+  --q-tabrail-w: calc(var(--q-desk-w) + 16px);
+  --q-tabrail-tab: 44px;
+  --q-tabrail-top: var(--q-desk-top);
+}
+/* A big computer screen (Jay's laptop is 1710 wide): an app laid out in
+   columns gets more of it, never a narrow band between two wide margins. */
+@media (min-width: 1680px) {
+  html.q-tabrail.q-desk {
+    --q-wide-max: 1400px;
+  }
+}
+@media (min-width: 2200px) {
+  html.q-tabrail.q-desk {
+    --q-wide-max: 1680px;
+  }
+}
+html.q-tabrail.q-desk .q-tabbar.q-tabbar {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--q-desk-w);
+  max-height: none;
+  padding: var(--q-desk-top) 12px 84px;
+  align-content: start;
+  grid-auto-rows: var(--q-tabrail-tab);
+  gap: 2px;
+  border-radius: 0;
+  background: var(--q-desk-bg);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: inset -1px 0 0 var(--q-desk-edge);
+  transform: none;
+  transition: none;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+html.q-tabrail.q-desk .q-tabbar.q-tabbar::before {
+  left: 12px;
+  right: 12px;
+  height: var(--q-tab-h, 0px);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--q-accent) 15%, transparent);
+  transform: translateY(var(--q-tab-y, 0px));
+}
+/* The app's mark and name: what this window is, as a computer's own apps say it. */
+html.q-tabrail.q-desk .q-tabbar.q-tabbar::after {
+  content: var(--q-desk-name, '');
+  display: block;
+  position: absolute;
+  z-index: 1;
+  top: calc(var(--q-top) + 20px);
+  bottom: auto;
+  left: 20px;
+  right: 12px;
+  width: auto;
+  height: 36px;
+  padding-left: 46px;
+  overflow: hidden;
+  transform: none;
+  background: var(--q-desk-mark, none) left center / 34px 34px no-repeat;
+  color: var(--q-label);
+  font: 700 17px/36px var(--q-font);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+html.q-tabrail.q-desk .q-tab {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0 12px;
+  border-radius: 12px;
+  font: 500 15px/20px var(--q-font);
+  text-align: start;
+}
+html.q-tabrail.q-desk .q-tab[aria-selected='true'] {
+  font-weight: 600;
+}
+html.q-tabrail.q-desk .q-tab-icon {
+  flex: none;
+  width: 24px;
+  height: 24px;
+}
+html.q-tabrail.q-desk .q-tab svg {
+  width: 22px;
+  height: 22px;
+}
+html.q-tabrail.q-desk .q-tab-badge {
+  left: auto;
+  right: -8px;
+}
+@media (hover: hover) {
+  html.q-tabrail.q-desk .q-tab:not([aria-selected='true']):hover {
+    background: color-mix(in srgb, var(--q-label) 6%, transparent);
+  }
+}
+/* (No grow on a click: a mouse, not a finger.) */
+html.q-tabrail.q-desk .q-tab:is(:active, [data-q-press]) .q-tab-icon {
+  transform: none;
+}
+/* The app's action: a row under the tabs, its mark and its name. */
+html.q-tabrail.q-desk .q-tab-action {
+  top: calc(var(--q-desk-top) + var(--q-tabs, 4) * (var(--q-tabrail-tab) + 2px) + 10px);
+  left: 12px;
+  width: calc(var(--q-desk-w) - 24px);
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0 12px;
+  border-radius: 12px;
+  box-shadow: none;
+  font: 600 15px/20px var(--q-font);
+}
+html.q-tabrail.q-desk .q-tab-action::after {
+  content: attr(aria-label);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+html.q-tabrail.q-desk .q-tab-action svg {
+  flex: none;
+  width: 22px;
+  height: 22px;
+}
+html.q-tabrail.q-desk .q-tab-action:active {
+  transform: none;
+  filter: brightness(0.92);
+}
+/* The account and the round buttons (refresh, help) along the bar's foot. */
+html.q-tabrail.q-desk .q-appbar .q-actions {
+  left: 12px;
+  bottom: 12px;
+  z-index: 61;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  width: calc(var(--q-desk-w) - 24px);
+  padding: 10px 0 0;
+  border-radius: 0;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: inset 0 1px 0 var(--q-desk-edge);
+}
+html.q-tabrail.q-desk .q-appbar .q-actions > :is(.q-icon-btn, .q-account:not(.q-framed)) {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+html.q-tabrail.q-desk .q-appbar .q-actions > .q-account {
+  order: -1;
+  margin-right: auto;
+}
+html.q-tabrail.q-desk .q-appbar .q-actions > .q-icon-btn svg {
+  width: 22px;
+  height: 22px;
+}
+html.q-tabrail.q-desk .q-appbar .q-actions > .q-account:not(.q-framed) .q-avatar {
+  height: 36px;
+}
+html.q-tabrail.q-desk .q-appbar .q-actions > .q-account.q-framed {
+  width: 36px;
+  height: 36px;
+  margin: 4px auto 4px 4px;
+}
+html.q-tabrail.q-desk .q-appbar .q-actions > .q-account:not(.q-framed) .q-account-dot {
+  right: 4px;
+  bottom: 4px;
+}
+@media (hover: hover) {
+  html.q-tabrail.q-desk .q-appbar .q-actions > :is(.q-icon-btn, .q-account:not(.q-framed)):hover {
+    background: color-mix(in srgb, var(--q-label) 6%, transparent);
+  }
 }
 html.q-tabrail .q-day-bar:not(.flat) {
   padding-top: 4px;

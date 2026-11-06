@@ -141,7 +141,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 
 | Need | Use |
 | --- | --- |
-| Tabs | `tabBar({ tabs, onSelect, onShow })` (orbit.mjs): the floating capsule on a phone, a rail on a phone on its side (slim) and a computer; on the rail one column, one width (`--q-tabrail-cw`); apps set only its colours; an in-progress bar is a `.q-accessory` pill above it |
+| Tabs | `tabBar({ tabs, onSelect, onShow })` (orbit.mjs): a phone's floating capsule, a rail on its side and a tablet (one width, `--q-tabrail-cw`), a computer's side bar (`q-desk`); apps set only its colours; an in-progress bar is a `.q-accessory` pill above it |
 | The top line | `topActions`, `accountButton` (the account pill and at most one action) |
 | A tab's title | `navTitle` / `navTitleHtml` + `wireNavTitles` (the 34 pt large title), `pageHead` |
 | Switching a view | `view()` (cross-faded with View Transitions); `segmented` / `segHtml` + `settleSegs` for a whole tab's view (at most 4); a single-choice filter row is `.q-chips.q-texttabs` (text tabs) |
@@ -160,7 +160,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | Icons | `ICONS` (orbit.mjs) / `icons` (ui.mjs): one drawing per idea; new ones read as `kitUI.icons?.x` |
 | Live data | `everyDev(key, fn)` beats at the owner's speeds (they wait while a finger is down); `data-q-live` + `liveChanged` pop a number that changed; patch in place (the same nodes), never rebuild what didn't change; `hold-place.mjs` keeps the reader's place by itself; `steady-pics.mjs` the pictures |
 | Fitting | `fitNames` (`.q-fit`, `.q-fit-wrap`), `fitNumbers` / `watchFit`, `balanceRows` (`.q-balance`), `fullRows` (`.q-rows-full`/`-keep`), `.q-even` / `.q-even3` |
-| Every screen | `screenFit()` / `onScreen(fn)` mark `html.q-tabrail`, `q-float`, `q-wide`, `q-w3`; `--q-page-max`, `--q-vw`; `.q-cols`; `.q-flow` + `flowColumns(root)` for columns of even height (DESIGN §10) |
+| Every screen | `screenFit()` / `onScreen(fn)` mark `html.q-tabrail`, `q-float`, `q-desk`, `q-wide`, `q-w3`; `--q-page-max`, `--q-vw`; `.q-cols`; `.q-flow` + `flowColumns(root)` for columns of even height (DESIGN §10) |
 | Pull to refresh, taps | `pullToRefresh`; `haptic()` / `tick()`; `PRESS_DELAY` / `pressSelector` |
 | Offline | `onlineOnly` (live apps: Securities, Transit, Sports), `keepOffline` (the rest open on what they kept), `netState` / `netVerdict` |
 | Picks for you | `rank` + `feedback.mjs` (`lifter`, `shown`, `picked`, `did`, `keep`); measured: `tools/picks-backtest.mjs` |
