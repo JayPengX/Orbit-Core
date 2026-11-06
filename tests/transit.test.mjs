@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   tdxRequest, tdxGet, warmBikes, SLOW_MS, tdxAccess, resetTdxToken, resetPace, resetTurns, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
-  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta, tdxTrim
+  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta, tdxTrim, tdxUse, DEV_SHARE
 } from '../transit.js';
 
 const NOW = Date.parse('2026-10-03T01:00:00Z');
@@ -708,6 +708,36 @@ test("a bus's drive to its stops: Google's traffic matrix, an element each from 
   assert.equal(c.src, 'cap');
   assert.equal(calls, 1);
   assert.ok(CAPS.drive < 5000, "inside Google's free 5,000");
+});
+
+test("our tools' spends (the dev door) and the showcase's counted apart for the admin's people count; our tools stop at half a free month, people go on to the cap", async () => {
+  fresh();
+  const env = { GOOGLE_MAPS_KEY: 'k', RATE_LIMIT_KV: memKv() };
+  const fetchFn = async (url, opts) => json(JSON.parse(opts.body).destinations.map((d, i) => ({ originIndex: 0, destinationIndex: i, condition: 'ROUTE_EXISTS', distanceMeters: 800, duration: '120s', staticDuration: '100s' })));
+  const ask = (to, session) => handleTransit(new Request(`https://w/transit/drive?from=24.8177,121.0163&to=${to}`), env, {}, '/transit/drive', { session, fetchFn, now: NOW, cache: memCache() }).then(r => r.json());
+  assert.equal((await ask('24.82,121.02;24.83,121.03', { s: 'dev', dev: true })).src, 'google');
+  assert.equal((await ask('24.84,121.04', { s: 'S' })).src, 'google');
+  const used = await usage(env, NOW);
+  assert.equal(used.drive, 3, 'everyone against the cap');
+  assert.equal(used['dev:drive'], 2, "our tools' apart");
+  assert.equal(used['dev:drive'] + (used['show:drive'] || 0), 2);
+  // Half the month used: our tools get the fallback; a person still Google's.
+  fresh();
+  await env.RATE_LIMIT_KV.put(`transit:use:${billingMonth(NOW)}`, JSON.stringify({ drive: CAPS.drive * DEV_SHARE }));
+  assert.equal((await ask('24.85,121.05', { s: 'dev', dev: true })).src, 'cap');
+  assert.equal((await ask('24.86,121.06', { s: 'S' })).src, 'google');
+  // TDX's points: ours apart too, read by tdxUse with the prefix (the same keys without it).
+  fresh();
+  const kv = memKv();
+  const tdxEnv = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', RATE_LIMIT_KV: kv };
+  const tdxFetch = async url => (url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : json([]));
+  await tdxGet(tdxEnv, 'basic/v2/Bus/Route/City/Hsinchu', { fetchFn: tdxFetch, cache: memCache(), now: NOW, by: 'dev' });
+  await tdxGet(tdxEnv, 'basic/v2/Bus/Route/City/Taipei', { fetchFn: tdxFetch, cache: memCache(), now: NOW });
+  const all = await tdxUse(tdxEnv, NOW);
+  const ours = await tdxUse(tdxEnv, NOW, 'dev:');
+  assert.deepEqual(Object.values(all), [2]);
+  assert.deepEqual(ours, { [Object.keys(all)[0]]: 1 });
+  assert.equal(tdxPoints(ours, NOW).month, 1 / 1500);
 });
 
 test("a sample spends a real ask: none without a session or past the limit (a stranger can't use up the month's Google routes or TDX's points)", async () => {

@@ -112,10 +112,17 @@ export async function usage(env, now = Date.now()) {
 // A count only (`tally`) waits 10 minutes before it's written: it is for the
 // status page and TDX's points, and writing TDX's every 10 calls ran KV out
 // of writes (a write each 10 minutes an isolate: under 150 a day).
-export async function spend(env, sku, n = 1, now = Date.now(), ctx = null, { countOnly = false } = {}) {
+// `by`: who spent it when it isn't a person: 'dev' (our own tools, the dev
+// door) or 'show' (the showcase's demo), also counted as `dev:<sku>` /
+// `show:<sku>`, so the admin panel's 容量 counts people's use without ours
+// (capacity.js). Our tools yield to people: none past half of a free month
+// (DEV_SHARE), the rest is theirs.
+export const DEV_SHARE = 0.5;
+export async function spend(env, sku, n = 1, now = Date.now(), ctx = null, { countOnly = false, by = '' } = {}) {
   const used = await usage(env, now);
-  if (CAPS[sku] != null && used[sku] + n > CAPS[sku]) return false;
+  if (CAPS[sku] != null && used[sku] + n > CAPS[sku] * (by === 'dev' ? DEV_SHARE : 1)) return false;
   meter.pending[sku] = (meter.pending[sku] || 0) + n;
+  if (by) meter.pending[`${by}:${sku}`] = (meter.pending[`${by}:${sku}`] || 0) + n;
   const gathered = Object.entries(meter.pending).reduce((a, [k, v]) => a + (CAPS[k] != null ? v : 0), 0);
   if (countOnly ? now - meter.flushedAt > 10 * MIN : gathered >= 10 || now - meter.flushedAt > 2 * MIN) {
     const p = flushUse(env, now);
@@ -132,8 +139,9 @@ export const tally = (env, key, n = 1, now = Date.now(), ctx = null) => spend(en
 // `tdx:b:2026-10-11`, `tdx:a:2026-10-11` (the admin panel's 用量).
 export const TDX_POINTS = { month: 200, basic: 1500, advanced: 200 };
 export const tdxKind = path => (String(path).startsWith('basic/') ? 'b' : 'a');
-export async function tallyTdx(env, path, now = Date.now(), ctx = null) {
+export async function tallyTdx(env, path, now = Date.now(), ctx = null, by = '') {
   await tally(env, `tdx:${tdxKind(path)}:${twDay(now)}`, 1, now, ctx);
+  if (by) await tally(env, `${by}:tdx:${tdxKind(path)}:${twDay(now)}`, 1, now, ctx);
 }
 // TDX's calls this Taiwan month, by kind and day. TDX's month starts at
 // 00:00 on the 1st in Taiwan; the meter's (Google's, Pacific) 16 hours
@@ -141,11 +149,16 @@ export async function tallyTdx(env, path, now = Date.now(), ctx = null) {
 // (once a minute), or they dropped out of the month at 16:00 on the 1st.
 const lastMeter = { month: '', stored: null, readAt: 0 };
 const prevMonth = month => new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7) - 2, 1)).toISOString().slice(0, 7);
-export async function tdxUse(env, now = Date.now()) {
+// (`prefix` 'dev:' or 'show:': ours alone, by the same keys without it.)
+export async function tdxUse(env, now = Date.now(), prefix = '') {
   const month = twDay(now).slice(0, 7);
   const out = {};
   const add = from => {
-    for (const [k, n] of Object.entries(from || {})) if (/^tdx:[ab]:/.test(k) && k.slice(6, 13) === month) out[k] = (out[k] || 0) + n;
+    for (const [k, n] of Object.entries(from || {})) {
+      if (!k.startsWith(prefix)) continue;
+      const key = k.slice(prefix.length);
+      if (/^tdx:[ab]:/.test(key) && key.slice(6, 13) === month) out[key] = (out[key] || 0) + n;
+    }
   };
   add(await usage(env, now));
   if (billingMonth(now) === month) {
@@ -602,7 +615,7 @@ export async function warmBikes(env, deps = {}) {
 // One TDX answer, from the shared cache when it's fresh enough.
 // → { status, body (text), age (ms), state: 'hit' | 'miss' | 'stale' | 'busy' | 'error' }
 // `warm` (the cron's): refreshed when its copy is past its fresh time, else 'warm'.
-export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.caches?.default, ctx = null, now = Date.now(), warm = false, stale = null } = {}) {
+export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.caches?.default, ctx = null, now = Date.now(), warm = false, stale = null, by = '' } = {}) {
   const req = tdxRequest(raw);
   // (`stale`: served at once that long, instead of the rule's.)
   const staleMs = stale ?? req?.rule.stale;
@@ -644,7 +657,7 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
         // TDX sometimes hangs or answers 5xx for a moment: 12 s at most, and
         // one more try (the app said 暫時無法取得資料 for these).
         res = await fetchFn(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Accept-Encoding': 'br, gzip' }, signal: timeout(12_000) }).catch(err => ({ ok: false, status: 504, text: async () => String(err?.name || err) }));
-        await tallyTdx(env, req.path, now, ctx);
+        await tallyTdx(env, req.path, now, ctx, by);
         if (res.status >= 500 && tries < 1) continue;
         if (res.status !== 429 || tries >= 2 || !Number(env.TDX_PER_SEC)) break;
         turn.next = Math.max(turn.next, Date.now() + 1100);
@@ -798,13 +811,13 @@ export function nearFirst(found, near, text) {
   return [...whole, ...close, ...rest].filter(i => !seen.has(i.id) && seen.add(i.id)).slice(0, 15);
 }
 
-async function search(env, q, { fetchFn, ctx, now, cache }) {
+async function search(env, q, { fetchFn, ctx, now, cache, by }) {
   const text = String(q.get('q') || '').trim().slice(0, 80);
   if (!text) return { items: [] };
   const lat = num(q.get('lat'));
   const lon = num(q.get('lon'));
   const session = /^[A-Za-z0-9_-]{8,64}$/.test(q.get('s') || '') ? q.get('s') : '';
-  if (googleKey(env) && (await spend(env, 'autocomplete', 1, now, ctx))) {
+  if (googleKey(env) && (await spend(env, 'autocomplete', 1, now, ctx, { by }))) {
     const body = { input: text, languageCode: 'zh-TW', regionCode: 'tw', includedRegionCodes: ['tw'], ...(session ? { sessionToken: session } : {}) };
     if (lat != null && lon != null && inTaiwan(lat, lon)) Object.assign(body, { origin: { latitude: lat, longitude: lon }, locationBias: { circle: { center: { latitude: lat, longitude: lon }, radius: 30_000 } } });
     // (Asked once more on a failure before OpenStreetMap: its search is far weaker in Taiwan.)
@@ -827,7 +840,7 @@ async function search(env, q, { fetchFn, ctx, now, cache }) {
         const hit = cache && (await cache.match(key));
         if (hit) return parseTextSearch(await hit.json(), lat, lon).filter(p => inTaiwan(p.lat, p.lon));
       } catch {}
-      if (!(await spend(env, 'textSearch', 1, now, ctx))) return [];
+      if (!(await spend(env, 'textSearch', 1, now, ctx, { by }))) return [];
       const tb = { textQuery: text, languageCode: 'zh-TW', regionCode: 'tw', pageSize: 20, ...(origin ? { locationBias: { circle: { center: origin, radius: 10_000 } } } : {}) };
       const res = await fetchFn(TEXT_SEARCH, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types' }, body: JSON.stringify(tb), signal: timeout(8000) }).catch(() => null);
       if (!res?.ok) return [];
@@ -872,7 +885,7 @@ export function parsePlace(j) {
   return { id: j.id || '', name: j.displayName?.text || '', lat, lon, address: j.formattedAddress || '', types: (j.types || []).slice(0, 6) };
 }
 
-async function place(env, q, { fetchFn, ctx, now, cache }) {
+async function place(env, q, { fetchFn, ctx, now, cache, by }) {
   const id = String(q.get('id') || '');
   if (!/^[A-Za-z0-9_-]{10,300}$/.test(id)) return [{ code: 'BAD_PLACE' }, 400];
   if (!googleKey(env)) return [{ code: 'NO_KEY' }, 503];
@@ -890,11 +903,11 @@ async function place(env, q, { fetchFn, ctx, now, cache }) {
   const wantName = q.get('name') === '1';
   const named = wantName ? await kept(true) : null;
   if (named) return [named, 200];
-  const pro = wantName && (await spend(env, 'detailsPro', 1, now, ctx));
+  const pro = wantName && (await spend(env, 'detailsPro', 1, now, ctx, { by }));
   const plain = pro ? null : await kept(false);
   if (plain) return [plain, 200];
   const key = keyOf(pro);
-  if (!pro && !(await spend(env, 'details', 1, now, ctx))) return [{ code: 'CAP_REACHED' }, 429];
+  if (!pro && !(await spend(env, 'details', 1, now, ctx, { by }))) return [{ code: 'CAP_REACHED' }, 429];
   const session = /^[A-Za-z0-9_-]{8,64}$/.test(q.get('s') || '') ? `&sessionToken=${q.get('s')}` : '';
   const fields = `id,location,formattedAddress,types${pro ? ',displayName' : ''}`;
   const res = await fetchFn(`${PLACES}places/${encodeURIComponent(id)}?languageCode=zh-TW&regionCode=tw${session}`, { headers: { 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': fields }, signal: timeout(8000) }).catch(() => null);
@@ -1169,7 +1182,7 @@ export const planSig = p =>
 
 const twIso = t => new Date(t + 8 * HOUR).toISOString().slice(0, 19);
 
-async function routes(env, q, { fetchFn, ctx, now, cache }) {
+async function routes(env, q, { fetchFn, ctx, now, cache, by: who }) {
   const ll = s => {
     const m = /^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(s || '');
     return m && inTaiwan(Number(m[1]), Number(m[2])) ? { lat: Number(m[1]), lon: Number(m[2]) } : null;
@@ -1206,7 +1219,7 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
   if (src === 'tdx') {
     // (TDX's alone.)
   } else if (!railOrBus) sources.google = 'off';
-  else if (googleKey(env) && (await spend(env, 'routes', 1, now, ctx))) {
+  else if (googleKey(env) && (await spend(env, 'routes', 1, now, ctx, { by: who }))) {
     jobs.push(timed('google',
       fetchFn(ROUTES, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': GOOGLE_ROUTE_FIELDS }, body: JSON.stringify(googleRouteBody(from, to, { at: by === 'arrive' || at > now + MIN ? at : null, by, modes })), signal: timeout(15_000) })
         .then(async r => {
@@ -1231,7 +1244,7 @@ async function routes(env, q, { fetchFn, ctx, now, cache }) {
         const token = await tdxAccess(env, fetchFn, now);
         if (!token) return ((sources[key] = 'nokey'), []);
         const r = await fetchFn(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, signal: timeout(15_000) });
-        await tallyTdx(env, 'maas/routing', now, ctx);
+        await tallyTdx(env, 'maas/routing', now, ctx, who);
         sources[key] = r.ok ? 'ok' : `http ${r.status}`;
         return r.ok ? parseTdxRoutes(await r.json()).map(p => ({ ...p, src: key === 'tdx' ? 'tdx' : 'tdx-bike' })) : [];
       })().catch(() => ((sources[key] = 'error'), []));
@@ -1285,7 +1298,9 @@ export const SAMPLES = {
 };
 // fetch called as a method of another object throws in Workers (Illegal invocation).
 const fetchOf = deps => (...a) => (0, deps.fetchFn)(...a);
-async function statusSample(env, name, deps) {
+async function statusSample(env, name, dependencies) {
+  // (A sample is a check: ours, whoever asks it.)
+  const deps = { ...dependencies, by: 'dev' };
   const cut = text => String(text || '').slice(0, 6000);
   if (SAMPLES[name]) {
     const got = await tdxGet(env, SAMPLES[name], deps);
@@ -1306,7 +1321,7 @@ async function statusSample(env, name, deps) {
     const codes = /^[0-9](,[0-9]){0,9}$/.test(deps.transit || '') ? deps.transit : '3,4,5,6,7,8,9';
     const params = new URLSearchParams({ origin: `${AT.lat},${AT.lon}`, destination: `${to.lat},${to.lon}`, gc: '1.0', top: '5', transit: codes, transfer_time: '0,60', first_mile_mode: '0', first_mile_time: '15', last_mile_mode: '0', last_mile_time: '15' });
     const r = await fetchOf(deps)(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, signal: timeout(15_000) });
-    await tallyTdx(env, 'maas/routing', deps.now, deps.ctx);
+    await tallyTdx(env, 'maas/routing', deps.now, deps.ctx, deps.by);
     const text = await r.text();
     let parsed = null;
     try {
@@ -1319,7 +1334,7 @@ async function statusSample(env, name, deps) {
     } catch {}
     out = { name, status: r.status, body: cut(text), shape, parsed };
   } else if (name === 'google-route') {
-    if (!googleKey(env) || !(await spend(env, 'routes', 1, deps.now, deps.ctx))) return { name, status: 503, body: 'no key or cap' };
+    if (!googleKey(env) || !(await spend(env, 'routes', 1, deps.now, deps.ctx, { by: deps.by }))) return { name, status: 503, body: 'no key or cap' };
     const r = await fetchOf(deps)(ROUTES, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': GOOGLE_ROUTE_FIELDS }, body: JSON.stringify(googleRouteBody(AT, TO)), signal: timeout(15_000) });
     const text = await r.text();
     let parsed = null;
@@ -1344,7 +1359,7 @@ const scrubKey = (text, env) => [env.GOOGLE_MAPS_KEY, env.GOOGLE_WEATHER_KEY, en
 // month (streets don't move), so a walk asked once is never paid for again.
 //   ?from=lat,lon&to=lat,lon;lat,lon…  → { walks: [{ dist, dur, poly? } | null], src }
 const WALK_KEEP_S = 30 * 86_400;
-async function walks(env, q, { fetchFn, ctx, now, cache }) {
+async function walks(env, q, { fetchFn, ctx, now, cache, by }) {
   const ll = s => {
     const m = /^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(s || '');
     return m && inTaiwan(Number(m[1]), Number(m[2])) ? { lat: Number(m[1]), lon: Number(m[2]) } : null;
@@ -1368,7 +1383,7 @@ async function walks(env, q, { fetchFn, ctx, now, cache }) {
   if (todo.length) {
     const sku = line ? 'routes' : 'matrix';
     if (!googleKey(env)) src = 'nokey';
-    else if (!(await spend(env, sku, todo.length, now, ctx))) src = 'cap';
+    else if (!(await spend(env, sku, todo.length, now, ctx, { by }))) src = 'cap';
     else {
       const pt = p => ({ location: { latLng: { latitude: p.lat, longitude: p.lon } } });
       const secs = d => Number(String(d || '').replace('s', '')) || 0;
@@ -1407,7 +1422,7 @@ async function walks(env, q, { fetchFn, ctx, now, cache }) {
 // Pro SKU, an element each, out of `drive`'s share of the 5,000 free). An
 // answer is shared a minute by every phone asking from the same ~10 m.
 const DRIVE_KEEP_S = 60;
-async function drives(env, q, { fetchFn, ctx, now, cache }) {
+async function drives(env, q, { fetchFn, ctx, now, cache, by }) {
   const ll = s => {
     const m = /^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(s || '');
     return m && inTaiwan(Number(m[1]), Number(m[2])) ? { lat: Number(m[1]), lon: Number(m[2]) } : null;
@@ -1422,7 +1437,7 @@ async function drives(env, q, { fetchFn, ctx, now, cache }) {
     if (hit) return [{ ...(await hit.json()), src: 'cached' }, 200];
   } catch {}
   if (!googleKey(env)) return [{ drives: tos.map(() => null), src: 'nokey' }, 200];
-  if (!(await spend(env, 'drive', tos.length, now, ctx))) return [{ drives: tos.map(() => null), src: 'cap' }, 200];
+  if (!(await spend(env, 'drive', tos.length, now, ctx, { by }))) return [{ drives: tos.map(() => null), src: 'cap' }, 200];
   const pt = p => ({ waypoint: { location: { latLng: { latitude: p.lat, longitude: p.lon } } } });
   const secs = d => (d == null ? null : Number(String(d).replace('s', '')) || 0);
   const out = tos.map(() => null);
@@ -1458,7 +1473,9 @@ async function transitRoute(request, env, headers, path, { session = null, limit
   const send = (data, status = 200, extra = {}) => new Response(typeof data === 'string' ? data : JSON.stringify(data), { status, headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8', ...extra } });
   if (request.method !== 'GET') return send({ code: 'GET_ONLY' }, 405);
   const q = new URL(request.url).searchParams;
-  const deps = { fetchFn, ctx, now, cache };
+  // (Who spends Google's and TDX's counts when it isn't a person: our tools, the showcase's demo.)
+  const by = session?.dev ? 'dev' : session?.showcase ? 'show' : '';
+  const deps = { fetchFn, ctx, now, cache, by };
   if (path === '/transit/status') {
     const sample = q.get('sample');
     if (!sample) return send({ month: billingMonth(now), used: await usage(env, now), caps: CAPS, keys: { tdx: Boolean(env.TDX_CLIENT_ID && env.TDX_CLIENT_SECRET), mapsBrowser: Boolean(env.GOOGLE_MAPS_BROWSER_KEY), google: Boolean(googleKey(env)) }, tdxPerMin: Number(env.TDX_PER_MIN) || 5 });
@@ -1466,7 +1483,7 @@ async function transitRoute(request, env, headers, path, { session = null, limit
   if (path === '/transit/showcase-map') {
     // The showcase's Transit demo draws Google's map like the real app: one
     // map load, from its own small share and the month's cap; NLSC's past either.
-    const google = SHOWCASE_ORIGINS.has(request.headers.get('Origin') || '') && Boolean(env.GOOGLE_MAPS_BROWSER_KEY) && !limited() && (await usage(env, now)).maps < CAPS.maps && (await spend(env, 'showcaseMaps', 1, now, ctx)) && (await spend(env, 'maps', 1, now, ctx));
+    const google = SHOWCASE_ORIGINS.has(request.headers.get('Origin') || '') && Boolean(env.GOOGLE_MAPS_BROWSER_KEY) && !limited() && (await usage(env, now)).maps < CAPS.maps && (await spend(env, 'showcaseMaps', 1, now, ctx)) && (await spend(env, 'maps', 1, now, ctx, { by: 'show' }));
     return send({ map: google ? { provider: 'google', key: env.GOOGLE_MAPS_BROWSER_KEY } : { provider: 'nlsc' } });
   }
   if (!session) return send({ code: 'ECO_TOKEN_INVALID' }, 401);
@@ -1482,7 +1499,7 @@ async function transitRoute(request, env, headers, path, { session = null, limit
     // One map load per call (the app asks once each time it opens).
     // (A dev page gets NLSC's map: the browser key works only on the site, and no map load is spent;
     // unless it asks ?map=google, as the preview's screenshots do, seen as the site.)
-    const google = (!session.dev || q.get('map') === 'google') && Boolean(env.GOOGLE_MAPS_BROWSER_KEY) && (!session.showcase || (await spend(env, 'showcaseMaps', 1, now, ctx))) && (await spend(env, 'maps', 1, now, ctx));
+    const google = (!session.dev || q.get('map') === 'google') && Boolean(env.GOOGLE_MAPS_BROWSER_KEY) && (!session.showcase || (await spend(env, 'showcaseMaps', 1, now, ctx))) && (await spend(env, 'maps', 1, now, ctx, { by }));
     return send({ map: google ? { provider: 'google', key: env.GOOGLE_MAPS_BROWSER_KEY } : { provider: 'nlsc' }, search: googleKey(env) ? 'google' : 'osm', tdx: Boolean(env.TDX_CLIENT_ID) });
   }
   if (path === '/transit/running') {

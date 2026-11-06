@@ -31,8 +31,7 @@ it, extend it, or move yours into the kit (TRUTH §4); never a second copy.
   here; each app's deploy tests against main's kit.
 - Workers deploy from `main` (`deploy.yml`, the wrangler tomls).
 - `node tools/shots.mjs <app> --before main` takes every screenshot a change
-  needs (320/390 upright, on its side, tablet, desktop; light/dark;
-  a diff against live); `tools/README.md` lists the tools.
+  needs (§11); `tools/README.md` lists the tools.
 - Brand, icons, share cards: `kit/brand.mjs`, `node brand/generate.mjs`.
 
 ## 1. The system
@@ -230,7 +229,7 @@ w;dur=` (the Worker's own time), which the 除錯紀錄 notes with a slow read.
   `API`; worker.js `viaSite` takes `/api` off). `api.`, workers.dev answer too.
 - **Dev doors:** a request with `Origin: http://localhost:<port>` and no
   pass gets a dev session on `/sports-proxy`, `/transit`, `/weather` and
-  `/flight` (counted per address): `tools/preview.mjs --live`, or `curl -H
+  `/flight` (per address; Google's as `dev:<sku>` too, half a free month at most): `tools/preview.mjs --live`, or `curl -H
   'Origin: http://localhost:8123' '…/sports-proxy?url=<encoded>&app=match'`.
 
 - **Crons:** even minutes (notices, builders at :16 and on, weather
@@ -424,8 +423,8 @@ can be turned off on its own.
   a row in `gemini_call` (`gemini-use.js`), only behind a person's tap.
 - **Errors**: each route's 5xx tallied (`err:<route>:<day>`); the guard's
   `/errors`; the panel's 部署 runs workflows with `GH_ACTIONS_TOKEN`.
-- **容量** (`capacity.js` `quotas`): each quota's people held = this
-  week's × (room past the fixed part ÷ people's use), the fewest named
+- **容量** (`capacity.js` `quotas`): people each quota holds = this
+  week's × room past the fixed part ÷ people's use, the fewest named
   (under `FEW`: `TYPICAL_CPU_MS`); people's Workers use: the
   proxy's near Taiwan (`/hours`, `NEAR_TAIWAN`), the rest fixed.
 - **`quota-guard`** (`guard.js`, every 5 minutes) reads the use against
@@ -470,7 +469,7 @@ can be turned off on its own.
 | Tool | What |
 | --- | --- |
 | `node tools/kit-find.mjs <word…>` | The kit's exports and CSS classes matching: look before writing a helper or a style |
-| `node tools/shots.mjs <app> [page…]` | Every screenshot a change needs (five screens × light/dark, live data, signed in), a contact sheet, faults, `--before main` diff; pages in `tools/shots/pages.mjs` |
+| `node tools/shots.mjs <app> [page…]` | Every screenshot a change needs (five screens × light/dark, live data read once for all, `live-keep.mjs`, signed in), a contact sheet, faults, `--before main` diff; pages in `tools/shots/pages.mjs` |
 | `node tools/preview.mjs <app>` | The app with real data (`--live`, `--width`, `--timing`, `--requests`, `--profile`, `--webkit`, `--reopen`…); prints `wraps:`, `cut:`, `scrolls sideways:` |
 | `node tools/gate.mjs [app…]` | The family quality gate (`tools/gate-page.js`): lift, stalls, dead taps, wraps, cuts, letters, white, mixed language… on every tab |
 | `node tools/speed.mjs <app…>` | Before vs after (3G, CPU ×4, answers replayed): each step's time, KB, requests, CPU, redraws, memory, proxy calls and CPU |

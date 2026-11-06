@@ -168,3 +168,25 @@ test('plan carries the quotas', () => {
   const p = plan({ users: u, base, guard: guardOf({ cpuMs: 0.2 }), hours: week, usage: {}, now: NOW });
   assert.ok(p.quotas.rows.some(r => r.key === 'cf:cpuMs' && r.holds > 0));
 });
+
+test("quotas: Maps' and TDX's spends by our tools and the showcase's demo are taken off before people's", () => {
+  const users = { week: 20 };
+  const maps = { drive: { used: 600, month: 3000, fixed: 2000, cap: 3000 } };
+  const usage = { tdx: { points: 30, devPoints: 6, showPoints: 0, plan: { month: 200 }, guard: { why: '' } } };
+  const q = quotas({ users, usage, maps, now: NOW });
+  const drive = q.rows.find(r => r.key === 'maps:drive');
+  assert.equal(drive.fixedMonth, 2000);
+  assert.equal(drive.perPerson, 1000 / 20);
+  assert.equal(drive.holds, Math.floor((20 * (3000 - 2000)) / 1000));
+  const tdx = q.rows.find(r => r.key === 'tdx:points');
+  // Nov 3, 14:30 in Taiwan: 2.6 days gone of 30.
+  const carry = n => (n / (2 + 14.5 / 24)) * 30;
+  assert.ok(Math.abs(tdx.fixedMonth - carry(6)) < 1e-6);
+  assert.equal(tdx.holds, Math.floor((20 * (200 - carry(6))) / (carry(30) - carry(6))));
+  // The plan carries each SKU's own share from the meter's dev:/show: counts.
+  const u = { ...estimateUsers({ active: { day: 4, week: 8 }, apps: { transit: { week: 4 } }, newWeek: 0 }), apps: { transit: 4 } };
+  const p = plan({ users: u, base, usage: { transit: { drive: { used: 600, cap: 3000, dev: 300, show: 100 } } }, now: Date.parse('2026-10-10T04:00:00Z') });
+  assert.equal(p.maps.drive.month, Math.round((600 / 10) * 31));
+  assert.equal(p.maps.drive.fixed, Math.round((400 / 10) * 31));
+  assert.equal(p.maps.drive.holds, Math.floor(((3000 - (400 / 10) * 31) / ((200 / 10) * 31)) * 4));
+});
