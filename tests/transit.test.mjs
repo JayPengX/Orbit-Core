@@ -675,55 +675,33 @@ test("walks by Google's streets: five in one matrix call, each kept a month; wit
   assert.equal((await handleTransit(new Request('https://w/transit/walk?from=35,139&to=24.8,120.9'), env, {}, '/transit/walk', { session: { s: 'S' }, fetchFn, now: NOW, cache })).status, 400);
 });
 
-test("a bus's drive to its stops: Google's traffic matrix, an element each from its own share, a minute shared, none past the cap", async () => {
+// Nothing asks Google's traffic matrix (a bus's drive to its stops): the
+// address had no app calling it, only a test page, and its share was counted
+// as people's on the admin panel's 容量 (Jay 2026-11-06: "3 people"). Gone.
+test('no Google traffic matrix: /transit/drive is no address, nothing spent', async () => {
   fresh();
   const env = { GOOGLE_MAPS_KEY: 'k', RATE_LIMIT_KV: memKv() };
-  const cache = memCache();
   let calls = 0;
-  const fetchFn = async (url, opts) => {
-    const body = JSON.parse(opts.body);
-    assert.match(String(url), /computeRouteMatrix/);
-    assert.equal(body.travelMode, 'DRIVE');
-    assert.equal(body.routingPreference, 'TRAFFIC_AWARE');
-    calls++;
-    return json(body.destinations.map((d, i) => ({ originIndex: 0, destinationIndex: i, condition: 'ROUTE_EXISTS', distanceMeters: 800 * (i + 1), duration: `${120 * (i + 1)}s`, staticDuration: `${100 * (i + 1)}s` })));
-  };
-  const ask = (qs, s = { s: 'S' }, e = env) => handleTransit(new Request(`https://w/transit/drive?${qs}`), e, {}, '/transit/drive', { session: s, fetchFn, now: NOW, cache }).then(r => r.json());
-  const qs = 'from=24.8177,121.0163&to=24.82,121.02;24.83,121.03';
-  const a = await ask(qs);
-  assert.equal(a.src, 'google');
-  assert.deepEqual(a.drives, [{ dist: 800, dur: 120, base: 100 }, { dist: 1600, dur: 240, base: 200 }]);
-  assert.equal((await usage(env, NOW)).drive, 2, 'an element each');
-  const b = await ask(qs);
-  assert.equal(b.src, 'cached');
-  assert.equal(calls, 1);
-  // The showcase never spends it.
-  assert.equal((await ask(qs, { s: 'S', showcase: true })).code, 'NOT_FOUND');
-  // Past the month's cap: nothing asked.
-  fresh();
-  const full = { ...env, RATE_LIMIT_KV: memKv() };
-  await full.RATE_LIMIT_KV.put(`transit:use:${billingMonth(NOW)}`, JSON.stringify({ drive: CAPS.drive }));
-  const c = await handleTransit(new Request('https://w/transit/drive?from=24.8177,121.0163&to=24.82,121.02'), full, {}, '/transit/drive', { session: { s: 'S' }, fetchFn, now: NOW, cache: memCache() }).then(r => r.json());
-  assert.deepEqual(c.drives, [null]);
-  assert.equal(c.src, 'cap');
-  assert.equal(calls, 1);
-  assert.ok(CAPS.drive < 5000, "inside Google's free 5,000");
+  const r = await handleTransit(new Request('https://w/transit/drive?from=24.8177,121.0163&to=24.82,121.02'), env, {}, '/transit/drive', { session: { s: 'S' }, fetchFn: async () => (calls++, json([])), now: NOW, cache: memCache() });
+  assert.equal(r.status, 404);
+  assert.equal(calls, 0);
+  assert.equal('drive' in CAPS, false);
 });
 
 test("our tools' spends (the dev door) and the showcase's counted apart for the admin's people count; our tools stop at half a free month, people go on to the cap", async () => {
   fresh();
   const env = { GOOGLE_MAPS_KEY: 'k', RATE_LIMIT_KV: memKv() };
-  const fetchFn = async (url, opts) => json(JSON.parse(opts.body).destinations.map((d, i) => ({ originIndex: 0, destinationIndex: i, condition: 'ROUTE_EXISTS', distanceMeters: 800, duration: '120s', staticDuration: '100s' })));
-  const ask = (to, session) => handleTransit(new Request(`https://w/transit/drive?from=24.8177,121.0163&to=${to}`), env, {}, '/transit/drive', { session, fetchFn, now: NOW, cache: memCache() }).then(r => r.json());
+  const fetchFn = async (url, opts) => json(JSON.parse(opts.body).destinations.map((d, i) => ({ originIndex: 0, destinationIndex: i, condition: 'ROUTE_EXISTS', distanceMeters: 800, duration: '600s' })));
+  const ask = (to, session) => handleTransit(new Request(`https://w/transit/walk?from=24.8177,121.0163&to=${to}`), env, {}, '/transit/walk', { session, fetchFn, now: NOW, cache: memCache() }).then(r => r.json());
   assert.equal((await ask('24.82,121.02;24.83,121.03', { s: 'dev', dev: true })).src, 'google');
   assert.equal((await ask('24.84,121.04', { s: 'S' })).src, 'google');
   const used = await usage(env, NOW);
-  assert.equal(used.drive, 3, 'everyone against the cap');
-  assert.equal(used['dev:drive'], 2, "our tools' apart");
-  assert.equal(used['dev:drive'] + (used['show:drive'] || 0), 2);
+  assert.equal(used.matrix, 3, 'everyone against the cap');
+  assert.equal(used['dev:matrix'], 2, "our tools' apart");
+  assert.equal(used['dev:matrix'] + (used['show:matrix'] || 0), 2);
   // Half the month used: our tools get the fallback; a person still Google's.
   fresh();
-  await env.RATE_LIMIT_KV.put(`transit:use:${billingMonth(NOW)}`, JSON.stringify({ drive: CAPS.drive * DEV_SHARE }));
+  await env.RATE_LIMIT_KV.put(`transit:use:${billingMonth(NOW)}`, JSON.stringify({ matrix: CAPS.matrix * DEV_SHARE }));
   assert.equal((await ask('24.85,121.05', { s: 'dev', dev: true })).src, 'cap');
   assert.equal((await ask('24.86,121.06', { s: 'S' })).src, 'google');
   // TDX's points: ours apart too, read by tdxUse with the prefix (the same keys without it).

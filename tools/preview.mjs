@@ -838,7 +838,7 @@ if (key === 'admin') {
     // (Transit's month of Google and TDX, made up: a share of each spent by our tools, counted apart.)
     const { billingMonth } = await import('../transit.js');
     const twToday = new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
-    kv.set(`transit:use:${billingMonth(now)}`, JSON.stringify({ maps: 420, autocomplete: 380, details: 40, textSearch: 60, routes: 260, matrix: 700, drive: 520, 'dev:maps': 90, 'dev:routes': 110, 'dev:matrix': 380, 'dev:drive': 300, [`tdx:b:${twToday}`]: 9000, [`tdx:a:${twToday}`]: 900, [`dev:tdx:a:${twToday}`]: 400 }));
+    kv.set(`transit:use:${billingMonth(now)}`, JSON.stringify({ maps: 420, autocomplete: 380, details: 40, textSearch: 60, routes: 260, matrix: 700, 'dev:maps': 90, 'dev:routes': 110, 'dev:matrix': 380, [`tdx:b:${twToday}`]: 9000, [`tdx:a:${twToday}`]: 900, [`dev:tdx:a:${twToday}`]: 400 }));
   }
   // (The door, door.js, made up: 184 people in of 200 (busy), 3 priority, a peak and some turned away today.)
   {
