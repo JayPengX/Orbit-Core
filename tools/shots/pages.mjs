@@ -57,6 +57,9 @@ export const PAGES = {
     'home-next': { args: click(wait(3000), "js:(()=>{const d=[...document.querySelectorAll('.q-chip.day')].filter(e=>e.offsetParent);d[d.findIndex(e=>e.classList.contains('is-today'))+1]?.click()})()", wait(7000)) },
     // 首頁 on yesterday (a day gone by: 已結束 beside 我的聯賽).
     'home-past': { args: click(wait(3000), "js:(()=>{const d=[...document.querySelectorAll('.q-chip.day')].filter(e=>e.offsetParent);d[d.findIndex(e=>e.classList.contains('is-today'))-1]?.click()})()", wait(9000)) },
+    // 首頁's games over with who led each side (a light day's 已結束): today, else the nearest day before with one,
+    // scrolled to the card (Jay 2026-11-06, iPad: the card one game, a tap off a face or name opens it).
+    'home-recap': { args: click(wait(3000), "js:document.querySelector('.q-chip.day.is-today')?.click()", wait(9000), "js:(async()=>{for(let i=1;i<4&&!document.querySelector('.q-card.recap');i++){const d=[...document.querySelectorAll('.q-chip.day')].filter(e=>e.offsetParent);d[d.findIndex(e=>e.classList.contains('is-today'))-i]?.click();await new Promise(r=>setTimeout(r,8000))}document.querySelector('.q-card.recap')?.scrollIntoView({block:'center'})})()", wait(26000)) },
     // 首頁 swiped left on the empty page under a short day (Jay 2026-11-06, an iPad: only a card swiped): the next day.
     'home-swipe-empty': { args: click(wait(9000), swipeAt(-160), wait(2500)) },
     // 首頁 past ELTA's list (11/22: Newcastle v Arsenal, the Lakers): the guessed channel, said 預估 (with --account fan).

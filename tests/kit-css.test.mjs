@@ -45,3 +45,15 @@ test('an icon tile never gets a fill without its glyph colour', () => {
     assert.match(body, /(^|;)\s*color\s*:/, `${sel.trim()} sets a fill, so it sets the glyph's colour too`);
   }
 });
+
+// A day strip on a wide page (an iPad, a computer) shows a week at most, each
+// chip about a phone's, never every day the width could hold (Jay 2026-11-06,
+// Sports on an iPad: fifteen days at once). dayStrip's fit() reads --q-day-n.
+test('a wide page’s day strip holds a week at most', () => {
+  const rule = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find(([, s]) => s.trim() === 'html.q-wide .q-day-bar .q-day-strip');
+  assert.ok(rule, 'a rule for the strip on q-wide');
+  assert.match(rule[2], /--q-day-n:\s*7;/);
+  assert.match(rule[2], /width:\s*calc\(/, 'its width a week of chips, not the page');
+  const ui = readFileSync(new URL('../kit/ui.mjs', import.meta.url), 'utf8');
+  assert.match(ui, /getPropertyValue\('--q-day-n'\)/, 'fit() honours it');
+});
