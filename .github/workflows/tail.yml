@@ -139,7 +139,8 @@ jobs:
               const u = r ? new URL(r.url) : null;
               // (A phone asks on the domain, /api/…; our own tools on api. or workers.dev. A data read by its app.)
               const sp = u && /^(\/api)?\/sports-proxy$/.test(u.pathname);
-              const key = c ? `cron ${c}` : u ? `${r.method} ${u.pathname}${sp ? (u.searchParams.has("batch") ? " batch" : " " + (u.searchParams.get("url") || "").split("/")[2]) + " " + (u.searchParams.get("app") || "?") : ""}` : (e.eventType || "other");
+              // (A test ask tagged probe=… counts apart, by its tag: one kind of answer timed alone.)
+              const key = c ? `cron ${c}` : u ? `${r.method} ${u.pathname}${sp ? (u.searchParams.has("batch") ? " batch" : " " + (u.searchParams.get("url") || "").split("/")[2]) + " " + (u.searchParams.get("app") || "?") : ""}${u.searchParams.get("probe") ? " probe=" + u.searchParams.get("probe").slice(0, 20) : ""}` : (e.eventType || "other");
               const k = (by[key] ||= { n: 0, cpu: 0, wall: 0 });
               k.n++; k.cpu += e.cpuTime || 0; k.wall += e.wallTime || 0;
               // (Who asked: a page on the domain, /api/…, or a direct call; from where, through which colo and network.)
