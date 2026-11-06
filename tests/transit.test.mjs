@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   tdxRequest, tdxGet, warmBikes, SLOW_MS, tdxAccess, resetTdxToken, resetPace, resetTurns, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
-  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta, tdxTrim, tdxUse, DEV_SHARE, HOT_ASKS, SMALL_ETA, SMALL_ROWS
+  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta, tdxTrim, tdxUse, DEV_SHARE, HOT_ASKS, SMALL_ETA, SMALL_ROWS, together
 } from '../transit.js';
 
 const NOW = Date.parse('2026-10-03T01:00:00Z');
@@ -29,6 +29,10 @@ const memCache = () => {
     },
     put: async (req, res) => void store.set(req.url, { body: await res.text(), headers: Object.fromEntries(res.headers) })
   };
+};
+const memCacheCopy = c => {
+  const store = new Map(c.store);
+  return { store, match: async req => (store.has(req.url) ? new Response(store.get(req.url).body, { headers: store.get(req.url).headers }) : undefined), put: async (req, res) => void store.set(req.url, { body: await res.text(), headers: Object.fromEntries(res.headers) }) };
 };
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const fresh = () => {
@@ -958,6 +962,64 @@ test("buses due in a small city (新竹市): two stop lists asked within a minut
   await ask('city=Keelung&stops=KEE4', NOW + 401_000);
   assert.equal(log.length, k + 2);
   assert.ok(!log.slice(k).some(whole), 'then by its stops');
+});
+
+// 公路客運 (all Taiwan, never read whole): a crowd at its own stops asked
+// together, a few reads of every stop (route) asked here this minute.
+test("公路客運's stops and routes asked together: a crowd at its own stops shares a few reads of all of them; one phone alone its own read; a stop coming changes only its own group", async () => {
+  fresh();
+  resetEta();
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 'secret', RATE_LIMIT_KV: memKv(), TDX_PER_MIN: '1000' };
+  const cache = memCache();
+  const log = [];
+  const fetchFn = async url => {
+    if (url.includes('token')) return json({ access_token: 'T', expires_in: 86400 });
+    const u = decodeURIComponent(url);
+    log.push(u);
+    const named = [...u.matchAll(/(StopUID|RouteUID) eq '([^']+)'/g)].map(m => m[2]);
+    if (u.includes('RealTimeByFrequency')) return json(named.map(id => ({ RouteUID: id, PlateNumb: `${id}-bus`, Direction: 0, BusPosition: { PositionLat: 24.7, PositionLon: 121.1 }, GPSTime: 't' })));
+    return json(named.map(id => ({ StopUID: id, RouteUID: 'THB5700', EstimateTime: 60 })));
+  };
+  const eta = async (stops, now, had = 0) => (await (await handleTransit(new Request(`https://w/transit/eta?city=InterCity&stops=${stops.join(',')}${had ? `&had=${had}` : ''}`), env, {}, '/transit/eta', { session: { s: 'S' }, fetchFn, now, cache })).json()).map(r => r.StopUID);
+  const gps = async (routes, now, had = 0) => (await (await handleTransit(new Request(`https://w/transit/gps?city=InterCity&routes=${routes.join(',')}${had ? `&had=${had}` : ''}`), env, {}, '/transit/gps', { session: { s: 'S' }, fetchFn, now, cache })).json()).map(r => r.RouteUID);
+  // One phone alone: its own stops' read, as before.
+  assert.deepEqual(await eta(['THB102', 'THB101'], NOW), ['THB102', 'THB101']);
+  assert.equal(log.length, 1);
+  assert.match(log[0], /InterCity\?\$filter=StopUID eq 'THB102' or StopUID eq 'THB101'&/);
+  // Another phone's stop: one read of all three in one order, each phone its own rows…
+  assert.deepEqual(await eta(['THB201'], NOW + 3_000), ['THB201']);
+  assert.match(log.at(-1), /InterCity\?\$filter=StopUID eq 'THB101' or StopUID eq 'THB102' or StopUID eq 'THB201'&/);
+  // …and the first phone's next ask from that same read (its copy 5 s old, this one 2 s).
+  assert.deepEqual(await eta(['THB102', 'THB101'], NOW + 5_000, 5), ['THB101', 'THB102']);
+  assert.equal(log.length, 2);
+  // 50 phones each at its own stop: once they're all asked, a round of every
+  // one's next ask is a couple of reads (two groups), not 50.
+  const crowd = Array.from({ length: 50 }, (_, i) => `THB${3000 + i * 7}`);
+  for (const [i, s] of crowd.entries()) assert.deepEqual(await eta([s], NOW + 6_000 + i * 100), [s]);
+  const n = log.length;
+  for (const [i, s] of crowd.entries()) assert.deepEqual(await eta([s], NOW + 36_000 + i * 100, 30), [s], 'each phone its own stop');
+  assert.ok(log.length - n <= 4, `a round of 50 asks: ${log.length - n} reads`);
+  assert.ok(log.slice(n).every(u => (u.match(/StopUID eq/g) || []).length > 10), 'each a group of stops');
+  // A stop coming changes only its own group: the others' reads stay as they were.
+  const groupOf = async (id, at) => (await together('eta', [id], 40, { cache }, at))?.find(g => g.includes(id))?.join(',');
+  const g0 = await groupOf(crowd[0], NOW + 40_100);
+  let coming = null;
+  for (let i = 0; i < 40 && !coming; i++) {
+    const id = `THB9${i}`;
+    const sees = (await together('eta', [id], 40, { cache: memCacheCopy(cache) }, NOW + 40_200)) || [];
+    if (!sees.some(g => g.includes(crowd[0]))) coming = id;
+  }
+  assert.ok(g0 && coming);
+  await together('eta', [coming], 40, { cache }, NOW + 40_300);
+  assert.equal(await groupOf(crowd[0], NOW + 40_400), g0, "another group's stop coming leaves this group's read as it was");
+  // Buses' places: two phones' lagging routes, one read of both; then each from it.
+  const m = log.length;
+  assert.deepEqual(await gps(['THB5700'], NOW), ['THB5700']);
+  assert.match(log.at(-1), /RealTimeByFrequency\/InterCity\?\$filter=RouteUID eq 'THB5700'&/);
+  assert.deepEqual(await gps(['THB5630', 'THB5608'], NOW + 2_000), ['THB5608', 'THB5630']);
+  assert.match(log.at(-1), /RouteUID eq 'THB5608' or RouteUID eq 'THB5630' or RouteUID eq 'THB5700'&/);
+  assert.deepEqual(await gps(['THB5700'], NOW + 4_000, 4), ['THB5700']);
+  assert.equal(log.length, m + 2);
 });
 
 test("a route's buses' places, had=<s>: a copy here no newer than the phone's is read again now (a bus sends its place each 20 s); operators' notices kept 10 minutes", async () => {
