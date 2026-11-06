@@ -28,7 +28,7 @@
 //                          for any symbol, for when Yahoo answers 429)
 //
 //   app   sports | securities | words | orbit | weather | transit | beats | law | money (or the repo's folder name)
-//         | admin [overview accounts money health usage dev tools]  (the admin panel, made-up accounts)
+//         | admin [overview accounts money health usage dev tools]  (the admin panel, made-up accounts; money: the 證券的錢 sheet)
 //
 // Orbit Transit: /transit is answered by transit.js itself on made-up TDX
 // answers around 新竹車站 (tests/fixtures/transit; until the TDX key is set no
@@ -1355,7 +1355,8 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
   // The admin panel's views are tabs, not addresses: the one named, clicked.
   // (With --click, the profile is of the clicks alone.)
   if (cdp && clicks.length) await cdp.send('Profiler.stop').then(() => cdp.send('Profiler.start'));
-  for (const sel of [...(key === 'admin' && hash ? [`[data-view="${hash}"]`] : []), ...clicks]) {
+  // (money: 證券的錢 is a sheet over 總覽, opened from its 這週的錢.)
+  for (const sel of [...(key === 'admin' && hash ? [hash === 'money' ? 'js:document.querySelector(\'[data-go="money"]\').click()' : `[data-view="${hash}"]`] : []), ...clicks]) {
     // ('js:<code>': run on the page instead, e.g. a click on something the tab bar covers.)
     if (sel.startsWith('js:')) await page.evaluate(sel.slice(3)).catch(e => errors.push(`click ${sel}: ${e.message.split('\n')[0]}`));
     // ('xy:<x>,<y>': a finger's tap at that point of the page, e.g. on a map.)

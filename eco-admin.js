@@ -109,7 +109,7 @@ export const RETIRED_SETTINGS = ['oddsWeeklyLimit', 'orbitFollow', 'bests:vocab'
 const MONEY_APPS = new Set(['eco', 'stock']);
 export function tidyWallet(w, now) {
   const { links, ...rest } = w;
-  const gone = { entries: 0, money: 0, settings: 0, looks: 0 };
+  const gone = { entries: 0, money: 0, settings: 0, looks: 0, apps: 0 };
   const entries = [];
   for (const { peer, ...e } of rest.entries) {
     if (!MONEY_APPS.has(e.app) || e.id.startsWith('stock:xs-')) {
@@ -127,7 +127,13 @@ export function tidyWallet(w, now) {
     if (RETIRED_SETTINGS.includes(k) || k.startsWith('act:')) gone.settings++;
     else settings[k] = v;
   }
-  return { wallet: { ...rest, entries, settings }, gone };
+  // Apps that are gone (Slips' `slip`, Play's): their first/last use.
+  const apps = {};
+  for (const [k, v] of Object.entries(rest.apps || {})) {
+    if (ECO_APPS[k]) apps[k] = v;
+    else gone.apps++;
+  }
+  return { wallet: { ...rest, entries, settings, ...(rest.apps ? { apps } : {}) }, gone };
 }
 
 export async function handleAdmin({ env, deps, headers, request, ip, body }) {
@@ -234,12 +240,12 @@ async function walletList(env, deps) {
   const now = deps.now();
   return wallets.map(w => {
     const wallet = parseWallet(w.payload);
-    const last = Math.max(0, ...Object.values(wallet?.apps || {}).map(a => a.last || 0));
+    const last = lastUsed(wallet);
     return {
       ref: w.id.slice(0, 8),
       created: wallet?.created ? new Date(wallet.created).toISOString() : null,
       lastUsed: last ? new Date(last).toISOString() : null,
-      apps: Object.keys(wallet?.apps || {}),
+      apps: appsOf(wallet).map(a => a.app),
       entries: wallet?.entries?.length || 0,
       balance: wallet ? poolBalance(wallet) : null,
       gen: wallet ? gen(wallet) : null,
@@ -263,7 +269,7 @@ export async function planClean(env, deps) {
   const inboxIds = new Set();
   const keyIds = new Set();
   const tidy = [];
-  const retired = { entries: 0, money: 0, settings: 0, looks: 0 };
+  const retired = { entries: 0, money: 0, settings: 0, looks: 0, apps: 0 };
   for (const w of wallets) {
     const wallet = parseWallet(w.payload);
     if (!wallet) {
@@ -276,7 +282,7 @@ export async function planClean(env, deps) {
     const { wallet: next, gone } = tidyWallet(wallet, now);
     if (JSON.stringify(next) === JSON.stringify(wallet)) continue;
     tidy.push({ id: w.id, wallet: next, updateTime: w.updateTime });
-    for (const k of ['entries', 'settings', 'looks']) retired[k] += gone[k];
+    for (const k of ['entries', 'settings', 'looks', 'apps']) retired[k] += gone[k];
     retired.money = Math.round((retired.money + gone.money) * 100) / 100;
   }
   for (const name of collections) {
@@ -315,7 +321,7 @@ export async function planClean(env, deps) {
   // Notice subscriptions (KV) of accounts that are gone.
   const pushes = await pushRecords(env).catch(() => []);
   counts[PUSH_KV] = pushes.length;
-  const kvDeletes = pushes.filter(r => !accounts.has(r.account)).map(r => r.key);
+  const kvDeletes = pushes.filter(r => !accounts.has(r.account) || !ECO_APPS[r.app]).map(r => r.key);
   return { collections, counts, deletes, kvDeletes, tidy, retired };
 }
 const PUSH_KV = '通知訂閱（KV）';
@@ -349,7 +355,9 @@ function summary(plan) {
 // panel's table shows it): exactly one must match.
 const DAY = 86_400_000;
 const MAX_GRANT = 1_000_000;
-const appsOf = w => Object.entries(w?.apps || {}).map(([app, a]) => ({ app, first: a.first || null, last: a.last || null }));
+// Only the apps there are now (ECO_APPS): an old wallet's apps.slip (Slips,
+// gone with Longshot) is never shown or counted; 資料整理 takes it out (tidyWallet).
+const appsOf = w => Object.entries(w?.apps || {}).filter(([app]) => ECO_APPS[app]).map(([app, a]) => ({ app, first: a.first || null, last: a.last || null }));
 const lastUsed = w => Math.max(0, ...appsOf(w).map(a => a.last || 0));
 async function findWallet(env, deps, ref) {
   const r = String(ref || '').trim();
@@ -483,7 +491,7 @@ export const ADMIN_TOOLS = {
     if (!hit) return notFound;
     const { id, wallet } = hit;
     const now = deps.now();
-    const pushes = (await pushRecords(env, `push:${id}:`).catch(() => [])).map(r => r.app);
+    const pushes = (await pushRecords(env, `push:${id}:`).catch(() => [])).map(r => r.app).filter(a => ECO_APPS[a]);
     return {
       ref: id.slice(0, 8),
       created: wallet.created || null,
@@ -574,7 +582,7 @@ export const ADMIN_TOOLS = {
     // A subscription outlives an account removed some other way (it keeps
     // 60 days in KV): those are shown apart and 整理 takes them.
     const accounts = new Set((await deps.fsList(env, WALLET_COLLECTION, 300)).map(w => w.id));
-    const live = records.filter(r => accounts.has(r.account));
+    const live = records.filter(r => accounts.has(r.account) && ECO_APPS[r.app]);
     const apps = {};
     for (const r of live) apps[r.app] = (apps[r.app] || 0) + 1;
     const next = Object.values(due).filter(Number.isFinite).sort((a, b) => a - b);
