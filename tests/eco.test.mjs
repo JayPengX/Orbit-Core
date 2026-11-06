@@ -884,15 +884,3 @@ test('fresh: passes issued before the mark count while never used; used accounts
   assert.equal((await t.call('GET', `${t.qt(back.data.token)}&app=vocab`)).status, 200);
 });
 
-// Outside Taiwan (2026-11-06): every answer with a session says the caller's
-// country, so the kit knows a Taiwan-only app is abroad without asking again.
-test('a session answer carries the caller country; none without one', async () => {
-  const t = setup();
-  const acct = await newPass(t);
-  const there = await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'transit' }, { country: 'US' });
-  assert.equal(there.data.country, 'US');
-  const read = await t.call('GET', `?app=transit&qt=${encodeURIComponent(there.data.token)}`, undefined, { country: 'JP' });
-  assert.equal(read.data.country, 'JP');
-  assert.equal((await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'transit' })).data.country, undefined);
-  assert.equal((await t.call('POST', '', { op: 'login', passcode: 'ABCDEFGHJK', app: 'vocab' }, { country: 'US' })).data.country, undefined, 'never on an error');
-});

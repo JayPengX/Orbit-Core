@@ -22,31 +22,6 @@ export function ipBucket(ip) {
   return `${groups.slice(0, 4).map(g => g.replace(/^0+(?=.)/, '')).join(':')}::/64`;
 }
 
-// A caller outside Taiwan (Jay 2026-11-06: "block international user from
-// using Taiwan only service outright"): the country Cloudflare reads from the
-// caller's address (a phone roaming on its Taiwan SIM still reads TW). Only a
-// real country code that isn't Taiwan's; unknown ('XX'), Tor ('T1') or none
-// (a test, a local run) counts as here, never turned away. Nor does a phone
-// whose clock is Taiwan's (`tz=Asia/Taipei`, sent by Transit): someone in
-// Taiwan on a VPN abroad (Jay 2026-11-06) is still in Taiwan.
-export function abroad(request) {
-  const c = request?.cf?.country;
-  if (!(typeof c === 'string' && /^[A-Z]{2}$/.test(c) && c !== 'TW' && c !== 'XX')) return false;
-  try {
-    // (`tw=1`: the phone's own fix is in Taiwan, Transit's say: a visitor on a roaming address.)
-    const q = new URL(request.url).searchParams;
-    return q.get('tz') !== 'Asia/Taipei' && q.get('tw') !== '1';
-  } catch {
-    return true;
-  }
-}
-// The routes of the Taiwan-only services: Orbit Transit's (TDX, Taiwan's
-// map). Not Law: foreigners study Taiwan's law in it (its English texts; Jay 2026-11-06).
-export const TW_ONLY_PATH = /^\/transit(\/.*)?$/;
-// Turned away abroad: a Taiwan-only route asked from outside Taiwan, except
-// the dev door (a local page: previews, shots) and the showcase's demos.
-export const twOnlyRefused = (request, path, origin, showcase = new Set()) => TW_ONLY_PATH.test(path) && abroad(request) && !LOCAL_ORIGIN.test(origin || '') && !showcase.has(origin);
-
 export function isAllowedOrigin(origin) {
   return ALLOWED_ORIGINS.includes(origin) || LOCAL_ORIGIN.test(origin || '');
 }
