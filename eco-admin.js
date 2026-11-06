@@ -18,7 +18,7 @@ import { doorReport, doorSet } from './door.js';
 import { systemReport, alertAccount, tell, OPS_DOC } from './ops.js';
 import { passAccount, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet } from './eco.js';
 import { sendPush, dueLists } from './push.js';
-import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, tdxPoints, tdxGuard, tdxUse } from './transit.js';
+import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, TDX_BOOK, tdxPoints, tdxGuard, tdxUse } from './transit.js';
 import { aiUse } from './gemini-use.js';
 import { twDate, googleToday, GOOGLE_MONTH_CALLS } from './weather.js';
 import { cleanDev, DEV } from './kit/devconfig.mjs';
@@ -724,22 +724,26 @@ export const ADMIN_TOOLS = {
     const now = deps.now();
     const transit = await transitUsage(env, now).catch(() => ({}));
     const weatherCalls = env.RATE_LIMIT_KV ? Number(await env.RATE_LIMIT_KV.get(`weather:google:${twDate(now)}`).catch(() => 0)) || 0 : null;
-    // TDX by Taiwan's day ({ day: { basic, advanced, points } }), this Taiwan month only (it starts again on the 1st).
+    // TDX by Taiwan's day ({ day: { basic, advanced, calls, kb, points, book } }), this Taiwan month only
+    // (it starts again on the 1st): the advanced with the planner's, kb the bytes TDX sent (as read);
+    // a day the meter counted short TDX's own numbers (TDX_BOOK, `book`).
     const tdx = await tdxUse(env, now).catch(() => ({}));
     const days = {};
-    let total = 0;
     for (const [k, n] of Object.entries(tdx)) {
-      const m = /^tdx:([ab]):(\d{4}-\d{2}-\d{2})$/.exec(k);
+      const m = /^tdx:(v?)([bam]):(\d{4}-\d{2}-\d{2})$/.exec(k);
       if (!m) continue;
-      const d = (days[m[2]] ||= { basic: 0, advanced: 0 });
-      d[m[1] === 'b' ? 'basic' : 'advanced'] += n;
-      total += n;
+      const d = (days[m[3]] ||= { basic: 0, advanced: 0, kb: 0 });
+      if (m[1]) d.kb += n / 1024;
+      else d[m[2] === 'b' ? 'basic' : 'advanced'] += n;
     }
-    for (const d of Object.values(days)) d.points = d.basic / TDX_POINTS.basic + d.advanced / TDX_POINTS.advanced;
+    for (const [day, d] of Object.entries(days)) Object.assign(d, { calls: d.basic + d.advanced, kb: Math.round(d.kb), points: tdxPoints(Object.fromEntries(Object.entries(tdx).filter(([k]) => k.endsWith(day))), now, {}).month });
+    const today = twDate(now);
+    for (const [day, b] of Object.entries(TDX_BOOK)) if (day.slice(0, 7) === today.slice(0, 7) && day <= today) days[day] = { basic: 0, advanced: 0, ...days[day], calls: b.calls, kb: b.kb, points: b.points, book: true };
+    const total = Object.values(days).reduce((a, d) => a + d.calls, 0);
     const pts = tdxPoints(tdx, now);
-    // (Ours of them: our tools' (the dev door) and the showcase demo's, counted apart since 2026-11-06.)
-    const oursOf = async prefix => tdxPoints(await tdxUse(env, now, prefix).catch(() => ({})), now).month;
-    const [devPoints, showPoints] = await Promise.all([oursOf('dev:'), oursOf('show:')]);
+    // (Ours of them: our tools' (the dev door), the showcase demo's and the builders', counted apart since 2026-11-06.)
+    const oursOf = async prefix => tdxPoints(await tdxUse(env, now, prefix).catch(() => ({})), now, {}).month;
+    const [devPoints, showPoints, buildPoints] = await Promise.all([oursOf('dev:'), oursOf('show:'), oursOf('build:')]);
     const tw = new Date(now + 8 * 3_600_000);
     // (When TDX starts the next month: 00:00 on the 1st in Taiwan.)
     const resets = Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth() + 1, 1) - 8 * 3_600_000;
@@ -752,7 +756,7 @@ export const ADMIN_TOOLS = {
       .map(([key, d]) => ({ key, cap: dev[key], days: (use?.week || []).map(day => d.ai.reduce((n, f) => n + (use.byFeature[f]?.[day] || 0), 0)) }));
     return {
       at: now,
-      tdx: { days, points: pts.month, devPoints, showPoints, today: pts.today, guard: tdxGuard(pts, now), plan: TDX_POINTS, total, resets },
+      tdx: { days, points: pts.month, devPoints, showPoints, buildPoints, today: pts.today, guard: tdxGuard(pts, now), plan: TDX_POINTS, total, resets },
       ai,
       google: use ? { day: use.googleDay, resets: use.googleResets, models: use.google } : null,
       // (The meter keeps errors too: the panel's 錯誤, not Transit's. Each

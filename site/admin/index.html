@@ -519,11 +519,11 @@
       <div class="pane-head"><div><h2>TDX</h2></div></div>
       <p id="use-error" class="error"></p>
       <div class="card">
-        <div><strong>點數（每月 200 點）</strong><p class="muted" style="margin:2px 0 0">基本 1,500 次 1 點 · 進階 200 次 1 點</p></div>
+        <div><strong>點數（每月 200 點）</strong><p class="muted" style="margin:2px 0 0">呼叫：基本 1,500 次 1 點 · 進階 200 次 1 點；資料量另計：基本 150 MB 1 點 · 進階 20 MB 1 點</p></div>
         <div class="tiles" id="tdx-tiles" style="margin-top:10px"></div>
         <svg id="tdx-chart" class="chart" viewBox="0 0 360 150" role="img" aria-label="每天的 TDX 點數" style="margin-top:12px"></svg>
         <details class="note"><summary>每天的明細</summary>
-          <div class="tablewrap"><table id="tdx-days"><thead><tr><th>日期</th><th class="right">基本</th><th class="right">進階</th><th class="right">點數</th></tr></thead><tbody></tbody></table></div>
+          <div class="tablewrap"><table id="tdx-days"><thead><tr><th>日期</th><th class="right">呼叫</th><th class="right">資料量 (KB)</th><th class="right">點數</th></tr></thead><tbody></tbody></table></div>
           <p class="muted" id="tdx-note" style="margin:10px 0 0"></p>
         </details>
       </div>
@@ -1805,12 +1805,12 @@ function drawTdx(t, now) {
   const counted = days.length;
   const avg = counted ? t.points / counted : 0;
   const projected = t.points + avg * (monthDays - day + (days.some(([d]) => Number(d.slice(8)) === day) ? 0 : 1));
-  const today = days.find(([d]) => Number(d.slice(8)) === day)?.[1] || { basic: 0, advanced: 0, points: 0 };
+  const today = days.find(([d]) => Number(d.slice(8)) === day)?.[1] || { basic: 0, advanced: 0, kb: 0, points: 0 };
   const pts = n => (n < 10 ? n.toFixed(2) : n.toFixed(1));
   $('tdx-tiles').replaceChildren(
     tile('本月已用', `${pts(t.points)} 點`, `${Math.round((t.points / plan) * 100)}% · 剩 ${pts(Math.max(0, plan - t.points))} 點`),
     tile('照這速度月底', `${pts(projected)} 點`, projected > plan ? '會超過！調慢 開發 的交通設定' : `${Math.round((projected / plan) * 100)}% 的額度`),
-    tile('今天', `${pts(today.points)} 點`, `基本 ${today.basic.toLocaleString()} · 進階 ${today.advanced.toLocaleString()}`),
+    tile('今天', `${pts(today.points)} 點`, `基本 ${today.basic.toLocaleString()} · 進階 ${today.advanced.toLocaleString()} · ${Math.round((today.kb || 0) / 1024).toLocaleString()} MB`),
     tile('每天平均', `${pts(avg)} 點`, `可用 ${pts(plan / monthDays)} 點 / 天`),
     tile('節流', t.guard?.advanced > 1 ? `進階 ×${t.guard.advanced}` : '沒有', t.guard?.why === 'month' ? '本月點數剩不到 5%：進階最多 5 分鐘一次' : t.guard?.why === 'day' ? `今天用到了月底要的點數，差 ${Math.abs(t.guard.room).toFixed(1)} 點` : t.guard?.room != null ? `月底前還多 ${t.guard.room.toFixed(1)} 點可用` : '')
   );
@@ -1827,10 +1827,10 @@ function drawTdx(t, now) {
   $('tdx-chart').innerHTML = last.length ? out : '';
   $('tdx-days').tBodies[0].replaceChildren(
     ...(days.length
-      ? days.map(([d, v]) => el('tr', {}, [el('td', { text: d }), el('td', { class: 'right', text: v.basic.toLocaleString() }), el('td', { class: 'right', text: v.advanced.toLocaleString() }), el('td', { class: `right ${v.points > plan / monthDays ? 'neg' : ''}`, text: pts(v.points) })]))
+      ? days.map(([d, v]) => el('tr', {}, [el('td', { text: v.book ? `${d}（TDX）` : d }), el('td', { class: 'right', text: (v.calls ?? v.basic + v.advanced).toLocaleString() }), el('td', { class: 'right', text: Math.round(v.kb || 0).toLocaleString() }), el('td', { class: `right ${v.points > plan / monthDays ? 'neg' : ''}`, text: pts(v.points) })]))
       : [el('tr', {}, [el('td', { colspan: '4', class: 'muted', text: '這個月還沒用到。' })])])
   );
-  $('tdx-note').textContent = `本月共 ${t.total.toLocaleString()} 次呼叫。每月 1 日 00:00（台灣時間）自動歸零，下次在 ${twTime(t.resets).slice(0, 5)}。點數依 TDX 的扣點規則估算，以 TDX 會員中心為準。只有當今天用到「剩下的點數不夠你照平常的速度用到月底」時，Worker 才會把進階資料保留得更久（沒用的日子會留給之後）；月底前不會用完。`;
+  $('tdx-note').textContent = `本月共 ${t.total.toLocaleString()} 次呼叫${t.buildPoints ? `（每週更新公車資料用了 ${pts(t.buildPoints)} 點）` : ''}。每月 1 日 00:00（台灣時間）自動歸零，下次在 ${twTime(t.resets).slice(0, 5)}。點數依 TDX 的扣點規則（呼叫次數加資料量）估算，以 TDX 會員中心為準；標「（TDX）」的日子是 TDX 會員中心的數字（11/6 以前的計數漏算了）。只有當今天用到「剩下的點數不夠你照平常的速度用到月底」時，Worker 才會把進階資料保留得更久（沒用的日子會留給之後）；月底前不會用完。`;
 }
 async function loadHealth() {
   $('health-error').textContent = '';
@@ -2075,11 +2075,11 @@ async function loadCapacity() {
     const on = devSaved?.autoScale;
     const slow = p.scale == null ? '最慢也不夠：要減少即時功能，否則會碰到 $5 方案的上限而停' : p.scale > 1 ? `即時更新要放慢 ×${p.scale}` : '不用放慢';
     // (A typical person: capacity.js TYPICAL_DAY, measured 2026-11-06.)
-    const few = q.typical?.few ? `本週只有 ${u.week} 人，多半是你自己在測試，照你們的用量算，每一項都會估得太少；所以每一項的「撐 N 人」和「撐得住」都照一般用法估：一個人大約隔天用一次 Orbit，用的那天開三個 App（交通開兩次）、即時畫面看 45 分鐘（公車站牌、交通的地圖、比賽直播各三分之一）、規劃一趟路，每兩次搜尋一個地點。每一樣用掉多少都是 11-06 實測，在新竹車站（站牌有三個縣市的公車，一般站牌用得更少，所以只會估少）：打開交通和一個站牌 0.019 點 TDX（車站、公告、每個縣市第一次問），之後 10 分鐘 Worker 幫你的城市更新 YouBike 數量 0.003 點，公車站牌每小時 0.54 點、地圖 0.20 點，一趟路 0.02 點；交通開一次是一次地圖載入，搜尋一次打字問 3 次，一趟路問 2 次路線，從沒走過的地方出發要 5 個步行時間。每一項的上限扣掉固定用量，除以一個人的用量，就是撐的人數；最少的那項就是撐得住；每項人數下面的「照實際」是照本週這幾個人的用量。每週 10 人以上就改回照實際用量算。` : '';
+    const few = q.typical?.few ? `本週只有 ${u.week} 人，多半是你自己在測試，照你們的用量算，每一項都會估得太少；所以每一項的「撐 N 人」和「撐得住」都照一般用法估：一個人大約隔天用一次 Orbit，用的那天開三個 App（交通開兩次）、即時畫面看 45 分鐘（公車站牌、交通的地圖、比賽直播各三分之一）、規劃一趟路，每兩次搜尋一個地點。每一樣用掉多少都是 11-06 實測，在新竹車站（站牌有三個縣市的公車，一般站牌用得更少，所以只會估少）：TDX 每次呼叫和傳回的資料量都要算點數，所以：打開交通和一個站牌 0.020 點（車站、公告、每個縣市第一次問），之後 10 分鐘 Worker 幫你的城市更新 YouBike 數量 0.005 點，公車站牌每小時 0.58 點、地圖 0.27 點，一趟路 0.03 點，看哪些路線有開（公路客運的公車位置）一天 0.016 點；交通開一次是一次地圖載入，搜尋一次打字問 3 次，一趟路問 2 次路線，從沒走過的地方出發要 5 個步行時間。每一項的上限扣掉固定用量，除以一個人的用量，就是撐的人數；最少的那項就是撐得住；每項人數下面的「照實際」是照本週這幾個人的用量。每週 10 人以上就改回照實際用量算。` : '';
     const how = few + (!q.typical?.few && q.holds ? `撐得住＝最先滿的那一項（${quotaName(q.holds.key)}）撐的人數，這個人數以內不會放慢：Cloudflare 只有實際用到 60% 以上、而且照最近幾天的速度撐不到週期結束才放慢。` : '') + (q.near && q.who === 'caller'
-      ? '每一項的「撐 N 人」＝本週活躍人數 ×（上限扣掉固定用量）÷ 現在大家用掉的。Cloudflare 的人用量看是誰呼叫：近 7 天從 App 和首頁的頁面來的請求算人用的，不分國家；其餘算固定用量：排程、建置，和我們自己的開發工具與檢查（開發多的那週就多）。Google 地圖和 TDX 扣掉我們的工具和展示頁用的（工具最多用到每項免費額度的一半）；其他項目全部算成人用的，所以只會估少。'
+      ? '每一項的「撐 N 人」＝本週活躍人數 ×（上限扣掉固定用量）÷ 現在大家用掉的。Cloudflare 的人用量看是誰呼叫：近 7 天從 App 和首頁的頁面來的請求算人用的，不分國家；其餘算固定用量：排程、建置，和我們自己的開發工具與檢查（開發多的那週就多）。Google 地圖和 TDX 扣掉我們的工具、展示頁和每週公車資料建置用的（工具最多用到每項 Google 免費額度的一半、TDX 每天 0.5 點）；其他項目全部算成人用的，所以只會估少。'
       : q.near
-      ? '每一項的「撐 N 人」＝本週活躍人數 ×（上限扣掉固定用量）÷ 現在大家用掉的。Cloudflare 的人用量暫時照地點估：近 7 天台灣附近機房收到的請求；其餘算固定用量：排程、建置，和我們自己的開發工具與檢查（在美國的機器上跑，開發多的那週就多）。帳單保護的權杖加上 Workers Observability 權限後，改成看是誰呼叫（App 本身還是工具），不分國家。Google 地圖和 TDX 扣掉我們的工具和展示頁用的（11-06 起分開算，工具最多用到每項免費額度的一半）；其他項目全部算成人用的，所以只會估少。'
+      ? '每一項的「撐 N 人」＝本週活躍人數 ×（上限扣掉固定用量）÷ 現在大家用掉的。Cloudflare 的人用量暫時照地點估：近 7 天台灣附近機房收到的請求；其餘算固定用量：排程、建置，和我們自己的開發工具與檢查（在美國的機器上跑，開發多的那週就多）。帳單保護的權杖加上 Workers Observability 權限後，改成看是誰呼叫（App 本身還是工具），不分國家。Google 地圖和 TDX 扣掉我們的工具、展示頁和每週公車資料建置用的（11-06 起分開算，工具最多用到每項 Google 免費額度的一半、TDX 每天 0.5 點）；其他項目全部算成人用的，所以只會估少。'
       : q.measured
       ? '每一項的「撐 N 人」＝本週活躍人數 ×（上限扣掉固定用量）÷ 現在大家用掉的。Cloudflare 的固定用量是近 7 天最安靜的一成小時 × 24（排程、建置、帳單保護，沒人用也在跑）；其他項目全部算成人用的，所以只會估少。'
       : `每一項的「撐 N 人」＝本週活躍人數 × 上限 ÷ 現在用掉的；${p.hours?.error ? `近 7 天的逐時用量讀不到（${p.hours.error}），` : '還沒有近 7 天的逐時用量，'}排程的固定用量也算成人用的，所以只會估少。`);

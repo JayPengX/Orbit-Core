@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --import ./kit/no-net.mjs --test"
   },
   "imports": {
     "#kit/*": "./kit/*"
