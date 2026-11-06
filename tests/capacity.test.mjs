@@ -43,7 +43,7 @@ test('plan: Maps carried to the month\'s end, and the people it holds', () => {
 });
 
 // ---- Each quota from what was really used (quotas, splitHours) ----
-import { quotas, splitHours } from '../capacity.js';
+import { quotas, splitHours, TYPICAL_CPU_MS } from '../capacity.js';
 import { PLAN } from '../guard.js';
 
 const HOUR = 3_600_000;
@@ -109,6 +109,14 @@ test('splitHours: with people\'s part read (requests near Taiwan), that is what 
   assert.equal(cpu.holds, Math.floor((40 * (capDay - (20_000 * 24 + 20_000 * 9))) / (10_000 * 16)));
   assert.ok(cpu.holds > 40);
   assert.equal(q.near, true);
+  // Enough people to tell what one uses: no typical-use stand-in needed.
+  assert.equal(q.typical.few, false);
+  // Two people a week (the owner testing): the plan's people by typical use, a second of CPU a day each.
+  const two = quotas({ users: { week: 2 }, guard: guardOf({ cpuMs: 0.2 }), hours: mixed, now: NOW });
+  assert.equal(two.typical.few, true);
+  assert.equal(two.typical.ms, TYPICAL_CPU_MS);
+  assert.equal(two.typical.people, Math.floor((capDay - (20_000 * 24 + 20_000 * 9)) / TYPICAL_CPU_MS));
+  assert.equal(quotas({ users: { week: 2 }, guard: guardOf({ cpuMs: 0.2 }), hours: null, now: NOW }).typical, null, 'no hours: no fixed part to take off');
 });
 
 test('quotas: people held = this week\'s × room after the fixed part ÷ what people use; the fewest is named', () => {

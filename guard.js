@@ -514,10 +514,12 @@ export async function workerErrors(env, { fetcher = fetch, now = Date.now(), kv 
 // analytics is asked once).
 export const HOURS_KEY = 'guard:hours';
 export const NEAR_TAIWAN = ['TPE', 'KHH', 'RMQ', 'HKG', 'MFM', 'NRT', 'KIX', 'FUK', 'OKA', 'ICN', 'PUS', 'SIN', 'KUL', 'BKK', 'MNL', 'CGK', 'SGN', 'HAN'];
-// (People's part by hour and kind, near Taiwan only: crons are left out by
-// their kind, which analytics has named only since 2026-11-04, "unknown" before.)
+// (People's part by hour and kind, the proxy's near Taiwan only: phones call
+// nothing else, and a Durable Object's alarm (the guard's own clock) answers
+// where it lives; crons are left out by their kind, which analytics has named
+// only since 2026-11-04, "unknown" before.)
 const HOURS_Q = (cpu, people = false) => `query($a: string!, $s: Time!, $e: Time!) { viewer { accounts(filter: { accountTag: $a }) {
-  x: workersInvocationsAdaptive(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e${people ? `, coloCode_in: ${JSON.stringify(NEAR_TAIWAN)}` : ''} }) { sum { requests${cpu ? ' cpuTimeUs' : ''} } ${cpu ? '' : 'quantiles { cpuTimeP99 } '}dimensions { datetimeHour ${people ? 'eventType' : 'scriptName'} } }
+  x: workersInvocationsAdaptive(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e${people ? `, scriptName: "${WORKERS[0]}", coloCode_in: ${JSON.stringify(NEAR_TAIWAN)}` : ''} }) { sum { requests${cpu ? ' cpuTimeUs' : ''} } ${cpu ? '' : 'quantiles { cpuTimeP99 } '}dimensions { datetimeHour ${people ? 'eventType' : 'scriptName'} } }
 } } }`;
 export async function useByHour(env, { fetcher = fetch, now = Date.now(), kv = env.RATE_LIMIT_KV } = {}) {
   if (!env.CF_GUARD_TOKEN) return { off: true };
