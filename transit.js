@@ -199,11 +199,17 @@ export const TDX_RULES = [
   { re: /^basic\/v2\/Bike\/Availability\/City\/[A-Za-z]+$/, fresh: 50e3, stale: 3 * MIN, tier: 'live' },
   { re: /^advanced\/v2\/Bike\/Availability\/NearBy$/, fresh: 50e3, stale: 3 * MIN, tier: 'live' },
   { re: /^basic\/v2\/Rail\/Metro\/LiveBoard\/[A-Z]+$/, fresh: 20e3, stale: 60e3, tier: 'live' },
-  { re: /^basic\/v3\/Rail\/TRA\/(StationLiveBoard(\/Station\/\d+)?|TrainLiveBoard(\/TrainNo\/\w+)?|Alert)$/, fresh: 50e3, stale: 3 * MIN, tier: 'live' },
-  { re: /^basic\/v2\/Rail\/THSR\/AlertInfo$/, fresh: 5 * MIN, stale: 30 * MIN, tier: 'live' },
-  // Operators' notices: a bus route or metro line stopped or changed (typhoons, works).
-  { re: /^basic\/v2\/Bus\/(Alert|News)\/(City\/[A-Za-z]+|InterCity)$/, fresh: 3 * MIN, stale: 30 * MIN, tier: 'live' },
-  { re: /^basic\/v2\/Rail\/Metro\/(Alert|News)\/[A-Z]+$/, fresh: 3 * MIN, stale: 30 * MIN, tier: 'live' },
+  { re: /^basic\/v3\/Rail\/TRA\/(StationLiveBoard(\/Station\/\d+)?|TrainLiveBoard(\/TrainNo\/\w+)?)$/, fresh: 50e3, stale: 3 * MIN, tier: 'live' },
+  // Operators' notices: a bus route, a metro line or trains stopped or
+  // changed (typhoons, works). Posted hours ahead, never by the minute: read
+  // again each 10 minutes, not at the live speed (as 'live' they were read
+  // again at each phone's ask past 10 s: six a city, a third of what an open
+  // map asked TDX; 2026-11-06). The phone asks each 3 (Transit service.mjs
+  // NOTICE_FRESH): what's here answers.
+  { re: /^basic\/v3\/Rail\/TRA\/Alert$/, fresh: 10 * MIN, stale: 30 * MIN, tier: 'notice' },
+  { re: /^basic\/v2\/Rail\/THSR\/AlertInfo$/, fresh: 10 * MIN, stale: 30 * MIN, tier: 'notice' },
+  { re: /^basic\/v2\/Bus\/(Alert|News)\/(City\/[A-Za-z]+|InterCity)$/, fresh: 10 * MIN, stale: 30 * MIN, tier: 'notice' },
+  { re: /^basic\/v2\/Rail\/Metro\/(Alert|News)\/[A-Z]+$/, fresh: 10 * MIN, stale: 30 * MIN, tier: 'notice' },
   // Timetables: a day's trains, a metro station's departures.
   { re: /^basic\/v3\/Rail\/TRA\/DailyTrainTimetable\/(TrainDate\/\d{4}-\d{2}-\d{2}|OD\/\d+\/to\/\d+\/\d{4}-\d{2}-\d{2})$/, fresh: 6 * HOUR, stale: DAY, tier: 'timetable' },
   { re: /^basic\/v2\/Rail\/THSR\/DailyTimetable\/(TrainDate\/\d{4}-\d{2}-\d{2}|OD\/\d+\/to\/\d+\/\d{4}-\d{2}-\d{2})$/, fresh: 6 * HOUR, stale: DAY, tier: 'timetable' },
@@ -1519,7 +1525,12 @@ async function transitRoute(request, env, headers, path, { session = null, limit
     return send(got.body, got.status, got.age != null ? { 'X-Transit-Age': String(Math.round(got.age / 100) / 10) } : {});
   }
   if (path === '/transit/tdx') {
-    const got = await tdxGet(env, q.get('p') || '', deps);
+    // (`had=<s>`: the phone's copy that many seconds old, so a copy here no
+    // newer is no use to it: TDX read then (given 3 s, then the copy), as
+    // /transit/eta's. A route's buses' places, asked once each 20 s they can
+    // move (Transit bus.mjs routeGps): the copy here was always a step old.)
+    const had = Number(q.get('had')) || 0;
+    const got = await tdxGet(env, q.get('p') || '', had > 0 ? { ...deps, stale: 0, young: Math.max(0, had * 1000 - 1500) } : deps);
     return send(got.body || '{}', got.status, { 'X-Transit-Cache': got.state, ...(got.age != null ? { 'X-Transit-Age': String(Math.round(got.age / 1000)) } : {}) });
   }
   if (path === '/transit/search') return send(await search(env, q, deps));
