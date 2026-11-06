@@ -57,3 +57,13 @@ test('a wide page’s day strip holds a week at most', () => {
   const ui = readFileSync(new URL('../kit/ui.mjs', import.meta.url), 'utf8');
   assert.match(ui, /getPropertyValue\('--q-day-n'\)/, 'fit() honours it');
 });
+
+// A full-width bar sizes its own box: goHtml draws .q-more as a link, and in an
+// app that sets no box-sizing 100% plus its padding ran past the card's right
+// edge (Jay 2026-11-06, Law's 到司法院看原文 on an iPad).
+test('every full-width .q-more sets its own box-sizing', () => {
+  const rule = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find(([, s]) => s.trim() === '.q-more');
+  assert.ok(rule, '.q-more has a rule');
+  assert.match(rule[2], /width:\s*100%/);
+  assert.match(rule[2], /box-sizing:\s*border-box/);
+});
