@@ -18,6 +18,8 @@
 //   GET /transit/eta      ?city=&stops= (or &route=, &routes=): those stops'
 //                         (routes') buses due, from one ask of the whole
 //                         city's estimates, shared
+//   GET /transit/gps      ?city=&routes=: where those routes' buses are (a
+//                         city's from one ask of its whole list, shared)
 //   GET /transit/route    plans from A to B: Google's transit routes and TDX's
 //                         planner, made one shape (the app adds YouBike plans)
 //   GET /transit/status   (open) this month's use against each cap, which
@@ -489,6 +491,37 @@ async function etaAsked(env, city, stops, routes, deps) {
   } catch {
     return { status: 502, body: { code: 'TDX_FAILED' } };
   }
+}
+
+// ---- Where routes' buses are, one TDX read a city -----------------------------------------
+//
+// GET /transit/gps?city=<TDX city | InterCity>&routes=<RouteUID,…>[&had=<s>]:
+// those routes' buses' places (TDX RealTimeByFrequency, A1: each bus's GPS,
+// sent each 20 s), as TDX's read filtered by them would answer. A city's
+// whole list is one small read (新竹市's 61 buses, 23 KB; 新竹縣's 37,
+// 14 KB; 2026-11-06), so every route and every phone in the city shares it:
+// each stop card asked its own lagging routes, a TDX read a stop each 20 s,
+// a crowd at different stops as many. 公路客運's (InterCity: all Taiwan,
+// 1,848 buses, 714 KB) by its routes, as before. `had=`: as /transit/eta's.
+export const GPS_SELECT = 'RouteUID,PlateNumb,Direction,BusPosition,GPSTime';
+export const cityGpsPath = city => `basic/v2/Bus/RealTimeByFrequency/City/${city}?$select=${GPS_SELECT}`;
+export async function gpsRows(env, q, deps = {}) {
+  const city = q.get('city') || '';
+  if (!RUN_CITY.test(city)) return { status: 400, body: { code: 'BAD_CITY' } };
+  const routes = [...new Set((q.get('routes') || '').split(',').filter(u => UID.test(u)))].slice(0, 20);
+  if (!routes.length) return { status: 400, body: { code: 'BAD_ROUTES' } };
+  const had = Number(q.get('had')) || 0;
+  const d = had > 0 ? { ...deps, stale: 0, young: Math.max(0, had * 1000 - 1500) } : deps;
+  const path = city === 'InterCity' ? `basic/v2/Bus/RealTimeByFrequency/InterCity?$filter=${routes.map(u => `RouteUID eq '${u}'`).join(' or ')}&$select=${GPS_SELECT}` : cityGpsPath(city);
+  const got = await tdxGet(env, path, d);
+  if (got.status !== 200 || got.body == null) return { status: got.status === 429 ? 429 : 502, body: { code: got.status === 429 ? 'TDX_BUSY' : 'TDX_FAILED' } };
+  let rows;
+  try {
+    rows = JSON.parse(got.body);
+  } catch {}
+  if (!Array.isArray(rows)) return { status: 502, body: { code: 'TDX_FAILED' } };
+  const want = new Set(routes);
+  return { status: 200, body: rows.filter(r => want.has(r?.RouteUID)), age: got.age || 0, state: got.state };
 }
 
 // The access token (a day long): kept in memory and KV, asked for again an
@@ -1523,6 +1556,10 @@ async function transitRoute(request, env, headers, path, { session = null, limit
     const got = await etaRows(env, q, deps);
     // (Its age to a tenth of a second: the phone learns from it when each estimate can be read.)
     return send(got.body, got.status, got.age != null ? { 'X-Transit-Age': String(Math.round(got.age / 100) / 10) } : {});
+  }
+  if (path === '/transit/gps') {
+    const got = await gpsRows(env, q, deps);
+    return send(got.body, got.status, got.age != null ? { 'X-Transit-Age': String(Math.round(got.age / 100) / 10), 'X-Transit-Cache': got.state || '' } : {});
   }
   if (path === '/transit/tdx') {
     // (`had=<s>`: the phone's copy that many seconds old, so a copy here no
