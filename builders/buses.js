@@ -53,7 +53,8 @@ export function tdxClient(env, { get = fetch, sleep = ms => new Promise(r => set
       const res = await get(`${TDX}${path}${path.includes('?') ? '&' : '?'}$format=JSON`, { headers: { Authorization: `Bearer ${token}`, 'Accept-Encoding': 'gzip' } }).catch(e => ({ ok: false, status: String(e) }));
       if (res.ok) return res.json();
       if (res.status === 401) await auth();
-      if (tries >= 4) throw new Error(`${path}: ${res.status}`);
+      // (Refused, 400 or 404: what TDX doesn't have, never asked again four times.)
+      if (tries >= 4 || res.status === 400 || res.status === 404) throw Object.assign(new Error(`${path}: ${res.status}`), { status: res.status });
       await sleep(2000 * (tries + 1));
     }
   };
@@ -377,8 +378,14 @@ export async function runBuses({ store, env, now = Date.now(), until = now + 8 *
       (index.stations ||= {})[city] = { stations: got.stations, tiles: Object.keys(got.tiles).sort(), built };
       stations.push(city);
     } catch (e) {
-      // Left as they were; tried again next run (why, in the run's answer).
-      failed[city] = String(e?.message || e).slice(0, 160);
+      // Stations TDX doesn't have for a city (連江縣's list is refused, 400,
+      // and its search around a point there finds none, 2026-11-06): none,
+      // asked again in a week. Else left as they were, tried again next run
+      // (why, in the run's answer).
+      if (e?.status === 400 || e?.status === 404) {
+        (index.stations ||= {})[city] = { stations: 0, tiles: [], built, refused: e.status };
+        stations.push(city);
+      } else failed[city] = String(e?.message || e).slice(0, 160);
     }
   }
   if (done.length || stations.length) await store.put('index.json', index);

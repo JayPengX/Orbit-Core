@@ -144,3 +144,27 @@ test("bus stations on R2: each city's in 0.05° tiles as TDX's NearBy gives them
   assert.equal((await store.json('station/Hsinchu/24.80_120.95.json')).stations.length, 2);
   assert.equal((await store.json('index.json')).stations.Hsinchu.stations, 5);
 });
+
+test("a city whose stations TDX refuses (連江縣's, 400; its search there finds none) has none: the phone's list isn't held up by it", async () => {
+  const { runBuses, CITIES, tdxClient } = await import('../builders/buses.js');
+  const { r2Store } = await import('../builders/store.js');
+  const { memoryBucket } = await import('./fixtures/bucket.mjs');
+  const now = Date.parse('2026-11-06T10:40:00Z');
+  const fresh = new Date(now - 86_400_000).toISOString();
+  const cities = Object.fromEntries(CITIES.map(c => [c, { routes: 1, bytes: 1, built: fresh }]));
+  const stations = Object.fromEntries(CITIES.filter(c => c !== 'LienchiangCounty').map(c => [c, { stations: 1, tiles: ['25.00_121.50'], built: fresh }]));
+  const store = r2Store(memoryBucket({ 'index.json': { built: fresh, cities, stations } }));
+  let asks = 0;
+  const get = async url => {
+    if (url.includes('token')) return Response.json({ access_token: 'T' });
+    asks++;
+    return new Response('{"Message":"City not supported"}', { status: 400 });
+  };
+  const r = await runBuses({ store, env: {}, now, until: Date.now() + 60_000, tdx: tdxClient({}, { get, sleep: async () => {}, gap: 0 }) });
+  assert.deepEqual(r.stations, ['LienchiangCounty']);
+  assert.equal(asks, 1, 'refused once, not asked four times more');
+  assert.deepEqual((await store.json('index.json')).stations.LienchiangCounty, { stations: 0, tiles: [], built: new Date(now).toISOString(), refused: 400 });
+  const list = await store.json('station/index.json');
+  assert.deepEqual(list.cities.LienchiangCounty, []);
+  assert.deepEqual(list.cities.Taipei, ['25.00_121.50']);
+});
