@@ -81,7 +81,8 @@ export function passSync(q, { decode, apply, encode, now = Date.now }) {
     if (at === era) pulled = true;
   }
   async function push(again = true) {
-    if (!q.active || unreadable) return;
+    // (`canSave`: a tab that gave way to another tab here still saves what it had.)
+    if (!(q.canSave ?? q.active) || unreadable) return;
     if (!pulled) {
       const at = era;
       const res = await q.read({ data: true });
