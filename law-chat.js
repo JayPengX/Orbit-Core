@@ -34,7 +34,7 @@ export const CHAT_LIMITS = { maxQ: 500, maxTurns: 6, maxTurn: 1500, maxPins: 2, 
 const CHAT_TTL_S = 30 * 86_400;
 const BILL_WORDS = /修法|修正|草案|立法院|立委|三讀|二讀|一讀|法案|進度|提案|bill/i;
 // The answer's model: Gemini's second (Flash), for the reasoning; the plan stays on the first.
-export const ANSWER_MODEL = 'gemini-3.7-flash';
+export const ANSWER_MODEL = 'gemini-3.6-flash';
 const CITE = /^([A-Z]\d{7}):(\d{1,4}(?:-\d{1,3})?)$/;
 
 // ---- The ask --------------------------------------------------------------------

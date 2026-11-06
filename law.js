@@ -528,7 +528,7 @@ const JOBS = {
         prompt: explainPrompt(law, articles, ask.lang),
         schema: EXPLAIN_SCHEMA,
         // (Flash, not Flash-Lite: a real explanation needs it, and each article's is kept 180 days.)
-        model: 'gemini-3.7-flash',
+        model: 'gemini-3.6-flash',
         check: raw => checkExplain(raw, law, keys)
       };
     const ground = await groundFor(ask.q);
