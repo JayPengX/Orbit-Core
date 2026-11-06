@@ -145,7 +145,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | The top line | `topActions`, `accountButton` (the account pill and at most one action) |
 | A tab's title | `navTitle` / `navTitleHtml` + `wireNavTitles` (the 34 pt large title), `pageHead` |
 | Switching a view | `view()` (cross-faded with View Transitions); `segmented` / `segHtml` + `settleSegs` for a whole tab's view (at most 4); a single-choice filter row is `.q-chips.q-texttabs` (text tabs) |
-| A day | `dayBar` + `dayStrip` + `daySwipe` (`dayStep`, `dayList`, `dayTop`, `dayNum`, `dayToday`): the one date selector |
+| A day | `dayBar` + `dayStrip` + `daySwipe` (`dayStep`, `dayList`, `dayTop`, `dayNum`, `dayToday`): the one date selector; a swipe anywhere on the page, its empty space too, outside a sheet |
 | A page on top | `sheet({ detent, foot, lead, trailing })`, `bindSheet`, `setSheetDetent`; `closeSheet` (orbit.mjs) slides it out; `sheetHero`, `sheetFoot` / `.q-sheet-foot`; a whole page (a game, a team, a law) in `.q-sheet-wide` with `.q-sheet-cols` / `.q-sheet-pair` |
 | A question | `ask()` / `tell()` (orbit.mjs), `confirm()` (ui.mjs): never the browser's popups; a one-tap delete gets a `toast` with 復原 |
 | Rows | `list` / `cell` (grouped), `rowCard`, `section` / `sectionHead` / `sectionHtml`, `.q-list-head` |

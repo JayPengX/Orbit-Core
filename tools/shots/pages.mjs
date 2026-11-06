@@ -18,6 +18,9 @@ const lift = (scope, n = 0, by = 70) => `js:(()=>{const g=[...document.querySele
 // A finger swiped across `sel` by `dx` px (touch events, as a phone sends them): a day on in a day swipe.
 const swipe = (sel, dx) => `js:(async()=>{const n=document.querySelector('${sel}');const r=n.getBoundingClientRect();const x=r.x+r.width/2,y=r.y+Math.min(r.height/2,60);const t=X=>new Touch({identifier:1,target:n,clientX:X,clientY:y});const ev=(k,X)=>n.dispatchEvent(new TouchEvent(k,{bubbles:true,cancelable:true,touches:k==='touchend'?[]:[t(X)],changedTouches:[t(X)]}));ev('touchstart',x);for(let i=1;i<=8;i++){await new Promise(r=>setTimeout(r,16));ev('touchmove',x+(${dx})*i/8)}ev('touchend',x+(${dx}))})()`;
 
+// The same, a finger on whatever is at the screen's foot (the page's empty space under a short day).
+const swipeAt = dx => `js:(async()=>{const x=innerWidth*0.6,y=innerHeight-30;const n=document.elementFromPoint(x,y);window.__swipeAt=n&&(n.id||n.className||n.tagName);const t=X=>new Touch({identifier:1,target:n,clientX:X,clientY:y});const ev=(k,X)=>n.dispatchEvent(new TouchEvent(k,{bubbles:true,cancelable:true,touches:k==='touchend'?[]:[t(X)],changedTouches:[t(X)]}));ev('touchstart',x);for(let i=1;i<=8;i++){await new Promise(r=>setTimeout(r,16));ev('touchmove',x+(${dx})*i/8)}ev('touchend',x+(${dx}))})()`;
+
 export const PAGES = {
   sports: {
     default: ['tabs'],
@@ -52,6 +55,10 @@ export const PAGES = {
     'home-lower': { args: click(wait(6000), 'js:scrollTo(0,700)', wait(1500)) },
     // 首頁 on the next day (its games to come, the lead one on top).
     'home-next': { args: click(wait(3000), "js:(()=>{const d=[...document.querySelectorAll('.q-chip.day')].filter(e=>e.offsetParent);d[d.findIndex(e=>e.classList.contains('is-today'))+1]?.click()})()", wait(7000)) },
+    // 首頁 on yesterday (a day gone by: 已結束 beside 我的聯賽).
+    'home-past': { args: click(wait(3000), "js:(()=>{const d=[...document.querySelectorAll('.q-chip.day')].filter(e=>e.offsetParent);d[d.findIndex(e=>e.classList.contains('is-today'))-1]?.click()})()", wait(9000)) },
+    // 首頁 swiped left on the empty page under a short day (Jay 2026-11-06, an iPad: only a card swiped): the next day.
+    'home-swipe-empty': { args: click(wait(9000), swipeAt(-160), wait(2500)) },
     // 首頁 past ELTA's list (11/22: Newcastle v Arsenal, the Lakers): the guessed channel, said 預估 (with --account fan).
     // 賽事 on Saturday 11/7, 英超: the day's 推薦 (a soft grey row, ★ 推薦), the rest plain (no 追蹤 marks: a followed league's games are all theirs).
     'matches-picks': { args: click('#tab-matches', '[data-league=epl]', wait(2500), "js:document.querySelector('.q-day-bar [data-day=\"2026-11-07\"]')?.click()", wait(6000)) },

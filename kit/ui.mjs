@@ -268,14 +268,13 @@ export function daySwipe(panel, step) {
     panel.style.removeProperty('--swipe');
     panel.style.removeProperty('--swipe-fade');
   };
-  panel.addEventListener('touchstart', ev => {
+  const begin = (ev, src) => {
     // (Not under a sheet: one open over the page has the finger; a panel inside that sheet swipes.)
     const over = [...document.querySelectorAll('dialog[open]')].some(d => !d.contains(panel));
-    const box = ev.touches.length === 1 && !over ? sideways(ev.target) : true;
-    start = box !== true ? { x: ev.touches[0].clientX, y: ev.touches[0].clientY, at: Date.now(), lock: null, box } : null;
-  }, { passive: true });
-  panel.addEventListener('touchmove', ev => {
-    if (!start) return;
+    const box = ev.touches.length === 1 && !over ? (src === 'panel' ? sideways(ev.target) : null) : true;
+    start = box !== true ? { x: ev.touches[0].clientX, y: ev.touches[0].clientY, at: Date.now(), lock: null, box, src } : null;
+  };
+  const move = ev => {
     const dx = ev.touches[0].clientX - start.x;
     const dy = ev.touches[0].clientY - start.y;
     if (start.lock == null && Math.hypot(dx, dy) > 10) start.lock = Math.abs(dx) > Math.abs(dy) * 1.3 && !(start.box && canScroll(start.box, dx)) ? 'x' : 'y';
@@ -288,8 +287,8 @@ export function daySwipe(panel, step) {
     panel.style.setProperty('--swipe', `${Math.round(dx * 0.45)}px`);
     // (Fading as it goes, never a step down the moment the drag starts.)
     panel.style.setProperty('--swipe-fade', String(Math.round((1 - Math.min(Math.abs(dx) / 600, 0.2)) * 100) / 100));
-  }, { passive: false });
-  panel.addEventListener('touchend', ev => {
+  };
+  const end = ev => {
     const s = start;
     start = null;
     if (!s || s.lock !== 'x') return settle(true);
@@ -300,8 +299,37 @@ export function daySwipe(panel, step) {
     if (!dir || !step(dir)) return settle(true);
     settle();
     slideIn(panel, dir);
-  }, { passive: true });
+  };
+  panel.addEventListener('touchstart', ev => begin(ev, 'panel'), { passive: true });
+  panel.addEventListener('touchmove', ev => start?.src === 'panel' && move(ev), { passive: false });
+  panel.addEventListener('touchend', ev => (!start || start.src === 'panel') && end(ev), { passive: true });
   panel.addEventListener('touchcancel', () => ((start = null), settle(true)), { passive: true });
+  // The page's empty space swipes too, not only what's drawn on it (Jay
+  // 2026-11-06, Sports on an iPad: below a short day, nothing moved): a
+  // finger on what holds the panel (the page, its main) while the panel
+  // shows; never in a sheet (its backdrop is the sheet's), never on a bar or
+  // anything else beside the panel. Let go once the panel is gone.
+  let seen = false;
+  const onPage = ev => {
+    if (!panel.isConnected) return seen && off();
+    seen = true;
+    const t = ev.target;
+    if (panel.contains(t) || !t?.contains?.(panel) || panel.closest('dialog, [hidden]') || !panel.getClientRects().length) return;
+    begin(ev, 'page');
+  };
+  const pageMove = ev => start?.src === 'page' && move(ev);
+  const pageEnd = ev => start?.src === 'page' && end(ev);
+  const pageCancel = () => start?.src === 'page' && ((start = null), settle(true));
+  const off = () => {
+    document.removeEventListener('touchstart', onPage);
+    document.removeEventListener('touchmove', pageMove);
+    document.removeEventListener('touchend', pageEnd);
+    document.removeEventListener('touchcancel', pageCancel);
+  };
+  document.addEventListener('touchstart', onPage, { passive: true });
+  document.addEventListener('touchmove', pageMove, { passive: false });
+  document.addEventListener('touchend', pageEnd, { passive: true });
+  document.addEventListener('touchcancel', pageCancel, { passive: true });
 }
 // The new day or place comes in from the side the finger sent it, the same
 // slide every time: started on the parts drawn by step(); a part drawn again

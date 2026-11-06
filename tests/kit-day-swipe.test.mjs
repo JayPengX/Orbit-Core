@@ -39,7 +39,21 @@ class El {
     return 300;
   }
   matches(sel) {
-    return sel.split(',').some(s => s.trim() === `.${this.cls}`);
+    return sel.split(',').some(s => s.trim() === `.${this.cls}` || (s.trim() === '[hidden]' && this.hidden) || s.trim() === this.tag);
+  }
+  contains(n) {
+    for (; n; n = n.parentNode) if (n === this) return true;
+    return false;
+  }
+  closest(sel) {
+    for (let n = this; n; n = n.parentNode) if (n.matches(sel)) return n;
+    return null;
+  }
+  get isConnected() {
+    return this.closest('.root') != null;
+  }
+  getClientRects() {
+    return [{}];
   }
   addEventListener(type, fn) {
     this.listeners[type] = fn;
@@ -61,7 +75,13 @@ class El {
     return a;
   }
 }
-globalThis.document = { querySelectorAll: () => [] };
+const docListeners = {};
+globalThis.document = { querySelectorAll: () => [], addEventListener: (k, fn) => (docListeners[k] ||= []).push(fn), removeEventListener: (k, fn) => (docListeners[k] = (docListeners[k] || []).filter(f => f !== fn)) };
+// (A touch the page gets: its target's own listeners first, as it bubbles, then the document's.)
+const fire = (k, ev) => {
+  for (let n = ev.target; n; n = n.parentNode) n.listeners?.[k]?.(ev);
+  for (const fn of docListeners[k] || []) fn(ev);
+};
 globalThis.getComputedStyle = () => ({ overflowX: 'visible' });
 globalThis.matchMedia = () => ({ matches: false });
 globalThis.performance = { now: () => now };
@@ -167,4 +187,46 @@ test('a part that stays put (the day bar) never slides', () => {
   drag(panel, -200);
   assert.equal(bar.anims.length, 0);
   assert.equal(part.anims.length, 1);
+});
+
+test('the page’s empty space swipes too, never a bar beside the panel or a hidden tab (Jay 2026-11-06, an iPad)', () => {
+  const root = new El('root');
+  const main = new El('page');
+  const bar = new El('tabbar');
+  const panel = new El();
+  const other = new El();
+  const part = new El('part');
+  panel.append(part);
+  main.append(panel, other);
+  root.append(main, bar);
+  const steps = [];
+  daySwipe(panel, dir => (steps.push(dir), true));
+  other.hidden = true;
+  daySwipe(other, () => (steps.push('hidden tab'), true));
+  const swipeOn = target => {
+    const at = Date.now;
+    const t0 = at();
+    Date.now = () => t0;
+    fire('touchstart', { target, touches: [{ clientX: 300, clientY: 700 }] });
+    for (let i = 1; i <= 5; i++) fire('touchmove', { target, touches: [{ clientX: 300 - 40 * i, clientY: 700 }], preventDefault() {} });
+    Date.now = () => t0 + 400;
+    fire('touchend', { target, changedTouches: [{ clientX: 100, clientY: 700 }] });
+    Date.now = at;
+  };
+  // Under a short day: the finger on the page itself, outside the panel.
+  swipeOn(main);
+  assert.deepEqual(steps, [1], 'the next day, from the empty page');
+  assert.equal(part.anims.length, 1, 'slid in');
+  // On what's drawn: once, not twice (the panel's own and the page's).
+  swipeOn(part);
+  assert.deepEqual(steps, [1, 1]);
+  // On the tab bar beside it: nothing.
+  swipeOn(bar);
+  assert.deepEqual(steps, [1, 1]);
+  // Gone from the page: it lets the document go.
+  const n = docListeners.touchstart.length;
+  main.children = [];
+  panel.parentNode = null;
+  fire('touchstart', { target: root, touches: [{ clientX: 0, clientY: 0 }] });
+  assert.equal(docListeners.touchstart.length, n - 1);
 });
