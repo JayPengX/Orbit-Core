@@ -84,6 +84,9 @@ export function everyDev(key, fn) {
   const beat = soon => {
     timer = setTimeout(() => {
       if (stopped) return;
+      // (Hidden, or open somewhere else: nothing asked; the beat runs the
+      // moment the page is back and live.)
+      if (beatsAsleep()) return void sleepingBeats.add(() => !stopped && beat(0));
       readDev();
       // (A finger on the screen or a scroll still running: tried again in a moment, not drawn under it.)
       if (sheetHeld() || scrollBusy()) return beat(400);
@@ -568,6 +571,51 @@ export function randomId() {
 //
 // The session token comes from the app's orbitSession (the last one made).
 let dataSession = null;
+
+// ---- One live copy of an app (Jay 2026-11-06) -----------------------------------------
+//
+// The same app open twice (two tabs, two windows, two devices): only the one
+// in use keeps reading. The others go quiet (`quiet()`): no reads to our
+// Worker but the Pass's own (/eco, /config), no everyDev beats, the box
+// 已在別處開啟 with 在這裡繼續 over the page. Nothing is lost: a quiet copy's
+// saves are refused (the Worker's live session, eco.js) and the app saves
+// again when it's live (`active`). Two devices: the Worker says which
+// session is live; two tabs of one browser (one session): a BroadcastChannel.
+let quietNow = false;
+const liveWaiters = new Set();
+export const quiet = () => quietNow;
+// Resolves at once while live, else when this copy is live again.
+export const liveAgain = () => (quietNow ? new Promise(done => liveWaiters.add(done)) : Promise.resolve());
+function setQuiet(next) {
+  if (quietNow === next) return;
+  quietNow = next;
+  if (next) return;
+  for (const done of [...liveWaiters]) done();
+  liveWaiters.clear();
+  rouseBeats();
+}
+// A read a quiet copy doesn't make: our Worker's, but the Pass's own.
+export const pausable = url => {
+  if (!isApi(url)) return false;
+  try {
+    return !/\/(eco|config)$/.test(new URL(url, globalThis.location?.href).pathname);
+  } catch {
+    return false;
+  }
+};
+// (An AbortError: given up, never counted against the network: watchNet.)
+const pausedError = () => Object.assign(new Error('paused: open somewhere else'), { name: 'AbortError', code: 'ORBIT_PAUSED' });
+// everyDev's beats held while hidden or quiet, run at once when back.
+const sleepingBeats = new Set();
+const beatsAsleep = () => quietNow || (typeof document !== 'undefined' && document.visibilityState === 'hidden');
+function rouseBeats() {
+  if (beatsAsleep()) return;
+  for (const run of [...sleepingBeats]) {
+    sleepingBeats.delete(run);
+    run();
+  }
+}
+if (typeof document !== 'undefined') document.addEventListener?.('visibilitychange', rouseBeats);
 const DATA_CACHE = 'orbit-data-v1';
 const DATA_KEEP_MS = 4 * 86_400_000;
 const memory = new Map();
@@ -983,7 +1031,7 @@ const keptAt = new Map(); // key → when it was last written to the device
 const PENDING_MAX_MS = 45_000;
 function keptJson(url, key, { ttl, keep }, read) {
   const hit = memory.get(key);
-  const lost = hit?.pending && Date.now() - hit.at >= PENDING_MAX_MS;
+  const lost = hit?.pending && !hit.waiting && Date.now() - hit.at >= PENDING_MAX_MS;
   if (hit && !lost && Date.now() - hit.at < (hit.failed ? Math.min(ttl, hit.hold) : hit.stale ? Math.min(ttl, RETRY_MS) : ttl)) return hit.promise;
   // A read still on its way is that read, however long it's taking (up to
   // PENDING_MAX_MS): never a second one alongside it (on a slow link a page
@@ -999,6 +1047,15 @@ function keptJson(url, key, { ttl, keep }, read) {
     // device's is read (and parsed) only for a key's first read here.
     const saved = keep ? (hit?.data !== undefined ? { at: hit.dataAt, data: hit.data } : await persistedSoon(key)) : null;
     if (saved && Date.now() - saved.at < ttl) return ((entry.data = saved.data), (entry.dataAt = saved.at), saved.data);
+    // Open somewhere else (quiet): the copy this page has, of any age, asked
+    // again once live; none, the read waits till then (one for each key).
+    if (quietNow && saved) return ((entry.stale = true), (entry.data = saved.data), (entry.dataAt = saved.at), saved.data);
+    if (quietNow) {
+      entry.waiting = true;
+      await liveAgain();
+      entry.waiting = false;
+      entry.at = Date.now();
+    }
     let got;
     let data;
     try {
@@ -1675,6 +1732,36 @@ function makeSession(app, { lang, heartbeat }) {
   let walletAt = '';
   let timer = 0;
   let started = false;
+  // Another tab of this browser has the app (one session for both: the
+  // Worker can't tell them apart). Said on a channel by the tab that claims.
+  let tabAway = false;
+  const tabId = Math.random().toString(36).slice(2);
+  const liveTabs = typeof BroadcastChannel === 'function' ? new BroadcastChannel('orbit-live') : null;
+  const sayTabs = type => {
+    try {
+      liveTabs?.postMessage({ type, app, account: storedAccount(), tab: tabId });
+    } catch {}
+  };
+  if (liveTabs) {
+    liveTabs.unref?.();
+    liveTabs.onmessage = event => {
+      const m = event.data || {};
+      if (m.app !== app || m.tab === tabId || !m.account || m.account !== storedAccount() || !started) return;
+      if (m.type === 'live') {
+        tabAway = true;
+        setActive(false, { app, tab: true });
+      }
+      // The tab that had it closed: this one, on screen and quiet for it, goes on.
+      if (m.type === 'gone' && tabAway && document.visibilityState === 'visible') takeTab();
+    };
+    globalThis.addEventListener?.('pagehide', () => active && sayTabs('gone'));
+  }
+  // Live again in this browser at once (the Worker's word follows).
+  function takeTab() {
+    tabAway = false;
+    sayTabs('live');
+    if (live?.tab) setActive(true, null);
+  }
 
   const s = {
     app,
@@ -1697,6 +1784,11 @@ function makeSession(app, { lang, heartbeat }) {
     get live() {
       return live;
     },
+    // A save goes through: live, or quiet only for another tab of this
+    // browser (the same session: nothing a person did is held back).
+    get canSave() {
+      return active || Boolean(live?.tab);
+    },
     on(name, fn) {
       (listeners[name] ||= []).push(fn);
       return s;
@@ -1713,7 +1805,10 @@ function makeSession(app, { lang, heartbeat }) {
     setTimeout(() => syncPrefs(s), 0);
   }
   function setActive(next, where = null) {
+    // (Live for the Worker but another tab here has it: still quiet.)
+    if (next && tabAway) return;
     live = where;
+    setQuiet(started && !next);
     if (active === next) return;
     active = next;
     emit('active', next);
@@ -1767,6 +1862,8 @@ function makeSession(app, { lang, heartbeat }) {
   // fires only when it changes, so a claim on coming back that finds this
   // app still live said nothing, and an app couldn't tell it had landed.
   function claimed(p) {
+    // (Opened in a tab behind: the tab in use keeps it till this one is looked at.)
+    if (typeof document === 'undefined' || document.visibilityState !== 'hidden') takeTab();
     const was = active;
     const end = ok => emit('claim', { ok, active, live, changed: active !== was });
     return p.then(
@@ -1806,6 +1903,7 @@ function makeSession(app, { lang, heartbeat }) {
     dataAt = null;
     wallet = null;
     active = false;
+    setQuiet(false);
     emit('signedout');
     // Signed out while in use (another device signed everyone out, the
     // pass changed): straight back to the sign-in screen, like a new device.
@@ -1874,7 +1972,7 @@ function makeSession(app, { lang, heartbeat }) {
   // the Pass refuses it, ECO_DATA_CHANGED: read, merge, save again.)
   s.write = ({ payload, wallet: patch, base } = {}) =>
     withToken(qt => {
-      if (!active) {
+      if (!s.canSave) {
         const error = new Error('not live');
         error.code = 'ECO_SESSION_MOVED';
         error.live = live;
@@ -1966,17 +2064,15 @@ function makeSession(app, { lang, heartbeat }) {
     globalThis.addEventListener?.('pageshow', event => event.persisted && wake());
     globalThis.addEventListener?.('online', wake);
   }
-  // Back on screen: this app becomes the live one again.
+  // Back on screen: live again if this tab gave way to another tab here;
+  // the Worker asked whether another device has it meanwhile (then quiet,
+  // 在這裡繼續 takes it back: a screen left on never takes it from the one
+  // in use). Hidden (back online in the background), nothing.
   let waking = null;
   function wake() {
-    if (!storedAccount() || waking) return;
-    const was = active;
-    waking = refresh({ claim: true })
-      // Back from another device or app that was live meanwhile (the Worker's
-      // `took`): told as becoming live again even when this one never saw
-      // itself paused (asleep, no beat), so the app reads what changed.
-      // (One that saw itself paused was told by setActive already.)
-      .then(res => res?.took && was && active && emit('active', true))
+    if (!storedAccount() || waking || document.visibilityState === 'hidden') return;
+    takeTab();
+    waking = refresh({ claim: false })
       .catch(() => {})
       .finally(() => (waking = null));
   }
@@ -2545,7 +2641,7 @@ function showMoved(s) {
   movedEl = node('dialog', { class: 'q-moved', 'aria-modal': 'true' }, [
     node('div', { class: 'q-moved-box' }, [
       node('p', { class: 'q-moved-title', text: en ? 'Open somewhere else' : '已在別處開啟' }),
-      node('p', { class: 'q-moved-text', text: en ? `${name} was opened on another device or in another browser, so it paused here. Your other Orbit apps keep running.` : `${name} 已在其他裝置或瀏覽器開啟，這裡先暫停；其他 Orbit App 照常使用。` }),
+      node('p', { class: 'q-moved-text', text: en ? `${name} is in use in another tab or on another device, so it paused here.` : '別的分頁或裝置正在用，這裡先暫停。' }),
       node('button', {
         class: 'q-btn primary block',
         type: 'button',
@@ -4939,6 +5035,8 @@ function watchNet() {
   };
   window.fetch = (input, init) => {
     const url = typeof input === 'string' ? input : input?.url || String(input);
+    // Open somewhere else: nothing from this copy reaches our Worker but the Pass's own.
+    if (quietNow && pausable(url)) return Promise.reject(pausedError());
     if (own(url)) return real(input, init);
     const k = ++net.id;
     const at = Date.now();
