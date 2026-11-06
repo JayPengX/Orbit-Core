@@ -93,9 +93,11 @@ test("bus stations on R2: each city's in 0.05° tiles as TDX's NearBy gives them
     throw new Error('TDX: 503');
   };
   let hsinchu = [station('HSZ2', 24.80168, 120.97162, [stop('HSZ20', 'HSZ0010', '10')]), station('HSZ1', 24.80171, 120.97166, [stop('HSZ12', 'HSZ0020', '20'), stop('HSZ11', 'HSZ0010', '10')]), station('HSZ9', 0, 0, [])];
+  const tops = new Set();
   const tdx = {
     pages: async (path, top, each) => {
       asked.push(path);
+      if (path.includes('/Station/')) tops.add(top);
       if (path.startsWith('basic/v2/Bus/Station/City/Hsinchu?')) each(hsinchu);
       if (path.startsWith('basic/v2/Bus/Station/InterCity?')) each(interCity());
     }
@@ -103,7 +105,10 @@ test("bus stations on R2: each city's in 0.05° tiles as TDX's NearBy gives them
   let r = await runBuses({ store, env: {}, now, tdx, until: Date.now() + 60_000 });
   assert.deepEqual(r.built, []);
   assert.deepEqual(r.stations, ['Hsinchu']);
-  // Only the two not built this week asked, with what the phone reads.
+  // (Why one failed, in the run's answer.)
+  assert.match(r.failed.InterCity, /503/);
+  // Only the two not built this week asked, a few hundred a page, with what the phone reads.
+  assert.ok(asked.filter(p => p.includes('/Station/')).length === 2 && [...tops].every(t => t <= 300));
   assert.deepEqual(asked.filter(p => p.includes('/Station/')).map(p => p.split('?')[0]), ['basic/v2/Bus/Station/City/Hsinchu', 'basic/v2/Bus/Station/InterCity']);
   assert.ok(asked.every(p => !p.includes('/Station/') || p.includes('$select=StationUID,StationID,StationName,StationPosition,Stops,LocationCityCode,Bearing')));
   assert.equal(tileOf(24.80168, 120.97162), '24.80_120.95');
