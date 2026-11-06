@@ -147,6 +147,8 @@ export const PAGES = {
     plans: { args: ['--google-map', ...click('#tab-map', wait(2500), "js:(()=>{const q=document.querySelector('#q');q.focus();q.value=document.documentElement.lang==='en'?'Taipei Main Station':'臺北車站';q.dispatchEvent(new Event('input',{bubbles:true}))})()", wait(8000), '.ot-res', "js:document.querySelector('[data-card=go]')?.click()", wait(9000))] },
     // A trip across counties, past TPASS (新竹車站 → 臺南車站): the plans card with each way's fare (our own trains priced too).
     'plans-far': { args: ['--google-map', ...click('#tab-map', wait(2500), "js:(()=>{const q=document.querySelector('#q');q.focus();q.value=document.documentElement.lang==='en'?'Tainan Station':'臺南車站';q.dispatchEvent(new Event('input',{bubbles:true}))})()", wait(8000), '.ot-res', "js:document.querySelector('[data-card=go]')?.click()", wait(12000))] },
+    // 地圖 on Google's map as the site gets it: Google's places (restaurants, temples, the city hall) beside our stops and bikes.
+    map: { args: ['--google-map', ...click('#tab-map', wait(7000))] },
     // 地圖's 搜尋地點, the field tapped (取消 beside it, your recents under it); then the keyboard put
     // away with nothing typed (取消 gone, the field the whole row).
     search: { args: click('#tab-map', wait(3000), "js:document.querySelector('#q').focus()", wait(1500)) },

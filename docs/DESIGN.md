@@ -141,6 +141,9 @@ The map's question is "where am I and what can I use near me". So:
   cover the blue dot.
 - YouBike stays always visible and reliable (YOUBIKE CRUCIAL): quieter, not
   hidden.
+- The base map's own places (Google's restaurants, hotels, temples, its
+  stations) are context: greyed by the map's style, never in their own
+  colours, so the only colour on the map is ours (Transit `mapStyles`, Jay 2026-11-06).
 - Same idea for any map or chart: the reader's own data loud, context quiet.
 
 ## 8. Do and don't, from real Orbit screens
