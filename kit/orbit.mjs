@@ -3871,6 +3871,8 @@ export function sounding() {
   }
 }
 
+// Away this long, coming back to the app is an opening: a newer version on the phone is shown then.
+const AWAY_MS = 5 * 60_000;
 let watching = null;
 export function watchUpdates({ current, key, every = 15_000 } = {}) {
   if (!current || current === 'dev' || typeof document === 'undefined') return;
@@ -3880,6 +3882,10 @@ export function watchUpdates({ current, key, every = 15_000 } = {}) {
   let checking = false;
   let retry = 0;
   let notReady = 0;
+  // A version whose files are all on the phone, waiting for the person to
+  // look away; when the page last went out of sight (null: in sight since).
+  let ready = null;
+  let awaySince = null;
   const channel = globalThis.BroadcastChannel ? new BroadcastChannel('orbit-updates') : null;
   async function apply(latest) {
     // (Music playing: not now. The check every few seconds, or the next opening, updates once it stops.)
@@ -3899,6 +3905,8 @@ export function watchUpdates({ current, key, every = 15_000 } = {}) {
       retry = setTimeout(() => check(true), wait + 50);
       return;
     }
+    // (All on the phone already: waiting for the person to look away.)
+    if (ready === latest) return void (swapNow() && swap(latest, n));
     // The new version's files on the phone first; until they are, this page
     // runs on and looks again (each look a little later, up to half a minute).
     if (!(await updateReady(latest))) {
@@ -3907,11 +3915,30 @@ export function watchUpdates({ current, key, every = 15_000 } = {}) {
       return;
     }
     notReady = 0;
-    if (document.visibilityState === 'hidden' || sounding()) return;
+    // On the phone: shown when the person isn't looking at this page, never
+    // swapped in front of them (Jay 2026-11-06). The next opening has it
+    // anyway (the service worker keeps the new page, and every file it
+    // names is kept now); a page left open swaps as the person comes back
+    // to it after AWAY_MS (to them, the app opening again).
+    ready = latest;
+    if (!swapNow()) return;
+    swap(latest, n);
+  }
+  function swapNow() {
+    return document.visibilityState !== 'hidden' && awaySince != null && Date.now() - awaySince >= AWAY_MS && !sounding();
+  }
+  async function swap(latest, n) {
+    const flag = `${key || 'orbit'}.reloadedTo`;
     sessionStorage.setItem(flag, `${latest}|${n + 1}|${Date.now()}`);
     rememberPlace();
     // (Leaving: what the page still had on the way fails as the page goes, and says nothing of the network.)
     globalThis.__bootUpdating = true;
+    // (Shown as the app opening: the cover up while the new page comes from the phone.)
+    const box = document.getElementById('loading');
+    if (box) {
+      box.classList.remove('q-lift');
+      box.hidden = false;
+    }
     // Only the kit changed: the same page again, its loader now on the new
     // kit (the app's own files are still current).
     if (latest.startsWith('kit:')) {
@@ -3957,11 +3984,32 @@ export function watchUpdates({ current, key, every = 15_000 } = {}) {
   }
   // boot.js's first look: a newer deploy it found with the app already on screen
   // (or a version it couldn't read) is looked for again at once.
+  // (A newer one found as the app opens is downloaded once its first screen
+  // is up: before, it shared a slow link with what that screen reads.)
   const boot = globalThis.__bootCheck;
-  if (boot?.then) boot.then(r => r !== 'boot' && r !== 'none' && check(true), () => check(true));
+  const settled = () =>
+    new Promise(done => {
+      const box = document.getElementById('loading');
+      const t0 = Date.now();
+      const look = () => (!box || box.hidden || Date.now() - t0 > 20_000 ? setTimeout(done, 2000) : setTimeout(look, 250));
+      look();
+    });
+  if (boot?.then) boot.then(r => r !== 'boot' && r !== 'none' && settled().then(() => check(true)), () => settled().then(() => check(true)));
   else check();
   channel?.addEventListener('message', () => check(true));
-  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && check());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      awaySince = Date.now();
+      return;
+    }
+    // Back after a while with a newer version on the phone: it opens now.
+    if (ready && swapNow()) {
+      const [was, tries = 0] = String(sessionStorage.getItem(`${key || 'orbit'}.reloadedTo`) || '').split('|');
+      return void swap(ready, was === ready ? Number(tries) || 0 : 0);
+    }
+    awaySince = null;
+    check();
+  });
   globalThis.addEventListener?.('focus', () => check());
   globalThis.addEventListener?.('online', () => check(true));
   globalThis.addEventListener?.('pageshow', () => check());

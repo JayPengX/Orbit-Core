@@ -28,7 +28,8 @@
   // The first screen: the kit's loading cover gone (Class: its booting class off).
   const isReady = () => {
     const box = document.getElementById('loading');
-    if (box) return box.hidden || getComputedStyle(box).display === 'none' || box.style.opacity === '0';
+    // (A cover the app hid but boot.js still holds for its update check is still up: q-boot-hold.)
+    if (box) return !box.classList.contains('q-boot-hold') && (box.hidden || getComputedStyle(box).display === 'none' || box.style.opacity === '0');
     return document.readyState !== 'loading' && !!document.body && !document.body.classList.contains('orbit-booting') && !!document.querySelector('#app, main, [id^="panel-"]');
   };
   const tick = () => {

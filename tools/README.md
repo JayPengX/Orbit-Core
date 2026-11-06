@@ -124,8 +124,11 @@ weak 3G (400 kbps, 400 ms; `--net 4g|wifi`) with its CPU slowed 4×, signed
 in with a test Pass, through steps: `open` (the first opening, nothing on
 the phone), `idle` (30 s left open), each tab, `scroll`, `away` (to the
 background and back) and `reopen` (closed, opened again 15 minutes later
-on the page's clock). For each: the time to the first screen (`#loading`
-gone) and until the page settles, KB and requests (the app's own files,
+on the page's clock); by `--steps`, also `update` (a deploy while it's
+open) and `relaunch` (a deploy while it was closed, then opened from the
+home screen: the time until a screen is up for good, which version, how many
+page loads). For each: the time to the first screen (`#loading`
+gone, not held) and until the page settles, KB and requests (the app's own files,
 the proxy's, other sites'), CPU, long tasks, layouts, nodes redrawn, memory,
 and the proxy's requests with their estimated Worker CPU.
 
