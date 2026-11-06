@@ -916,6 +916,41 @@ test("a route's buses' places, had=<s>: a copy here no newer than the phone's is
   assert.equal(tdxRequest('basic/v3/Rail/TRA/StationLiveBoard/Station/1210').rule.fresh, 50e3);
 });
 
+// A city's buses' places: one read of its whole list for every route and
+// every phone (each stop card asked its own lagging routes, a TDX read a stop
+// each 20 s); 公路客運's (all Taiwan) by its routes.
+test("buses' places, /transit/gps: a city's whole list read once for every route asked, each ask its own routes'; 公路客運's by its routes; had= as eta's", async () => {
+  fresh();
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 'secret', RATE_LIMIT_KV: memKv(), TDX_PER_MIN: '100' };
+  const cache = memCache();
+  const reads = [];
+  const fetchFn = async url => {
+    if (url.includes('token')) return json({ access_token: 'T', expires_in: 86400 });
+    reads.push(decodeURIComponent(url.replace(/^.*?\/api\//, '')));
+    const ids = url.includes('InterCity') ? [...decodeURIComponent(url).matchAll(/RouteUID eq '([^']+)'/g)].map(m => m[1]) : ['HSZ10', 'HSZ20', 'HSZ30'];
+    return json(ids.map(id => ({ RouteUID: id, PlateNumb: `${id}-${reads.length}`, Direction: 0, GPSTime: 't' })));
+  };
+  const ask = async (qs, now) => {
+    const res = await handleTransit(new Request(`https://w/transit/gps?${qs}`), env, {}, '/transit/gps', { session: { s: 'S' }, fetchFn, now, cache });
+    return { status: res.status, plates: (await res.json()).map?.(r => r.PlateNumb), age: res.headers.get('X-Transit-Age') };
+  };
+  // Two stop cards' lagging routes, a moment apart: one read of the city's whole list.
+  assert.deepEqual(await ask('city=Hsinchu&routes=HSZ10,HSZ20', NOW), { status: 200, plates: ['HSZ10-1', 'HSZ20-1'], age: '0' });
+  assert.deepEqual(await ask('city=Hsinchu&routes=HSZ30', NOW + 2000), { status: 200, plates: ['HSZ30-1'], age: '2' });
+  assert.equal(reads.length, 1);
+  assert.match(reads[0], /RealTimeByFrequency\/City\/Hsinchu\?\$select=RouteUID,PlateNumb,Direction,BusPosition,GPSTime/);
+  assert.doesNotMatch(reads[0], /filter/);
+  // A phone whose copy is 20 s old, 20 s on: no newer here, so read now.
+  assert.deepEqual((await ask('city=Hsinchu&routes=HSZ10&had=20', NOW + 20_000)).plates, ['HSZ10-2']);
+  // 公路客運: its routes' own read.
+  assert.deepEqual((await ask('city=InterCity&routes=THB5608,THB5801', NOW)).plates, ['THB5608-3', 'THB5801-3']);
+  assert.match(reads[2], /RealTimeByFrequency\/InterCity\?\$filter=RouteUID eq 'THB5608' or RouteUID eq 'THB5801'&\$select=/);
+  // Nothing to ask, or not a city: refused, no read.
+  assert.equal((await ask('city=Hsinchu&routes=', NOW)).status, 400);
+  assert.equal((await ask('city=../x&routes=HSZ10', NOW)).status, 400);
+  assert.equal(reads.length, 3);
+});
+
 test("a day's trains keep only what the phone reads (台鐵's 4 MB day to 40%): each train's number, type, headsign, line, note and bike flag, each stop's station and times, names in Chinese and English; a train that won't run left out; kept so", async () => {
   fresh();
   const name = (zh, en) => ({ Zh_tw: zh, En: en, Ja: zh, Kr: '타이베이' });
