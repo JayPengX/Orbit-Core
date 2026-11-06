@@ -132,13 +132,16 @@ export function squares(p) {
 export const TILE = 0.05;
 export const tileOf = (lat, lon) => `${(Math.floor(lat / TILE) * TILE).toFixed(2)}_${(Math.floor(lon / TILE) * TILE).toFixed(2)}`;
 export const STATION_SELECT = 'StationUID,StationID,StationName,StationPosition,Stops,LocationCityCode,Bearing';
+// (A page of 1000 of 臺北市's stations, a dozen routes at some, failed where
+// 新北市's passed, 2026-11-06: a few hundred a page.)
+export const STATION_PAGE = 250;
 const enOf = x => (x && typeof x === 'object' && x.En) || '';
 const byFirst = (a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
 export async function cityStations(tdx, city) {
   const scope = city === 'InterCity' ? 'InterCity' : `City/${city}`;
   const tiles = {};
   let stations = 0;
-  await tdx.pages(`basic/v2/Bus/Station/${scope}?$select=${STATION_SELECT}`, 1000, rows => {
+  await tdx.pages(`basic/v2/Bus/Station/${scope}?$select=${STATION_SELECT}`, STATION_PAGE, rows => {
     for (const s of rows) {
       const lat = r5(s.StationPosition?.PositionLat);
       const lon = r5(s.StationPosition?.PositionLon);
@@ -362,6 +365,7 @@ export async function runBuses({ store, env, now = Date.now(), until = now + 8 *
   // The stations, each city's once a week on their own (the time left).
   const stationAge = k => now - (Date.parse(index.stations?.[k]?.built || '') || 0);
   const stations = [];
+  const failed = {};
   for (const city of CITIES.filter(c => stationAge(c) > WEEK)) {
     if (Date.now() >= until) break;
     try {
@@ -372,8 +376,9 @@ export async function runBuses({ store, env, now = Date.now(), until = now + 8 *
       for (const [k, t] of Object.entries(got.tiles)) await store.put(`station/${city}/${k}.json`, { v: 1, city, tile: k, built, ...t });
       (index.stations ||= {})[city] = { stations: got.stations, tiles: Object.keys(got.tiles).sort(), built };
       stations.push(city);
-    } catch {
-      // Left as they were; tried again next run.
+    } catch (e) {
+      // Left as they were; tried again next run (why, in the run's answer).
+      failed[city] = String(e?.message || e).slice(0, 160);
     }
   }
   if (done.length || stations.length) await store.put('index.json', index);
@@ -382,5 +387,5 @@ export async function runBuses({ store, env, now = Date.now(), until = now + 8 *
   // The phone's list of every city's tiles, once every city has its stations
   // (one missing would leave its stops off the map: TDX is asked till then).
   if (stations.length && CITIES.every(c => index.stations?.[c])) await store.put('station/index.json', { v: 1, built, tile: TILE, cities: Object.fromEntries(CITIES.map(c => [c, index.stations[c].tiles])) });
-  return { stale: stale.length, built: done, stations };
+  return { stale: stale.length, built: done, stations, ...(Object.keys(failed).length ? { failed } : {}) };
 }
