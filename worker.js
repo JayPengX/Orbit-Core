@@ -1319,7 +1319,11 @@ async function route(request, env, ctx, headers, origin) {
   if (path === '/ops' && request.method === 'POST') {
     if (!env.DATA_PUSH_SECRET || request.headers.get('Authorization') !== `Bearer ${env.DATA_PUSH_SECRET}`) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
     const check = new URL(request.url).searchParams.get('check');
-    if (check === 'gemini') return json(await geminiCheck(env), 200, headers);
+    if (check === 'gemini') {
+      // (?model= any Gemini model by name: is it there, and on this key's tier?)
+      const m = new URL(request.url).searchParams.get('model') || '';
+      return json(await geminiCheck(env, /^gemini-[a-z0-9.-]{1,40}$/.test(m) ? m : undefined), 200, headers);
+    }
     // 問法律's steps timed on real questions, nothing kept read or written (law-chat.js).
     if (check === 'law-chat') return json(await lawChatTimes(env, ctx, headers, lawGemini('law-chat'), new URL(request.url).searchParams.get('try') || ''), 200, headers);
     if (check === 'system') return json(await systemReport(env, ECO_DEPS), 200, headers);
