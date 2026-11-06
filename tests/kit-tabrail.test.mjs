@@ -22,7 +22,6 @@ test('the tab bar, a tab and the action size their own box, whatever the app set
 test('the rail is one column: the capsule, the action and the account are one width', () => {
   assert.match(kitRule('html.q-tabrail .q-tabbar.q-tabbar'), /width:\s*var\(--q-tabrail-cw\)/);
   // (The action: as wide as the capsule, centred under it.)
-  assert.match(kitRule('html.q-tabrail'), /--q-tabrail-act:\s*var\(--q-tabrail-cw\)/);
   assert.match(kitRule('html.q-tabrail .q-tab-action'), /left:\s*calc\(var\(--q-tabrail-x\) \+ \(var\(--q-tabrail-cw\) - var\(--q-tabrail-act\)\) \/ 2\)/);
   assert.match(kitRule('html.q-tabrail .q-appbar .q-actions'), /width:\s*var\(--q-tabrail-cw\)/);
   assert.match(kitRule('html.q-tabrail .q-appbar .q-actions'), /left:\s*var\(--q-tabrail-x\)/);
@@ -38,6 +37,12 @@ test('the app’s action is a true circle, on the bar and on the rail', () => {
     assert.ok(w && w === h, `${sel}: width (${w}) is its height (${h})`);
     assert.match(body, /border-radius:\s*50%/, `${sel} is round`);
   }
+  // (On the rail: a size smaller than the capsule, of its glass, the app's colour in its mark:
+  // a solid circle the capsule's width read "a bit big and not in style with the tabs".)
+  assert.match(kitRule('html.q-tabrail'), /--q-tabrail-act:\s*calc\(var\(--q-tabrail-cw\) - 8px\)/);
+  const glass = kitRule('html.q-tabrail:not(.q-desk) .q-tab-action');
+  assert.match(glass, /background:\s*var\(--q-glass\)/);
+  assert.match(glass, /color:\s*var\(--q-accent\)/);
   // (Nothing else gives it a width or height of its own; a computer's side bar,
   // q-desk, alone draws it as a labelled row, as its tabs.)
   const later = rules(css).filter(r => /\.q-tab-action(?![\w-])/.test(r.sel) && !/svg|::|:active|\[aria-pressed|q-desk/.test(r.sel) && r.sel !== '.q-tab-action' && r.sel !== 'html.q-tabrail .q-tab-action');
