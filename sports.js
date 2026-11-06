@@ -558,8 +558,17 @@ export function trimFotmobPage(data) {
     // (A league's page: its clubs' own numbers too, each with its whole list's file: Sports' 數據 球隊.)
     teamStats: (Array.isArray(st.teams) ? st.teams : []).map(x => ({ header: x.header, name: x.participant?.stat?.name || '', fractions: x.participant?.stat?.fractions ?? 0, url: x.fetchAllUrl || '', top: (x.topThree || []).map(fotmobPerson) })),
     teams: [...teams.values()],
-    ...(data.details?.type === 'team' ? { home: fotmobHome(data) } : {})
+    ...(data.details?.type === 'team' ? { home: fotmobHome(data), squad: fotmobSquad(data) } : {})
   };
+}
+// A club's squad from its team page: each player's name, shirt, role (G, D,
+// M, F) and age. ESPN's MLS rosters have wrong roles and ages (Nashville's
+// keeper Joe Willis a 25-year-old midfielder; Jay 2026-11-06), so Sports'
+// 陣容 takes a footballer's role and age from here where the name matches.
+const FOTMOB_ROLE = { keepers: 'G', defenders: 'D', midfielders: 'M', attackers: 'F' };
+export function fotmobSquad(data) {
+  const groups = Array.isArray(data?.squad?.squad) ? data.squad.squad : [];
+  return groups.flatMap(g => (FOTMOB_ROLE[g?.title] ? (g.members || []).map(m => ({ name: m?.name || '', shirt: m?.shirtNumber ?? null, role: FOTMOB_ROLE[g.title], age: m?.age ?? null })) : []));
 }
 // A club's own league from its team page: the league, its table and the
 // club's games in every competition (a club opened from a European cup whose

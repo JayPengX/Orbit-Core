@@ -493,3 +493,24 @@ test("FotMob's cup page: its clubs from its fixtures (the FA Cup has no table)",
   const page = trimFotmobPage({ details: { id: 132, selectedSeason: '2026/2027' }, stats: { players: [] }, fixtures: { allMatches: [{ id: '1', home: { id: '8197', name: 'Leicester City', shortName: 'Leicester' }, away: { id: '161836', name: 'Oxford City', shortName: 'Oxford City' } }] } });
   assert.deepEqual(page.teams, [{ id: 8197, name: 'Leicester City', shortName: 'Leicester' }, { id: 161836, name: 'Oxford City', shortName: 'Oxford City' }]);
 });
+
+test("FotMob's team page keeps its squad's roles and ages (ESPN's MLS roster called keeper Joe Willis a 25-year-old midfielder)", async () => {
+  const { trimFotmobPage } = await import('../sports.js');
+  const page = trimFotmobPage({
+    details: { id: 915807, type: 'team' },
+    stats: { players: [] },
+    squad: { squad: [
+      { title: 'coach', members: [{ id: 1, name: 'BJ Callaghan', age: 45 }] },
+      { title: 'keepers', members: [{ id: 254980, name: 'Joe Willis', shirtNumber: 1, age: 38, role: { key: 'keeper_long' } }] },
+      { title: 'defenders', members: [{ id: 2, name: 'Andy Nájar', shirtNumber: 31, age: 33 }] },
+      { title: 'midfielders', members: [{ id: 3, name: 'Hany Mukhtar', shirtNumber: 10, age: 31 }] },
+      { title: 'attackers', members: [{ id: 4, name: 'Sam Surridge', shirtNumber: 9, age: 28 }] }
+    ] }
+  });
+  assert.deepEqual(page.squad, [
+    { name: 'Joe Willis', shirt: 1, role: 'G', age: 38 },
+    { name: 'Andy Nájar', shirt: 31, role: 'D', age: 33 },
+    { name: 'Hany Mukhtar', shirt: 10, role: 'M', age: 31 },
+    { name: 'Sam Surridge', shirt: 9, role: 'F', age: 28 }
+  ]);
+});
