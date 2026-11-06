@@ -6066,6 +6066,8 @@ dialog[open] .q-menu { background: var(--q-sheet); }
   align-items: center;
   justify-content: center;
   gap: 4px;
+  /* Its own box-sizing: as a link (goHtml's <a>) in an app that sets none, 100% plus its padding ran past the card's edge. */
+  box-sizing: border-box;
   width: 100%;
   min-height: 36px;
   margin: var(--q-s-2) 0 0;
