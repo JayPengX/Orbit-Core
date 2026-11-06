@@ -5396,9 +5396,15 @@ html.q-tabrail:not(.q-desk) .q-tab-action[aria-pressed='true'] {
   background: linear-gradient(var(--q-glass-pick), var(--q-glass-pick)), var(--q-glass);
   box-shadow: var(--q-glass-rim), var(--q-glass-drop);
 }
-html.q-tabrail.q-float .q-tab-action svg {
+/* (Its mark about half the circle, larger than a tab's: Jay 2026-11-06, the
+   spark at a tab's size read "small" in the circle.) */
+html.q-tabrail .q-tab-action svg {
   width: 26px;
   height: 26px;
+}
+html.q-tabrail.q-float .q-tab-action svg {
+  width: 32px;
+  height: 32px;
 }
 /* A phone on its side is short: the large titles a size down, as iOS's;
    the sign-in screens without their big mark. */
