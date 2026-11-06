@@ -21,6 +21,8 @@ const swipe = (sel, dx) => `js:(async()=>{const n=document.querySelector('${sel}
 // The same, a finger on whatever is at the screen's foot (the page's empty space under a short day).
 const swipeAt = dx => `js:(async()=>{const x=innerWidth*0.6,y=innerHeight-30;const n=document.elementFromPoint(x,y);window.__swipeAt=n&&(n.id||n.className||n.tagName);const t=X=>new Touch({identifier:1,target:n,clientX:X,clientY:y});const ev=(k,X)=>n.dispatchEvent(new TouchEvent(k,{bubbles:true,cancelable:true,touches:k==='touchend'?[]:[t(X)],changedTouches:[t(X)]}));ev('touchstart',x);for(let i=1;i<=8;i++){await new Promise(r=>setTimeout(r,16));ev('touchmove',x+(${dx})*i/8)}ev('touchend',x+(${dx}))})()`;
 
+// Beats: six songs made on the built-in band and every one kept (about a minute).
+const KEEP_SIX = "js:(async()=>{const z=ms=>new Promise(r=>setTimeout(r,ms));location.hash='make';await z(1500);document.getElementById('go').click();for(let i=0;i<150;i++){await z(1000);if(document.querySelectorAll('#out .act.heart').length>=6&&!document.getElementById('go').disabled)break}await z(1000);for(const b of document.querySelectorAll('#out .act.heart:not(.kept)')){b.click();await z(400)}await z(2500)})()";
 export const PAGES = {
   sports: {
     default: ['tabs'],
@@ -348,6 +350,10 @@ export const PAGES = {
     make: { hash: 'make', args: click(wait(3000)) },
     // Now Playing, opened from the home's card (the mini bar steps aside while the card shows).
     'now-playing': { args: click("js:(document.querySelector('.bt-play')||[...document.querySelectorAll('button')].find(b=>b.offsetParent&&/play|播放/i.test(b.getAttribute('aria-label')||''))).click()", wait(8000), "js:(document.querySelector('.bt-head')||document.querySelector('.mp-main')).click()", wait(2000)) },
+    // 資料庫 with songs kept: 做歌's 做 6 首歌 on the built-in band, every one ♡'d, then 資料庫
+    // (library-songs: its 歌曲 opened; on a wide page, beside the rows).
+    'library-kept': { args: click(KEEP_SIX, "js:document.getElementById('tab-library').click()", wait(2500)) },
+    'library-songs': { args: click(KEEP_SIX, "js:document.getElementById('tab-library').click()", wait(2000), "js:[...document.querySelectorAll('#panel-library .q-cell')].find(c=>/歌曲|Songs/.test(c.textContent)).click()", wait(1500)) },
     // The rhythm game mid-play (autoplay, no fps text).
     game: { hash: 'create', args: ['--store', 'orbit-beats-game-auto=shot', ...click(card('Rhythm game|節奏遊戲'), wait(2000), "js:[...document.querySelectorAll('.gm-list > *')].find(e=>e.offsetParent).click()", wait(2500), "js:document.querySelectorAll('.gm-level')[2].click()", wait(14000))] }
   },
