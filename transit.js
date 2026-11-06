@@ -520,8 +520,10 @@ export async function gpsRows(env, q, deps = {}) {
     rows = JSON.parse(got.body);
   } catch {}
   if (!Array.isArray(rows)) return { status: 502, body: { code: 'TDX_FAILED' } };
+  // (Only what the phone reads: TDX sends each bus's speed, heading, statuses and times too, ~390 bytes a bus.)
   const want = new Set(routes);
-  return { status: 200, body: rows.filter(r => want.has(r?.RouteUID)), age: got.age || 0, state: got.state };
+  const slim = r => ({ RouteUID: r.RouteUID, PlateNumb: r.PlateNumb, Direction: r.Direction, BusPosition: r.BusPosition ? { PositionLat: r.BusPosition.PositionLat, PositionLon: r.BusPosition.PositionLon } : null, GPSTime: r.GPSTime });
+  return { status: 200, body: rows.filter(r => want.has(r?.RouteUID)).map(slim), age: got.age || 0, state: got.state };
 }
 
 // The access token (a day long): kept in memory and KV, asked for again an
