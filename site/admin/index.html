@@ -99,7 +99,6 @@
   .flow .v.warn { color: var(--q-warn, #c77700); }
   .flow .v small { display: block; margin-top: 1px; font-size: 12px; font-weight: 500; color: var(--q-muted); }
   .set strong .using { display: block; font-weight: 500; font-size: 12px; color: var(--q-accent); margin-top: 2px; }
-  .eq { font-size: 13px; color: var(--q-muted); line-height: 1.6; margin: 10px 0 0; }
   .neg { color: var(--q-bad); }
   .code { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 26px; font-weight: 800; letter-spacing: 0.12em; margin: 10px 0 4px; }
   .passes { margin: 14px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
@@ -116,7 +115,7 @@
   dialog.sheet { width: min(720px, 100vw); max-width: 100vw; max-height: 92vh; margin: auto auto 0; border: 0; padding: 0; border-radius: 22px 22px 0 0; background: var(--q-page); color: var(--q-text); box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.3); }
   @media (min-width: 760px) { dialog.sheet { margin: auto; border-radius: 22px; } }
   dialog.sheet.wide { width: min(980px, 100vw); }
-  #mo-tiles { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+  @media (min-width: 560px) { #mo-tiles { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); } }
   dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.45); }
   .sheet-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px; background: var(--q-page); border-bottom: 1px solid var(--q-divider); }
   .sheet-head h2 { margin: 0; font-size: 19px; }
@@ -627,23 +626,19 @@
 <dialog id="money" class="sheet wide" aria-labelledby="money-title">
   <div class="sheet-head"><h2 id="money-title">證券的錢</h2><button id="money-close" class="icon-btn" aria-label="關閉"></button></div>
   <div class="sheet-body">
-    <p class="muted">系統發的、Orbit 賺的、政府收和發的、市場賺賠的，加起來就是流通中的錢。</p>
+    <p class="muted">發出去的錢，加上下面每一項（減的是紅字），就是現在大家手上的錢。</p>
     <p id="mo-error" class="error"></p>
     <div id="mo" hidden>
       <div class="tiles" id="mo-tiles"></div>
-      <p class="eq" id="mo-eq"></p>
       <div class="twocol" style="margin-top:6px">
-        <div><h3>四方對帳</h3><div class="card"><ul class="flow" id="mo-where"></ul></div></div>
-        <div><h3>系統</h3><div class="card"><ul class="flow" id="mo-given"></ul></div></div>
+        <div><h3>怎麼加起來</h3><div class="card"><ul class="flow" id="mo-where"></ul></div></div>
+        <div><h3>發出去的</h3><div class="card"><ul class="flow" id="mo-given"></ul></div></div>
       </div>
       <div class="twocol">
-        <div><h3>Orbit：透支利息</h3><div class="card"><ul class="flow" id="mo-orbit"></ul></div></div>
-        <div><h3>市場：玩家投資賺的</h3><div class="card"><ul class="flow" id="mo-own"></ul></div></div>
+        <div><h3>投資賺賠</h3><div class="card"><ul class="flow" id="mo-own"></ul></div></div>
+        <div><h3>稅和紓困</h3><div class="card"><ul class="flow" id="mo-gov"></ul></div></div>
       </div>
-      <div class="twocol">
-        <div><h3>政府：稅和補助</h3><div class="card"><ul class="flow" id="mo-gov"></ul></div></div>
-        <div><h3>繳稅最多的帳戶</h3><div id="mo-taxed"></div></div>
-      </div>
+      <h3>繳稅最多</h3><div id="mo-taxed"></div>
       <details class="note"><summary>怎麼算</summary><p class="muted" id="mo-note"></p></details>
     </div>
   </div>
@@ -1590,25 +1585,23 @@ async function loadMoney() {
     // The government's take across accounts (taxes less 急難紓困; money.js gov is the player's side).
     const govTake = -n(all.gov, 'net');
     $('mo-tiles').replaceChildren(
-      tile('系統淨發出', big(net), gone.accounts ? `還回 ${big(n(gone, 'worth'))}` : `${n(live, 'accounts')} 個帳戶`),
-      tile('Orbit 賺', big(n(all, 'orbit')), '透支利息'),
-      tile('政府收', big(govTake), `稅減紓困`),
-      tile('市場', big(n(all, 'own')), n(all, 'own') >= 0 ? '玩家投資淨賺' : '玩家投資淨賠'),
-      tile('流通中', big(n(live, 'worth')), '現有帳戶的身價')
+      tile('發出去', big(net), `${n(live, 'accounts')} 個帳戶`),
+      tile('透支利息', big(-n(all, 'orbit')), '付給 Orbit'),
+      tile('稅和紓困', big(-govTake), govTake > 0 ? '稅比紓困多' : '紓困比稅多'),
+      tile('投資', big(n(all, 'own')), n(all, 'own') >= 0 ? '大家淨賺' : '大家淨賠'),
+      tile('現在總共', big(n(live, 'worth')), '大家的身價')
     );
-    $('mo-eq').textContent = `系統淨發出 ${big(net)} − Orbit 賺 ${big(n(all, 'orbit'))} − 政府收 ${big(govTake)} ${n(all, 'own') < 0 ? '−' : '+'} 市場 ${big(Math.abs(n(all, 'own')))} = 流通中 ${big(n(live, 'worth'))}`;
     const g = all.gave || {};
-    flow('mo-given', [['開戶金', n(g, 'start')], ['週薪', n(g, 'pay')], ['財富等級獎勵', n(g, 'rank')], ['其他', n(g, 'other'), '手動調整'], ['刪除的帳戶還回', -n(gone, 'worth'), `${n(gone, 'accounts')} 個`]].filter(r => r[1]), { total: ['淨發出', net] });
-    flow('mo-where', [['系統淨發出', net], ['Orbit 賺走', -n(all, 'orbit')], ['政府收走', -govTake, '稅減去急難紓困'], ['市場', n(all, 'own')]], { total: ['流通中', n(live, 'worth')] });
+    flow('mo-given', [['開戶金', n(g, 'start')], ['週薪', n(g, 'pay')], ['財富等級獎勵', n(g, 'rank')], ['手動調整', n(g, 'other')], ['刪除的帳戶還回', -n(gone, 'worth'), `${n(gone, 'accounts')} 個`]].filter(r => r[1]), { total: ['合計', net] });
+    flow('mo-where', [['發出去', net], ['透支利息', -n(all, 'orbit')], ['稅和紓困', -govTake], ['投資賺賠', n(all, 'own')]], { total: ['現在總共', n(live, 'worth')] });
     const gp = all.gov?.paid || {};
-    flow('mo-gov', [['證券交易稅', n(gp, 'trade')], ['股利與利息扣繳', n(gp, 'withheld'), '含外國政府'], ['二代健保補充保費', n(gp, 'nhi')], ['急難紓困', -n(all.gov?.got, 'relief'), '發給玩家']].filter(r => r[1]), { total: ['政府淨收', govTake] });
+    flow('mo-gov', [['證券交易稅', -n(gp, 'trade')], ['股利與利息扣繳', -n(gp, 'withheld')], ['二代健保補充保費', -n(gp, 'nhi')], ['急難紓困', n(all.gov?.got, 'relief')]].filter(r => r[1]), { total: ['合計', -govTake] });
     if (!n(all.gov, 'paidTotal') && !n(all.gov, 'gotTotal')) $('mo-gov').innerHTML = '<li class="muted" style="display:block">還沒有稅或紓困（Securities 同步後就會出現）。</li>';
     if (!wallets.length) await loadWallets();
     const taxed = wallets.filter(w => w.tax > 0).sort((a, b) => b.tax - a.tax).slice(0, 5);
     $('mo-taxed').innerHTML = taxed.length ? acctCard(taxed.map(w => ({ ...w, shown: `−${money(w.tax)}`, red: true })), { compact: true }) : emptyCard('check', '還沒有人繳稅');
-    flow('mo-orbit', [['透支利息', n(all.fees, 'od')]].filter(r => r[1]), { total: ['合計', n(all, 'orbit')] });
     flow('mo-own', byMarket(all.stockBy, n(all, 'own'), MARKET_NAMES, ['其他', '股利、利息、匯兌']), { total: ['合計', n(all, 'own')] });
-    $('mo-note').textContent = `帳戶刪除時，剩下的錢還給系統（透支的帳戶，欠的由系統吸收）；它讓 Orbit 賺的和在市場賺賠的照樣留在帳上。各市場由 Securities 打開時回報，還沒打開過新版的帳戶算在「未分類／其他」。刪除的帳戶${gone.since ? `從 ${fmtDay(gone.since)} 起` : '從現在起'}記錄。${fmt(m.at)} 更新。`;
+    $('mo-note').textContent = `刪除的帳戶，剩下的錢算還回來（透支的，欠的不收），它付過的利息、稅和投資賺賠照樣算在內${gone.since ? `（從 ${fmtDay(gone.since)} 起）` : ''}。各市場的賺賠在 Securities 打開時回報，還沒回報的算「其他」。${fmt(m.at)} 更新。`;
   } catch (e) {
     $('mo-error').textContent = e.message;
   }
