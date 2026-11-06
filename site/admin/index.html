@@ -2012,10 +2012,8 @@ async function loadCapacity() {
     $('cap-tiles').replaceChildren(
       tile('本週活躍', `${u.week} 人`, `今天 ${u.day} · 本月 ${u.month}`),
       tile('30 天後預估', `${u.expected} 人`, `近兩週新開 ${u.newWeek + u.newPrev} 個`),
-      // (Too few people this week to tell what one uses: by typical use, about 1.2 s of CPU a day each.)
-      q.typical?.few
-        ? tile('撐得住', `${n0(q.typical.people)} 人`, '照一般用法估')
-        : tile('撐得住', q.holds ? `${n0(q.holds.people)} 人` : '—', q.holds ? `${quotaName(q.holds.key).replace(/^Google (?=\S)/, '')} ${Math.round(fillOf(q.rows.find(r => r.key === q.holds.key)) * 100)}%` : '還沒有人用'),
+      // (The quota that fills first; too few people this week to tell what one uses: every quota at a typical person's use, capacity.js TYPICAL_DAY.)
+      tile('撐得住', q.holds ? `${n0(q.holds.people)} 人` : '—', q.holds ? (q.typical?.few ? `${quotaName(q.holds.key).replace(/^Google (?=\S)/, '')}先滿` : `${quotaName(q.holds.key).replace(/^Google (?=\S)/, '')} ${Math.round(fillOf(q.rows.find(r => r.key === q.holds.key)) * 100)}%`) : '還沒有人用'),
       tile('本期預估', p.guard?.forecast ? pct(p.guard.forecast.end) : '—', !p.guard?.forecast ? '帳單還沒讀到' : p.guard.forecast.warn ? `${fmtDay(p.guard.forecast.at)} 會到 90%（只是提醒）` : '撐得到週期結束')
     );
     // (Short: 3.7 萬, 7 億; CPU in seconds.)
@@ -2028,15 +2026,19 @@ async function loadCapacity() {
       const share = fillOf(r);
       const pct = r.cap ? `${Math.round(share * 100)}%` : '—';
       // (People on top, the share used under it; a quota not counted in people: its share alone.)
-      const shown = r.paused ? ['暫停'] : r.holds != null ? [`${n0(r.holds)} 人`, el('small', { text: `用了 ${pct}` })] : [pct];
+      const shown = r.paused ? ['暫停'] : r.holds != null ? [`${cn(r.holds)} 人`, el('small', { text: r.byTypical && r.seen != null ? `照實際 ${cn(r.seen)} 人` : `用了 ${pct}` })] : [pct];
       return el('li', {}, [
         el('span', { class: 'nm' }, [quotaName(r.key), el('small', { text: sub })]),
         el('span', { class: `v ${share > 1 ? 'neg' : share > 0.8 ? 'warn' : 'pos'}` }, shown),
         el('span', { class: 'bar' }, [el('i', { class: tone(share), style: `width:${Math.max(1.5, Math.min(100, share * 100))}%` })])
       ]);
     };
+    // (Counted at a typical person's use: what one of them uses, beside the quota's own count.)
+    // (Short enough for 320 beside the people: the bar shows how full it is.)
+    const one = r => (r.kind === 'cf' ? `一人每天 ${r.count === 'cpuMs' ? `${(r.typical / 1000).toFixed(1)} 秒` : cn(r.typical)} · 上限 ${big(r.count, r.capDay)}` : r.kind === 'tdx' ? `一人每月 ${(r.typical * 30).toFixed(1)} 點 · 上限 ${r.cap}${r.slowed ? ' · 已放慢' : ''}` : `一人每月 ${n0(r.typical * 30)} · 上限 ${n0(r.cap)}`);
     const subOf = r => {
       if (r.kind === 'cf' && r.by === 'store') return `存了 ${big(r.count, r.used)} / ${big(r.count, r.cap)}`;
+      if (r.byTypical) return one(r);
       if (r.kind === 'cf') {
         const fixed = r.day ? Math.round((r.fixedDay / r.day) * 100) : 0;
         return `每天 ${big(r.count, r.day).replace(/ 秒$/, '')} / ${big(r.count, r.capDay)}${r.measured ? ` · 固定 ${fixed}%` : ''}`;
@@ -2072,7 +2074,8 @@ async function loadCapacity() {
     $('cap-plans').replaceChildren(...rows);
     const on = devSaved?.autoScale;
     const slow = p.scale == null ? '最慢也不夠：要減少即時功能，否則會碰到 $5 方案的上限而停' : p.scale > 1 ? `即時更新要放慢 ×${p.scale}` : '不用放慢';
-    const few = q.typical?.few ? `本週只有 ${u.week} 人，多半是你自己在測試，下面各項的「撐 N 人」照你們的用量算，會估少；所以「撐得住」改照一般用法估：每人每天約 ${q.typical.ms / 1000} 秒 CPU（一天用三個 App、各用完一輪，共 0.47 秒，11-06 實測；加上即時畫面開 45 分鐘，公車站牌、地圖、比賽直播各三分之一，約 2 秒；大約隔天用一次），也就是每天的上限扣掉固定用量，除以 ${q.typical.ms / 1000} 秒。人多了就改回照實際用量算。` : '';
+    // (A typical person: capacity.js TYPICAL_DAY, measured 2026-11-06.)
+    const few = q.typical?.few ? `本週只有 ${u.week} 人，多半是你自己在測試，照你們的用量算，每一項都會估得太少；所以每一項的「撐 N 人」和「撐得住」都照一般用法估：一個人大約隔天用一次 Orbit，用的那天開三個 App（交通開兩次）、即時畫面看 45 分鐘（公車站牌、交通的地圖、比賽直播各三分之一）、規劃一趟路，每兩次搜尋一個地點。每一樣用掉多少都是 11-06 實測，在新竹車站（站牌有三個縣市的公車，一般站牌用得更少，所以只會估少）：公車站牌每小時 0.83 點 TDX、地圖 0.39 點、一趟路 0.02 點；交通開一次是一次地圖載入，搜尋一次打字問 3 次，一趟路問 2 次路線，從沒走過的地方出發要 5 個步行時間。每一項的上限扣掉固定用量，除以一個人的用量，就是撐的人數；最少的那項就是撐得住；每項人數下面的「照實際」是照本週這幾個人的用量。每週 10 人以上就改回照實際用量算。` : '';
     const how = few + (!q.typical?.few && q.holds ? `撐得住＝最先滿的那一項（${quotaName(q.holds.key)}）撐的人數，這個人數以內不會放慢：Cloudflare 只有實際用到 60% 以上、而且照最近幾天的速度撐不到週期結束才放慢。` : '') + (q.near && q.who === 'caller'
       ? '每一項的「撐 N 人」＝本週活躍人數 ×（上限扣掉固定用量）÷ 現在大家用掉的。Cloudflare 的人用量看是誰呼叫：近 7 天從 App 和首頁的頁面來的請求算人用的，不分國家；其餘算固定用量：排程、建置，和我們自己的開發工具與檢查（開發多的那週就多）。Google 地圖和 TDX 扣掉我們的工具和展示頁用的（工具最多用到每項免費額度的一半）；其他項目全部算成人用的，所以只會估少。'
       : q.near

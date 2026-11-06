@@ -43,7 +43,7 @@ test('plan: Maps carried to the month\'s end, and the people it holds', () => {
 });
 
 // ---- Each quota from what was really used (quotas, splitHours) ----
-import { quotas, splitHours, TYPICAL_CPU_MS } from '../capacity.js';
+import { quotas, splitHours, TYPICAL_CPU_MS, TYPICAL_DAY, ACTIVE } from '../capacity.js';
 import { PLAN } from '../guard.js';
 
 const HOUR = 3_600_000;
@@ -112,14 +112,49 @@ test('splitHours: with people\'s part read (requests near Taiwan), that is what 
   assert.equal(q.who, 'place');
   // (Read by who called, the Workers Logs' share: the same split, named so.)
   assert.equal(quotas({ users: { week: 40 }, guard: guardOf({ cpuMs: 0.2 }), hours: { ...mixed, who: 'caller' }, now: NOW }).who, 'caller');
-  // Enough people to tell what one uses: no typical-use stand-in needed.
+  // Enough people to tell what one uses: each quota by this week's use.
   assert.equal(q.typical.few, false);
-  // Two people a week (the owner testing): the plan's people by typical use, about 1.2 s of CPU a day each.
+  assert.ok(q.rows.every(r => !r.byTypical));
+  // Two people a week (the owner testing): every quota by a typical person's use (CPU about 1.2 s a day), the fewest the headline.
   const two = quotas({ users: { week: 2 }, guard: guardOf({ cpuMs: 0.2 }), hours: mixed, now: NOW });
+  const cpu2 = two.rows.find(r => r.key === 'cf:cpuMs');
   assert.equal(two.typical.few, true);
-  assert.equal(two.typical.ms, TYPICAL_CPU_MS);
-  assert.equal(two.typical.people, Math.floor((capDay - (20_000 * 24 + 20_000 * 9)) / TYPICAL_CPU_MS));
-  assert.equal(quotas({ users: { week: 2 }, guard: guardOf({ cpuMs: 0.2 }), hours: null, now: NOW }).typical, null, 'no hours: no fixed part to take off');
+  assert.equal(TYPICAL_CPU_MS, 1200);
+  assert.equal(cpu2.byTypical, true);
+  assert.equal(cpu2.holds, Math.floor((capDay - (20_000 * 24 + 20_000 * 9)) / TYPICAL_CPU_MS));
+  assert.equal(cpu2.seen, Math.floor((2 * (capDay - (20_000 * 24 + 20_000 * 9))) / (10_000 * 16)), "what this week's two used, beside it");
+  assert.deepEqual(two.holds, { people: Math.min(...two.rows.filter(r => r.byTypical && r.holds != null).map(r => r.holds)), key: two.holds.key });
+  assert.equal(two.typical.people, two.holds.people);
+  // No hours: today's use all counted fixed, a typical person on top of it (erring low).
+  const blind = quotas({ users: { week: 2 }, guard: guardOf({ cpuMs: 0.2 }), hours: null, now: NOW }).rows.find(r => r.key === 'cf:cpuMs');
+  assert.equal(blind.holds, Math.floor((capDay - (PLAN.cpuMs * 0.2) / 32) / TYPICAL_CPU_MS));
+  // KV's writes (read only as the period's total) split as the requests are: the share from who called is people's.
+  const kv = quotas({ users: { week: 40 }, guard: guardOf({ cpuMs: 0.2, kvWrite: 0.01 }), hours: mixed, now: NOW }).rows.find(r => r.key === 'cf:kvWrite');
+  const kvDay = (0.01 * PLAN.kvWrite) / 32;
+  assert.equal(kv.measured, 'requests');
+  assert.ok(Math.abs(kv.fixedDay - (kvDay * 39_000) / 55_000) < 1e-6);
+  // …and a typical person's, their requests' worth (400 a day).
+  assert.ok(Math.abs(kv.typical - (kvDay / 55_000) * 400) < 1e-9);
+});
+
+test('quotas, few people: Google and TDX at a typical person\'s month, the fewest named; Gemini at the use seen, never the headline', () => {
+  const usage = { ai: [{ key: 'aiLaw', cap: 300, days: [0, 0, 0, 0, 0, 0, 30] }], tdx: { points: 30, devPoints: 6, plan: { month: 200 }, guard: { why: '' } } };
+  const maps = { matrix: { used: 600, month: 3000, fixed: 2000, cap: 9000 }, maps: { used: 100, month: 500, fixed: 0, cap: 9000 } };
+  const q = quotas({ users: { week: 2 }, usage, maps, now: NOW });
+  const days = 30; // November
+  const tdx = q.rows.find(r => r.key === 'tdx:points');
+  // A stop card a quarter hour, the map a quarter hour and a trip, on half the days.
+  assert.ok(Math.abs(TYPICAL_DAY['tdx:points'] - (0.25 * 0.83 + 0.25 * 0.39 + 0.02)) < 1e-9);
+  assert.equal(tdx.holds, Math.floor((200 - tdx.fixedMonth) / (TYPICAL_DAY['tdx:points'] * ACTIVE * days)));
+  const walks = q.rows.find(r => r.key === 'maps:matrix');
+  assert.equal(walks.holds, Math.floor((9000 - 2000) / (5 * ACTIVE * days)));
+  assert.equal(walks.seen, Math.floor((2 * (9000 - 2000)) / 1000));
+  assert.equal(q.rows.find(r => r.key === 'maps:maps').holds, Math.floor(9000 / (2 * ACTIVE * days)));
+  // Gemini: the use seen (fewer than TDX's here), not the headline.
+  const law = q.rows.find(r => r.key === 'ai:aiLaw');
+  assert.equal(law.holds, Math.floor((2 * 300) / 30));
+  assert.ok(law.holds < tdx.holds);
+  assert.deepEqual(q.holds, { people: tdx.holds, key: 'tdx:points' });
 });
 
 test('quotas: people held = this week\'s × room after the fixed part ÷ what people use; the fewest is named', () => {
