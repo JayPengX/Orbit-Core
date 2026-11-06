@@ -106,6 +106,10 @@ export function googleUrl(env, path, lat, lon, extra = '', units = true) {
   return `${GOOGLE}${path}?key=${encodeURIComponent(env.GOOGLE_WEATHER_KEY)}&location.latitude=${lat}&location.longitude=${lon}&languageCode=zh-TW${units ? '&unitsSystem=METRIC' : ''}${extra}`;
 }
 export const cwaUrl = (env, id, extra = '') => `${CWA}${id}?Authorization=${encodeURIComponent(env.CWA_KEY)}&format=JSON${extra}`;
+// The AQI forecast's rows: 10 areas, an issue three times a day, newest
+// first. From 2026-11-10 an issue is 60 rows (4 days, the first in three);
+// today's day comes from an earlier issue in the evening, so two issues and more.
+const AQF_LIMIT = '&limit=200';
 export const moenvUrl = (env, id, extra = '') => `${MOENV}${id}?api_key=${encodeURIComponent(env.MOENV_KEY)}&format=json${extra}`;
 
 // CWA's township forecasts, one dataset per county: 3 days (3-hourly); the
@@ -567,6 +571,35 @@ async function fetchCwa(env, lat, lon, fetchFn) {
 const AQI_LEVELS = [[50, '良好'], [100, '普通'], [150, '對敏感族群不健康'], [200, '對所有族群不健康'], [300, '非常不健康'], [Infinity, '危害']];
 export const aqiLevel = aqi => (aqi == null ? null : AQI_LEVELS.find(([max]) => aqi <= max)[1]);
 
+// MOENV's AQI forecast (AQF_P_01) for one area: date → { aqi, level, main },
+// from the newest issue that has the day. Until 2026-11-10 a day is one row;
+// from then the forecast runs 4 days and its first day has three rows
+// (timeperiod 全日, 上午, 下午). A day is its 全日 row (a row with no
+// timeperiod is one), never the halves counted again; with no 全日 row, its
+// worst half (a day's value is its worst, as MOENV means it).
+const aqfPart = p => (!p || /全|all|whole/i.test(p) ? 'day' : /上午|早|^am\b|morning/i.test(p) ? 'am' : /下午|午|^pm\b|afternoon/i.test(p) ? 'pm' : null);
+export function aqfDays(rows, area) {
+  const newest = new Map();
+  for (const r of rows || []) {
+    const aqi = num(r?.aqi);
+    const part = aqfPart(String(r?.timeperiod ?? '').trim());
+    if (r?.area !== area || !r.forecastdate || aqi == null || !part) continue;
+    const key = `${r.forecastdate}|${part}`;
+    const had = newest.get(key);
+    // The newest issue wins; on a tie the first row (MOENV lists newest first).
+    if (!had || String(r.publishtime || '') > String(had.publishtime || '')) newest.set(key, r);
+  }
+  const out = new Map();
+  for (const date of [...new Set([...newest.keys()].map(k => k.split('|')[0]))].sort()) {
+    const whole = newest.get(`${date}|day`);
+    const halves = [newest.get(`${date}|am`), newest.get(`${date}|pm`)].filter(Boolean);
+    const r = whole || halves.reduce((a, h) => (num(h.aqi) > num(a.aqi) ? h : a), halves[0]);
+    const aqi = num(r.aqi);
+    out.set(date, { aqi, level: aqiLevel(aqi), main: r.majorpollutant || null });
+  }
+  return out;
+}
+
 export function parseAir(sites, forecast, lat, lon, county) {
   let best = null;
   let d = Infinity;
@@ -579,10 +612,8 @@ export function parseAir(sites, forecast, lat, lon, county) {
   }
   if (!best || d > NEAR_KM) return null;
   const area = airArea(county || best.county);
-  const fc = date => {
-    const f = (forecast || []).find(x => x.area === area && x.forecastdate === date);
-    return f ? { aqi: num(f.aqi), level: aqiLevel(num(f.aqi)), main: f.majorpollutant || null } : null;
-  };
+  const byDate = aqfDays(forecast, area);
+  const fc = date => byDate.get(date) || null;
   const aqi = num(best.aqi);
   const now = Date.now();
   return {
@@ -598,7 +629,7 @@ export function parseAir(sites, forecast, lat, lon, county) {
       area,
       today: fc(twDay(now)),
       tomorrow: fc(twDay(now + 24 * HOUR)),
-      days: [...new Set((forecast || []).filter(x => x.area === area).map(x => x.forecastdate))].sort().map(date => ({ date, ...fc(date) }))
+      days: [...byDate.keys()].sort().map(date => ({ date, ...fc(date) }))
     }
   };
 }
@@ -1395,7 +1426,7 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
     !env.GOOGLE_WEATHER_KEY ? { state: 'off', v: null } : gFresh ? { state: 'ok', ...gFresh } : justBuilt && wantFar ? ((await googleAllowed(env, now, 10, defer, true)) ? farOnly() : { state: 'ok', ...gFc }) : gFc && !wantFar ? ((await googleAllowed(env, now, 1, defer, true)) ? googleNowOnly() : { state: 'ok', ...gFc }) : (await googleAllowed(env, now, wantFar ? 12 : 4, defer, wantFar)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan, wantFar)) : wantFar && (await googleAllowed(env, now, 4, defer)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan)) : keep('google') ? { state: 'stale', ...keep('google') } : { state: 'capped', v: null },
     env.CWA_KEY && inTaiwan ? settle('cwa', () => fetchCwa(env, lat, lon, fetchFn)) : { state: inTaiwan ? 'off' : 'n/a', v: null },
     env.MOENV_KEY && inTaiwan ? airSites(env, fetchFn, now, defer) : null,
-    env.MOENV_KEY && inTaiwan ? shared(env, 'weather:moenv:aqf', 3 * HOUR, () => getJson(fetchFn, moenvUrl(env, 'aqf_p_01', '&limit=100'), env).then(j => (Array.isArray(j) ? j : j.records || []).map(f => ({ area: f.area, forecastdate: f.forecastdate, aqi: f.aqi, majorpollutant: f.majorpollutant }))), now, defer) : null,
+    env.MOENV_KEY && inTaiwan ? shared(env, 'weather:moenv:aqf', 3 * HOUR, () => getJson(fetchFn, moenvUrl(env, 'aqf_p_01', AQF_LIMIT), env).then(j => (Array.isArray(j) ? j : j.records || []).map(f => ({ area: f.area, forecastdate: f.forecastdate, timeperiod: f.timeperiod, publishtime: f.publishtime, aqi: f.aqi, majorpollutant: f.majorpollutant }))), now, defer) : null,
     env.CWA_KEY && inTaiwan ? shared(env, 'weather:cwa:warn', 30 * MIN, () => getJson(fetchFn, cwaUrl(env, 'W-C0033-001'), env), now, defer) : null,
     kvJson(env, 'weather:weights'),
     inTaiwan ? kvJson(env, 'weather:aqi:hist') : null,
@@ -1571,7 +1602,7 @@ const SAMPLES = {
   'cwa-warn': env => cwaUrl(env, 'W-C0033-001'),
   'cwa-track': env => cwaUrl(env, 'W-C0034-005'),
   'moenv-aqi': env => moenvUrl(env, 'aqx_p_432', '&limit=1000'),
-  'moenv-aqf': env => moenvUrl(env, 'aqf_p_01', '&limit=100'),
+  'moenv-aqf': env => moenvUrl(env, 'aqf_p_01', AQF_LIMIT),
   'moenv-uv': env => moenvUrl(env, 'uv_s_01', '&limit=100'),
   'moenv-aqi-hist': env => moenvUrl(env, 'aqx_p_488', `&limit=60&filters=${encodeURIComponent('sitename,EQ,松山')}&sort=${encodeURIComponent('datacreationdate desc')}`),
   'moenv-aqi-hist-plain': env => moenvUrl(env, 'aqx_p_488', '&limit=3'),
