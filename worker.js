@@ -376,7 +376,12 @@ Regardless of documentKind:
 //
 // That leaves two, both verified correct and reasonably fast on repeated
 // single- and multi-file live runs.
-const GEMINI_ALLOWED_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.7-flash'];
+// 2026-11-06: 3.7 Flash and 3.8 Flash stopped answering this key (a tiny
+// call hung past 20 s, /ops?check=gemini&model=…) once billing was
+// unlinked and the key fell to the free tier; 3.6 Flash answered in 2.4 s.
+// Orbit Law's answers ask for 3.6 by name (law-chat.js, law.js); 3.7 stays
+// allowed for Orbit Class's phones, which name it as their fallback.
+const GEMINI_ALLOWED_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.7-flash', 'gemini-3.6-flash'];
 
 // Gemini from Taiwan: through the relay (gemini-relay.js, pinned there) when
 // bound; this Worker runs near each caller, which Gemini may refuse (Hong Kong).
