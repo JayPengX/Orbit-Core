@@ -95,8 +95,10 @@ const pageScript = readFileSync(new URL('./speed/page.js', import.meta.url), 'ut
 
 // What the proxy's routes cost in CPU on Cloudflare (ms a request), as
 // tools' tail.yml read them live on 2026-11-05 (15 minutes): an estimate
-// of what each step asks of the Workers.
-const WORKER_CPU = { '/sports-proxy batch': 20.6, '/sports-proxy': 3.0, '/sports-today': 72, '/config': 0.86, '/weather': 19.6, '/transit': 5.6, '/data': 2.5, '/eco': 4, '/flight': 5, '/law-live': 3, '/push': 2 };
+// of what each step asks of the Workers. Transit's bus times by route, read
+// again on 2026-11-06 once transit.js stopped parsing a whole city for each
+// quiet ask (eta 61 → 6.6, running 48 → 24.7); its other routes, '/transit'.
+const WORKER_CPU = { '/sports-proxy batch': 20.6, '/sports-proxy': 3.0, '/sports-today': 72, '/config': 0.86, '/weather': 19.6, '/transit eta': 6.6, '/transit running': 24.7, '/transit tdx': 3.3, '/transit': 5.6, '/data': 2.5, '/eco': 4, '/flight': 5, '/law-live': 3, '/push': 2 };
 
 async function device(app, side, prof = profile) {
   const ip = `127.0.0.${ipN++}`;
