@@ -1,6 +1,7 @@
 # A Worker's live logs for a few minutes (Run workflow, by hand): what a cron
 # or a request printed, without signing in to Cloudflare; or (cpu) where its
-# CPU goes, by route and cron. Read-only.
+# CPU goes, by route, cron and caller (country, colo, network), and where each
+# country's requests come in. Read-only.
 name: Tail a Worker
 on:
   workflow_dispatch:
@@ -92,9 +93,28 @@ jobs:
               console.log("== by day and colo (top 3 a day)");
               const days = {}; for (const x of rows) { const d = x.dimensions.date; const k = x.dimensions[by]; ((days[d] ||= {})[k] ||= { n: 0, cpu: 0 }); days[d][k].n += x.sum.requests; days[d][k].cpu += x.sum.cpuTimeUs / 1000; }
               for (const d of Object.keys(days).sort()) console.log(d, Object.entries(days[d]).sort((a, b) => b[1].cpu - a[1].cpu).slice(0, 3).map(([k, v]) => `${k} ${Math.round(v.cpu)} ms/${v.n}`).join(" · "), "· all", Math.round(Object.values(days[d]).reduce((t, v) => t + v.cpu, 0)));
+              // Where each country comes in: the zone, its requests to the proxy (/api/…) by
+              // country, colo and host, as far back as its plan lets (a day, else less).
+              const zones = await fetch("https://api.cloudflare.com/client/v4/zones", { headers: { Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}` } }).then(r => r.json()).catch(() => ({}));
+              const ZQ = "query($z: string!, $s: Time!, $e: Time!, $p: string!) { viewer { zones(filter: { zoneTag: $z }) { x: httpRequestsAdaptiveGroups(limit: 5000, filter: { datetime_geq: $s, datetime_leq: $e, clientRequestPath_like: $p }) { count dimensions { clientCountryName coloCode clientRequestHTTPHost } } } } }";
+              for (const z of zones.result || []) {
+                let got = null, said = "";
+                for (const [token, hours] of [[process.env.CF_GUARD_TOKEN, 24], [process.env.CLOUDFLARE_API_TOKEN, 24], [process.env.CLOUDFLARE_API_TOKEN, 6]]) {
+                  const a = await fetch("https://api.cloudflare.com/client/v4/graphql", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ query: ZQ, variables: { z: z.id, s: iso(Date.now() - hours * 3_600_000), e: iso(Date.now() - 60_000), p: "/api/%" } }) }).then(r => r.json()).catch(e => ({ errors: [{ message: e.message }] }));
+                  if (!a.errors && a.data) { got = { rows: a.data.viewer?.zones?.[0]?.x || [], hours }; break; }
+                  said = JSON.stringify(a.errors).slice(0, 300);
+                }
+                console.log(`== zone ${z.name} (${z.plan?.name || "?"}): requests to /api/… ${got ? `the last ${got.hours} hours` : "unread: " + said}`);
+                if (!got) continue;
+                const tally = pick => { const m = {}; for (const x of got.rows) { const k = pick(x.dimensions); m[k] = (m[k] || 0) + x.count; } return Object.entries(m).sort((a, b) => b[1] - a[1]); };
+                console.log("by country:", tally(d => d.clientCountryName).slice(0, 12).map(([k, n]) => `${k} ${n}`).join(" · "));
+                console.log("Taiwan by colo:", tally(d => (d.clientCountryName === "TW" ? d.coloCode : "")).filter(([k]) => k).map(([k, n]) => `${k} ${n}`).join(" · "));
+                console.log("the rest by country, colo and host:"); for (const [k, n] of tally(d => (d.clientCountryName === "TW" ? "" : `${d.clientCountryName} ${d.coloCode} ${d.clientRequestHTTPHost}`)).filter(([k]) => k).slice(0, 20)) console.log(String(n).padStart(8), k);
+              }
             })().catch(e => console.log("failed:", e.message));'
         env:
           CF_GUARD_TOKEN: ${{ secrets.CF_GUARD_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       - name: Listen
         run: |
           if [ "$CPU" != "true" ]; then timeout "$(( ${MINUTES:-6} * 60 ))" npx --yes wrangler@4 tail "$WORKER" --format pretty || true; exit 0; fi
@@ -109,9 +129,15 @@ jobs:
               const key = c ? `cron ${c}` : u ? `${r.method} ${u.pathname}${sp ? (u.searchParams.has("batch") ? " batch" : " " + (u.searchParams.get("url") || "").split("/")[2]) + " " + (u.searchParams.get("app") || "?") : ""}` : (e.eventType || "other");
               const k = (by[key] ||= { n: 0, cpu: 0, wall: 0 });
               k.n++; k.cpu += e.cpuTime || 0; k.wall += e.wallTime || 0;
+              // (Who asked: a page on the domain, /api/…, or a direct call; from where, through which colo and network.)
+              const f = r?.cf || {};
+              const who = c ? "cron" : `${u?.pathname.startsWith("/api/") ? "page" : "direct"} ${f.country || "?"} ${f.colo || "?"} ${f.asOrganization || f.asn || "?"}`;
+              const w = (from[who] ||= { n: 0, cpu: 0 });
+              w.n++; w.cpu += e.cpuTime || 0;
             };
+            const from = {};
             let raw = "";
-            const finish = () => { if (!Object.keys(by).length) console.log("nothing parsed; the stream began:", JSON.stringify(raw.slice(0, 1500))); const rows = Object.entries(by).sort((a, b) => b[1].cpu - a[1].cpu); const all = rows.reduce((s, [, v]) => s + v.cpu, 0); console.log("cpu ms in all:", all, "(cpu ms, count, wall ms, what)"); for (const [k, v] of rows) console.log(String(v.cpu).padStart(8), String(v.n).padStart(6), String(Math.round(v.wall)).padStart(9), k); process.exit(0); };
+            const finish = () => { if (!Object.keys(by).length) console.log("nothing parsed; the stream began:", JSON.stringify(raw.slice(0, 1500))); const rows = Object.entries(by).sort((a, b) => b[1].cpu - a[1].cpu); const all = rows.reduce((s, [, v]) => s + v.cpu, 0); console.log("cpu ms in all:", all, "(cpu ms, count, wall ms, what)"); for (const [k, v] of rows) console.log(String(v.cpu).padStart(8), String(v.n).padStart(6), String(Math.round(v.wall)).padStart(9), k); console.log("== by caller (cpu ms, count; page: a page on the domain, direct: api. or workers.dev), country, colo, network"); for (const [k, v] of Object.entries(from).sort((a, b) => b[1].cpu - a[1].cpu)) console.log(String(v.cpu).padStart(8), String(v.n).padStart(6), k); process.exit(0); };
             setTimeout(finish, Number(process.env.MINUTES || 6) * 60_000);
             process.stdin.on("data", d => { if (raw.length < 1500) raw += d; buf += d; let i; while ((i = buf.indexOf("\n}\n")) >= 0) { const one = buf.slice(0, i + 2); buf = buf.slice(i + 3); try { add(JSON.parse(one)); } catch {} } });
             process.stdin.on("end", finish);' || true
