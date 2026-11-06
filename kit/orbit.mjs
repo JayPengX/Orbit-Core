@@ -1507,7 +1507,7 @@ const screenFns = new Set();
 let screenNow = null;
 export function screenFit() {
   if (screenNow) return screenNow;
-  if (typeof document === 'undefined' || !document.documentElement) return { rail: false, float: false, wide: false, w3: false, width: 390 };
+  if (typeof document === 'undefined' || !document.documentElement) return { rail: false, float: false, desk: false, wide: false, w3: false, width: 390 };
   return measureScreen();
 }
 export function onScreen(fn) {
@@ -1515,6 +1515,8 @@ export function onScreen(fn) {
   return () => screenFns.delete(fn);
 }
 let insetProbe = null;
+// (The computer's side bar: orbit.css --q-desk-w.)
+const DESK_W = 224;
 function measureScreen() {
   const root = document.documentElement;
   const w = root.clientWidth || globalThis.innerWidth || 390;
@@ -1527,17 +1529,24 @@ function measureScreen() {
   }
   const cs = insetProbe && typeof getComputedStyle === 'function' ? getComputedStyle(insetProbe) : null;
   const insets = cs ? (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) : 0;
-  const rail = (w > h && h <= 520) || w >= 1100;
+  // A computer (a mouse or a trackpad, 1000 px and up): the rail is the
+  // page's side bar, down the whole left edge with the app's name at its top
+  // and the account at its foot (Jay 2026-11-06, his laptop: the rail and the
+  // account floated as two pills beside a narrow page). An iPad, even with a
+  // trackpad, is touch first and keeps its rail.
+  const desk = w >= 1000 && Boolean(globalThis.matchMedia?.('(hover: hover) and (pointer: fine)').matches);
+  const rail = desk || (w > h && h <= 520) || w >= 1100;
   const float = w >= 600 && h > 520;
-  // (The rail's room: the slim one on a phone on its side, a tablet's wider; orbit.css --q-tabrail-w + 12.)
-  const width = Math.round(w - insets - (rail ? (w >= 600 && h > 520 ? 112 : 92) : 0));
-  const now = { rail, float, wide: width >= 640, w3: width >= 1000, width };
+  // (The rail's room: the slim one on a phone on its side, a tablet's wider,
+  // a computer's side bar; orbit.css --q-tabrail-w + 12.)
+  const width = Math.round(w - insets - (desk ? DESK_W + 28 : rail ? (w >= 600 && h > 520 ? 112 : 92) : 0));
+  const now = { rail, float, desk, wide: width >= 640, w3: width >= 1000, width };
   const sbw = Math.max(0, Math.round((globalThis.innerWidth || w) - w));
   if (root.style.getPropertyValue('--q-sbw') !== `${sbw}px`) root.style.setProperty('--q-sbw', `${sbw}px`);
-  for (const [k, cls] of [['rail', 'q-tabrail'], ['float', 'q-float'], ['wide', 'q-wide'], ['w3', 'q-w3']]) if (root.classList.contains(cls) !== now[k]) root.classList.toggle(cls, now[k]);
+  for (const [k, cls] of [['rail', 'q-tabrail'], ['float', 'q-float'], ['desk', 'q-desk'], ['wide', 'q-wide'], ['w3', 'q-w3']]) if (root.classList.contains(cls) !== now[k]) root.classList.toggle(cls, now[k]);
   const was = screenNow;
   screenNow = now;
-  if (was && (was.rail !== now.rail || was.float !== now.float || was.wide !== now.wide || was.w3 !== now.w3 || was.width !== now.width)) for (const fn of screenFns) {
+  if (was && (was.rail !== now.rail || was.float !== now.float || was.desk !== now.desk || was.wide !== now.wide || was.w3 !== now.w3 || was.width !== now.width)) for (const fn of screenFns) {
     try {
       fn(now);
     } catch (e) {
@@ -1557,6 +1566,8 @@ function watchScreen() {
   };
   globalThis.addEventListener?.('resize', again);
   globalThis.screen?.orientation?.addEventListener?.('change', again);
+  // (A mouse plugged into a tablet, or taken away.)
+  globalThis.matchMedia?.('(hover: hover) and (pointer: fine)').addEventListener?.('change', again);
   // (A page that grows a scroll bar on a computer: the width it leaves.)
   let seenW = 0;
   if (typeof ResizeObserver === 'function') new ResizeObserver(es => es[0].contentRect.width !== seenW && ((seenW = es[0].contentRect.width), again())).observe(document.documentElement);
@@ -5149,6 +5160,11 @@ export function tabBar({ tabs, onSelect, onShow = null, hash = id => `#${id}`, n
   nav.setAttribute('role', 'tablist');
   if (ariaLabel) nav.setAttribute('aria-label', ariaLabel);
   nav.style.setProperty('--q-tabs', String(tabs.length));
+  // (A computer's side bar is headed by the app's mark and name: orbit.css html.q-desk.)
+  const appId = document.documentElement?.dataset?.app;
+  const name = BRANDS[appId]?.name || document.getElementById?.('title')?.textContent?.trim() || '';
+  if (name) nav.style.setProperty('--q-desk-name', JSON.stringify(name));
+  if (BRANDS[appId]) nav.style.setProperty('--q-desk-mark', `url("data:image/svg+xml,${encodeURIComponent(appIcon(appId))}")`);
   const again = id => {
     if ((globalThis.scrollY || 0) > 4) globalThis.scrollTo({ top: 0, behavior: reducedMotion() ? 'auto' : 'smooth' });
     else onSelect(id, { again: true });

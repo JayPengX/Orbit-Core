@@ -195,6 +195,7 @@ marks `<html>`:
 | --- | --- | --- |
 | `q-tabrail` | a phone on its side (520 px tall or less), or 1100 px wide and up | the tab bar stands down the left side as a slim rail (60 wide: 22 px icons, the pick a capsule hugging its tab; `--q-tabrail-bw`); the app's round action under it; nothing floats along the foot but an accessory |
 | `q-float` | 600 px wide and up, taller than 520 | sheets are cards in the middle of the screen, every corner round |
+| `q-desk` | a computer: a mouse or a trackpad, 1000 px wide and up | the rail is a side bar down the whole left edge (224 wide, `--q-desk-w`): the app's mark and name at its top, the tabs as rows, the app's action a row under them, the account and round buttons along its foot; the page beside it. A tablet keeps the rail |
 | `q-wide` | the page has 640 px or more | the app lays the page out in two columns |
 | `q-w3` | the page has 1000 px or more | three columns where there's content for them |
 

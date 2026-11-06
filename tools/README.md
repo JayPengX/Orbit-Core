@@ -29,7 +29,7 @@ as before | after | diff, the change in pink). Exit code 1 on a fault.
 | `--at <ref>` | Shoot a ref instead of the working tree (`main` for the live build, a branch for a preview) |
 | `--against <dir>` | Compare with an earlier run's folder |
 | `--account <name\|file>` | Start with that account: `tools/shots/accounts/<app>-<name>.txt`, or Money's `demo` (its sample books) |
-| `--screens` (or `--widths`), `--themes`, `--engines`, `--lang en` | The matrix (default 320,390,land,tablet,desktop · light,dark · chromium,webkit · zh; any `WxH` too) |
+| `--screens` (or `--widths`), `--themes`, `--engines`, `--lang en` | The matrix (default 320,390,land,tablet,desktop · light,dark · chromium,webkit · zh; any `WxH` too). Computers, with a mouse: `laptop` 1280×800, `desktop` 1440×900, `hd` 1920×1080, `big` 2560×1440, `short` 1120×560 (a window half a laptop's height); `ipad` 1180×820 (Jay's, on its side) |
 | `--fixtures` | Saved answers instead of live data: offline checks only, never a shot anyone sees |
 | `--out`, `--jobs` | Where (default a new folder in the temp dir) and how many at once (4) |
 | `-- …` | Anything after it goes to each `preview.mjs` run (`--clock`, `--geo`, `--wait`…) |
