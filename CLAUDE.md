@@ -97,11 +97,10 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 - **Addresses by content.** The kit's deploy (`kit/stamp.mjs`) and every
   app's (`kit/stamp-app.mjs`) minify each file and address it by its hash
   (`?v=<hash>`, `kit/hash.mjs`): a phone downloads only what a push changed;
-  `version.json` lists every hash (the device's `orbit.kitFiles`).
-- **Updates.** An opening shows the phone's version at once; the watch
-  downloads a newer one behind (`updateReady`), shown at the next opening
-  or on coming back after 5 minutes away (`AWAY_MS`), never swapped in
-  front of the person; `sw.js` never refuses `boot.js` (it mends).
+  `version.json` lists every hash (`orbit.kitFiles`).
+- **Updates.** An opening shows the phone's version at once; a newer one
+  downloads behind (`updateReady`), shown next opening or after 5 minutes
+  away (`AWAY_MS`), never swapped in view; `sw.js` serves `boot.js`.
 - **A phone may run an older kit:** a new export is read with a fallback
   (`kitUI.newThing?.(…)`, a namespace import), never imported by name.
 - **Kit CSS loads after the app's**: an override needs higher specificity.
@@ -115,7 +114,7 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `ui.mjs` | The builders (§3.3) and their HTML-string twins (`…Html`) for apps that draw with template strings; loads `hold-place.mjs` |
 | `hold-place.mjs` | A redraw never moves the page, a sheet or a panel (only the code's scrolls do); a tap holds the control under the finger; never a drawing (`loose`); a content-sized sheet keeps its height (`--q-sheet-floor`); `scrollBusy()` holds `everyDev`'s beats under a finger; `freshScreen()`: a new screen at the top; `letGo()`: a drag carries its grip away |
 | `steady-pics.mjs` | A picture drawn again is eager and decoded at once |
-| `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, before the app's modules), which never holds the cover nor reloads |
+| `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, before the app's modules), never holding the cover |
 | `loader.html` | The snippets every app's page carries (`kit:head`, `kit:boot`) |
 | `brand.mjs` | Families, names, colours, marks, repos, slugs, `APP_ORDER`, `DEV` (speeds, §9) |
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: never money); every app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
