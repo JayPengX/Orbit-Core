@@ -163,7 +163,7 @@ test('packJson reads a pack from the family\'s data (/data/, R2), not the data p
   await assert.rejects(kit.packJson('sports/nope/2026.json'), e => e.status === 404);
 });
 
-test("every read goes to the proxy in the batch (the proxy answers a held read from the nightly mirror); one the app knows is behind asks the source on its own (mirror=0)", async () => {
+test("a read the device doesn't make itself goes to the proxy in the batch (the proxy answers a held read from the nightly mirror); one the app knows is behind asks the source on its own (mirror=0)", async () => {
   const asked = [];
   globalThis.fetch = async url => {
     asked.push(String(url));
@@ -171,8 +171,9 @@ test("every read goes to the proxy in the batch (the proxy answers a held read f
     if (u.searchParams.has('batch')) return new Response(JSON.stringify({ r: u.searchParams.getAll('u').map(() => ({ s: 200, b: { from: 'batch' } })) }), { status: 200 });
     return new Response(JSON.stringify({ from: 'one' }), { status: 200 });
   };
-  const roster = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/21/roster';
-  const day = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261006&limit=200';
+  // (Not ESPN's site API or MLB's: the device reads those itself, kit DEVICE_FIRST.)
+  const roster = 'https://www.thesportsdb.com/api/v1/json/3/lookup_all_players.php?id=134860';
+  const day = 'https://www.thesportsdb.com/api/v1/json/3/eventsday.php?d=2026-10-06&l=4429';
   const [a, b] = await Promise.all([kit.proxyJson(roster, { persist: false }), kit.proxyJson(day, { persist: false })]);
   assert.deepEqual([a.from, b.from], ['batch', 'batch']);
   assert.ok(!asked.some(u => u.startsWith(kit.PACKS_URL)), 'no copy fetched by the phone');

@@ -838,10 +838,38 @@ function proxyOrSelf(url, timeout, ask) {
     return fetchDirect(url, timeout).catch(() => Promise.reject(error));
   });
 }
+// ESPN's site API and MLB's own (statsapi) answer any page too, each kept a
+// few seconds on its own CDN (2026-11-06): a read of theirs the proxy
+// wouldn't trim is the device's own, no trip through the proxy. Every Sports
+// read went through it before (its batches were 42% of the Worker's CPU,
+// 2026-11-05), an open live game's every 3 s. A read the device can't get (a
+// network that keeps the host out, a page that isn't theirs, turned away) is
+// the proxy's, and that host the proxy's for ten minutes after. Until the
+// device has read a host, its first reads get 6 s to start answering: a
+// network that drops them is never waited on for 20.
+const DEVICE_FIRST = new Set(['site.api.espn.com', 'site.web.api.espn.com', 'statsapi.mlb.com']);
+const proxyUntil = new Map();
+const deviceOk = new Set();
+async function deviceFirst(url, timeout, ask) {
+  const host = hostOf(url);
+  if ((proxyUntil.get(host) || 0) > Date.now()) return ask();
+  try {
+    const text = await fetchDirect(url, deviceOk.has(host) ? timeout : Math.min(timeout, 6_000));
+    // (A captive portal's page or a block page, not JSON: not the source's answer.)
+    if (!/^\s*[[{]/.test(text.slice(0, 64)) || !/[\]}]\s*$/.test(text.slice(-64))) throw new Error('not JSON');
+    deviceOk.add(host);
+    return text;
+  } catch (error) {
+    // (Not there: the source's own answer, the same through the proxy.)
+    if (error?.status === 404) throw error;
+    deviceOk.delete(host);
+    proxyUntil.set(host, Date.now() + SELF_FOR_MS);
+    return ask();
+  }
+}
 export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, timeout = 20_000, mirror = true, alone = false } = {}) {
-  return keptJson(url, dataKey(url, trim), { ttl, keep }, () =>
-    isDirect(url) ? fetchDirect(url, timeout) : proxyOrSelf(url, timeout, () => (!mirror ? fetchOne(url, trim, timeout, '&mirror=0') : alone ? fetchOne(url, trim, timeout) : enqueue(url, trim, timeout)))
-  );
+  const ask = () => (!mirror ? fetchOne(url, trim, timeout, '&mirror=0') : alone ? fetchOne(url, trim, timeout) : enqueue(url, trim, timeout));
+  return keptJson(url, dataKey(url, trim), { ttl, keep }, () => (isDirect(url) ? fetchDirect(url, timeout) : !trim && DEVICE_FIRST.has(hostOf(url)) ? deviceFirst(url, timeout, ask) : proxyOrSelf(url, timeout, ask)));
 }
 // The family's data (the proxy's /data/, kept in R2 on Cloudflare; built at
 // night and through the day): what doesn't change in a day (a league's
@@ -868,8 +896,16 @@ const keptAt = new Map(); // key → when it was last written to the device
 function keptJson(url, key, { ttl, keep }, read) {
   const hit = memory.get(key);
   if (hit && Date.now() - hit.at < (hit.failed ? Math.min(ttl, hit.hold) : hit.stale ? Math.min(ttl, RETRY_MS) : ttl)) return hit.promise;
-  let entry;
-  const promise = (async () => {
+  // A read still on its way is that read, however long it's taking: never a
+  // second one alongside it (on a slow link a page asked every 2 s was being
+  // downloaded two and three times over).
+  if (hit?.pending) return hit.promise;
+  // (The entry is there before its read starts: an answer this page already
+  // had, young enough, is handed back at once, and it was set on an entry
+  // not made yet, 2026-11-06: the read failed and its day was taken for
+  // half read.)
+  const entry = { at: Date.now(), promise: null, failed: false, stale: false, pending: true };
+  const promise = (entry.promise = (async () => {
     // The last answer this page had is the copy to fall back on: the
     // device's is read (and parsed) only for a key's first read here.
     const saved = keep ? (hit?.data !== undefined ? { at: hit.dataAt, data: hit.data } : await persisted(key)) : null;
@@ -901,12 +937,12 @@ function keptJson(url, key, { ttl, keep }, read) {
       keepLater(key, got);
     }
     return data;
-  })();
-  entry = { at: Date.now(), promise, failed: false, stale: false };
+  })());
   memory.set(key, entry);
   promise.then(
-    () => entry.stale && Object.assign(entry, { at: Date.now() }),
+    () => Object.assign(entry, { pending: false }, entry.stale ? { at: Date.now() } : {}),
     error => {
+      entry.pending = false;
       recFail(url, error);
       // Too many asks or signed out: a minute. Anything else (a slow or
       // failed source): asked again soon.

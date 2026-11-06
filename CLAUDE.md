@@ -265,11 +265,10 @@ OpenF1's tables (`openF1Raw`) and kept in R2 for good.
   kept in R2 the first time it's read (`settleable`, `readKept`) and wiped
   with its season (`builders/kept.js`).
 - **A day in one answer** (`GET /sports-today?day=YYYY-MM-DD`,
-  `sports-today.js`): Orbit Sports' first screen, built on demand (no cron)
-  from the ESPN pages through the proxy's own read (`readThrough`), parsed by
-  the kit's `sports-espn.mjs`; 60 s at the edge for today and tomorrow, longer
-  for older days, 10 s when a league was missed; from pace 2 it answers 503
-  `{error: 'paced'}` and the phone reads as before.
+  `sports-today.js`): Sports' first screen, built on demand from ESPN's
+  pages (`readThrough`, parsed by the kit's `sports-espn.mjs`); 60 s at the
+  edge for today and tomorrow, longer for older days, 10 s when a league was
+  missed; from pace 2, 503 `{error: 'paced'}` and the phone reads as before.
 
 ### 4.2 The other Workers
 
@@ -286,29 +285,29 @@ OpenF1's tables (`openF1Raw`) and kept in R2 for good.
 
 A read (`kit proxyJson`) goes down these until one answers:
 
-1. memory (500 keys; the same address within its `ttl`);
+1. memory (500 keys; the same address within its `ttl`, or still on its way);
 2. the device's Cache Storage (`orbit-data-v1`, copies kept 4 days):
    younger than its `ttl`, used as is;
-3. the failure hold (a source that just failed isn't asked by every part
-   of the page: 15 s, a minute after a 429 or 401);
+3. the failure hold (a source that just failed waits 15 s, a minute
+   after a 429 or 401, however many parts of the page ask);
 4. the family's data in R2 (`/data/`, `packJson`): seasons, game days,
    watch links, win probability, photos, bus packs, shapes;
 5. the proxy's edge cache in Taiwan, by tier (§4.1);
-6. reads kept on demand in R2: what's over for good, kept the first time
-   anyone reads it;
+6. reads kept on demand in R2 (what's over for good, from its first read);
 7. the upstream.
 
-- On the device, a copy past its `ttl` is read again, the old copy the
-  answer only if that fails. To paint at
-  once on what the phone has, an app asks `peekJson(url)` (the last copy of
-  any age) first and draws the fresh one when it lands.
+- A copy past its `ttl` is read again, the old one answering only if that
+  fails; to paint at once, an app asks `peekJson(url)` (the last copy of
+  any age) and draws the fresh one when it lands.
 - Reads made within a few milliseconds go to the proxy as one batch.
 - A failed read is a failure, never "nothing there": the device's copy of
   any age answers, asked again soon; a failed batch item fails alone.
-- Two sources answer the phone itself (open to any page): ESPN's core API
-  always (it refuses the proxy); Jolpica when the proxy can't get it
-  (it counts per address, and Cloudflare's are shared), at once and for
-  ten minutes after (`proxyJson`, `SELF_TOO`).
+- The phone reads some sources itself (open to any page), no Worker
+  request: ESPN's core API always (it refuses the proxy); ESPN's site API
+  and MLB's statsapi untrimmed (`DEVICE_FIRST`; one the device can't get
+  goes to the proxy, its host for ten minutes); Jolpica when the proxy
+  can't get it (it counts per address; Cloudflare's are shared), then for
+  ten minutes (`SELF_TOO`).
 - On top of these, apps put live knowledge over slower copies: Sports'
   `liveTable` counts results before ESPN does; F1's own timing calls a
   session over at the flag; MLB's postseason comes from MLB itself.
@@ -475,7 +474,7 @@ can be turned off on its own.
 | `node tools/shots.mjs <app> [page…]` | Every screenshot a change needs (five screens × light/dark, live data, signed in), a contact sheet, faults, `--before main` diff; pages in `tools/shots/pages.mjs` |
 | `node tools/preview.mjs <app>` | The app with real data (`--live`, `--width`, `--timing`, `--requests`, `--profile`, `--webkit`, `--reopen`…); prints `wraps:`, `cut:`, `scrolls sideways:` |
 | `node tools/gate.mjs [app…]` | The family quality gate (`tools/gate-page.js`): lift, stalls, dead taps, wraps, cuts, letters, white, mixed language… on every tab |
-| `node tools/speed.mjs <app…>` | Before vs after on 3G, CPU ×4, real answers replayed: each step's (open, tabs, scroll, away, reopen) time, KB, requests, CPU, redraws, memory, proxy calls |
+| `node tools/speed.mjs <app…>` | Before vs after (3G, CPU ×4, answers replayed): each step's time, KB, requests, CPU, redraws, memory, proxy calls and CPU |
 | `node tools/live-scroll.mjs [app…] [--webkit]` | Nothing jumps: a live game through 4 refreshes; pages as they load (`late`), then scrolled: a refresh above, a tab drawn short, a moving drawing, taps folding below and above, a sheet showing less |
 | `node tools/store-shots.mjs <app>` | The README's and Showcase's screenshot set, both languages |
 | `node tools/test-apps.mjs [app…]` | Every app's tests against this kit (checkouts beside this one) |
