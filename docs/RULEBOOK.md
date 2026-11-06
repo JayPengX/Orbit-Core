@@ -80,6 +80,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-21 Reflect results the moment they happen: never hide data because a feed is stale; compute it from live results.
 - 10-21 Test UI in WebKit (Safari's engine), not only Chromium.
 - 10-22 One date selector in every app (kit `dayBar`/`dayStrip`); never an app's own day chip row.
+- 11-06 A day strip shows a week at most on a wide page (Jay, Sports on an iPad: "the date has so many to show", fifteen days at once): seven days, each about a phone's chip, the 📅 right after them (kit `orbit.css` `html.q-wide .q-day-strip`, `--q-day-n`).
 - 11-05 A tab you come back to is as you left it (Jay: "Switching tab force it to scroll back up and sometimes switching tab cause it to flick", in Orbit Law): at the place you left it, with the same drawing; the app's redraw after the pill lands changes only what changed, never empties a part to fill it again, never scrolls to the top. A detail page tapped in one tab (a bill or a 立委 in Law's 我的) opens over that tab, the same way for every kind (Jay: "weird that clicking on a legislator from 我的 go to 立法 tab but individual bill doesn't").
 - 10-27 One tab bar in every app: the kit's floating capsule (`tabBar`), Securities included; an app's in-progress bar is a `.q-accessory` pill above it. Never `html.q-dock` for a tab bar.
 - 10-30 The tab bar stays whole while scrolling (the fold to icons is gone: Jay gave the call, it hid labels and mis-fired); the app's round action button beside it is smaller than the bar and sits on its middle, never a big ring ("too big and fat").
@@ -169,6 +170,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 11-04 A train you pick is the train you take ("I intentionally select a train later and it thought I am catching this one"): a later departure chosen over an earlier one (the plans card, 交通's 其他班次, 改搭別班, 指定車次) is never switched to a sooner one by itself; a plan you didn't pick still moves to a sooner train still to come (10-28).
 
 ### Sports
+- 11-06 A game's card is one game (Jay, iPad: "clicking empty space of that player area will result in opening player not the match"): only a player's face or name opens the player; any other spot on the card opens the game, and a press lights the whole card, never half of it. On a wide card who led each side stands beside that side's row. Sports `tests/home-recap-card.test.mjs`.
 - 10-20 Every break gets a countdown, timeouts too.
 - 10-21 Two sports' games clash only within 30 min of each other.
 - 10-22 賽事 opens on 全部, never on the first followed league.
