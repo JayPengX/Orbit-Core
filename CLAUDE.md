@@ -142,7 +142,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 
 | Need | Use |
 | --- | --- |
-| Tabs | `tabBar({ tabs, onSelect, onShow })` (orbit.mjs): the floating capsule on a phone, a slim rail on a phone on its side and on a computer; an in-progress bar is a `.q-accessory` pill above it |
+| Tabs | `tabBar({ tabs, onSelect, onShow })` (orbit.mjs): the floating capsule on a phone, a rail on a phone on its side (slim) and a computer; an in-progress bar is a `.q-accessory` pill above it |
 | The top line | `topActions`, `accountButton` (the account pill and at most one action) |
 | A tab's title | `navTitle` / `navTitleHtml` + `wireNavTitles` (the 34 pt large title), `pageHead` |
 | Switching a view | `view()` (cross-faded with View Transitions); `segmented` / `segHtml` + `settleSegs` for a whole tab's view (at most 4); a single-choice filter row is `.q-chips.q-texttabs` (text tabs) |
