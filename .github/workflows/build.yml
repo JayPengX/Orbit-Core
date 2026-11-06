@@ -2,7 +2,7 @@
 # through the proxy's POST /data/build with the push secret. For checking a
 # builder without waiting for its minute or its hour. Or a check of the
 # proxy (POST /ops): gemini-check, one tiny Gemini call through the Taiwan
-# relay; system, the report the admin panel's 系統 shows.
+# relay; system, the report the admin panel's 系統 shows; capacity, its 容量.
 name: Run a builder or a check
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ on:
       job:
         description: The job
         type: choice
-        options: [watch, watch-full, cutouts, buses, play, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, gemini-check, law-chat-time, system, purge-money-mail]
+        options: [watch, watch-full, cutouts, buses, play, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, gemini-check, law-chat-time, system, capacity, purge-money-mail]
         default: watch
       try:
         description: "law-chat-time only: settings to try, e.g. answer=minimal,plan=minimal,model=lite"
@@ -27,6 +27,7 @@ jobs:
             gemini-check) url="$base/ops?check=gemini" ;;
             law-chat-time) url="$base/ops?check=law-chat&try=$TRY" ;;
             system) url="$base/ops?check=system" ;;
+            capacity) url="$base/ops?check=capacity" ;;
             purge-money-mail) url="$base/ops?check=purge-money-mail" ;;
             watch-full) url="$base/data/build?job=watch&full=1" ;;
             watch|cutouts|buses) url="$base/data/build?job=$JOB" ;;

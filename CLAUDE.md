@@ -215,7 +215,7 @@ w;dur=` (the Worker's own time), which the 除錯紀錄 notes with a slow read.
 | `/config` | `worker.js`, `kit/devconfig.mjs` | The live speeds (`DEV`), a minute in Cloudflare's cache |
 | `/guard` | `worker.js` | The bill's guard as it last read the bill (no key) |
 | `/store/check` | `worker.js`, `doc-store.js` | Each collection's count, from a localhost page only |
-| `/ops` | `ops.js`, `worker.js` | The repo's own checks (Bearer `DATA_PUSH_SECRET`): `?check=gemini`, `law-chat` (問法律's steps timed), `system`, `purge-money-mail` |
+| `/ops` | `ops.js`, `worker.js` | The repo's own checks (Bearer `DATA_PUSH_SECRET`): `?check=gemini`, `law-chat` (問法律's steps timed), `system`, `capacity` (容量), `purge-money-mail` |
 
 - **The gate:** every route needs a Pass session (`qt=`), counted per
   session and app in memory (600 a minute on the data proxy). Public routes
@@ -288,8 +288,8 @@ A read (`kit proxyJson`) goes down these until one answers:
 1. memory (500 keys; the same address within its `ttl`, or still on its way);
 2. the device's Cache Storage (`orbit-data-v1`, copies kept 4 days):
    younger than its `ttl`, used as is;
-3. the failure hold (a source that just failed waits 15 s, a minute
-   after a 429 or 401, however many parts of the page ask);
+3. the failure hold (a source that just failed: 15 s, a minute after a
+   429 or 401, for the whole page);
 4. the family's data in R2 (`/data/`, `packJson`): seasons, game days,
    watch links, win probability, photos, bus packs, shapes;
 5. the proxy's edge cache in Taiwan, by tier (§4.1);
