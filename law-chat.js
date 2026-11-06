@@ -552,7 +552,11 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
         }
       };
       const answerModel = tune.model === 'lite' ? undefined : ANSWER_MODEL;
-      out = checkChat(await modelJson((parts, schema) => gemini(parts, schema, answerModel, { onText, thinking: tune.answer }), answerPrompt(chat, articles, nameOf, ground, more, ly), ANSWER), articles, chat.lang, grounded, moreCites(more), ly);
+      // (Flash failing, an answer from Flash-Lite rather than none: 3.6 Flash
+      // now and then ends its JSON early on the free tier, 2026-11-06.)
+      const ask = model => modelJson((parts, schema) => gemini(parts, schema, model, { onText, thinking: tune.answer }), answerPrompt(chat, articles, nameOf, ground, more, ly), ANSWER);
+      const raw = await ask(answerModel).catch(e => (answerModel ? ask(undefined) : Promise.reject(e)));
+      out = checkChat(raw, articles, chat.lang, grounded, moreCites(more), ly);
     }
     mark('answer');
     if (answerKey && !ms) keep(env, ctx, answerKey, out, CHAT_TTL_S);
