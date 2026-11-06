@@ -348,7 +348,28 @@ export const phoneZone = () => {
     return '';
   }
 };
-export const abroad = () => phoneZone() !== 'Asia/Taipei' && /^[A-Z]{2}$/.test(country()) && country() !== 'TW' && country() !== 'XX';
+// Where the phone's own fix put it (a Taiwan-only app tells: `notePlace`),
+// the surest of the three (Jay 2026-11-06: Transit in the US mustn't half
+// work behind a Taiwan clock): a fix in the last 6 hours wins over the clock
+// and the address. Never asked for here; only an app that already has a fix tells.
+const WHERE_KEY = 'orbit.where';
+const WHERE_MS = 6 * 3_600_000;
+export function notePlace(inTaiwan, now = Date.now()) {
+  writeStore(WHERE_KEY, JSON.stringify({ in: Boolean(inTaiwan), at: now }));
+}
+export const placeSeen = (now = Date.now()) => {
+  try {
+    const w = JSON.parse(readStore(WHERE_KEY) || 'null');
+    return w && typeof w.in === 'boolean' && now - w.at >= 0 && now - w.at < WHERE_MS ? w.in : null;
+  } catch {
+    return null;
+  }
+};
+export const abroad = () => {
+  const seen = placeSeen();
+  if (seen != null) return !seen;
+  return phoneZone() !== 'Asia/Taipei' && /^[A-Z]{2}$/.test(country()) && country() !== 'TW' && country() !== 'XX';
+};
 // (Kept on the device's own: told again with each session.)
 const noteCountry = c => /^[A-Z0-9]{2}$/.test(c || '') && c !== readStore(COUNTRY_KEY) && writeStore(COUNTRY_KEY, c);
 let abroadEl = null;

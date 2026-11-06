@@ -108,3 +108,31 @@ test("a VPN abroad from Taiwan: the phone's Taiwan clock keeps it in", () => {
   assert.equal(twOnlyRefused(req('US', 'America/New_York'), '/transit/route', page), true);
   assert.equal(twOnlyRefused(req('US'), '/transit/route', page), true, 'an older Transit, no zone');
 });
+
+// Transit in the US behind a Taiwan clock (Jay 2026-11-06): the phone's own
+// fix decides, over the clock and the address, for 6 hours; never half working.
+test("the phone's own fix wins: out of Taiwan closes, in Taiwan opens", () => {
+  const was = process.env.TZ;
+  const now = Date.now();
+  try {
+    process.env.TZ = 'Asia/Taipei';
+    store.set('orbit.country', 'US');
+    assert.equal(kit.abroad(), false, 'a Taiwan clock alone: in');
+    kit.notePlace(false, now);
+    assert.equal(kit.abroad(), true, 'a fix in the US: out, whatever the clock');
+    assert.equal(kit.twOnlyCheck('transit'), true);
+    process.env.TZ = 'America/New_York';
+    kit.notePlace(true, now);
+    assert.equal(kit.abroad(), false, 'a fix in Taiwan: in, whatever the address and clock');
+    kit.notePlace(false, now - 7 * 3_600_000);
+    assert.equal(kit.placeSeen(), null, 'an old fix says nothing');
+    assert.equal(kit.abroad(), true);
+  } finally {
+    process.env.TZ = was;
+    store.delete('orbit.country');
+    store.delete('orbit.where');
+  }
+  const req = q => ({ cf: { country: 'US' }, url: `https://api.jaypengx.com/transit/route?qt=x${q}` });
+  assert.equal(twOnlyRefused(req('&tw=1'), '/transit/route', 'https://orbit.jaypengx.com'), false, "a fix in Taiwan on a roaming address");
+  assert.equal(twOnlyRefused(req(''), '/transit/route', 'https://orbit.jaypengx.com'), true);
+});
