@@ -1486,7 +1486,7 @@ export default {
     // Odd minutes: F1 only (above).
     if (event.cron === ODD_CRON) return;
     run('notices', () => sendDue(env), r => (r.sent ? r : null));
-    // Orbit Transit's YouBike: every city asked in the last half hour kept warm (transit.js warmBikes).
+    // Orbit Transit's YouBike: every city asked in the last 10 minutes kept warm (transit.js warmBikes).
     run('bikes', () => warmBikes(env), () => null);
     // Orbit Weather's scoring, once an hour (weather-skill.js).
     if (!pace && min === 10) run('weather-skill', () => weatherCron(env));

@@ -142,8 +142,8 @@ test('YouBike is kept warm in KV: another colo answers at once from it while TDX
   const third = await tdxGet(env, path, { fetchFn, cache: memCache(), now: NOW + 2 * 60_000 + 5000, ctx });
   assert.equal(third.state, 'hit');
   assert.ok(JSON.parse(third.body)[0].AvailableRentBikes > 1, 'the cron’s copy');
-  // Not asked for half an hour: no longer kept warm.
-  assert.deepEqual(await warmBikes(env, { fetchFn, cache: memCache(), now: NOW + 40 * 60_000 }), {});
+  // Not asked for 10 minutes: no longer kept warm (half an hour before 2026-11-06: 15 reads no one saw).
+  assert.deepEqual(await warmBikes(env, { fetchFn, cache: memCache(), now: NOW + 11 * 60_000 }), {});
 });
 
 test('TDX slow past a copy’s stale time: that copy after SLOW_MS (its age said), TDX’s answer kept for the next ask', async () => {
