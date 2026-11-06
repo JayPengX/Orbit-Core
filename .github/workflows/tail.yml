@@ -54,6 +54,8 @@ jobs:
       # crons elsewhere. The dimensions the dataset has are listed first.
       - name: The last 7 days by colo
         if: inputs.cpu
+        # (A slip in this report never fails the run: a failed run mails Jay.)
+        continue-on-error: true
         run: |
           node -e '
             const q = (query, variables = {}) => fetch("https://api.cloudflare.com/client/v4/graphql", { method: "POST", headers: { Authorization: `Bearer ${process.env.CF_GUARD_TOKEN}`, "Content-Type": "application/json" }, body: JSON.stringify({ query, variables }) }).then(r => r.json());
