@@ -424,8 +424,8 @@ can be turned off on its own.
   `/errors`; the panel's 部署 runs workflows with `GH_ACTIONS_TOKEN`.
 - **容量** (`capacity.js` `quotas`): people each quota holds = this
   week's × room past the fixed part ÷ people's use, the fewest named
-  (under `FEW`: `TYPICAL_CPU_MS`); people's Workers use: the
-  proxy's near Taiwan (`/hours`, `NEAR_TAIWAN`), the rest fixed.
+  (under `FEW`: `TYPICAL_CPU_MS`); people's Workers use: what the
+  apps' pages called, anywhere (`pageShare`); the rest fixed.
 - **`quota-guard`** (`guard.js`, every 5 minutes) reads the use against
   `PLAN` (Workers, CPU, KV, DO, R2, D1), paces on real use only (`paceFor`:
   past 60/75/85% used with the last days' rate reaching the stop; 85%

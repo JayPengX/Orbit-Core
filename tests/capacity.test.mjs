@@ -109,6 +109,9 @@ test('splitHours: with people\'s part read (requests near Taiwan), that is what 
   assert.equal(cpu.holds, Math.floor((40 * (capDay - (20_000 * 24 + 20_000 * 9))) / (10_000 * 16)));
   assert.ok(cpu.holds > 40);
   assert.equal(q.near, true);
+  assert.equal(q.who, 'place');
+  // (Read by who called, the Workers Logs' share: the same split, named so.)
+  assert.equal(quotas({ users: { week: 40 }, guard: guardOf({ cpuMs: 0.2 }), hours: { ...mixed, who: 'caller' }, now: NOW }).who, 'caller');
   // Enough people to tell what one uses: no typical-use stand-in needed.
   assert.equal(q.typical.few, false);
   // Two people a week (the owner testing): the plan's people by typical use, about 1.2 s of CPU a day each.

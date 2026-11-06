@@ -97,37 +97,40 @@ jobs:
         env:
           CF_GUARD_TOKEN: ${{ secrets.CF_GUARD_TOKEN }}
       # (cpu only) Who calls, from the Workers Logs (the proxy's sampled
-      # invocations, 7 days): an app's page (/api/… on the family's domain)
-      # or anything else, in any country. Needs Workers Observability Edit on
-      # the guard's token; the keys the logs have are listed first.
+      # invocations, 7 days, scaled to the whole): an app's page (a host on the
+      # family's domain, orbit.<domain> or <domain>, at /api/…) or anything else
+      # (our tools on api.<domain> or workers.dev, the checks), in any country.
+      # Needs Workers Observability Edit on the guard's token (guard.js
+      # pageShare reads the same for the panel's 容量).
       - name: Who calls, from the Workers Logs
         if: inputs.cpu
         continue-on-error: true
         run: |
           node -e '
-            const api = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/observability/telemetry`;
-            const post = (path, body) => fetch(`${api}/${path}`, { method: "POST", headers: { Authorization: `Bearer ${process.env.CF_GUARD_TOKEN}`, "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(async r => ({ status: r.status, text: await r.text() }));
+            const api = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/observability/telemetry/query`;
+            const timeframe = { from: Date.now() - 7 * 86_400_000, to: Date.now() };
+            const ask = async (filters, by) => {
+              const r = await fetch(api, { method: "POST", headers: { Authorization: `Bearer ${process.env.CF_GUARD_TOKEN}`, "Content-Type": "application/json" }, body: JSON.stringify({ queryId: "orbit-who-calls", timeframe, view: "calculations", limit: 30, parameters: { calculations: [{ operator: "sum", key: "$workers.cpuTimeMs", keyType: "number", alias: "cpu" }], filters, groupBys: by.map(value => ({ type: "string", value })), limit: 30, orderBy: { value: "cpu", order: "desc" } } }) });
+              const j = await r.json().catch(() => ({}));
+              if (!j.success) return console.log("  failed:", r.status, JSON.stringify(j.errors || j).slice(0, 300));
+              const rows = j.result?.calculations?.[0]?.aggregates || [];
+              const all = rows.reduce((t, x) => t + (x.value || 0), 0);
+              for (const x of rows) console.log(String(Math.round((x.value || 0) / 7)).padStart(9), "ms/day", String(Math.round((x.count || 0) / 7)).padStart(7), "a day", String(Math.round((100 * (x.value || 0)) / (all || 1))).padStart(3) + "%", (x.groups || []).map(g => g.value).join(" · ") || "(all)");
+            };
+            const proxy = { key: "$workers.scriptName", operation: "eq", type: "string", value: "orbit-workers-proxy" };
+            const host = h => ({ key: "$workers.event.request.headers.host", operation: "eq", type: "string", value: h });
+            const notHost = h => ({ key: "$workers.event.request.headers.host", operation: "neq", type: "string", value: h });
+            const domain = process.env.DOMAIN;
             (async () => {
-              const timeframe = { from: Date.now() - 7 * 86_400_000, to: Date.now() };
-              const keys = await post("keys", { timeframe, limit: 1000 });
-              let list = [];
-              try { list = JSON.parse(keys.text).result || []; } catch {}
-              console.log("keys:", keys.status, Array.isArray(list) ? list.map(k => k.key || k).filter(k => /cpu|wall|path|url|host|script|event|colo|country|asOrg|outcome/i.test(String(k))).slice(0, 80).join(" ") : "", Array.isArray(list) && list.length ? "" : keys.text.slice(0, 400));
-              const cpu = { operator: "sum", key: "$workers.cpuTimeMs", keyType: "number", alias: "cpu" };
-              const page = { key: "$workers.event.request.path", operation: "includes", type: "string", value: "/api/" };
-              const asks = [
-                ["all", [], []],
-                ["pages (/api/ on the domain)", [page], []],
-                ["pages by country", [page], [{ type: "string", value: "$workers.event.request.cf.country" }]],
-                ["all by network", [], [{ type: "string", value: "$workers.event.request.cf.asOrganization" }]]
-              ];
-              for (const [name, filters, groupBys] of asks) {
-                const r = await post("query", { queryId: "orbit-who-calls", timeframe, view: "calculations", limit: 20, parameters: { calculations: [cpu, { operator: "count", alias: "n" }], filters, groupBys } });
-                console.log(`== ${name}:`, r.status, r.text.slice(0, 1500));
-              }
+              console.log("== every Worker, by kind"); await ask([], ["$workers.scriptName", "$workers.eventType"]);
+              console.log("== the proxy, by host"); await ask([proxy], ["$workers.event.request.headers.host"]);
+              console.log(`== pages (orbit.${domain}), by country`); await ask([proxy, host(`orbit.${domain}`)], ["$workers.event.request.cf.country"]);
+              console.log("== not pages, by network"); await ask([proxy, notHost(`orbit.${domain}`), notHost(domain)], ["$workers.event.request.cf.asOrganization"]);
+              console.log("== not pages, by host and country"); await ask([proxy, notHost(`orbit.${domain}`), notHost(domain)], ["$workers.event.request.headers.host", "$workers.event.request.cf.country"]);
             })().catch(e => console.log("failed:", e.message));'
         env:
           CF_GUARD_TOKEN: ${{ secrets.CF_GUARD_TOKEN }}
+          DOMAIN: jaypengx.com
       - name: Listen
         run: |
           if [ "$CPU" != "true" ]; then timeout "$(( ${MINUTES:-6} * 60 ))" npx --yes wrangler@4 tail "$WORKER" --format pretty || true; exit 0; fi

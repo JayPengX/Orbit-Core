@@ -9,6 +9,7 @@ on:
     paths:
       - 'guard.js'
       - 'guard-worker.js'
+      - 'kit/domain.mjs'
       - 'wrangler.guard.toml'
       - '.github/workflows/deploy-guard.yml'
   workflow_dispatch:

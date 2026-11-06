@@ -110,10 +110,11 @@ export function applyScale(base, scale) {
 // family's limit, and the quota that sets it is named.
 
 // Workers' requests and CPU a day, what people use and the rest: the last 7
-// days hour by hour (guard.js useByHour). People's: the requests answered
-// near Taiwan, where the family's phones come in; the rest is there whoever
-// comes (the crons, the builders, our own tools and checks, which run on
-// machines in the US: 2026-11-06, most of the week's CPU), so it's fixed.
+// days hour by hour (guard.js useByHour). People's: the proxy's requests from
+// the apps' pages on the family's domain, in any country (`who: 'caller'`,
+// the Workers Logs' share), else those answered near Taiwan (`'place'`); the
+// rest is there whoever comes (the crons, the builders, our own tools and
+// checks: 2026-11-06, most of the week's CPU), so it's fixed.
 // Without people's part read (`near` false: an older guard, analytics without
 // it), the steady floor: the quietest tenth of the hours is what runs with
 // nobody there, × 24 a day, and what people add at least a tenth of the day,
@@ -134,7 +135,7 @@ export function splitHours(h, now = Date.now()) {
     const day = v.reduce((a, b) => a + b, 0) / 7;
     if (near) {
       const people = Math.min(day, seen.reduce((a, r) => a + (r[i + 2] || 0), 0) / 7);
-      out[k] = { day, fixed: day - people, people, near: true };
+      out[k] = { day, fixed: day - people, people, near: true, who: h.who === 'caller' ? 'caller' : 'place' };
       continue;
     }
     const quiet = [...v].sort((a, b) => a - b)[Math.floor(v.length * QUIET)];
@@ -223,7 +224,7 @@ export function quotas({ users = {}, guard = null, hours = null, usage = {}, map
   // (By typical use: the CPU a day past the fixed part, a second a person.)
   const cpu = split && rows.find(r => r.key === 'cf:cpuMs');
   const typical = cpu ? { people: Math.max(0, Math.floor((cpu.capDay - cpu.fixedDay) / TYPICAL_CPU_MS)), ms: TYPICAL_CPU_MS, few: week < FEW } : null;
-  return { rows, week, holds: h ? { people: h.holds, key: h.key } : null, typical, measured: !!split, near: !!split?.cpuMs?.near };
+  return { rows, week, holds: h ? { people: h.holds, key: h.key } : null, typical, measured: !!split, near: !!split?.cpuMs?.near, who: split?.cpuMs?.who || null };
 }
 
 // What the panel shows and the cron applies: people, each budget against
