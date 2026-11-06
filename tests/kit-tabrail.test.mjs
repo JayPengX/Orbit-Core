@@ -21,10 +21,26 @@ test('the tab bar, a tab and the action size their own box, whatever the app set
 
 test('the rail is one column: the capsule, the action and the account are one width', () => {
   assert.match(kitRule('html.q-tabrail .q-tabbar.q-tabbar'), /width:\s*var\(--q-tabrail-cw\)/);
-  assert.match(kitRule('html.q-tabrail .q-tab-action'), /width:\s*var\(--q-tabrail-cw\)/);
-  assert.match(kitRule('html.q-tabrail .q-tab-action'), /left:\s*var\(--q-tabrail-x\)/);
+  // (The action: as wide as the capsule, centred under it.)
+  assert.match(kitRule('html.q-tabrail'), /--q-tabrail-act:\s*var\(--q-tabrail-cw\)/);
+  assert.match(kitRule('html.q-tabrail .q-tab-action'), /left:\s*calc\(var\(--q-tabrail-x\) \+ \(var\(--q-tabrail-cw\) - var\(--q-tabrail-act\)\) \/ 2\)/);
   assert.match(kitRule('html.q-tabrail .q-appbar .q-actions'), /width:\s*var\(--q-tabrail-cw\)/);
   assert.match(kitRule('html.q-tabrail .q-appbar .q-actions'), /left:\s*var\(--q-tabrail-x\)/);
+});
+
+// Jay 2026-11-06 (iPad: Law's 問法律 and Money's add as pills "ugly and fat"):
+// the app's action is a circle everywhere, on the phone's bar and on the rail.
+test('the app’s action is a true circle, on the bar and on the rail', () => {
+  for (const sel of ['.q-tab-action', 'html.q-tabrail .q-tab-action']) {
+    const body = kitRule(sel);
+    const w = /(?:^|[;\s])width:\s*([^;]+)/.exec(body)?.[1].trim();
+    const h = /(?:^|[;\s])height:\s*([^;]+)/.exec(body)?.[1].trim();
+    assert.ok(w && w === h, `${sel}: width (${w}) is its height (${h})`);
+    assert.match(body, /border-radius:\s*50%/, `${sel} is round`);
+  }
+  // (Nothing later gives it a width or height of its own.)
+  const later = rules(css).filter(r => /\.q-tab-action(?![\w-])/.test(r.sel) && !/svg|::|:active|\[aria-pressed/.test(r.sel) && r.sel !== '.q-tab-action' && r.sel !== 'html.q-tabrail .q-tab-action');
+  for (const r of later) assert.doesNotMatch(r.body, /(?:^|[;\s])(?:width|height|border-radius):/, `${r.sel} reshapes the action`);
 });
 
 test("no app's CSS reshapes the tab bar or the rail (the apps checked out beside this one)", t => {

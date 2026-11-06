@@ -5282,6 +5282,8 @@ html.q-tabrail {
   --q-tabrail-tab: 54px;
   /* (The capsule itself: what the action and the account centre on.) */
   --q-tabrail-cw: calc(var(--q-tabrail-bw) - 8px);
+  /* (The app's round action: as wide as the capsule, a circle.) */
+  --q-tabrail-act: var(--q-tabrail-cw);
   --q-tabrail-h: calc(var(--q-tabs, 4) * var(--q-tabrail-tab) + 8px);
   /* (At the top, beside the page's first line, as iPad's sidebar: not
      floating in the middle of a tall screen, Jay 2026-11-01.) */
@@ -5293,7 +5295,7 @@ html.q-tabrail {
   html.q-tabrail {
     --q-tabrail-tab: 50px;
     /* (Five tabs, the action and the account fit a phone on its side.) */
-    --q-tabrail-act-h: 44px;
+    --q-tabrail-act: 44px;
     --q-tabrail-foot: 40px;
     --q-tabrail-face: 32px;
   }
@@ -5368,17 +5370,16 @@ html.q-tabrail .q-tabbar.q-tabbar.q-tabbar-act {
 /* The rail is one column: the tabs' capsule, the app's action under it and
    the account at the foot, all the capsule's width, so none reads smaller or
    off to one side (Jay 2026-11-06, iPad: "the tab buttons and the orbit pass
-   button the size is not the same"). */
+   button the size is not the same"). The action is a true circle, as wide
+   as the capsule, centred under it: a pill the capsule's width but shorter
+   read "ugly and fat" (Jay 2026-11-06, Law's 問法律 and Money's add). */
 html.q-tabrail .q-tab-action {
   top: calc(var(--q-tabrail-top) + var(--q-tabrail-h) + 10px);
   bottom: auto;
-  left: var(--q-tabrail-x);
-  width: var(--q-tabrail-cw);
-  height: var(--q-tabrail-act-h, 48px);
-  border-radius: 999px;
-}
-html.q-tabrail.q-float {
-  --q-tabrail-act-h: 56px;
+  left: calc(var(--q-tabrail-x) + (var(--q-tabrail-cw) - var(--q-tabrail-act)) / 2);
+  width: var(--q-tabrail-act);
+  height: var(--q-tabrail-act);
+  border-radius: 50%;
 }
 html.q-tabrail.q-float .q-tab-action svg {
   width: 26px;
