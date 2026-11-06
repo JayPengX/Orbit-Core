@@ -46,5 +46,15 @@ if [ -n "$apps" ]; then
   node "$core/tools/layout-check.mjs" $apps >"$log" 2>&1 || { cat "$log" >&2; no "the layout check failed (the shots it names are in /tmp/orbit-layout)"; }
   grep -E '^[a-z]+: ' "$log" >&2
 fi
-rm -f "$log"
-git push origin HEAD:main
+# (The checks above can take half an hour; another push may land meanwhile.
+# Then the tree is rebased onto it and its tests run again, not the whole
+# check: what landed passed its own.)
+for try in 1 2 3; do
+  git push -q origin HEAD:main 2>"$log" && { rm -f "$log"; echo "push: pushed." >&2; exit 0; }
+  grep -qE 'rejected|fetch first|non-fast-forward' "$log" || { cat "$log" >&2; no "the push failed"; }
+  echo "push: main moved meanwhile; rebasing and testing again…" >&2
+  git -C "$repo" fetch -q origin main || no "fetch failed"
+  git -C "$repo" rebase -q origin/main || no "rebase onto origin/main stopped (resolve it, then run this again)"
+  npm test >"$log" 2>&1 || no "npm test failed after the rebase"
+done
+no "main kept moving"
