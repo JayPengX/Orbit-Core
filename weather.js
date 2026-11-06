@@ -788,17 +788,40 @@ export function parseVillage(xml) {
   const county = xmlTag(xml, 'ctyName');
   return county ? { county, town: xmlTag(xml, 'townName') } : { county: null, town: null };
 }
+// Outside Taiwan (NLSC knows Taiwan alone, 2026-11-06): OpenStreetMap's city
+// and country (Nominatim, © OpenStreetMap contributors, ODbL; light use, each
+// ~100 m square kept 30 days), in the page's language, `abroad: true`.
+const NOMINATIM_REVERSE = 'https://nominatim.openstreetmap.org/reverse';
+export function parseOsmPlace(j) {
+  const a = j?.address || {};
+  const county = a.country || null;
+  const town = a.city || a.town || a.village || a.municipality || a.county || a.state || null;
+  return county ? { county, town, abroad: true } : { county: null, town: null };
+}
+const kept30 = place => new Response(JSON.stringify(place), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=2592000' } });
 // The place at lat / lon (to ~100 m), kept in Cloudflare's cache 30 days.
-export async function whereIs(lat, lon, { fetchFn = fetch, cache = globalThis.caches?.default } = {}) {
+export async function whereIs(lat, lon, { fetchFn = fetch, cache = globalThis.caches?.default, lang = 'zh' } = {}) {
   const la = (Math.round(lat * 1000) / 1000).toFixed(3);
   const lo = (Math.round(lon * 1000) / 1000).toFixed(3);
   const key = `https://weather.cache/where/${la},${lo}`;
   const hit = cache && (await cache.match(key).catch(() => null));
-  if (hit) return hit.json();
-  const res = await fetchFn(`${NLSC}${lo}/${la}`, { headers: { Accept: 'application/xml' }, signal: AbortSignal.timeout(UPSTREAM_MS) });
-  const place = parseVillage(res.ok ? await res.text() : '');
-  if (cache && (res.ok || place.county)) await cache.put(key, new Response(JSON.stringify(place), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=2592000' } })).catch(() => {});
-  return place;
+  let place = hit ? await hit.json() : null;
+  if (!place) {
+    const res = await fetchFn(`${NLSC}${lo}/${la}`, { headers: { Accept: 'application/xml' }, signal: AbortSignal.timeout(UPSTREAM_MS) });
+    place = parseVillage(res.ok ? await res.text() : '');
+    if (cache && (res.ok || place.county)) await cache.put(key, kept30(place)).catch(() => {});
+    // (NLSC down: no name, never a guess from abroad's map.)
+    if (!res.ok) return place;
+  }
+  if (place.county) return place;
+  const tag = lang === 'en' ? 'en' : 'zh-TW';
+  const osmKey = `https://weather.cache/where-osm/${tag}/${la},${lo}`;
+  const osmHit = cache && (await cache.match(osmKey).catch(() => null));
+  if (osmHit) return osmHit.json();
+  const res = await fetchFn(`${NOMINATIM_REVERSE}?${new URLSearchParams({ lat: la, lon: lo, format: 'jsonv2', zoom: '10', 'accept-language': tag })}`, { headers: { 'User-Agent': 'OrbitWeather/1.0 (https://orbit.jaypengx.com/weather/)', Accept: 'application/json' }, signal: AbortSignal.timeout(UPSTREAM_MS) }).catch(() => null);
+  const abroad = res?.ok ? parseOsmPlace(await res.json().catch(() => null)) : { county: null, town: null };
+  if (cache && abroad.county) await cache.put(osmKey, kept30(abroad)).catch(() => {});
+  return abroad;
 }
 
 // ---- The blend --------------------------------------------------------------------
@@ -1706,7 +1729,7 @@ export async function handleWeather(request, env, headers, path, { session = nul
     const lat = Number(q.get('lat'));
     const lon = Number(q.get('lon'));
     if (!q.get('lat') || !q.get('lon') || !(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180)) return send({ code: 'BAD_LOCATION' }, 400);
-    return send(await whereIs(lat, lon, { fetchFn, ...(cache !== undefined ? { cache } : {}) }).catch(() => ({ county: null, town: null })));
+    return send(await whereIs(lat, lon, { fetchFn, lang: q.get('lang') === 'en' ? 'en' : 'zh', ...(cache !== undefined ? { cache } : {}) }).catch(() => ({ county: null, town: null })));
   }
   if (path === '/weather') {
     if (!session) return send({ code: 'ECO_TOKEN_INVALID' }, 401);

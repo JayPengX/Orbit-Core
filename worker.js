@@ -39,7 +39,7 @@ import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLEC
 import { checkStock } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
 import { handleGift, giftNight } from './gift.js';
-import { handleShowcasePass, showcaseOf, SHOW_PER_MIN } from './showcase.js';
+import { handleShowcasePass, showcaseOf, SHOW_PER_MIN, SHOWCASE_ORIGINS } from './showcase.js';
 import { handlePush, sendDue } from './push.js';
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
@@ -52,7 +52,7 @@ import { beat, tellOwner, systemReport, countFolders, FOLDERS_KEY } from './ops.
 import { applyScale } from './capacity.js';
 import { handleSports, sportsCron, useDevSettings } from './sports.js';
 import { handleToday } from './sports-today.js';
-import { isAllowedOrigin, corsHeaders, json, LOCAL_ORIGIN, bodyText, sha256Hex, ipBucket } from './http.js';
+import { isAllowedOrigin, corsHeaders, json, LOCAL_ORIGIN, bodyText, sha256Hex, ipBucket, twOnlyRefused } from './http.js';
 import { handleData } from './data.js';
 import { handleStock, moveBook } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
@@ -1255,6 +1255,10 @@ async function route(request, env, ctx, headers, origin) {
   if (GEMINI_BILLED_PATHS.has(path) && !isAllowedOrigin(origin)) {
     return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
   }
+
+  // Taiwan-only services (http.js twOnlyRefused): Transit's routes answer
+  // callers in Taiwan only (the apps show why, kit orbit.mjs abroad).
+  if (twOnlyRefused(request, path, origin, SHOWCASE_ORIGINS)) return errorJson('TW_ONLY', 403, headers, request);
 
   // Orbit Class's AI features need a Orbit Pass session (`qt=`).
   if (path === '/gemini' || path === '/nl-edit') {

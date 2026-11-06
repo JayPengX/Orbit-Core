@@ -99,6 +99,15 @@ export function twDay(t) {
   const ms = t instanceof Date ? t.getTime() : typeof t === 'string' ? Date.parse(t) : Number(t);
   return Number.isFinite(ms) ? new Date(ms + 8 * 3_600_000).toISOString().slice(0, 10) : '';
 }
+// The phone's own calendar day of a time, 'YYYY-MM-DD' (its time zone,
+// wherever it is: what a person abroad calls today; '' for no time). twDay
+// stays for what is Taiwan's on purpose (the weekly pay, the Workers' counts).
+export function localDay(t = Date.now()) {
+  if (typeof t === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  const d = new Date(t instanceof Date ? t.getTime() : typeof t === 'string' ? Date.parse(t) : Number(t));
+  if (!Number.isFinite(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 // Its month, 'YYYY-MM'.
 export const twMonth = t => twDay(t).slice(0, 7);
 // The calendar day `n` days from a day ('YYYY-MM-DD'; n may be negative).

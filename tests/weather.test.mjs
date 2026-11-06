@@ -746,3 +746,22 @@ test('today\'s earlier hours are kept from the last answer, for the day sheet (J
   assert.deepEqual(keepPast(null, resp, at), []);
   assert.equal(keepPast(old, resp, at + 3 * H).length, 0, 'gone the next day');
 });
+
+// Outside Taiwan (2026-11-06): NLSC has no name, so OpenStreetMap's city and
+// country, in the page's language, each kept; Taiwan never asks it.
+test('the place abroad: OpenStreetMap city and country, by language, cached', async () => {
+  const store = new Map();
+  const cache = { match: async k => (store.has(k) ? new Response(store.get(k)) : undefined), put: async (k, r) => void store.set(k, await r.text()) };
+  const urls = [];
+  const fetchFn = async url => {
+    urls.push(url);
+    if (url.includes('nlsc')) return { ok: true, text: async () => '<error/>' };
+    const en = url.includes('accept-language=en');
+    return { ok: true, json: async () => ({ address: { city: en ? 'Los Angeles' : '洛杉磯', state: 'California', country: en ? 'United States' : '美國' } }) };
+  };
+  assert.deepEqual(await whereIs(34.05, -118.25, { fetchFn, cache, lang: 'en' }), { county: 'United States', town: 'Los Angeles', abroad: true });
+  assert.deepEqual(await whereIs(34.05, -118.25, { fetchFn, cache }), { county: '美國', town: '洛杉磯', abroad: true });
+  await whereIs(34.05, -118.25, { fetchFn, cache, lang: 'en' });
+  assert.equal(urls.filter(u => u.includes('nominatim')).length, 2, 'each language asked once');
+  assert.equal(urls.filter(u => u.includes('nlsc')).length, 1, "NLSC's empty answer kept too");
+});

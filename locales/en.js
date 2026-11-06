@@ -20,6 +20,7 @@ export default {
   MISSING_PAYLOAD: 'Missing or invalid payload',
   SYNC_PASSCODE_NOT_FOUND: 'This sync passcode was not found.',
   FORBIDDEN_ORIGIN: 'Forbidden origin',
+  TW_ONLY: 'This Orbit app works only in Taiwan.',
   ECO_UNKNOWN_APP: 'Unknown app',
   ECO_UNKNOWN_OP: 'Unknown operation',
   ECO_INVALID_SOURCES: 'List 1 to 12 codes to merge.',

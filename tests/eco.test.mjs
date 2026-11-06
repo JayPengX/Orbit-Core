@@ -50,7 +50,7 @@ function setup() {
     now: () => (clock += 1000)
   };
   const env = { STORE: {}, ECO_TOKEN_SECRET: 'test-secret', ECO_OPEN_SIGNUP: 'on', ECO_ADMIN_TOKEN: 'o'.repeat(40) };
-  const call = (method, query = '', body) => handleEcoRequest({ method, url: `https://w/eco${query}`, body }, env, {}, '1.1.1.1', deps);
+  const call = (method, query = '', body, cf) => handleEcoRequest({ method, url: `https://w/eco${query}`, body, ...(cf ? { cf } : {}) }, env, {}, '1.1.1.1', deps);
   const qt = token => `?qt=${encodeURIComponent(token)}`;
   return { store, deps, env, call, qt, advance: ms => (clock += ms) };
 }
@@ -882,4 +882,17 @@ test('fresh: passes issued before the mark count while never used; used accounts
   const back = await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'vocab' });
   assert.equal(back.data.fresh, undefined);
   assert.equal((await t.call('GET', `${t.qt(back.data.token)}&app=vocab`)).status, 200);
+});
+
+// Outside Taiwan (2026-11-06): every answer with a session says the caller's
+// country, so the kit knows a Taiwan-only app is abroad without asking again.
+test('a session answer carries the caller country; none without one', async () => {
+  const t = setup();
+  const acct = await newPass(t);
+  const there = await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'transit' }, { country: 'US' });
+  assert.equal(there.data.country, 'US');
+  const read = await t.call('GET', `?app=transit&qt=${encodeURIComponent(there.data.token)}`, undefined, { country: 'JP' });
+  assert.equal(read.data.country, 'JP');
+  assert.equal((await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'transit' })).data.country, undefined);
+  assert.equal((await t.call('POST', '', { op: 'login', passcode: 'ABCDEFGHJK', app: 'vocab' }, { country: 'US' })).data.country, undefined, 'never on an error');
 });

@@ -316,8 +316,56 @@ export function detectLang() {
     const saved = localStorage.getItem('orbit.lang');
     if (saved === 'zh' || saved === 'en') return saved;
   } catch {}
-  const langs = globalThis.navigator?.languages || [globalThis.navigator?.language || 'zh-TW'];
-  return langs.some(l => /^zh/i.test(l)) || !langs.some(l => /^en/i.test(l)) ? 'zh' : 'en';
+  // Chinese for a phone in any Chinese (or saying none); English for every
+  // other one, a phone in Japanese or Spanish too (2026-11-06: those opened
+  // in Chinese, the worst guess for people outside Taiwan).
+  const langs = globalThis.navigator?.languages?.length ? globalThis.navigator.languages : [globalThis.navigator?.language || 'zh-TW'];
+  return langs.some(l => /^zh/i.test(l)) ? 'zh' : 'en';
+}
+
+// ---- Where the phone is ------------------------------------------------------------
+// The country the proxy saw this device in at its last sign-in or refresh
+// (eco.js puts Cloudflare's in every answer that hands out a session; 'TW',
+// 'JP'…, '' before the first). Taiwan-only apps (Transit: Taiwan's buses and
+// trains alone; not Law, which foreigners study Taiwan's law in) are closed outside Taiwan (Jay 2026-11-06: "block international user
+// from using Taiwan only service outright"), with a short card saying why;
+// the proxy turns their routes away too (http.js twOnlyRefused). An unknown
+// place ('XX', '') is never turned away.
+const COUNTRY_KEY = 'orbit.country';
+export const TW_ONLY_APPS = new Set(['transit']);
+export const country = () => {
+  const c = readStore(COUNTRY_KEY) || '';
+  return /^[A-Z0-9]{2}$/.test(c) ? c : '';
+};
+export const abroad = () => /^[A-Z]{2}$/.test(country()) && country() !== 'TW' && country() !== 'XX';
+// (Kept on the device's own: told again with each session.)
+const noteCountry = c => /^[A-Z0-9]{2}$/.test(c || '') && c !== readStore(COUNTRY_KEY) && writeStore(COUNTRY_KEY, c);
+let abroadEl = null;
+// A Taiwan-only app abroad: its card on top of everything (true), else
+// nothing (false; one shown before goes once the phone is back in Taiwan).
+export function twOnlyCheck(app, lang = detectLang()) {
+  if (!TW_ONLY_APPS.has(app)) return false;
+  const away = abroad();
+  if (typeof document === 'undefined') return away;
+  if (!away) {
+    dropFromTop(abroadEl);
+    abroadEl = null;
+    return false;
+  }
+  if (abroadEl) return true;
+  const en = lang === 'en';
+  const name = APPS[app]?.name || 'Orbit';
+  // (Short: whole on a 320 phone, both languages.)
+  abroadEl = node('dialog', { class: 'q-moved q-abroad', 'aria-modal': 'true' }, [
+    node('div', { class: 'q-moved-box' }, [
+      node('p', { class: 'q-moved-title', text: en ? 'Only in Taiwan' : '只在台灣提供' }),
+      node('p', { class: 'q-moved-text', text: en ? `${name} covers Taiwan alone, so it's closed outside Taiwan. Your other Orbit apps work anywhere.` : `${name} 的資料只涵蓋台灣，在台灣以外無法使用；其他 Orbit App 照常使用。` }),
+      node('button', { class: 'q-btn primary block', type: 'button', text: en ? 'Other Orbit apps' : '看其他 Orbit App', onclick: () => location.assign('/pass/') })
+    ])
+  ]);
+  keepOnTop(abroadEl);
+  globalThis.__bootStep?.('', 1);
+  return true;
 }
 export const pick = (lang, zh, en) => (lang === 'en' ? en : zh);
 
@@ -569,7 +617,7 @@ export function clearData() {
 // how the device itself is set up stays: its language and its screen's
 // safe area, and the kit's version (the app files stay cached, so the
 // sign-in screen opens offline).
-const DEVICE_KEYS = new Set(['orbit.lang', 'orbit.safeBottom', 'orbit.kit', 'orbit.kitFiles']);
+const DEVICE_KEYS = new Set(['orbit.lang', 'orbit.safeBottom', 'orbit.kit', 'orbit.kitFiles', 'orbit.country']);
 export function wipeDevice() {
   for (const store of [globalThis.localStorage, globalThis.sessionStorage]) {
     try {
@@ -1546,6 +1594,8 @@ export function orbitSession(app, { lang = detectLang(), heartbeat = 120_000 } =
   const help = typeof location !== 'undefined' && /(?:^|[#&])help=([a-z]+)(?::([a-z0-9]+))?/.exec(location.hash);
   if (help && typeof document !== 'undefined') setTimeout(() => !document.querySelector('dialog[open]') && openHelp(made, help[1], help[2] || null), 800);
   made.app ??= app;
+  // A Taiwan-only app opened abroad: its card at once, from the last place known.
+  twOnlyCheck(app, lang);
   made.on('wallet', () => msTick(made));
   dataSession = made;
   return made;
@@ -1633,6 +1683,7 @@ function makeSession(app, { lang, heartbeat }) {
       writeStore(KEY.refresh, data.refresh);
       writeStore(KEY.account, accountOf(data.refresh));
     }
+    if (data.country && noteCountry(data.country) !== false) twOnlyCheck(app, lang);
     if (data.token) {
       token = data.token;
       tokenAt = Date.now();
@@ -3278,7 +3329,7 @@ function queueBanner(s, notice) {
     const list = bannerQueue;
     bannerQueue = null;
     if (list.length === 1) return banner(s, list[0]);
-    const zh = !/^en/i.test(globalThis.navigator?.language || '');
+    const zh = (s.lang || detectLang()) !== 'en';
     banner(s, { title: list[0].title, body: zh ? `還有 ${list.length - 1} 則通知` : `and ${list.length - 1} more`, hash: list[0].hash, more: list.slice(1) });
   }, 700);
 }
