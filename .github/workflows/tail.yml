@@ -67,7 +67,7 @@ jobs:
               if (!by) return console.log("no colo dimension");
               const end = Math.floor(Date.now() / 3_600_000) * 3_600_000;
               const iso = t => new Date(t).toISOString().replace(/\.\d+Z$/, "Z");
-              const r = await q(`query($a: string!, $s: Time!, $e: Time!) { viewer { accounts(filter: { accountTag: $a }) { x: workersInvocationsAdaptive(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e }) { sum { requests cpuTimeUs } dimensions { ${by} scriptName date } } } } }`, { a: process.env.CLOUDFLARE_ACCOUNT_ID, s: iso(end - 7 * 86_400_000), e: iso(end - 1000) });
+              const r = await q(`query($a: string!, $s: Time!, $e: Time!) { viewer { accounts(filter: { accountTag: $a }) { x: workersInvocationsAdaptive(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e }) { sum { requests cpuTimeUs } dimensions { ${by} scriptName date eventType } } } } }`, { a: process.env.CLOUDFLARE_ACCOUNT_ID, s: iso(end - 7 * 86_400_000), e: iso(end - 1000) });
               if (r.errors) console.log("errors:", JSON.stringify(r.errors).slice(0, 600));
               const rows = r.data?.viewer?.accounts?.[0]?.x || [];
               const sum = (key, pick) => { const m = {}; for (const x of rows) { const k = pick(x.dimensions); const v = (m[k] ||= { n: 0, cpu: 0 }); v.n += x.sum.requests; v.cpu += x.sum.cpuTimeUs / 1000; } return Object.entries(m).sort((a, b) => b[1].cpu - a[1].cpu); };
@@ -77,6 +77,16 @@ jobs:
               for (const [k, v] of sum(by, d => d[by])) console.log(String(Math.round(v.cpu)).padStart(10), String(v.n).padStart(9), (v.cpu / all * 100).toFixed(1).padStart(6) + "%", k);
               console.log("== by colo and Worker");
               for (const [k, v] of sum(by, d => `${d[by]} ${d.scriptName}`).slice(0, 40)) console.log(String(Math.round(v.cpu)).padStart(10), String(v.n).padStart(9), k);
+              // (Where Taiwan's phones come in: its own colos and the region's.)
+              const NEAR = new Set(["TPE", "KHH", "RMQ", "HKG", "MFM", "NRT", "KIX", "FUK", "OKA", "ICN", "PUS", "SIN", "KUL", "BKK", "MNL", "CGK", "SGN", "HAN"]);
+              const side = d => `${d.eventType} ${NEAR.has(d[by]) ? "near Taiwan" : "elsewhere"}`;
+              console.log("== by kind and place (cpu ms, requests, share of cpu)");
+              for (const [k, v] of sum(by, side)) console.log(String(Math.round(v.cpu)).padStart(10), String(v.n).padStart(9), (v.cpu / all * 100).toFixed(1).padStart(6) + "%", k);
+              console.log("== by day, kind and place");
+              const dk = {}; for (const x of rows) { const k = `${x.dimensions.date} ${side(x.dimensions)}`; const v = (dk[k] ||= { n: 0, cpu: 0 }); v.n += x.sum.requests; v.cpu += x.sum.cpuTimeUs / 1000; }
+              for (const k of Object.keys(dk).sort()) console.log(k.padEnd(36), String(Math.round(dk[k].cpu)).padStart(9), "ms", String(dk[k].n).padStart(7));
+              console.log("== near Taiwan by colo and kind");
+              for (const [k, v] of sum(by, d => `${d[by]} ${d.eventType} ${d.scriptName}`).filter(([k]) => NEAR.has(k.split(" ")[0]))) console.log(String(Math.round(v.cpu)).padStart(10), String(v.n).padStart(9), k);
               console.log("== by day and colo (top 3 a day)");
               const days = {}; for (const x of rows) { const d = x.dimensions.date; const k = x.dimensions[by]; ((days[d] ||= {})[k] ||= { n: 0, cpu: 0 }); days[d][k].n += x.sum.requests; days[d][k].cpu += x.sum.cpuTimeUs / 1000; }
               for (const d of Object.keys(days).sort()) console.log(d, Object.entries(days[d]).sort((a, b) => b[1].cpu - a[1].cpu).slice(0, 3).map(([k, v]) => `${k} ${Math.round(v.cpu)} ms/${v.n}`).join(" · "), "· all", Math.round(Object.values(days[d]).reduce((t, v) => t + v.cpu, 0)));
