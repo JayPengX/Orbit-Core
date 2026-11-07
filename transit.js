@@ -1785,6 +1785,25 @@ async function walks(env, q, { fetchFn, ctx, now, cache, by }) {
             if (i != null && el.condition === 'ROUTE_EXISTS') out[i] = { dist: Number(el.distanceMeters) || 0, dur: secs(el.duration) };
           }
           src = r.ok ? 'google' : `http ${r.status}`;
+          // The matrix refused (403 since 2026-11-07 while Compute Routes still
+          // answered): each walk by Compute Routes, from that share, never
+          // OpenStreetMap's round the block (成功國中 → 成功九街: Google's 267 m by
+          // the lane, OpenStreetMap's 460 round the school; the phone left the
+          // YouBike at 新竹縣體育場 for it, Jay 2026-11-07).
+          if (!r.ok && (r.status === 403 || r.status === 401) && (await spend(env, 'routes', todo.length, now, ctx, { by }))) {
+            const got = await Promise.all(
+              todo.map(i =>
+                fetchFn(ROUTES, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration' }, body: JSON.stringify({ origin: pt(from), destination: pt(tos[i]), travelMode: 'WALK', languageCode: 'zh-TW', regionCode: 'tw', units: 'METRIC' }), signal: timeout(8000) })
+                  .then(x => (x.ok ? x.json() : null))
+                  .catch(() => null)
+              )
+            );
+            got.forEach((g, k) => {
+              const w = g?.routes?.[0];
+              if (w) out[todo[k]] = { dist: Number(w.distanceMeters) || 0, dur: secs(w.duration) };
+            });
+            if (got.some(Boolean)) src = 'google-routes';
+          }
         }
       } catch {
         src = 'error';

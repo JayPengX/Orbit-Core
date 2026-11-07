@@ -679,6 +679,28 @@ test("walks by Google's streets: five in one matrix call, each kept a month; wit
   assert.equal((await handleTransit(new Request('https://w/transit/walk?from=35,139&to=24.8,120.9'), env, {}, '/transit/walk', { session: { s: 'S' }, fetchFn, now: NOW, cache })).status, 400);
 });
 
+// Jay 2026-11-07: Google's matrix answered 403 while Compute Routes answered;
+// every station's walk fell to OpenStreetMap's (成功國中 → 成功九街 460 m round
+// the school, Google's 267 by the lane) and the bike went back at the wrong station.
+test("the matrix refused: each walk by Compute Routes instead, counted on its share, never left to the app's router", async () => {
+  fresh();
+  const env = { GOOGLE_MAPS_KEY: 'k', RATE_LIMIT_KV: memKv() };
+  let routes = 0;
+  const fetchFn = async (url, opts) => {
+    if (String(url).includes('computeRouteMatrix')) return new Response('{}', { status: 403 });
+    routes++;
+    const lat = JSON.parse(opts.body).destination.location.latLng.latitude;
+    assert.doesNotMatch(opts.headers['X-Goog-FieldMask'], /polyline/);
+    return lat === 24.9 ? json({}) : json({ routes: [{ distanceMeters: lat === 24.81872 ? 267 : 300, duration: '200s' }] });
+  };
+  const r = await handleTransit(new Request('https://w/transit/walk?from=24.8176,121.0165&to=24.81872,121.01597;24.81614,121.0171;24.9,121.0'), env, {}, '/transit/walk', { session: { s: 'S' }, fetchFn, now: NOW, cache: memCache() }).then(x => x.json());
+  assert.equal(r.src, 'google-routes');
+  assert.deepEqual(r.walks.map(w => w && w.dist), [267, 300, null]);
+  assert.equal(routes, 3);
+  const used = await usage(env, NOW);
+  assert.equal(used.routes, 3);
+});
+
 // Nothing asks Google's traffic matrix (a bus's drive to its stops): the
 // address had no app calling it, only a test page, and its share was counted
 // as people's on the admin panel's 容量 (Jay 2026-11-06: "3 people"). Gone.
