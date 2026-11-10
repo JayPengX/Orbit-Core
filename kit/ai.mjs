@@ -11,6 +11,7 @@
 //   aiBar({ placeholder, onSend })        the box to type or dictate into, with its send button
 //   pickList(items, { title, current })   the person's own list as a sheet (a search past 8) → id | null
 //   picker(items, { value, onChange })    a field's value as a button that opens pickList (review rows)
+//   askBox(ask, { lists })                a question with chips, AI's or code's own → { box, answer }
 //   aiNote(text)                          the quiet line under what AI wrote ("AI 整理，送出前可以改")
 //   aiSays(error, left)                   why an ask was turned away, in words
 //
@@ -117,31 +118,46 @@ export function picker(items, { value = '', title, empty = W('未選', 'None'), 
   return Object.assign(b, { set: v => ((value = v), draw()) });
 }
 
-// The AI's question back: its words, a chip an option (a list's ids drawn
-// by name), 其他 (the whole list) or 自己打 (words). → the answer { q, a, id? }.
+// The AI's question back (or code's own, the same way): its words, a chip
+// an option (a list's ids drawn by name), 其他 (the whole list) or 自己打
+// (words). → { box, answer }: the box to put where the question goes, and
+// the answer it gives once tapped, { q, a, id?, field? }.
 export function askBox(ask, { lists = {}, titles = {} } = {}) {
-  return new Promise(resolve => {
-    const list = ask.field ? lists[ask.field] || [] : null;
-    const nameOf = id => list?.find(x => x.id === id)?.name || id;
-    const answer = (a, id) => {
-      box.classList.add('answered');
-      box.querySelectorAll('button').forEach(b => (b.disabled = true));
-      resolve({ q: ask.q, a, ...(id ? { id, field: ask.field } : {}) });
-    };
-    const chips = h('div', { class: 'q-chips q-ai-chips' }, ask.options.map(o => h('button', { type: 'button', class: 'q-chip', onclick: e => (e.currentTarget.classList.add('on'), answer(list ? `${nameOf(o)}（${ask.field} ${o}）` : o, list ? o : null)) }, [list ? nameOf(o) : o])));
-    const own = h('div', { class: 'q-ai-own', hidden: true });
-    if (list) chips.append(h('button', { type: 'button', class: 'q-chip q-ai-more', onclick: async () => {
-      const id = await pickList(list, { title: titles[ask.field] || ask.q });
-      if (id != null) answer(`${nameOf(id)}（${ask.field} ${id}）`, id);
-    } }, [W('其他…', 'Other…')]));
-    else {
-      const bar = aiBar({ placeholder: W('自己打', 'Type your answer'), onSend: t => answer(t) });
-      own.append(bar);
-      chips.append(h('button', { type: 'button', class: 'q-chip q-ai-more', onclick: () => ((own.hidden = false), bar.input.focus()) }, [W('自己打', 'Type it')]));
-    }
-    const box = h('div', { class: 'q-ai-ask', role: 'group', 'aria-label': ask.q }, [h('p', { class: 'q-ai-q' }, [mark(), h('span', { text: ask.q })]), chips, own]);
-    askBox.last = box;
-  });
+  let resolve;
+  const answer = new Promise(r => (resolve = r));
+  const list = ask.field ? lists[ask.field] || [] : null;
+  const nameOf = id => list?.find(x => x.id === id)?.name || id;
+  const done = (a, id) => {
+    box.classList.add('answered');
+    box.querySelectorAll('button, textarea').forEach(b => (b.disabled = true));
+    resolve({ q: ask.q, a, ...(id ? { id, field: ask.field } : {}) });
+  };
+  const said = id => `${nameOf(id)}（${ask.field} ${id}）`;
+  const chips = h(
+    'div',
+    { class: 'q-chips q-ai-chips' },
+    ask.options.map(o => h('button', { type: 'button', class: 'q-chip', onclick: e => (e.currentTarget.classList.add('on'), list ? done(said(o), o) : done(o)) }, [list ? nameOf(o) : o]))
+  );
+  const own = h('div', { class: 'q-ai-own', hidden: true });
+  if (list) {
+    if (list.length > ask.options.length)
+      chips.append(
+        h('button', {
+          type: 'button',
+          class: 'q-chip q-ai-more',
+          onclick: async () => {
+            const id = await pickList(list, { title: titles[ask.field] || ask.q });
+            if (id != null) done(said(id), id);
+          }
+        }, [W('其他…', 'Other…')])
+      );
+  } else {
+    const bar = aiBar({ placeholder: W('自己打', 'Type your answer'), onSend: t => done(t) });
+    own.append(bar);
+    chips.append(h('button', { type: 'button', class: 'q-chip q-ai-more', onclick: () => ((own.hidden = false), bar.input.focus()) }, [W('自己打', 'Type it')]));
+  }
+  const box = h('div', { class: 'q-ai-ask', role: 'group', 'aria-label': ask.q }, [h('p', { class: 'q-ai-q' }, [mark(), h('span', { text: ask.q })]), chips, own]);
+  return { box, answer };
 }
 
 // The whole exchange drawn in `host`: thinking, each question and its
@@ -156,9 +172,9 @@ export async function aiFlow(host, { feature, input, lists = {}, titles = {}, th
     wait.remove();
     if (r.error) return { error: r.error, left: r.left ?? null };
     if (!r.ask) return { out: r.out, answers, left: r.left };
-    const p = askBox(r.ask, { lists, titles });
-    host.append(askBox.last);
-    askBox.last.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
-    answers.push(await p);
+    const { box, answer } = askBox(r.ask, { lists, titles });
+    host.append(box);
+    box.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    answers.push(await answer);
   }
 }

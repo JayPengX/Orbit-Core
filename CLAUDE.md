@@ -371,12 +371,12 @@ writing a file only when it changed (`builders/store.js`):
 | `photos.js`, `official-photos.js` | photo lists, cutouts, official headshots | hourly / daily 18:00 |
 | `gtfs.js`, `buses.js`, `ntpc.js` (GitHub `buses.yml`, `tools/gtfs-buses.mjs`) | `bus/…`, `shape/…`, `station/…`, `where.json`, `rail/…`, `tdx/…` | weekly (`kickBuses`) |
 | `asia.js`, `cpbl.js` | CPBL's month and standings | daily 15:00 |
-| `f1kept.js` | each finished F1 session's 數據 and laps, kept before anyone opens them (via the proxy: OpenF1 refuses quick askers) | :06, :26, :46 |
-| `kept.js` | wipes the proxy's kept copies (`mirror/`) from before a league's first askable day | daily 17:00 |
-| `news.js`, `news-words.js` | `news/index.json` (3 days), `past.json` (weeks): stories by importance, topic, side, Taiwan's on the world's (`private/news/`) | every 10 min |
+| `f1kept.js` | each finished F1 session's 數據 and laps, kept early (via the proxy) | :06, :26, :46 |
+| `kept.js` | wipes kept copies (`mirror/`) before a league's first askable day | daily 17:00 |
+| `news.js`, `news-words.js` | `news/index.json` (3 days), `past.json` (weeks): stories by weight, topic, side, Taiwan's on the world's | every 10 min |
+| `ai.js`, `recaps.js` | AI made once: `news/lines.json`, `words/cards/<a…z>.json`, `sports/recaps/<day>.json` | :04 :24 :34 :54 |
 
-A season is kept whole until the next season's first game (preseason
-included), then wiped whole. `private/` is never served.
+A season is kept until the next one's first game. `private/` is never served.
 
 ## 6. The Orbit Pass (`/eco`)
 

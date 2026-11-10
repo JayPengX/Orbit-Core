@@ -143,20 +143,23 @@ export const FEATURES = {
   // can't write, from the game's own facts only, every number one of theirs.
   'sports-recap': {
     models: ['haiku', 'luna'],
-    parts: ({ facts, en }) =>
+    maxIn: 3000,
+    parts: ({ facts }) =>
       text(
         [
-          `Write ONE line${en ? ' in English' : ' in Traditional Chinese (台灣的體育報導用語)'} on why this game ended as it did: the deciding moment or player.`,
-          en ? '≤ 20 words.' : '≤ 40 字.',
-          'Use only the facts below; every number you write must be one of theirs; no adjectives the facts don’t support; no score (it is shown already).',
-          'Team and player names as the facts write them.',
+          'You write the one line of a game recap that the score can’t tell: WHY this game ended as it did. The reader already sees the final score, the teams and their records, so never repeat those.',
+          'Say the deciding moment or player, as a sports desk in Taiwan would: a late run, a swing play, a pitcher who shut them down, a goal against the run of play.',
+          'zh: ONE line in Traditional Chinese (台灣的體育報導用語), ≤ 40 字. Team names exactly as the facts write them (Chinese); players in English as written.',
+          'en: the same line in English, ≤ 22 words, teams by their English names given.',
+          'Use only these facts. Every number you write must be one of theirs. No adjectives the facts don’t support. When the facts don’t show why, say the plainest true thing (who led the scoring for the winner).',
+          'Facts:',
           facts
         ].join('\n')
       ),
-    schema: obj({ line: S }),
+    schema: obj({ zh: S, en: S }),
     clean: (raw, { facts }) => {
-      const line = str(raw?.line, 120);
-      return line && numbersFrom(line, facts) ? { line } : null;
+      const zh = str(raw?.zh, 80), en = str(raw?.en, 200);
+      return zh && en && numbersFrom(zh + ' ' + en, facts) ? { zh, en } : null;
     }
   },
 

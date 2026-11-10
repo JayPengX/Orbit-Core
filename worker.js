@@ -1224,7 +1224,7 @@ const ECO_DEPS = {
   // The admin panel's 系統 (ops.js): the store's collections, a Gemini check, a builder by hand.
   count: DOCS.count,
   geminiCheck: env => geminiCheck(env),
-  build: (env, job) => runBuilders(env, { proxy: builderProxy(env), now: Date.now(), ...(job === 'watch-full' ? { job: 'watch', full: true } : ['watch', 'cutouts', 'buses'].includes(job) ? { job } : { only: job }), log: () => {} }),
+  build: (env, job) => runBuilders(env, { proxy: builderProxy(env), aiCap: builderCap(env), now: Date.now(), ...(job === 'watch-full' ? { job: 'watch', full: true } : ['watch', 'cutouts', 'buses'].includes(job) ? { job } : { only: job }), log: () => {} }),
   // Securities' money counted here (stock-check.js), its market data read as the apps read it.
   checkStock: (env, docId, payload, wallet) => checkStock(env, docId, payload, wallet, { read: url => stockReads(env)(url), fsGet: DOCS.get, fsWrite: DOCS.write }, LOCK_SINCE),
   // A pass merged into another: what this Worker watches for it moves too.
@@ -1260,6 +1260,8 @@ const builderProxy = env => async (url, trim = '') => {
   const res = await handleSports(new Request(ask), env, inPlace, {}, 'worker');
   return res.ok ? res.json() : null;
 };
+// A builder's AI cap for a feature (the admin panel's DEV ai*), as a route's is.
+const builderCap = env => feature => aiCap(env, { waitUntil() {} }, feature);
 // Each league's season bounds (sports/bounds.json in the family's data), read in place.
 const seasonBounds = async env => {
   const res = await handleData(new Request('https://orbit-workers-proxy.orbit/data/sports/bounds.json'), env, inPlace, {}, 'worker', '/data/sports/bounds.json');
@@ -1478,7 +1480,7 @@ async function route(request, env, ctx, headers, origin) {
   if (path === '/data/build' && request.method === 'POST') {
     if (!env.DATA_PUSH_SECRET || request.headers.get('Authorization') !== `Bearer ${env.DATA_PUSH_SECRET}`) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
     const q = new URL(request.url).searchParams;
-    const r = await runBuilders(env, { proxy: builderProxy(env), job: q.get('job') || undefined, only: q.get('only') || undefined, full: q.get('full') === '1' ? true : undefined, now: Date.now() });
+    const r = await runBuilders(env, { proxy: builderProxy(env), aiCap: builderCap(env), job: q.get('job') || undefined, only: q.get('only') || undefined, full: q.get('full') === '1' ? true : undefined, now: Date.now() });
     return json(r, 200, headers);
   }
   // The family's data, kept in R2 (data.js): packs, the mirror, bus packs.
@@ -1648,7 +1650,7 @@ async function cronTick(event, env, ctx, part) {
     // (The bill's pace, pace.js: what can wait waits.)
     const pace = (await paceOf(env)).pace;
     // The family's data (builders/), each job at its minute.
-    if (event.cron !== ODD_CRON && BUILD_SLOTS[min]) run(`build:${BUILD_SLOTS[min]}`, () => runBuilders(env, { proxy: builderProxy(env), now: tick.getTime(), pace, log: () => {} }));
+    if (event.cron !== ODD_CRON && BUILD_SLOTS[min]) run(`build:${BUILD_SLOTS[min]}`, () => runBuilders(env, { proxy: builderProxy(env), aiCap: builderCap(env), now: tick.getTime(), pace, log: () => {} }));
     // The bill's guard: its clock woken (started if it isn't); and what the
     // owner should hear of it (ops.js tellOwner: a higher alert, a stop, a new pace).
     if (event.cron !== ODD_CRON && min % 10 === 0) {

@@ -9,6 +9,7 @@
 //   (the bus packs: GitHub's weekly build from TDX's GTFS since 2026-11,
 //   tools/gtfs-buses.mjs, started from here: :22 at 19 UTC daily, kickBuses,
 //   when none ran in a week; buses.js runBuses only by hand, POST /data/build?job=buses)
+//   :04 :24 :34 :54  the family's AI made once (ai.js: news lines, game recaps, word cards)
 //   :00 :10 :18 :30 :40 :50  Orbit News' stories (every outlet's feed, news.js),
 //                and its site published when News's main moved (newsSite)
 //   :22 daily    15 UTC CPBL's tables and its month whole (23:00 in Taiwan);
@@ -32,18 +33,19 @@ import { runBuses, kickBuses, BUSES_HOUR } from './buses.js';
 import { runKept, KEPT_HOUR } from './kept.js';
 import { runF1Kept } from './f1kept.js';
 import { runNews, newsSite } from './news.js';
+import { runAi } from './ai.js';
 
 export const WINPROB_HOUR = 23;
 
 // `proxy(url, trim)`: a read through the data proxy's route (its trims and edge cache), its JSON or null.
 // One job a run (each run its own 30 s of CPU: the whole hour's work in one
 // went past it, 2026-10-13), each on its own even minute of the hour.
-export const SLOTS = { 0: 'news', 6: 'f1kept', 10: 'news', 16: 'watch', 18: 'news', 20: 'cutouts', 22: 'daily', 26: 'f1kept', 30: 'news', 40: 'news', 46: 'f1kept', 50: 'news' };
+export const SLOTS = { 0: 'news', 4: 'ai', 6: 'f1kept', 10: 'news', 16: 'watch', 18: 'news', 20: 'cutouts', 22: 'daily', 24: 'ai', 26: 'f1kept', 30: 'news', 34: 'ai', 40: 'news', 46: 'f1kept', 50: 'news', 54: 'ai' };
 
 // `proxy(url, trim)`: a read through the data proxy's route (its trims and edge cache), its JSON or null.
 // `pace` (pace.js): at 1 only what phones would miss runs, from 2 nothing
 // (a job asked for by hand, `only`, runs whatever the pace).
-export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[new Date(now).getUTCMinutes()], full, only, pace = 0, log = console.log } = {}) {
+export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[new Date(now).getUTCMinutes()], full, only, pace = 0, log = console.log, aiCap = async () => 0 } = {}) {
   if (!env.DATA || (!job && !only)) return { off: env.DATA ? 'no job this minute' : 'no data bucket' };
   const store = r2Store(env.DATA);
   const hour = new Date(now).getUTCHours();
@@ -59,6 +61,8 @@ export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[ne
   if (job === 'watch') await step('watch', () => runWatch({ store, proxy, now, until: now + 8 * 60_000, full }));
   if (job === 'cutouts') await step('cutouts', () => runCutouts({ store, now }));
   if (job === 'buses') await step('buses', () => runBuses({ store, env, now, until: now + 6 * 60_000 }));
+  // The family's AI made once (builders/ai.js): news lines, game recaps, word cards; `ai-news`… one step by hand.
+  if (job === 'ai' || only === 'ai' || only?.startsWith?.('ai-')) await step('ai', () => runAi({ store, env, proxy, now, cap: aiCap, only: only?.startsWith?.('ai-') ? only.slice(3) : null }));
   if (job === 'news' || only === 'news') {
     await step('news', () => runNews({ store, now }));
     await step('newsSite', () => newsSite({ store, env, now }));
