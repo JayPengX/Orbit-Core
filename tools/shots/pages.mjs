@@ -280,6 +280,8 @@ export const PAGES = {
     photo: { args: click("js:window.openTransferSheet('photo')", wait(1200)) },
     swap: { hash: 'week', args: click('.cx-way.is-swap', wait(1200)) },
     flight: { hash: 'tools', args: click('.cx-fly-card', wait(2500)) },
+    // 工具's 分享 card: 分享金鑰 and 加到行事曆.
+    cal: { hash: 'tools', args: click(wait(1500), "js:document.querySelector('.cx-way.is-cal')?.scrollIntoView({block:'center'})", wait(800)) },
     sim: { args: click('js:window.openTestPanel()', wait(1200)) }
   },
   money: {
