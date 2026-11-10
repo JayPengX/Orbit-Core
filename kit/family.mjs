@@ -22,6 +22,7 @@
 //   sports.follows  [{ league, id, name, zh, short, athlete }] the teams and players followed
 //   stock.holds     [{ code, symbol, name, en, market }] what the account holds (names only, never money)
 //   vocab.due       { day, n } words due for review today
+//   vocab.learning  { words: [{ w, zh, f }] } words being learned (short meaning, forms), News' 新聞學單字
 //   transit.trips   [{ name, from: { lat, lon, name } or null (from here), to: {…} }] saved trips
 //   transit.ride    { id, at, name, fare, modes } the latest planned trip with a fare (Money's 車資記帳)
 //   weather.today   { day, word, lines: [{ kind: umbrella|pe|wear, level, text }] } 我的行程's advice for the day
