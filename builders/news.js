@@ -655,7 +655,10 @@ const keepOf = ({ o, t, u, at, d, img, v }) => ({ o, t, u, at, ...(d ? { d } : {
 // last, peak, items }]. → { tw, intl } (the front: heard of in NOW_MS,
 // ranked), past: { tw, intl } (older, by importance), recs (to keep).
 export function deskOf(items, recs = [], now, { pages = {} } = {}) {
-  const live = recs.filter(r => now - r.last <= keepFor(r.peak || 0)).map(r => ({ ...r, items: [...r.items] }));
+  // (A kept headline read again takes the feed's picture as it is now: a
+  // larger one, once the build asks for it.)
+  const fresh = new Map(items.filter(it => it.img).map(it => [it.u, it.img]));
+  const live = recs.filter(r => now - r.last <= keepFor(r.peak || 0)).map(r => ({ ...r, items: r.items.map(it => (fresh.has(it.u) && fresh.get(it.u) !== it.img ? { ...it, img: fresh.get(it.u) } : it)) }));
   const every = new Map();
   for (const it of [...live.flatMap(r => r.items), ...items]) every.set(it.u, it);
   const same = sameOf(pages, [...every.values()]);

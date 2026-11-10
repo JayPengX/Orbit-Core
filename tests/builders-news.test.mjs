@@ -271,6 +271,10 @@ test('a story is kept for days, grows as coverage comes, and ranks by importance
   const b3 = deskOf(second, b2.recs, T + 46 * H);
   assert.equal(b3.tw[0].id, id);
   assert.equal(b3.tw[0].m, 6);
+  // A kept headline read again takes the feed's picture as it is now (a larger one).
+  const bigger = second.map((it, i) => (i ? it : { ...it, img: 'https://pic.example/700.jpg' }));
+  const kept = deskOf(bigger, b2.recs, T + 46 * H).recs.flatMap(r => r.items).find(it => it.u === second[0].u);
+  assert.equal(kept.img, 'https://pic.example/700.jpg');
   // A fresh small story doesn't push it down: it carried six outlets over two days.
   const fresh = ['pts', 'ebc', 'ettoday'].map((o, i) => item(o, `易遊網遭駭個資外洩${i}`, T + 46 * H));
   const b4 = deskOf([...second, ...fresh], b3.recs, T + 47 * H);
