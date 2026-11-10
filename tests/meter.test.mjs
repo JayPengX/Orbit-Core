@@ -92,13 +92,16 @@ test("the cron copies D1 to KV (every isolate's read), KV's counts from before D
   assert.deepEqual(doc(), { [`tdx:b:2026-11-03`]: 900, maps: 41, [`tdx:b:${DAY}`]: 1, [`tdx:vb:${DAY}`]: 2_000_000 });
   // Again: nothing added twice.
   await spend(env, 'maps', 1, NOW);
-  const second = await mirrorMeter(env, NOW + 120_000);
+  // (Not written again within 10 minutes: KV's Free plan has 1,000 writes a day.)
+  await mirrorMeter(env, NOW + 120_000);
+  assert.equal(doc().maps, 41);
+  const second = await mirrorMeter(env, NOW + 600_000);
   assert.equal(second.seeded, undefined);
   assert.equal(doc().maps, 42);
   assert.equal(doc()[`tdx:b:2026-11-03`], 900);
   // An isolate reading later sees it all.
   resetMeter();
-  const pts = tdxPoints(await tdxUse(env, NOW + 180_000), NOW + 180_000, {});
+  const pts = tdxPoints(await tdxUse(env, NOW + 660_000), NOW + 660_000, {});
   assert.ok(Math.abs(pts.month - (901 / 1500 + 2_000_000 / (150 * 2 ** 20))) < 1e-9, String(pts.month));
 });
 

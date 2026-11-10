@@ -98,6 +98,7 @@ const meter = { month: '', stored: null, readAt: 0, pending: {}, flushedAt: 0, t
 export function resetMeter() {
   Object.assign(meter, { month: '', stored: null, readAt: 0, pending: {}, flushedAt: 0, timer: null, timerAt: 0 });
   Object.assign(lastMeter, { month: '', stored: null, readAt: 0 });
+  mirrored.clear();
 }
 const meterKey = month => `transit:use:${month}`;
 const FLUSH_MS = 2000;
@@ -290,6 +291,8 @@ export async function flushUse(env, now = Date.now()) {
 // ended, its last adds, for its first two hours) written from D1. A month
 // first seen here gets KV's counts from before D1 kept them added in, once
 // (`_seeded`, in the same transaction as the adds).
+export const MIRROR_EVERY = 10 * MIN;
+const mirrored = new Map(); // month → { text, at } last written (this isolate)
 export async function mirrorMeter(env, now = Date.now()) {
   if (!env?.STORE || !env.RATE_LIMIT_KV) return { off: true };
   await meterTable(env);
@@ -306,7 +309,14 @@ export async function mirrorMeter(env, now = Date.now()) {
     }
     const { results } = await env.STORE.prepare("SELECT k, n FROM meter WHERE month = ?1 AND k != '_seeded'").bind(month).all();
     const doc = Object.fromEntries((results || []).map(r => [r.k, Number(r.n) || 0]));
-    await kvPut(env, meterKey(month), doc, 62 * 86_400);
+    // (Written when it changed, at most each MIRROR_EVERY: KV's Free plan
+    // takes 1,000 writes a day, and every 2 minutes was 720 of them.)
+    const text = JSON.stringify(doc);
+    const last = mirrored.get(month);
+    if (!last || (last.text !== text && now - last.at >= MIRROR_EVERY)) {
+      await kvPut(env, meterKey(month), doc, 62 * 86_400);
+      mirrored.set(month, { text, at: now });
+    }
     out[month] = Object.keys(doc).length;
   }
   // (Months past the last three gone.)
