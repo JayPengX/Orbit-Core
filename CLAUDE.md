@@ -198,7 +198,7 @@ w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 | `/stock` | `stock-fill.js`, `stock-check.js` | Securities' fills at the proxy's own quote; the account replayed on each save |
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
 | `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `weather-radar.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations) scored hourly (`/weather/skill`); `radar`: the next hour's rain (CWA); in a typhoon (NCDR's CAP), `dayOff`: each county's 停班停課 (人事行政總處) or a fitted chance |
-| `/transit/…` | `transit.js`, `transit-free.js` | TDX (allowlist `TDX_RULES`; `tdxTrim`; YouBike, 新竹/臺北/新北's buses, 台鐵's day: own sites; 高鐵's day, metros but live: `rail/`; `tdxf:*`), bus places (`gps`), map config, search, place, route (TDX's if `TDX_MAAS`), walk, book (高鐵), `gtfs` (dev, bus build); `status?sample=` |
+| `/transit/…` | `transit.js`, `transit-free.js` | TDX (allowlist `TDX_RULES`; `tdxTrim`; YouBike, 新竹/臺北/新北's buses, 台鐵's day: own sites; 高鐵's day, metros but live: `rail/`; slow lists: `tdx/`; `tdxf:*`), bus places (`gps`), map config, search, place, route (TDX's if `TDX_MAAS`), walk, book (高鐵), `gtfs` (dev, bus build); `status?sample=` |
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `f1-people.js`, `fund-nav.js`, `taifex.js` | The data proxy (§4.1): sports, quotes, F1, Asian baseball, SITCA's fund NAVs, TAIFEX |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
@@ -315,7 +315,7 @@ A read (`kit proxyJson`) goes down these until one answers:
 | Store | Binding | What's in it |
 | --- | --- | --- |
 | D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data, the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced (§5.3); `gemini_call`: every Gemini call (`gemini-use.js`); `law_day`: the AI caps' counts a day; `gift`, `gift_claim`: the giveaway (`gift.js`); `beats`: each job's last run and failures (`ops.js`); `meter`: Google's and TDX's counts a month (`transit.js`); `push_kv`: notices' devices and lists (`push.js`) |
-| R2 `orbit-data` | `DATA` | Public: the builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `station/`, `rail/`, `where.json`), the proxy's kept reads (`mirror/`), the radar's (`weather/`). Never served: `private/` (nightly backups `private/store/`, Firestore's last copy) |
+| R2 `orbit-data` | `DATA` | Public: the builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `station/`, `rail/`, `tdx/`, `where.json`), the proxy's kept reads (`mirror/`), the radar's (`weather/`). Never served: `private/` (nightly backups `private/store/`, Firestore's last copy) |
 | KV | `RATE_LIMIT_KV` | Counters (sign-ins, per-address limits); the guard's state, pace and alerts (`guard:*`); Google Weather's cells and calls a day (`weather:g:*`, `weather:google:<day>`); TDX's last reads (`tdx:warm:*`); the meter's copy (`transit:use:<month>`); Law's kept plans and answers (`law:*`); the showcase's passes a day (`showcase:passes:*`); the door's state (`door:state`); `ops:data-folders` |
 | Durable Objects | `F1_LOG`, `DOOR`, `RUNNER`, `CLOCK` | `F1Log`: F1's laps; `Door`: seats and the line; `Runner` (`runner.js`): heavy routes, crons by alarm, relays past 40 outside calls; `GuardClock`: the guard's alarm |
 | Edge cache | (Cache API) | The data proxy's answers by tier (§4.1), `/sports-today`, TDX's reads and routes (`transit.js`), the weather blend's cells (`weather.js`), `/law-live`, `/law-page`, `/config` |
@@ -371,7 +371,7 @@ writing a file only when it changed (`builders/store.js`):
 | `watch.js` | `sports/watch.json`, the season archive | hourly / daily 20:00 |
 | `winprob.js` | `winprob/…` | daily 23:00 |
 | `photos.js`, `official-photos.js` | photo lists, cutouts, official headshots | hourly / daily 18:00 |
-| `gtfs.js`, `buses.js`, `ntpc.js` (GitHub `buses.yml`, `tools/gtfs-buses.mjs`) | `bus/…`, `shape/…`, `station/…`, `where.json`, `rail/…` | Sat 19:07 |
+| `gtfs.js`, `buses.js`, `ntpc.js` (GitHub `buses.yml`, `tools/gtfs-buses.mjs`) | `bus/…`, `shape/…`, `station/…`, `where.json`, `rail/…`, `tdx/…` | Sat 19:07 |
 | `asia.js`, `cpbl.js` | CPBL's month and standings | daily 15:00 |
 | `f1kept.js` | each finished F1 session's 數據 and laps, kept before anyone opens them (via the proxy: OpenF1 refuses quick askers) | :06, :26, :46 |
 | `kept.js` | wipes the proxy's kept copies (`mirror/`) from before a league's first askable day | daily 17:00 |
@@ -415,11 +415,11 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   panel, served by `/config`): `sportsList`, `sportsGame`, `f1*`,
   `playLive`, `tdx*`, `transit*`. `autoScale` slows them together as the
   family grows (`capacity.js`).
-- **AI caps** are settings too (`DEV ai*`): calls a day for everyone, one
-  count in D1 `law_day`, 0 pauses (`worker.js aiCap`). Every Gemini call is
-  a row in `gemini_call` (`gemini-use.js`), only behind a person's tap.
-- **Errors**: each route's 5xx tallied (`err:<route>:<day>`); the guard's
-  `/errors`; the panel's 部署 runs workflows with `GH_ACTIONS_TOKEN`.
+- **AI caps** are settings too (`DEV ai*`): calls a day for all, one
+  count in D1 `law_day`, 0 pauses (`worker.js aiCap`). Each Gemini call is
+  a row in `gemini_call` (`gemini-use.js`), only on a person's tap.
+- **Errors**: each route's 5xx tallied (`err:<route>:<day>`), the guard's
+  `/errors`; 部署 runs workflows (`GH_ACTIONS_TOKEN`).
 - **容量** (`capacity.js` `quotas`): people each quota holds = this
   week's × room past the fixed part ÷ people's use, the fewest named
   (under `FEW`: by `TYPICAL_DAY`); people's Workers use: what the

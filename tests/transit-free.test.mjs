@@ -328,3 +328,28 @@ test("A metro's maps and timetables from the weekly copy in R2 (rail/metro/…):
   // (Not copied yet: TDX's.)
   assert.equal(await freeTdx('basic/v2/Rail/Metro/Line/KRTC', '$format=JSON', opts), null);
 });
+
+test("The slow lists every phone asks the same way (a city's bus routes, 台鐵's and 高鐵's stations and lines) from the build's copies (tdx/…); asked another way, TDX's", async () => {
+  const { tdxCopies, copyFile } = await import('../transit-free.js');
+  const { tdxRequest } = await import('../transit.js');
+  const asks = tdxCopies(['Taipei', 'InterCity']);
+  const files = new Map(asks.map(a => {
+    const r = tdxRequest(a);
+    return [copyFile(decodeURIComponent(r.path), new URLSearchParams(r.query)), JSON.stringify([{ ask: a }])];
+  }));
+  assert.equal(files.size, asks.length, 'each its own file');
+  assert.ok(files.has('tdx/basic/v2/Rail/THSR/Station.json'));
+  resetFree();
+  const env = { DATA: { get: async k => (files.has(k) ? { text: async () => files.get(k) } : null) } };
+  const opts = { env, now: NOW, fetchFn: async () => assert.fail('no network') };
+  // (As the phone asks: tdxRequest's order and spelling.)
+  for (const a of asks) {
+    const r = tdxRequest(a);
+    const got = await freeTdx(r.path, r.query, opts);
+    assert.equal(got?.state, 'free', a);
+    assert.equal(JSON.parse(got.body)[0].ask, a);
+  }
+  const other = tdxRequest('basic/v2/Bus/Route/City/Taipei?$select=RouteUID');
+  assert.equal(await freeTdx(other.path, other.query, opts), null);
+  assert.equal(copyFile('basic/v2/Bus/Route/City/Taipei/307', new URLSearchParams()), undefined);
+});
