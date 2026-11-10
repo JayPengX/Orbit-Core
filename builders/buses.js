@@ -411,3 +411,28 @@ export async function runBuses({ store, env, now = Date.now(), until = now + 8 *
   if (stations.length && CITIES.every(c => index.stations?.[c])) await store.put('station/index.json', { v: 1, built, tile: TILE, cities: Object.fromEntries(CITIES.map(c => [c, index.stations[c].tiles])) });
   return { stale: stale.length, built: done, stations, ...(Object.keys(failed).length ? { failed } : {}) };
 }
+
+// ---- The weekly build, started from here -------------------------------------
+//
+// GitHub's own timer barely fires in this repo (2026-11-10: News's every-15
+// minutes none in hours), so buses.yml's Saturday schedule can't be trusted:
+// each day at BUSES_HOUR the proxy looks at its last run and starts it when
+// none began in the last week (less two hours, so a run GitHub did start
+// counts). With GH_ACTIONS_TOKEN (Actions read and write).
+export const BUSES_HOUR = 19;
+const BUSES_EVERY = 7 * 86_400_000 - 2 * 3_600_000;
+export async function kickBuses({ env, now = Date.now(), fetchImpl = fetch }) {
+  if (!env?.GH_ACTIONS_TOKEN) return { off: 'no token' };
+  const gh = (path, init = {}) =>
+    fetchImpl(`https://api.github.com/repos/JayPengX/Orbit-Core/actions/workflows/buses.yml/${path}`, {
+      ...init,
+      headers: { Authorization: `Bearer ${env.GH_ACTIONS_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'orbit-buses', ...(init.body ? { 'Content-Type': 'application/json' } : {}) },
+      signal: AbortSignal.timeout(10_000)
+    });
+  const res = await gh('runs?per_page=1');
+  if (!res.ok) return { failed: `HTTP ${res.status}` };
+  const last = Date.parse((await res.json())?.workflow_runs?.[0]?.created_at || '') || 0;
+  if (now - last < BUSES_EVERY) return { last: new Date(last).toISOString() };
+  const go = await gh('dispatches', { method: 'POST', body: JSON.stringify({ ref: 'main' }) });
+  return go.ok ? { started: true, last: last ? new Date(last).toISOString() : null } : { failed: `start: HTTP ${go.status}` };
+}
