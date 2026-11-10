@@ -121,7 +121,7 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); each app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
 | `passkey.mjs` | Passkeys in the browser: made, used, named (`passkeyHere()` false where a browser can't) |
 | `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); topics (`TOPICS`); `sideOf`, `partiesIn`, `topicsOf` |
-| `ai.mjs`, `family.mjs`, `today.mjs` | AI on a phone: `aiCall`, `aiFlow` (asks back as chips), `pickList`/`picker`, `aiBar`, `aiPicture`; the phone's family notebook (`tell`/`heard`, places, Class's periods, `planHash`: a Transit trip); Pass's 今天 |
+| `ai.mjs`, `family.mjs`, `today.mjs` | AI: `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`; the phone's family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天 |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs`: qrcode-generator 2.0.4 (MIT), vendored |
 | `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays` |
@@ -374,7 +374,7 @@ writing a file only when it changed (`builders/store.js`):
 | `f1kept.js` | each finished F1 session's 數據 and laps, kept early (via the proxy) | :06, :26, :46 |
 | `kept.js` | wipes kept copies (`mirror/`) before a league's first askable day | daily 17:00 |
 | `news.js`, `news-words.js` | `news/index.json` (3 days), `past.json` (weeks): stories by weight, topic, side, Taiwan's on the world's | every 10 min |
-| `ai.js`, `recaps.js` | AI made once: `news/lines.json`, `words/cards/<a…z>.json`, `sports/recaps/<day>.json` | :04 :24 :34 :54 |
+| `ai.js`, `recaps.js`, `f1story.js` | AI made once: `news/lines.json`, `words/cards/<a…z>.json`, `sports/recaps/<day>.json`, `sports/f1/stories/` | :04 :24 :34 :54 |
 
 A season is kept until the next one's first game. `private/` is never served.
 

@@ -305,6 +305,31 @@ export const FEATURES = {
     }
   },
 
+  // Orbit Sports' F1 賽後故事: how a race or sprint was won, told once from
+  // code's digest of F1's own timing (builders/f1story.js): the result with
+  // grids, stops and tyres, who led which laps, climbs, retirements, safety
+  // cars. Every number must be the digest's.
+  'f1-story': {
+    models: ['haiku', 'luna'],
+    maxIn: 3000,
+    parts: ({ facts }) =>
+      text(
+        [
+          'You write the short story of how this Formula 1 race was won, for fans in Taiwan who already see the finishing order. Tell what the order can’t: when and how the lead changed (the stops, the tyre calls, a safety car), who climbed or fell back, in race order.',
+          'zh: 2 or 3 sentences in Traditional Chinese, as Taiwan’s F1 coverage writes (進站, 換胎, 軟胎, 中性胎, 硬胎, 半雨胎, 雨胎, 安全車, 杆位, 領跑), ≤ 110 字. Drivers by surname as written in English (Norris), teams in English.',
+          'en: the same story in English, ≤ 60 words.',
+          'Use only these facts. Every number you write must be one of theirs. Never give a reason the facts don’t show: no crash, penalty, rain or mistake they don’t name; a tyre change from inter to soft and back says only that the cars changed tyres.',
+          'Facts:',
+          facts
+        ].join('\n')
+      ),
+    schema: obj({ zh: S, en: S }),
+    clean: (raw, { facts }) => {
+      const zh = str(raw?.zh, 180), en = str(raw?.en, 420);
+      return zh && en && numbersFrom(zh + ' ' + en, facts) ? { zh, en } : null;
+    }
+  },
+
   // Orbit Transit: an operator's free-text notice (its own site's, not
   // TDX's, which names its routes) read into which lines, stops and days.
   // Every route and stop must be words of the notice's own.
