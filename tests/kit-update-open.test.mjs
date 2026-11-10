@@ -14,7 +14,8 @@ const ORIGIN = 'https://orbit.test';
 const page = v => `<!doctype html><html><head><meta name="build-version" content="${v}"><script>!function(){}('../Orbit-Core/kit/',null)</script></head><body></body></html>`;
 
 // The kit's service worker in a sandbox: its caches, and a server that answers after `serverMs`.
-function worker({ serverMs, lastCheckMs }) {
+function worker({ serverMs, lastCheckMs, preload }) {
+  const asked = [];
   const stores = new Map();
   const store = name => {
     if (!stores.has(name)) stores.set(name, new Map());
@@ -47,6 +48,7 @@ function worker({ serverMs, lastCheckMs }) {
   const handlers = {};
   const fetch = async (u, init = {}) => {
     const url = String(typeof u === 'string' ? u : u.url);
+    asked.push(url);
     await new Promise((done, fail) => {
       const t = setTimeout(done, serverMs);
       init.signal?.addEventListener('abort', () => (clearTimeout(t), fail(new Error('aborted'))));
@@ -57,6 +59,7 @@ function worker({ serverMs, lastCheckMs }) {
   const self = { ORBIT_SW: { cache: 'orbit-test-v1' }, location: { origin: ORIGIN }, addEventListener: (t, f) => (handlers[t] = f), navigator: { onLine: true } };
   vm.runInNewContext(swSource, { self, caches, fetch, Response, Request, Headers, URL, AbortController, setTimeout, clearTimeout, crypto, console, Promise, Date });
   return {
+    asked,
     async ready() {
       await (await caches.open('orbit-test-v1')).put(`${ORIGIN}/test/`, new Response(page('old')));
       if (lastCheckMs != null) await (await caches.open('orbit-sw-link')).put('/__orbit/page-check-ms', new Response(String(lastCheckMs)));
@@ -64,7 +67,8 @@ function worker({ serverMs, lastCheckMs }) {
     async open() {
       let answer;
       const t0 = Date.now();
-      handlers.fetch({ request: { url: `${ORIGIN}/test/`, mode: 'navigate', method: 'GET', destination: 'document' }, respondWith: p => (answer = p), waitUntil: () => {} });
+      const preloadResponse = preload ? preload() : undefined;
+      handlers.fetch({ request: { url: `${ORIGIN}/test/`, mode: 'navigate', method: 'GET', destination: 'document' }, preloadResponse, respondWith: p => (answer = p), waitUntil: () => {} });
       const res = await answer;
       return { ms: Date.now() - t0, html: await res.text() };
     }
@@ -95,6 +99,23 @@ test('a server that stalls is waited on at most PAGE_WAIT_MS', async () => {
   const { html, ms } = await sw.open();
   assert.match(html, /content="old"/);
   assert.ok(ms < 1800, `${ms} ms`);
+});
+
+// Navigation preload: the page asked while the worker started is the one used, never asked twice.
+test("an opening takes the browser's navigation preload in place of asking the server again", async () => {
+  const sw = worker({ serverMs: 30, lastCheckMs: 120, preload: () => new Promise(done => setTimeout(() => done(new Response(page('pre'), { status: 200 })), 10)) });
+  await sw.ready();
+  const { html } = await sw.open();
+  assert.match(html, /content="pre"/);
+  assert.ok(!sw.asked.some(u => u.endsWith('/test/')), `asked again: ${sw.asked}`);
+});
+test('a preload that fails is asked again; none (a first visit, an old browser) as before', async () => {
+  const failing = worker({ serverMs: 30, lastCheckMs: 120, preload: () => Promise.reject(new Error('net')) });
+  await failing.ready();
+  assert.match((await failing.open()).html, /content="new"/);
+  const empty = worker({ serverMs: 30, lastCheckMs: 120, preload: () => Promise.resolve(undefined) });
+  await empty.ready();
+  assert.match((await empty.open()).html, /content="new"/);
 });
 
 test('the watch downloads a newer version behind the screen and swaps only after the person was away', async () => {

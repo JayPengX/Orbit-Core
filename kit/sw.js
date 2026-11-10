@@ -38,10 +38,14 @@ self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(['./'])).then(() => self.skipWaiting()));
 });
 
+// Navigation preload: an opening's page is asked for while the worker is
+// still starting (iPhone: 0.1–0.5 s asleep after the app was away), not
+// after; the routes below take that answer in place of their own ask.
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches
-      .keys()
+    Promise.resolve(self.registration?.navigationPreload?.enable())
+      .catch(() => {})
+      .then(() => caches.keys())
       // Only this app's own old copies: the other apps share this site (and its caches), and the pictures are kept for all of them.
       .then(keys => Promise.all(keys.filter(k => k.startsWith(PREFIX) && k !== CACHE && !SW.spare.includes(k)).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
@@ -125,6 +129,29 @@ async function keep(request, response) {
   await cache.put(request, response);
 }
 
+// The page from the server, checked every time (cache 'no-cache'): the
+// navigation preload's answer when the browser asked it while this worker
+// started (the site's pages are max-age=0, must-revalidate: the same check),
+// else asked now. A preload that fails or hangs is asked again here.
+const PRELOAD = new WeakMap();
+let PRELOAD_ON = false;
+async function pageAsk(request) {
+  const pre = PRELOAD.get(request);
+  if (pre) {
+    let timer = 0;
+    const got = await Promise.race([pre.catch(() => null), new Promise(done => (timer = setTimeout(() => done(null), STALL_MS)))]);
+    clearTimeout(timer);
+    if (got) {
+      if (got.type !== 'basic' || got.status !== 200 || !got.body) return got;
+      try {
+        const body = await Promise.race([got.arrayBuffer(), new Promise((_, no) => setTimeout(() => no(new Error('body')), BODY_MS))]);
+        return new Response(body, { status: got.status, statusText: got.statusText, headers: got.headers });
+      } catch {}
+    }
+  }
+  return fetchSure(request.url, { cache: 'no-cache', credentials: 'same-origin', redirect: 'manual' });
+}
+
 // A poor connection: the network gets this long before a kept copy answers
 // (the network's copy still saved for next time). It had no limit: on a slow
 // connection each file the page imports waited out the network in turn.
@@ -146,7 +173,7 @@ async function networkFirstNow(request, later) {
     // when unchanged): GitHub Pages lets browsers keep it 10 minutes, which
     // would open the last deploy's page right after a new one. By address,
     // since a navigation can't be re-sent with options.
-    const response = request.mode === 'navigate' ? await fetchSure(request.url, { cache: 'no-cache', credentials: 'same-origin', redirect: 'manual' }) : await fetchSure(request);
+    const response = request.mode === 'navigate' ? await pageAsk(request) : await fetchSure(request);
     later(keep(request, response.clone()));
     return response;
   } catch (error) {
@@ -194,7 +221,7 @@ async function pageFirst(request, later) {
   if (!kept) return networkFirst(request, later);
   // (The page checked with the server, a cheap 304 when unchanged; kept for next time.)
   const t0 = Date.now();
-  const net = fetchSure(request.url, { cache: 'no-cache', credentials: 'same-origin', redirect: 'manual' }).then(r => {
+  const net = pageAsk(request).then(r => {
     later(noteCheckMs(Date.now() - t0));
     if (r.status === 200 && r.type !== 'opaqueredirect') later(keep(request, r.clone()));
     return r;
@@ -307,6 +334,17 @@ self.addEventListener('fetch', event => {
   // (a save started while another was awaited is waited for too).
   const tail = [];
   const later = work => tail.push(Promise.resolve(work).catch(() => {}));
+  // (Every navigation's preload is taken, used or not: a page served from here lets it go quietly.)
+  if (request.mode === 'navigate' && !PRELOAD_ON) {
+    // (Turned on once a start too: a phone whose worker was installed before it had it.)
+    PRELOAD_ON = true;
+    later(self.registration?.navigationPreload?.enable());
+  }
+  if (request.mode === 'navigate' && event.preloadResponse) {
+    const pre = Promise.resolve(event.preloadResponse).then(r => r || null);
+    PRELOAD.set(request, pre);
+    later(pre);
+  }
   const own = SW.route(request, url);
   const route = ROUTES[own] || (request.mode === 'navigate' ? (url.searchParams.has('v') ? versionFirst : pageFirst) : url.searchParams.has('v') ? cacheFirst : request.destination === 'image' ? pictureFirst : networkFirst);
   const answer = own && typeof own !== 'string' ? Promise.resolve(own) : route(request, later);

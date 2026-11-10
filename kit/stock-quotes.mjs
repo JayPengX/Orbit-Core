@@ -6,7 +6,7 @@
 // /v7/finance/spark (with the day's price line), charts, dividends and
 // splits from /v8/finance/chart, and symbol search from /v1/finance/search.
 import { API } from './domain.mjs';
-import { BASE, METALS, GRAMS_PER_OUNCE, FUND_CUTOFF, isTwFund, isWarrant, isFuture, futureOf, isOption, tickSize, toTick as onTickOf, SSF_RATE, optionOf, optionTick, optionExpiry, seriesFuture, OPTION, kindOf, marketOf, normalizeCurrency } from './stock-markets.mjs';
+import { BASE, METALS, GRAMS_PER_OUNCE, FUND_CUTOFF, isTwFund, isWarrant, isCb, isFuture, futureOf, isOption, tickSize, toTick as onTickOf, SSF_RATE, optionOf, optionTick, optionExpiry, seriesFuture, OPTION, kindOf, marketOf, normalizeCurrency } from './stock-markets.mjs';
 import { BONDS, ISSUERS, CURVE_SYMBOLS, bondQuote, bondLine, curveOf } from './stock-bonds.mjs';
 
 export const PROXY_URL = API;
@@ -53,6 +53,10 @@ const FUND_BATCH = 40;
 // 牛熊證's price where Yahoo has none (most trade rarely). Its last trade
 // today, else the market maker's best bid (what it can be sold for), else
 // the day's reference price; `bid`/`ask` the best of each. MIS_BATCH to a request.
+// And every listed stock's and ETF's while the market is open: Yahoo's
+// Taiwan prices are 20 minutes late (2330.TW at 10:45 read 10:25's), TWSE's
+// are the last trade (`traded`); Yahoo's line and figures stay, the price
+// and the day's range move on (liveTw). Yahoo down, TWSE's alone.
 const MIS_URL = 'https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=';
 const MIS_BATCH = 40;
 const misChannel = symbol => `${/\.TWO$/i.test(symbol) ? 'otc' : 'tse'}_${symbol.replace(/\.TWO?$/i, '').toLowerCase()}.tw`;
@@ -62,18 +66,22 @@ export function misQuote(symbol, m, now = Date.now()) {
   const prev = n(m?.y);
   const bid = best(m?.b);
   const ask = best(m?.a);
-  const last = n(m?.z);
+  // (The last trade: `z`, or since 2026 often '-' there and in `trade`, with its own time.)
+  const last = n(m?.z) ?? n(m?.trade?.z);
   const price = last ?? bid ?? prev;
   if (!price) return null;
   const day = /^\d{8}$/.test(m.d || '') ? `${m.d.slice(0, 4)}-${m.d.slice(4, 6)}-${m.d.slice(6)}` : new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
   const at = clock => Date.parse(`${day}T${clock}+08:00`);
-  const marketTime = /^\d\d:\d\d:\d\d$/.test(m.t || '') ? at(m.t) : now;
+  const clock = n(m.z) == null && last != null && /^\d\d:\d\d:\d\d$/.test(m.trade?.t || '') ? m.trade.t : m.t;
+  const marketTime = /^\d\d:\d\d:\d\d$/.test(clock || '') ? at(clock) : now;
   const base = prev || price;
+  const code = symbol.replace(/\.TWO?$/i, '');
   return {
     symbol,
     name: m.n || symbol,
     shortName: m.n || symbol,
-    kind: 'warrant',
+    kind: isWarrant(symbol) ? 'warrant' : kindOf(/^00/.test(code) ? 'ETF' : 'EQUITY', symbol),
+    traded: last != null,
     market: 'TW',
     currency: 'TWD',
     price,
@@ -116,6 +124,38 @@ async function fetchMisQuotes(symbols) {
     }
   }
   return out;
+}
+// A listed stock or ETF TWSE quotes live (not a warrant, a 可轉債, a fund).
+export const isTwListed = symbol => /^[0-9]{4}[0-9A-Z]{0,2}\.TWO?$/i.test(symbol || '') && !isWarrant(symbol) && !isCb(symbol);
+// Taiwan's market open (and the close's call), Monday to Friday, by Taipei's clock.
+export function twOpen(now = Date.now()) {
+  const t = new Date(now + 8 * 3_600_000);
+  const min = t.getUTCHours() * 60 + t.getUTCMinutes();
+  return t.getUTCDay() >= 1 && t.getUTCDay() <= 5 && min >= 9 * 60 && min <= 13 * 60 + 40;
+}
+// Yahoo's quote moved on to TWSE's last trade (when newer): the price, the
+// change on TWSE's reference price, the day's range, the line's last point.
+export function liveTw(y, m) {
+  if (!m?.traded || !(m.price > 0)) return y;
+  if (!y) return m;
+  if (!(m.marketTime > (y.marketTime || 0))) return y;
+  const prev = m.prev > 0 ? m.prev : y.prev;
+  const hi = [y.dayHigh, m.dayHigh, m.price].filter(x => x > 0);
+  const lo = [y.dayLow, m.dayLow, m.price].filter(x => x > 0);
+  return {
+    ...y,
+    price: m.price,
+    prev,
+    change: m.price - prev,
+    pct: prev ? m.price / prev - 1 : 0,
+    bid: m.bid ?? y.bid,
+    ask: m.ask ?? y.ask,
+    dayHigh: hi.length ? Math.max(...hi) : null,
+    dayLow: lo.length ? Math.min(...lo) : null,
+    marketTime: m.marketTime,
+    line: [...(y.line || []).filter(p => p[0] < m.marketTime), [m.marketTime, m.price]],
+    live: 'TWSE'
+  };
 }
 export function fundQuote(symbol, f) {
   if (!f || !(f.nav > 0)) return null;
@@ -457,6 +497,9 @@ export async function fetchQuotes(symbols, { range = '1d', interval = '5m' } = {
   const futRead = futs.length || opts.length ? readTaifex().catch(() => null) : null;
   const batches = [];
   for (let i = 0; i < wanted.length; i += SPARK_BATCH) batches.push(wanted.slice(i, i + SPARK_BATCH));
+  // (Today's quotes while Taiwan's market is open: TWSE's live beside Yahoo's late ones.)
+  const listed = range === '1d' && twOpen() ? wanted.filter(x => isTwListed(x) || isWarrant(x)) : [];
+  const misRead = listed.length ? fetchMisQuotes(listed).catch(() => new Map()) : null;
   const results = await Promise.allSettled(
     batches.map(batch =>
       getJson(`${YAHOO}/v7/finance/spark?symbols=${batch.map(encodeURIComponent).join(',')}&range=${range}&interval=${interval}`)
@@ -468,6 +511,16 @@ export async function fetchQuotes(symbols, { range = '1d', interval = '5m' } = {
   for (const r of results) {
     if (r.status === 'fulfilled') for (const [k, v] of parseSpark(r.value)) out.set(k, v);
     else failed++;
+  }
+  if (misRead) {
+    let got = 0;
+    for (const [k, m] of await misRead) {
+      // (A warrant Yahoo has no price for: TWSE's as it is, a bid if nothing traded.)
+      const q = isWarrant(k) && !out.has(k) ? m : liveTw(out.get(k), m);
+      if (q) out.set(k, q), got++;
+    }
+    // (Yahoo down: TWSE's answered for these.)
+    if (got && failed === asked) failed--;
   }
   for (const s of symbols) if (METALS[s]) {
     const q = metalQuote(s, out.get(METALS[s].future), out.get(fxSymbol('USD')));
@@ -492,7 +545,7 @@ export async function fetchQuotes(symbols, { range = '1d', interval = '5m' } = {
     for (const u of new Set([TAIEX, ...futs.map(s => futureOf(s).underlying)])) if (!symbols.includes(u)) out.delete(u);
   }
   // Warrants Yahoo has no price for: TWSE's own.
-  const noPrice = symbols.filter(s => isWarrant(s) && !out.has(s));
+  const noPrice = symbols.filter(s => isWarrant(s) && !out.has(s) && !listed.includes(s));
   if (noPrice.length) for (const [k, v] of await fetchMisQuotes(noPrice).catch(() => new Map())) out.set(k, v);
   if (fundRead) {
     const f = await fundRead;

@@ -91,6 +91,49 @@ test('a warrant from TWSE’s own quotes: last trade, else the best bid, else th
   assert.equal(misQuote('030004.TW', { z: '-', y: '-', b: '-', a: '-' }), null);
 });
 
+// Yahoo's Taiwan prices are 20 minutes late; TWSE's own (MIS) are the last trade.
+test('a Taiwan stock while the market is open: TWSE’s last trade over Yahoo’s late one', async () => {
+  const { misQuote, liveTw, twOpen, isTwListed, fetchQuotes, useQuotesReader } = await import('../kit/stock-quotes.mjs');
+  // MIS as it answers since 2026: `z` '-', the last trade in `trade`.
+  const m = { c: '2330', ex: 'tse', n: '台積電', z: '-', y: '2235.0000', b: '2250.0000_2245.0000_', a: '2255.0000_', h: '2280.0000', l: '2250.0000', d: '20261110', t: '10:44:20', trade: { t: '10:42:20', v: 10, z: '2250.0000' } };
+  const live = misQuote('2330.TW', m);
+  assert.equal(live.price, 2250);
+  assert.equal(live.traded, true);
+  assert.equal(live.kind, 'stock');
+  assert.equal(live.marketTime, Date.parse('2026-11-10T10:42:20+08:00'));
+  assert.equal(misQuote('0050.TW', { ...m, c: '0050' }).kind, 'etf');
+  assert.equal(misQuote('2330.TW', { ...m, trade: undefined }).traded, false, 'only a bid: not a trade');
+  const yahoo = { symbol: '2330.TW', price: 2265, prev: 2235, dayHigh: 2275, dayLow: 2255, marketTime: Date.parse('2026-11-10T10:25:10+08:00'), line: [[Date.parse('2026-11-10T09:00:00+08:00'), 2240], [Date.parse('2026-11-10T10:25:00+08:00'), 2265]], name: 'TSMC' };
+  const q = liveTw(yahoo, live);
+  assert.equal(q.price, 2250);
+  assert.equal(q.change, 15);
+  assert.equal(q.dayLow, 2250);
+  assert.equal(q.dayHigh, 2280);
+  assert.equal(q.name, 'TSMC', "Yahoo's own figures stay");
+  assert.deepEqual(q.line.at(-1), [live.marketTime, 2250]);
+  assert.equal(liveTw(yahoo, { ...live, marketTime: yahoo.marketTime - 1 }), yahoo, 'an older trade changes nothing');
+  assert.equal(liveTw(yahoo, { ...live, traded: false }), yahoo);
+  // Open: Monday to Friday 09:00–13:40, Taipei.
+  assert.equal(twOpen(Date.parse('2026-11-10T10:00:00+08:00')), true);
+  assert.equal(twOpen(Date.parse('2026-11-10T14:00:00+08:00')), false);
+  assert.equal(twOpen(Date.parse('2026-11-08T10:00:00+08:00')), false);
+  assert.ok(isTwListed('2330.TW') && isTwListed('00679B.TWO') && !isTwListed('030001.TW') && !isTwListed('12561.TWO') && !isTwListed('AAPL'));
+  // Yahoo down while open: TWSE's alone, no error.
+  const realNow = Date.now;
+  Date.now = () => Date.parse('2026-11-10T10:45:00+08:00');
+  try {
+    useQuotesReader(async url => {
+      if (url.includes('mis.twse.com.tw')) return { msgArray: [m] };
+      throw new Error('yahoo down');
+    });
+    const got = await fetchQuotes(['2330.TW']);
+    assert.equal(got.get('2330.TW').price, 2250);
+  } finally {
+    Date.now = realNow;
+    useQuotesReader(null);
+  }
+});
+
 test('a convertible bond’s terms: maturity, conversion price, put, company', async () => {
   const { cbTerms, cbMaturity } = await import('../kit/stock-markets.mjs');
   const t = cbTerms('12561.TWO');
