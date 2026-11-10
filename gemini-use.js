@@ -37,13 +37,15 @@ async function table(env) {
   if (ready.has(env.STORE)) return;
   await env.STORE.prepare('CREATE TABLE IF NOT EXISTS gemini_call (at INTEGER NOT NULL, feature TEXT NOT NULL, model TEXT NOT NULL, status INTEGER NOT NULL, tin INTEGER NOT NULL, cached INTEGER NOT NULL, tout INTEGER NOT NULL)').run();
   await env.STORE.prepare('CREATE INDEX IF NOT EXISTS gemini_call_at ON gemini_call (at)').run();
+  // (How long each call took, ms, since 11-10: the AI tab's speed. Added once; there already, it throws.)
+  await env.STORE.prepare('ALTER TABLE gemini_call ADD COLUMN ms INTEGER').run().catch(() => {});
   // (Rows past the keep go, once an isolate.)
   await env.STORE.prepare('DELETE FROM gemini_call WHERE at < ?1').bind(Date.now() - KEEP_DAYS * 86_400_000).run();
   ready.add(env.STORE);
 }
 
 // One call as Google answered it (usage: its usageMetadata, when it sent one).
-export async function logCall(env, { feature, model, status, usage = null, at = Date.now() }) {
+export async function logCall(env, { feature, model, status, usage = null, at = Date.now(), ms = null }) {
   if (!env?.STORE) return;
   const u = usage || {};
   const cached = u.cachedContentTokenCount ?? 0;
@@ -52,7 +54,7 @@ export async function logCall(env, { feature, model, status, usage = null, at = 
   const tout = (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0);
   try {
     await table(env);
-    await env.STORE.prepare('INSERT INTO gemini_call (at, feature, model, status, tin, cached, tout) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)').bind(at, String(feature), String(model), status | 0, tin, cached, tout).run();
+    await env.STORE.prepare('INSERT INTO gemini_call (at, feature, model, status, tin, cached, tout, ms) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)').bind(at, String(feature), String(model), status | 0, tin, cached, tout, Number.isFinite(ms) ? Math.round(ms) : null).run();
   } catch {
     // Counting must never affect the call it counts.
   }
@@ -78,7 +80,7 @@ export async function lastFailed(env, model, withinMs, now = Date.now()) {
 export async function callsSince(env, since) {
   if (!env?.STORE) return [];
   await table(env);
-  const { results } = await env.STORE.prepare('SELECT at, feature, model, status, tin, cached, tout FROM gemini_call WHERE at >= ?1 ORDER BY at').bind(since).all();
+  const { results } = await env.STORE.prepare('SELECT at, feature, model, status, tin, cached, tout, ms FROM gemini_call WHERE at >= ?1 ORDER BY at').bind(since).all();
   return results || [];
 }
 

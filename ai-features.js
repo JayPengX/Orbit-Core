@@ -1,0 +1,218 @@
+// Every AI feature of the family's, by name (ai.js runs them). Each is:
+//   app        the kit id whose session may tap it (taps only)
+//   tap        true: a person's tap through POST /ai; else built once by a builder (aiOnce)
+//   models     tried in order (ai.js MODELS' names), the next when one fails or answers nothing usable
+//   effort     the model's effort ('low' | 'medium' | 'high'; Gemini's thinking), or per model
+//   clarify    may ask one short question back with options to tap, rather than guess (ai.js withAsk)
+//   pick       the person's own lists it may ask about (['cat', 'pay']: input.cats, input.pays, [{ id, name }])
+//   perPass    a tap's cap a Pass a day
+//   input(raw) the phone's input made safe (null: refused)
+//   parts(in)  the fixed prompt and the input, as Gemini's parts
+//   schema     the JSON it answers (Gemini's OpenAPI subset; ai-other.js turns it into JSON Schema)
+//   clean(raw, in) what may be shown (null: nothing usable)
+// Code first (Jay 11-10): each is only what code can't do reliably; the
+// apps parse what they can themselves and ask here for the rest.
+import { cleanBuys } from './money-read.js';
+
+const str = (v, max) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const list = (v, max) => (Array.isArray(v) ? v.slice(0, max) : []);
+const S = { type: 'string' }, N = { type: 'number' }, B = { type: 'boolean' };
+const obj = (properties, required = Object.keys(properties)) => ({ type: 'object', properties, required });
+const arr = items => ({ type: 'array', items });
+const text = t => [{ text: t }];
+
+// Every number an answer writes must be one the input gave (numbers come
+// from code; a model only puts them in words). Years and small counts too.
+export function numbersFrom(out, given) {
+  const have = new Set(String(given).match(/\d+(?:\.\d+)?/g) || []);
+  return (String(out).match(/\d+(?:\.\d+)?/g) || []).every(n => have.has(n));
+}
+
+export const FEATURES = {
+  // Orbit Money: 用說的記帳, the sentences the app's own parser couldn't
+  // read ("跟同學吃火鍋花了三百五"). Entries for the person to look over, as 拍照記帳's.
+  'money-say': {
+    app: 'money',
+    tap: true,
+    clarify: true,
+    pick: ['cat', 'pay'],
+    models: ['luna', 'haiku'],
+    effort: { luna: 'low' },
+    perPass: 60,
+    perMinute: 20,
+    input(raw) {
+      const t = str(raw?.text, 400);
+      const today = DAY.test(raw?.today) ? raw.today : '';
+      if (!t || !today) return null;
+      const cats = list(raw?.cats, 160)
+        .map(c => ({ id: str(c?.id, 64), name: str(c?.name, 48), k: c?.k === 'in' ? 'in' : 'out' }))
+        .filter(c => c.id && c.name);
+      const pays = list(raw?.pays, 60)
+        .map(c => ({ id: str(c?.id, 64), name: str(c?.name, 48) }))
+        .filter(c => c.id && c.name);
+      return { text: t, today, cats, pays, en: raw?.lang === 'en' };
+    },
+    parts: ({ text: t, today, cats = [], pays = [] }) =>
+      text(
+        [
+          'You turn what a person in Taiwan typed or said into entries for their own money book.',
+          `Today is ${today} (Asia/Taipei). 昨天, 前天, 上週五 and dates without a year are the latest such day not after today.`,
+          'Each separate amount is one entry: k "out" for money spent, "in" for money received; day YYYY-MM-DD; store: what or where, short, in their words (火鍋, 全家, 捷運); total: a whole number of NT$ (三百五 = 350, 1.2k = 1200, 兩千 = 2000); items [].',
+          cats.length ? `cat: the id of the one category below that fits best, "" when unsure. 早餐, 午餐 and 晚餐 are separate: pick by the meal or the hour said. Categories (id: name):\n${cats.map(c => `${c.id}: ${c.name}${c.k === 'in' ? ' (income)' : ''}`).join('\n')}` : 'cat: "".',
+          pays.length ? `pay: the id of the way they paid, only when they said it (a card, 現金, LINE Pay, 悠遊卡); "" otherwise. Ways to pay (id: name):\n${pays.map(p => `${p.id}: ${p.name}`).join('\n')}` : 'pay: "".',
+          'invoice "" always.',
+          'Only what was said. Never guess an amount. Nothing about money: an empty `buys`.',
+          'Ask back only when an amount, which entry is income, or the meal (早餐/午餐/晚餐) really can’t be told; a category or way to pay they didn’t say is NOT a reason to ask: leave it "".',
+          `What they said: ${t}`
+        ].join('\n')
+      ),
+    schema: obj({ buys: arr(obj({ k: { type: 'string', enum: ['out', 'in'] }, day: S, store: S, total: N, items: arr(obj({ name: S, amt: N })), cat: S, pay: S, invoice: S })) }),
+    clean(raw, input) {
+      const buys = cleanBuys(raw, input.today, { cats: input.cats || [], pays: input.pays || [] }).map(b => ({ ...b, day: b.day || input.today }));
+      return { buys };
+    }
+  },
+
+  // Orbit Words: 檢查我的句子. A sentence the learner wrote with the word,
+  // corrected, with one line on why (in Chinese, or English on English phones).
+  'words-check': {
+    app: 'vocab',
+    tap: true,
+    models: ['haiku', 'luna'],
+    effort: { luna: 'low' },
+    perPass: 80,
+    perMinute: 20,
+    input(raw) {
+      const word = str(raw?.word, 60), sentence = str(raw?.sentence, 300);
+      if (!word || !sentence || sentence.length < 3) return null;
+      return { word, meaning: str(raw?.meaning, 120), sentence, en: raw?.lang === 'en' };
+    },
+    parts: ({ word, meaning, sentence, en }) =>
+      text(
+        [
+          'You are an English teacher for a Taiwanese high-school student learning vocabulary.',
+          `The word: ${word}${meaning ? ` (${meaning})` : ''}`,
+          `Their sentence: ${sentence}`,
+          'Check the sentence. ok: true only when it is natural, correct English AND uses the word in the right meaning and form.',
+          'fixed: the sentence corrected with the fewest changes (the same sentence when ok). Keep their idea; never write a new sentence.',
+          `why: when not ok, one short line on the main mistake${en ? ', in English' : ', in Traditional Chinese (台灣用語), ≤ 40 字'}; when ok, one short line of praise naming what they did well. No markdown.`,
+          'used: true when the word itself (any form: plural, tense) is in their sentence.'
+        ].join('\n')
+      ),
+    schema: obj({ ok: B, fixed: S, why: S, used: B }),
+    clean: raw => (typeof raw?.fixed === 'string' && raw.fixed.trim() ? { ok: !!raw.ok, fixed: str(raw.fixed, 400), why: str(raw.why, 120), used: raw.used !== false } : null)
+  },
+
+  // Orbit Words: 例句與記憶法, made once for the whole list (builders/words-cards.js)
+  // and kept in R2: two example sentences, a memory hook, the words it's confused with.
+  'words-cards': {
+    models: ['haiku', 'luna'],
+    timeoutMs: 60_000,
+    parts: ({ words }) =>
+      text(
+        [
+          'For each English word below (with its meaning for a Taiwanese high-school student), write a study card.',
+          'ex: two short, natural example sentences (≤ 14 words each) using the word in that meaning, each with a natural Traditional Chinese translation (台灣用語). Use the word itself or a plain form of it.',
+          'hook: one memory hook in Traditional Chinese, ≤ 30 字: a word root, a sound-alike or a picture that really helps remember it. No made-up etymology: a root only when it is real.',
+          'confuse: up to 3 English words learners mix it up with (look or sound alike, or near meanings), [] when none.',
+          'Return one card per word, the word spelled exactly as given.',
+          ...words.map(w => `${w.w}: ${w.zh}`)
+        ].join('\n')
+      ),
+    schema: obj({ cards: arr(obj({ w: S, ex: arr(obj({ en: S, zh: S })), hook: S, confuse: arr(S) })) }),
+    clean(raw, { words }) {
+      const asked = new Map(words.map(w => [w.w.toLowerCase(), w.w]));
+      const out = {};
+      for (const c of list(raw?.cards, 200)) {
+        const w = asked.get(String(c?.w || '').toLowerCase());
+        if (!w) continue;
+        const stem = w.toLowerCase().slice(0, Math.max(3, Math.min(5, w.length - 2)));
+        const ex = list(c.ex, 2)
+          .map(e => ({ en: str(e?.en, 160), zh: str(e?.zh, 80) }))
+          .filter(e => e.en && e.zh && e.en.toLowerCase().includes(stem));
+        if (!ex.length) continue;
+        out[w] = { ex, hook: str(c.hook, 60), confuse: list(c.confuse, 3).map(x => str(x, 30)).filter(x => x && x.toLowerCase() !== w.toLowerCase()) };
+      }
+      return Object.keys(out).length ? out : null;
+    }
+  },
+
+  // Orbit Sports: 賽後三句話's one "why" line, made once a final
+  // (builders/recaps.js): the score lines are code's; this is the line code
+  // can't write, from the game's own facts only, every number one of theirs.
+  'sports-recap': {
+    models: ['haiku', 'luna'],
+    parts: ({ facts, en }) =>
+      text(
+        [
+          `Write ONE line${en ? ' in English' : ' in Traditional Chinese (台灣的體育報導用語)'} on why this game ended as it did: the deciding moment or player.`,
+          en ? '≤ 20 words.' : '≤ 40 字.',
+          'Use only the facts below; every number you write must be one of theirs; no adjectives the facts don’t support; no score (it is shown already).',
+          'Team and player names as the facts write them.',
+          facts
+        ].join('\n')
+      ),
+    schema: obj({ line: S }),
+    clean: (raw, { facts }) => {
+      const line = str(raw?.line, 120);
+      return line && numbersFrom(line, facts) ? { line } : null;
+    }
+  },
+
+  // Orbit Transit: an operator's free-text notice (its own site's, not
+  // TDX's, which names its routes) read into which lines, stops and days.
+  // Every route and stop must be words of the notice's own.
+  'transit-notice': {
+    models: ['luna', 'haiku'],
+    effort: { luna: 'low' },
+    parts: ({ title, body, today }) =>
+      text(
+        [
+          'Read this Taiwanese public-transport notice and say what it changes.',
+          `Today is ${today}.`,
+          'routes: the route or line names it affects, exactly as written (e.g. 307, 紅2, 板南線); stops: stop or station names it names; from / to: YYYY-MM-DD HH:MM when it starts and ends ("" when not said); kind: one of 停駛 改道 施工 停靠調整 班次調整 票價 其他; short: one line ≤ 30 字 of what a rider must know.',
+          `Title: ${title}`,
+          `Text: ${body}`
+        ].join('\n')
+      ),
+    schema: obj({ routes: arr(S), stops: arr(S), from: S, to: S, kind: S, short: S }),
+    clean: (raw, { title, body }) => {
+      const all = `${title}\n${body}`;
+      const routes = list(raw?.routes, 40).map(r => str(r, 20)).filter(r => r && all.includes(r));
+      const stops = list(raw?.stops, 40).map(r => str(r, 30)).filter(r => r && all.includes(r));
+      const when = v => (/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(v || '') ? v : '');
+      return { routes, stops, from: when(raw?.from), to: when(raw?.to), kind: str(raw?.kind, 8), short: str(raw?.short, 60) };
+    }
+  },
+
+  // Orbit News: 一句話講清楚 and 國際新聞中文標題, made once a story
+  // (builders/news.js), from the outlets' own headlines and summaries only.
+  'news-lines': {
+    models: ['haiku', 'luna'],
+    timeoutMs: 60_000,
+    parts: ({ stories }) =>
+      text(
+        [
+          'For each news story below (the headlines and short summaries different outlets gave it), write:',
+          'line: one neutral sentence in Traditional Chinese (台灣用語), ≤ 45 字, of what happened. Only facts every given outlet agrees on; no outlet’s adjectives or framing; no opinion; every number must be one the headlines or summaries give.',
+          'zh: a short Traditional Chinese headline (≤ 22 字), neutral.',
+          'en: a short neutral English headline (≤ 14 words).',
+          'Return one item per story with its id.',
+          JSON.stringify(stories)
+        ].join('\n')
+      ),
+    schema: obj({ items: arr(obj({ id: S, line: S, zh: S, en: S })) }),
+    clean(raw, { stories }) {
+      const given = new Map(stories.map(s => [s.id, JSON.stringify(s)]));
+      const out = {};
+      for (const it of list(raw?.items, 200)) {
+        const src = given.get(String(it?.id || ''));
+        if (!src) continue;
+        const line = str(it.line, 90), zh = str(it.zh, 40), en = str(it.en, 120);
+        if (line && numbersFrom(line + zh + en, src)) out[it.id] = { line, zh, en };
+      }
+      return out;
+    }
+  }
+};

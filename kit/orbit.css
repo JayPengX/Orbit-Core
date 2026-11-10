@@ -1677,6 +1677,187 @@ dialog.q-sheet.q-full {
   color: color-mix(in srgb, var(--q-accent) 62%, #fff);
 }
 
+/* ---- AI (kit/ai.mjs): the box to type into, a thinking line, the AI's
+   question back with chips, a picker for the person's own lists, the note
+   under what AI wrote. The spark marks anything AI wrote or asks. ---- */
+.q-ai-mark {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  color: var(--q-accent);
+}
+.q-ai-mark svg {
+  width: 100%;
+  height: 100%;
+}
+.q-ai-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 22px;
+  background: var(--q-fill-3);
+  transition: box-shadow 0.2s;
+}
+.q-ai-bar:focus-within {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--q-accent) 45%, transparent);
+}
+.q-ai-bar > .q-ai-mark {
+  align-self: center;
+}
+.q-ai-bar textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 34px;
+  max-height: 132px;
+  padding: 7px 0;
+  border: 0;
+  background: none;
+  color: var(--q-label);
+  font: 400 var(--q-t-body, 17px) / 1.3 var(--q-font);
+  resize: none;
+  outline: none;
+}
+.q-ai-bar textarea::placeholder {
+  color: var(--q-label-3, var(--q-muted));
+}
+.q-ai-send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--q-accent);
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.2s, transform var(--q-dur-snappy) var(--q-spring-snappy);
+}
+.q-ai-send svg {
+  width: 18px;
+  height: 18px;
+}
+.q-ai-send:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.q-ai-send:not(:disabled):active {
+  transform: scale(0.9);
+}
+.q-ai-bar.busy .q-ai-send {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.q-ai-think {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 2px;
+  color: var(--q-label-2, var(--q-muted));
+  font: 400 var(--q-t-subhead, 15px) / 1.3 var(--q-font);
+}
+.q-ai-think .q-ai-mark {
+  animation: q-ai-breathe 1.4s ease-in-out infinite;
+}
+@keyframes q-ai-breathe {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.82) rotate(20deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .q-ai-think .q-ai-mark {
+    animation: none;
+  }
+}
+.q-ai-ask {
+  display: grid;
+  gap: 8px;
+  margin: 6px 0 10px;
+  padding: 12px 12px 10px;
+  border-radius: var(--q-r-cell, 12px);
+  background: color-mix(in srgb, var(--q-accent) 8%, var(--q-fill-4, transparent));
+}
+.q-ai-q {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--q-label);
+  font: 600 var(--q-t-subhead, 15px) / 1.35 var(--q-font);
+}
+.q-ai-chips {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+.q-ai-more {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--q-sep);
+  color: var(--q-label-2, var(--q-muted));
+}
+.q-ai-ask.answered .q-chip:not(.on) {
+  opacity: 0.4;
+}
+.q-ai-ask.answered .q-ai-own {
+  display: none;
+}
+.q-ai-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 2px 0;
+  color: var(--q-label-2, var(--q-muted));
+  font: 400 var(--q-t-footnote, 13px) / 1.3 var(--q-font);
+}
+.q-ai-note .q-ai-mark {
+  width: 14px;
+  height: 14px;
+}
+.q-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  max-width: 100%;
+  padding: 0 8px 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--q-fill-3);
+  color: var(--q-label);
+  font: 500 var(--q-t-subhead, 15px) / 1 var(--q-font);
+  cursor: pointer;
+}
+.q-picker > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.q-picker-empty {
+  color: var(--q-label-3, var(--q-muted));
+}
+.q-picker-chev {
+  display: inline-grid;
+  width: 14px;
+  height: 14px;
+  color: var(--q-label-3, var(--q-muted));
+  transform: rotate(90deg);
+}
+.q-picker-chev svg,
+.q-pick-on svg {
+  width: 100%;
+  height: 100%;
+}
+.q-pick-on {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-left: auto;
+  color: var(--q-accent);
+}
+
 /* ---- Segmented control: a capsule track, a raised thumb that slides on a
    spring (kit/ui.mjs segmented sets --q-seg-i and --q-seg-n) ---- */
 .q-seg {
