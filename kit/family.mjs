@@ -27,6 +27,8 @@
 //   transit.ride    { id, at, name, fare, modes } the latest planned trip with a fare (Money's 車資記帳)
 //   weather.today   { day, word, lines: [{ kind: umbrella|pe|wear, level, text }] } 我的行程's advice for the day
 //   sports.next     [{ at, title, hash }] followed games starting within a day (their start notices')
+//   weather.rain    { places: [{ lat, lon, wet: [[from, to]] }] } where rain is due in the next 12 hours (ms; the
+//                   radar's shower, then hours at 50%+), Transit's 下雨改搭車
 // Places (place.home / place.school / place.work) are the family's, written
 // by whichever app last learned them.
 
