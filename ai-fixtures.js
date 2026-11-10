@@ -55,6 +55,38 @@ export const EXAMPLES = {
     { name: 'count English', input: { question: '接下來幾天有幾節英文？', facts: 'Now: 2026-11-11 (Wed) 10:30.\n2026-11-11 Wed: 1 08:10-09:00 國文; 2 09:10-10:00 英文; 3 10:10-11:00 數學; 4 11:10-12:00 物理; 5 13:10-14:00 體育 (outdoors); 6 14:10-15:00 歷史; 7 15:10-16:00 自習\n2026-11-12 Thu: 1 08:10-09:00 數學; 2 09:10-10:00 化學; 3 10:10-11:00 英文; 4 11:10-12:00 國文; 5 13:10-14:00 地理; 6 14:10-15:00 美術\n2026-11-13 Fri: 1 08:10-09:00 英文; 2 09:10-10:00 數學; 3 10:10-11:00 生物; 4 11:10-12:00 公民; 5 13:10-14:00 班會\n2026-11-16 Mon: 1 08:10-09:00 數學; 2 09:10-10:00 國文; 3 10:10-11:00 英文; 4 11:10-12:00 物理; 5 13:10-14:00 化學; 6 14:10-15:00 音樂; 7 15:10-16:00 體育 (outdoors)' } },
     { name: 'not in facts', input: { question: '期中考是哪天？', facts: 'Now: 2026-11-11 (Wed) 10:30.\n2026-11-11 Wed: 1 08:10-09:00 國文; 2 09:10-10:00 英文; 3 10:10-11:00 數學; 4 11:10-12:00 物理; 5 13:10-14:00 體育 (outdoors); 6 14:10-15:00 歷史; 7 15:10-16:00 自習\n2026-11-12 Thu: 1 08:10-09:00 數學; 2 09:10-10:00 化學; 3 10:10-11:00 英文; 4 11:10-12:00 國文; 5 13:10-14:00 地理; 6 14:10-15:00 美術\n2026-11-13 Fri: 1 08:10-09:00 英文; 2 09:10-10:00 數學; 3 10:10-11:00 生物; 4 11:10-12:00 公民; 5 13:10-14:00 班會\n2026-11-16 Mon: 1 08:10-09:00 數學; 2 09:10-10:00 國文; 3 10:10-11:00 英文; 4 11:10-12:00 物理; 5 13:10-14:00 化學; 6 14:10-15:00 音樂; 7 15:10-16:00 體育 (outdoors)' } }
   ],
+  // (A picture by address: ai.js aiTry reads it and sends it as the phone would.)
+  'class-book': [
+    { name: 'contact book page', input: { imageUrl: 'https://orbit.jaypengx.com/Orbit-Core/test/class-book.jpg', today: '2026-11-11', subjects: ['國文', '英文', '數學', '物理', '化學', '生物', '歷史', '地理', '公民', '體育', '美術', '音樂', '班會'] } }
+  ],
+  'class-plan': [
+    { name: 'midterm, scopes typed', input: { today: '2026-11-11', exam: '第二次段考', subjects: [{ name: '數學', scope: '2-1~3-2', n: 5, exam: '2026-11-26', weak: true }, { name: '英文', scope: 'L4-L6、文法：關係代名詞', n: 4, exam: '2026-11-26' }, { name: '化學', scope: 'Ch3 化學反應、Ch4 酸鹼', n: 3, exam: '2026-11-27' }, { name: '國文', scope: '', n: 3, exam: '2026-11-27' }] } },
+    { name: 'one quiz', input: { today: '2026-11-11', exam: '英文 L4 單字小考', subjects: [{ name: '英文', scope: 'L4 單字', n: 2, exam: '2026-11-13' }] } },
+    { name: 'english', input: { today: '2026-11-11', exam: 'Midterm', lang: 'en', subjects: [{ name: 'Physics', scope: 'Ch1–Ch2 motion', n: 3, exam: '2026-11-26' }] } }
+  ],
+  'class-news': [
+    {
+      name: 'a national school’s feed',
+      input: {
+        school: 'www.ctsh.hcc.edu.tw',
+        today: '2026-11-11',
+        items: [
+          { id: 'n1', title: '【轉知】伊甸社會福利基金會2027伊甸服務學習寒假營隊', date: '2026-11-10', desc: '報名時間：於115年11月9日起開放營隊報名' },
+          { id: 'n2', title: '【轉知】南華大學116學年度特殊選才學系探索線上說明會', date: '2026-11-10' },
+          { id: 'n3', title: '【進修部】116學年度四技二專甄選入學、四技二專技優入學及二技技優入學招生群類別採計技藝技能競賽優勝對照表', date: '2026-11-10' },
+          { id: 'n4', title: '「2027第23屆科技教育研究與發展學術研討會」論文徵稿資訊', date: '2026-11-09' },
+          { id: 'n5', title: '【轉知】115年度生成式AI演算法認證暨競賽活動辦法，歡迎同學報名參加。', date: '2026-11-06' },
+          { id: 'n6', title: '<公告>「教育人員任用條例施行細則」第11條、第27條，業經教育部修正發布', date: '2026-11-06' },
+          { id: 'n7', title: '115學年度第1學期第2次期中考考程表', date: '2026-11-10', unit: '教務處' },
+          { id: 'n8', title: '【全校】學習歷程檔案115-1課程學習成果上傳期程', date: '2026-11-05' },
+          { id: 'n9', title: '11/27(五)全校晚自習暫停乙次(當日請於17：30離開校園)', date: '2026-11-09' },
+          { id: 'n10', title: '公告本校115學年度第2學期減免學雜費申請', date: '2026-11-09' },
+          { id: 'n11', title: '高三模擬考 12/3、12/4 舉行，請同學準時到考', date: '2026-11-08', unit: '教務處' },
+          { id: 'n12', title: '午餐廚房設備採購案招標公告', date: '2026-11-04', unit: '總務處' }
+        ]
+      }
+    }
+  ],
   'money-month': [
     { name: 'shopping grew', input: { facts: 'Month: 2026-10. Amounts are NT$.\nSpent 32103; the month before 20703\nIncome 104000; kept 69% of it\nMost went to 購物: 12169\nUp most on the month before: 購物 5443 → 12169 (more 6726)\nWent most often to 路易莎: 6 times, 534' } },
     { name: 'student, little income', input: { facts: 'Month: 2026-10. Amounts are NT$.\nSpent 4380; the month before 3920\nIncome 2000; spent more than that\nMost went to 餐飲: 2650\nUp most on the month before: 餐飲 2210 → 2650 (more 440)\nWent most often to 7-ELEVEN: 14 times, 1120' } }

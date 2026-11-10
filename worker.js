@@ -12,6 +12,7 @@
 //   POST  /law-chat              Orbit Law's 問法律, answered from the articles it finds (law-chat.js)
 //   GET   /law-page              A government page (gov.tw) read inside Orbit Law (law-page.js)
 //   GET   /law-live              What 立法院's IVOD streams now, for Orbit Law's 議程 (law-live.js)
+//   GET   /class-news            Orbit Class's 學校公告: a school's own list, worded once an hour (class-news.js)
 //   GET/POST /push/…             notices while an app is closed (push.js)
 //   GET   /weather/…             Orbit Weather's blended forecast (weather.js)
 //   GET   /transit/…             Orbit Transit's map, places, routes and TDX data (transit.js)
@@ -65,6 +66,7 @@ import { handleMoneyRead } from './money-read.js';
 import { handleCal } from './cal.js';
 import { logCall, callsSince, reliability, lastFailed } from './gemini-use.js';
 import { handleAi, aiTry } from './ai.js';
+import { handleClassNews } from './class-news.js';
 import { FEATURES } from './ai-features.js';
 import { handleFlight } from './flight.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
@@ -1388,6 +1390,8 @@ async function route(request, env, ctx, headers, origin) {
     } catch {}
     return handleAi(request, env, ctx, headers, await sessionOf(request, env), { cap: FEATURES[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai') });
   }
+  // Orbit Class's 學校公告摘要 (class-news.js): a school's list read by code, worded once an hour by the AI, kept in R2.
+  if (path === '/class-news') return handleClassNews(request, env, ctx, headers, await sessionOf(request, env), { cap: await aiCap(env, ctx, 'class-news') });
   if (path === '/money-read') return handleMoneyRead(request, env, headers, await sessionOf(request, env), lawGemini('money-read'), await aiCap(env, ctx, 'money-read'));
   // The bill's guard (guard.js), as it last read the bill: armed or not,
   // each count's share of the $5 plan, stopped or not. No key or token.
