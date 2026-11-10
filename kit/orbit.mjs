@@ -78,18 +78,26 @@ readDev();
 // the drag; a finger on the page or a fling still running: iOS stops a
 // scroll whose content is swapped under it. Each beat waits till it's over.
 export const sheetHeld = () => typeof document !== 'undefined' && Boolean(document.querySelector('dialog.q-sheet.q-dragging, dialog.q-sheet.q-leaving'));
+// A beat put off for a finger or a scroll runs anyway past this: a live
+// page is never held for good by a gesture the page lost the end of.
+export const BEAT_WAIT_MAX_MS = 10_000;
 export function everyDev(key, fn) {
   let timer = 0;
   let stopped = false;
+  let heldSince = 0;
   const beat = soon => {
     timer = setTimeout(() => {
       if (stopped) return;
       // (Hidden, or open somewhere else: nothing asked; the beat runs the
       // moment the page is back and live.)
-      if (beatsAsleep()) return void sleepingBeats.add(() => !stopped && beat(0));
+      if (beatsAsleep()) return void sleepingBeats.add(() => !stopped && ((heldSince = 0), beat(0)));
       readDev();
       // (A finger on the screen or a scroll still running: tried again in a moment, not drawn under it.)
-      if (sheetHeld() || scrollBusy()) return beat(400);
+      if (sheetHeld() || scrollBusy()) {
+        heldSince ||= Date.now();
+        if (Date.now() - heldSince < BEAT_WAIT_MAX_MS) return beat(400);
+      }
+      heldSince = 0;
       try {
         fn();
       } finally {
