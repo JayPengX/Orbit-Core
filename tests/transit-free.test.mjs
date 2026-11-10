@@ -272,3 +272,29 @@ test("a day's trains asked of TDX come from 台鐵's own site (read in the Runne
   assert.ok(freeHeavy(path('2026-11-10')), 'in the Runner: a 2 MB day');
   assert.ok(!freeHeavy('basic/v3/Rail/TRA/StationLiveBoard'));
 });
+
+test("高鐵's day from the weekly GTFS pack (rail/thsr.json in R2): TDX's trimmed shape, trains by number, a day it hasn't left to TDX", async () => {
+  const { hsrPack } = await import('../builders/gtfs.js');
+  const { hsrDay, HSR_PACK } = await import('../transit-free.js');
+  const stops = [['THSR_1070', '07:55', '07:55'], ['THSR_1040', '08:37', '08:39'], ['THSR_0990', '09:40', '09:40']];
+  const pack = hsrPack(
+    [
+      { no: '0109', dates: ['20261111'], stops: stops.slice().reverse() },
+      { no: '0108', dates: ['20261111', '20261114'], stops },
+      { no: '0108', dates: ['20261112'], stops }
+    ],
+    { THSR_1070: '左營', THSR_1040: '台中', THSR_0990: '南港' },
+    'b'
+  );
+  assert.equal(pack.trains.length, 2, 'each timetable once');
+  const day = hsrDay(pack, '2026-11-11');
+  assert.deepEqual(day.map(t => t.DailyTrainInfo.TrainNo), ['0108', '0109']);
+  assert.equal(JSON.stringify(day[0]), JSON.stringify({ TrainDate: '2026-11-11', DailyTrainInfo: { TrainNo: '0108', EndingStationName: { Zh_tw: '南港', En: 'Nangang' }, Note: {} }, StopTimes: [{ StationID: '1070', ArrivalTime: '07:55', DepartureTime: '07:55' }, { StationID: '1040', ArrivalTime: '08:37', DepartureTime: '08:39' }, { StationID: '0990', ArrivalTime: '09:40', DepartureTime: '09:40' }] }));
+  assert.equal(hsrDay(pack, '2026-12-25'), null);
+  resetFree();
+  const env = { DATA: { get: async k => (k === HSR_PACK ? { text: async () => JSON.stringify(pack) } : null) } };
+  const got = await freeTdx('basic/v2/Rail/THSR/DailyTimetable/TrainDate/2026-11-14', '$format=JSON', { env, now: Date.parse('2026-11-10T00:00:00Z'), fetchFn: async () => assert.fail('no network') });
+  assert.equal(got.state, 'free');
+  assert.deepEqual(JSON.parse(got.body).map(t => t.DailyTrainInfo.TrainNo), ['0108']);
+  assert.equal(await freeTdx('basic/v2/Rail/THSR/DailyTimetable/TrainDate/2026-12-25', '$format=JSON', { env, now: Date.parse('2026-11-10T00:00:00Z') }), null);
+});

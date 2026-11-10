@@ -21,7 +21,7 @@ import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { CITIES, squares, cityStations, TILE, simplify, schedOf } from '../builders/buses.js';
-import { CITY_CODE, CODE_CITY, calendarBits, tripDays, specialOf, gtfsMins, wayPlan, cityPack, tdxWays, cityLines, whereOf, specialSubs } from '../builders/gtfs.js';
+import { CITY_CODE, CODE_CITY, calendarBits, tripDays, specialOf, gtfsMins, wayPlan, cityPack, tdxWays, cityLines, whereOf, specialSubs, hsrPack } from '../builders/gtfs.js';
 import { fillNewTaipei } from '../builders/ntpc.js';
 import { tdxPlan } from '../transit.js';
 
@@ -144,8 +144,14 @@ async function eachRow(file, fn) {
   }
 }
 
+// '24:10:00' → '00:10'.
+const clock = t => {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(t || ''));
+  return m ? `${String(Number(m[1]) % 24).padStart(2, '0')}:${m[2]}` : '';
+};
 async function readGtfs(dir) {
-  const codes = new Set(cities.map(c => CITY_CODE[c]));
+  // (高鐵's too, THSR_…: its days for transit-free.js hsrDay.)
+  const codes = new Set([...cities.map(c => CITY_CODE[c]), ...(ONLY ? [] : ['THS'])]);
   const mine = id => codes.has(String(id).slice(0, 3));
   const stops = new Map();
   const intern = new Map();
@@ -170,7 +176,7 @@ async function readGtfs(dir) {
   const trips = new Map();
   await eachRow(join(dir, 'trips.txt'), (c, h) => {
     const r = c[h.route_id];
-    if (routes.has(r)) trips.set(c[h.trip_id], { route: r, service: c[h.service_id], shape: c[h.shape_id] || r, stops: null, times: null });
+    if (routes.has(r)) trips.set(c[h.trip_id], { route: r, service: c[h.service_id], shape: c[h.shape_id] || r, stops: null, times: null, rail: r.startsWith('THSR_') });
   });
   const freq = new Map();
   await eachRow(join(dir, 'frequencies.txt'), (c, h) => {
@@ -196,6 +202,7 @@ async function readGtfs(dir) {
       } else {
         t.stops = stopsOf;
         t.times = Int16Array.from(rows.map(r => r[2]));
+        if (t.rail) t.hm = rows.map(r => [r[3], r[4]]);
       }
     }
     rows = [];
@@ -203,8 +210,9 @@ async function readGtfs(dir) {
   await eachRow(join(dir, 'stop_times.txt'), (c, h) => {
     const id = c[h.trip_id];
     if (id !== cur) flush(), (cur = id);
-    if (!trips.has(id)) return;
-    rows.push([Number(c[h.stop_sequence]), sid(c[h.stop_id]), gtfsMins(c[h.departure_time] || c[h.arrival_time])]);
+    const t = trips.get(id);
+    if (!t) return;
+    rows.push([Number(c[h.stop_sequence]), sid(c[h.stop_id]), gtfsMins(c[h.departure_time] || c[h.arrival_time]), ...(t.rail ? [clock(c[h.arrival_time]), clock(c[h.departure_time])] : [])]);
   });
   flush();
   // By city, by sub-route ('sub_dir'), in trips.txt's order.
@@ -220,8 +228,10 @@ async function readGtfs(dir) {
     if (f) for (const x of f) g.runs.push({ days, start: x.start, end: x.end, secs: x.secs, stops: t.stops });
     else g.timed.push({ days, special: specialOf(ex.get(t.service)), stops: t.stops, times: [...t.times] });
   }
-  log(`GTFS: ${stops.size} stops, ${trips.size} trips, ${patterns.size} patterns`);
-  return { stops, byCity };
+  const hsr = [...trips.values()].filter(t => t.rail && t.hm).map(t => ({ no: t.route.split('_')[1], dates: ex.get(t.service)?.add || [], stops: t.stops.map((u, i) => [u, ...t.hm[i]]) }));
+  const hsrNames = Object.fromEntries([...stops].filter(([u]) => u.startsWith('THSR_')).map(([u, v]) => [u, v[0]]));
+  log(`GTFS: ${stops.size} stops, ${trips.size} trips, ${patterns.size} patterns, ${hsr.length} 高鐵 trips`);
+  return { stops, byCity, hsr, hsrNames };
 }
 // GTFS's lines by shape id, simplified as they come (only the ones wanted).
 async function readLines(dir, want) {
@@ -264,7 +274,13 @@ async function main() {
   const index = (await data('index.json')) || { cities: {} };
   old.set('index.json', JSON.parse(JSON.stringify(index)));
   const dir = gtfsDir();
-  const { stops, byCity } = await readGtfs(dir);
+  const { stops, byCity, hsr, hsrNames } = await readGtfs(dir);
+  // 高鐵's next four weeks (a day TDX's GTFS has, the proxy answers without TDX).
+  if (!ONLY) {
+    const p = hsrPack(hsr, hsrNames, built);
+    if (Object.keys(p.days).length >= 7 && p.trains.length >= 100) put('rail/thsr.json', p);
+    else log(`高鐵: ${Object.keys(p.days).length} days, ${p.trains.length} trains: not written`);
+  }
   const done = [];
   const failed = {};
   const asked = {};

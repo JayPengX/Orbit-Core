@@ -604,15 +604,49 @@ async function traFree(path, q, { fetchFn, now }) {
   return { status: 200, body: day.val, age: Math.max(0, now - day.at), state: 'free' };
 }
 
+// ---- 高鐵's day, from TDX's GTFS ------------------------------------------------------------
+
+// THSR's trains for the four weeks TDX's GTFS covers (0 points), written to
+// R2 each week by the bus build (tools/gtfs-buses.mjs: rail/thsr.json,
+// builders/gtfs.js hsrPack), a day of them in TDX's DailyTimetable shape as
+// tdxTrim keeps it (2026-11-11 and 14, against TDX's own: every train, stop
+// for stop). A day the pack hasn't, TDX's.
+const HSR_DAY = /^basic\/v2\/Rail\/THSR\/DailyTimetable\/TrainDate\/(\d{4}-\d{2}-\d{2})$/;
+export const HSR_PACK = 'rail/thsr.json';
+export function hsrDay(pack, date) {
+  const list = pack?.days?.[date];
+  if (!Array.isArray(list) || !list.length) return null;
+  return list
+    .map(i => pack.trains[i])
+    .filter(t => t?.[1]?.length > 1)
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .map(([no, stops]) => {
+      const n = pack.stations?.[stops.at(-1)[0]] || ['', ''];
+      return { TrainDate: date, DailyTrainInfo: { TrainNo: no, EndingStationName: { Zh_tw: n[0], En: n[1] }, Note: {} }, StopTimes: stops.map(([id, a, d]) => ({ StationID: id, ArrivalTime: a, DepartureTime: d })) };
+    });
+}
+async function hsrFree(path, q, { env, now }) {
+  const m = path.match(HSR_DAY);
+  if (!m) return undefined;
+  if (!env?.DATA || q.has('$filter') || q.has('$select') || q.has('$top') || q.has('$skip') || q.has('$orderby')) return null;
+  const pack = await held('hsr:pack', TRA_FRESH, 7 * 86_400_000, async () => {
+    const obj = await env.DATA.get(HSR_PACK);
+    if (!obj) throw new Error('no thsr pack');
+    return JSON.parse(await obj.text());
+  }, now, 3000);
+  const day = hsrDay(pack.val, m[1]);
+  return day ? { status: 200, body: JSON.stringify(day), age: Math.max(0, now - pack.at), state: 'free' } : null;
+}
+
 // ---- One entry for tdxGet -----------------------------------------------------------------
 
 // A TDX ask (its path and query, as tdxRequest made them) answered from a free
 // source → { status, body, age, state: 'free' }, or null (TDX's to answer).
-export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now() } = {}) {
+export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), env = null } = {}) {
   const q = new URLSearchParams(query);
   try {
     const p = decodeURIComponent(path);
-    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now }));
+    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now }));
     if (got !== undefined) return got;
   } catch (err) {
     console.log('free source failed', path.slice(0, 80), String(err?.message || err).slice(0, 120));

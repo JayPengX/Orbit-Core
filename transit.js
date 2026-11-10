@@ -1130,7 +1130,7 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
   if (!req) return { status: 400, body: JSON.stringify({ code: 'TDX_NOT_ALLOWED' }), state: 'error' };
   // (What the operators' own free sources answer: no TDX, no points; transit-free.js. `free: false`: TDX's own.)
   if (free) {
-    const own = await freeTdx(req.path, req.query, { fetchFn, now });
+    const own = await freeTdx(req.path, req.query, { fetchFn, now, env });
     if (own) return warm ? { status: own.status, age: own.age, state: 'free' } : own;
   }
   const url = `${TDX_BASE}${req.path}?${req.query}`;

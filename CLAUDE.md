@@ -196,7 +196,7 @@ w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 | `/stock` | `stock-fill.js`, `stock-check.js` | Securities' fills at the proxy's own quote; the account replayed on each save |
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
 | `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `weather-radar.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations) scored hourly (`/weather/skill`); `radar`: the next hour's rain (CWA's radar); in a typhoon (NCDR's CAP), `dayOff`: each county's 停班停課 from 人事行政總處, else a fitted chance |
-| `/transit/…` | `transit.js`, `transit-free.js` | TDX (allowlist `TDX_RULES`; `tdxTrim`; YouBike, 新竹/臺北/新北's buses, 台鐵's day: own sites; `tdxPlan`: free from 12-01; `tdxf:*`), bus places (`gps`), map config, search, place, route (TDX's if `TDX_MAAS`), walk, book (高鐵), `gtfs` (dev, bus build: `buildTdxRoom`); `status?sample=` |
+| `/transit/…` | `transit.js`, `transit-free.js` | TDX (allowlist `TDX_RULES`; `tdxTrim`; YouBike, 新竹/臺北/新北's buses, 台鐵's day: own sites; 高鐵's: `rail/thsr.json`; `tdxf:*`), bus places (`gps`), map config, search, place, route (TDX's if `TDX_MAAS`), walk, book (高鐵), `gtfs` (dev, bus build); `status?sample=` |
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `f1-people.js`, `fund-nav.js`, `taifex.js` | The data proxy (§4.1): sports, quotes, F1, Asian baseball, SITCA's fund NAVs, TAIFEX |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
@@ -291,7 +291,7 @@ A read (`kit proxyJson`) goes down these until one answers:
    429 or 401, for the whole page);
 4. the family's data in R2 (`/data/`, `packJson`): seasons, game days,
    watch links, win probability, photos, bus packs, shapes;
-5. the proxy's edge cache in Taiwan, by tier (§4.1);
+5. the proxy's edge cache, by tier (§4.1);
 6. reads kept on demand in R2 (what's over for good, from its first read);
 7. the upstream.
 
@@ -304,11 +304,9 @@ A read (`kit proxyJson`) goes down these until one answers:
 - The phone reads some sources itself, no Worker request: ESPN's core
   API always (it refuses the proxy); ESPN's site API and MLB's statsapi
   untrimmed (`DEVICE_FIRST`; failing, the proxy, that host for ten
-  minutes); Jolpica when the proxy can't get it (it counts per address;
-  Cloudflare's are shared), then 10 minutes (`SELF_TOO`).
-- On top of these, apps put live knowledge over slower copies: Sports'
-  `liveTable` counts results before ESPN does; F1's own timing calls a
-  session over at the flag; MLB's postseason comes from MLB itself.
+  minutes); Jolpica when the proxy can't get it, then 10 minutes (`SELF_TOO`).
+- Apps put live knowledge over slower copies (Sports' `liveTable`, F1's
+  timing at the flag, MLB's postseason from MLB).
 
 ### 5.2 Where data lives
 
@@ -371,7 +369,7 @@ writing a file only when it changed (`builders/store.js`):
 | `watch.js` | `sports/watch.json`, the season archive | hourly / daily 20:00 |
 | `winprob.js` | `winprob/…` | daily 23:00 |
 | `photos.js`, `official-photos.js` | photo lists, cutouts, official headshots | hourly / daily 18:00 |
-| `gtfs.js`, `buses.js`, `ntpc.js` (GitHub `buses.yml`, `tools/gtfs-buses.mjs`) | `bus/…`, `shape/…`, `station/…`, `where.json` | Sat 19:07 |
+| `gtfs.js`, `buses.js`, `ntpc.js` (GitHub `buses.yml`, `tools/gtfs-buses.mjs`) | `bus/…`, `shape/…`, `station/…`, `where.json`, `rail/thsr.json` | Sat 19:07 |
 | `asia.js`, `cpbl.js` | CPBL's month and standings | daily 15:00 |
 | `f1kept.js` | each finished F1 session's 數據 and laps, kept before anyone opens them (via the proxy: OpenF1 refuses quick askers) | :06, :26, :46 |
 | `kept.js` | wipes the proxy's kept copies (`mirror/`) from before a league's first askable day | daily 17:00 |
@@ -406,8 +404,7 @@ Securities' broker rules (`stock-access.mjs`, `stock-credit.mjs`): its MAP.md.
 ## 8. Notices (`/push`)
 
 Apps hand the Worker their coming notices (`schedulePush`); it sends them by
-Web Push and can check first (an ESPN final, a price, weather, a bus). One device per person per app; every kind in `NOTICE_KINDS`
-can be turned off on its own.
+Web Push and can check first (an ESPN final, a price, weather, a bus). One device per person per app; each kind in `NOTICE_KINDS` can be off.
 
 ## 9. Speeds, capacity and the bill
 
@@ -431,6 +428,9 @@ can be turned off on its own.
   tells the owner at 50/75/90% (`ops.js`), and at 90% turns the proxy off
   until the next period. Google: Maps stops at 90% of each SKU's free
   month, Weather under 8,500 a month (`googleDayCap`).
+- **TDX** (`transit.js`): `tdxPlan` (free from 12-01: 3 points a month);
+  `tdxGuard`: people's share a day, kept longer as it's spent, copies only
+  past 95%; the bus build's apart (`buildTdxRoom`).
 
 ## 10. Deploying, secrets and the domain
 
@@ -442,10 +442,9 @@ can be turned off on its own.
 - By hand: `build.yml` (a builder now, a check), `tail.yml` (logs),
   `audit.yml` (secret names, the store counted), `zone-speed.yml` (the zone's
   HTTP/3, 0-RTT, Early Hints, Brotli, Tiered Cache).
-- Never a cancelling `concurrency:` in a deploy workflow (a cancel mails
-  Jay): copy the `queue` job; builds check out main's tip.
-- **Only what must stay secret is a secret.** Public settings live in code
-  or the tomls.
+- Never a cancelling `concurrency:` (a cancel mails Jay): copy the `queue`
+  job; builds check out main's tip.
+- **Only what must stay secret is a secret** (the rest: code, tomls).
   - GitHub: `CLOUDFLARE_API_TOKEN`, `CF_GUARD_TOKEN`, `DATA_PUSH_SECRET`,
     `ECO_TOKEN_SECRET`, `ECO_ADMIN_TOKEN`.
   - The proxy: Google's keys, `CWA_KEY`, `MOENV_KEY`, `TDX_CLIENT_*`.
