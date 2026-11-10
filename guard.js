@@ -647,7 +647,7 @@ export async function cpuByRoute(env, { fetcher = fetch, now = Date.now(), hours
   if (!env.CF_GUARD_TOKEN) return { off: true };
   const state = JSON.parse((await env.RATE_LIMIT_KV?.get(STATE_KEY).catch(() => null)) || 'null') || {};
   const a = env.CF_ACCOUNT_ID || state.account || (await accountOf(env, fetcher));
-  const from = now - Math.min(72, Math.max(1, hours)) * 3_600_000;
+  const from = now - Math.min(72, Math.max(0.1, hours)) * 3_600_000;
   const call = (path, body) =>
     fetcher(`${API}/accounts/${a}/workers/observability/telemetry/${path}`, {
       method: 'POST',
@@ -666,7 +666,7 @@ export async function cpuByRoute(env, { fetcher = fetch, now = Date.now(), hours
     const r = await call('keys', { timeframe: { from, to: now }, limit: 500 });
     return { keys: (Array.isArray(r) ? r : r?.keys || []).map(k => k.key || k).filter(k => /request|path|url|cron|event|cpu|wall|outcome|script|entry/i.test(String(k))) };
   }
-  const by = group || '$workers.event.request.path';
+  const by = group || '$workers.event.path';
   const r = await call('query', {
     queryId: 'orbit-cpu-routes',
     timeframe: { from, to: now },
@@ -681,14 +681,14 @@ export async function cpuByRoute(env, { fetcher = fetch, now = Date.now(), hours
         { operator: 'max', key: '$workers.cpuTimeMs', keyType: 'number', alias: 'max' }
       ],
       filters: [{ key: '$workers.scriptName', operation: 'eq', type: 'string', value: script || WORKERS[0] }],
-      groupBys: [{ type: 'string', value: by }],
+      groupBys: by.split(',').map(value => ({ type: 'string', value })),
       limit: 200
     }
   });
   const rows = new Map();
   for (const c of r?.calculations || []) {
     for (const g of c.aggregates || []) {
-      const k = String(g.groups?.[0]?.value ?? g.groupKey ?? '');
+      const k = (g.groups || []).map(x => String(x?.value ?? '')).join(' ') || String(g.groupKey ?? '');
       const row = rows.get(k) || { route: k };
       row[c.alias] = c.alias === 'n' ? Number(g.value ?? g.count) || 0 : Math.round((Number(g.value) || 0) * 10) / 10;
       rows.set(k, row);
