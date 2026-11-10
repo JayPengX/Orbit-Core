@@ -58,6 +58,7 @@ import { handleStock, moveBook } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
 import { docStore, storeReady } from './doc-store.js';
 import { handleMoneyRead } from './money-read.js';
+import { handleCal } from './cal.js';
 import { logCall } from './gemini-use.js';
 import { handleFlight } from './flight.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
@@ -1304,6 +1305,8 @@ async function route(request, env, ctx, headers, origin) {
     if (request.method !== 'GET' || !isAllowedOrigin(origin)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
     return handleLawLive(ctx, headers);
   }
+  // Orbit Class's 加到行事曆 (cal.js): the calendar its phone made, kept and handed to the Calendar app.
+  if (path === '/cal' || path.startsWith('/cal/')) return handleCal(request, env, headers, path === '/cal' ? await sessionOf(request, env) : null, path);
   // …and its 讀圖: a picture of purchases read by Gemini, on a tap only (money-read.js).
   if (path === '/money-read') return handleMoneyRead(request, env, headers, await sessionOf(request, env), lawGemini('money-read'), await aiCap(env, ctx, 'money-read'));
   // The bill's guard (guard.js), as it last read the bill: armed or not,
