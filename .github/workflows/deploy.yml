@@ -36,6 +36,8 @@ jobs:
       HAS_ADMIN_TOKEN: ${{ secrets.ECO_ADMIN_TOKEN != '' }}
       HAS_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET != '' }}
       HAS_LAW_BUILD_KEY: ${{ secrets.LAW_BUILD_KEY != '' }}
+      HAS_ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+      HAS_OPENAI_KEY: ${{ secrets.OPENAI_API_KEY != '' }}
     steps:
       # The account: the deploy token's own (one), so it needn't be a secret.
       - name: The account
@@ -145,6 +147,20 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           LAW_BUILD_KEY: ${{ secrets.LAW_BUILD_KEY }}
+      # Paid AI keys (Jay 11-10: Claude and OpenAI, prepaid credit), on the
+      # proxy only when the repo has them; tried side by side with Gemini first.
+      - name: Anthropic's key on the proxy
+        if: ${{ env.HAS_ANTHROPIC_KEY == 'true' }}
+        run: printf '%s' "$ANTHROPIC_API_KEY" | npx --yes wrangler@4 secret put ANTHROPIC_API_KEY
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      - name: OpenAI's key on the proxy
+        if: ${{ env.HAS_OPENAI_KEY == 'true' }}
+        run: printf '%s' "$OPENAI_API_KEY" | npx --yes wrangler@4 secret put OPENAI_API_KEY
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       # The owner's admin token (tools/issue-passes.mjs makes it and keeps it
       # on the owner's computer): handing out passes, /eco op 'admin'.
       - name: Owner's admin token on the eco Worker
