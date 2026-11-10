@@ -8,7 +8,8 @@
 //     685 KB gzipped, refreshed by YouBike each minute), read once a minute
 //     at most and kept here; a city's list or the stations near a point.
 //   - 新竹's buses (竹塹交通資訊網), 臺北's and 新北's (the cities' open data).
-//   - 台鐵's day of trains (台鐵's own open data, ods.railway.gov.tw).
+//   - 台鐵's day of trains (台鐵's own open data, ods.railway.gov.tw); its
+//     notices while every line runs whole (its 路線運行狀態 page).
 //   - 臺北捷運's trains coming in (the metro's own open file); 高雄捷運's and
 //     輕軌's next trains at a station (KRTC's 高捷e遊行); 機場捷運's (its
 //     platform screens).
@@ -1248,6 +1249,33 @@ async function tymcFree(path, q, { fetchFn, env, now }) {
   return { status: 200, body: JSON.stringify(rows), age: Math.max(0, now - got.at), state: 'free' };
 }
 
+// ---- 台鐵's notices -------------------------------------------------------------------------
+
+// TDX's TRA Alert is 台鐵's 路線運行狀態 (railway.gov.tw tip711/blockList:
+// each line's state and its blocked stretches). Every line running whole
+// (the most of the time) is answered here as TDX words it; a line with a
+// stretch listed is TDX's to say, its stations and words as the app reads them.
+export const TRA_BLOCKS = 'https://www.railway.gov.tw/tra-tip-web/tip/tip007/tip711/blockList';
+const TRA_ALERT = /^basic\/v3\/Rail\/TRA\/Alert$/;
+// The page → TDX's answer when every line runs whole, else null.
+export function traAllClear(html) {
+  const lines = [...String(html).matchAll(/<dl class="now_status">([\s\S]*?)<\/dl>\s*<table[^>]*>([\s\S]*?)<\/table>/g)];
+  if (lines.length < 8 || lines.some(([, head, table]) => !/<label>全線正常運行<\/label>/.test(head) || /<tr/i.test(table))) return null;
+  const [, d, t] = String(html).match(/更新時間：\s*(\d{4}\/\d\d\/\d\d)\s+(\d\d:\d\d)/) || [];
+  return { Alerts: [{ Title: '全線營運正常', Status: 1, UpdateTime: d ? `${d.replace(/\//g, '-')}T${t}:00+08:00` : null }] };
+}
+async function traAlertFree(path, q, { fetchFn, now }) {
+  if (!TRA_ALERT.test(path)) return undefined;
+  if ([...q.keys()].some(k => k !== '$format')) return null;
+  const got = await held('tra:alert', 5 * MIN, 30 * MIN, async () => {
+    const res = await fetchFn(TRA_BLOCKS, { signal: AbortSignal.timeout?.(8000) });
+    if (!res.ok) throw new Error(`TRA blocks ${res.status}`);
+    const all = traAllClear(await res.text());
+    return all ? JSON.stringify(all) : null;
+  }, now, 3000);
+  return got.val == null ? null : { status: 200, body: got.val, age: Math.max(0, now - got.at), state: 'free' };
+}
+
 // ---- TDX's slow lists, copied ------------------------------------------------------------
 
 // What every phone asks the same way and seldom changes (a city's bus routes,
@@ -1291,7 +1319,7 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), 
   const q = new URLSearchParams(query);
   try {
     const p = decodeURIComponent(path);
-    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await trtcFree(p, q, { fetchFn, env, now })) ?? (await krtcFree(p, q, { fetchFn, env, now })) ?? (await tymcFree(p, q, { fetchFn, env, now })) ?? (await copiedFree(p, q, { env, now }));
+    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await trtcFree(p, q, { fetchFn, env, now })) ?? (await krtcFree(p, q, { fetchFn, env, now })) ?? (await tymcFree(p, q, { fetchFn, env, now })) ?? (await traAlertFree(p, q, { fetchFn, now })) ?? (await copiedFree(p, q, { env, now }));
     if (got !== undefined) return got;
   } catch (err) {
     console.log('free source failed', path.slice(0, 80), String(err?.message || err).slice(0, 120));

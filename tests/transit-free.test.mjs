@@ -695,3 +695,24 @@ test("桃園機場捷運's next trains from its own platform screens (PIDS), in 
   assert.equal(asked, 1);
   assert.equal(await freeTdx('basic/v2/Rail/Metro/LiveBoard/TYMC', '%24top=3', { env, fetchFn, now: said }), null);
 });
+
+test("台鐵's notices: every line running whole on its 路線運行狀態 page is TDX's 全線營運正常, no TDX; a line with a stretch listed, or the page down, is TDX's to say", async () => {
+  const { traAllClear, TRA_BLOCKS } = await import('../transit-free.js');
+  const page = readFileSync(new URL('./fixtures/tra-blocklist.html', import.meta.url), 'utf8');
+  assert.deepEqual(traAllClear(page), { Alerts: [{ Title: '全線營運正常', Status: 1, UpdateTime: '2026-11-10T17:00:00+08:00' }] });
+  const blocked = page.replace(/(<dt>平溪線<\/dt>[\s\S]*?<CAPTION[^>]*>[^<]*<\/CAPTION>)/, '$1<tr><td>2026/11/10</td><td>十分-菁桐</td><td>落石</td><td>17:30</td></tr>');
+  assert.notEqual(blocked, page);
+  assert.equal(traAllClear(blocked), null);
+  assert.equal(traAllClear(page.replace('<dt>南迴線</dt>', '<dt>南迴線</dt><dd></dd><label>列車延誤 (Delay)</label>').replace(/(<dt>南迴線<\/dt>[\s\S]*?)<label>全線正常運行<\/label>/, '$1')), null, 'a line not 全線正常運行');
+  assert.equal(traAllClear('<html>維護中</html>'), null);
+  resetFree();
+  let asked = 0, body = page;
+  const fetchFn = async u => (assert.equal(String(u), TRA_BLOCKS), asked++, new Response(body));
+  const got = await freeTdx('basic/v3/Rail/TRA/Alert', '$format=JSON', { fetchFn, now: NOW });
+  assert.equal(got.state, 'free');
+  assert.equal(JSON.parse(got.body).Alerts[0].Status, 1);
+  body = blocked;
+  assert.equal((await freeTdx('basic/v3/Rail/TRA/Alert', '', { fetchFn, now: NOW + 60_000 })).state, 'free', 'read again each 5 minutes');
+  assert.equal(await freeTdx('basic/v3/Rail/TRA/Alert', '', { fetchFn, now: NOW + 6 * 60_000 }), null, 'a stretch blocked: TDX');
+  assert.equal(asked, 2);
+});
