@@ -102,8 +102,8 @@ Jay's specific decisions, app by app and dated, are in [`RULEBOOK.md`](RULEBOOK.
 
 ## 5. Data, cost and safety
 
-- **Cheap by design.** Cloudflare's $5 Workers plan and free tiers
-  elsewhere. `guard.js` watches every Cloudflare count; a new Cloudflare
+- **Cheap by design.** Only the domain is paid: Cloudflare's Workers Free
+  plan (heavy work in the Runner DO) and free tiers elsewhere. `guard.js` watches every Cloudflare count; a new Cloudflare
   product goes into its `PLAN`. A new paid call shows in the admin page's
   cost panels.
 - **Read on demand, one step ahead.** Nothing is read on a timer for a
