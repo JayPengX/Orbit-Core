@@ -107,3 +107,17 @@ test('司法院\'s judgment pages (Taiwan only since 2026-10) are read from Taiw
   const r = await handleLawPage(new Request(`https://proxy.test/law-page?v=1&u=${encodeURIComponent(jd)}`, { headers: { 'X-Build-Key': KEY } }), env, null, {}, null, async () => html('<p>direct</p>'));
   assert.equal(r.status, 401);
 });
+
+test('the build reads a Taiwan-only PDF\u2019s bytes (file=1), never kept at the edge; a Pass or no key gets only its size', async () => {
+  const KEY = 'k'.repeat(32);
+  const pdf = 'https://www.zhubei.gov.tw/admin/upload/twgov_file_1.pdf';
+  const env = { LAW_BUILD_KEY: KEY, GEMINI_RELAY: { fetch: async () => new Response('%PDF-1.7 x', { headers: { 'Content-Type': 'application/pdf' } }) } };
+  const ask = (q, key) => handleLawPage(new Request(`https://proxy.test/law-page?v=1&u=${encodeURIComponent(pdf)}${q}`, { headers: key ? { 'X-Build-Key': key } : {} }), env, null, {}, null, async () => new Response('direct'));
+  const got = await (await ask('&file=1', KEY)).json();
+  assert.equal(got.type, 'pdf');
+  assert.equal(Buffer.from(got.b64, 'base64').toString(), '%PDF-1.7 x');
+  const plain = await (await ask('', KEY)).json();
+  assert.equal(plain.b64, undefined, 'without file=1, its size only');
+  assert.equal((await ask('&file=1')).status, 401, 'no key, no file');
+});
+
