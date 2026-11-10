@@ -9,7 +9,8 @@
 //     at most and kept here; a city's list or the stations near a point.
 //   - 新竹's buses (竹塹交通資訊網), 臺北's and 新北's (the cities' open data).
 //   - 台鐵's day of trains (台鐵's own open data, ods.railway.gov.tw).
-//   - 臺北捷運's trains coming in (the metro's own open file).
+//   - 臺北捷運's trains coming in (the metro's own open file); 高雄捷運's and
+//     輕軌's next trains at a station (KRTC's 高捷e遊行).
 //   - 高鐵's day and the metros' maps and timetables: the weekly build's
 //     copies in R2 (rail/: TDX's GTFS, 0 points; the metros asked of TDX
 //     only when GTFS says they changed); the bus route lists and 台鐵's and
@@ -1110,6 +1111,92 @@ async function trtcFree(path, q, { fetchFn, env, now }) {
   return { status: 200, body: JSON.stringify(rows.slice(0, top)), age: Math.max(0, now - got.at), state: 'free' };
 }
 
+// ---- 高雄捷運's and 輕軌's next trains -------------------------------------------------------
+
+// TDX's KRTC and KLRT LiveBoards, a station at a time, from KRTC's own 高捷e遊行
+// (easygo.krtc.com.tw: a station's next trains each way in minutes, a form
+// post a station): its page read once an hour for the form (each station's
+// post, ASP.NET's view state), then one post a station asked, kept 20 s.
+// A whole system's board (77 posts) is TDX's still.
+export const KRTC_EASYGO = 'https://easygo.krtc.com.tw/main2.aspx';
+const KRTC_ASK = /^basic\/v2\/Rail\/Metro\/LiveBoard\/(KRTC|KLRT)$/;
+const KRTC_FRESH = 20_000;
+// (Each column's sign, the end its trains go to.)
+const KRTC_TO = { RK1: 'RK1', R3: 'R3', O1: 'O1', 'station-oline-Daliao': 'OT1' };
+const KLRT_WAYS = ['順行方向', '逆行方向'];
+const cellText = c => c.replace(/<[^>]*>|&nbsp;/g, ' ').replace(/\s+/g, '');
+const minsOf = t => (/^\d{1,3}$/.test(t) ? Number(t) : /進站/.test(t) ? 0 : null);
+// The page's form: { at: { R16: '10', O5R10: '16', … }, fields }.
+export function easygoForm(html) {
+  const at = Object.fromEntries([...String(html).matchAll(/imgmapRoute','(\d+)'\)" title="([A-Z0-9]+)"/g)].map(m => [m[2], m[1]]));
+  const val = n => (String(html).match(new RegExp(`id="${n}" value="([^"]*)"`)) || [])[1];
+  const fields = { __VIEWSTATE: val('__VIEWSTATE'), __VIEWSTATEGENERATOR: val('__VIEWSTATEGENERATOR'), __EVENTVALIDATION: val('__EVENTVALIDATION') };
+  return Object.keys(at).length && fields.__VIEWSTATE && fields.__EVENTVALIDATION ? { at, fields } : null;
+}
+// A station's page → TDX's rows (the next train each way; a column's two
+// platforms to one end, the sooner), `lines`: the systems' StationOfLine and Line.
+export function easygoRows(html, lines, now = Date.now()) {
+  const out = [];
+  for (const [, kind, panel] of String(html).matchAll(/id="ctl00_ContentPlaceHolder1_panel([ROC])Line"([\s\S]*?)<\/table>/g)) {
+    const sys = kind === 'C' ? 'KLRT' : 'KRTC';
+    const id = (panel.match(/class="StationNo">\s*([A-Z0-9]+)\s*</) || [])[1];
+    const st = lines[sys]?.at.get(id);
+    if (!st) continue;
+    const signs = [...panel.matchAll(/src="Images\/point\/([^".]+)\.png"/gi)].map(m => m[1]);
+    const next = [...(panel.match(/<tr class="tr2">([\s\S]*?)<\/tr>/) || ['', ''])[1].matchAll(/DisplayMRTInfo[^>]*>([\s\S]*?)<\/td>/g)].map(m => minsOf(cellText(m[1])));
+    const said = (String(html).match(/最後更新時間:\s*(\d{4}-\d\d-\d\d) (\d\d:\d\d:\d\d)/) || []).slice(1);
+    const src = kind === 'C' && said.length ? `${said[0]}T${said[1]}+08:00` : twNow(now);
+    const soon = new Map();
+    next.forEach((min, i) => {
+      const to = kind === 'C' ? 'C1' : KRTC_TO[signs[i]];
+      const k = kind === 'C' ? KLRT_WAYS[i] : to;
+      if (min == null || !to || !k || (soon.has(k) && soon.get(k).min <= min)) return;
+      soon.set(k, { min, to });
+    });
+    for (const [k, { min, to }] of soon) {
+      const dest = lines[sys].at.get(to);
+      if (!dest) continue;
+      out.push({ ...(kind === 'C' ? {} : { LineNO: st.line.LineID }), LineID: st.line.LineID, LineName: lines[sys].names[st.line.LineID] || { Zh_tw: '' }, StationID: id, StationName: st.s.StationName, TripHeadSign: kind === 'C' ? k : `往${dest.s.StationName.Zh_tw}`, DestinationStaionID: to, DestinationStationID: to, DestinationStationName: dest.s.StationName, ServiceStatus: 0, EstimateTime: min, SrcUpdateTime: src, UpdateTime: twNow(now) });
+    }
+  }
+  return out;
+}
+async function krtcFree(path, q, { fetchFn, env, now }) {
+  const m = KRTC_ASK.exec(path);
+  if (!m || !env?.DATA) return undefined;
+  const one = [...q.keys()].every(k => k === '$filter' || k === '$format') && METRO_STATION.exec(q.get('$filter') || '');
+  if (!one) return null;
+  const lines = (await held('krtc:lines', TRA_FRESH, 7 * DAY, async () => {
+    const read = async f => JSON.parse((await (await env.DATA.get(`rail/metro/${f}.json`))?.text()) || 'null');
+    const out = {};
+    for (const sys of ['KRTC', 'KLRT']) {
+      const [sol, names] = await Promise.all([read(`${sys}/StationOfLine`), read(`${sys}/Line`)]);
+      if (!sol?.length) throw new Error('not copied');
+      out[sys] = { at: new Map(sol.flatMap(line => (line.Stations || []).map(s => [s.StationID, { line, s }]))), names: Object.fromEntries((names || []).map(l => [l.LineID, l.LineName])) };
+    }
+    return out;
+  }, now, 3000)).val;
+  if (!lines[m[1]].at.has(one[1])) return null;
+  const form = await held('krtc:form', 3_600_000, 6 * 3_600_000, async () => {
+    const res = await fetchFn(`${KRTC_EASYGO}?t=${Math.floor(now / 3_600_000)}`, { signal: AbortSignal.timeout?.(8000) });
+    const f = res.ok ? easygoForm(await res.text()) : null;
+    if (!f) throw new Error(`easygo form ${res.status}`);
+    return f;
+  }, now, 3000);
+  const title = Object.keys(form.val.at).find(t => t.match(/[A-Z]+\d+A?/g).includes(one[1]));
+  if (!title) return null;
+  const got = await held(`krtc:${title}`, KRTC_FRESH, 2 * MIN, async () => {
+    const body = new URLSearchParams({ __EVENTTARGET: 'ctl00$ContentPlaceHolder1$imgmapRoute', __EVENTARGUMENT: form.val.at[title], ...form.val.fields });
+    const res = await fetchFn(KRTC_EASYGO, { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: AbortSignal.timeout?.(6000) });
+    const html = res.ok ? await res.text() : '';
+    // (No board: the form gone stale, read again for the next ask.)
+    if (!/class="StationNo"/.test(html)) throw (kept.delete('krtc:form'), new Error(`easygo ${res.status}`));
+    return easygoRows(html, lines, now);
+  }, now);
+  const rows = got.val.filter(r => r.StationID === one[1]);
+  return { status: 200, body: JSON.stringify(rows), age: Math.max(0, now - got.at), state: 'free' };
+}
+
 // ---- TDX's slow lists, copied ------------------------------------------------------------
 
 // What every phone asks the same way and seldom changes (a city's bus routes,
@@ -1153,7 +1240,7 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), 
   const q = new URLSearchParams(query);
   try {
     const p = decodeURIComponent(path);
-    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await trtcFree(p, q, { fetchFn, env, now })) ?? (await copiedFree(p, q, { env, now }));
+    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await trtcFree(p, q, { fetchFn, env, now })) ?? (await krtcFree(p, q, { fetchFn, env, now })) ?? (await copiedFree(p, q, { env, now }));
     if (got !== undefined) return got;
   } catch (err) {
     console.log('free source failed', path.slice(0, 80), String(err?.message || err).slice(0, 120));

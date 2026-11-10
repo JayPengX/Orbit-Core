@@ -612,3 +612,56 @@ test("臺北捷運's trains coming in from its own open file, in TDX's shape (ea
   assert.equal((await freeTdx('basic/v2/Rail/Metro/LiveBoard/TRTC', '', { env, fetchFn, now: now + 60_000 })).state, 'free', 'its last copy a while');
   assert.equal(await freeTdx('basic/v2/Rail/Metro/LiveBoard/TRTC', '', { env, fetchFn, now: now + 3 * 60_000 }), null);
 });
+
+test("高雄捷運's and 輕軌's next trains at a station from KRTC's 高捷e遊行 (its form read once an hour, a post a station), in TDX's shape; a whole system, or the page down past 2 minutes: TDX", async () => {
+  const { easygoForm, easygoRows, KRTC_EASYGO } = await import('../transit-free.js');
+  const fx = JSON.parse(readFileSync(new URL('./fixtures/krtc-easygo.json', import.meta.url), 'utf8'));
+  const now = Date.parse('2026-11-10T16:43:00+08:00');
+  const form = easygoForm(fx.form);
+  assert.equal(form.at.R16, '10');
+  assert.equal(form.at.O5R10, '16');
+  assert.equal(form.at.C3, '40');
+  assert.equal(Object.keys(form.at).length, 76, '38 stations of 捷運 (美麗島 one), 38 of 輕軌');
+  const lines = Object.fromEntries(['KRTC', 'KLRT'].map(sys => [sys, { at: new Map(fx[sys].StationOfLine.flatMap(line => line.Stations.map(s => [s.StationID, { line, s }]))), names: Object.fromEntries(fx[sys].Line.map(l => [l.LineID, l.LineName])) }]));
+  const said = page => easygoRows(fx.pages[page], lines, now).map(r => `${r.StationID} ${r.TripHeadSign} ${r.DestinationStationID} ${r.EstimateTime}`);
+  assert.deepEqual(said('O5R10'), ['O5 往大寮 OT1 1', 'O5 往哈瑪星 O1 3', 'R10 往岡山車站 RK1 3', 'R10 往小港 R3 1']);
+  assert.deepEqual(said('R16'), ['R16 往岡山車站 RK1 0', 'R16 往小港 R3 4'], '進站中: 0');
+  assert.deepEqual(said('RK1'), ['RK1 往小港 R3 1'], 'two platforms to one end: the sooner');
+  assert.deepEqual(said('C3'), ['C3 順行方向 C1 9', 'C3 逆行方向 C1 5'], "輕軌: left 順行, right 逆行, toward C1 as TDX's");
+  const [c3] = easygoRows(fx.pages.C3, lines, now);
+  assert.equal(c3.SrcUpdateTime, '2026-11-10T16:42:14+08:00');
+  assert.equal(c3.LineNO, undefined);
+  assert.deepEqual(c3.LineName, { Zh_tw: '環狀輕軌' });
+  assert.deepEqual(easygoRows(fx.pages.R16, lines, now)[0], {
+    LineNO: 'R', LineID: 'R', LineName: { Zh_tw: '紅線' }, StationID: 'R16', StationName: { Zh_tw: '左營', En: 'Zuoying', Ja: null, Ko: null }, TripHeadSign: '往岡山車站', DestinationStaionID: 'RK1', DestinationStationID: 'RK1', DestinationStationName: { Zh_tw: '岡山車站', En: 'Gangshan Station', Ja: null, Ko: null }, ServiceStatus: 0, EstimateTime: 0, SrcUpdateTime: '2026-11-10T16:43:00+08:00', UpdateTime: '2026-11-10T16:43:00+08:00'
+  });
+
+  resetFree();
+  const files = new Map(['KRTC', 'KLRT'].flatMap(sys => [[`rail/metro/${sys}/StationOfLine.json`, JSON.stringify(fx[sys].StationOfLine)], [`rail/metro/${sys}/Line.json`, JSON.stringify(fx[sys].Line)]]));
+  const env = { DATA: { get: async k => (files.has(k) ? { text: async () => files.get(k) } : null) } };
+  const asked = [];
+  let stale = false;
+  const fetchFn = async (u, o = {}) => {
+    assert.ok(String(u).startsWith(KRTC_EASYGO));
+    if (o.method !== 'POST') return asked.push('form'), new Response(fx.form);
+    const b = new URLSearchParams(o.body);
+    assert.equal(b.get('__VIEWSTATE'), form.fields.__VIEWSTATE);
+    const page = Object.keys(form.at).find(t => form.at[t] === b.get('__EVENTARGUMENT'));
+    asked.push(page);
+    return new Response(stale ? '此網頁已過期' : fx.pages[page]);
+  };
+  const ask = (sys, id, t = now) => freeTdx(`basic/v2/Rail/Metro/LiveBoard/${sys}`, `%24filter=${encodeURIComponent(`StationID eq '${id}'`)}&$format=JSON`, { env, fetchFn, now: t });
+  const o5 = await ask('KRTC', 'O5');
+  assert.equal(o5.state, 'free');
+  assert.deepEqual(JSON.parse(o5.body).map(r => r.DestinationStationID), ['OT1', 'O1']);
+  assert.deepEqual(JSON.parse((await ask('KRTC', 'R10', now + 5000)).body).map(r => r.DestinationStationID), ['RK1', 'R3']);
+  assert.deepEqual(JSON.parse((await ask('KLRT', 'C3')).body).map(r => r.EstimateTime), [9, 5]);
+  assert.deepEqual(asked, ['form', 'O5R10', 'C3'], 'the form once, 美麗島 once for both its lines');
+  assert.equal(await ask('KRTC', 'C3'), null, 'a station not of that system: TDX');
+  assert.equal(await freeTdx('basic/v2/Rail/Metro/LiveBoard/KRTC', '$format=JSON', { env, fetchFn, now }), null, 'a whole system: TDX');
+  stale = true;
+  assert.equal(await ask('KRTC', 'R16'), null, 'no board, none kept: TDX');
+  assert.equal(JSON.parse((await ask('KRTC', 'O5', now + 60_000)).body).length, 2, 'the last answer a while');
+  assert.equal(asked.filter(a => a === 'form').length, 2, 'the form read again after a post found no board');
+  assert.equal(await ask('KRTC', 'O5', now + 3 * 60_000), null);
+});
