@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, newsSite, NEWS_SITE } from '../builders/news.js';
+import { parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -142,19 +142,19 @@ test('a build reads every feed, keeps what it read, never writes an empty page o
     'https://setn/1': rss([['黃仁勳外遇後首交談！川普曝他「不知黃樂涉共諜」：FBI查明中', 1]])
   };
   const fetchImpl = async url => new Response(bodies[url], { status: 200, headers: { ETag: `"${url}"` } });
-  const r = await runNews({ store, now: NOW, fetchImpl, feeds });
+  const r = await runNews({ store, now: NOW, fetchImpl, feeds, channels: {} });
   assert.equal(r.items, 3);
   const page = files.get(NEWS_PATH);
   assert.equal(page.tw.length, 1);
   assert.deepEqual(page.tw[0].sides, { g: 1, c: 1, b: 1 });
   // The next build: every feed unchanged (304), the kept headlines still make the story.
-  const r2 = await runNews({ store, now: NOW + 600_000, fetchImpl: async () => new Response(null, { status: 304 }), feeds });
+  const r2 = await runNews({ store, now: NOW + 600_000, fetchImpl: async () => new Response(null, { status: 304 }), feeds, channels: {} });
   assert.equal(r2.items, 3);
   assert.equal(files.get(NEWS_PATH).tw.length, 1);
   // Every feed failing, nothing kept: the page stays as it was.
   files.set(NEWS_STATE, { items: [], etag: {} });
   const before = files.get(NEWS_PATH);
-  const r3 = await runNews({ store, now: NOW + 1_200_000, fetchImpl: async () => new Response('', { status: 500 }), feeds });
+  const r3 = await runNews({ store, now: NOW + 1_200_000, fetchImpl: async () => new Response('', { status: 500 }), feeds, channels: {} });
   assert.equal(r3.failed.length, 3);
   assert.equal(files.get(NEWS_PATH), before);
   assert.ok(files.get(NEWS_PAST));
@@ -311,3 +311,33 @@ test('newsSite: News\'s site published once a commit, from the news builds', asy
   assert.equal(files.get(NEWS_SITE).sha, 'a'.repeat(40));
   assert.equal((await newsSite({ store, env, fetchImpl })).started, true);
 });
+
+test("the outlets' YouTube clips go to the story their title is nearest (Jay 11-10: video and news together)", async () => {
+  // A channel's feed: its clips, not its live streams, broadcasts or shorts.
+  const entry = (y, t, at) => `<entry><id>yt:video:${y}</id><yt:videoId>${y}</yt:videoId><title>${t}</title><published>${new Date(at).toISOString()}</published></entry>`;
+  const xml = `<feed>${entry('CLIP0000001', '卓榮泰批老福法破壞憲政 不副署｜三立新聞網 SETN.com', NOW - H)}${entry('LIVE0000001', '【LIVE】立法院直播', NOW)}${entry('SHORT000001', '一句話 #shorts', NOW)}</feed>`;
+  assert.deepEqual(parseChannel(xml).map(v => v.y), ['CLIP0000001']);
+  assert.equal(clipTitle('【#重點新聞】基隆辯論！謝國樑沉默6秒｜三立新聞網 SETN.com'), '基隆辯論！謝國樑沉默6秒');
+  assert.equal(clipTitle('France blames Iran for cyberattack | DW News'), 'France blames Iran for cyberattack');
+  for (const o of Object.keys(CHANNELS)) assert.ok(OUTLETS[o], o);
+  // Matched to its story (not the other one), as a clip that plays here.
+  const words = ['卓榮泰不副署老福法 批破壞憲政', '不副署老福法 卓榮泰：破壞憲政秩序', '老福法不副署 卓榮泰批憲政'];
+  const items = [...['cna', 'udn', 'ltn'].map((o, i) => item(o, words[i], NOW - 3 * H + i * H)), ...['pts', 'ebc', 'tvbs'].map((o, i) => item(o, `易遊網遭駭個資外洩 ${['十萬', '多人', '用戶'][i]}`, NOW - 2 * H))];
+  const vids = [{ o: 'setn', y: 'CLIP0000001', t: '卓榮泰批老福法破壞憲政 不副署｜三立新聞網 SETN.com', at: NOW - H }, { o: 'setn', y: 'FAR00000001', t: '颱風明天登陸 全台嚴防豪雨', at: NOW - H }];
+  const out = deskOf(items, [], NOW, { vids });
+  const s = out.tw.find(x => /老福法/.test(x.title));
+  assert.deepEqual(s.clips.map(c => c[1]), ['CLIP0000001']);
+  assert.equal(s.clips[0][2], 'https://www.youtube.com/watch?v=CLIP0000001');
+  assert.ok(out.tw.filter(x => x !== s).every(x => !x.clips.length));
+  // The build reads the channels due, keeps their clips, and counts them.
+  const files = new Map();
+  const store = { json: async p => files.get(p) ?? null, put: async (p, d) => (files.set(p, d), true) };
+  const fetchImpl = async url => ({ ok: true, status: 200, headers: new Headers(), text: async () => (url === ytFeed(CHANNELS.setn) ? xml : '<rss></rss>') });
+  const r = await runNews({ store, now: NOW, fetchImpl, feeds: {}, channels: { setn: CHANNELS.setn }, channelEvery: { tw: 1 } });
+  assert.equal(r.clips, 1);
+  assert.deepEqual(files.get(NEWS_STATE).vids.map(v => v.y), ['CLIP0000001']);
+  // (A build's calls, feeds and channels, stay near 90.)
+  const chans = Object.fromEntries(Object.entries(CHANNELS).map(([o, id]) => [o, [[ytFeed(id), 'yt', OUTLETS[o].region === 'tw' ? 2 : 3]]]));
+  assert.ok(feedsDue(FEEDS, NOW).length + feedsDue(chans, NOW).length < 95);
+});
+

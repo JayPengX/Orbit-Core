@@ -78,6 +78,8 @@ export const PAGE_READS = 12;
 // stay near 90 (each past the Runner's 40 a relay's own request).
 const S2 = 2;
 const S3 = 3;
+// (Taiwan's channels post more, so are read more often.)
+const CHANNEL_EVERY = { tw: 2, intl: 3 };
 const sec = (list, url, every = S3) => list.map(x => [url(x), 'rss', every]);
 export const FEEDS = {
   ltn: [...['all', 'politics', 'society', 'life', 'world', 'local'].map(c => [`https://news.ltn.com.tw/rss/${c}.xml`, 'rss']), ...sec(['business', 'sports'], c => `https://news.ltn.com.tw/rss/${c}.xml`)],
@@ -155,6 +157,62 @@ export const FEEDS = {
   cgtn: [['https://www.cgtn.com/subscribe/rss/section/world.xml', 'rss']],
   xinhua: [['https://english.news.cn/rss/worldrss.xml', 'rss']]
 };
+
+// The outlets' own YouTube channels (their news clips), read every 2nd build
+// (Taiwan's) or 3rd (the world's):
+// each clip goes to the story its title is nearest, as that story's clip
+// (Jay 11-10: video and news together). Resolved from each channel's
+// handle; 自由時報's and the SCMP's are not their news.
+export const CHANNELS = {
+  setn: 'UCIU8ha-NHmLjtUwU7dFiXUA',
+  ebc: 'UCR3asjvr_WAaxwJYEDV_Bfw',
+  tvbs: 'UC5nwNW4KdC0SzrhF9BXEYOQ',
+  pts: 'UCexpzYDEnfmAvPSfG4xbcjA',
+  cna: 'UCVNbTzo72WMFZUN9_sdBpBA',
+  ettoday: 'UCl3aKvzB7uC5mTlVEWiCogA',
+  cts: 'UCDCJyLpbfgeVE9iZiEam-Kg',
+  chinatimes: 'UCmdVfsLHu18lCkKYXSOGUxg',
+  ctinews: 'UCpu3bemTQwAU8PqM4kJdoEQ',
+  mirror: 'UC4LjkybVKXCDlneVXlKAbmw',
+  bbc: 'UC16niRr50-MSBwiO3YDb3RA',
+  aljazeera: 'UCNye-wNBqNL5ZzHSJj3l8Bg',
+  sky: 'UCoMdktPbSTixAyNGwb-UYkQ',
+  nbc: 'UCeY0bbntWzzVIaj2z3QigXg',
+  abc: 'UCBi2mrWuNuyYy4gbM6fU18Q',
+  cbs: 'UC8p1vwvWtl6T73JiExfWs1g',
+  fox: 'UCXIJgqnII2ZOINSWNOGFThA',
+  pbs: 'UC6ZFN9Tx6xh-skXCuRHCDpQ',
+  dw: 'UCknLrEdhRCp1aegoMqRaCZg',
+  f24: 'UCQfwfsi5VrQ8yKZ-UWmAEFg',
+  cgtn: 'UCgrNz-aDmcr2uuto8_DL2jg',
+  guardian: 'UCIRYBXDze5krPDzAEOxFGVA',
+  nyt: 'UCqnbDFdCpuN8CMEg0VuEBqA',
+  wsj: 'UCK7tptUDHh-RYDsdxO1-5QQ',
+  bloomberg: 'UCIALMKvObZNtJ6AmdCLP7Lg'
+};
+export const ytFeed = id => `https://www.youtube.com/feeds/videos.xml?channel_id=${id}`;
+// (Not a story's clip: a live stream, a whole broadcast, a podcast, a short.)
+const NOT_A_CLIP = /#shorts|\blive\b|直播|podcast|完整版/i;
+// A channel's feed: [{ y, t, at }], its clips only.
+export function parseChannel(xml) {
+  const out = [];
+  for (const m of String(xml || '').matchAll(/<entry\b[^>]*>([\s\S]*?)<\/entry>/g)) {
+    const b = m[1];
+    const y = plain(tagOf(b, 'yt:videoId'));
+    const t = plain(tagOf(b, 'title'));
+    const at = timeOf(tagOf(b, 'published'));
+    if (/^[\w-]{11}$/.test(y) && t && at && !NOT_A_CLIP.test(t)) out.push({ y, t, at });
+  }
+  return out;
+}
+// A clip's title without the channel's own tags: 【#重點新聞】, #hashtags,
+// and what follows its first ｜ (the channel's name, the show's).
+export const clipTitle = t =>
+  cleanTitle(String(t || ''))
+    .replace(/【[^】]*】|#\S+/g, ' ')
+    .split(/\s*[｜|]\s*/)[0]
+    .replace(/\s+/g, ' ')
+    .trim();
 // The feeds a build reads: each in its turn (`every` builds, spread so each
 // build reads its share; a build's slot: :00 0, :10 1, :18 2, :30 3…).
 export function feedsDue(feeds, now) {
@@ -540,7 +598,7 @@ export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lan
 const STEADY = new Set(['gov', 'public']);
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t.id, t]));
 const twDay = at => new Date(at + 8 * HOUR).toISOString().slice(5, 10);
-export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, items) } = {}) {
+export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, items), vids = [] } = {}) {
   const lang = region === 'tw' ? 'zh' : 'en';
   const newest = [...items].sort((a, b) => (b.at || 0) - (a.at || 0));
   const byOutlet = new Map();
@@ -572,6 +630,14 @@ export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, i
     }
     if (it.v && !y.length) clips.push([it.o, '', it.u, cleanTitle(it.t), bigPicture(it.img || pages[it.u]?.i || '')]);
   }
+  // Then the channels' clips matched to it (matchClips), newest first.
+  for (const v of [...vids].sort((x, z) => z.at - x.at)) {
+    if (ids.has(v.y) || clips.length >= CLIPS_MAX) continue;
+    ids.add(v.y);
+    clips.push([v.o, v.y, `https://www.youtube.com/watch?v=${v.y}`, clipTitle(v.t), ytPicture(v.y)]);
+  }
+  // (Those that play here first, then the outlets' own video pages.)
+  clips.sort((a, b) => Boolean(b[1]) - Boolean(a[1]));
   const withImg = pics.find(Boolean) || (clips[0]?.[4] && [clips[0][4], clips[0][0]]);
   const sides = region === 'tw' ? { g: 0, c: 0, b: 0 } : { l: 0, c: 0, r: 0 };
   for (const o of byOutlet.keys()) {
@@ -648,13 +714,42 @@ const sumOf = vs => {
 // What a story keeps of a headline.
 const keepOf = ({ o, t, u, at, d, img, v }) => ({ o, t, u, at, ...(d ? { d } : {}), ...(img ? { img } : {}), ...(v ? { v } : {}) });
 
+// Each channel clip to the kept story its title is nearest: near enough
+// (CLIP_NEAR, the title against the story's middle), from a day before its
+// first headline to a day after its last. → Map(rec → clips).
+export const CLIP_NEAR = { zh: 0.24, en: 0.28 };
+const CLIPS_MAX = 8;
+function matchClips(vids, sized, vecOf, lang) {
+  const out = new Map();
+  if (!vids.length || !sized.length) return out;
+  // (Which stories each piece is in: a clip is weighed against those only.)
+  const by = new Map();
+  for (const x of sized) for (const k of x.c.keys()) (by.get(k) || by.set(k, []).get(k)).push(x);
+  for (const v of vids) {
+    const vv = vecOf({ t: clipTitle(v.t) });
+    if (vv.size < 2) continue;
+    const vn = norm(vv);
+    const near = new Set();
+    for (const k of vv.keys()) for (const x of by.get(k) || []) near.add(x);
+    let best = null;
+    let bestSim = 0;
+    for (const x of near) {
+      if (v.at < x.first - 24 * HOUR || v.at > x.last + 24 * HOUR) continue;
+      const sim = cosine(vv, vn, x.c, x.cn);
+      if (sim > bestSim) (bestSim = sim), (best = x.r);
+    }
+    if (best && bestSim >= CLIP_NEAR[lang]) (out.get(best) || out.set(best, []).get(best)).push(v);
+  }
+  return out;
+}
+
 // The desk: today's headlines grouped, each group added to the story it
 // continues (one of its headlines already that story's, or, after a quiet
 // spell, its last day's headlines near), else a new story if FEWEST outlets
 // carry it and it has a topic. recs: the stories kept, [{ id, r, first,
 // last, peak, items }]. → { tw, intl } (the front: heard of in NOW_MS,
 // ranked), past: { tw, intl } (older, by importance), recs (to keep).
-export function deskOf(items, recs = [], now, { pages = {} } = {}) {
+export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
   // (A kept headline read again takes the feed's picture as it is now: a
   // larger one, once the build asks for it.)
   const fresh = new Map(items.filter(it => it.img).map(it => [it.u, it.img]));
@@ -713,13 +808,16 @@ export function deskOf(items, recs = [], now, { pages = {} } = {}) {
         owner.set(it.u, rec);
       }
     }
-    for (const r of recsHere) {
+    const sized = recsHere.map(r => {
       r.items.sort((a, b) => a.at - b.at);
       if (r.items.length > REC_ITEMS) r.items = [...r.items.slice(0, 10), ...r.items.slice(10 - REC_ITEMS)];
       const vs = r.items.map(vecOf);
       const c = sumOf(vs);
-      const cn = norm(c);
-      const s = storyOf(r.items.map((it, i) => ({ ...it, near: cosine(vs[i], norm(vs[i]), c, cn) })), region, now, { pages, same });
+      return { r, vs, c, cn: norm(c), first: r.items[0]?.at || now, last: r.items.at(-1)?.at || now };
+    });
+    const clipsOf = matchClips(vids.filter(v => OUTLETS[v.o]?.region === region), sized, vecOf, lang);
+    for (const { r, vs, c, cn } of sized) {
+      const s = storyOf(r.items.map((it, i) => ({ ...it, near: cosine(vs[i], norm(vs[i]), c, cn) })), region, now, { pages, same, vids: clipsOf.get(r) || [] });
       r.first = s.first;
       r.last = s.at;
       r.peak = Math.max(r.peak || 0, s.n);
@@ -753,7 +851,7 @@ async function readFeed(url, kind, tag, { fetchImpl = fetch } = {}) {
   return { items: parseFeed(await res.text(), kind), etag: res.headers.get('ETag') || '' };
 }
 
-export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feeds = FEEDS } = {}) {
+export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feeds = FEEDS, channels = CHANNELS, channelEvery = CHANNEL_EVERY } = {}) {
   const kept = (await store.json(NEWS_STATE).catch(() => null)) || { items: [], etag: {} };
   const byUrl = new Map(kept.items.filter(it => now - it.at <= KEEP_MS && OUTLETS[it.o]).map(it => [it.u, it]));
   // (A feed not due this build keeps its ETag.)
@@ -761,8 +859,21 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
   const etag = Object.fromEntries(Object.entries(kept.etag || {}).filter(([u]) => urls.has(u)));
   const failed = [];
   let fresh = 0;
-  await Promise.all(
-    feedsDue(feeds, now).map(async ([o, url, kind]) => {
+  // The channels' clips kept 48 hours (each channel's newest 120).
+  const vids = new Map((kept.vids || []).filter(v => now - v.at <= KEEP_MS && OUTLETS[v.o]).map(v => [v.y, v]));
+  const chans = Object.fromEntries(Object.entries(channels).map(([o, id]) => [o, [[ytFeed(id), 'yt', channelEvery[OUTLETS[o]?.region] || 3]]]));
+  const readChannel = async ([o, url]) => {
+    try {
+      const res = await fetchImpl(url, { headers: { 'User-Agent': UA, Accept: 'application/atom+xml, application/xml;q=0.9' }, signal: AbortSignal.timeout(12_000) });
+      if (!res.ok) throw new Error(`${res.status}`);
+      for (const v of parseChannel(await res.text())) if (!vids.has(v.y) && now - v.at <= KEEP_MS) vids.set(v.y, { o, ...v, at: Math.min(v.at, now) });
+    } catch (e) {
+      failed.push(`${o} clips: ${String(e?.message || e).slice(0, 40)}`);
+    }
+  };
+  await Promise.all([
+    ...feedsDue(chans, now).map(readChannel),
+    ...feedsDue(feeds, now).map(async ([o, url, kind]) => {
       try {
         const r = await readFeed(url, kind, kept.etag?.[url], { fetchImpl });
         if (r.same) return void (etag[url] = kept.etag[url]);
@@ -781,7 +892,14 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
         failed.push(`${o}: ${String(e?.message || e).slice(0, 40)}`);
       }
     })
-  );
+  ]);
+  const clips = [];
+  const perOutlet = new Map();
+  for (const v of [...vids.values()].sort((a, b) => b.at - a.at)) {
+    const n = (perOutlet.get(v.o) || 0) + 1;
+    perOutlet.set(v.o, n);
+    if (n <= 120) clips.push(v);
+  }
   // (One outlet's same headline in two of its feeds: once.)
   const seen = new Set();
   const items = [...byUrl.values()].filter(it => {
@@ -792,20 +910,20 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
   const recs = kept.recs || [];
   const pages = {};
   for (const it of [...items, ...recs.flatMap(r => r.items)]) if (kept.pages?.[it.u]) pages[it.u] = kept.pages[it.u];
-  let out = deskOf(items, recs, now, { pages });
+  let out = deskOf(items, recs, now, { pages, vids: clips });
   const want = pagesToRead(out, pages);
   const read = await Promise.all(want.map(u => readPage(u, { fetchImpl })));
   want.forEach((u, i) => (pages[u] = read[i] || { i: '', y: [] }));
-  if (want.length) out = deskOf(items, recs, now, { pages });
+  if (want.length) out = deskOf(items, recs, now, { pages, vids: clips });
   const keep = new Set([...items, ...out.recs.flatMap(r => r.items)].map(it => it.u));
   for (const u of Object.keys(pages)) if (!keep.has(u)) delete pages[u];
-  await store.put(NEWS_STATE, { items, etag, pages, recs: out.recs });
+  await store.put(NEWS_STATE, { items, etag, pages, recs: out.recs, vids: clips });
   // (Never an empty page over a good one: a build that read nothing keeps the last.)
   if (out.tw.length || out.intl.length) {
     await store.put(NEWS_PATH, { built: now, tw: out.tw, intl: out.intl });
     await store.put(NEWS_PAST, { built: now, ...out.past });
   }
-  return { items: items.length, fresh, pages: want.length, kept: out.recs.length, tw: out.tw.length, intl: out.intl.length, past: out.past.tw.length + out.past.intl.length, failed };
+  return { items: items.length, fresh, clips: clips.length, pages: want.length, kept: out.recs.length, tw: out.tw.length, intl: out.intl.length, past: out.past.tw.length + out.past.intl.length, failed };
 }
 
 // Outlets whose pages carry the story's own YouTube clip.
