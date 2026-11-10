@@ -283,6 +283,11 @@ function joinSquares(parts) {
   return { v: 1, city: 'InterCity', stops, routes: [...routes.values()] };
 }
 
+// InterCity's every route's ways, without timetables or places, in one file
+// (bus/InterCity/ways.json: the proxy's reader of 公路局's site finds a
+// stop's or a route's sub-routes in it; the phones' packs are by square).
+const waysOf = (pack, built) => ({ v: 1, city: 'InterCity', built, stops: Object.fromEntries(Object.entries(pack.stops || {}).map(([k, v]) => [k, [v?.[0] || '']])), routes: (pack.routes || []).map(r => ({ uid: r.uid, name: r.name, ways: (r.ways || []).map(([sub, name, dir, stops]) => [sub, name, dir, stops]) })) });
+
 // ---- The run -----------------------------------------------------------------------------
 
 const out = new Map(); // path → data
@@ -304,6 +309,7 @@ async function main() {
   const failed = {};
   const asked = {};
   const packs = new Map();
+  let lastInterCity = null;
   for (const city of cities) {
     try {
       let last;
@@ -314,6 +320,7 @@ async function main() {
           if (p) parts.push(p), old.set(`bus/InterCity/${k}.json`, p);
         }
         last = parts.length ? joinSquares(parts) : null;
+        lastInterCity = last;
       } else {
         last = await data(`bus/${city}.json`);
         if (last) old.set(`bus/${city}.json`, last);
@@ -399,6 +406,7 @@ async function main() {
     if (city === 'InterCity') {
       const parts = squares(pack);
       for (const [k, p] of Object.entries(parts)) put(`bus/InterCity/${k}.json`, p);
+      put('bus/InterCity/ways.json', waysOf(pack, built));
       index.squares = Object.fromEntries(Object.entries(parts).map(([k, p]) => [k, JSON.stringify(p).length]));
       index.cities[city] = { routes: pack.routes.length, bytes: Object.values(index.squares).reduce((a, b) => a + b, 0), squares: Object.keys(parts).length, built };
       for (const [k, keys] of sq) put(`shape/bus/InterCity/${k}.json`, { v: 1, city, square: k, built, shapes: Object.fromEntries([...keys].sort().map(x => [x, shapes[x]])) });
@@ -408,6 +416,8 @@ async function main() {
       put(`shape/bus/${city}.json`, { v: 1, city, built, shapes });
     }
   }
+  // (公路客運's ways once, from the last squares, when it wasn't rebuilt and the site hasn't them yet.)
+  if (!packs.has('InterCity') && lastInterCity && !(await data('bus/InterCity/ways.json'))) put('bus/InterCity/ways.json', waysOf(lastInterCity, built));
   // where.json from every pack (the ones not rebuilt as they were).
   if (packs.size) {
     const all = [];

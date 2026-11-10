@@ -57,6 +57,7 @@ export const SOURCES = [
   { id: 'txg-bus', zh: '臺中市公車動態', group: 'transit', apps: ['transit'], feeds: '臺中公車到站', hosts: ['citybus.taichung.gov.tw'], where: ['worker'] },
   { id: 'tnn-bus', zh: '臺南市公車動態', group: 'transit', apps: ['transit'], feeds: '臺南公車到站', hosts: ['2384.tainan.gov.tw'], where: ['worker'] },
   { id: 'khh-bus', zh: '高雄市公車動態', group: 'transit', apps: ['transit'], feeds: '高雄公車到站與位置（只答臺灣的網路：手機自己讀）', hosts: ['ibus.tbkc.gov.tw'], where: ['phone'] },
+  { id: 'thb-bus', zh: '公路局公路客運乘車資訊', group: 'transit', apps: ['transit'], feeds: '公路客運與 11 縣市公車到站與位置', hosts: ['www.taiwanbus.tw'], where: ['worker'] },
   { id: 'tra', zh: '臺鐵開放資料', group: 'transit', apps: ['transit'], feeds: '臺鐵今天的時刻', hosts: ['ods.railway.gov.tw'], where: ['worker'] },
   { id: 'metro', zh: '捷運（臺北、桃園、高雄）', group: 'transit', apps: ['transit'], feeds: '捷運列車到站', hosts: ['tcgmetro.blob.core.windows.net', 'www.tymetro.com.tw', 'easygo.krtc.com.tw'], where: ['worker'] },
   { id: 'tra-site', zh: '臺鐵網站', group: 'transit', apps: ['transit'], feeds: '路線運行狀態、一班車的誤點', hosts: ['www.railway.gov.tw'], where: ['worker'] },
