@@ -113,8 +113,21 @@ test('the AI tab: spend by provider, money left from the balance typed, speed an
   assert.equal(moneyLeft({ anthropic: { usd: 3.2, at: now - 7_200_000 } }, calls, now).anthropic.tone, 'bad');
   const h = healthOf(calls, { 'money-say': 'gpt-6-luna' }, now);
   assert.equal(h['money-say'].backup, 1, 'Haiku answered for Luna once');
+  assert.equal(h['money-say'].models['claude-haiku-5-5'], 1, 'which model answered, counted');
   assert.equal(h['money-say'].failToday, 1);
   assert.equal(h['law-chat'].mid, 9000);
+});
+
+test('backups are the same class from another maker, never a lesser one (Jay 11-10)', async () => {
+  const { FEATURES } = await import('../ai-features.js');
+  const CLASS = { sonnet: 'judge', sol: 'judge', haiku: 'write', luna: 'write', flash: 'see', lite: 'see' };
+  const MAKER = { sonnet: 'anthropic', sol: 'openai', haiku: 'anthropic', luna: 'openai', flash: 'google', lite: 'google' };
+  for (const [name, f] of Object.entries(FEATURES)) {
+    const [first, second] = f.models;
+    if (!second) continue;
+    assert.notEqual(MAKER[first], MAKER[second], `${name}: its backup from another maker`);
+    if (CLASS[first] === 'judge') assert.equal(CLASS[second], 'judge', `${name}: a judgment's backup judges too`);
+  }
 });
 
 test('effort: a word for every model, or only the models a map names', async () => {

@@ -25,8 +25,12 @@ import { EXAMPLES } from './ai-fixtures.js';
 import { buildKeyOk } from './law-hosts.js';
 
 // The models by job (the plan's table): Sonnet judges, Haiku and Luna
-// write and fill forms, Gemini reads pictures and PDFs.
-export const MODELS = { sonnet: 'claude-sonnet-5-5', haiku: 'claude-haiku-5-5', luna: 'gpt-6-luna', flash: 'gemini-3.6-flash', lite: 'gemini-3.5-flash-lite' };
+// write and fill forms, Gemini reads pictures and PDFs. A feature's backup is
+// a model of the same class from another maker (Jay 11-10: "fallback better
+// be designed well"): Sonnet ↔ GPT's Sol (judgment), Haiku ↔ Luna (writing,
+// forms), Flash → Haiku (pictures: Claude reads them too). Never a lesser
+// class behind a better one.
+export const MODELS = { sonnet: 'claude-sonnet-5-5', sol: 'gpt-6.1-sol', haiku: 'claude-haiku-5-5', luna: 'gpt-6-luna', flash: 'gemini-3.6-flash', lite: 'gemini-3.5-flash-lite' };
 // US$ per 1M tokens (11-10; Flash doubles 2027-01-01): what aiBill counts spend by.
 export const PRICES = {
   'claude-sonnet-5-5': { in: 2, cached: 0.2, out: 10 },
@@ -299,14 +303,17 @@ export function moneyLeft(saved, calls, now = Date.now()) {
 
 // Each feature's speed and health from its calls (ms logged since 11-10):
 // the middle and the slow end of its answered calls, today's failures, how
-// often a backup model answered (any model past its first).
+// often a backup model answered (any model past its first), and each
+// model's answers (`models`).
 export function healthOf(calls, firstModel = {}, now = Date.now()) {
   const out = {};
   const day = twDay(now);
   for (const c of calls) {
-    const f = (out[c.feature] ||= { ms: [], failToday: 0, n: 0, backup: 0 });
+    const f = (out[c.feature] ||= { ms: [], failToday: 0, n: 0, backup: 0, models: {} });
     if (c.status === 200) {
       f.n++;
+      // (Which model answered, each counted: admin's AI 錢包 shows them.)
+      if (c.model) f.models[c.model] = (f.models[c.model] || 0) + 1;
       if (Number.isFinite(c.ms)) f.ms.push(c.ms);
       if (firstModel[c.feature] && c.model !== firstModel[c.feature]) f.backup++;
     } else if (twDay(c.at) === day) f.failToday++;

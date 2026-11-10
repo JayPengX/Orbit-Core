@@ -328,3 +328,15 @@ export function namesRe(words = [], codes = []) {
 }
 // The headlines a story is known by (news/index.json's): its own and each outlet's.
 export const storyText = story => [story?.title, story?.zh, ...(story?.items || []).map(it => it[1]), ...(story?.tw?.items || []).map(it => it[1])].filter(Boolean).join('\n');
+
+// 各方怎麼說's one difference, said again as each side's line (Jay 11-10: AI
+// repeating what's on screen is for nothing): it names three sides, or
+// quotes a 「word」 a side's own line already quotes.
+export function sidesRecap(diff, lines = []) {
+  const d = String(diff || '');
+  if (!d) return false;
+  const named = [/綠/, /藍/, /中間|中立|centre|center/i, /左/, /右/].filter(re => re.test(d)).length;
+  if (named >= 3) return true;
+  const quotes = d.match(/「[^」]{1,12}」/g) || [];
+  return quotes.some(q => lines.some(l => String(l || '').includes(q)));
+}

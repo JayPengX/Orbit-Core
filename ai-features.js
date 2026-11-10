@@ -14,6 +14,7 @@
 // Code first (Jay 11-10): each is only what code can't do reliably; the
 // apps parse what they can themselves and ask here for the rest.
 import { cleanBuys } from './money-read.js';
+import { sidesRecap } from './kit/news-outlets.mjs';
 import { str, list, S, N, B, obj, arr, text, nums, numbersFrom, fileOf } from './ai-util.js';
 import { LAW_FEATURES } from './law-ai.js';
 
@@ -126,17 +127,24 @@ export const FEATURES = {
       text(
         [
           'You answer a question about a person’s own money book (NT$, Taiwan). The facts below are their real entries, already added up by the app.',
-          'Answer only from the facts: every number you write must appear in them exactly (no new sums, no percentages they don’t give, no thousands commas). If the facts can’t answer it, say so in one line and say what they do show.',
-          `Answer in ${en ? 'English' : 'Traditional Chinese (台灣用語)'}: at most 3 short sentences, the number they asked first, plain words, no markdown, no lists. Never advise investing or borrowing; a gentle observation is fine.`,
+          'Each fact line starting [id] is a table the app draws as rows and bars under your answer. First read what is asked: where the money went (by category, cat0…), how it was paid (by card, cash, LINE Pay, account: pay0…), inside a category (sub0.<cat>), income, places, the largest, against last month (vs), by month, this week, the budget.',
+          'show: the ids of the one or two tables that answer it, the best first ([] when none does). line: ONE short sentence that answers it with the number asked first (zh at most 40 字, en at most 22 words); never list what the tables will show. mark: up to 3 row labels in those tables to light up, written exactly as in the facts.',
+          'Every number in line must appear in the facts exactly (no new sums, no percentages they don’t give, no thousands commas). If the facts can’t answer it, line says so and what they do show, show [].',
+          `Write line in ${en ? 'English' : 'Traditional Chinese (台灣用語)'}, plain words, no markdown. Never advise investing or borrowing.`,
           'Facts:',
           facts,
           `Question: ${q}`
         ].join('\n')
       ),
-    schema: obj({ answer: S }),
+    schema: obj({ line: S, show: arr(S), mark: arr(S) }),
     clean: (raw, { facts }) => {
-      const a = str(raw?.answer, 400);
-      return a && numbersFrom(a, facts) ? { answer: a } : null;
+      const a = str(raw?.line ?? raw?.answer, 200);
+      if (!a || !numbersFrom(a, facts)) return null;
+      const ids = new Set([...facts.matchAll(/^\[([a-z0-9.]+)\]/gm)].map(m => m[1]));
+      const show = [...new Set(list(raw?.show, 4).map(x => str(x, 40)).filter(x => ids.has(x)))].slice(0, 2);
+      const mark = list(raw?.mark, 6).map(x => str(x, 40)).filter(x => x && facts.includes(x)).slice(0, 3);
+      // (answer: what phones before 11-11 read.)
+      return { answer: a, line: a, show, mark };
     }
   },
 
@@ -190,7 +198,7 @@ export const FEATURES = {
   'class-book': {
     app: 'orbit',
     tap: true,
-    models: ['flash', 'lite'],
+    models: ['flash', 'haiku'],
     effort: 'low',
     timeoutMs: 40_000,
     maxIn: 3000,
@@ -395,7 +403,7 @@ export const FEATURES = {
       text(
         [
           'A student or young person in Taiwan keeps their own money book. Here is last month, added up by the app.',
-          `Write ONE suggestion for next month in ${en ? 'English, ≤ 25 words' : 'Traditional Chinese (台灣用語), ≤ 45 字'}: honest, kind and concrete, about the biggest thing these figures show (a category that grew, a place visited often, how much was kept). Not a lecture; no investing or borrowing advice; no markdown.`,
+          `Write ONE suggestion for next month in ${en ? 'English, ≤ 25 words' : 'Traditional Chinese (台灣用語), ≤ 45 字'}: honest, kind and concrete. The person already sees the lines before the note in brackets on the same card: never restate them. Build it on what only the lines after the note show (weekends against weekdays, the small buys, the biggest one, the place, what grew inside a category), saying what to try, not the figure again. Not a lecture; no investing or borrowing advice; no markdown.`,
           'Any number you write must appear in the figures exactly (no thousands commas, no new sums or percentages).',
           facts
         ].join('\n')
@@ -486,7 +494,7 @@ export const FEATURES = {
   'words-photo': {
     app: 'vocab',
     tap: true,
-    models: ['flash', 'lite'],
+    models: ['flash', 'haiku'],
     effort: 'low',
     timeoutMs: 40_000,
     perPass: 20,
@@ -633,7 +641,7 @@ export const FEATURES = {
   // each side's outlets framed it, from their own headlines only, never
   // which side is right. Sonnet: telling an angle from a fact is judgment.
   'news-sides': {
-    models: ['sonnet', 'haiku'],
+    models: ['sonnet', 'sol'],
     timeoutMs: 90_000,
     maxIn: 9000,
     parts: ({ stories }) =>
@@ -641,7 +649,7 @@ export const FEATURES = {
         [
           'You compare how each side’s news outlets framed the same story, using only the headlines each side gave it. Sides: in Taiwan g = 偏綠 (green-leaning), c = 中間, b = 偏藍 (blue-leaning); for world news l = left-leaning, c = centre, r = right-leaning.',
           'For each story, for each side it gives (and only those): what that side’s headlines stress or leave out: their angle, who they quote, the words they choose. Not the facts every side shares. zh: at most 30 字, Traditional Chinese (台灣用語) with full-width punctuation (，：；); en: at most 18 words. Quote a headline’s telling word: in zh in 「」 (an English word translated into Chinese), in en in "" (a Chinese word translated into English).',
-          'diff: the ONE difference between the sides that matters most, not a recap of each (zh at most 40 字, en at most 24 words); both "" when the sides frame it the same way.',
+          'diff: what a reader of only one side would miss: a fact, a voice or a number one side reports and another leaves out (zh at most 40 字, en at most 24 words). The reader already sees each side’s line above it: never restate or sum them up, never quote a word they quote; both "" when nothing is left out.',
           'Never say which side is right, never call an outlet biased or propaganda, add no adjective of your own about anyone. Every number you write must be in the headlines. Names as the headlines write them.',
           'Return one item per story with its id.',
           JSON.stringify(stories)
@@ -666,7 +674,9 @@ export const FEATURES = {
         if (Object.keys(sides).length < 2) continue;
         const dz = str(it.diff?.zh, 80), de = str(it.diff?.en, 200);
         const whole = String(it.diff?.zh || '').trim().length <= 70;
-        out[src.id] = { sides, diff: whole && dz && de && numbersFrom(dz + ' ' + de, text) ? { zh: dz, en: de } : null };
+        // (A diff that only says each side's line again is dropped: sidesRecap.)
+        const recap = sidesRecap(dz, Object.values(sides).map(x => x.zh));
+        out[src.id] = { sides, diff: whole && dz && de && !recap && numbersFrom(dz + ' ' + de, text) ? { zh: dz, en: de } : null };
       }
       return out;
     }
