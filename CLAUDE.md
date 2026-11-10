@@ -198,7 +198,7 @@ w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 | `/stock` | `stock-fill.js`, `stock-check.js` | Securities' fills at the proxy's own quote; the account replayed on each save |
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
 | `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `weather-radar.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations) scored hourly (`/weather/skill`); `radar`: the next hour's rain (CWA); in a typhoon (NCDR's CAP), `dayOff`: each county's 停班停課 (人事行政總處) or a fitted chance |
-| `/transit/…` | `transit.js`, `transit-free.js` | TDX (allowlist `TDX_RULES`; `tdxTrim`; YouBike, 竹/北/新北/桃/中/南 buses, 台鐵's day: own sites; 高鐵's day, metros but live: `rail/`; slow lists: `tdx/`; `tdxf:*`), bus places (`gps`), map config, search, place, route (TDX's if `TDX_MAAS`), walk, book (高鐵), `gtfs` (dev, bus build); `status?sample=` |
+| `/transit/…` | `transit.js`, `transit-free.js` | TDX (allowlist `TDX_RULES`; `tdxTrim`; YouBike, 竹/北/新北/桃/中/南 buses, 台鐵's day: own sites; 高鐵's day, metros but live: `rail/`; slow lists: `tdx/`; `tdxf:*`), bus places (`gps`), map config, search, place, route (TDX's if `TDX_MAAS`), walk, book (高鐵), `gtfs` (bus build); `status?sample=` |
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `f1-people.js`, `fund-nav.js`, `taifex.js` | The data proxy (§4.1): sports, quotes, F1, Asian baseball, SITCA's fund NAVs, TAIFEX |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
@@ -371,7 +371,7 @@ writing a file only when it changed (`builders/store.js`):
 | `watch.js` | `sports/watch.json`, the season archive | hourly / daily 20:00 |
 | `winprob.js` | `winprob/…` | daily 23:00 |
 | `photos.js`, `official-photos.js` | photo lists, cutouts, official headshots | hourly / daily 18:00 |
-| `gtfs.js`, `buses.js`, `ntpc.js` (GitHub `buses.yml`, `tools/gtfs-buses.mjs`) | `bus/…`, `shape/…`, `station/…`, `where.json`, `rail/…`, `tdx/…` | Sat 19:07 |
+| `gtfs.js`, `buses.js`, `ntpc.js` (GitHub `buses.yml`, `tools/gtfs-buses.mjs`) | `bus/…`, `shape/…`, `station/…`, `where.json`, `rail/…`, `tdx/…` | weekly (`kickBuses`) |
 | `asia.js`, `cpbl.js` | CPBL's month and standings | daily 15:00 |
 | `f1kept.js` | each finished F1 session's 數據 and laps, kept before anyone opens them (via the proxy: OpenF1 refuses quick askers) | :06, :26, :46 |
 | `kept.js` | wipes the proxy's kept copies (`mirror/`) from before a league's first askable day | daily 17:00 |
@@ -433,7 +433,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   month, Weather under 8,500 a month (`googleDayCap`).
 - **TDX** (`transit.js`): `tdxPlan` (free from 12-01: 3 points a month);
   `tdxGuard`: people's share a day, kept longer as it's spent, copies only
-  past 95%; the bus build's apart (`buildTdxRoom`).
+  past 95%; the bus build's: `buildTdxRoom`.
 
 ## 10. Deploying, secrets and the domain
 

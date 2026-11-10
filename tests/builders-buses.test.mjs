@@ -201,3 +201,23 @@ test('新北: a way TDX has no timetable for, filled from 新北’s own list (i
   assert.deepEqual(back(2), [['G', 1, ['K'], [], [[62, '07:00', '17:10', 0, 0]]]]);
   assert.equal(fillMissing(pack, rows), 0, 'a way timed is never filled again');
 });
+
+test("the weekly bus build started from the proxy's cron when GitHub's own timer didn't run it in a week", async () => {
+  const { kickBuses } = await import('../builders/buses.js');
+  const NOW = Date.parse('2026-11-14T19:22:00Z');
+  let last = '2026-11-07T19:30:00Z';
+  const calls = [];
+  const fetchImpl = async (url, init = {}) => {
+    calls.push([init.method || 'GET', url.replace(/^.*buses\.yml\//, ''), init.body ? JSON.parse(init.body) : null]);
+    return url.endsWith('dispatches') ? new Response(null, { status: 204 }) : Response.json({ workflow_runs: last ? [{ created_at: last }] : [] });
+  };
+  assert.deepEqual(await kickBuses({ env: {}, now: NOW, fetchImpl }), { off: 'no token' });
+  const env = { GH_ACTIONS_TOKEN: 't' };
+  // (A week less a few minutes: GitHub's own Saturday run counts.)
+  assert.equal((await kickBuses({ env, now: NOW, fetchImpl })).started, true);
+  last = '2026-11-14T19:07:00Z';
+  assert.deepEqual(await kickBuses({ env, now: NOW, fetchImpl }), { last: '2026-11-14T19:07:00.000Z' });
+  last = null;
+  assert.equal((await kickBuses({ env, now: NOW, fetchImpl })).started, true);
+  assert.deepEqual(calls.filter(c => c[0] === 'POST').map(c => c[2]), [{ ref: 'main' }, { ref: 'main' }]);
+});

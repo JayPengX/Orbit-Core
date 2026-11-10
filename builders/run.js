@@ -7,7 +7,8 @@
 //                season, older highlights, Apple TV)
 //   :20 hourly   a few cutouts
 //   (the bus packs: GitHub's weekly build from TDX's GTFS since 2026-11,
-//   tools/gtfs-buses.mjs; buses.js runBuses only by hand, POST /data/build?job=buses)
+//   tools/gtfs-buses.mjs, started from here: :22 at 19 UTC daily, kickBuses,
+//   when none ran in a week; buses.js runBuses only by hand, POST /data/build?job=buses)
 //   :00 :10 :18 :30 :40 :50  Orbit News' stories (every outlet's feed, news.js),
 //                and its site published when News's main moved (newsSite)
 //   :22 daily    15 UTC CPBL's tables and its month whole (23:00 in Taiwan);
@@ -27,7 +28,7 @@ import { runCpbl, CPBL_HOUR } from './cpbl.js';
 import { runAsia, ASIA_HOUR } from './asia.js';
 import { runSports, SPORTS_HOUR } from './sports.js';
 import { runPhotos, runCutouts, PHOTOS_HOUR } from './photos.js';
-import { runBuses } from './buses.js';
+import { runBuses, kickBuses, BUSES_HOUR } from './buses.js';
 import { runKept, KEPT_HOUR } from './kept.js';
 import { runF1Kept } from './f1kept.js';
 import { runNews, newsSite } from './news.js';
@@ -71,6 +72,7 @@ export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[ne
   if (only === 'photos') await step('photos', () => runPhotos({ store, proxy, now }));
   if (only === 'winprob') await step('winprob', () => runWinprob({ store, proxy, now }));
   // (kept-dry: what would go, nothing wiped.)
+  if (only === 'buses-kick') await step('busesKick', () => kickBuses({ env, now }));
   if (only === 'kept' || only === 'kept-dry') await step('kept', () => runKept({ store, now, dry: only === 'kept-dry' }));
   if (job === 'daily') {
     if (hour === ASIA_HOUR) await step('asia', () => runAsia({ store, now }));
@@ -80,6 +82,7 @@ export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[ne
     // (The proxy's kept copies of a season wiped: after sports' bounds.)
     if (hour === KEPT_HOUR) await step('kept', () => runKept({ store, now }));
     if (hour === WINPROB_HOUR) await step('winprob', () => runWinprob({ store, proxy, now }));
+    if (hour === BUSES_HOUR) await step('busesKick', () => kickBuses({ env, now }));
   }
   done.store = store.stats;
   log('builders', job, JSON.stringify(done));
