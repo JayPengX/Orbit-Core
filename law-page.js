@@ -16,7 +16,7 @@ import { fail, twDay, passOf, passKey, countOf, addOne } from './law.js';
 import { sessionLimited } from './orbit-token.js';
 import { twOnly, viaTaiwan, buildKeyOk } from './law-hosts.js';
 
-export const PAGE_LIMITS = { perPass: 500, perMinute: 60, buildPerMinute: 720, hops: 5, timeoutMs: 20_000, maxHtml: 2 * 1024 * 1024, maxBytes: 6 * 1024 * 1024, fileBytes: 3 * 1024 * 1024 };
+export const PAGE_LIMITS = { perPass: 500, perMinute: 60, buildPerMinute: 720, hops: 5, timeoutMs: 20_000, maxHtml: 2 * 1024 * 1024, maxBytes: 6 * 1024 * 1024, fileBytes: 40 * 1024 * 1024 };
 const LONG = new Set(['judgment.judicial.gov.tw', 'cons.judicial.gov.tw']);
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 
@@ -110,13 +110,8 @@ async function bytesOf(res) {
   return out;
 }
 
-// The build's own read of a file (`&file=1`, its key only): a PDF's bytes, base64, up to fileBytes (its text is read
-// at build: a 代表會's 決議案 on a site that serves only Taiwan).
-const b64 = bytes => {
-  let s = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(s);
-};
+// The build's own read of a file (`&file=1`, its key only): a PDF's bytes passed straight through, never held
+// or encoded here (its text is read at build: a 代表會's 決議案 on a site that serves only Taiwan).
 export async function readPage(url, fetchFn = fetch, { file = false } = {}) {
   const got = await fetchPage(url, fetchFn);
   if (got.error) return got;
@@ -129,10 +124,8 @@ export async function readPage(url, fetchFn = fetch, { file = false } = {}) {
   if (!/text\/html|application\/xhtml|text\/plain/i.test(type) && type) {
     const size = Number(res.headers.get('Content-Length')) || null;
     const kind = /pdf/i.test(type) || /\.pdf$/i.test(new URL(got.url).pathname) ? 'pdf' : 'file';
-    if (file && kind === 'pdf' && (!size || size <= PAGE_LIMITS.fileBytes)) {
-      const bytes = await bytesOf(res);
-      if (bytes.length < PAGE_LIMITS.fileBytes) return { url: got.url, type: 'pdf', size: bytes.length, b64: b64(bytes) };
-    } else res.body?.cancel?.().catch(() => {});
+    if (file && kind === 'pdf' && (!size || size <= PAGE_LIMITS.fileBytes)) return { url: got.url, type: 'pdf', size, body: res.body };
+    res.body?.cancel?.().catch(() => {});
     return { url: got.url, type: kind, size };
   }
   const bytes = await bytesOf(res);
@@ -181,6 +174,7 @@ export async function handleLawPage(request, env, ctx, headers, session, fetchFn
   }
   if (out.error === 'host') return fail('host', 400, headers);
   if (out.error) return fail('upstream', 502, headers, { status: out.status });
+  if (out.body) return new Response(out.body, { status: 200, headers: { ...headers, 'Content-Type': 'application/pdf', 'Cache-Control': 'no-store', ...(out.size ? { 'Content-Length': String(out.size) } : {}) } });
   if (cache) ctx?.waitUntil?.(cache.put(key, new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `max-age=${ttlOf(url)}` } })).catch(() => {}));
   return json({ ...out, cached: false }, 200, headers);
 }
