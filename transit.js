@@ -102,6 +102,24 @@ export function resetMeter() {
   Object.assign(meter, { month: '', stored: null, readAt: 0, pending: {}, flushedAt: 0, timer: null, timerAt: 0 });
   Object.assign(lastMeter, { month: '', stored: null, readAt: 0 });
   mirrored.clear();
+  googleDay.outUntil = 0;
+}
+// Google's day used up: Compute Routes answers 429 past 100 asks a day on
+// this project (ComputeRoutesRequestsPerDay, seen 2026-11-10: gone by 10:50
+// Taiwan time, back at 16:00, midnight Pacific). Not asked, nor counted,
+// again till its window turns (each isolate learns it from one 429; nothing
+// written). A minute's limit: a minute.
+export const googleDay = { outUntil: 0 };
+const googleOut = now => now < googleDay.outUntil;
+async function noteGoogle(r, now) {
+  if (r?.status !== 429) return;
+  let until = now + MIN;
+  try {
+    const m = (await r.clone().json())?.error?.details?.find(d => d?.metadata?.window_start_time)?.metadata;
+    const start = Number(m?.window_start_time) * 1000;
+    if (/\/d\b/.test(m?.quota_unit || '') && start) until = start + DAY;
+  } catch {}
+  googleDay.outUntil = Math.max(googleDay.outUntil, until);
 }
 const meterKey = month => `transit:use:${month}`;
 const FLUSH_MS = 2000;
@@ -1640,11 +1658,13 @@ async function routes(env, q, { fetchFn, ctx, now, cache, by: who }) {
   if (src === 'tdx') {
     // (TDX's alone.)
   } else if (!railOrBus) sources.google = 'off';
+  else if (googleKey(env) && googleOut(now)) sources.google = 'out';
   else if (googleKey(env) && (await spend(env, 'routes', 1, now, ctx, { by: who }))) {
     jobs.push(timed('google',
       fetchFn(ROUTES, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': GOOGLE_ROUTE_FIELDS }, body: JSON.stringify(googleRouteBody(from, to, { at: by === 'arrive' || at > now + MIN ? at : null, by, modes })), signal: timeout(15_000) })
         .then(async r => {
           sources.google = r.ok ? 'ok' : `http ${r.status}`;
+          if (!r.ok) await noteGoogle(r, now);
           return r.ok ? parseGoogleRoutes(await r.json(), at) : [];
         })
         .catch(() => ((sources.google = 'error'), []))
@@ -1859,6 +1879,7 @@ async function walks(env, q, { fetchFn, ctx, now, cache, by }) {
   if (todo.length) {
     const sku = line ? 'routes' : 'matrix';
     if (!googleKey(env)) src = 'nokey';
+    else if (googleOut(now) && line) src = 'out';
     else if (!(await spend(env, sku, todo.length, now, ctx, { by }))) src = 'cap';
     else {
       const pt = p => ({ location: { latLng: { latitude: p.lat, longitude: p.lon } } });
@@ -1866,6 +1887,7 @@ async function walks(env, q, { fetchFn, ctx, now, cache, by }) {
       try {
         if (line) {
           const r = await fetchFn(ROUTES, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline' }, body: JSON.stringify({ origin: pt(from), destination: pt(tos[0]), travelMode: 'WALK', languageCode: 'zh-TW', regionCode: 'tw', units: 'METRIC' }), signal: timeout(8000) });
+          if (!r.ok) await noteGoogle(r, now);
           const j = r.ok ? await r.json() : null;
           const w = j?.routes?.[0];
           if (w) out[0] = { dist: Number(w.distanceMeters) || 0, dur: secs(w.duration), poly: w.polyline?.encodedPolyline || '' };
@@ -1883,11 +1905,12 @@ async function walks(env, q, { fetchFn, ctx, now, cache, by }) {
           // OpenStreetMap's round the block (成功國中 → 成功九街: Google's 267 m by
           // the lane, OpenStreetMap's 460 round the school; the phone left the
           // YouBike at 新竹縣體育場 for it, Jay 2026-11-07).
-          if (!r.ok && (r.status === 403 || r.status === 401) && (await spend(env, 'routes', todo.length, now, ctx, { by }))) {
+          // (Not once Google's day is used up: Compute Routes is the trips' too.)
+          if (!r.ok && (r.status === 403 || r.status === 401) && !googleOut(now) && (await spend(env, 'routes', todo.length, now, ctx, { by }))) {
             const got = await Promise.all(
               todo.map(i =>
                 fetchFn(ROUTES, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': googleKey(env), 'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration' }, body: JSON.stringify({ origin: pt(from), destination: pt(tos[i]), travelMode: 'WALK', languageCode: 'zh-TW', regionCode: 'tw', units: 'METRIC' }), signal: timeout(8000) })
-                  .then(x => (x.ok ? x.json() : null))
+                  .then(async x => (x.ok ? x.json() : (await noteGoogle(x, now), null)))
                   .catch(() => null)
               )
             );

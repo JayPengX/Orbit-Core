@@ -701,6 +701,40 @@ test("the matrix refused: each walk by Compute Routes instead, counted on its sh
   assert.equal(used.routes, 3);
 });
 
+// Google's Compute Routes stops at 100 asks a day on this project (2026-11-10:
+// 429 RESOURCE_EXHAUSTED by 10:50 Taiwan time, back at 16:00): from the first
+// 429 nothing more is asked or counted till its window turns, neither a trip
+// nor a walk; the matrix's per-walk stand-in never spends the trips' day.
+test("Google's day used up (429): neither a trip nor a walk asks it again till its window turns", async () => {
+  fresh();
+  const env = { GOOGLE_MAPS_KEY: 'k', RATE_LIMIT_KV: memKv() };
+  const start = Math.floor((NOW - 8 * 3_600_000) / 86_400_000) * 86_400_000 + 8 * 3_600_000; // midnight Pacific (UTC−8), as Google's window
+  let google = 0;
+  const quota = { error: { code: 429, status: 'RESOURCE_EXHAUSTED', details: [{ reason: 'RATE_LIMIT_EXCEEDED', metadata: { window_start_time: String(start / 1000), quota_unit: '1/d/{project}', quota_limit: 'ComputeRoutesRequestsPerDay', quota_limit_value: '100' } }] } };
+  const fetchFn = async url => {
+    if (String(url).includes('googleapis')) {
+      google++;
+      return String(url).includes('computeRouteMatrix') ? new Response('{}', { status: 403 }) : new Response(JSON.stringify(quota), { status: 429 });
+    }
+    return new Response('{}', { status: 503 });
+  };
+  const trip = at => handleTransit(new Request('https://w/transit/route?from=24.8,120.97&to=24.84,121.012&src=google'), env, {}, '/transit/route', { session: { s: 'S' }, fetchFn, now: at, cache: memCache() }).then(r => r.json());
+  const walk = (at, qs) => handleTransit(new Request(`https://w/transit/walk?from=24.8177,121.0163&${qs}`), env, {}, '/transit/walk', { session: { s: 'S' }, fetchFn, now: at, cache: memCache() }).then(r => r.json());
+  assert.equal((await trip(NOW)).sources.google, 'http 429');
+  assert.equal(google, 1);
+  const used = (await usage(env, NOW)).routes;
+  assert.equal((await trip(NOW + 60_000)).sources.google, 'out', 'not asked again');
+  assert.deepEqual(await walk(NOW + 60_000, 'to=24.81872,121.01597&line=1'), { walks: [null], src: 'out' });
+  // The matrix (403) asked, its per-walk stand-in on Compute Routes not.
+  const m = await walk(NOW + 60_000, 'to=24.81872,121.01597;24.8162,121.0171');
+  assert.equal(m.src, 'http 403');
+  assert.equal(google, 2, 'only the matrix');
+  assert.equal((await usage(env, NOW)).routes, used, 'nothing counted while out');
+  // Its window turned: asked again.
+  assert.equal((await trip(start + 86_400_000 + 1000)).sources.google, 'http 429');
+  assert.equal(google, 3);
+});
+
 // Nothing asks Google's traffic matrix (a bus's drive to its stops): the
 // address had no app calling it, only a test page, and its share was counted
 // as people's on the admin panel's 容量 (Jay 2026-11-06: "3 people"). Gone.
