@@ -196,7 +196,7 @@ w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 | `/stock` | `stock-fill.js`, `stock-check.js` | Securities' fills at the proxy's own quote; the account replayed on each save |
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
 | `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `weather-radar.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations) scored hourly (`/weather/skill`); `radar`: the next hour's rain (CWA's radar); in a typhoon (NCDR's CAP), `dayOff`: each county's 停班停課 from 人事行政總處, else a fitted chance |
-| `/transit/…` | `transit.js`, `transit-free.js` | TDX (allowlist `TDX_RULES`; `tdxTrim`; YouBike, 新竹/臺北/新北's buses, 台鐵's day: own sites; `tdxPlan`: free from 12-01; `tdxf:*`), bus places (`gps`), map config, search, place, route (TDX's if `TDX_MAAS`), walk, book (高鐵), `gtfs` (dev); `status?sample=` |
+| `/transit/…` | `transit.js`, `transit-free.js` | TDX (allowlist `TDX_RULES`; `tdxTrim`; YouBike, 新竹/臺北/新北's buses, 台鐵's day: own sites; `tdxPlan`: free from 12-01; `tdxf:*`), bus places (`gps`), map config, search, place, route (TDX's if `TDX_MAAS`), walk, book (高鐵), `gtfs` (dev, bus build: `buildTdxRoom`); `status?sample=` |
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `f1-people.js`, `fund-nav.js`, `taifex.js` | The data proxy (§4.1): sports, quotes, F1, Asian baseball, SITCA's fund NAVs, TAIFEX |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
@@ -229,7 +229,7 @@ w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
   pass gets a dev session on `/sports-proxy`, `/transit`, `/weather` and
   `/flight` (per address; Google's as `dev:<sku>`, half a free month at most;
   TDX's copies 10 minutes old, `devTdxDay`): `tools/preview.mjs --live`,
-  or `curl -H 'Origin: http://localhost:8123' '…/sports-proxy?url=…'`.
+  or `curl -H 'Origin: http://localhost:8123' '…'`.
 
 - **Crons:** even minutes (notices, builders, weather scoring and radar,
   capacity, the meter's copy), F1's laps on both, run by Runner alarms.
@@ -361,9 +361,9 @@ A new Cloudflare product goes into `guard.js` `PLAN` with it.
 
 ### 5.5 The family's data (`data.js`, `builders/`)
 
-R2 bucket `orbit-data`, served at `/data/<path>`. The builders run from
-`builders/run.js` on the even-minute cron, each only as often as its data
-changes, writing a file only when it changed (`builders/store.js`):
+R2 bucket `orbit-data`, served at `/data/<path>`. Builders run from
+`builders/run.js` on the even-minute cron, as often as their data changes,
+writing a file only when it changed (`builders/store.js`):
 
 | Builder | Writes | When (UTC) |
 | --- | --- | --- |
@@ -371,7 +371,7 @@ changes, writing a file only when it changed (`builders/store.js`):
 | `watch.js` | `sports/watch.json`, the season archive | hourly / daily 20:00 |
 | `winprob.js` | `winprob/…` | daily 23:00 |
 | `photos.js`, `official-photos.js` | photo lists, cutouts, official headshots | hourly / daily 18:00 |
-| `buses.js`, `ntpc.js` | `bus/…`, `shape/…`, `station/…`, `where.json` | weekly, a city |
+| `gtfs.js`, `buses.js`, `ntpc.js` (GitHub `buses.yml`, `tools/gtfs-buses.mjs`) | `bus/…`, `shape/…`, `station/…`, `where.json` | Sat 19:07 |
 | `asia.js`, `cpbl.js` | CPBL's month and standings | daily 15:00 |
 | `f1kept.js` | each finished F1 session's 數據 and laps, kept before anyone opens them (via the proxy: OpenF1 refuses quick askers) | :06, :26, :46 |
 | `kept.js` | wipes the proxy's kept copies (`mirror/`) from before a league's first askable day | daily 17:00 |
@@ -400,7 +400,7 @@ included), then wiped whole. `private/` is never served.
 The numbers live in `eco.js` and the kit's `orbit.mjs` (the same tables in
 both; RULEBOOK §4): NT$200,000 to open, NT$10,000 every Monday, 急難紓困
 (`kit/pay.mjs`), 財富等級 rewards, 1% a month overdraft, no personal loan.
-Money is shown and written only in Securities (資金), never on the Pass sheet; and `eco:` ids are the Worker's alone.
+Money is shown and written only in Securities (資金), never on the Pass sheet; `eco:` ids are the Worker's alone.
 Securities' broker rules (`stock-access.mjs`, `stock-credit.mjs`): its MAP.md.
 
 ## 8. Notices (`/push`)
@@ -451,7 +451,7 @@ can be turned off on its own.
   - The proxy: Google's keys, `CWA_KEY`, `MOENV_KEY`, `TDX_CLIENT_*`.
 - **The domain:** `kit/domain.mjs` `DOMAIN` (jaypengx.com), the one place
   it is set. Each repo publishes its built site with `deploy/cf-site.mjs`
-  (an assets-only Worker on routes of its paths): `orbit.<DOMAIN>/<slug>/` every app (`slug`,
+  (§4.2): `orbit.<DOMAIN>/<slug>/` every app (`slug`,
   `SHORT` in `kit/brand.mjs`; one origin, so one Pass sign-in), `orbit-pass`
   for `/`, `/pass/`, `/key/`, `/Orbit-Core/` and the old `/Shared-Proxy/`,
   `orbit-home` for `<DOMAIN>/` (Orbit-Showcase: Jay's homepage, `/showcase/`).

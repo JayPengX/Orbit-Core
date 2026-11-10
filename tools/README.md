@@ -269,6 +269,7 @@ importScripts('../Orbit-Core/kit/sw.js');
 | `node tools/espn.mjs <path> [query]` | The shape of an ESPN answer |
 | `node tools/issue-passes.mjs` | Issue passes (the owner) |
 | `node tools/weather-stations.mjs` | Rebuild `weather-stations.js` |
+| `node tools/gtfs-buses.mjs [--gtfs dir] [--out dir] [--only Hsinchu] [--no-tdx] [--push]` | The weekly bus packs from TDX's GTFS (GitHub's `buses.yml` runs it with `--push`); `--out` alone writes them to compare with what's live. Needs `DATA_PUSH_SECRET` for the zip and TDX's asks |
 | `python3 tools/word-audio.py` | Orbit Words' missing recordings |
 
 ESPN answers 403 to unusual User-Agents: use curl's default. Its scoreboard

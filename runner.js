@@ -62,6 +62,8 @@ export function runsInRunner(request, path) {
   // (A free source's list of all Taiwan, YouBike's, read and kept in the Runner: transit-free.js.)
   const q = new URL(request.url).searchParams;
   if ((p === '/transit/tdx' && freeHeavy(q.get('p'))) || freeRoutesHeavy(p, q)) return true;
+  // (The bus build's TDX asks, a city's list at a time: tools/gtfs-buses.mjs, its secret in the header.)
+  if (p === '/transit/tdx' && request.headers.has('Authorization')) return true;
   if (STAY.test(p)) return false;
   if (/yahoo/i.test(request.url)) return false;
   return true;
