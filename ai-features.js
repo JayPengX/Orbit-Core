@@ -154,6 +154,42 @@ export const FEATURES = {
     }
   },
 
+  // Orbit Weather's 問天氣 (code first, Jay 11-10): the person's question is read
+  // by code (day, place, what) and answered from the forecast by code; only a
+  // place code can't find among Taiwan's townships (a mountain, a park, a
+  // school) is asked here, on a tap: where it is, nothing more.
+  'weather-ask': {
+    app: 'weather',
+    tap: true,
+    models: ['luna', 'haiku'],
+    effort: { luna: 'low' },
+    maxIn: 1200,
+    perPass: 30,
+    perMinute: 6,
+    input(raw) {
+      const q = str(raw?.question, 60);
+      const place = str(raw?.place, 30);
+      return q && place ? { q, place } : null;
+    },
+    parts: ({ q, place }) =>
+      text(
+        [
+          'A person in Taiwan asks about the weather at a place. Say where that place is: its usual name in Traditional Chinese (台灣用語), the county or city it is in, and its coordinates in decimal degrees (a mountain: its summit; a town, park, school or sight: its centre).',
+          'Only a real place you know. If it is not one, or it could be several places and the question gives no hint which, return name "" and lat 0, lon 0. Never guess.',
+          `The place as they wrote it: ${place}`,
+          `Their question: ${q}`
+        ].join('\n')
+      ),
+    schema: obj({ name: S, county: S, lat: N, lon: N }),
+    clean(raw) {
+      const name = str(raw?.name, 30);
+      const lat = Number(raw?.lat), lon = Number(raw?.lon);
+      // (Anywhere on the map; Taiwan's own is what it's for, abroad Google's forecast answers too.)
+      if (!name || !Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180 || (lat === 0 && lon === 0)) return { name: '', county: '', lat: 0, lon: 0 };
+      return { name, county: str(raw?.county, 20), lat: Math.round(lat * 1e4) / 1e4, lon: Math.round(lon * 1e4) / 1e4 };
+    }
+  },
+
   'money-month': {
     app: 'money',
     tap: true,
