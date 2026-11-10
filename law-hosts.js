@@ -31,8 +31,7 @@ export const COUNCIL_HOSTS = new Set([
   'www.mlcc.gov.tw', // 苗栗縣議會
   'www.mtcc.gov.tw', // 連江縣議會
   'www.tthcc.gov.tw', // 臺東縣議會
-  'www.jbc.gov.tw', // 竹北市民代表會 (the first 鄉鎮市民代表會)
-  'www.chupei.gov.tw' // 竹北市公所
+  'www.zhubei.gov.tw' // 竹北市公所, whose CMS holds 竹北市民代表會's site (/jbc/; jbc.gov.tw is gone)
 ]);
 
 // A url of those sites' rule pages, or a council's page: https, no credentials or port.
