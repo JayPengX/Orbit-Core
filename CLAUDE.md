@@ -118,10 +118,10 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, before the app's modules); the cover held for it |
 | `loader.html` | The snippets every app's page carries (`kit:head`, `kit:boot`) |
 | `brand.mjs` | Families, names, colours, marks, repos, slugs, `APP_ORDER`, `DEV` (speeds, §9) |
-| `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: never money); every app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
+| `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); each app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
 | `passkey.mjs` | Passkeys in the browser: made, used, named (`passkeyHere()` false where a browser can't) |
 | `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); topics (`TOPICS`); `sideOf`, `partiesIn`, `topicsOf` |
-| `ai.mjs`, `family.mjs` | AI on a phone: `aiCall`, `aiFlow` (asks back as chips), `pickList`/`picker` (own lists), `aiBar`, `aiPicture`; the apps' notebook on the phone (`tell`/`heard`, places, Class's periods, `planHash`: a Transit trip) |
+| `ai.mjs`, `family.mjs`, `today.mjs` | AI on a phone: `aiCall`, `aiFlow` (asks back as chips), `pickList`/`picker`, `aiBar`, `aiPicture`; the phone's family notebook (`tell`/`heard`, places, Class's periods, `planHash`: a Transit trip); Pass's 今天 |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs`: qrcode-generator 2.0.4 (MIT), vendored |
 | `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays` |

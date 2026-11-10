@@ -11,7 +11,8 @@ import { APPS, AVATARS, FRAMES, MILESTONES, TIERS, DEFAULT_AVATAR, milestoneOf, 
 let helpMod = null;
 let helpLoad = null;
 export const loadHelp = () => (helpLoad ||= import('./help.mjs').then(m => (helpMod = m)).catch(e => ((helpLoad = null), Promise.reject(e))));
-import { sheet, section } from './ui.mjs';
+import { sheet, section, list, cell } from './ui.mjs';
+import { todayRows } from './today.mjs';
 import { homeOf } from './brand.mjs';
 
 export const STRINGS = {
@@ -68,7 +69,8 @@ export const STRINGS = {
     tab_help: '說明',
     here: '這裡',
     share: '分享',
-    appsSub: '每天用得到的 App，用同一個 Orbit Pass。'
+    appsSub: '每天用得到的 App，用同一個 Orbit Pass。',
+    today: '今天'
   },
   en: {
     looksTitle: 'Avatar and frame',
@@ -123,7 +125,8 @@ export const STRINGS = {
     tab_help: 'Help',
     here: 'Here',
     share: 'Share',
-    appsSub: 'Everyday apps, on the same Orbit Pass.'
+    appsSub: 'Everyday apps, on the same Orbit Pass.',
+    today: 'Today'
   }
 };
 const TABS = ['pass', 'looks', 'apps', 'help'];
@@ -214,11 +217,29 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
     account = null;
     if (state.tab === 'pass') {
       account = passAccount(s, { extra: state.extra, close, looks: () => show('looks') });
-      return put(body, ...account.nodes);
+      return put(body, ...[todayCard(), ...account.nodes].filter(Boolean));
     }
     if (state.tab === 'looks') return put(body, looksSection(ctx));
     if (state.tab === 'apps') return renderApps(body, ctx);
     renderHelp(body, ctx, state.help);
+  }
+  // 今天 (today.mjs): what each app told the phone's family notebook for
+  // today, a row an app, each opening its app there (this one: closes the sheet).
+  function todayCard() {
+    let rows = [];
+    try {
+      rows = todayRows({ en: locale === 'en' });
+    } catch {}
+    if (!rows.length) return null;
+    const goTo = r => () => {
+      if (r.app !== s.app) return void s.go?.(r.app, r.hash);
+      close();
+      if (r.hash) location.hash = r.hash;
+    };
+    return list(
+      rows.map(r => cell({ icon: el('img', { src: svgUrl(appIcon(r.app)), alt: '', width: 29, height: 29 }), title: r.title, sub: r.sub, chevron: true, onClick: goTo(r) })),
+      { head: t('today') }
+    );
   }
   // (The Pass tab only redraws its card: a device code or a note on it stays.)
   const onWallet = () => dialog?.open && !Object.keys(pending).length && (state.tab === 'pass' ? account?.card?.() : state.tab !== 'help' && paint());
