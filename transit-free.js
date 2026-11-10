@@ -83,8 +83,10 @@ export function indexYouBike(list) {
 
 let yb = null; // { at, idx }
 let ybGoing = null;
+let ybFailed = 0; // (refused: not asked again for 10 minutes, never the 6 MB at each ask)
 async function youBike(fetchFn, now) {
   if (yb && now - yb.at < YB_FRESH) return yb;
+  if (now - ybFailed < YB_KEEP) return yb && now - yb.at < YB_KEEP ? yb : null;
   if (!ybGoing) {
     ybGoing = (async () => {
       const res = await fetchFn(YB_URL, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout?.(8000) });
@@ -98,6 +100,7 @@ async function youBike(fetchFn, now) {
   try {
     return await ybGoing;
   } catch (err) {
+    ybFailed = now;
     console.log('youbike failed', String(err?.message || err).slice(0, 120));
     return yb && now - yb.at < YB_KEEP ? yb : null;
   }
@@ -105,6 +108,7 @@ async function youBike(fetchFn, now) {
 export function resetYouBike() {
   yb = null;
   ybGoing = null;
+  ybFailed = 0;
 }
 
 const BIKE_CITY = /^basic\/v2\/Bike\/(Station|Availability)\/City\/([A-Za-z]+)$/;
