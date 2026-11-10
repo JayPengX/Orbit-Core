@@ -864,3 +864,93 @@ test("a county's buses (基隆 107) from 公路局's site; the site down: its la
   assert.ok(log.some(x => x.includes?.('tdx.transportdata.tw')), 'then TDX');
   assert.equal(runsInRunner(new Request('https://w/transit/eta?city=Keelung&stops=KEE306361'), '/transit/eta'), true);
 });
+
+// ---- 台鐵's fares: 台鐵's own 票價試算 ---------------------------------------------------------
+
+test("台鐵's fares from 台鐵's own 票價試算 (every type in one form), in TDX's ODFare shape, kept in R2 30 days; the site down: the copy of any age, else TDX; a pair it doesn't sell: TDX, not asked again that day", async () => {
+  const { traFareRows, traFareForm, traFareFile, TRA_FARE, TRA_TRAIN, TRA_FARE_TYPES } = await import('../transit-free.js');
+  // (花蓮 → 臺北, 2026-11-10: TDX's ODFare said 583 自強 / 太魯閣 / 普悠瑪 / 自強(3000), 450 莒光, 376 復興 / 區間快 / 區間, 194.3 km.)
+  const page = readFileSync(new URL('./fixtures/tra-fare.html', import.meta.url), 'utf8');
+  const rows = traFareRows(page, '7000', '1000');
+  assert.deepEqual(rows.map(r => [r.TrainType, r.Fares[0].Price]), [[11, 583], [1, 583], [2, 583], [3, 583], [4, 450], [5, 376], [10, 376], [6, 376]]);
+  assert.ok(rows.every(r => r.TravelDistance === 194.3 && r.OriginStationID === '7000' && r.DestinationStationID === '1000' && r.Fares[0].TicketType === 1 && r.Fares[0].FareClass === 1));
+  // (A row the site answered as another type than asked: dropped.)
+  assert.deepEqual(traFareRows(page.replace(/(<span>\s*)莒光(\s*<span><\/span>)/, '$1區間$2'), '7000', '1000').map(r => r.TrainType), [11, 1, 2, 3, 5, 10, 6]);
+  assert.deepEqual(traFareRows('<html>查無資料</html>', '7000', '1000'), []);
+  const form = traFareForm('tok', '7000', '1000', '2026/11/10');
+  assert.equal(form.get('tip114QueryVOs[7].trainType'), '6');
+  assert.equal(form.get('tip114QueryVOs[0].startStation'), '7000');
+  assert.equal([...form.keys()].filter(k => k.endsWith('.trainType')).length, TRA_FARE_TYPES.length);
+
+  resetFree();
+  const now = Date.parse('2026-11-10T18:30:00+08:00');
+  const files = new Map();
+  const env = { DATA: { get: async k => (files.has(k) ? { text: async () => files.get(k).body, uploaded: new Date(files.get(k).at) } : null), put: async (k, body) => void files.set(k, { body, at: now }) } };
+  const asked = [];
+  let down = false;
+  const fetchFn = async (u, o = {}) => {
+    if (String(u).startsWith(TRA_TRAIN)) return asked.push('form'), new Response('<input type="hidden" name="_csrf" value="tok-1"/>', { headers: { 'Set-Cookie': 'T4TIPSESSIONID=abc; path=/' } });
+    assert.equal(String(u), TRA_FARE);
+    if (down) throw new Error('down');
+    const b = new URLSearchParams(o.body);
+    assert.equal(b.get('_csrf'), 'tok-1');
+    assert.equal(o.headers.cookie, 'T4TIPSESSIONID=abc');
+    asked.push(`${b.get('tip114QueryVOs[0].startStation')}-${b.get('tip114QueryVOs[0].endStation')}`);
+    return new Response(b.get('tip114QueryVOs[0].startStation') === '7000' ? page : '<table class="fare-table"></table>');
+  };
+  const ask = (a, b, at = now) => freeTdx(`basic/v3/Rail/TRA/ODFare/${a}/to/${b}`, '$format=JSON', { env, fetchFn, now: at });
+  const got = await ask('7000', '1000');
+  assert.equal(got.state, 'free');
+  assert.deepEqual(JSON.parse(got.body).ODFares.map(r => r.Fares[0].Price), [583, 583, 583, 583, 450, 376, 376, 376]);
+  assert.ok(files.has(traFareFile('7000', '1000')), 'kept in R2');
+  await ask('7000', '1000');
+  assert.deepEqual(asked, ['form', '7000-1000'], 'asked of the site once');
+  // (A new isolate: R2's copy, the site not asked.)
+  resetFree();
+  assert.equal(JSON.parse((await ask('7000', '1000', now + 20 * 86_400_000)).body).ODFares.length, 8);
+  assert.deepEqual(asked, ['form', '7000-1000']);
+  // (Past 30 days and the site down: the old copy still.)
+  resetFree();
+  down = true;
+  assert.equal(JSON.parse((await ask('7000', '1000', now + 40 * 86_400_000)).body).ODFares.length, 8);
+  // (Never read, the site down: TDX's.)
+  assert.equal(await ask('1000', '3300'), null);
+  down = false;
+  // (A pair the site doesn't sell: TDX's, and not asked again that day.)
+  assert.equal(await ask('0920', '1000'), null);
+  assert.equal(await ask('0920', '1000'), null);
+  assert.equal(asked.filter(x => x === '0920-1000').length, 1);
+  assert.equal(await freeTdx('basic/v3/Rail/TRA/ODFare/7000/to/1000', '$filter=TrainType eq 3', { env, fetchFn, now }), null, 'asked another way: TDX');
+  assert.ok(freeHeavy('basic/v3/Rail/TRA/ODFare/7000/to/1000'), 'read in the Runner');
+});
+
+test("高鐵's fares from 高鐵's own 時刻表與票價查詢 (its PriceTable), in TDX's ODFare shape, kept in R2 as 台鐵's; 南港, 臺北, 板橋 between them: no 商務", async () => {
+  const { thsrFareRows, THSR_SEARCH } = await import('../transit-free.js');
+  const fx = JSON.parse(readFileSync(new URL('./fixtures/thsr-fare.json', import.meta.url), 'utf8'));
+  // (TDX's 臺北 → 左營, 2026-11-10: 1490 標準, 2440 商務, 1445 自由座.)
+  assert.deepEqual(thsrFareRows(fx['1000-1070'], '1000', '1070'), [{ OriginStationID: '1000', DestinationStationID: '1070', Direction: 0, Fares: [{ TicketType: 1, FareClass: 1, CabinClass: 1, Price: 1490 }, { TicketType: 1, FareClass: 1, CabinClass: 2, Price: 2440 }, { TicketType: 1, FareClass: 1, CabinClass: 3, Price: 1445 }] }]);
+  assert.deepEqual(thsrFareRows(fx['0990-1000'], '0990', '1000')[0].Fares.map(f => [f.CabinClass, f.Price]), [[1, 40], [3, 35]]);
+  assert.equal(thsrFareRows(fx['1000-1070'], '1070', '1000')[0].Direction, 1);
+  assert.equal(thsrFareRows({ success: false }, '1000', '1070'), null);
+
+  resetFree();
+  const now = Date.parse('2026-11-10T18:30:00+08:00');
+  const files = new Map();
+  const env = { DATA: { get: async k => (files.has(k) ? { text: async () => files.get(k), uploaded: new Date(now) } : null), put: async (k, body) => void files.set(k, body) } };
+  const asked = [];
+  const fetchFn = async (u, o = {}) => {
+    assert.equal(String(u), THSR_SEARCH);
+    const b = new URLSearchParams(o.body);
+    asked.push(`${b.get('StartStation')}-${b.get('EndStation')}`);
+    assert.equal(b.get('OutWardSearchDate'), '2026/11/11');
+    return new Response(JSON.stringify(fx['1000-1070']));
+  };
+  const got = await freeTdx('basic/v2/Rail/THSR/ODFare/1000/to/1070', '$format=JSON', { env, fetchFn, now });
+  assert.equal(got.state, 'free');
+  assert.equal(JSON.parse(got.body)[0].Fares[0].Price, 1490);
+  await freeTdx('basic/v2/Rail/THSR/ODFare/1000/to/1070', '', { env, fetchFn, now });
+  assert.deepEqual(asked, ['TaiPei-ZuoYing']);
+  assert.ok(files.has('rail/fare/thsr/1000-1070.json'));
+  assert.equal(await freeTdx('basic/v2/Rail/THSR/ODFare/1000/to/9999', '', { env, fetchFn, now }), null, 'a station it has not: TDX');
+  assert.ok(freeHeavy('basic/v2/Rail/THSR/ODFare/1000/to/1070'));
+});

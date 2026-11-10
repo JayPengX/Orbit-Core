@@ -1,0 +1,166 @@
+{
+ "note": "高鐵 /TimeTable/Search, 2026-11-10 (PriceTable kept; the trains cut)",
+ "1000-1070": {
+  "success": true,
+  "data": {
+   "PriceTable": {
+    "Coach": [
+     "$1490",
+     "$745"
+    ],
+    "Business": [
+     "$2440",
+     "$1220"
+    ],
+    "Unreserved": [
+     "$1445",
+     "$720"
+    ],
+    "Column": []
+   },
+   "DepartureTable": {
+    "TrainItem": [
+     {
+      "TrainNumber": "0803",
+      "DepartureDate": null,
+      "DepartureTime": "06:26",
+      "DestinationTime": "08:40",
+      "DestinationDate": null,
+      "Duration": "02:14",
+      "NonReservedCar": "10-12",
+      "IsNonReservedDesignated": false,
+      "Discount": [
+       {
+        "Id": "9973b559-8279-4bf4-90be-601f7973a39f",
+        "Name": "指定區間團體",
+        "Value": "65折",
+        "Color": "#9e652e",
+        "Discount": "65"
+       },
+       {
+        "Id": "68d9fc7b-7330-44c2-962a-74bc47d2ee8a",
+        "Name": "大學生",
+        "Value": "88折",
+        "Color": "#2977b1",
+        "Discount": "88"
+       }
+      ],
+      "Note": "",
+      "Sequence": 0,
+      "StationInfo": [
+       {
+        "StationNo": "01",
+        "StationName": "南港",
+        "DepartureTime": "06:15",
+        "Show": true,
+        "ColorClass": "orange"
+       },
+       {
+        "StationNo": "02",
+        "StationName": "台北",
+        "DepartureTime": "06:26",
+        "Show": true,
+        "ColorClass": "purple"
+       },
+       {
+        "StationNo": "03",
+        "StationName": "板橋",
+        "DepartureTime": "06:34",
+        "Show": true,
+        "ColorClass": "dark_green"
+       },
+       {
+        "StationNo": "04",
+        "StationName": "桃園",
+        "DepartureTime": "06:49",
+        "Show": true,
+        "ColorClass": "light_green"
+       },
+       {
+        "StationNo": "05",
+        "StationName": "新竹",
+        "DepartureTime": "07:02",
+        "Show": true,
+        "ColorClass": "gray"
+       },
+       {
+        "StationNo": "06",
+        "StationName": "苗栗",
+        "DepartureTime": "07:13",
+        "Show": true,
+        "ColorClass": "sky_blue"
+       },
+       {
+        "StationNo": "07",
+        "StationName": "台中",
+        "DepartureTime": "07:32",
+        "Show": true,
+        "ColorClass": "pink"
+       },
+       {
+        "StationNo": "08",
+        "StationName": "彰化",
+        "DepartureTime": "07:45",
+        "Show": true,
+        "ColorClass": "red"
+       },
+       {
+        "StationNo": "09",
+        "StationName": "雲林",
+        "DepartureTime": "07:56",
+        "Show": true,
+        "ColorClass": "dark_blue"
+       },
+       {
+        "StationNo": "10",
+        "StationName": "嘉義",
+        "DepartureTime": "08:10",
+        "Show": true,
+        "ColorClass": "yellow"
+       },
+       {
+        "StationNo": "11",
+        "StationName": "台南",
+        "DepartureTime": "08:28",
+        "Show": true,
+        "ColorClass": "brown"
+       },
+       {
+        "StationNo": "12",
+        "StationName": "左營",
+        "DepartureTime": "08:40",
+        "Show": true,
+        "ColorClass": "blue"
+       }
+      ],
+      "IsCrossNight": false,
+      "RunDate": "2026/11/11",
+      "DepartureTime_Order": "06:26",
+      "DestinationTime_Order": "08:40",
+      "DiscountWord": null
+     }
+    ]
+   }
+  }
+ },
+ "0990-1000": {
+  "success": true,
+  "data": {
+   "PriceTable": {
+    "Coach": [
+     "$40",
+     "$20"
+    ],
+    "Business": [
+     "$260",
+     "$130"
+    ],
+    "Unreserved": [
+     "$35",
+     "$15"
+    ],
+    "Column": []
+   }
+  }
+ }
+}
