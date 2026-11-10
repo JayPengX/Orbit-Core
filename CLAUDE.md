@@ -130,7 +130,7 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `f1live.mjs`, `postseason.mjs`, `sports-espn.mjs`, `sports-broadcast.mjs`, `sports-highlights.mjs`, `sports-winprob.mjs` | F1's own timing read one way everywhere; MLB's postseason; ESPN's scoreboards as events (one parser for the proxy and the phone); where to watch in Taiwan (past ELTA's list, `eltaGuess`: its usual line-up, said 預估); highlights; win probability (also run by the builders) |
 | `stock-account.mjs`, `stock-access.mjs`, `stock-credit.mjs`, `stock-markets.mjs`, `stock-quotes.mjs`, `stock-bonds.mjs`, `stock-savings.mjs`, `stock-ipo.mjs`, `stock-holidays.mjs`, `stock-hk-lots.mjs`, `stock-jp-lists.mjs`, `stock-codec.mjs` | Securities' ledger, broker rules, markets, prices, bonds, savings, IPOs, holidays, lot sizes, saved-copy codec; shared with the Worker |
 | `pay.mjs`, `gov.mjs` | The weekly pay and relief (rules only; the Worker alone writes them); what the government took and gave one account |
-| `flight.mjs`, `ebus.mjs`, `ebus-read.mjs` | A real plane in the air on a sphere (`/flight`, Class's 專注飛行); bus sites' ETAs, notices as TDX's (臺中, 桃園: phones, then proxy; 高雄: phones) |
+| `flight.mjs`, `ebus.mjs`, `ebus-read.mjs` | A real plane in the air on a sphere (`/flight`, Class's 專注飛行); bus sites' ETAs, notices as TDX's (臺中, 桃園, 臺南: phones, then proxy; 高雄: phones) |
 | `domain.mjs`, `devconfig.mjs`, `mirror.mjs` | The family's domain (one place); `DEV` for the Workers; the nightly mirror's addresses |
 | `sw.js`, `sw-images.js` | The one service worker every app imports (page and own pictures kept first, refreshed behind; `?v=` files from the cache, checked against their hash); other sites' pictures in one cache all apps share |
 | `apps.mjs`, `link.mjs`, `preload.mjs`, `stamp.mjs`, `stamp-app.mjs`, `hash.mjs`, `frame-guard.mjs`, `no-net.mjs` | Build tools, never served: the apps' snippets; `.kit` links; first-screen modulepreload; the kit's and each app's content-hashed build; `frameFaults` (apps' tests: only colours on the tab bar); tests offline |
@@ -216,7 +216,7 @@ w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 | `/config` | `worker.js`, `kit/devconfig.mjs` | The live speeds (`DEV`), a minute in Cloudflare's cache |
 | `/guard` | `worker.js` | The guard as it last read the bill (no key) |
 | `/store/check` | `worker.js`, `doc-store.js` | Each collection's count, localhost only |
-| `/ops` | `ops.js`, `worker.js`, `ai-other.js` | The repo's own checks (Bearer `DATA_PUSH_SECRET`): `?check=gemini`, `gemini-use`, `law-chat`, `ai-models`, `ai-compare`, `system`, `capacity`, `cpu` |
+| `/ops` | `ops.js`, `worker.js`, `ai-other.js` | Checks (Bearer `DATA_PUSH_SECRET`): `?check=gemini`, `gemini-use`, `law-chat`, `ai-models`, `ai-compare`, `system`, `capacity`, `cpu`, `sources` |
 
 - **The gate:** every route needs a Pass session (`qt=`), counted per
   session and app in memory (600 a minute on the data proxy). Public routes

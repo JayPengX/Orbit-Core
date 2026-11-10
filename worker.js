@@ -29,7 +29,7 @@
 // sources are. The Orbit Pass is the only way anything is saved.
 
 // (First: the outside calls counted, sources.js, before anything keeps a fetch of its own.)
-import { watchRelay, flushSources, asSourceCall, pruneSources, takeBeacon } from './sources.js';
+import { watchRelay, flushSources, asSourceCall, pruneSources, takeBeacon, readSources } from './sources.js';
 import { handleLawAsk, useLawSite, addOne, twDay } from './law.js';
 import { handleLawChat, lawChatTimes, lawCompare, COMPARE_QS } from './law-chat.js';
 import { otherAnswer, streamOther, makerOf, modelsOf } from './ai-other.js';
@@ -1438,6 +1438,13 @@ async function route(request, env, ctx, headers, origin) {
     // The admin panel's 容量 (capacity.js): people (counts only), every quota
     // and how many people it holds.
     if (check === 'capacity') return json(await ADMIN_TOOLS.capacity({ env, deps: ECO_DEPS }), 200, headers);
+    // Each outside source's last 7 days as the proxy and the phones counted
+    // them (sources.js, the panel's 外部來源): ?src=a,b only those.
+    if (check === 'sources') {
+      const want = (new URL(request.url).searchParams.get('src') || '').split(',').filter(Boolean).slice(0, 20);
+      const all = await readSources(env);
+      return json(want.length ? Object.fromEntries(want.map(s => [s, all[s] || null])) : all, 200, headers);
+    }
     // Orbit Money's mail-in, removed 2026-10-27 (Jay: too privacy-invading): its
     // stored boxes and invoices deleted, once (build.yml purge-money-mail).
     if (check === 'purge-money-mail') {
@@ -1445,7 +1452,7 @@ async function route(request, env, ctx, headers, origin) {
       for (const d of docs) await DOCS.delete(env, 'orbit-money-mail', d.id);
       return json({ deleted: docs.length }, 200, headers);
     }
-    return json({ error: { message: 'check=gemini|system|capacity|purge-money-mail' } }, 400, headers);
+    return json({ error: { message: 'check=gemini|system|capacity|sources|purge-money-mail' } }, 400, headers);
   }
   // A builder's job now (builders/run.js), by hand: Bearer DATA_PUSH_SECRET
   // (Orbit-Core's build.yml). ?job=watch|cutouts|buses, or
