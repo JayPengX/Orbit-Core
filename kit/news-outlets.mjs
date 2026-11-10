@@ -311,3 +311,20 @@ export function topicWord(id, lang = 'zh', region = 'tw') {
   if (region === 'intl') return (lang === 'en' ? t.enAbroad : t.zhAbroad) || (lang === 'en' ? t.en : t.zh);
   return lang === 'en' ? t.en : t.zh;
 }
+
+// A name in the news (News' 你關心的, Securities' 持股新聞): Chinese names as
+// written (2 characters at least), English ones as whole words (5 letters at
+// least: "Heat" is a word), a Taiwan stock's code only standing alone. A
+// RegExp, or null when no word is long enough to match by chance.
+const latinWord = w => /^[\x20-\x7e]+$/.test(w);
+const escRe = w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+export function namesRe(words = [], codes = []) {
+  const ws = [...new Set(words.filter(Boolean).map(String))];
+  const zh = ws.filter(w => !latinWord(w) && w.length >= 2);
+  const en = ws.filter(w => latinWord(w) && w.length >= 5 && !/^\d+$/.test(w));
+  const cs = codes.filter(c => /^\d{4,6}$/.test(c || ''));
+  const parts = [...zh.map(escRe), ...en.map(w => `\\b${escRe(w)}\\b`), ...cs.map(c => `(?<!\\d)${c}(?!\\d)`)];
+  return parts.length ? new RegExp(parts.join('|'), 'i') : null;
+}
+// The headlines a story is known by (news/index.json's): its own and each outlet's.
+export const storyText = story => [story?.title, story?.zh, ...(story?.items || []).map(it => it[1]), ...(story?.tw?.items || []).map(it => it[1])].filter(Boolean).join('\n');

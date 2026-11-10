@@ -119,7 +119,7 @@ modules for modulepreload. `node kit/apps.mjs` refreshes every app's snippets;
 | `brand.mjs` | Families, names, colours, marks, repos, slugs, `APP_ORDER`, `DEV` (speeds, §9) |
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); each app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
 | `passkey.mjs` | Passkeys in the browser: made, used, named (`passkeyHere()` false where a browser can't) |
-| `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); topics (`TOPICS`); `sideOf`, `partiesIn`, `topicsOf` |
+| `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); `TOPICS`; `sideOf`, `partiesIn`, `topicsOf`, `namesRe` |
 | `ai.mjs`, `family.mjs`, `today.mjs` | AI: `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`; the phone's family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天 |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs`: qrcode-generator 2.0.4 (MIT), vendored |
