@@ -1014,3 +1014,36 @@ test("高鐵's state from its own 列車運行狀況 (TDX's AlertInfo: 正常 is
   assert.equal(await ask('basic/v2/Rail/Metro/Alert/NTDLRT'), null, 'TDX');
   assert.ok(freeHeavy('basic/v2/Rail/Metro/Alert/TMRT'), "read in the Runner (臺中's page is 700 KB)");
 });
+
+test("公路客運's News from 公路局's own 最新消息 (營運異動 and 其他, as TDX's row for row), each notice's words read once; 路線通阻 (TDX's Alert, which names routes) stays TDX's", async () => {
+  const { tbNewsRow, TB_NEWS } = await import('../transit-free.js');
+  const fx = nfx.tbNews;
+  const row = tbNewsRow(fx.list.find(r => r.id === 37100), fx.words['37100']);
+  assert.equal(row.NewsID, 'tb37100');
+  assert.equal(row.PublishTime, '2026-11-10T00:00:00+08:00');
+  assert.match(row.Description, /^因車輛維修不足調度/);
+  assert.match(row.NewsURL, /NewsD\.aspx\?td=37100/);
+  assert.ok(!/\r|\n/.test(row.Title.Zh_tw), 'a title on one line');
+  assert.equal(tbNewsRow(fx.list[0]).Description, fx.list[0].title.trim(), 'words not read: its title');
+
+  resetFree();
+  const now = Date.parse('2026-11-10T19:00:00+08:00');
+  const asked = [];
+  const fetchFn = async u => {
+    assert.ok(String(u).startsWith(TB_NEWS));
+    const q = new URL(u).searchParams;
+    asked.push(`${q.get('type')}:${q.get('key')}`);
+    if (q.get('type') === '2') return new Response(JSON.stringify(fx.list.filter(r => q.get('key').split(',').includes(String(r.type)))));
+    return new Response(JSON.stringify(fx.words[q.get('key')] || { title: '' }));
+  };
+  const got = await freeTdx('basic/v2/Bus/News/InterCity', '$format=JSON', { fetchFn, now });
+  assert.equal(got.state, 'free');
+  const rows = JSON.parse(got.body);
+  assert.deepEqual(rows.map(r => r.NewsID), fx.list.filter(r => r.type !== 7).map(r => `tb${r.id}`), "營運異動 and 其他, never 路線通阻");
+  assert.match(rows.find(r => r.NewsID === 'tb37108').Description, /5250B/);
+  await freeTdx('basic/v2/Bus/News/InterCity', '', { fetchFn, now: now + 6 * 60_000 });
+  assert.equal(asked.filter(a => a.startsWith('3:')).length, 3, 'each notice once');
+  assert.equal(asked.filter(a => a.startsWith('2:')).length, 2, 'the list each 5 minutes');
+  assert.equal(await freeTdx('basic/v2/Bus/Alert/InterCity', '', { fetchFn, now }), null, "路線通阻: TDX's");
+  assert.equal(await freeTdx('basic/v2/Bus/News/City/Taipei', '', { fetchFn, now }), null);
+});

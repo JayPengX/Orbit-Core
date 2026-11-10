@@ -27,6 +27,7 @@ import { ebusState, twClock, twNow } from './kit/ebus.mjs';
 
 const MIN = 60_000;
 const DAY = 86_400_000;
+const HOUR = 3_600_000;
 
 // ---- YouBike -------------------------------------------------------------------------------
 
@@ -1013,6 +1014,53 @@ async function tbGps(city, routes, deps) {
   return { rows, missing, age: Math.max(0, deps.now - oldest) };
 }
 
+// 公路客運's notices, TDX's Bus News of InterCity, from 公路局's own 最新消息
+// (taiwanbus.tw getNews.ashx): its 營運異動 and 其他 are TDX's News row for
+// row (2026-11-10: 54 of TDX's 54, each its NewsURL's td=), listed while up;
+// each notice's words read once by its id (four at a time, the answer not
+// kept waiting past 4 s: its title meanwhile). TDX's Alert of InterCity (路線通阻)
+// stays TDX's: it names each notice's routes (Scope), the site doesn't.
+export const TB_NEWS = 'https://www.taiwanbus.tw/eBUSPage/Query/ws/getNews.ashx';
+const TB_NOTICE = /^basic\/v2\/Bus\/News\/InterCity$/;
+export const TB_NEWS_TYPES = [3, 99];
+// '115-11-10' (民國) → '2026-11-10', else ''.
+const rocDay = t => {
+  const m = /^(\d{2,3})-(\d{1,2})-(\d{1,2})$/.exec(String(t || '').trim());
+  return m ? `${Number(m[1]) + 1911}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : '';
+};
+// A notice (the list's row, its words if read) → TDX's News row.
+export function tbNewsRow(r, d = null) {
+  const at = rocDay(r.time) ? `${rocDay(r.time)}T00:00:00+08:00` : null;
+  const words = String(d?.content || r.title || '').replace(/\r\n?/g, '\n').trim();
+  return { NewsID: `tb${r.id}`, Title: { Zh_tw: String(r.title || '').replace(/\s*\r?\n\s*/g, ' ').trim() }, Description: words, NewsCategory: 2, PublishTime: at, StartTime: at, NewsURL: d?.url || `https://www.taiwanbus.tw/eBUSPage/NewsD.aspx?td=${r.id}&lan=C`, Department: r.name || '' };
+}
+let tbWords = Promise.resolve();
+async function tbNoticeFree(path, q, { fetchFn, now }) {
+  if (!TB_NOTICE.test(path)) return undefined;
+  if ([...q.keys()].some(k => k !== '$format')) return null;
+  const tbGet = async (qs, ms) => {
+    const res = await fetchFn(`${TB_NEWS}?${qs}`, { signal: AbortSignal.timeout?.(ms) });
+    if (!res.ok) throw new Error(`公路局 news ${res.status}`);
+    return res.json();
+  };
+  const list = await held('tb:news', 5 * MIN, 2 * HOUR, async () => {
+    const j = await tbGet(`type=2&key=${TB_NEWS_TYPES.join(',')}&data=&lan=C`, 10_000);
+    if (!Array.isArray(j)) throw new Error('公路局 news: not a list');
+    return j.filter(r => TB_NEWS_TYPES.includes(r?.type) && r.id != null);
+  }, now, 3000);
+  const want = list.val.filter(r => !kept.has(`tb:news:${r.id}`));
+  // (The words not read yet: four at a time, one line of reads in all.)
+  const reads = [];
+  for (let i = 0; i < want.length; i += 4) {
+    const batch = want.slice(i, i + 4);
+    tbWords = tbWords.then(() => Promise.all(batch.map(r => held(`tb:news:${r.id}`, 30 * DAY, 30 * DAY, () => tbGet(`type=3&key=${encodeURIComponent(r.id)}`, 8000), now, 8000).catch(() => null))));
+    reads.push(tbWords);
+  }
+  if (reads.length) await Promise.race([Promise.all(reads), new Promise(r => setTimeout(r, 4000))]);
+  const rows = list.val.map(r => tbNewsRow(r, kept.get(`tb:news:${r.id}`)?.val));
+  return { status: 200, body: JSON.stringify(rows), age: Math.max(0, now - list.at), state: 'free' };
+}
+
 // The cities whose buses a free source reads (TDX's city names).
 export const FREE_BUS = /^(Hsinchu|HsinchuCounty|InterCity|Taipei|NewTaipei|Taichung|Taoyuan|Tainan|Keelung|MiaoliCounty|ChanghuaCounty|NantouCounty|YunlinCounty|ChiayiCounty|Chiayi|PingtungCounty|YilanCounty|HualienCounty|TaitungCounty|PenghuCounty)$/;
 const MAX_STOPS = 30;
@@ -1811,7 +1859,7 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), 
   const q = new URLSearchParams(query);
   try {
     const p = decodeURIComponent(path);
-    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await trtcFree(p, q, { fetchFn, env, now })) ?? (await krtcFree(p, q, { fetchFn, env, now })) ?? (await tymcFree(p, q, { fetchFn, env, now })) ?? (await traAlertFree(p, q, { fetchFn, now })) ?? (await thsrAlertFree(p, q, { fetchFn, now })) ?? (await metroAlertFree(p, q, { fetchFn, now })) ?? (await traTrainFree(p, q, { fetchFn, env, now })) ?? (await traFareFree(p, q, { fetchFn, env, now })) ?? (await thsrFareFree(p, q, { fetchFn, env, now })) ?? (await copiedFree(p, q, { env, now }));
+    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await trtcFree(p, q, { fetchFn, env, now })) ?? (await krtcFree(p, q, { fetchFn, env, now })) ?? (await tymcFree(p, q, { fetchFn, env, now })) ?? (await traAlertFree(p, q, { fetchFn, now })) ?? (await thsrAlertFree(p, q, { fetchFn, now })) ?? (await metroAlertFree(p, q, { fetchFn, now })) ?? (await tbNoticeFree(p, q, { fetchFn, now })) ?? (await traTrainFree(p, q, { fetchFn, env, now })) ?? (await traFareFree(p, q, { fetchFn, env, now })) ?? (await thsrFareFree(p, q, { fetchFn, env, now })) ?? (await copiedFree(p, q, { env, now }));
     if (got !== undefined) return got;
   } catch (err) {
     console.log('free source failed', path.slice(0, 80), String(err?.message || err).slice(0, 120));
@@ -1822,6 +1870,6 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), 
 // Whether a /transit/tdx ask is one the free sources answer (worker.js sends
 // those to the Runner: a list of all Taiwan read and kept there, not in each
 // isolate's 10 ms).
-export const freeHeavy = p => /^((basic|advanced)\/v2\/Bike\/|basic\/v3\/Rail\/TRA\/(DailyTrainTimetable\/TrainDate|ODFare)\/|basic\/v2\/Rail\/(THSR\/ODFare|Metro\/Alert)\/)/.test(String(p || '').replace(/^\/+/, ''));
+export const freeHeavy = p => /^((basic|advanced)\/v2\/Bike\/|basic\/v3\/Rail\/TRA\/(DailyTrainTimetable\/TrainDate|ODFare)\/|basic\/v2\/Rail\/(THSR\/ODFare|Metro\/Alert)\/|basic\/v2\/Bus\/News\/InterCity$)/.test(String(p || '').replace(/^\/+/, ''));
 // (A route's whole list of stops, or its buses, from 新竹's site: read in the Runner too.)
 export const freeRoutesHeavy = (path, q) => (path === '/transit/gps' || (path === '/transit/eta' && (q.get('routes') || q.get('route') || CITY_FEEDS[q.get('city')] || EBUS[q.get('city')] || TB_CITIES[q.get('city')] || q.get('city') === 'Tainan'))) && FREE_BUS.test(q.get('city') || '');

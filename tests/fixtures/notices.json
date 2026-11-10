@@ -6,5 +6,70 @@
  "TYMC": "<div class=\"operation operation-1199  visible-md visible-sm visible-xs\">\n                    <p>最新營運狀態\n                        <span class=\"green\"><i class=\"fa fa-circle-o\" aria-hidden=\"true\"></i>正常營運</span>                    </p>\n                </div>\n                ",
  "TMRT": "<script id=\"__NEXT_DATA__\">{\"ConfigKey\":\"PagePostToFB\",\"ConfigValue\":\"N\"},{\"ConfigKey\":\"PagePostToLine\",\"ConfigValue\":\"N\"},{\"ConfigKey\":\"RunStatus\",\"ConfigValue\":\"全線正常營運（目前班距6分鐘）\"},</script>",
  "KRTC": "<div id=\"RtStatusMobile\">\n\t\t\t\t\t<div><div class='g ci'></div> 捷運全線正常營運 </div><div><div class='g ci'></div> 輕軌全線正常營運 </div>\n\t\t\t\t</div>\n        ",
- "tra": "<p>更新時間：2026/11/10 18:21 <a href=\"\" title=\"更新內容\" class=\"links\" onclick=\"javascript:location.reload()\">更新內容</a></p>\n\t\t<ul class=\"btn-tabs\">\n\t\t\t<li class=\"active\">\n\t\t\t\t<a href=\"/tra-tip-web/tip/tip007/tip711/blockList\">列表顯示</a>\n\t\t\t</li>\n\t\t\t<li>\n\t\t\t\t<a href=\"/tra-tip-web/tip/tip007/tip711/mapView\">地圖顯示</a>\n\t\t\t</li>\n\t\t</ul>\n\t\t<!--列表資訊-->\n\t\t<div class=\"operation-list\">\n\t\t\t<div class=\"info\">\n\t\t\t\t<div class=\"text-right\">\n\t\t\t\t\t<dl>\n\t\t\t\t\t\t<dt>列車通行狀態：</dt>\n\t\t\t\t\t\t\t<dd class=\"icon-fa fullcircle\" style=\"color: #009900\"></dd><label>恢復正常 (Resume)</label>\n\t\t\t\t\t\t\t<dd class=\"icon-fa fullcircle\" style=\"color: #FFCC00\"></dd><label>列車延誤 (Delay)</label>\n\t\t\t\t\t\t\t<dd class=\"icon-fa fullcircle\" style=\"color: #EE9200\"></dd><label>列車丙級災害規模 (Moderate)</label>\n\t\t\t\t\t\t\t<dd class=\"icon-fa fullcircle\" style=\"color: #FF0099\"></dd><label>列車乙級災害規模 (Severe)</label>\n\t\t\t\t\t\t\t<dd class=\"icon-fa fullcircle\" style=\"color: #CC0000\"></dd><label>列車甲級災害規模 (Extreme)</label>\n\t\t\t\t\t\t\t<dd class=\"icon-fa fullcircle\" style=\"color: #3300FF\"></dd><label>颱風期間列車運行資訊 (Typhoon)</label>\n\t\t\t\t\t</dl>\n\t\t\t\t</div>\n\t\t\t</div>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>西部幹線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>西部幹線 (海線)</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>東部幹線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>南迴線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>成追線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>平溪線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>深澳線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>六家線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>內灣線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>集集線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>沙崙線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>蘇澳新-蘇澳</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t"
+ "tra": "<p>更新時間：2026/11/10 18:21 <a href=\"\" title=\"更新內容\" class=\"links\" onclick=\"javascript:location.reload()\">更新內容</a></p>\n\t\t<ul class=\"btn-tabs\">\n\t\t\t<li class=\"active\">\n\t\t\t\t<a href=\"/tra-tip-web/tip/tip007/tip711/blockList\">列表顯示</a>\n\t\t\t</li>\n\t\t\t<li>\n\t\t\t\t<a href=\"/tra-tip-web/tip/tip007/tip711/mapView\">地圖顯示</a>\n\t\t\t</li>\n\t\t</ul>\n\t\t<!--列表資訊-->\n\t\t<div class=\"operation-list\">\n\t\t\t<div class=\"info\">\n\t\t\t\t<div class=\"text-right\">\n\t\t\t\t\t<dl>\n\t\t\t\t\t\t<dt>列車通行狀態：</dt>\n\t\t\t\t\t\t\t<dd class=\"icon-fa fullcircle\" style=\"color: #009900\"></dd><label>恢復正常 (Resume)</label>\n\t\t\t\t\t\t\t<dd class=\"icon-fa fullcircle\" style=\"color: #FFCC00\"></dd><label>列車延誤 (Delay)</label>\n\t\t\t\t\t\t\t<dd class=\"icon-fa fullcircle\" style=\"color: #EE9200\"></dd><label>列車丙級災害規模 (Moderate)</label>\n\t\t\t\t\t\t\t<dd class=\"icon-fa fullcircle\" style=\"color: #FF0099\"></dd><label>列車乙級災害規模 (Severe)</label>\n\t\t\t\t\t\t\t<dd class=\"icon-fa fullcircle\" style=\"color: #CC0000\"></dd><label>列車甲級災害規模 (Extreme)</label>\n\t\t\t\t\t\t\t<dd class=\"icon-fa fullcircle\" style=\"color: #3300FF\"></dd><label>颱風期間列車運行資訊 (Typhoon)</label>\n\t\t\t\t\t</dl>\n\t\t\t\t</div>\n\t\t\t</div>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>西部幹線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>西部幹線 (海線)</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>東部幹線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>南迴線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>成追線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>平溪線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>深澳線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>六家線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>內灣線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>集集線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>沙崙線</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t\t\t<dl class=\"now_status\">\n\t\t\t\t\t<dt>蘇澳新-蘇澳</dt>\n\t\t\t\t\t<dd class=\"icon-fa circle-o\" style=\"color: #5bb900\" ></dd><label>全線正常運行</label>\n\t\t\t\t</dl>\n\t\t\t\t<table class=\"itinerary-controls tdbg\" summary=\"此表格為列車運行受阻的狀態顯示，表格分為四直欄，第一直欄標示日期，第二直欄標示線段，第三直欄標示受阻原因，第四直欄標示預計通行時間。\">\n\t\t\t\t\t<CAPTION class=\"sr-only\">通阻列表</CAPTION>\n\t\t\t\t</table>\n\t\t",
+ "tbNews": {
+  "note": "公路局 getNews.ashx, 2026-11-10 (a list of types 3, 99 and one 7; two notices words)",
+  "list": [
+   {
+    "id": 37108,
+    "type": 3,
+    "tname": "營運異動",
+    "title": "【5250B】車輛異動通知",
+    "time": "115-11-10",
+    "name": "亞通客運",
+    "tclass": 1
+   },
+   {
+    "id": 37100,
+    "type": 3,
+    "tname": "營運異動",
+    "title": "因車輛維修不足調度,於11月11日取消\r\n從小人國發車北上0630.0930兩班次\r\n以及中和景安南下0800.1100兩班次\r\n合計四趟次,如有不便請見諒.",
+    "time": "115-11-10",
+    "name": "亞通客運",
+    "tclass": 1
+   },
+   {
+    "id": 37097,
+    "type": 99,
+    "tname": "其他",
+    "title": "7500路線11/10無障礙班車變更一般車型",
+    "time": "115-11-10",
+    "name": "和欣客運",
+    "tclass": 2
+   },
+   {
+    "id": 37106,
+    "type": 7,
+    "tname": "路線通阻",
+    "title": "【東台灣客運】11/10(二)因中華路二段道路施工管制，部分路線班次受影響繞駛公告",
+    "time": "115-11-10",
+    "name": "東台灣客運",
+    "tclass": 1
+   }
+  ],
+  "words": {
+   "37100": {
+    "tname": "營運異動",
+    "title": "因車輛維修不足調度,於11月11日取消\r\n從小人國發車北上0630.0930兩班次\r\n以及中和景安南下0800.1100兩班次\r\n合計四趟次,如有不便請見諒.",
+    "content": "因車輛維修不足調度,於11月1日取消\r\n從小人國發車北上0630.0930兩班次\r\n以及中和景安南下0800.1100兩班次\r\n合計四趟次,如有不便請見諒.\n\n聯絡單位：亞通客運\n聯絡人：亞通客運\n聯絡電話：4803885",
+    "time": "115-11-10",
+    "name": "亞通客運",
+    "url": "",
+    "fpath": "",
+    "fpathTxt": "檔案",
+    "urlTxt": "連結"
+   },
+   "37108": {
+    "tname": "營運異動",
+    "title": "【5250B】車輛異動通知",
+    "content": "11/11本公司5250B路線，部份班次車輛異動，由紅牌車輛KAE—578及KAA—0998支援，不便之處敬請見諒\n\n聯絡單位：ibus亞通客服中心\n聯絡人：客服專員\n聯絡電話：0800889116",
+    "time": "115-11-10",
+    "name": "亞通客運",
+    "url": "",
+    "fpath": "",
+    "fpathTxt": "檔案",
+    "urlTxt": "連結"
+   }
+  }
+ }
 }
