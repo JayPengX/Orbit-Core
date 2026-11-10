@@ -35,7 +35,8 @@
 //          estimates at that stop (`path`, the app's own TDX ask, through the
 //          shared cache); asked again every run (each 2 minutes), not each 15
 //
-// Stored in KV (RATE_LIMIT_KV): `push:<account>:<app>` the device's
+// Stored in D1 (`push_kv`, pushStore below; KV, RATE_LIMIT_KV, before
+// 2026-11-10 and where there's no D1): `push:<account>:<app>` the device's
 // subscription and list (its next notice's time in the key's metadata, `due`:
 // one list of the keys finds what's due, and no one key every phone rewrites
 // loses another's time), `push:prefs:<account>` the switches,
@@ -225,6 +226,63 @@ export function cleanPrefs(body) {
 export const wanted = (prefs, app, item) => !prefs || (prefs.on !== false && !(item.kind && prefs.off?.includes(`${app}:${item.kind}`)));
 // A list kept with when its next notice is due (none: no subscription or nothing on it).
 const dueOf = record => (record.sub && record.items?.length ? record.items[0].at : 0);
+// D1 with KV's few calls (get, put with a ttl and `due`, delete, the due
+// lists): KV's Free plan takes 1,000 writes and 1,000 lists a day, and the
+// notices' cron listed every 2 minutes (720 a day). KV's lists are copied
+// in once (`_moved`). Without D1 (tests, a local run): KV itself.
+const PUSH_TABLE = 'CREATE TABLE IF NOT EXISTS push_kv (key TEXT PRIMARY KEY, value TEXT NOT NULL, due INTEGER NOT NULL DEFAULT 0, expires INTEGER NOT NULL DEFAULT 0)';
+const pushReady = new WeakSet(); // the D1 bindings set up (table made, KV moved in)
+export function pushStore(env) {
+  const db = env.STORE;
+  const kv = env.RATE_LIMIT_KV;
+  if (!db?.prepare) return kv || null;
+  const ready = async () => {
+    if (pushReady.has(db)) return;
+    await db.prepare(PUSH_TABLE).run();
+    if (!(await db.prepare("SELECT 1 AS x FROM push_kv WHERE key = '_moved'").first()) && kv?.list) {
+      let cursor;
+      for (let i = 0; i < 20; i++) {
+        const page = await kv.list({ prefix: 'push:', cursor });
+        for (const k of page.keys) {
+          if (k.name === 'push:due') continue;
+          const v = await kv.get(k.name);
+          if (v != null) await put(k.name, v, { expires: k.expiration ? k.expiration * 1000 : 0, due: k.metadata?.due || 0 }, true);
+        }
+        if (page.list_complete || !page.cursor) break;
+        cursor = page.cursor;
+      }
+      await db.prepare("INSERT OR IGNORE INTO push_kv (key, value) VALUES ('_moved', '1')").run();
+    }
+    pushReady.add(db);
+  };
+  const put = async (key, value, { expires = 0, due = 0 } = {}, raw = false) => {
+    if (!raw) await ready();
+    await db.prepare('INSERT INTO push_kv (key, value, due, expires) VALUES (?1, ?2, ?3, ?4) ON CONFLICT (key) DO UPDATE SET value = ?2, due = ?3, expires = ?4').bind(key, String(value), Number(due) || 0, Number(expires) || 0).run();
+  };
+  return {
+    async get(key, type) {
+      await ready();
+      const row = await db.prepare('SELECT value, expires FROM push_kv WHERE key = ?1').bind(key).first();
+      if (!row || (row.expires && row.expires < Date.now())) return null;
+      return type === 'json' ? JSON.parse(row.value) : row.value;
+    },
+    async put(key, value, o = {}) {
+      await put(key, value, { expires: o.expirationTtl ? Date.now() + o.expirationTtl * 1000 : 0, due: o.metadata?.due || 0 });
+    },
+    async delete(key) {
+      await ready();
+      await db.prepare('DELETE FROM push_kv WHERE key = ?1').bind(key).run();
+    },
+    // (Only lists with a notice due: all dueLists reads.)
+    async list() {
+      await ready();
+      const now = Date.now();
+      await db.prepare('DELETE FROM push_kv WHERE expires > 0 AND expires < ?1').bind(now).run();
+      const { results } = await db.prepare("SELECT key, due FROM push_kv WHERE due > 0 AND key LIKE 'push:%'").all();
+      return { keys: (results || []).map(r => ({ name: r.key, metadata: { due: r.due } })), list_complete: true };
+    }
+  };
+}
 const putRecord = (kv, key, record) => kv.put(key, JSON.stringify(record), { expirationTtl: 60 * 86_400, metadata: { due: dueOf(record) } });
 // Each list and its due time, from the keys' metadata (`push:prefs:` and the Worker's own skipped).
 export async function dueLists(kv) {
@@ -241,7 +299,7 @@ export async function dueLists(kv) {
 // (Lists kept before the due time moved into their own keys: given it once, from the old shared key.)
 const moved = new WeakSet(); // the KV namespaces checked
 async function moveOldDue(kv) {
-  if (moved.has(kv)) return;
+  if (moved.has(kv) || !kv.list || kv.prepare) return;
   const old = await kv.get('push:due', 'json').catch(() => null);
   for (const key of Object.keys(old || {})) {
     const record = await kv.get(key, 'json').catch(() => null);
@@ -252,7 +310,7 @@ async function moveOldDue(kv) {
 }
 
 export async function handlePush(request, env, headers, session, path) {
-  const kv = env.RATE_LIMIT_KV;
+  const kv = pushStore(env);
   const reply = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...headers, 'Content-Type': 'application/json' } });
   if (path === '/push/key') return reply({ key: (await vapidKeys(env)).pub });
   if (!kv) return reply({ error: { message: 'Push isn’t set up here.' } }, 503);
@@ -401,7 +459,7 @@ export function overNow(comp, espn) {
 // What's due, sent: each list's notices up to now (a check that has no
 // answer yet waits 15 minutes more), and the lists' next times.
 export async function sendDue(env, now = Date.now()) {
-  const kv = env.RATE_LIMIT_KV;
+  const kv = pushStore(env);
   if (!kv?.list) return { sent: 0 };
   await moveOldDue(kv);
   let sent = 0;
@@ -463,7 +521,7 @@ export async function sendDue(env, now = Date.now()) {
 // `app` (the owner's bill alerts, ops.js): `make(lang)` the message. Nothing kept
 // (KV's writes are few), unless the device has unsubscribed.
 export async function notifyNow(env, account, app, kind, make) {
-  const kv = env.RATE_LIMIT_KV;
+  const kv = pushStore(env);
   if (!kv) return 'off';
   const key = recordKey(account, app);
   const record = await kv.get(key, 'json');

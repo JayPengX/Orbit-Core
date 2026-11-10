@@ -463,3 +463,27 @@ test("a CPBL final when TheSportsDB turns the proxy away (429): asked again thro
   assert.equal(via.length, 1);
   assert.ok(via[0].startsWith('https://gemini-relay/?to=' + encodeURIComponent('https://www.thesportsdb.com/api/v1/json/123/eventsday.php?d=2026-10-21&l=5111')));
 });
+
+test('the notices kept in D1 (push_kv): KV moved in once, the due lists without a KV list, expired ones gone', async () => {
+  const { pushStore } = await import('../push.js');
+  const { fakeD1 } = await import('./fake-d1.mjs');
+  const kvm = new Map([['push:a1:transit', { v: JSON.stringify({ sub: { endpoint: 'x' }, items: [{ at: 5 }] }), meta: { due: 5 } }], ['push:prefs:a1', { v: '{"on":true,"off":[]}' }]]);
+  let lists = 0;
+  const kv = {
+    get: async (k, t) => (kvm.has(k) ? (t === 'json' ? JSON.parse(kvm.get(k).v) : kvm.get(k).v) : null),
+    list: async () => (lists++, { keys: [...kvm].map(([name, x]) => ({ name, metadata: x.meta })), list_complete: true })
+  };
+  const env = { STORE: fakeD1(), RATE_LIMIT_KV: kv };
+  const st = pushStore(env);
+  assert.deepEqual((await st.get('push:a1:transit', 'json')).items, [{ at: 5 }]);
+  assert.equal(await st.get('push:prefs:a1'), '{"on":true,"off":[]}');
+  assert.deepEqual((await st.list({ prefix: 'push:' })).keys, [{ name: 'push:a1:transit', metadata: { due: 5 } }]);
+  await st.put('push:a2:weather', '{"items":[]}', { expirationTtl: -1, metadata: { due: 9 } });
+  assert.equal(await st.get('push:a2:weather'), null);
+  assert.equal((await st.list()).keys.length, 1);
+  await st.delete('push:a1:transit');
+  assert.equal((await st.list()).keys.length, 0);
+  // A second binding (another isolate): KV isn't listed again.
+  await pushStore(env).get('push:prefs:a1');
+  assert.equal(lists, 1);
+});
