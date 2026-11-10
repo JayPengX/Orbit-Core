@@ -12,7 +12,7 @@
 // TheSportsDB's CPBL day list for a game's final (push.js): its free key
 // answers the proxy's shared addresses with 429 most of the time, so a
 // second way out.
-import { viaTaiwan } from './law-hosts.js';
+import { viaTaiwan, buildHost } from './law-hosts.js';
 import { DGPA_NDS } from './typhoon.js';
 import { tsdbCpblDay } from './kit/catalog.mjs';
 
@@ -22,7 +22,8 @@ const OTHER_AI = ['https://api.anthropic.com/v1/', 'https://api.openai.com/v1/']
 export default {
   async fetch(request) {
     const to = new URL(request.url).searchParams.get('to') || '';
-    if ((viaTaiwan(to) || to === DGPA_NDS || tsdbCpblDay(to)) && request.method === 'GET') {
+    // (A gov.tw page for Law's build: the proxy sends one only with the build's key.)
+    if ((viaTaiwan(to) || buildHost(to) || to === DGPA_NDS || tsdbCpblDay(to)) && request.method === 'GET') {
       const pick = ['User-Agent', 'Accept', 'Accept-Language'].filter(h => request.headers.get(h)).map(h => [h, request.headers.get(h)]);
       return fetch(to, { headers: Object.fromEntries(pick), redirect: 'manual' });
     }

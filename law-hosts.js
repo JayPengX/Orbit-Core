@@ -48,6 +48,19 @@ export function twOnly(raw) {
   return (TW_ONLY_HOSTS.has(host) && RULE_PAGE.test(u.pathname)) || COUNCIL_HOSTS.has(host);
 }
 
+// The build reads any government site from Taiwan (its key only): the ~200 鄉鎮市公所 and 代表會 sites, many
+// serving only Taiwan, each its own host (彰化's towns on town.chcg.gov.tw, 新竹縣's on their own domains).
+export function buildHost(raw) {
+  let u;
+  try {
+    u = new URL(String(raw || ''));
+  } catch {
+    return false;
+  }
+  // (Not the central sites the build reads directly, nor 司法院's, whose judgments stay a Pass's reads.)
+  return u.protocol === 'https:' && !u.username && !u.password && !u.port && /(^|\.)gov\.tw$/i.test(u.hostname) && !/(^|\.)(judicial|moj)\.gov\.tw$/i.test(u.hostname);
+}
+
 // 司法院's judgment pages (judgment.judicial.gov.tw/FJUD/data.aspx) turned
 // away every address outside Taiwan by 2026-10-27 (GitHub's US runner timed
 // out connecting; the app's 類似判決 and #r= rulings never loaded): a

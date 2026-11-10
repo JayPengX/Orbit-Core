@@ -14,7 +14,7 @@
 import { json, isAllowedOrigin } from './http.js';
 import { fail, twDay, passOf, passKey, countOf, addOne } from './law.js';
 import { sessionLimited } from './orbit-token.js';
-import { twOnly, viaTaiwan, buildKeyOk } from './law-hosts.js';
+import { twOnly, viaTaiwan, buildKeyOk, buildHost } from './law-hosts.js';
 
 export const PAGE_LIMITS = { perPass: 500, perMinute: 60, buildPerMinute: 720, hops: 5, timeoutMs: 20_000, maxHtml: 2 * 1024 * 1024, maxBytes: 6 * 1024 * 1024, fileBytes: 40 * 1024 * 1024 };
 const LONG = new Set(['judgment.judicial.gov.tw', 'cons.judicial.gov.tw']);
@@ -150,13 +150,14 @@ export async function handleLawPage(request, env, ctx, headers, session, fetchFn
   if (origin && !isAllowedOrigin(origin)) return fail('origin', 403, headers);
   const pass = passOf(session);
   const raw = new URL(request.url).searchParams.get('u');
-  const build = !pass && twOnly(raw) && buildKeyOk(request.headers.get('X-Build-Key'), env?.LAW_BUILD_KEY);
+  const build = !pass && (twOnly(raw) || buildHost(raw)) && buildKeyOk(request.headers.get('X-Build-Key'), env?.LAW_BUILD_KEY);
   if (!pass && !build) return fail('pass', 401, headers);
   const url = pageUrl(raw);
   if (!url) return fail('host', 400, headers);
   if (sessionLimited(build ? 'law:build' : `law:page:${pass}`, build ? PAGE_LIMITS.buildPerMinute : PAGE_LIMITS.perMinute)) return fail('busy', 429, headers);
   // A site that serves only Taiwan (a county's rules, 司法院's judgments) is read from there (when the relay is bound).
-  const via = viaTaiwan(url) && env?.GEMINI_RELAY ? (u, init) => env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, init) : fetchFn;
+  // (The build's every read too: it runs abroad and wants Taiwan's view.)
+  const via = (viaTaiwan(url) || build) && env?.GEMINI_RELAY ? (u, init) => env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, init) : fetchFn;
 
   // A file's bytes are the build's alone, and never kept at the edge.
   const file = build && new URL(request.url).searchParams.get('file') === '1';
