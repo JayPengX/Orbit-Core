@@ -22,6 +22,9 @@ const swipe = (sel, dx) => `js:(async()=>{const n=document.querySelector('${sel}
 const swipeAt = dx => `js:(async()=>{const x=innerWidth*0.6,y=innerHeight-30;const n=document.elementFromPoint(x,y);window.__swipeAt=n&&(n.id||n.className||n.tagName);const t=X=>new Touch({identifier:1,target:n,clientX:X,clientY:y});const ev=(k,X)=>n.dispatchEvent(new TouchEvent(k,{bubbles:true,cancelable:true,touches:k==='touchend'?[]:[t(X)],changedTouches:[t(X)]}));ev('touchstart',x);for(let i=1;i<=8;i++){await new Promise(r=>setTimeout(r,16));ev('touchmove',x+(${dx})*i/8)}ev('touchend',x+(${dx}))})()`;
 
 // Beats: six songs made on the built-in band and every one kept (about a minute).
+// 做歌 with a 24 s drum take that has no silence in it (made here: kick, snare, hats over a
+// low hum, 100 BPM, a two-bar riff and then a busier one), cut on its beat (lib/rhythm.mjs): its status and pieces.
+const BEAT_TAKE = "js:(async()=>{const z=ms=>new Promise(r=>setTimeout(r,ms));await z(2500);const sr=44100,n=sr*24,x=new Float32Array(n),b=60/100;for(let i=0;i<n;i++)x[i]=0.02*Math.sin(i/sr*2*Math.PI*110);const hit=(t,f,d,a,nz)=>{const o=Math.round(t*sr);for(let i=0;i<d*sr&&o+i<n;i++){const e=Math.exp(-i/sr/(d/5));x[o+i]+=a*e*(nz?Math.random()*2-1:Math.sin(2*Math.PI*f*i/sr*(1+2*e)))}};for(let k=0;k<40;k++){const t=k*b;if(k%4==0||(k%8==6))hit(t,55,0.3,0.8);if(k%4==1||k%4==3)hit(t,0,0.15,0.5,1);if(k>=20&&k%2==0)hit(t+b/4,0,0.1,0.3,1);hit(t,0,0.04,0.15,1);hit(t+b/2,0,0.04,0.12,1)}const v=new DataView(new ArrayBuffer(44+n*2)),w=(o,s)=>[...s].forEach((c,i)=>v.setUint8(o+i,c.charCodeAt(0)));w(0,'RIFF');v.setUint32(4,36+n*2,1);w(8,'WAVEfmt ');v.setUint32(16,16,1);v.setUint16(20,1,1);v.setUint16(22,1,1);v.setUint32(24,sr,1);v.setUint32(28,sr*2,1);v.setUint16(32,2,1);v.setUint16(34,16,1);w(36,'data');v.setUint32(40,n*2,1);for(let i=0;i<n;i++)v.setInt16(44+i*2,Math.max(-1,Math.min(1,x[i]))*32767,1);const d=new DataTransfer();d.items.add(new File([v.buffer],'drum take.wav',{type:'audio/wav'}));const f=document.getElementById('file');f.files=d.files;f.dispatchEvent(new Event('change'));for(let i=0;i<60;i++){await z(500);if(document.querySelector('#status:not([hidden])')&&!/busy/.test(document.getElementById('status').className))break}await z(1500)})()";
 const KEEP_SIX = "js:(async()=>{const z=ms=>new Promise(r=>setTimeout(r,ms));location.hash='make';await z(1500);document.getElementById('go').click();for(let i=0;i<150;i++){await z(1000);if(document.querySelectorAll('#out .act.heart').length>=6&&!document.getElementById('go').disabled)break}await z(1000);for(const b of document.querySelectorAll('#out .act.heart:not(.kept)')){b.click();await z(400)}await z(2500)})()";
 export const PAGES = {
   sports: {
@@ -358,6 +361,7 @@ export const PAGES = {
     jam: { hash: 'jam', args: click(wait(4000)) },
     studio: { hash: 'studio', args: click(wait(3000)) },
     make: { hash: 'make', args: click(wait(3000)) },
+    'make-beat': { hash: 'make', args: click(BEAT_TAKE) },
     // Now Playing, opened from the home's card (the mini bar steps aside while the card shows).
     'now-playing': { args: click("js:(document.querySelector('.bt-play')||[...document.querySelectorAll('button')].find(b=>b.offsetParent&&/play|播放/i.test(b.getAttribute('aria-label')||''))).click()", wait(8000), "js:(document.querySelector('.bt-head')||document.querySelector('.mp-main')).click()", wait(2000)) },
     // 資料庫 with songs kept: 做歌's 做 6 首歌 on the built-in band, every one ♡'d, then 資料庫
