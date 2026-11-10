@@ -17,7 +17,10 @@
 //     10 minutes a phone (source-watch.mjs), one a minute an address here.
 //   - Kept: in the isolate's memory, then one D1 statement adds it all to
 //     `sources` (a row a source, hour and side) once the oldest count is 5
-//     minutes old, or a minute while something fails. Rows a week old go
+//     minutes old, or a minute while something fails; a phone's beacon at
+//     once when this isolate kept nothing in the last 5 minutes (a quiet
+//     isolate may see no request after it, and its counts would go with
+//     it; 2026-11-10). Rows a week old go
 //     with the nightly backup's slot (pruneSources).
 //   - Read: the admin panel's `sources` (eco-admin.js), on demand.
 
@@ -43,6 +46,7 @@ const pending = new Map();
 let oldest = 0;
 let failing = false;
 let flushing = null;
+let lastFlush = 0;
 
 const HOST = /^[a-z][a-z0-9+.-]*:\/\/([^/:?#]+)([^?#]*)/i;
 const failed = status => status >= 500 || status === 429 || status === 401 || status === 403 || status === 0;
@@ -131,10 +135,13 @@ async function table(db) {
 }
 
 // What this isolate counted, added to D1 when it's due (in the background:
-// `ctx.waitUntil`). `force`: now (tests, the end of a cron tick).
-export function flushSources(env, ctx = null, { now = Date.now(), force = false } = {}) {
+// `ctx.waitUntil`). `force`: now (tests, the end of a cron tick). `soon` (a
+// phone's beacon): now too, unless this isolate kept something in the last
+// 5 minutes (still one D1 statement an isolate every 5 minutes at most).
+export function flushSources(env, ctx = null, { now = Date.now(), force = false, soon = false } = {}) {
   if (!pending.size || !env?.STORE || flushing) return null;
-  if (!force && now - oldest < (failing ? FLUSH_FAILING_MS : FLUSH_MS)) return null;
+  if (!force && now - oldest < (failing ? FLUSH_FAILING_MS : FLUSH_MS) && !(soon && now - lastFlush >= FLUSH_MS)) return null;
+  lastFlush = now;
   const rows = [...pending].map(([k, r]) => {
     const [src, hour, side] = k.split('|');
     return [src, Number(hour), side, r.ok, r.fail, r.ms, r.lastOk, r.lastFail, r.err];
@@ -234,4 +241,5 @@ export function _reset() {
   oldest = 0;
   failing = false;
   flushing = null;
+  lastFlush = 0;
 }

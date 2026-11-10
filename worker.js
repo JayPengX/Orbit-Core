@@ -1369,6 +1369,7 @@ async function route(request, env, ctx, headers, origin) {
       body = JSON.parse(text);
     } catch {}
     takeBeacon(body);
+    flushSources(env, ctx, { soon: true });
     return new Response(null, { status: 204, headers });
   }
   // Orbit Class's 加到行事曆 (cal.js): the calendar its phone made, kept and handed to the Calendar app.

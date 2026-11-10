@@ -98,6 +98,20 @@ test('a phone’s beacon: only named sources, numbers bounded, counted as the ph
   _reset();
 });
 
+test("a phone's beacon kept at once in a quiet isolate (no later request may come), never twice in 5 minutes", async () => {
+  _reset();
+  const env = { STORE: fakeD1() };
+  const t = 1_800_000_000_000;
+  takeBeacon({ h: { '2384.tainan.gov.tw': [4, 0, 2000, t - 1000, 0, ''] } }, t);
+  await flushSources(env, null, { now: t, soon: true });
+  assert.equal(_pending().size, 0, 'kept at once');
+  takeBeacon({ h: { '2384.tainan.gov.tw': [2, 0, 900, t, 0, ''] } }, t + 60_000);
+  assert.equal(flushSources(env, null, { now: t + 60_000, soon: true }), null, 'not twice in 5 minutes');
+  await flushSources(env, null, { now: t + 6 * 60_000, soon: true });
+  assert.equal((await readSources(env, t + 7 * 60_000))['tnn-bus'].sides.phone.ok, 6);
+  _reset();
+});
+
 test('a state: broken when the last calls failed and nothing worked since; data late; nobody asking is no problem', () => {
   const now = 1_800_000_000_000;
   const h = Math.floor(now / HOUR);
