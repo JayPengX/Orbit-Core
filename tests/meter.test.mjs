@@ -32,7 +32,13 @@ test('two isolates counting at once both count: each adds in D1, never writes th
     [`tdx:a:${DAY}`]: 2,
     [`tdx:b:${DAY}`]: 3,
     [`tdx:va:${DAY}`]: 1000,
-    [`tdx:vb:${DAY}`]: 3000
+    [`tdx:vb:${DAY}`]: 3000,
+    // (The month's by TDX's API: what still reads TDX.)
+    'dev:tdxf:Bus/EstimatedTimeOfArrival/NearBy': 2,
+    'tdxf:Bus/EstimatedTimeOfArrival/NearBy': 2,
+    'tdxf:Bus/Route/Hsinchu': 3,
+    'tdxfv:Bus/EstimatedTimeOfArrival/NearBy': 1000,
+    'tdxfv:Bus/Route/Hsinchu': 3000
   });
 });
 
@@ -89,7 +95,7 @@ test("the cron copies D1 to KV (every isolate's read), KV's counts from before D
   const first = await mirrorMeter(env, NOW);
   assert.equal(first.seeded, MONTH);
   const doc = () => JSON.parse(kv.store.get(`transit:use:${MONTH}`));
-  assert.deepEqual(doc(), { [`tdx:b:2026-11-03`]: 900, maps: 41, [`tdx:b:${DAY}`]: 1, [`tdx:vb:${DAY}`]: 2_000_000 });
+  assert.deepEqual(doc(), { [`tdx:b:2026-11-03`]: 900, maps: 41, [`tdx:b:${DAY}`]: 1, [`tdx:vb:${DAY}`]: 2_000_000, 'tdxf:?': 1, 'tdxfv:?': 2_000_000 });
   // Again: nothing added twice.
   await spend(env, 'maps', 1, NOW);
   // (Not written again within 10 minutes: KV's Free plan has 1,000 writes a day.)

@@ -18,7 +18,7 @@ import { doorReport, doorSet } from './door.js';
 import { systemReport, alertAccount, tell, OPS_DOC } from './ops.js';
 import { passAccount, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet } from './eco.js';
 import { sendPush, dueLists } from './push.js';
-import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, TDX_BOOK, tdxPoints, tdxGuard, tdxUse } from './transit.js';
+import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, TDX_BOOK, tdxPoints, tdxGuard, tdxUse, tdxPlan } from './transit.js';
 import { aiUse } from './gemini-use.js';
 import { twDate, googleToday, GOOGLE_MONTH_CALLS } from './weather.js';
 import { cleanDev, DEV } from './kit/devconfig.mjs';
@@ -756,7 +756,7 @@ export const ADMIN_TOOLS = {
       .map(([key, d]) => ({ key, cap: dev[key], days: (use?.week || []).map(day => d.ai.reduce((n, f) => n + (use.byFeature[f]?.[day] || 0), 0)) }));
     return {
       at: now,
-      tdx: { days, points: pts.month, devPoints, showPoints, buildPoints, today: pts.today, guard: tdxGuard(pts, now), plan: TDX_POINTS, total, resets },
+      tdx: { days, points: pts.month, devPoints, showPoints, buildPoints, today: pts.today, guard: tdxGuard(pts, now), plan: { ...TDX_POINTS, month: tdxPlan(now).month }, total, resets },
       ai,
       google: use ? { day: use.googleDay, resets: use.googleResets, models: use.google } : null,
       // (The meter keeps errors too: the panel's 錯誤, not Transit's. Each

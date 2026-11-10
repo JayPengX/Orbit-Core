@@ -20,10 +20,12 @@
 //                         city's estimates, shared
 //   GET /transit/gps      ?city=&routes=: where those routes' buses are (a
 //                         city's from one ask of its whole list, shared)
-//   GET /transit/route    plans from A to B: Google's transit routes and TDX's
-//                         planner, made one shape (the app adds YouBike plans)
+//   GET /transit/route    plans from A to B: Google's transit routes (TDX's
+//                         planner only with TDX_MAAS = "on"), made one shape
+//                         (the app's own planner does the rest)
 //   GET /transit/book     ?sys=hsr&from=&to=&date=&time=&no=[&app=1]: a link into
 //                         高鐵's own booking, the trip filled in (TDX 訂票導訂)
+//   GET /transit/gtfs     ?p=: TDX's GTFS zip streamed (0 points; the dev door)
 //   GET /transit/status   (open) this month's use against each cap, which
 //                         keys are set; never a key itself. ?sample=<name>:
 //                         one fixed real ask (a session's or the dev door's)
@@ -196,6 +198,26 @@ export const tally = (env, key, n = 1, now = Date.now(), ctx = null) => spend(en
 // the calls TDX answered compressed, `tdx:z:…` the bytes it said it sent,
 // Content-Length, of `tdx:zn:…` calls that said.)
 export const TDX_POINTS = { month: 200, basic: 1500, advanced: 200, basicMB: 150, advancedMB: 20 };
+// TDX's plan: 銅級 (200 points a month, 5 calls a second) until it ends on
+// 2026-12-01 (the owner cancelled it 2026-11-06, Orbit runs for NT$0), then
+// the free tier: 3 points a month, 5 calls a minute (past them TDX answers
+// 429). `month`: the plan's points; `perMin`: its calls a minute.
+export const TDX_PAID_UNTIL = Date.parse('2026-12-01T00:00:00+08:00');
+export const TDX_FREE = { month: 3, perMin: 5 };
+export const tdxPlan = (now = Date.now()) => (now < TDX_PAID_UNTIL ? { month: TDX_POINTS.month, perMin: 300, paid: true } : { month: TDX_FREE.month, perMin: TDX_FREE.perMin, paid: false });
+// Which of TDX's APIs a call was (the month's calls and bytes by it,
+// `tdxf:<family>`, `tdxfv:<family>`: what still reads TDX, and how much,
+// as each moves to the operators' own free sources):
+// basic/v2/Bus/EstimatedTimeOfArrival/City/Hsinchu?… → Bus/EstimatedTimeOfArrival/Hsinchu,
+// basic/v3/Rail/TRA/StationLiveBoard/Station/1210 → Rail/TRA/StationLiveBoard,
+// basic/v2/Rail/Metro/LiveBoard/TRTC → Rail/Metro/LiveBoard/TRTC, maas/routing → maas.
+export function tdxFamily(path) {
+  const p = String(path || '').split('?')[0].split('/');
+  if (!/^(basic|advanced)$/.test(p[0])) return p[0] || '?';
+  const [, , dom, api, a, b] = p;
+  if (dom === 'Rail') return [dom, api, a, api === 'Metro' ? b : ''].filter(Boolean).join('/');
+  return [dom, api, a === 'City' ? b : a].filter(Boolean).join('/') || '?';
+}
 // (TDX's MB is 1,024 KB: its own 明細, 2026-11-06, each row exactly: 921
 // advanced calls and 3,267 KB 4.765 points = 921/200 + 3,267/1,024/20; 公路客運's
 // 1,527 basic calls and 73,530 KB 1.497 = 1,527/1,500 + 73,530/1,024/150.)
@@ -222,17 +244,21 @@ export async function tdxBody(res) {
 export async function tallyTdx(env, path, now = Date.now(), ctx = null, by = '', read = null) {
   const kind = tdxKind(path);
   const day = twDay(now);
-  const adds = { [`tdx:${kind}:${day}`]: 1, [`tdx:v${kind}:${day}`]: read?.bytes || 0, [`tdx:gz:${day}`]: read?.zipped ? 1 : 0, [`tdx:z:${day}`]: read?.sent || 0, [`tdx:zn:${day}`]: read?.sent ? 1 : 0 };
-  if (by) Object.assign(adds, { [`${by}:tdx:${kind}:${day}`]: 1, [`${by}:tdx:v${kind}:${day}`]: read?.bytes || 0 });
+  const fam = tdxFamily(path);
+  const adds = { [`tdx:${kind}:${day}`]: 1, [`tdx:v${kind}:${day}`]: read?.bytes || 0, [`tdx:gz:${day}`]: read?.zipped ? 1 : 0, [`tdx:z:${day}`]: read?.sent || 0, [`tdx:zn:${day}`]: read?.sent ? 1 : 0, [`tdxf:${fam}`]: 1, [`tdxfv:${fam}`]: read?.bytes || 0 };
+  if (by) Object.assign(adds, { [`${by}:tdx:${kind}:${day}`]: 1, [`${by}:tdx:v${kind}:${day}`]: read?.bytes || 0, [`${by}:tdxf:${fam}`]: 1 });
   await meterAdd(env, adds, now, ctx, true);
 }
 // Our own tools (the dev door: previews, screenshots, the layout check each
 // push runs) yield TDX's month to people: a copy up to 10 minutes old
 // answers them as it is (DEV_OLDEST; a live answer is kept that long), they
-// never keep YouBike warm, and past DEV_TDX_DAY points a Taiwan day they get
+// never keep YouBike warm, and past devTdxDay's points a Taiwan day (5 while 銅級 lasts, 0.02 on the free tier) they get
 // copies only (TDX_BUSY's cousin, DEV_TDX_CAP, where there's none). On
 // 2026-11-06 they made six of every seven calls the meter counted.
-export const DEV_TDX_DAY = 0.5;
+// (While 銅級 lasts, its points spare this month go to moving Orbit off it:
+// the owner, 2026-11-10, "you can spend it if it makes things faster", 5 a
+// day; on the free tier a sliver, the rest copies.)
+export const devTdxDay = (now = Date.now()) => (tdxPlan(now).paid ? 5 : 0.02);
 export const DEV_OLDEST = 10 * MIN;
 const DEV_TDX = /^dev:tdx:(v?[bam]):(\d{4}-\d{2}-\d{2})$/;
 export async function devTdxRoom(env, now = Date.now()) {
@@ -242,7 +268,7 @@ export async function devTdxRoom(env, now = Date.now()) {
     const m = DEV_TDX.exec(k);
     if (m && m[2] === day) points += n * TDX_RATE[m[1]];
   }
-  return points < DEV_TDX_DAY;
+  return points < devTdxDay(now);
 }
 // TDX's counts this Taiwan month, by kind and day. TDX's month starts at
 // 00:00 on the 1st in Taiwan; the meter's (Google's, Pacific) 16 hours
@@ -882,7 +908,8 @@ function paced(env, now) {
   if (now < pace.until) return false;
   const minute = Math.floor(now / MIN);
   if (pace.minute !== minute) Object.assign(pace, { minute, n: 0 });
-  const limit = Number(env.TDX_PER_MIN) || 5;
+  // (The plan's own a minute at most: the free tier's 5 from 2026-12-01, whatever the setting.)
+  const limit = Math.min(Number(env.TDX_PER_MIN) || 5, tdxPlan(now).perMin);
   if (pace.n >= limit) return false;
   pace.n++;
   return true;
@@ -896,7 +923,8 @@ const turn = { next: 0 };
 export const resetTurns = () => (turn.next = 0);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function myTurn(env) {
-  const perSec = Number(env.TDX_PER_SEC) || 0;
+  // (The free tier counts a minute, not a second: none from 2026-12-01.)
+  const perSec = tdxPlan(Date.now()).paid ? Number(env.TDX_PER_SEC) || 0 : 0;
   if (!perSec) return true;
   const t = Date.now();
   const at = Math.max(t, turn.next);
@@ -1676,6 +1704,13 @@ async function routes(env, q, { fetchFn, ctx, now, cache, by: who }) {
   } else sources.google = googleKey(env) ? 'cap' : 'nokey';
   if (src === 'google') {
     // (Google's alone.)
+  } else if (env.TDX_MAAS !== 'on') {
+    // TDX's planner is off (TDX_MAAS = "on" turns it on): its calls are
+    // TDX's dear kind (a point each 200, advanced), and the free tier from
+    // 2026-12-01 holds 600 of them a month for everything. The phone's own
+    // planner (Transit planner.mjs: live buses, trains and bikes) and
+    // Google's plans make a trip without it (2026-11-10).
+    sources.tdx = 'off';
   } else if (env.TDX_CLIENT_ID) {
     // Twice: walking to and from the stops, and by 共享單車 (YouBike) for the
     // first and last mile (TDX's mode 3), which reaches the express buses and
@@ -2018,6 +2053,23 @@ async function transitRoute(request, env, headers, path, { session = null, limit
   if (path === '/transit/book') {
     const [body, status] = await book(env, q, deps);
     return send(body, status);
+  }
+  if (path === '/transit/gtfs') {
+    // TDX's GTFS: all Taiwan's buses, trains and metros in one zip (?p=
+    // empty), or one operator's (p=Rail/TRTC). TDX's 0 points (計次 and
+    // 計量 不計入, no review), streamed through as it comes: the weekly bus
+    // build's source (tools/gtfs-buses.mjs, run by GitHub) and its checks.
+    // Our tools' only (the dev door).
+    if (!session.dev) return send({ code: 'NOT_ALLOWED' }, 403);
+    const sub = q.get('p') || '';
+    if (!/^(|(Rail|OperatorCode)\/[A-Z]{2,10})$/.test(sub)) return send({ code: 'BAD_PATH' }, 400);
+    const token = await tdxAccess(env, fetchFn, now).catch(() => null);
+    if (!token) return send({ code: 'TDX_NO_KEY' }, 503);
+    const r = await fetchFn(`${TDX_BASE}gtfs/V3/Map/GTFS/Static${sub ? `/${sub}` : ''}`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
+    if (!r) return send({ code: 'TDX_FAILED' }, 502);
+    await tally(env, 'tdx:gtfs', 1, now, ctx);
+    const keep = ['Content-Type', 'Content-Length', 'Content-Disposition', 'Last-Modified', 'ETag'];
+    return new Response(r.body, { status: r.status, headers: { ...headers, ...Object.fromEntries(keep.filter(k => r.headers.get(k)).map(k => [k, r.headers.get(k)])) } });
   }
   return send({ code: 'NOT_FOUND' }, 404);
 }
