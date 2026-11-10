@@ -145,11 +145,11 @@ test("a 新竹 route's every stop with its bus's plate, and its buses' GPS, from
   assert.ok(log.some(u => u.includes('tdx')), 'then TDX');
 });
 
-test("a route's whole stops or its buses go to the Runner (新竹's whole routes read there); a stop's times stay in the Worker", () => {
+test("bus times and a route's buses go to the Runner (新竹's whole routes read there, one in eight stop times passed 10 ms)", () => {
   const req = qs => new Request(`https://api.jaypengx.com/transit/x?${qs}`);
   assert.equal(runsInRunner(req('city=Hsinchu&routes=HSZ0007'), '/transit/gps'), true);
   assert.equal(runsInRunner(req('city=InterCity&routes=THB5608'), '/transit/eta'), true);
-  assert.equal(runsInRunner(req('city=InterCity&stops=THB21282'), '/transit/eta'), false);
+  assert.equal(runsInRunner(req('city=InterCity&stops=THB21282'), '/transit/eta'), true);
   assert.equal(runsInRunner(req('city=Taichung&routes=TXG300'), '/transit/gps'), true, 'gps was the Runner\'s already');
 });
 
