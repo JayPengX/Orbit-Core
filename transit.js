@@ -652,7 +652,7 @@ export async function etaRows(env, q, deps = {}) {
   if (!stops.length && !routes.length) return { status: 400, body: { code: 'BAD_STOPS' } };
   // (新竹's from 竹塹交通資訊網, no TDX: transit-free.js; what it doesn't know, TDX as before, and its rows beside them.)
   if (deps.free !== false) {
-    const own = await freeEta(city, { stops, routes }, deps).catch(() => null);
+    const own = await freeEta(city, { stops, routes }, { ...deps, env }).catch(() => null);
     if (own) {
       const { stops: ms, routes: mr } = own.missing;
       if (!ms.length && !mr.length) return { status: 200, body: own.rows, age: own.age, state: 'free' };
@@ -816,7 +816,7 @@ export async function gpsRows(env, q, deps = {}) {
   const routes = [...new Set((q.get('routes') || '').split(',').filter(u => UID.test(u)))].slice(0, 20);
   if (!routes.length) return { status: 400, body: { code: 'BAD_ROUTES' } };
   if (deps.free !== false) {
-    const own = await freeGps(city, routes, deps).catch(() => null);
+    const own = await freeGps(city, routes, { ...deps, env }).catch(() => null);
     if (own && own.missing.length < routes.length) {
       if (!own.missing.length) return { status: 200, body: own.rows, age: own.age, state: 'free' };
       const rest = await gpsRows(env, new URLSearchParams({ city, routes: own.missing.join(','), ...(q.get('had') ? { had: q.get('had') } : {}) }), { ...deps, free: false });
