@@ -45,6 +45,7 @@
 // entry (`bySource`), for the scoring that moves the blend's weights; it is
 // never in the answer.
 
+import { radarAt } from './weather-radar.js';
 import { STATIONS } from './weather-stations.js';
 import { twDay } from './kit/format.mjs';
 import { COUNTIES, readTyphoon, readDgpa, readSeatRain, dayOffFor, closuresFor, tradeClosed, stampSeen } from './typhoon.js';
@@ -1124,6 +1125,7 @@ export function briefText(resp, now) {
 // 'brief' answers at once; 'rain' answers only when the next 2 hours reach
 // RAIN_ALERT (else null: push.js asks again in 15 minutes, until `until`).
 export const RAIN_ALERT = 60;
+export const RADAR_ALERT_MM = 1;
 export async function weatherCheck(env, w, { fetchFn = fetch, now = Date.now() } = {}) {
   const jobs = [];
   const resp = await cellForecast(env, { waitUntil: p => jobs.push(p) }, w.lat, w.lon, { fetchFn, now, freshMs: HOUR });
@@ -1133,7 +1135,10 @@ export async function weatherCheck(env, w, { fetchFn = fetch, now = Date.now() }
   }
   const soon = (resp.hours || []).filter(h => h.t + HOUR > now && h.t < now + 2 * HOUR && h.pop != null);
   const wet = soon.find(h => h.pop >= RAIN_ALERT);
+  // (CWA's radar seeing rain reach the place within the hour: said even when the hours' numbers don't.)
+  const radar = wet ? null : await radarAt(env, w.lat, w.lon, now).catch(() => null);
   await Promise.all(jobs);
+  if (!wet && radar?.mm >= RADAR_ALERT_MM) return { title: `{title} · 一小時內`, body: `雷達看到雨正接近，約 ${Math.round(radar.mm)} 毫米，出門記得帶傘`, place: resp.place?.town || '' };
   if (!wet) return null;
   return { title: `{title} · ${clockIn(Math.max(wet.t, now), resp.tz)}`, body: `降雨機率 ${wet.pop}%，出門記得帶傘`, place: resp.place?.town || '' };
 }
@@ -1842,14 +1847,16 @@ export async function handleWeather(request, env, headers, path, { session = nul
     // the second, on the same request the moment it's in (the page asked
     // again every 2 s for it). Without a job to follow, one line.
     let rest = null;
-    const first = { ...(await withDayOff(env, await cellForecast(env, ctx, lat, lon, { fetchFn, follow: q.get('lines') ? job => (rest = job) : null }), { lat, lon }, fetchFn, ctx)), ...where };
+    // (The next hour's rain from CWA's radar, weather-radar.js: read for each answer, never kept with the cell.)
+    const radar = radarAt(env, lat, lon).catch(() => null);
+    const first = { ...(await withDayOff(env, await cellForecast(env, ctx, lat, lon, { fetchFn, follow: q.get('lines') ? job => (rest = job) : null }), { lat, lon }, fetchFn, ctx)), ...where, radar: await radar };
     if (!rest) return send(first);
     // (Gzipped, each line flushed: http.js lineAnswer. Sent whole, the two lines were 156 KB.)
     const lines = lineAnswer(request, headers);
     const body = (async () => {
       await lines.line(first);
       const whole = await rest.catch(() => null);
-      if (whole) await lines.line({ ...(await withDayOff(env, whole, { lat, lon }, fetchFn, ctx)), ...where });
+      if (whole) await lines.line({ ...(await withDayOff(env, whole, { lat, lon }, fetchFn, ctx)), ...where, radar: first.radar });
       await lines.end();
     })().catch(() => lines.abort());
     if (ctx?.waitUntil) ctx.waitUntil(body);
