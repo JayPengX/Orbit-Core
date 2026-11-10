@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gnews, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed } from '../builders/news.js';
+import { bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -367,14 +367,14 @@ test('Bing News’ feed of a site: the outlet’s own link and summary, its Los 
   assert.equal(FEEDS.reuters[0][1], 'bing');
 });
 
-test('Google News’ feed of a site: the headline without " - Outlet", its link, no summary', () => {
-  const xml = `<rss><channel><item><title>US consumer prices rise above expectations in October - Reuters</title><link>https://news.google.com/rss/articles/CBMiabc?oc=5</link><pubDate>Tue, 10 Nov 2026 13:46:16 GMT</pubDate><description>&lt;a href="x"&gt;US consumer prices&lt;/a&gt;</description><source url="https://www.reuters.com">Reuters</source></item></channel></rss>`;
-  assert.deepEqual(parseFeed(xml, 'gnews'), [{ t: 'US consumer prices rise above expectations in October', u: 'https://news.google.com/rss/articles/CBMiabc', d: '', at: Date.parse('2026-11-10T13:46:16Z'), img: '' }]);
-  assert.match(gnews('reuters.com'), /site:reuters\.com\+when:1d&hl=en-US/);
-  assert.match(gnews('ftvnews.com.tw', 'zh'), /hl=zh-TW/);
-  // (Its links aren't read for a picture: they aren't the outlet's page.)
-  const s = { items: [['reuters', 'x', 'https://news.google.com/rss/articles/CBMiabc', NOW]], clips: [], img: '' };
-  assert.deepEqual(pagesToRead({ tw: [], intl: [s] }, {}), []);
+test('民視 through its YouTube channel: each report’s headline (its tags off), the clip’s address; never a live stream or a Short', () => {
+  const entry = (y, title, href = `https://www.youtube.com/watch?v=${y}`) => `<entry><yt:videoId>${y}</yt:videoId><title>${title}</title><link rel="alternate" href="${href}"/><published>2026-11-10T08:00:00+00:00</published></entry>`;
+  const xml = `<feed>${entry('AAAAAAAAAAA', '【#重點新聞】立院三讀通過預算案｜民視新聞網')}${entry('DDDDDDDDDDD', '竹市長選情關鍵倒數 林俊憲現身授證－民視新聞')}${entry('BBBBBBBBBBB', '民視新聞 LIVE 直播')}${entry('CCCCCCCCCCC', '颱風來襲', 'https://www.youtube.com/shorts/CCCCCCCCCCC')}</feed>`;
+  assert.deepEqual(parseFeed(xml, 'yt'), [{ t: '立院三讀通過預算案', u: 'https://www.youtube.com/watch?v=AAAAAAAAAAA', d: '', at: Date.parse('2026-11-10T08:00:00Z'), img: 'https://i.ytimg.com/vi/AAAAAAAAAAA/hqdefault.jpg' }, { t: '竹市長選情關鍵倒數 林俊憲現身授證', u: 'https://www.youtube.com/watch?v=DDDDDDDDDDD', d: '', at: Date.parse('2026-11-10T08:00:00Z'), img: 'https://i.ytimg.com/vi/DDDDDDDDDDD/hqdefault.jpg' }]);
+  assert.equal(FEEDS.ftv[0][1], 'yt');
+  // (No page of its own to read for a picture.)
+  const s = { items: [['ftv', 'x', 'https://www.youtube.com/watch?v=AAAAAAAAAAA', NOW]], clips: [], img: '' };
+  assert.deepEqual(pagesToRead({ tw: [s], intl: [] }, {}), []);
 });
 
 test('a story’s topic is what most of it names; another only where 40% name it (Jay 11-10: 健康 held a car crash)', () => {
