@@ -36,14 +36,27 @@
 
 const GESTURE_MS = 900;
 const SCROLL_IDLE_MS = 250;
+// A finger the page last heard of this long ago is taken for gone (a touch
+// whose end Safari never sent: the app put away mid-touch, a system swipe).
+const FINGER_STALE_MS = 4_000;
+// Fingers on the screen now, as the last touch event counted them (its
+// `touches`), never a running sum of starts and ends: two fingers down one
+// by one and up together sent one end for two starts, the sum stuck at 1
+// and every live refresh in the app waited on a finger that had gone (Jay
+// 2026-11-09: a game's page stuck near its end, over by the time he
+// reopened it).
 let touching = 0;
+let touchAt = 0;
 let lastGesture = 0;
 let lastScroll = 0;
 // The control just tapped (or the field typed in): { s, node, sig, y, off, top, at }.
 let tap = null;
+const fingers = () => (touching > 0 && Date.now() - touchAt < FINGER_STALE_MS ? touching : 0);
+// (For the tests: what the page counts after a touch event with these fingers still down.)
+export const countFingers = (left, now = Date.now()) => ((touching = Math.max(0, left | 0)), (touchAt = now), fingers());
 
 // A scroll still running, or a finger on the screen: a live redraw waits.
-export const scrollBusy = () => touching > 0 || Date.now() - lastScroll < SCROLL_IDLE_MS;
+export const scrollBusy = () => fingers() > 0 || Date.now() - lastScroll < SCROLL_IDLE_MS;
 // The person did something just now: a change after it is theirs (a tab, a chip, a row opened).
 const theirs = () => Date.now() - lastGesture < GESTURE_MS;
 
@@ -364,14 +377,20 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
   // Typing: the field stays where it is while what it finds changes under it.
   addEventListener('keydown', ev => ((lastGesture = Date.now()), noteTap(ev.target)), true);
   addEventListener('wheel', () => ((lastGesture = Date.now()), (tap = null)), { capture: true, passive: true });
-  addEventListener('touchstart', () => (touching++, (lastGesture = Date.now())), { capture: true, passive: true });
-  const lift = () => {
-    touching = Math.max(0, touching - 1);
+  addEventListener('touchstart', ev => (countFingers(ev.touches?.length ?? 1), (lastGesture = Date.now())), { capture: true, passive: true });
+  // (A finger held still sends nothing: a move says it's still there.)
+  addEventListener('touchmove', ev => countFingers(ev.touches?.length ?? touching), { capture: true, passive: true });
+  const lift = ev => {
+    countFingers(ev?.touches?.length ?? Math.max(0, touching - 1));
     lastGesture = Date.now();
     if (tap) tap.at = Date.now();
   };
   addEventListener('touchend', lift, { capture: true, passive: true });
   addEventListener('touchcancel', lift, { capture: true, passive: true });
+  // Put away (another app, the lock): no finger is on this page when it's back.
+  const away = () => document.visibilityState === 'hidden' && countFingers(0);
+  document.addEventListener('visibilitychange', away);
+  addEventListener('pagehide', () => countFingers(0));
   addEventListener('resize', unfloor);
   globalThis.visualViewport?.addEventListener('resize', unfloor);
   // Any scroller the person moves is held from then on; its anchor read once the scroll settles.
@@ -401,7 +420,7 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
       // chain theirs, and its next grab too while it's still in hand.
       const now = Date.now();
       const quiet = now - lastScroll > SCROLL_IDLE_MS;
-      if (quiet || !chains.has(s)) chains.set(s, theirs() || touching > 0 || codeScrolled(s) || (now - (barAt.get(s) || 0) < BAR_MS && 'bar'));
+      if (quiet || !chains.has(s)) chains.set(s, theirs() || fingers() > 0 || codeScrolled(s) || (now - (barAt.get(s) || 0) < BAR_MS && 'bar'));
       if (st && !chains.get(s) && !settle.has(s)) {
         if (now - (drawnAt.get(s) || 0) < REDRAWN_MS && now - (putBackAt.get(s) || 0) > AGAIN_MS) {
           putBackAt.set(s, now);
@@ -412,7 +431,7 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
       if (chains.get(s) === 'bar') barAt.set(s, now);
       // (The code's own jump, no finger: held from where it landed at once,
       // not once it settles; a redraw just after it is kept too.)
-      if (!theirs() && !touching && codeScrolled(s)) {
+      if (!theirs() && !fingers() && codeScrolled(s)) {
         clearTimeout(settle.get(s));
         settle.delete(s);
         return s.scrollTop > 0 ? anchor(s) : (held.delete(s), trimRoom(s));
@@ -440,7 +459,7 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
     if (!held.size) return;
     // (When each held scroller was last drawn in: Safari's own move follows that.)
     for (const s of held.keys()) touched(s, list) && drawnAt.set(s, Date.now());
-    if (theirs() || touching) {
+    if (theirs() || fingers()) {
       for (const s of held.keys()) (t && s === t.s) || settle.has(s) || (s.isConnected ? anchor(s) : held.delete(s));
       return;
     }

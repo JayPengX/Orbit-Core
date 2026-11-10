@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { signature, scrollBusy, loose } from '../kit/hold-place.mjs';
+import { signature, scrollBusy, loose, countFingers } from '../kit/hold-place.mjs';
 
 const kit = f => readFileSync(new URL(`../kit/${f}`, import.meta.url), 'utf8');
 
@@ -183,4 +183,23 @@ test('in a browser: a search sheet on the foot keeps its field after the results
     await browser?.close();
     server.close();
   }
+});
+
+// Jay 2026-11-09: a live game's page stuck near its end, over by the time he
+// reopened it. The fingers were a sum of starts and ends: two down one by one
+// and up together sent one end for two starts, and every beat in the app
+// waited on a finger that had gone.
+test('fingers are counted from each touch event, never summed; one unheard of for a while is gone', () => {
+  assert.equal(countFingers(2), 2);
+  assert.equal(scrollBusy(), true);
+  // (Both up in one event: its touches are none, whatever the starts were.)
+  assert.equal(countFingers(0), 0);
+  assert.equal(scrollBusy(), false);
+  // (A finger whose end never came: taken for gone after a few seconds.)
+  assert.equal(countFingers(1, Date.now() - 10_000), 0);
+  assert.equal(scrollBusy(), false);
+  // And a beat put off for a gesture runs anyway past a few seconds.
+  const orbit = kit('orbit.mjs');
+  assert.match(orbit, /BEAT_WAIT_MAX_MS/);
+  assert.match(orbit.slice(orbit.indexOf('export function everyDev')), /Date\.now\(\) - heldSince < BEAT_WAIT_MAX_MS/);
 });
