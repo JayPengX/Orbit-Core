@@ -1758,6 +1758,7 @@ function makeSession(app, { lang, heartbeat }) {
     cacheWallet(storedAccount(), w);
     // The pass's notice switches (newer here: sent up).
     adoptNotifyPrefs(w);
+    adoptLinkWay(w);
     emit('wallet', w);
     setTimeout(() => syncPrefs(s), 0);
   }
@@ -2861,6 +2862,7 @@ export function passAccount(s, { extra = null, close = () => {}, looks = () => {
     ...passkeyRows(s, note),
     node('h3', { class: 'q-sheet-h', text: T('通知', 'Notifications') }),
     ...notifyRows(s, note),
+    ...(inHomeApp() ? [node('h3', { class: 'q-sheet-h', text: T('連結', 'Links') }), linkRows(s)] : []),
     node('h3', { class: 'q-sheet-h', text: T('除錯紀錄', 'Debug log') }),
     recRows(s, note),
     node('h3', { class: 'q-sheet-h', text: T('帳戶安全', 'Security') }),
@@ -3388,6 +3390,101 @@ function notifyRows(s, note) {
     node('p', { class: 'q-notice-note', text: T('通知設定跟著 Orbit Pass：在每個 App、每台裝置都一樣。', 'Notice settings follow your Orbit Pass: the same in every app, on every device.') }),
     node('div', { class: 'q-rows q-notice-kinds' }, groups)
   ];
+}
+
+// ---- Links out of Orbit ---------------------------------------------------------------------
+// (Jay 2026-11-10: "link opened from the add to home screen app … directly to
+// safari app instead of a pop up?", then "sometimes I want the quick view but
+// only safari app has my extensions … you decide how it works across the
+// app".) On an iPhone or iPad, a Home Screen app opens another site in iOS's
+// quick view, a sheet over the app. One switch on the Pass sheet (打開連結,
+// following the pass to every app and device) sends them to the Safari app
+// itself instead: `x-safari-https://`, the address iOS hands to Safari. The
+// quick view stays the default. Links that open another app (YouTube, Maps,
+// 高鐵's T Express: `opensApp`) are left to iOS either way, and so is
+// everything outside a Home Screen app (a browser tab, a computer).
+// Every app's links follow it without a line of their own: the page's taps
+// on an <a> are read here; a link opened by code goes through `openLink`.
+const LINKS_KEY = 'orbit.links.v1';
+export const inHomeApp = () => typeof navigator !== 'undefined' && navigator.standalone === true;
+export function linkPrefs() {
+  const v = readJson(LINKS_KEY, null);
+  return { way: v?.way === 'safari' ? 'safari' : 'quick', t: Number(v?.t) || 0 };
+}
+export const linkWay = () => linkPrefs().way;
+export function setLinkWay(way, s = null) {
+  const v = { way: way === 'safari' ? 'safari' : 'quick', t: Date.now() };
+  writeStore(LINKS_KEY, JSON.stringify(v));
+  s?.write?.({ wallet: { settings: { links: { value: v.way, t: v.t } } } })?.catch?.(() => {});
+  return v.way;
+}
+// The pass's choice, when newer than this device's.
+export function adoptLinkWay(wallet) {
+  const held = wallet?.settings?.links;
+  if (!held?.value || !(Number(held.t) > linkPrefs().t)) return false;
+  writeStore(LINKS_KEY, JSON.stringify({ way: held.value === 'safari' ? 'safari' : 'quick', t: Number(held.t) }));
+  return true;
+}
+const APP_LINKS = [/(^|\.)youtube\.com$/, /^youtu\.be$/, /^(apps|maps|music|podcasts|books)\.apple\.com$/, /^maps\.google\.[a-z.]+$/, /^maps\.app\.goo\.gl$/, /(^|\.)thsrc\.com\.tw$/, /(^|\.)eltaott\.tv$/];
+export function opensApp(href) {
+  let u;
+  try {
+    u = new URL(href);
+  } catch {
+    return false;
+  }
+  return APP_LINKS.some(r => r.test(u.hostname)) || (/(^|\.)google\.[a-z.]+$/.test(u.hostname) && /^\/maps(\/|$)/.test(u.pathname));
+}
+// The address a tap on `href` goes to: Safari's own for another site, when
+// the person chose Safari in a Home Screen app; else `href` as it is.
+export function linkHref(href, { home = inHomeApp(), way = linkWay(), here = typeof location !== 'undefined' ? location.origin : '' } = {}) {
+  if (!home || way !== 'safari' || !/^https?:\/\//i.test(href || '') || opensApp(href)) return href;
+  try {
+    if (new URL(href).origin === here) return href;
+  } catch {
+    return href;
+  }
+  return `x-safari-${href}`;
+}
+// A link opened by code (a tap's own handler): the way the person chose.
+export function openLink(href) {
+  const to = linkHref(href);
+  if (to !== href) {
+    location.href = to;
+    return null;
+  }
+  return globalThis.open?.(href, '_blank', 'noopener') ?? null;
+}
+// Every <a> tapped anywhere in the app (its own handler first: a read counted).
+if (typeof document !== 'undefined' && !document.__orbitLinks) {
+  document.__orbitLinks = true;
+  document.addEventListener('click', e => {
+    if (e.defaultPrevented || e.button > 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = e.target?.closest?.('a[href]');
+    if (!a || a.hasAttribute('download') || a.hasAttribute('data-q-quick')) return;
+    const to = linkHref(a.href);
+    if (to === a.href) return;
+    e.preventDefault();
+    location.href = to;
+  });
+}
+// The Pass sheet's row: the switch, with what it does now.
+function linkRows(s) {
+  const en = s.lang === 'en';
+  const T = (zh, e) => (en ? e : zh);
+  const say = () => (linkWay() === 'safari' ? T('連結在 Safari 打開，有你的延伸功能', 'Links open in Safari, with your extensions') : T('連結在 App 裡快速檢視', 'Links open in a quick view in the app'));
+  const sub = node('small', { class: 'q-notice-sub', text: say() });
+  return node('div', { class: 'q-rows' }, [
+    node('div', { class: 'q-notice-row master' }, [
+      tile(icons.compass, 'var(--q-blue)'),
+      node('div', { class: 'q-notice-text' }, [node('strong', { text: 'Safari App' }), sub]),
+      toggle(linkWay() === 'safari', T('連結用 Safari App 打開', 'Open links in the Safari app'), on => {
+        setLinkWay(on ? 'safari' : 'quick', s);
+        sub.textContent = say();
+        return true;
+      })
+    ])
+  ]);
 }
 
 // Where a notice's tap points (its #hash), in the open page: a new hash as

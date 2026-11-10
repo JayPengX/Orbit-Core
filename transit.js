@@ -1886,8 +1886,12 @@ const scrubKey = (text, env) => [env.GOOGLE_MAPS_KEY, env.GOOGLE_WEATHER_KEY, en
 
 // ---- Booking (TDX's 訂票導訂) ------------------------------------------------------------
 // GET /transit/book?sys=hsr&from=新竹&to=台北&date=2026-11-10&time=13:10&no=123[&app=1]
-// → { url }: 高鐵's own booking with the trip filled in, its website (with
-// app=1, its T-EX app's link). TDX's maas-thsr (0 points, never metered;
+// → { url }: 高鐵's own booking with the trip filled in, its website
+// (irs.thsrc.com.tw; with app=1, ets.thsrc.com.tw/queryTrain, a universal
+// link into its T Express app). TDX answers with its own address that
+// redirects there; it's followed here (`landing`), so the phone's tap goes
+// straight to 高鐵's: iOS opens an app only for a tap on the app's own
+// address, not one a redirect reaches. TDX's maas-thsr (0 points, never metered;
 // approved for our key 2026-11-10). Each link lasts minutes: asked on a tap,
 // never kept. Orbit sells nothing: the person books and pays there.
 // (臺鐵's, maas-tra, once TDX approves it.)
@@ -1919,6 +1923,13 @@ export function linkIn(j) {
   walk(j);
   return (found.find(f => f.named) || found[0])?.url || null;
 }
+// Where TDX's redirect lands (高鐵's own address), else TDX's as it was.
+export async function landing(url, fetchFn) {
+  if (!/^https:\/\/maas\.transportdata\.tw\/.*\/redirect\?/.test(url)) return url;
+  const r = await fetchFn(url, { redirect: 'manual', signal: timeout(5000) }).catch(() => null);
+  const to = r && r.status >= 300 && r.status < 400 ? r.headers.get('location') : null;
+  return to && /^https:\/\/[a-z0-9.-]*thsrc\.com\.tw\//i.test(to) ? to : url;
+}
 async function book(env, q, { fetchFn, now }) {
   const path = bookPath(q);
   if (!path) return [{ code: 'BAD_TRIP' }, 400];
@@ -1931,7 +1942,7 @@ async function book(env, q, { fetchFn, now }) {
     j = await r.json();
   } catch {}
   const url = r.ok ? linkIn(j) : null;
-  if (url) return [{ url }, 200];
+  if (url) return [{ url: await landing(url, fetchFn) }, 200];
   return [{ code: r.status === 401 || r.status === 403 ? 'NOT_ALLOWED' : 'TDX_FAILED', status: r.status, msg: String(j?.error?.msg || j?.message || '').slice(0, 200) }, 502];
 }
 

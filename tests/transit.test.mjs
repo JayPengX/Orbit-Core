@@ -1267,6 +1267,24 @@ test('高鐵 booking: a link into 高鐵’s own booking, the trip filled in, as
   assert.equal(linkIn({ result: 'success', data: { a: 'x', deeplink: 'texapp://book?x=1' } }), 'texapp://book?x=1');
 });
 
+// Jay 2026-11-10 ("高鐵導訂 open hsr app if possible"): TDX's link is its own
+// redirect; the proxy follows it so the phone's tap lands on 高鐵's address
+// (ets.thsrc.com.tw: T Express's universal link), never on TDX's.
+test('高鐵 booking: TDX’s redirect followed to 高鐵’s own address; anything else left as TDX gave it', async () => {
+  const { landing } = await import('../transit.js');
+  const tdx = 'https://maas.transportdata.tw/trip/api/v1/booking/deeplink/redirect?token=abc';
+  const ets = 'https://ets.thsrc.com.tw/queryTrain?s=4732';
+  const seen = [];
+  const to = loc => async (url, init) => (seen.push(init?.redirect), new Response('', { status: 302, headers: { location: loc } }));
+  assert.equal(await landing(tdx, to(ets)), ets);
+  assert.equal(seen[0], 'manual', 'read where it goes, never followed into 高鐵’s page');
+  assert.equal(await landing(tdx, to('https://irs.thsrc.com.tw/IMINT/?locale=tw&queryData=x')), 'https://irs.thsrc.com.tw/IMINT/?locale=tw&queryData=x');
+  assert.equal(await landing(tdx, to('https://evil.example/x')), tdx, 'only 高鐵’s own hosts');
+  assert.equal(await landing(tdx, async () => new Response('{}', { status: 200 })), tdx);
+  assert.equal(await landing(tdx, async () => { throw new Error('down'); }), tdx);
+  assert.equal(await landing(ets, to('https://x')), ets, 'a 高鐵 link already: not asked');
+});
+
 test("TDX's API of each call (the month's count by it), and the plan: 銅級 till 2026-12-01, then the free tier's 3 points and 5 a minute", () => {
   assert.equal(tdxFamily('basic/v2/Bus/EstimatedTimeOfArrival/City/Hsinchu?$filter=x'), 'Bus/EstimatedTimeOfArrival/Hsinchu');
   assert.equal(tdxFamily('basic/v2/Bus/EstimatedTimeOfArrival/InterCity'), 'Bus/EstimatedTimeOfArrival/InterCity');

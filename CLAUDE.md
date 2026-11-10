@@ -163,7 +163,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | Live data | `everyDev(key, fn)` beats at the owner's speeds (waiting while a finger is down); `data-q-live` + `liveChanged` pop a changed number; patch in place, never rebuild what didn't change; `hold-place.mjs` keeps the reader's place by itself; `steady-pics.mjs` the pictures |
 | Fitting | `fitNames` (`.q-fit`, `.q-fit-wrap`), `fitNumbers` / `watchFit`, `balanceRows` (`.q-balance`), `fullRows` (`.q-rows-full`/`-keep`), `.q-even` / `.q-even3` |
 | Every screen | `screenFit()` / `onScreen(fn)` mark `html.q-tabrail`, `q-float`, `q-desk`, `q-wide`, `q-w3`; `--q-page-max`, `--q-vw`. By their own width, anywhere (a page, a sheet, a pane): `.q-cols`, `.q-flow` + `flowColumns(root)` (columns of even height), `.q-grid` (cards), `.q-split` (list beside detail) (DESIGN §10) |
-| Pull to refresh, taps | `pullToRefresh`; `haptic()` / `tick()`; `PRESS_DELAY` / `pressSelector` |
+| Pull to refresh, taps, links | `pullToRefresh`; `haptic()` / `tick()`; `PRESS_DELAY` / `pressSelector`; links out: `<a target=_blank>`, `openLink` (Pass 連結) |
 | Offline | `onlineOnly` (live apps: Securities, Transit, Sports), `keepOffline` (the rest open on what they kept), `netState` / `netVerdict` |
 | Picks for you | `rank` + `feedback.mjs` (`lifter`, `shown`, `picked`, `did`, `keep`); measured: `tools/picks-backtest.mjs` |
 | Language | `W`, `makeT`, `place` (lang.mjs): every page in one language |
@@ -186,7 +186,7 @@ the `q-` components; they don't restyle them.
 
 ## 4. The APIs: the proxy (`orbit-workers-proxy`)
 
-`worker.js` routes (`route()`, in the Runner for heavy ones); each route's work is in its own file;
+`worker.js` routes (`route()`, heavy ones in the Runner); each route's work in its own file;
 `http.js` is what every route answers with (who may call, CORS, JSON;
 `lineAnswer`: lines gzipped, each flushed). It runs near each caller;
 Gemini through `gemini-relay.js`, pinned to Taiwan. Every answer carries `Server-Timing:
@@ -296,7 +296,7 @@ A read (`kit proxyJson`) goes down these until one answers:
 - A copy past its `ttl` is read again, the old one answering only if that
   fails; to paint at once, an app asks `peekJson(url)` (the last copy of
   any age) and draws the fresh one when it lands.
-- Reads made within a few milliseconds go to the proxy as one batch.
+- Reads within a few ms go to the proxy as one batch.
 - A failed read is a failure, never "nothing there": the device's copy of
   any age answers, asked again soon; a failed batch item fails alone.
 - The phone reads some sources itself, no Worker request: ESPN's core
@@ -455,7 +455,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   `SHORT` in `kit/brand.mjs`; one origin, so one Pass sign-in), `orbit-pass`
   for `/`, `/pass/`, `/key/`, `/Orbit-Core/` and the old `/Shared-Proxy/`,
   `orbit-home` for `<DOMAIN>/`, `/showcase/` (Orbit-Showcase).
-  Plain static paths (`/law` → `/law/`). Mail is refused. `deploy.yml`
+  Plain static paths. Mail is refused. `deploy.yml`
   attaches the hostnames (its token needs the zone and D1 Edit); the guard
   takes them off with the proxy.
 
@@ -463,7 +463,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
 
 | Tool | What |
 | --- | --- |
-| `node tools/kit-find.mjs <word…>` | The kit's exports and CSS classes matching: look before writing a helper or a style |
+| `node tools/kit-find.mjs <word…>` | The kit's exports and CSS classes matching: look before writing |
 | `node tools/shots.mjs <app> [page…]` | Every screenshot a change needs (light/dark, live data, signed in), a contact sheet, faults, `--before main`; pages in `tools/shots/pages.mjs` |
 | `node tools/layout-check.mjs <app…>` | Every tab and `check` page at 320, iPad, laptop: a narrow band, a half empty, overflow (`layout-faults.mjs`); `push.sh` runs it |
 | `node tools/preview.mjs <app>` | The app with real data (`--live`, `--width`, `--timing`, `--webkit`…; `ORBIT_DATA=<dir>`: local /data/ files); prints `wraps:`, `cut:` |

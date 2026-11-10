@@ -1381,6 +1381,8 @@ export const icons = {
   chart: g('<path d="M4 19h16M7 15l4-4 3 3 5-6"/>'),
   bars: g('<path d="M6 20V11M12 20V5M18 20v-6"/>'),
   bell: g('<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20.5h4"/>'),
+  // A compass: a link out to the web (the Pass sheet's 打開連結).
+  compass: g('<circle cx="12" cy="12" r="8.5"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>'),
   bus: g('<rect x="5" y="3.5" width="14" height="14" rx="3"/><path d="M5 11h14M8.5 20.5v-3M15.5 20.5v-3"/><circle cx="8.5" cy="14.5" r=".6"/><circle cx="15.5" cy="14.5" r=".6"/>'),
   train: g('<rect x="6" y="3.5" width="12" height="13" rx="4"/><path d="M6 10.5h12M9 20.5l1.5-4M15 20.5l-1.5-4"/>'),
   walk: g('<circle cx="13.5" cy="4.3" r="1.9" fill="currentColor" stroke="none"/><path d="M12.6 8.2 11 14.2l-2.6 6.3M11 14.2l2.8 2.6.9 3.7M7.5 12l2.2-3.3 2.9-.5 2.1 3 2.8 1"/>'),
