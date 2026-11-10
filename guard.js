@@ -619,8 +619,12 @@ export async function cpuByRoute(env, { fetcher = fetch, now = Date.now(), hours
       headers: { Authorization: `Bearer ${env.CF_GUARD_TOKEN}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     }).then(async r => {
-      const j = await r.json().catch(() => null);
-      if (!r.ok || !j?.success) throw new Error(`logs ${r.status}: ${(j?.errors || []).map(e => e.message).join('; ').slice(0, 300)}`);
+      const t = await r.text();
+      let j = null;
+      try {
+        j = JSON.parse(t);
+      } catch {}
+      if (!r.ok || !j?.success) throw new Error(`logs ${r.status}: ${(j?.errors || []).map(e => e.message).join('; ') || t}`.slice(0, 600));
       return j.result;
     });
   if (keys) {
@@ -636,7 +640,7 @@ export async function cpuByRoute(env, { fetcher = fetch, now = Date.now(), hours
     parameters: {
       calculations: [
         { operator: 'count', alias: 'n' },
-        { operator: 'p50', key: '$workers.cpuTimeMs', keyType: 'number', alias: 'p50' },
+        { operator: 'median', key: '$workers.cpuTimeMs', keyType: 'number', alias: 'p50' },
         { operator: 'p90', key: '$workers.cpuTimeMs', keyType: 'number', alias: 'p90' },
         { operator: 'p99', key: '$workers.cpuTimeMs', keyType: 'number', alias: 'p99' },
         { operator: 'max', key: '$workers.cpuTimeMs', keyType: 'number', alias: 'max' }
