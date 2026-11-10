@@ -9,6 +9,9 @@
 //     at most and kept here; a city's list or the stations near a point.
 //   - 新竹's buses (竹塹交通資訊網), 臺北's and 新北's (the cities' open data).
 //   - 台鐵's day of trains (台鐵's own open data, ods.railway.gov.tw).
+//   - 高鐵's day and the metros' maps and timetables: the weekly build's
+//     copies in R2 (rail/: TDX's GTFS, 0 points; the metros asked of TDX
+//     only when GTFS says they changed).
 //
 // Nothing here is counted as TDX's: no points.
 
@@ -638,6 +641,44 @@ async function hsrFree(path, q, { env, now }) {
   return day ? { status: 200, body: JSON.stringify(day), age: Math.max(0, now - pack.at), state: 'free' } : null;
 }
 
+// ---- The metros' maps and timetables ------------------------------------------------------
+
+// Each system's stations, lines, exits, headways and station timetables, as
+// TDX answered them, copied to R2 by the weekly build (tools/gtfs-buses.mjs:
+// asked again when TDX's GTFS says a system changed, else a month on;
+// builders/gtfs.js METRO_KINDS). Asked as Orbit Transit asks: whole, with
+// `$select`, or a station's timetable by `$filter=StationID eq '…'`. Not
+// copied (live boards, notices, any other ask): TDX's.
+const METRO_ASK = /^basic\/v2\/Rail\/Metro\/(Station|StationOfLine|Line|StationOfRoute|LineTransfer|StationExit|Frequency|S2STravelTime|StationTimeTable)\/([A-Z]+)$/;
+const METRO_STATION = /^StationID eq '([A-Za-z0-9-]+)'$/;
+export function metroFile(path, q) {
+  const m = path.match(METRO_ASK);
+  if (!m) return undefined;
+  const [, kind, sys] = m;
+  const keys = [...q.keys()].filter(k => k !== '$format');
+  if (kind === 'StationTimeTable') {
+    const f = keys.length === 1 && keys[0] === '$filter' && METRO_STATION.exec(q.get('$filter'));
+    return f ? { file: `rail/metro/${sys}/StationTimeTable/${f[1]}.json`, select: '' } : null;
+  }
+  if (keys.some(k => k !== '$select')) return null;
+  const select = (q.get('$select') || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (select.some(s => !/^[A-Za-z]+$/.test(s))) return null;
+  return { file: `rail/metro/${sys}/${kind}.json`, select: select.join(',') };
+}
+async function metroFree(path, q, { env, now }) {
+  const ask = metroFile(path, q);
+  if (!ask || !env?.DATA) return ask === undefined ? undefined : null;
+  const got = await held(`metro:${ask.file}|${ask.select}`, TRA_FRESH, 7 * 86_400_000, async () => {
+    const obj = await env.DATA.get(ask.file);
+    if (!obj) throw new Error('not copied');
+    const text = await obj.text();
+    if (!ask.select) return text;
+    const want = ask.select.split(',');
+    return JSON.stringify(JSON.parse(text).map(r => Object.fromEntries(want.filter(k => k in r).map(k => [k, r[k]]))));
+  }, now, 3000);
+  return { status: 200, body: got.val, age: Math.max(0, now - got.at), state: 'free' };
+}
+
 // ---- One entry for tdxGet -----------------------------------------------------------------
 
 // A TDX ask (its path and query, as tdxRequest made them) answered from a free
@@ -646,7 +687,7 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), 
   const q = new URLSearchParams(query);
   try {
     const p = decodeURIComponent(path);
-    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now }));
+    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now }));
     if (got !== undefined) return got;
   } catch (err) {
     console.log('free source failed', path.slice(0, 80), String(err?.message || err).slice(0, 120));

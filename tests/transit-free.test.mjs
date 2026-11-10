@@ -298,3 +298,33 @@ test("高鐵's day from the weekly GTFS pack (rail/thsr.json in R2): TDX's trimm
   assert.deepEqual(JSON.parse(got.body).map(t => t.DailyTrainInfo.TrainNo), ['0108']);
   assert.equal(await freeTdx('basic/v2/Rail/THSR/DailyTimetable/TrainDate/2026-12-25', '$format=JSON', { env, now: Date.parse('2026-11-10T00:00:00Z') }), null);
 });
+
+test("A metro's maps and timetables from the weekly copy in R2 (rail/metro/…): whole, by `$select`, a station's timetable by its filter; live boards and other asks left to TDX", async () => {
+  const { metroFiles } = await import('../builders/gtfs.js');
+  const { metroFile } = await import('../transit-free.js');
+  const station = [
+    { StationUID: 'TRTC-BL01', StationID: 'BL01', StationName: { Zh_tw: '頂埔' }, StationAddress: 'x', StationPosition: { PositionLat: 24.95, PositionLon: 121.41 } },
+    { StationUID: 'TRTC-BR01', StationID: 'BR01', StationName: { Zh_tw: '動物園' }, StationAddress: 'y', StationPosition: { PositionLat: 24.99, PositionLon: 121.57 } }
+  ];
+  const tt = [
+    { LineID: 'BL', StationID: 'BL01', Direction: 0, Timetables: [{ Sequence: 1, DepartureTime: '06:00' }] },
+    { LineID: 'BL', StationID: 'BL01', Direction: 1, Timetables: [{ Sequence: 1, DepartureTime: '06:05' }] }
+  ];
+  const files = new Map(metroFiles('TRTC', { Station: station, StationTimeTable: tt }).map(([p, rows]) => [p, JSON.stringify(rows)]));
+  assert.deepEqual([...files.keys()].sort(), ['rail/metro/TRTC/Station.json', 'rail/metro/TRTC/StationTimeTable/BL01.json', 'rail/metro/TRTC/StationTimeTable/BR01.json']);
+  assert.equal(files.get('rail/metro/TRTC/StationTimeTable/BR01.json'), '[]', 'a station TDX has no timetable for: what its filter answers');
+  const q = s => new URLSearchParams(s);
+  assert.equal(metroFile('basic/v2/Rail/Metro/LiveBoard/TRTC', q('')), undefined);
+  assert.equal(metroFile('basic/v2/Rail/Metro/StationOfRoute/TRTC', q('$top=1')), null);
+  assert.equal(metroFile('basic/v2/Rail/Metro/StationTimeTable/TRTC', q('')), null);
+  resetFree();
+  const env = { DATA: { get: async k => (files.has(k) ? { text: async () => files.get(k) } : null) } };
+  const opts = { env, now: NOW, fetchFn: async () => assert.fail('no network') };
+  const sel = await freeTdx('basic/v2/Rail/Metro/Station/TRTC', '%24select=StationUID%2CStationID%2CStationName%2CStationPosition%2CLocationCity&$format=JSON', opts);
+  assert.equal(sel.state, 'free');
+  assert.deepEqual(JSON.parse(sel.body)[0], { StationUID: 'TRTC-BL01', StationID: 'BL01', StationName: { Zh_tw: '頂埔' }, StationPosition: { PositionLat: 24.95, PositionLon: 121.41 } });
+  const one = await freeTdx('basic/v2/Rail/Metro/StationTimeTable/TRTC', `%24filter=${encodeURIComponent("StationID eq 'BL01'")}&$format=JSON`, opts);
+  assert.deepEqual(JSON.parse(one.body).map(r => r.Direction), [0, 1]);
+  // (Not copied yet: TDX's.)
+  assert.equal(await freeTdx('basic/v2/Rail/Metro/Line/KRTC', '$format=JSON', opts), null);
+});
