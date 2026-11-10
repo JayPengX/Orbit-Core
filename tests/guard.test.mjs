@@ -174,7 +174,7 @@ test('the bill unreadable for 6 hours while armed: stopped (never watched blind)
 });
 
 test('the plan\'s amounts are the $5 plan\'s (developers.cloudflare.com, 2026-10-13)', () => {
-  assert.deepEqual(PLAN, { requests: 10e6, cpuMs: 30e6, kvRead: 10e6, kvWrite: 1e6, kvDelete: 1e6, kvList: 1e6, kvBytes: 1e9, doRequests: 1e6, doBytes: 5e9, r2ClassA: 1e6, r2ClassB: 10e6, r2Bytes: 10e9, d1RowsRead: 25e9, d1RowsWritten: 50e6, d1Bytes: 5e9 });
+  assert.deepEqual(PLAN, { requests: 10e6, cpuMs: 30e6, kvRead: 10e6, kvWrite: 1e6, kvDelete: 1e6, kvList: 1e6, kvBytes: 1e9, doRequests: 1e6, doDuration: 400e3, doBytes: 5e9, r2ClassA: 1e6, r2ClassB: 10e6, r2Bytes: 10e9, d1RowsRead: 25e9, d1RowsWritten: 50e6, d1Bytes: 5e9 });
 });
 
 test('R2: writes Class A, reads Class B, deletes free, anything unknown counted as Class A; the bucket\'s latest size', async () => {

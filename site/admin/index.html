@@ -1984,7 +1984,7 @@ $('door-save').onclick = () =>
 // ---- 容量 (capacity.js) ----
 const n0 = v => Math.round(v || 0).toLocaleString();
 const SKU_ZH = { maps: '地圖載入', autocomplete: '地點搜尋', details: '地點位置', detailsPro: '地點名稱', textSearch: '搜尋補充', routes: '路線規劃', matrix: '步行時間', drive: '公車車流' };
-const BILL_ZH = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'KV 讀取', kvWrite: 'KV 寫入', kvDelete: 'KV 刪除', kvList: 'KV 列出', kvBytes: 'KV 儲存', doRequests: 'Durable Objects 請求', doBytes: 'Durable Objects 儲存', r2ClassA: 'R2 寫入', r2ClassB: 'R2 讀取', r2Bytes: 'R2 儲存', d1RowsRead: 'D1 讀取', d1RowsWritten: 'D1 寫入', d1Bytes: 'D1 儲存' };
+const BILL_ZH = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'KV 讀取', kvWrite: 'KV 寫入', kvDelete: 'KV 刪除', kvList: 'KV 列出', kvBytes: 'KV 儲存', doRequests: 'Durable Objects 請求', doDuration: 'Durable Objects 時間', doBytes: 'Durable Objects 儲存', r2ClassA: 'R2 寫入', r2ClassB: 'R2 讀取', r2Bytes: 'R2 儲存', d1RowsRead: 'D1 讀取', d1RowsWritten: 'D1 寫入', d1Bytes: 'D1 儲存' };
 // A quota's name (capacity.js quotas: `cf:<count>`, `ai:<setting>`, `maps:<sku>`, `weather:google`, `tdx:points`).
 const quotaName = key => {
   const [kind, k] = String(key).split(':');
@@ -2143,7 +2143,7 @@ async function ghRun(repo, what, label) {
     $('run-out').textContent = `${label}：${e.message}`;
   }
 }
-const BILL_NAME = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'KV 讀取', kvWrite: 'KV 寫入', kvDelete: 'KV 刪除', kvList: 'KV 列出', kvBytes: 'KV 儲存', doRequests: 'Durable Objects 請求', doBytes: 'Durable Objects 儲存', r2ClassA: 'R2 寫入', r2ClassB: 'R2 讀取', r2Bytes: 'R2 儲存', d1RowsRead: 'D1 讀取', d1RowsWritten: 'D1 寫入', d1Bytes: 'D1 儲存' };
+const BILL_NAME = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'KV 讀取', kvWrite: 'KV 寫入', kvDelete: 'KV 刪除', kvList: 'KV 列出', kvBytes: 'KV 儲存', doRequests: 'Durable Objects 請求', doDuration: 'Durable Objects 時間', doBytes: 'Durable Objects 儲存', r2ClassA: 'R2 寫入', r2ClassB: 'R2 讀取', r2Bytes: 'R2 儲存', d1RowsRead: 'D1 讀取', d1RowsWritten: 'D1 寫入', d1Bytes: 'D1 儲存' };
 const PACE_WORD = ['照設定', '放慢 ×2，可以等的建置暫停', '放慢 ×4，建置全停，每個人讀取減半', '放慢 ×8，讀取剩四分之一，先顧基本功能：新的人先等'];
 // ---- 錯誤 (eco-admin.js errors): each Worker's in 24 hours, the proxy's by route ----
 const STATUS_ZH = { scriptThrewException: '程式出錯', exceededResources: '超過資源上限', exceededCpu: '超過 CPU', exceededMemory: '超過記憶體', internalError: 'Cloudflare 內部錯誤', responseStreamDisconnected: '回應中斷' };

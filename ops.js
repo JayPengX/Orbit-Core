@@ -80,7 +80,7 @@ export async function beats(env) {
 
 // ---- The bill's alerts ----
 const PCT = v => `${Math.round(v * 100)}%`;
-const ZH = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'KV 讀取', kvWrite: 'KV 寫入', kvDelete: 'KV 刪除', kvList: 'KV 列出', kvBytes: 'KV 儲存', doRequests: 'Durable Objects 請求', doBytes: 'Durable Objects 儲存', r2ClassA: 'R2 寫入', r2ClassB: 'R2 讀取', r2Bytes: 'R2 儲存', d1RowsRead: 'D1 讀取', d1RowsWritten: 'D1 寫入', d1Bytes: 'D1 儲存' };
+const ZH = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'KV 讀取', kvWrite: 'KV 寫入', kvDelete: 'KV 刪除', kvList: 'KV 列出', kvBytes: 'KV 儲存', doRequests: 'Durable Objects 請求', doDuration: 'Durable Objects 時間', doBytes: 'Durable Objects 儲存', r2ClassA: 'R2 寫入', r2ClassB: 'R2 讀取', r2Bytes: 'R2 儲存', d1RowsRead: 'D1 讀取', d1RowsWritten: 'D1 寫入', d1Bytes: 'D1 儲存' };
 export function billNotice(g, lang) {
   const en = lang === 'en';
   const top = g.top || 'requests';
