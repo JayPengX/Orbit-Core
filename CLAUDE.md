@@ -44,8 +44,8 @@ phone: a home-screen app at orbit.jaypengx.com/<slug>/
  └─ /api/… on the same origin (a route to the proxy; api.jaypengx.com answers too)
         ▼
 orbit-workers-proxy (worker.js, near each caller): every route in §4
- │  edge cache (Cache API, by tier) · D1 STORE · R2 DATA · KV RATE_LIMIT_KV · DO F1_LOG, DOOR
- │  crons: even and odd minutes (builders, notices, weather scoring, capacity, F1 laps)
+ │  edge cache (Cache API, by tier) · D1 STORE · R2 DATA · KV RATE_LIMIT_KV · DO F1_LOG, DOOR, RUNNER
+ │  heavy routes and crons' work in the DO Runner (runner.js: 30 s CPU, the Free plan's 10 ms)
  ├─ upstreams: ESPN, MLB, Jolpica, F1 timing, OpenF1, Polymarket, Yahoo, TDX,
  │   Google, CWA, MOENV, 立法院 and IVOD, 司法院, NCDR, TAIFEX, SITCA…
  ├─ gemini-relay (Gemini, placed in Taiwan: gcp:asia-east1), service GEMINI_RELAY
@@ -184,12 +184,12 @@ the `q-` components; they don't restyle them.
 
 ## 4. The APIs: the proxy (`orbit-workers-proxy`)
 
-`worker.js` routes (`route()`); each route's work is in its own file;
+`worker.js` routes (`route()`, in the Runner for heavy ones); each route's work is in its own file;
 `http.js` is what every route answers with (who may call, CORS, JSON;
 `lineAnswer`: lines gzipped, each flushed). No
 placement: it runs near each caller; only Gemini goes through
 `gemini-relay.js`, pinned to Taiwan. Every answer carries `Server-Timing:
-w;dur=` (the Worker's own time), noted by the 除錯紀錄 with a slow read.
+w;dur=` (the Worker's own time), noted by the 除錯紀錄 when slow.
 
 | Route | File | What |
 | --- | --- | --- |
@@ -212,7 +212,7 @@ w;dur=` (the Worker's own time), noted by the 除錯紀錄 with a slow read.
 | `/data/…` | `data.js` | R2, public reads (§5.5); `/data/build` (POST, Bearer `DATA_PUSH_SECRET`, `build.yml`) runs a builder now |
 | `/config` | `worker.js`, `kit/devconfig.mjs` | The live speeds (`DEV`), a minute in Cloudflare's cache |
 | `/guard` | `worker.js` | The bill's guard as it last read the bill (no key) |
-| `/store/check` | `worker.js`, `doc-store.js` | Each collection's count, from a localhost page only |
+| `/store/check` | `worker.js`, `doc-store.js` | Each collection's count, localhost only |
 | `/ops` | `ops.js`, `worker.js` | The repo's own checks (Bearer `DATA_PUSH_SECRET`): `?check=gemini`, `law-chat`, `system`, `capacity`, `cpu` (CPU by route) |
 
 - **The gate:** every route needs a Pass session (`qt=`), counted per
@@ -231,9 +231,9 @@ w;dur=` (the Worker's own time), noted by the 除錯紀錄 with a slow read.
   TDX's copies 10 minutes old, `DEV_TDX_DAY` points a day): `tools/preview.mjs --live`,
   or `curl -H 'Origin: http://localhost:8123' '…/sports-proxy?url=…'`.
 
-- **Crons:** even minutes (notices, builders at :16 and on, weather
-  scoring, capacity, the meter's copy); F1's laps on both. Add work to these (or a Durable
-  Object alarm), never new Cron Triggers: ones registered since October 2026 never ran.
+- **Crons:** even minutes (notices, builders, weather scoring, capacity,
+  the meter's copy), F1's laps on both, run by Runner alarms (`main`,
+  `slow`). Never new Cron Triggers: ones made since October 2026 never ran.
 - **The proxy is the only one adding money:** `eco.js appEntries` takes only
   spending from apps, dated by the Worker; Securities' cash and cost are the
   Worker's (`stock-check.js`).
@@ -317,7 +317,7 @@ A read (`kit proxyJson`) goes down these until one answers:
 | D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data, the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced (§5.3); `gemini_call`: every Gemini call (`gemini-use.js`); `law_day`: the AI caps' counts a day; `gift`, `gift_claim`: the giveaway (`gift.js`); `beats`: each job's last run and failures (`ops.js`); `meter`: Google's and TDX's counts a month (`transit.js`) |
 | R2 `orbit-data` | `DATA` | Public: the builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `station/`, `where.json`), the proxy's kept reads (`mirror/`). Never served: `private/` (nightly backups `private/store/<day>.jsonl.gz`, Firestore's last copy) |
 | KV | `RATE_LIMIT_KV` | Counters (sign-ins, per-address limits); the guard's state, pace and alerts (`guard:*`); push's devices, prefs and due notices (`push:*`); Google Weather's shared cells and its calls a day (`weather:g:*`, `weather:google:<day>`); TDX's last good reads (`tdx:warm:*`); the meter's copy (`transit:use:<month>`); Law's kept plans and answers (`law:*`); the showcase's passes a day (`showcase:passes:*`); the door's state (`door:state`); `ops:data-folders` |
-| Durable Objects | `F1_LOG`, `DOOR`, `CLOCK` | `F1Log`: F1's laps as they're driven; `Door`: seats and the line; `GuardClock`: the guard's alarm |
+| Durable Objects | `F1_LOG`, `DOOR`, `RUNNER`, `CLOCK` | `F1Log`: F1's laps; `Door`: seats and the line; `Runner` (`runner.js`): heavy routes, crons by alarm, relays past 40 outside calls; `GuardClock`: the guard's alarm |
 | Edge cache | (Cache API) | The data proxy's answers by tier (§4.1), `/sports-today`, TDX's reads and routes (`transit.js`), the weather blend's cells (`weather.js`), `/law-live`, `/law-page`, `/config` |
 | Services | `GEMINI_RELAY`, `LAW_SITE`, `GUARD` | The relay; Orbit Law's site (its data, read by the proxy); the guard's `/errors` |
 
@@ -431,7 +431,6 @@ can be turned off on its own.
   tells the owner at 50/75/90% (`ops.js`), and at 90% turns the proxy off
   until the next period. Google: Maps stops at 90% of each SKU's free
   month, Weather under 8,500 a month (`googleDayCap`).
-- **Each toml caps CPU** (`[limits]`) and samples logs.
 
 ## 10. Deploying, secrets and the domain
 

@@ -66,6 +66,7 @@ export { F1Log } from './f1-live.js';
 // The door's Durable Object (door.js), bound as DOOR: who gets in when too many come at once.
 export { Door } from './door.js';
 import { doorOf, doorSlow, limitOf, graceShut, fullBody } from './door.js';
+import { makeRunner, runsInRunner, toRunner, tickRunner, partOf } from './runner.js';
 
 // ---- Bilingual error responses ----------------------------------------
 //
@@ -1457,7 +1458,30 @@ export function viaSite(request) {
 export default {
   // A route that throws is still answered with the CORS headers (an app sees
   // a failure it can try again, not a blocked request), and logged.
+  // (A heavy route is answered by the Runner, a Durable Object of this same
+  // Worker: the Free plan's 10 ms a request, runner.js.)
   async fetch(request, env, ctx) {
+    if (env.RUNNER && (env.RUNNER_ROUTES === 'on' || request.headers.has('x-orbit-try-runner')) && runsInRunner(request, new URL(request.url).pathname)) return toRunner(request, env, req => handle(req, env, ctx));
+    return handle(request, env, ctx);
+  },
+
+  // The cron (wrangler.toml [triggers]): the notices that are due (push.js),
+  // F1's laps, the builders and the guard, all run by the Runner's alarms
+  // (runner.js: a cron run gets 10 ms on the Free plan); cronTick below.
+  // Mail to the domain (Email Routing's catch-all, if still on): nobody's
+  // mailbox since Orbit Money's mail-in was removed (2026-10-27).
+  async email(message) {
+    message.setReject('No mailbox here');
+  },
+
+  async scheduled(event, env, ctx) {
+    if (env.RUNNER && env.RUNNER_CRONS === 'on') return tickRunner(event, env, ctx);
+    return cronTick(event, env, ctx, null);
+  }
+};
+
+// The Worker's own answer to a request (in the Worker, or in the Runner).
+async function handle(request, env, ctx) {
     useLawSite(env.LAW_SITE);
     request = viaSite(request);
     const origin = request.headers.get('Origin') || '';
@@ -1473,22 +1497,16 @@ export default {
       countError(env, ctx, request);
       return errorJson('WORKER_FAILED', 500, headers, request);
     }
-  },
+}
 
-  // The cron (wrangler.toml [triggers]): the notices that are due (push.js),
-  // F1's laps, the builders and the guard.
-  // Mail to the domain (Email Routing's catch-all, if still on): nobody's
-  // mailbox since Orbit Money's mail-in was removed (2026-10-27).
-  async email(message) {
-    message.setReject('No mailbox here');
-  },
-
-  async scheduled(event, env, ctx) {
+// One cron tick's work (`part`: the Runner's 'main' or 'slow' share of it,
+// runner.js partOf; null, all of it).
+async function cronTick(event, env, ctx, part) {
     useLawSite(env.LAW_SITE);
     const tick = new Date(event.scheduledTime || Date.now());
     const min = tick.getUTCMinutes();
     // Each job's heartbeat kept (ops.js: the admin panel's 系統); a failure logged.
-    const run = (job, fn, log = r => r) => ctx.waitUntil(beat(env, job, fn).then(r => (r = log(r)) && console.log(job, JSON.stringify(r))).catch(e => console.log(`${job} failed`, String(e?.message || e))));
+    const run = (job, fn, log = r => r) => (part && partOf(job) !== part ? null : ctx.waitUntil(beat(env, job, fn).then(r => (r = log(r)) && console.log(job, JSON.stringify(r))).catch(e => console.log(`${job} failed`, String(e?.message || e)))));
     // F1's laps while a session runs (sports.js, f1-live.js): every minute of an F1 weekend.
     if (F1_DAYS.has(tick.getUTCDay())) run('f1', () => sportsCron(env, tick.getTime()), () => null);
     // (The bill's pace, pace.js: what can wait waits.)
@@ -1498,7 +1516,7 @@ export default {
     // The bill's guard: its clock woken (started if it isn't); and what the
     // owner should hear of it (ops.js tellOwner: a higher alert, a stop, a new pace).
     if (event.cron !== ODD_CRON && min % 10 === 0) {
-      if (env.GUARD) ctx.waitUntil(env.GUARD.fetch('https://quota-guard/tick').catch(() => {}));
+      if (env.GUARD && part !== 'slow') ctx.waitUntil(env.GUARD.fetch('https://quota-guard/tick').catch(() => {}));
       if (storeReady(env)) run('alerts', () => tellOwner(env, ECO_DEPS), r => (r.news ? r : null));
     }
     // Odd minutes: F1 only (above).
@@ -1521,5 +1539,7 @@ export default {
     if (min === 20 && tick.getUTCHours() % 6 === 0) run('capacity', () => capacityCron(env, ECO_DEPS));
     // R2's folders for the panel's 健康 (ops.js countFolders), every 6 hours (and on the first run after a deploy).
     if (env.DATA && min === 40 && (tick.getUTCHours() % 6 === 0 || !(await env.RATE_LIMIT_KV?.get(FOLDERS_KEY).catch(() => null)))) run('data-folders', () => countFolders(env));
-  }
-};
+}
+
+// The Runner (runner.js): heavy routes and the crons' work, 30 s of CPU each.
+export const Runner = makeRunner(handle, cronTick);
