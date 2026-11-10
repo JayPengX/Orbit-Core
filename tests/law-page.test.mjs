@@ -78,6 +78,8 @@ test('the build key reads a Taiwan-only county site, from Taiwan; nothing else g
   const page = 'https://law.tycg.gov.tw/LawContent.aspx?id=GL000133';
   assert.equal(twOnly(page), true);
   for (const bad of ['https://law.moj.gov.tw/LawContent.aspx?id=1', 'https://law.tycg.gov.tw/Admin.aspx', 'http://law.tycg.gov.tw/LawContent.aspx', 'https://law.tycg.gov.tw:444/LawContent.aspx']) assert.equal(twOnly(bad), false, bad);
+  assert.equal(twOnly('https://bms.ntp.gov.tw/NewTCAV/BillQuery/BillQuery_Form_Context.aspx?BillNO=1'), true, 'a council’s pages too');
+  for (const bad of ['http://www.mlcc.gov.tw/', 'https://www.mlcc.gov.tw:8443/', 'https://user:pw@www.tycc.gov.tw/']) assert.equal(twOnly(bad), false, bad);
   assert.equal(buildKeyOk(KEY, KEY), true);
   assert.equal(buildKeyOk('short', 'short'), false, 'no short secret');
   assert.equal(buildKeyOk('', undefined), false, 'no secret, no door');
