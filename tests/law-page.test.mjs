@@ -121,3 +121,14 @@ test('the build reads a Taiwan-only PDF\u2019s bytes (file=1), passed through, n
   assert.equal((await ask('&file=1')).status, 401, 'no key, no file');
 });
 
+
+test('the build reads a Taiwan-only site’s own JSON and raw page (file=1) as they came; without it, a page is cleaned', async () => {
+  const KEY = 'k'.repeat(32);
+  const env = { LAW_BUILD_KEY: KEY, GEMINI_RELAY: { fetch: async u => (/api/.test(u) ? new Response('[{"a":1}]', { headers: { 'Content-Type': 'application/json; charset=utf-8' } }) : new Response('<p>x</p><script>var api="/api/x"</script>', { headers: { 'Content-Type': 'text/html' } })) } };
+  const ask = (u, q) => handleLawPage(new Request(`https://proxy.test/law-page?v=1&u=${encodeURIComponent(u)}${q}`, { headers: { 'X-Build-Key': KEY } }), env, null, {}, null, async () => new Response('direct'));
+  const j = await ask('https://tccvideo.tcc.gov.tw/api/list', '&file=1');
+  assert.equal(j.headers.get('Content-Type'), 'application/json; charset=utf-8');
+  assert.equal(await j.text(), '[{"a":1}]');
+  assert.match(await (await ask('https://tccvideo.tcc.gov.tw/', '&file=1')).text(), /<script>/, 'its scripts kept for the build');
+  assert.doesNotMatch((await (await ask('https://tccvideo.tcc.gov.tw/', '')).json()).html, /<script>/, 'cleaned without file=1');
+});
