@@ -1332,6 +1332,15 @@ async function route(request, env, ctx, headers, origin) {
     // 問法律's steps timed on real questions, nothing kept read or written (law-chat.js).
     if (check === 'law-chat') return json(await lawChatTimes(env, ctx, headers, lawGemini('law-chat'), new URL(request.url).searchParams.get('try') || ''), 200, headers);
     if (check === 'system') return json(await systemReport(env, ECO_DEPS), 200, headers);
+    // CPU by route from the Workers Logs (guard.js cpuByRoute): what passes the
+    // Free plan's 10 ms a request. ?group= a logs key, ?keys=1 the keys, ?script=, ?hours=.
+    if (check === 'cpu') {
+      if (!env.GUARD) return json({ error: 'no guard' }, 200, headers);
+      const q = new URL(request.url).searchParams;
+      const u = new URL('https://quota-guard/cpu');
+      for (const k of ['group', 'keys', 'script', 'hours']) if (q.get(k)) u.searchParams.set(k, q.get(k));
+      return new Response(await (await env.GUARD.fetch(u.toString())).text(), { status: 200, headers: { ...headers, 'Content-Type': 'application/json' } });
+    }
     // The admin panel's 容量 (capacity.js): people (counts only), every quota
     // and how many people it holds.
     if (check === 'capacity') return json(await ADMIN_TOOLS.capacity({ env, deps: ECO_DEPS }), 200, headers);

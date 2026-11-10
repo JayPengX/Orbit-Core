@@ -9,7 +9,7 @@
 // proxy's own cron (which runs) wakes it through the service binding GUARD
 // every ten minutes in case it ever stopped, and it keeps running while the
 // guard has the proxy stopped, to start it again in the next period.
-import { guardRun, workerErrors, useByHour } from './guard.js';
+import { guardRun, workerErrors, useByHour, cpuByRoute } from './guard.js';
 
 const EVERY = 5 * 60_000;
 const next = now => Math.floor(now / EVERY) * EVERY + EVERY;
@@ -54,6 +54,13 @@ export default {
         r => Response.json(r),
         e => Response.json({ error: String(e?.message || e).slice(0, 200) })
       );
+    if (path === '/cpu') {
+      const q = new URL(request.url).searchParams;
+      return cpuByRoute(env, { hours: Number(q.get('hours')) || 24, group: q.get('group') || '', keys: q.get('keys') === '1', script: q.get('script') || '' }).then(
+        r => Response.json(r),
+        e => Response.json({ error: String(e?.message || e).slice(0, 300) })
+      );
+    }
     if (path !== '/tick') return new Response('', { status: 404 });
     return env.CLOCK.get(env.CLOCK.idFromName('clock')).fetch('https://clock/');
   },

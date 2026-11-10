@@ -603,3 +603,57 @@ export async function useByHour(env, { fetcher = fetch, now = Date.now(), kv = e
   await kv?.put(HOURS_KEY, JSON.stringify(out)).catch(() => {});
   return out;
 }
+
+// CPU by route (the Workers Logs, sampled): which requests and crons would
+// pass the Workers Free plan's 10 ms a request (2026-11-13 on). `group` is
+// the logs' key to group by (default the request's path); `keys=1` lists
+// the logs' keys instead. Asked by the proxy's /ops?check=cpu (build.yml).
+export async function cpuByRoute(env, { fetcher = fetch, now = Date.now(), hours = 24, group = '', keys = false, script = '' } = {}) {
+  if (!env.CF_GUARD_TOKEN) return { off: true };
+  const state = JSON.parse((await env.RATE_LIMIT_KV?.get(STATE_KEY).catch(() => null)) || 'null') || {};
+  const a = env.CF_ACCOUNT_ID || state.account || (await accountOf(env, fetcher));
+  const from = now - Math.min(72, Math.max(1, hours)) * 3_600_000;
+  const call = (path, body) =>
+    fetcher(`${API}/accounts/${a}/workers/observability/telemetry/${path}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.CF_GUARD_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(async r => {
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.success) throw new Error(`logs ${r.status}: ${(j?.errors || []).map(e => e.message).join('; ').slice(0, 300)}`);
+      return j.result;
+    });
+  if (keys) {
+    const r = await call('keys', { timeframe: { from, to: now }, limit: 500 });
+    return { keys: (Array.isArray(r) ? r : r?.keys || []).map(k => k.key || k).filter(k => /request|path|url|cron|event|cpu|wall|outcome|script|entry/i.test(String(k))) };
+  }
+  const by = group || '$workers.event.request.path';
+  const r = await call('query', {
+    queryId: 'orbit-cpu-routes',
+    timeframe: { from, to: now },
+    view: 'calculations',
+    limit: 200,
+    parameters: {
+      calculations: [
+        { operator: 'count', alias: 'n' },
+        { operator: 'p50', key: '$workers.cpuTimeMs', keyType: 'number', alias: 'p50' },
+        { operator: 'p90', key: '$workers.cpuTimeMs', keyType: 'number', alias: 'p90' },
+        { operator: 'p99', key: '$workers.cpuTimeMs', keyType: 'number', alias: 'p99' },
+        { operator: 'max', key: '$workers.cpuTimeMs', keyType: 'number', alias: 'max' }
+      ],
+      filters: [{ key: '$workers.scriptName', operation: 'eq', type: 'string', value: script || WORKERS[0] }],
+      groupBys: [{ type: 'string', value: by }],
+      limit: 200
+    }
+  });
+  const rows = new Map();
+  for (const c of r?.calculations || []) {
+    for (const g of c.aggregates || []) {
+      const k = String(g.groups?.[0]?.value ?? g.groupKey ?? '');
+      const row = rows.get(k) || { route: k };
+      row[c.alias] = c.alias === 'n' ? Number(g.value ?? g.count) || 0 : Math.round((Number(g.value) || 0) * 10) / 10;
+      rows.set(k, row);
+    }
+  }
+  return { from, to: now, by, script: script || WORKERS[0], rows: [...rows.values()].sort((x, y) => (y.p90 || 0) - (x.p90 || 0)) };
+}
