@@ -184,7 +184,8 @@ async function hcAsk(fetchFn, path, body) {
 const kept = new Map(); // key → { at, val }
 const unknown = new Map(); // a stop id the site said it doesn't know → when
 const going = new Map();
-async function held(key, fresh, keep, load, now) {
+// (A source slower than `slow` ms with a last answer still kept: that one now, the new one for the next ask.)
+async function held(key, fresh, keep, load, now, slow = 1500) {
   const k = kept.get(key);
   if (k && now - k.at < fresh) return k;
   if (!going.has(key))
@@ -201,7 +202,18 @@ async function held(key, fresh, keep, load, now) {
         .finally(() => going.delete(key))
     );
   try {
-    return await going.get(key);
+    const job = going.get(key);
+    if (k && now - k.at < keep) {
+      const late = Symbol('late');
+      let timer;
+      const got = await Promise.race([job, new Promise(r => (timer = setTimeout(r, slow, late)))]).finally(() => clearTimeout(timer));
+      if (got === late) {
+        job.catch(() => {});
+        return k;
+      }
+      return got;
+    }
+    return await job;
   } catch (err) {
     if (k && now - k.at < keep) return k;
     throw err;
@@ -298,7 +310,7 @@ async function hcRouteRows(route, deps) {
       for (const s of got.val?.[way] || []) {
         const r = hcRoute(s.routeId);
         if (!r || !s.stop_id) continue;
-        rows.push({ StopUID: r.pre + s.stop_id, StopID: String(s.stop_id), RouteUID: r.route, SubRouteUID: r.sub, RouteName: { Zh_tw: routeName(s.routeNo, r.sub), En: routeName(s.routeNo, r.sub) }, Direction: r.dir, ...hcTime(s.time?.[0], deps.now), PlateNumb: s.car_no || '', DataTime: twNow(got.at) });
+        rows.push({ StopUID: r.pre + s.stop_id, StopID: String(s.stop_id), StopName: { Zh_tw: s.name || '', En: s.name_en || s.name || '' }, RouteUID: r.route, SubRouteUID: r.sub, RouteName: { Zh_tw: routeName(s.routeNo, r.sub), En: routeName(s.routeNo, r.sub) }, Direction: r.dir, ...hcTime(s.time?.[0], deps.now), PlateNumb: s.car_no || '', DataTime: twNow(got.at) });
       }
     }
   }
@@ -324,16 +336,132 @@ async function hcGps(route, deps) {
   return { rows, at };
 }
 
+// ---- 臺北's and 新北's buses: the cities' own open data ------------------------------------
+//
+// 臺北市's every stop's next bus in one file (tcgbusfs: GetEstimateTime.gz,
+// 160 KB gzipped, 2 MB; its buses' places in GetBusData.gz), 新北市's on its
+// open data (a CSV, 630 KB); no key. Their ids are TDX's without the prefix
+// (TPE, NWT). Route names, stop names and a stop's way come from Orbit's own
+// bus packs (R2 bus/<city>.json, built weekly), as the phone has them.
+export const CITY_FEEDS = {
+  Taipei: { pre: 'TPE', eta: 'https://tcgbusfs.blob.core.windows.net/blobbus/GetEstimateTime.gz', bus: 'https://tcgbusfs.blob.core.windows.net/blobbus/GetBusData.gz', fresh: 20_000 },
+  NewTaipei: { pre: 'NWT', eta: 'https://data.ntpc.gov.tw/api/datasets/07f7ccb3-ed00-43c4-966d-08e9dab24e95/csv/file', fresh: 30_000 }
+};
+const CITY_KEEP = 3 * MIN;
+
+// A body that may be a .gz file (served as is, no Content-Encoding) → its text.
+async function bodyText(res) {
+  const buf = new Uint8Array(await res.arrayBuffer());
+  if (buf[0] === 0x1f && buf[1] === 0x8b) return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+  return new TextDecoder().decode(buf);
+}
+
+// Orbit's pack for a city → { route: Map(uid → name), stop: Map(uid → [zh]), ways: Map(stopUID@routeUID → [dir…]) }.
+async function cityPack(city, deps) {
+  if (!deps.env?.DATA) return null;
+  const got = await held(`pack:${city}`, 6 * 3_600_000, 14 * 86_400_000, async () => {
+    const o = await deps.env.DATA.get(`bus/${city}.json`);
+    if (!o) throw new Error(`no pack ${city}`);
+    const j = await o.json();
+    const route = new Map();
+    const ways = new Map();
+    const sub = new Map(); // (a way's id → its route's: GetBusData names a bus's way)
+    for (const r of j.routes || []) {
+      route.set(r.uid, r.name);
+      for (const [w] of r.ways || []) sub.set(w, r.uid);
+      for (const [, , dir, stops] of r.ways || []) for (const st of stops || []) {
+        const k = `${st}@${r.uid}`;
+        const d = ways.get(k) || [];
+        if (!d.includes(dir)) ways.set(k, [...d, dir]);
+      }
+    }
+    const stop = new Map(Object.entries(j.stops || {}).map(([k, v]) => [k, v?.[0] || '']));
+    return { route, stop, ways, sub };
+  }, deps.now);
+  return got.val;
+}
+
+// -1 尚未發車, -2 交管不停靠, -3 末班車已過, -4 今日未營運 (both cities' own words) → TDX's StopStatus.
+const SAID = { '-1': 1, '-2': 2, '-3': 3, '-4': 4 };
+function cityRows(city, list, at, pack) {
+  const { pre } = CITY_FEEDS[city];
+  const byStop = new Map();
+  const byRoute = new Map();
+  const data = twNow(at);
+  for (const x of list) {
+    const sid = String(x.StopID ?? x.stopid ?? '');
+    const rid = String(x.RouteID ?? x.routeid ?? '');
+    if (!sid || !rid) continue;
+    const stopUID = pre + sid;
+    const routeUID = pre + rid;
+    const est = Number(x.EstimateTime ?? x.estimatetime);
+    const gb = String(x.GoBack ?? x.goback ?? '');
+    // (A way the feed doesn't say, a bus not yet out or gone: the stop's own ways from the pack, else both.)
+    const dirs = gb === '0' || gb === '1' ? [Number(gb)] : pack?.ways.get(`${stopUID}@${routeUID}`) || [0, 1];
+    const name = pack?.route.get(routeUID) || rid;
+    const stopName = pack?.stop.get(stopUID);
+    for (const d of dirs) {
+      const row = { StopUID: stopUID, StopID: sid, RouteUID: routeUID, RouteID: rid, RouteName: { Zh_tw: name, En: name }, ...(stopName ? { StopName: { Zh_tw: stopName, En: stopName } } : {}), Direction: d, ...(Number.isFinite(est) && est >= 0 ? { StopStatus: 0, EstimateTime: est } : { StopStatus: SAID[String(est)] ?? 1 }), DataTime: data };
+      if (!byStop.has(stopUID)) byStop.set(stopUID, []);
+      byStop.get(stopUID).push(row);
+      if (!byRoute.has(routeUID)) byRoute.set(routeUID, []);
+      byRoute.get(routeUID).push(row);
+    }
+  }
+  return { byStop, byRoute };
+}
+const csvRows = text => {
+  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+  const head = (lines.shift() || '').split(',').map(h => h.trim());
+  return lines.map(l => Object.fromEntries(l.split(',').map((v, i) => [head[i], v.trim()])));
+};
+async function cityEtaIndex(city, deps) {
+  const f = CITY_FEEDS[city];
+  const pack = await cityPack(city, deps).catch(() => null);
+  const got = await held(`eta:${city}`, f.fresh, CITY_KEEP, async () => {
+    const res = await deps.fetchFn(f.eta, { headers: { Accept: '*/*' }, signal: AbortSignal.timeout?.(10_000) });
+    if (!res.ok) throw new Error(`${city} ${res.status}`);
+    const text = await bodyText(res);
+    const list = text.trimStart().startsWith('{') ? JSON.parse(text).BusInfo : text.trimStart().startsWith('[') ? JSON.parse(text) : csvRows(text);
+    if (!Array.isArray(list) || !list.length) throw new Error(`${city}: empty`);
+    return list;
+  }, deps.now);
+  // (Rows made once a read, with the pack as it is then.)
+  if (got.rows?.pack !== pack) got.rows = { pack, ...cityRows(city, got.val, got.at, pack) };
+  return got;
+}
+async function cityGpsList(city, deps) {
+  const f = CITY_FEEDS[city];
+  if (!f.bus) return null;
+  const pack = await cityPack(city, deps).catch(() => null);
+  const got = await held(`bus:${city}`, f.fresh, CITY_KEEP, async () => {
+    const res = await deps.fetchFn(f.bus, { signal: AbortSignal.timeout?.(10_000) });
+    if (!res.ok) throw new Error(`${city} buses ${res.status}`);
+    const list = JSON.parse(await bodyText(res)).BusInfo;
+    if (!Array.isArray(list)) throw new Error(`${city} buses: not a list`);
+    return list.map(b => ({ RouteUID: pack?.sub.get(f.pre + b.RouteID) || f.pre + b.RouteID, SubRouteUID: f.pre + b.RouteID, PlateNumb: b.BusID || '', Direction: Number(b.GoBack) === 1 ? 1 : 0, BusPosition: { PositionLat: Number(b.Latitude), PositionLon: Number(b.Longitude) }, GPSTime: /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(b.DataTime || '') ? `${b.DataTime.replace(' ', 'T')}+08:00` : twNow(deps.now), Speed: Number(b.Speed) || 0, Azimuth: Number(b.Azimuth) || 0 })).filter(b => Number.isFinite(b.BusPosition.PositionLat) && Number.isFinite(b.BusPosition.PositionLon));
+  }, deps.now);
+  return got;
+}
+
 // The cities whose buses a free source reads (TDX's city names).
-export const FREE_BUS = /^(Hsinchu|HsinchuCounty|InterCity)$/;
+export const FREE_BUS = /^(Hsinchu|HsinchuCounty|InterCity|Taipei|NewTaipei)$/;
 const MAX_STOPS = 30;
 const MAX_ROUTES = 12;
 
 // /transit/eta's stops or routes from the free sources → { rows, missing: { stops, routes }, age }.
 // What a source doesn't know (a 公路客運 stop far from 新竹) is left for TDX.
-export async function freeEta(city, { stops = [], routes = [] }, { fetchFn = fetch, now = Date.now() } = {}) {
+export async function freeEta(city, { stops = [], routes = [] }, { fetchFn = fetch, now = Date.now(), env = null } = {}) {
   if (!FREE_BUS.test(city)) return null;
-  const deps = { fetchFn, now };
+  const deps = { fetchFn, now, env };
+  if (CITY_FEEDS[city]) {
+    const got = await cityEtaIndex(city, deps).catch(() => null);
+    if (!got) return { rows: [], missing: { stops, routes }, age: 0 };
+    const rows = [...stops.flatMap(u => got.rows.byStop.get(u) || []), ...routes.flatMap(u => got.rows.byRoute.get(u) || [])];
+    // (Nothing at all of what was asked in a whole city's list: ids not the feed's, TDX's to answer.)
+    if (!rows.length && (stops.length || routes.length) > 0) return { rows: [], missing: { stops, routes }, age: 0 };
+    return { rows, missing: { stops: [], routes: [] }, age: Math.max(0, now - got.at) };
+  }
   const rows = [];
   const missing = { stops: [], routes: [] };
   let oldest = now;
@@ -361,9 +489,15 @@ export async function freeEta(city, { stops = [], routes = [] }, { fetchFn = fet
 }
 
 // /transit/gps's routes → { rows, missing, age }.
-export async function freeGps(city, routes, { fetchFn = fetch, now = Date.now() } = {}) {
+export async function freeGps(city, routes, { fetchFn = fetch, now = Date.now(), env = null } = {}) {
   if (!FREE_BUS.test(city)) return null;
-  const deps = { fetchFn, now };
+  const deps = { fetchFn, now, env };
+  if (CITY_FEEDS[city]) {
+    const got = CITY_FEEDS[city].bus ? await cityGpsList(city, deps).catch(() => null) : null;
+    if (!got) return { rows: [], missing: routes, age: 0 };
+    const want = new Set(routes);
+    return { rows: got.val.filter(b => want.has(b.RouteUID)), missing: [], age: Math.max(0, now - got.at) };
+  }
   const rows = [];
   const missing = [];
   let oldest = now;
@@ -400,4 +534,4 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now() }
 // isolate's 10 ms).
 export const freeHeavy = p => /^(basic|advanced)\/v2\/Bike\//.test(String(p || '').replace(/^\/+/, ''));
 // (A route's whole list of stops, or its buses, from 新竹's site: read in the Runner too.)
-export const freeRoutesHeavy = (path, q) => (path === '/transit/gps' || (path === '/transit/eta' && (q.get('routes') || q.get('route')))) && FREE_BUS.test(q.get('city') || '');
+export const freeRoutesHeavy = (path, q) => (path === '/transit/gps' || (path === '/transit/eta' && (q.get('routes') || q.get('route') || CITY_FEEDS[q.get('city')]))) && FREE_BUS.test(q.get('city') || '');

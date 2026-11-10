@@ -152,3 +152,68 @@ test("a route's whole stops or its buses go to the Runner (新竹's whole routes
   assert.equal(runsInRunner(req('city=InterCity&stops=THB21282'), '/transit/eta'), false);
   assert.equal(runsInRunner(req('city=Taichung&routes=TXG300'), '/transit/gps'), true, 'gps was the Runner\'s already');
 });
+
+// ---- 臺北's and 新北's buses ----
+import { gzipSync } from 'node:zlib';
+import { CITY_FEEDS } from '../transit-free.js';
+const cb = JSON.parse(readFileSync(new URL('./fixtures/city-buses.json', import.meta.url), 'utf8'));
+const cityEnv = { DATA: { get: async k => ({ json: async () => (k === 'bus/Taipei.json' ? cb.tpack : cb.npack) }) }, TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', TDX_PER_MIN: '300' };
+function cityFetch(log, { slow = 0 } = {}) {
+  return async url => {
+    log.push(url);
+    if (url.includes('tdx.transportdata.tw')) return url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : json([]);
+    if (slow) await new Promise(r => setTimeout(r, slow));
+    if (url === CITY_FEEDS.Taipei.eta) return new Response(gzipSync(JSON.stringify(cb.eta)));
+    if (url === CITY_FEEDS.Taipei.bus) return new Response(gzipSync(JSON.stringify(cb.bus)));
+    if (url === CITY_FEEDS.NewTaipei.eta) return new Response(cb.ncsv);
+    return assert.fail(`asked ${url}`);
+  };
+}
+const askCity = async (path, qs, fetchFn, now = NOW2) => {
+  const res = await handleTransit(new Request(`https://w${path}?${qs}`), cityEnv, {}, path, { session: { s: 'S' }, fetchFn, now, cache: null });
+  return { status: res.status, rows: await res.json() };
+};
+
+test("臺北's stops from the city's own file (gzipped): TDX's rows with the pack's names; a way the feed doesn't say, the stop's own from the pack; no TDX", async () => {
+  resetFree();
+  const log = [];
+  const live = cb.eta.BusInfo.find(x => Number(x.EstimateTime) >= 0);
+  const a = await askCity('/transit/eta', `city=Taipei&stops=TPE${live.StopID}`, cityFetch(log));
+  const row = a.rows.find(r => r.RouteUID === 'TPE16111' && r.Direction === Number(live.GoBack));
+  assert.equal(row.EstimateTime, Number(live.EstimateTime));
+  assert.equal(row.RouteName.Zh_tw, '307');
+  assert.ok(!log.some(u => u.includes('tdx')));
+  const odd = cb.eta.BusInfo.at(-1);
+  const b = await askCity('/transit/eta', `city=Taipei&stops=TPE${odd.StopID}`, cityFetch(log));
+  const dirs = cb.tpack.routes[0].ways.filter(w => w[3].includes(`TPE${odd.StopID}`)).map(w => w[2]);
+  assert.deepEqual(b.rows.map(r => r.Direction).sort(), dirs.sort());
+  assert.equal(b.rows[0].StopStatus, 1, '-1: 尚未發車');
+  assert.equal(log.filter(u => u === CITY_FEEDS.Taipei.eta).length, 1, 'the city read once for both');
+});
+
+test("臺北's buses' places by their route (the feed names a way: the pack's route); 新北's stops from its CSV, a way from the pack when it says 3", async () => {
+  resetFree();
+  const log = [];
+  const g = await askCity('/transit/gps', 'city=Taipei&routes=TPE16111', cityFetch(log));
+  assert.equal(g.rows.length, cb.bus.BusInfo.length);
+  assert.ok(g.rows.every(r => r.RouteUID === 'TPE16111' && r.PlateNumb));
+  const n = await askCity('/transit/eta', `city=NewTaipei&stops=${cb.nfirst},${cb.nsecond}`, cityFetch(log));
+  const first = n.rows.find(r => r.StopUID === cb.nfirst);
+  assert.deepEqual([first.Direction, first.EstimateTime, first.RouteName.Zh_tw], [0, 125, '231']);
+  assert.equal(n.rows.find(r => r.StopUID === cb.nsecond).StopStatus, 3);
+  assert.ok(!log.some(u => u.includes('tdx')));
+});
+
+test("a city's feed slow: its last list at once (1.5 s), the new one for the next ask; ids the feed doesn't have at all: TDX's", async () => {
+  resetFree();
+  const log = [];
+  await askCity('/transit/eta', `city=NewTaipei&stops=${cb.nfirst}`, cityFetch(log));
+  const t = Date.now();
+  const again = await askCity('/transit/eta', `city=NewTaipei&stops=${cb.nfirst}`, cityFetch(log, { slow: 2500 }), NOW2 + 40_000);
+  assert.ok(Date.now() - t < 2200, 'not held for the slow read');
+  assert.equal(again.rows.length, 1);
+  log.length = 0;
+  await askCity('/transit/eta', 'city=NewTaipei&stops=NWT1', cityFetch(log), NOW2 + 45_000);
+  assert.ok(log.some(u => u.includes('tdx') && u.includes('NWT1')));
+  assert.equal(runsInRunner(new Request('https://w/transit/eta?city=Taipei&stops=TPE1'), '/transit/eta'), true, "a whole city's file read in the Runner");
+});
