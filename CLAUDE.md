@@ -196,7 +196,7 @@ w;dur=` (the Worker's own time), noted by the 除錯紀錄 when slow.
 | `/eco` | `eco.js`, `eco-admin.js`, `money.js`, `passkey.js`, `webauthn.js`, `orbit-token.js` | The Pass (§6); `op: 'admin'` is the owner's panel |
 | `/stock` | `stock-fill.js`, `stock-check.js` | Securities' fills at the proxy's own quote; the account replayed on each save |
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
-| `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations), first hours by a station (`anchorHours`), the township, scored hourly (`/weather/skill`); during a typhoon warning (NCDR's CAP feed), `dayOff`: each county's 停班停課 from 人事行政總處, else a chance fitted to past decisions, all 22 every 3 minutes |
+| `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations), the township, scored hourly (`/weather/skill`); during a typhoon warning (NCDR's CAP feed), `dayOff`: each county's 停班停課 from 人事行政總處, else a chance fitted to past decisions, all 22 every 3 minutes |
 | `/transit/…` | `transit.js` | TDX (allowlist `TDX_RULES`; trains trimmed, `tdxTrim`), bus places (`gps`), map config, search, place, route, walk; `/transit/status?sample=` (a session or dev door) |
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `f1-people.js`, `fund-nav.js`, `taifex.js` | The data proxy (§4.1): sports, quotes, F1, Asian baseball, SITCA's fund NAVs, TAIFEX |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
@@ -206,6 +206,7 @@ w;dur=` (the Worker's own time), noted by the 除錯紀錄 when slow.
 | `/law-page` | `law-page.js`, `law-hosts.js` | A government page (gov.tw, www.edu.tw) read inside Orbit Law, cleaned, in its own charset (or a PDF's size); Cloudflare's cache only; Taiwan-only county sites through the Taiwan relay (`law-hosts.js`); 500 fresh reads a day a Pass |
 | `/law-live` | `law-live.js` | What 立法院's IVOD streams now (`{at, rooms}`), read on demand, 60 s at the edge, the last good read kept 30 minutes; our pages only, no Pass |
 | `/money-read` | `money-read.js` | Orbit Money's 拍照記帳: one picture → `{ buys, left }`, read by Gemini (Flash-Lite, through the relay) and checked; only on a tap; 30 a day a Pass, 300 in all |
+| `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |
 | `/flight` | `flight.js`, `kit/flight.mjs` | Orbit Class's 專注飛行: real planes landing in about N minutes, then one followed |
 | `/gift` | `gift.js` | 公開領取 at `/key/` (`site/key/`), set in the admin panel; one a device (a cookie, D1 `gift_claim`), `op: 'go'` a `#qh=` into an app; unreplaced passes back after `hold` hours; empty ones (wallet `gift`) cleared nightly if on |
 | `/showcase/pass` | `showcase.js` | The showcase's short pass for its live demos: reads only, per-address and daily caps, from the showcase's address only |
@@ -316,7 +317,7 @@ A read (`kit proxyJson`) goes down these until one answers:
 | --- | --- | --- |
 | D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data, the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced (§5.3); `gemini_call`: every Gemini call (`gemini-use.js`); `law_day`: the AI caps' counts a day; `gift`, `gift_claim`: the giveaway (`gift.js`); `beats`: each job's last run and failures (`ops.js`); `meter`: Google's and TDX's counts a month (`transit.js`) |
 | R2 `orbit-data` | `DATA` | Public: the builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `station/`, `where.json`), the proxy's kept reads (`mirror/`). Never served: `private/` (nightly backups `private/store/<day>.jsonl.gz`, Firestore's last copy) |
-| KV | `RATE_LIMIT_KV` | Counters (sign-ins, per-address limits); the guard's state, pace and alerts (`guard:*`); push's devices, prefs and due notices (`push:*`); Google Weather's shared cells and its calls a day (`weather:g:*`, `weather:google:<day>`); TDX's last good reads (`tdx:warm:*`); the meter's copy (`transit:use:<month>`); Law's kept plans and answers (`law:*`); the showcase's passes a day (`showcase:passes:*`); the door's state (`door:state`); `ops:data-folders` |
+| KV | `RATE_LIMIT_KV` | Counters (sign-ins, per-address limits); the guard's state, pace and alerts (`guard:*`); push's devices, prefs and due notices (`push:*`); Google Weather's cells and calls a day (`weather:g:*`, `weather:google:<day>`); TDX's last good reads (`tdx:warm:*`); the meter's copy (`transit:use:<month>`); Law's kept plans and answers (`law:*`); the showcase's passes a day (`showcase:passes:*`); the door's state (`door:state`); `ops:data-folders` |
 | Durable Objects | `F1_LOG`, `DOOR`, `RUNNER`, `CLOCK` | `F1Log`: F1's laps; `Door`: seats and the line; `Runner` (`runner.js`): heavy routes, crons by alarm, relays past 40 outside calls; `GuardClock`: the guard's alarm |
 | Edge cache | (Cache API) | The data proxy's answers by tier (§4.1), `/sports-today`, TDX's reads and routes (`transit.js`), the weather blend's cells (`weather.js`), `/law-live`, `/law-page`, `/config` |
 | Services | `GEMINI_RELAY`, `LAW_SITE`, `GUARD` | The relay; Orbit Law's site (its data, read by the proxy); the guard's `/errors` |
@@ -455,8 +456,7 @@ can be turned off on its own.
   `SHORT` in `kit/brand.mjs`; one origin, so one Pass sign-in), `orbit-pass`
   for `/`, `/pass/`, `/key/`, `/Orbit-Core/` and the old `/Shared-Proxy/`,
   `orbit-home` for `<DOMAIN>/` (Orbit-Showcase: Jay's homepage, `/showcase/`).
-  Plain static paths (`/law` → `/law/`). Mail to
-  `*@<DOMAIN>` reaches the proxy by Email Routing's catch-all. `deploy.yml`
+  Plain static paths (`/law` → `/law/`). Mail is refused. `deploy.yml`
   attaches the hostnames (its token needs the zone and D1 Edit); the guard
   takes them off with the proxy.
 
