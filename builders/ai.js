@@ -12,12 +12,15 @@
 //            two examples and a memory hook a word, by its first letter (a
 //            word's sheet reads one small file), the whole list made once, a
 //            few batches a run until done (kept whole in private/ai/words-cards.json).
+//   sides    news/sides.json   { built, sides: { id: { sides: { g: { zh, en }… }, diff, m, at } } }
+//            各方怎麼說: how each side's outlets framed the day's top stories.
 //   sports   sports/recaps/<YYYY-MM-DD>.json  { built, games: { espnId: { line } } }
 //            賽後三句話's "why" line for each finished game (builders/recaps.js).
 // Lean input (Jay 11-10): code picks and trims the facts before any call.
 import { aiOnce } from '../ai.js';
 import { runRecaps } from './recaps.js';
 import { runF1Stories } from './f1story.js';
+import { sideOf } from '../kit/news-outlets.mjs';
 
 const NEWS_LINES = 'news/lines.json';
 export const WORDS_CARDS = 'private/ai/words-cards.json';
@@ -65,6 +68,56 @@ export async function newsLines({ store, env, ctx, cap, until }) {
   // (An old line kept for a story still on the front that this run couldn't reach.)
   for (const s of need) if (!keep[s.id] && was[s.id]) keep[s.id] = was[s.id];
   await store.put(NEWS_LINES, { built: Date.now(), lines: keep });
+  return { made, calls, kept: Object.keys(keep).length };
+}
+
+// ---- News: 各方怎麼說, how each side framed a story ----
+// The day's top stories that sides take (politics, cross-strait, world, defence, law; both ends
+// carrying it), each told once and again only when its coverage has doubled
+// and 6 hours have passed (Sonnet's: kept few on purpose).
+const NEWS_SIDES = 'news/sides.json';
+export const SIDES_TOP = { tw: 8, intl: 4 };
+const SIDES_BATCH = 4;
+// (The topics sides frame: a company's revenue or a typhoon reads the same from both ends.)
+const FRAMED = new Set(['pol', 'cs', 'world', 'def', 'law']);
+const ENDS = { tw: ['g', 'b'], intl: ['l', 'r'] };
+export const sidesWanted = (s, region) => (s.topics || []).some(t => FRAMED.has(t)) && ENDS[region].every(k => (s.sides?.[k] || 0) > 0);
+// A story as the AI is told it: each side's headlines, four outlets at most a side.
+export function sideFacts(s, region) {
+  const sides = {};
+  const seen = new Set();
+  for (const [outlet, title] of s.items || []) {
+    const k = sideOf(outlet, region);
+    if (!k || seen.has(outlet) || (sides[k] ||= []).length >= 4) continue;
+    seen.add(outlet);
+    sides[k].push(String(title).slice(0, 90));
+  }
+  for (const k of Object.keys(sides)) if (!sides[k].length) delete sides[k];
+  return { id: s.id, region, sides };
+}
+export async function newsSides({ store, env, ctx, cap, until, now = Date.now() }) {
+  const index = await store.json('news/index.json');
+  if (!index) return { skipped: 'no index' };
+  const was = (await store.json(NEWS_SIDES))?.sides || {};
+  const front = ['tw', 'intl'].flatMap(r => (index[r] || []).filter(s => sidesWanted(s, r)).slice(0, SIDES_TOP[r]).map(s => [s, r]));
+  const keep = {};
+  const need = [];
+  for (const [s, r] of front) {
+    const old = was[s.id];
+    if (old && ((s.m || 0) < (old.m || 0) * 2 || now - (old.at || 0) < 6 * 3_600_000)) keep[s.id] = old;
+    else need.push([s, r]);
+  }
+  let made = 0, calls = 0;
+  for (let i = 0; i < need.length && Date.now() < until; i += SIDES_BATCH) {
+    const batch = need.slice(i, i + SIDES_BATCH);
+    const r = await aiOnce(env, ctx, 'news-sides', { stories: batch.map(([s, reg]) => sideFacts(s, reg)) }, cap);
+    calls++;
+    if (!r) break;
+    if (r.error) continue;
+    for (const [s] of batch) if (r.out[s.id]) (keep[s.id] = { ...r.out[s.id], m: s.m || 0, at: now }), made++;
+  }
+  for (const [s] of need) if (!keep[s.id] && was[s.id]) keep[s.id] = was[s.id];
+  await store.put(NEWS_SIDES, { built: now, sides: keep });
   return { made, calls, kept: Object.keys(keep).length };
 }
 
@@ -118,6 +171,7 @@ export async function runAi({ store, env, proxy, now = Date.now(), cap = async (
     }
   };
   await step('news', 'news-lines', c => newsLines({ store, env, ctx, cap: c, until }));
+  await step('sides', 'news-sides', c => newsSides({ store, env, ctx, cap: c, until, now }));
   await step('sports', 'sports-recap', c => runRecaps({ store, env, ctx, proxy, cap: c, now, until }));
   await step('f1', 'f1-story', c => runF1Stories({ store, env, ctx, proxy, cap: c, now, until }));
   await step('words', 'words-cards', c => wordsCards({ store, env, ctx, cap: c, until }));

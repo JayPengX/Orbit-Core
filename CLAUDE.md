@@ -374,7 +374,7 @@ writing a file only when it changed (`builders/store.js`):
 | `f1kept.js` | each finished F1 session's 數據 and laps, kept early (via the proxy) | :06, :26, :46 |
 | `kept.js` | wipes kept copies (`mirror/`) before a league's first askable day | daily 17:00 |
 | `news.js`, `news-words.js`, `news-laws.js` | `news/index.json` (3 days), `past.json` (weeks): stories by weight, topic, side, Taiwan's on the world's; `laws.json`: laws named | every 10 min |
-| `ai.js`, `recaps.js`, `f1story.js` | AI made once: `news/lines.json`, `words/cards/<a…z>.json`, `sports/recaps/<day>.json`, `sports/f1/stories/` | :04 :24 :34 :54 |
+| `ai.js`, `recaps.js`, `f1story.js` | AI made once: `news/lines.json`, `sides.json`, `words/cards/<a…z>.json`, `sports/recaps/<day>.json`, `sports/f1/stories/` | :04 :24 :34 :54 |
 
 A season is kept until the next one's first game. `private/` is never served.
 
