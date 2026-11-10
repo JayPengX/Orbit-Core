@@ -81,6 +81,7 @@ export const PLAN = {
   kvList: 1_000_000,
   kvBytes: 1_000_000_000,
   doRequests: 1_000_000,
+  doDuration: 400_000,
   doBytes: 5_000_000_000,
   r2ClassA: 1_000_000,
   r2ClassB: 10_000_000,
@@ -94,8 +95,8 @@ export const PLAN = {
 // amounts are a UTC day's, reset at 00:00 UTC, and past one Cloudflare
 // refuses that kind of call (nothing is ever billed). CPU has no daily sum,
 // only 10 ms a request (runner.js). R2 keeps its own month (a thirtieth a
-// day here). Durable Objects: 100,000 requests a day (their 13,000 GB-s
-// aren't in analytics' counts). So on Free the period is the UTC day, the
+// day here). Durable Objects: 100,000 requests a day and 13,000 GB-s
+// (their active time, durableObjectsPeriodicGroups). So on Free the period is the UTC day, the
 // pace works as before on these amounts, nothing is ever stopped (a stop
 // saves no money), and the owner hears only of 90%.
 export const FREE_PLAN = {
@@ -107,6 +108,7 @@ export const FREE_PLAN = {
   kvList: 1_000,
   kvBytes: 1_000_000_000,
   doRequests: 100_000,
+  doDuration: 13_000,
   doBytes: 5_000_000_000,
   r2ClassA: 33_000,
   r2ClassB: 330_000,
@@ -185,6 +187,8 @@ const WORKERS_Q = cpu => `query($a: string!, $s: Time!, $e: Time!) { viewer { ac
 const PART_Q = {
   kv: `query($a: string!, $ds: Date!, $de: Date!) { viewer { accounts(filter: { accountTag: $a }) { x: kvOperationsAdaptiveGroups(limit: 10000, filter: { date_geq: $ds, date_leq: $de }) { sum { requests } dimensions { actionType } } } } }`,
   do: `query($a: string!, $ds: Date!, $de: Date!) { viewer { accounts(filter: { accountTag: $a }) { x: durableObjectsInvocationsAdaptiveGroups(limit: 10000, filter: { date_geq: $ds, date_leq: $de }) { sum { requests } } } } }`,
+  // Durable Objects' duration in GB-s: their active time (µs) × 128 MB (the Free plan's 13,000 a day).
+  dodur: `query($a: string!, $ds: Date!, $de: Date!) { viewer { accounts(filter: { accountTag: $a }) { x: durableObjectsPeriodicGroups(limit: 10000, filter: { date_geq: $ds, date_leq: $de }) { sum { activeTime } } } } }`,
   r2: `query($a: string!, $s: Time!, $e: Time!) { viewer { accounts(filter: { accountTag: $a }) { x: r2OperationsAdaptiveGroups(limit: 10000, filter: { datetime_geq: $s, datetime_leq: $e }) { sum { requests } dimensions { actionType } } } } }`,
   d1: `query($a: string!, $ds: Date!, $de: Date!) { viewer { accounts(filter: { accountTag: $a }) { x: d1AnalyticsAdaptiveGroups(limit: 10000, filter: { date_geq: $ds, date_leq: $de }) { sum { rowsRead rowsWritten } } } } }`
 };
@@ -217,7 +221,7 @@ async function graphql(env, fetcher, query, variables) {
 // is the sum of each invocation's own (`cpuTimeUs`); where the API lacks it,
 // each Worker's requests × its 99th-percentile CPU (more than it was).
 export async function readUse(env, fetcher, now, p = period(now, Number(env.PERIOD_DAY) || 1)) {
-  const use = { requests: 0, cpuMs: 0, kvRead: 0, kvWrite: 0, kvDelete: 0, kvList: 0, kvBytes: 0, doRequests: 0, doBytes: 0, r2ClassA: 0, r2ClassB: 0, r2Bytes: 0, d1RowsRead: 0, d1RowsWritten: 0, d1Bytes: 0 };
+  const use = { requests: 0, cpuMs: 0, kvRead: 0, kvWrite: 0, kvDelete: 0, kvList: 0, kvBytes: 0, doRequests: 0, doDuration: 0, doBytes: 0, r2ClassA: 0, r2ClassB: 0, r2Bytes: 0, d1RowsRead: 0, d1RowsWritten: 0, d1Bytes: 0 };
   const partial = {};
   let cpuWay = 'sum';
   const add = {
@@ -228,6 +232,7 @@ export async function readUse(env, fetcher, now, p = period(now, Number(env.PERI
       }
     },
     do: rows => rows.forEach(r => (use.doRequests += r.sum?.requests || 0)),
+    dodur: rows => rows.forEach(r => (use.doDuration += ((r.sum?.activeTime || 0) / 1e6) * 0.128)),
     r2: rows => {
       for (const r of rows) {
         const t = r.dimensions?.actionType;
@@ -284,6 +289,7 @@ export async function readUse(env, fetcher, now, p = period(now, Number(env.PERI
     }
   }
   use.cpuMs = Math.round(use.cpuMs);
+  use.doDuration = Math.round(use.doDuration);
   return { use, period: p, cpuWay, partial };
 }
 
