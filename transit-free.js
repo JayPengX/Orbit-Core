@@ -552,8 +552,8 @@ const EB_FRESH = 20_000;
 const EB_KEEP = 2 * MIN;
 const ebUid = (city, u) => (String(u).startsWith(EBUS[city].pre) && /^\d{1,6}$/.test(String(u).slice(3)) ? String(u).slice(3) : '');
 
-async function ebAsk(city, fetchFn, query, variables) {
-  const res = await fetchFn(EBUS[city].gql, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(variables ? { query, variables } : { query }), signal: AbortSignal.timeout?.(8000) });
+async function ebAsk(city, fetchFn, query, variables, ms = 8000) {
+  const res = await fetchFn(EBUS[city].gql, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(variables ? { query, variables } : { query }), signal: AbortSignal.timeout?.(ms) });
   if (!res.ok) throw new Error(`${city} ${res.status}`);
   const j = await res.json();
   if (!j?.data) throw new Error(`${city}: ${String(j?.errors?.[0]?.message || 'no data').slice(0, 80)}`);
@@ -1634,6 +1634,70 @@ async function metroAlertFree(path, q, { fetchFn, now }) {
   return answer ? { status: 200, body: JSON.stringify(answer), age: Math.max(0, now - page.at), state: 'free' } : null;
 }
 
+// ---- 臺中's bus notices --------------------------------------------------------------------
+
+// TDX's Bus Alert of 臺中 (a row a message and route: 臨時站位, 改道…) from
+// 臺中's own EBUS: each route's clogMessages, TDX's ids and words (2026-11-10:
+// 106 of TDX's 110, the other 4 on retired routes the pack hasn't), every
+// route of the pack asked, 100 a POST (~3–5 s each, at once), in the Runner,
+// kept 10 minutes; a row a message here, its routes in its Scope. Its News:
+// the site's own 最新消息 (blogs, those on the shelf today: TDX's set, and the
+// day's new ones before TDX has them).
+const EB_NOTICE = /^basic\/v2\/Bus\/(Alert|News)\/City\/(Taichung)$/;
+export const EB_BLOG = 'https://citybus.taichung.gov.tw/ebus/blog/';
+const EB_DEPT = { Taichung: '臺中市政府交通局' };
+const EB_ALERT_AT_ONCE = 100;
+// clogMessages answers by route (`r<xno>`) → TDX's Alert rows, a message once with every route it's on.
+export function ebAlerts(d, names, city, at) {
+  const by = new Map();
+  for (const [k, v] of Object.entries(d || {})) {
+    const xno = k.slice(1);
+    for (const { node: n } of v?.edges || []) {
+      if (!n?.id || !(n.title || n.description)) continue;
+      if (!by.has(n.id)) by.set(n.id, { AlertID: String(n.id), Title: String(n.title || '').trim(), Description: String(n.description || '').trim(), Department: EB_DEPT[city], Status: 2, Scope: { Routes: [] }, UpdateTime: twNow(at) });
+      const r = by.get(n.id).Scope.Routes;
+      if (!r.some(x => x.RouteID === xno)) r.push({ RouteID: xno, RouteName: { Zh_tw: names.get(xno) || xno } });
+    }
+  }
+  return [...by.values()];
+}
+// The site's blogs → TDX's News rows, those on the shelf on `day` (YYYY-MM-DD).
+export function ebNews(edges, city, day, at) {
+  return (edges || [])
+    .map(e => e?.node)
+    .filter(n => n?.id && n.title && (!n.onShelfAt || n.onShelfAt <= day) && (!n.offShelfAt || n.offShelfAt >= day))
+    .map(n => {
+      const text = String(n.content || '').replace(/<br\s*\/?>|<\/p>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\n\s*\n+/g, '\n').trim();
+      return { NewsID: n.id, Title: String(n.title).trim(), Description: text || String(n.title).trim(), NewsCategory: 1, Department: EB_DEPT[city], NewsURL: `${EB_BLOG}${n.id}`, PublishTime: n.createdAt ? twNow(Date.parse(n.createdAt)) : undefined, StartTime: n.onShelfAt ? `${n.onShelfAt}T00:00:00+08:00` : undefined, EndTime: n.offShelfAt ? `${n.offShelfAt}T00:00:00+08:00` : undefined, UpdateTime: twNow(at) };
+    });
+}
+async function ebNoticeFree(path, q, { fetchFn, env, now }) {
+  const m = EB_NOTICE.exec(path);
+  if (!m) return undefined;
+  if ([...q.keys()].some(k => k !== '$format')) return null;
+  const [, kind, city] = m;
+  if (kind === 'News') {
+    const got = await held(`eb:${city}:news`, 10 * MIN, 6 * HOUR, async () => {
+      const d = await ebAsk(city, fetchFn, 'query { blogs(first: 60) { edges { node { id title content onShelfAt offShelfAt createdAt } } } }');
+      if (!Array.isArray(d.blogs?.edges)) throw new Error(`${city} news: not a list`);
+      return d.blogs.edges;
+    }, now, 3000);
+    return { status: 200, body: JSON.stringify(ebNews(got.val, city, twNow(now).slice(0, 10), got.at)), age: Math.max(0, now - got.at), state: 'free' };
+  }
+  const pack = await cityPack(city, { env, now }).catch(() => null);
+  if (!pack) return null;
+  const names = new Map([...pack.route].filter(([u]) => ebUid(city, u)).map(([u, n]) => [ebUid(city, u), n]));
+  const got = await held(`eb:${city}:alerts`, 10 * MIN, 6 * HOUR, async () => {
+    const xs = [...names.keys()];
+    const parts = Array.from({ length: Math.ceil(xs.length / EB_ALERT_AT_ONCE) }, (_, i) => xs.slice(i * EB_ALERT_AT_ONCE, (i + 1) * EB_ALERT_AT_ONCE));
+    // (Four parts or so, at once, as its ETAs are asked; all of them, or TDX's.)
+    const got = await Promise.all(parts.map(part => ebAsk(city, fetchFn, `query { ${part.map(x => `r${x}: clogMessages(xno: ${x}) { edges { node { id title description } } }`).join(' ')} }`, undefined, 15_000)));
+    if (parts.some((part, i) => part.some(x => !Array.isArray(got[i][`r${x}`]?.edges)))) throw new Error(`${city} alerts: a route unanswered`);
+    return Object.assign({}, ...got);
+  }, now, 3000);
+  return { status: 200, body: JSON.stringify(ebAlerts(got.val, names, city, got.at)), age: Math.max(0, now - got.at), state: 'free' };
+}
+
 // ---- A 台鐵 train's delay -----------------------------------------------------------------
 
 // TDX's TrainLiveBoard of one train (`/TrainNo/<n>`) from 台鐵's own 車次查詢
@@ -1945,7 +2009,7 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), 
   const q = new URLSearchParams(query);
   try {
     const p = decodeURIComponent(path);
-    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await trtcFree(p, q, { fetchFn, env, now })) ?? (await krtcFree(p, q, { fetchFn, env, now })) ?? (await tymcFree(p, q, { fetchFn, env, now })) ?? (await traAlertFree(p, q, { fetchFn, now })) ?? (await thsrAlertFree(p, q, { fetchFn, now })) ?? (await metroAlertFree(p, q, { fetchFn, now })) ?? (await tbNoticeFree(p, q, { fetchFn, now })) ?? (await traTrainFree(p, q, { fetchFn, env, now })) ?? (await traBoardFree(p, q, { fetchFn, env, now })) ?? (await traFareFree(p, q, { fetchFn, env, now })) ?? (await thsrFareFree(p, q, { fetchFn, env, now })) ?? (await copiedFree(p, q, { env, now }));
+    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await trtcFree(p, q, { fetchFn, env, now })) ?? (await krtcFree(p, q, { fetchFn, env, now })) ?? (await tymcFree(p, q, { fetchFn, env, now })) ?? (await traAlertFree(p, q, { fetchFn, now })) ?? (await thsrAlertFree(p, q, { fetchFn, now })) ?? (await metroAlertFree(p, q, { fetchFn, now })) ?? (await tbNoticeFree(p, q, { fetchFn, now })) ?? (await ebNoticeFree(p, q, { fetchFn, env, now })) ?? (await traTrainFree(p, q, { fetchFn, env, now })) ?? (await traBoardFree(p, q, { fetchFn, env, now })) ?? (await traFareFree(p, q, { fetchFn, env, now })) ?? (await thsrFareFree(p, q, { fetchFn, env, now })) ?? (await copiedFree(p, q, { env, now }));
     if (got !== undefined) return got;
   } catch (err) {
     console.log('free source failed', path.slice(0, 80), String(err?.message || err).slice(0, 120));
@@ -1956,6 +2020,6 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), 
 // Whether a /transit/tdx ask is one the free sources answer (worker.js sends
 // those to the Runner: a list of all Taiwan read and kept there, not in each
 // isolate's 10 ms).
-export const freeHeavy = p => /^((basic|advanced)\/v2\/Bike\/|basic\/v3\/Rail\/TRA\/(DailyTrainTimetable\/TrainDate|ODFare|StationLiveBoard\/Station)\/|basic\/v2\/Rail\/(THSR\/ODFare|Metro\/Alert)\/|basic\/v2\/Bus\/News\/InterCity$)/.test(String(p || '').replace(/^\/+/, ''));
+export const freeHeavy = p => /^((basic|advanced)\/v2\/Bike\/|basic\/v3\/Rail\/TRA\/(DailyTrainTimetable\/TrainDate|ODFare|StationLiveBoard\/Station)\/|basic\/v2\/Rail\/(THSR\/ODFare|Metro\/Alert)\/|basic\/v2\/Bus\/News\/InterCity$|basic\/v2\/Bus\/Alert\/City\/Taichung$)/.test(String(p || '').replace(/^\/+/, ''));
 // (A route's whole list of stops, or its buses, from 新竹's site: read in the Runner too.)
 export const freeRoutesHeavy = (path, q) => (path === '/transit/gps' || (path === '/transit/eta' && (q.get('routes') || q.get('route') || CITY_FEEDS[q.get('city')] || EBUS[q.get('city')] || TB_CITIES[q.get('city')] || q.get('city') === 'Tainan'))) && FREE_BUS.test(q.get('city') || '');

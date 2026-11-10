@@ -815,6 +815,54 @@ test("a 台鐵 station's board from 台鐵's own 車站時刻 (each way, 準點 
   assert.equal(await freeTdx('basic/v3/Rail/TRA/StationLiveBoard', '', { env, fetchFn, now }), null, 'every station: TDX');
 });
 
+test("臺中's bus notices from its own EBUS: each route's clogMessages as TDX's Alert (a message once, every route it's on), its 最新消息 (blogs on the shelf today) as TDX's News; every route asked, kept 10 minutes; a part unanswered: TDX", async () => {
+  const { ebAlerts, ebNews, EBUS } = await import('../transit-free.js');
+  // (Real words of 2026-11-10: 92 and 95's 中正紀念館 notice, as TDX has it, id and all.)
+  const msg = { id: '404025561', title: '臨時站位', description: '配合大甲區公所辦理大甲區「水源路人行道改善工程」，92路、95路公車將自115年11月7日起臨時取消停靠「中正紀念館」(往東)公車招呼站。' };
+  const other = { id: '399426893', title: '臨時站位', description: '自114年10月25日起「中央市場」(往中清路)將臨時取消停靠。' };
+  const names = new Map([['92', '92'], ['95', '95'], ['300', '300']]);
+  const at = Date.parse('2026-11-10T19:30:00+08:00');
+  const rows = ebAlerts({ r92: { edges: [{ node: msg }] }, r95: { edges: [{ node: msg }, { node: other }] }, r300: { edges: [] } }, names, 'Taichung', at);
+  assert.deepEqual(rows.map(r => [r.AlertID, r.Title, r.Status, r.Scope.Routes.map(x => x.RouteID)]), [['404025561', '臨時站位', 2, ['92', '95']], ['399426893', '臨時站位', 2, ['95']]]);
+  assert.equal(rows[0].Description, msg.description);
+  assert.equal(rows[0].Department, '臺中市政府交通局');
+  const blogs = [
+    { node: { id: '6aed7efad0ba1d001cceacc0', title: '🚧配合大甲區公所辦理…臨時取消停靠「中正紀念館」', content: '<p><br></p><p><img src="x.png"></p>', onShelfAt: '2026-11-06', offShelfAt: '2027-02-01', createdAt: '2026-11-06T07:17:14.900Z' } },
+    { node: { id: 'old', title: '舊的', content: '<p>過了</p>', onShelfAt: '2026-10-01', offShelfAt: '2026-11-09', createdAt: '2026-10-01T00:00:00Z' } },
+    { node: { id: 'soon', title: '還沒上架', content: '', onShelfAt: '2026-11-12', offShelfAt: '2026-12-01', createdAt: '2026-11-10T00:00:00Z' } }
+  ];
+  const news = ebNews(blogs, 'Taichung', '2026-11-10', at);
+  assert.deepEqual(news.map(n => n.NewsID), ['6aed7efad0ba1d001cceacc0'], 'only those on the shelf today');
+  assert.deepEqual([news[0].NewsURL, news[0].PublishTime, news[0].StartTime, news[0].EndTime], ['https://citybus.taichung.gov.tw/ebus/blog/6aed7efad0ba1d001cceacc0', '2026-11-06T15:17:14+08:00', '2026-11-06T00:00:00+08:00', '2027-02-01T00:00:00+08:00'], "TDX's times");
+  assert.equal(news[0].Description, news[0].Title, 'a picture only: its title');
+
+  resetFree();
+  const pack = { routes: [{ uid: 'TXG92', name: '92', ways: [] }, { uid: 'TXG95', name: '95', ways: [] }, { uid: 'TXG300', name: '300', ways: [] }] };
+  const env = { DATA: { get: async k => (k === 'bus/Taichung.json' ? { json: async () => pack } : null) } };
+  const asked = [];
+  let down = false;
+  const fetchFn = async (u, o) => {
+    assert.equal(u, EBUS.Taichung.gql);
+    const q = JSON.parse(o.body).query;
+    asked.push(q.includes('blogs') ? 'blogs' : [...q.matchAll(/clogMessages\(xno: (\d+)\)/g)].map(m => m[1]).join(','));
+    if (down) return new Response('', { status: 502 });
+    if (q.includes('blogs')) return json({ data: { blogs: { edges: blogs } } });
+    return json({ data: { r92: { edges: [{ node: msg }] }, r95: { edges: [{ node: msg }] }, r300: { edges: [] } } });
+  };
+  const now = at;
+  const a = await freeTdx('basic/v2/Bus/Alert/City/Taichung', '', { env, fetchFn, now });
+  assert.equal(a.state, 'free');
+  assert.deepEqual(JSON.parse(a.body).map(r => r.Scope.Routes.map(x => x.RouteID)), [['92', '95']]);
+  await freeTdx('basic/v2/Bus/Alert/City/Taichung', '', { env, fetchFn, now: now + 5 * 60_000 });
+  assert.deepEqual(asked, ['92,95,300'], 'every route in one part; kept 10 minutes');
+  assert.equal(JSON.parse((await freeTdx('basic/v2/Bus/News/City/Taichung', '$format=JSON', { env, fetchFn, now })).body).length, 1);
+  assert.ok(freeHeavy('basic/v2/Bus/Alert/City/Taichung'), 'in the Runner: every route asked');
+  resetFree();
+  down = true;
+  assert.equal(await freeTdx('basic/v2/Bus/Alert/City/Taichung', '', { env, fetchFn, now }), null, 'the site down: TDX');
+  assert.equal(await freeTdx('basic/v2/Bus/Alert/City/Taipei', '', { env, fetchFn, now }), null, "another city's: TDX");
+});
+
 // ---- 公路客運's and the counties' buses: 公路局's site ----------------------------------------
 
 import { tbTime, tbRows, TB_URL } from '../transit-free.js';
