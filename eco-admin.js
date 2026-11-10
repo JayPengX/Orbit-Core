@@ -19,7 +19,9 @@ import { systemReport, alertAccount, tell, OPS_DOC, beats } from './ops.js';
 import { passAccount, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet } from './eco.js';
 import { sendPush, dueLists } from './push.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, TDX_BOOK, tdxPoints, tdxGuard, tdxUse, tdxPlan } from './transit.js';
-import { aiUse } from './gemini-use.js';
+import { aiUse, callsSince } from './gemini-use.js';
+import { moneyLeft, spendOf, healthOf, PROVIDERS, MODELS } from './ai.js';
+import { FEATURES } from './ai-features.js';
 import { twDate, googleToday, GOOGLE_MONTH_CALLS } from './weather.js';
 import { cleanDev, DEV } from './kit/devconfig.mjs';
 import { BRANDS } from './kit/brand.mjs';
@@ -798,6 +800,40 @@ export const ADMIN_TOOLS = {
       if (doc.exists) saved = JSON.parse(doc.payload);
     } catch {}
     return { at: now, month, maps, weather, gemini, features, saved };
+  },
+  // The AI tab: each provider's money left (the balance typed, less the
+  // calls since), this month's spend by feature and model, each feature's
+  // speed and health, and its cap (DEV ai*). From gemini_call (70 days).
+  async ai({ env, deps }) {
+    const now = deps.now();
+    const doc = await deps.fsGet(env, CONFIG_COLLECTION, 'ai-money').catch(() => ({ exists: false }));
+    let saved = {};
+    try {
+      if (doc.exists) saved = JSON.parse(doc.payload);
+    } catch {}
+    const since = Math.min(now - 35 * 86_400_000, ...PROVIDERS.map(p => saved[p]?.at || now));
+    const calls = await callsSince(env, Math.max(since, now - 70 * 86_400_000)).catch(() => []);
+    const monthStart = Date.parse(`${new Date(now + 8 * 3_600_000).toISOString().slice(0, 7)}-01T00:00:00+08:00`);
+    const month = spendOf(calls.filter(c => c.at >= monthStart));
+    const week = calls.filter(c => c.at >= now - 7 * 86_400_000);
+    const first = Object.fromEntries(Object.entries(FEATURES).map(([k, f]) => [k, MODELS[f.models[0]] || f.models[0]]));
+    const dev = await readDev(env, deps).catch(() => cleanDev());
+    const caps = Object.fromEntries(Object.entries(DEV).filter(([, d]) => d.ai).map(([k]) => [k, dev[k]]));
+    return { at: now, money: moneyLeft(saved, calls, now), month, health: healthOf(week, first, now), features: Object.fromEntries(Object.entries(FEATURES).map(([k, f]) => [k, { app: f.app || null, tap: !!f.tap, models: f.models.map(m => MODELS[m] || m) }])), caps };
+  },
+  // A provider's balance as read off its own page (US$): from now, its calls' cost is taken off it.
+  async 'ai-set'({ env, deps, body }) {
+    const prov = String(body.provider || '');
+    const usd = Number(body.usd);
+    if (!PROVIDERS.includes(prov) || !Number.isFinite(usd) || usd < 0 || usd > 1e6) return { error: 'ADMIN_BAD_AMOUNT' };
+    const doc = await deps.fsGet(env, CONFIG_COLLECTION, 'ai-money').catch(() => ({ exists: false }));
+    let saved = {};
+    try {
+      if (doc.exists) saved = JSON.parse(doc.payload);
+    } catch {}
+    saved[prov] = { usd, at: deps.now() };
+    await deps.fsWrite(env, CONFIG_COLLECTION, 'ai-money', JSON.stringify(saved));
+    return saved;
   },
   async 'billing-set'({ env, deps, body }) {
     const b = body.billing || {};

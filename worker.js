@@ -64,6 +64,8 @@ import { docStore, storeReady } from './doc-store.js';
 import { handleMoneyRead } from './money-read.js';
 import { handleCal } from './cal.js';
 import { logCall, callsSince, reliability, lastFailed } from './gemini-use.js';
+import { handleAi, aiTry } from './ai.js';
+import { FEATURES } from './ai-features.js';
 import { handleFlight } from './flight.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
 // The F1 lap log's Durable Object (f1-live.js), bound as F1_LOG.
@@ -713,13 +715,14 @@ async function streamGeminiRequest(model, parts, schema, env, headers, ctx, feat
 // writing (its thinking comes first), 45 s in all; every call a row in
 // gemini_call by its model, as Gemini's are.
 async function claudeAnswer(model, parts, schema, env, ctx, feature, { onText = null, effort = null } = {}) {
+  const t0 = Date.now();
   const res = await streamOther(model, parts, schema, env, { onText, timeoutMs: 45_000, firstMs: 25_000, effort: ['low', 'medium', 'high'].includes(effort) ? effort : null });
   if (!res.ok) {
-    ctx?.waitUntil?.(logCall(env, { feature, model, status: res.status }));
+    ctx?.waitUntil?.(logCall(env, { feature, model, status: res.status, ms: Date.now() - t0 }));
     return res;
   }
   const body = await res.text();
-  ctx?.waitUntil?.(logCall(env, { feature, model, status: 200, usage: JSON.parse(body).usageMetadata }));
+  ctx?.waitUntil?.(logCall(env, { feature, model, status: 200, usage: JSON.parse(body).usageMetadata, ms: Date.now() - t0 }));
   return new Response(body, { status: 200, headers: { 'Content-Type': 'application/json' } });
 }
 
@@ -1375,6 +1378,14 @@ async function route(request, env, ctx, headers, origin) {
   // Orbit Class's 加到行事曆 (cal.js): the calendar its phone made, kept and handed to the Calendar app.
   if (path === '/cal' || path.startsWith('/cal/')) return handleCal(request, env, headers, path === '/cal' ? await sessionOf(request, env) : null, path);
   // …and its 讀圖: a picture of purchases read by Gemini, on a tap only (money-read.js).
+  // The family's AI door (ai.js): every app's AI taps by feature name, each with its fixed prompt and caps.
+  if (path === '/ai') {
+    let feature = '';
+    try {
+      feature = String((await request.clone().json())?.feature || '');
+    } catch {}
+    return handleAi(request, env, ctx, headers, await sessionOf(request, env), { cap: FEATURES[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai') });
+  }
   if (path === '/money-read') return handleMoneyRead(request, env, headers, await sessionOf(request, env), lawGemini('money-read'), await aiCap(env, ctx, 'money-read'));
   // The bill's guard (guard.js), as it last read the bill: armed or not,
   // each count's share of the $5 plan, stopped or not. No key or token.
@@ -1421,6 +1432,12 @@ async function route(request, env, ctx, headers, origin) {
       const from = Math.max(0, Number(q.get('from')) || 0);
       const qs = COMPARE_QS.slice(from, from + Math.min(10, Math.max(1, Number(q.get('n')) || 3)));
       return json(await lawCompare(env, ctx, headers, lawGemini('compare'), calls, qs), 200, headers);
+    }
+    // An AI feature's prompt tried on its examples (ai-fixtures.js), or ?models= each in turn
+    // (ai.js MODELS' names): what each answered, asked back, how long it took. Nothing kept.
+    if (check === 'ai-try') {
+      const q = new URL(request.url).searchParams;
+      return json(await aiTry(env, ctx, q.get('feature') || '', { models: (q.get('models') || '').split(',').filter(Boolean), from: Number(q.get('from')) || 0, n: Number(q.get('n')) || 3, gemini: lawGemini('ai-try') }), 200, headers);
     }
     // Every Gemini call of the last ?days= (30 at most) by day, feature, model and status.
     if (check === 'gemini-use') {

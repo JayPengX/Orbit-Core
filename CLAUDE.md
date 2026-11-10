@@ -45,9 +45,9 @@ phone: a home-screen app at orbit.jaypengx.com/<slug>/
 orbit-workers-proxy (worker.js, near each caller): every route in §4
  │  edge cache (Cache API, by tier) · D1 STORE · R2 DATA · KV RATE_LIMIT_KV · DO F1_LOG, DOOR, RUNNER
  │  heavy routes and crons' work in the DO Runner (runner.js: 30 s CPU, the Free plan's 10 ms)
- ├─ upstreams: ESPN, MLB, Jolpica, F1 timing, OpenF1, Polymarket, Yahoo, TDX,
- │   Google, CWA, MOENV, 立法院 and IVOD, 司法院, NCDR, TAIFEX, SITCA…
- ├─ gemini-relay (Gemini, placed in Taiwan: gcp:asia-east1), service GEMINI_RELAY
+ ├─ upstreams: ESPN, MLB, Jolpica, F1, OpenF1, Polymarket, Yahoo, TDX,
+ │   Google, CWA, MOENV, 立法院, 司法院, NCDR, TAIFEX…
+ ├─ gemini-relay (Gemini, Claude, GPT from Taiwan: gcp:asia-east1), GEMINI_RELAY
  ├─ orbit-law (Orbit Law's site), service LAW_SITE: its data read by the proxy
  └─ quota-guard, service GUARD: reads the bill every 5 minutes (a DO alarm),
      paces (Free plan: a day's amounts, no stop)
@@ -121,6 +121,7 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: never money); every app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
 | `passkey.mjs` | Passkeys in the browser: made, used, named (`passkeyHere()` false where a browser can't) |
 | `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); topics (`TOPICS`); `sideOf`, `partiesIn`, `topicsOf` |
+| `ai.mjs`, `family.mjs` | AI on a phone: `aiCall`, `aiFlow` (its question back as chips), `pickList`/`picker` (the person's own lists), `aiBar`; the apps' notebook on the phone (`tell`/`heard`, places, Class's periods) |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs`: qrcode-generator 2.0.4 (MIT), vendored |
 | `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays` |
@@ -202,14 +203,15 @@ w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `f1-people.js`, `fund-nav.js`, `taifex.js` | The data proxy (§4.1): sports, quotes, F1, Asian baseball, SITCA's fund NAVs, TAIFEX |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
+| `/ai` | `ai.js`, `ai-features.js`, `ai-fixtures.js` | Every app's AI by name: fixed prompt, models in turn, lean input (`maxIn`), caps, asks back (`clarify`, `pick`); builders' `aiOnce`; ops `ai-try` |
 | `/law-ask` | `law.js`, `law-ruling.js`, `law-town.js`, `law-ground.js` | Law's questions on 1–8 articles, every point cited and checked, kept in KV; modes `bill`, `diff`, `ruling`, `town`; 40 Gemini calls a day a Pass, 300 in all with `/law-chat`'s (D1 `law_day`) |
 | `/law-chat` | `law-chat.js`, `law-ground.js`, `law-more.js`, `ai-other.js` | 問法律: a plan (Flash-Lite), up to 14 articles from Law's lists and index, answered from those only by Claude Sonnet via the relay (failing: Gemini), cites checked; grounded by facts, news, bills, budget (`law-ground.js`), rulings, rules (`law-more.js`); 16 turns back; 30 a day a Pass |
-| `/law-page` | `law-page.js`, `law-hosts.js` | A government page (gov.tw, www.edu.tw) read in Law, cleaned; edge cache only; Taiwan-only sites via the Taiwan relay (build key: any gov.tw, raw `file=1`); 500 a day a Pass |
-| `/law-live` | `law-live.js` | What 立法院's IVOD streams now, 60 s at the edge, the last good read kept 30 minutes; our pages only, no Pass |
+| `/law-page` | `law-page.js`, `law-hosts.js` | A gov.tw / edu.tw page read in Law, cleaned; edge cache only; Taiwan-only sites via the relay (build key: any gov.tw; `file=1`: raw); 500 a day a Pass |
+| `/law-live` | `law-live.js` | 立法院's IVOD streams now, 60 s at the edge (the last good read 30 min); ours only |
 | `/money-read` | `money-read.js` | Orbit Money's 拍照記帳: one picture → `{ buys, left }`, read by Gemini through the relay, checked; only on a tap; 30 a day a Pass, 300 in all |
 | `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |
 | `/flight` | `flight.js`, `kit/flight.mjs` | Orbit Class's 專注飛行: real planes landing in about N minutes, then one followed |
-| `/gift` | `gift.js` | 公開領取 at `/key/` (`site/key/`), set in the admin panel; one a device (a cookie, D1 `gift_claim`), `op: 'go'` a `#qh=` into an app; unreplaced passes back after `hold` hours |
+| `/gift` | `gift.js` | 公開領取 at `/key/` (`site/key/`), set in admin; one a device (D1 `gift_claim`), `op: 'go'` a `#qh=` into an app; unreplaced back after `hold` hours |
 | `/showcase/pass` | `showcase.js` | The showcase's short pass for its live demos: reads only, capped per address and day |
 | `/data/…` | `data.js` | R2, public reads (§5.5); `/data/build` (POST, Bearer `DATA_PUSH_SECRET`, `build.yml`) runs a builder now |
 | `/sources` | `sources.js` | Phones' beacons of their outside reads (the proxy's: `fetch` wrapped) |
@@ -411,22 +413,15 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   panel, served by `/config`): `sportsList`, `sportsGame`, `f1*`,
   `playLive`, `tdx*`, `transit*`. `autoScale` slows them together as the
   family grows (`capacity.js`).
-- **AI caps** are settings too (`DEV ai*`): calls a day for all, one
-  count in D1 `law_day`, 0 pauses (`worker.js aiCap`). Each Gemini call is
-  a row in `gemini_call` (`gemini-use.js`), only on a person's tap.
-- **Outside sources** (admin 外部來源): real calls only (not the dev door's), one D1 upsert an isolate every 5 min (1 failing); plus beats, R2 ages, Law's `data/status.json`, quotas.
+- **AI**: caps a day (`DEV ai*`, D1 `law_day`, 0 pauses); a row a call in `gemini_call` (tokens, ms); admin AI 錢包: balances typed less calls since (`moneyLeft`)
+- **Outside sources** (admin 外部來源): real calls, a D1 upsert an isolate per 5 min; beats, R2 ages, Law's `data/status.json`.
 - **Errors**: each route's 5xx tallied (`err:<route>:<day>`), the guard's
   `/errors`; 部署 runs workflows (`GH_ACTIONS_TOKEN`).
-- **容量** (`capacity.js` `quotas`): people each quota holds = this
-  week's × room past the fixed part ÷ people's use, the fewest named
-  (under `FEW`: by `TYPICAL_DAY`); people's Workers use: what the
-  apps' pages called, anywhere (`pageShare`); the rest fixed.
+- **容量** (`capacity.js` `quotas`): people each quota holds (this week's × room ÷ people's use; under `FEW`: `TYPICAL_DAY`); people's share: what pages called (`pageShare`).
 - **`quota-guard`** (`guard.js`, every 5 minutes) reads the use against
-  `PLAN` (Workers, CPU, KV, DO, R2, D1), paces on real use only (`paceFor`:
-  past 60/75/85% used with the last days' rate reaching the stop; 85%
-  `newcomers: false`; `pace.js`), a forecast only warns (`forecastOf`),
-  tells the owner at 50/75/90% (`ops.js`), and at 90% turns the proxy off
-  until the next period. Google: Maps stops at 90% of each SKU's free
+  `PLAN`, paces on real use only (`paceFor`: past 60/75/85% at a rate
+  reaching the stop; 85% `newcomers: false`; `pace.js`), a forecast only
+  warns (`forecastOf`), mails at 50/75/90% (`ops.js`); 90%: the proxy off. Google: Maps stops at 90% of each SKU's free
   month, Weather under 8,500 a month (`googleDayCap`).
 - **TDX** (`transit.js`): `tdxPlan` (free from 12-01: 3 points a month);
   `tdxGuard`: people's share a day, kept longer as it's spent, copies only

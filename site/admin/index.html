@@ -95,6 +95,9 @@
   #door .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   @media (min-width: 900px) { #door .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
   .tile strong.warn { color: var(--q-warn, #c77700); }
+  .tile.bad strong { color: var(--q-red, #e5484d); }
+  .tile.warn strong { color: var(--q-warn, #c77700); }
+  #aim-tiles .tile em { white-space: normal; }
   .door-set { margin-top: 10px; align-items: center; gap: 8px; flex-wrap: nowrap; }
   .door-set label { white-space: nowrap; }
   .door-set input { width: 110px; }
@@ -534,6 +537,17 @@
       <div class="pane-head"><div><h2>AI 今天</h2><p class="muted">每個功能全部人一天加起來的次數（台灣的一天）。上限和暫停在設定。</p></div><button class="small" data-go="dev" data-to="set-ai">上限</button></div>
       <p id="ai-error" class="error"></p>
       <ul class="checks" id="ai-use"></ul>
+      <div class="pane-head"><div><h2>AI 錢包</h2><p class="muted">三家 AI 各剩多少、照這 7 天的速度還能用幾天。加值後到該家的頁面看餘額，在這裡輸入一次。</p></div><button class="small" id="aim-load">重新整理</button></div>
+      <p id="aim-error" class="error"></p>
+      <div class="card">
+        <div class="tiles" id="aim-tiles"></div>
+        <div class="row" style="margin-top:14px"><select id="aim-prov" style="flex:none"><option value="anthropic">Anthropic (Claude)</option><option value="openai">OpenAI (GPT)</option><option value="google">Google (Gemini)</option></select><input id="aim-usd" type="number" min="0" step="0.01" placeholder="現在的餘額（US$）" class="grow" /><button id="aim-save" class="primary">儲存</button></div>
+        <p id="aim-ok" class="ok"></p>
+        <details class="note" open><summary>這個月每個功能花多少</summary>
+          <div class="tablewrap"><table id="aim-feat"><thead><tr><th>功能</th><th class="right">次數</th><th class="right">花費</th><th class="right">每次</th><th class="right">速度</th></tr></thead><tbody></tbody></table></div>
+          <p class="muted" style="margin:8px 0 0">速度：一半的呼叫在這之內完成 / 九成在這之內。紅色：今天有失敗，或常由備用的 AI 回答。</p>
+        </details>
+      </div>
       <div class="pane-head"><div><h2>Gemini 今天</h2><p class="muted" id="google-note">Google 的每日額度照美國太平洋時間重置。</p></div></div>
       <ul class="checks" id="google-use"></ul>
       <div class="pane-head"><div><h2>Google 帳單</h2><p class="muted">Google 沒有預付餘額的 API：每次加值後輸入一次餘額，花費依下面的價格估算。</p></div></div>
@@ -803,7 +817,7 @@ const VIEWS = {
   overview: () => loadOverview(),
   accounts: () => Promise.all([loadWallets(), loadDoor()]),
   health: () => Promise.all([loadSystem(), loadSources(), loadErrors()]),
-  usage: () => Promise.all([loadCapacity(), loadSystem(), loadBilling(), loadUsage()]),
+  usage: () => Promise.all([loadCapacity(), loadSystem(), loadBilling(), loadUsage(), loadAiMoney()]),
   dev: () => loadDev(),
   tools: () => Promise.all([loadGift(), loadPushes(), loadBackups()])
 };
@@ -2642,6 +2656,57 @@ $('bill-prices-save').onclick = () =>
       $('bill-ok').textContent = '價格已儲存。';
     } catch (e) {
       $('bill-error').textContent = e.message;
+    }
+  });
+
+// ---- AI 錢包 (eco-admin.js `ai`): each provider's money left, each feature's spend and speed ----
+const AI_PROV = { anthropic: 'Claude', openai: 'GPT', google: 'Gemini' };
+const AI_FEATURES = { 'law-chat': '問法律（Law）', 'law-ask': '白話解釋（Law）', 'money-read': '拍照記帳（Money）', gemini: '課表照片匯入（Class）', 'nl-edit': '課表 AI 修改（Class）', 'money-say': '用說的記帳（Money）', 'money-ask': '問我的帳（Money）', 'money-month': '每月回顧（Money）', 'words-check': '檢查我的句子（Words）', 'words-cards': '例句與記憶法（Words）', 'words-photo': '拍一頁變單字卡（Words）', 'words-chat': '用新字聊天（Words）', 'sports-recap': '賽後三句話（Sports）', 'f1-story': 'F1 賽後故事（Sports）', 'sports-ask': '問比賽（Sports）', 'transit-notice': '通告讀成路線（Transit）', 'transit-say': '用說的查路線（Transit）', 'news-lines': '一句話與標題（News）', 'news-sides': '各方怎麼說（News）', 'weather-ask': '問天氣（Weather）', 'class-book': '拍聯絡簿（Class）', 'class-ask': '問我的課表（Class）', 'class-plan': '考前讀書計畫（Class）', 'class-news': '學校公告（Class）', 'law-contract': '拍合約幫你看（Law）', 'law-minutes': '會議紀錄變表格（Law）', 'law-weekly': '法案週報（Law）', 'sec-filing': '重大訊息白話（Securities）', 'sec-say': '用說的下單（Securities）', 'sec-lesson': '交易學到什麼（Securities）', 'beats-say': '用說的做節奏（Beats）', 'orbit-ask': 'Orbit 助理', 'showcase-ask': '問 Orbit（Showcase）', 'rec-weekly': '除錯週報', check: '管理面板的檢查' };
+const usd = v => (v == null ? '—' : `US$${(Math.round(v * 100) / 100).toLocaleString()}`);
+const secs = ms => (ms == null ? '—' : `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)} s`);
+let aim = null;
+function drawAiMoney() {
+  const rate = bill?.saved?.rate || 32;
+  $('aim-tiles').replaceChildren(
+    ...Object.entries(aim.money).map(([p, m]) => {
+      const t = tile(AI_PROV[p], m.left == null ? '—' : usd(m.left), m.left == null ? '還沒輸入餘額' : `≈ NT$${Math.round(m.left * rate).toLocaleString()} · ${m.days == null ? '這 7 天沒用' : `還能用 ${m.days.toLocaleString()} 天`} · ${ago(m.typed.at)}輸入 ${usd(m.typed.usd)}`);
+      if (m.tone) t.classList.add(m.tone === 'bad' ? 'bad' : 'warn');
+      return t;
+    })
+  );
+  const rows = Object.entries(aim.month.features).sort((a, b) => b[1].usd - a[1].usd);
+  $('aim-feat').tBodies[0].replaceChildren(
+    ...(rows.length
+      ? rows.map(([f, v]) => {
+          const h = aim.health[f] || {};
+          const sick = h.failToday > 0 || (h.n > 4 && h.backup / h.n > 0.2);
+          return el('tr', {}, [el('td', { text: AI_FEATURES[f] || f, class: sick ? 'neg' : '' }), el('td', { class: 'right', text: v.n.toLocaleString() }), el('td', { class: 'right', text: `NT$${(Math.round(v.usd * rate * 10) / 10).toLocaleString()}` }), el('td', { class: 'right muted', text: v.n ? `NT$${(Math.round((v.usd * rate * 100) / v.n) / 100).toLocaleString()}` : '—' }), el('td', { class: 'right muted', text: `${secs(h.mid)} / ${secs(h.slow)}${h.failToday ? ` · 失敗 ${h.failToday}` : ''}` })]);
+        })
+      : [el('tr', {}, [el('td', { colspan: '5', class: 'muted', text: '這個月還沒有 AI 呼叫。' })])])
+  );
+}
+async function loadAiMoney() {
+  $('aim-error').textContent = '';
+  try {
+    aim = await admin('ai');
+    drawAiMoney();
+  } catch (e) {
+    $('aim-error').textContent = e.message;
+  }
+}
+$('aim-load').onclick = () => busy($('aim-load'), loadAiMoney);
+$('aim-save').onclick = () =>
+  busy($('aim-save'), async () => {
+    $('aim-error').textContent = $('aim-ok').textContent = '';
+    const v = Number($('aim-usd').value);
+    if (!$('aim-usd').value || !(v >= 0)) return ($('aim-error').textContent = '輸入該家現在的餘額（US$）。');
+    try {
+      await admin('ai-set', { provider: $('aim-prov').value, usd: v });
+      $('aim-usd').value = '';
+      $('aim-ok').textContent = `已儲存：${AI_PROV[$('aim-prov').value]} 從現在起由 ${usd(v)} 扣掉之後的花費。`;
+      await loadAiMoney();
+    } catch (e) {
+      $('aim-error').textContent = e.message;
     }
   });
 
