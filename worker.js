@@ -32,7 +32,7 @@
 import { watchRelay, flushSources, asSourceCall, pruneSources, takeBeacon } from './sources.js';
 import { handleLawAsk, useLawSite, addOne, twDay } from './law.js';
 import { handleLawChat, lawChatTimes, lawCompare, COMPARE_QS } from './law-chat.js';
-import { otherAnswer, makerOf, modelsOf } from './ai-other.js';
+import { otherAnswer, streamOther, makerOf, modelsOf } from './ai-other.js';
 import { DEV, aiSettingOf } from './kit/brand.mjs';
 import { handleLawPage } from './law-page.js';
 import { handleLawLive } from './law-live.js';
@@ -709,6 +709,20 @@ async function streamGeminiRequest(model, parts, schema, env, headers, ctx, feat
 // A 4xx is the ask's own fault and goes back as it is. The answer is
 // Gemini's shape either way: { candidates: [{ content: { parts: [{ text }] } }] }.
 // opts: timeoutMs (Flash's whole call), liteMs (Flash-Lite's), thinking, onText (streamed).
+// Another maker's answer for a route (ai-other.js streamOther): 25 s to start
+// writing (its thinking comes first), 45 s in all; every call a row in
+// gemini_call by its model, as Gemini's are.
+async function claudeAnswer(model, parts, schema, env, ctx, feature, { onText = null, effort = null } = {}) {
+  const res = await streamOther(model, parts, schema, env, { onText, timeoutMs: 45_000, firstMs: 25_000, effort: ['low', 'medium', 'high'].includes(effort) ? effort : null });
+  if (!res.ok) {
+    ctx?.waitUntil?.(logCall(env, { feature, model, status: res.status }));
+    return res;
+  }
+  const body = await res.text();
+  ctx?.waitUntil?.(logCall(env, { feature, model, status: 200, usage: JSON.parse(body).usageMetadata }));
+  return new Response(body, { status: 200, headers: { 'Content-Type': 'application/json' } });
+}
+
 const FLASH_FIRST_MS = 12_000;
 const FLASH_SICK_MS = 10 * 60_000;
 const retryable = status => status >= 500 || status === 429;
@@ -1326,7 +1340,10 @@ async function route(request, env, ctx, headers, origin) {
   // (/law-chat's answer asks for Flash by name: reasoning on the reader's facts, 40 s at most.)
   // (onText: streamed, hearing the reply as it's written, /law-chat's answer;
   // thinking: the model's thinking level, 'low' unless said.)
+  // (A Claude model asked for by name, /law-chat's answer: streamed through the relay, logged as
+  // Gemini's calls are; thinking is then its effort, 'low' | 'medium' | 'high'.)
   const lawGemini = feature => (parts, schema, model = GEMINI_ALLOWED_MODELS[0], { onText = null, thinking = null } = {}) => {
+    if (makerOf(model)) return claudeAnswer(model, parts, schema, env, ctx, feature, { onText, effort: thinking });
     const m = GEMINI_ALLOWED_MODELS.includes(model) ? model : GEMINI_ALLOWED_MODELS[0];
     const level = ['minimal', 'low', 'medium'].includes(thinking) ? thinking : null;
     // (Flash stuck or failing: Flash-Lite's answer instead, geminiAnswer.)

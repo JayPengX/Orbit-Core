@@ -75,8 +75,24 @@ let textStatus = 200;
 // (A model's own answer status, and how many of its next calls fail 503: Google's free tier.)
 const MODEL_STATUS = {};
 const FAILS = {};
+// (Claude's answer: its status, or a refusal; streamed as Anthropic's server-sent events.)
+let claude = { status: 200, refuse: false };
 globalThis.fetch = async (url, init) => {
   const u = String(url);
+  if (u.startsWith('https://api.anthropic.com/')) {
+    const sent = JSON.parse(init.body);
+    gemini.push({ kind: 'answer', model: sent.model, prompt: sent.messages[0].content[0].text, stream: sent.stream === true, format: sent.output_config?.format?.type, effort: sent.output_config?.effort ?? null });
+    if (claude.status !== 200) return new Response(JSON.stringify({ type: 'error', error: { message: 'overloaded' } }), { status: claude.status });
+    const t = claude.refuse ? '' : JSON.stringify(answer);
+    const ev = o => `event: ${o.type}\ndata: ${JSON.stringify(o)}\n\n`;
+    return new Response(
+      ev({ type: 'message_start', message: { usage: { input_tokens: 900, output_tokens: 1 } } }) +
+        ev({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } }) +
+        (t ? ev({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: t.slice(0, 30) } }) + ev({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: t.slice(30) } }) : '') +
+        ev({ type: 'message_delta', delta: { stop_reason: claude.refuse ? 'refusal' : 'end_turn' }, usage: { output_tokens: 120 } }) +
+        ev({ type: 'message_stop' })
+    );
+  }
   if (u.includes('generativelanguage')) {
     const sent = JSON.parse(init.body);
     const kind = 'terms' in sent.generationConfig.response_schema.properties ? 'plan' : 'answer';
@@ -146,7 +162,7 @@ test('no Pass of Orbit Law\'s is a 401 {error:"pass"}, before anything is read o
 test('the chat is checked before anything is read', async () => {
   const ok = { ...Q, history: [{ role: 'user', text: 'a' }, { role: 'model', text: 'b', cites: ['B0000001:456'] }], pin: [{ p: 'B0000001', arts: ['456'] }] };
   assert.equal(typeof readChat(ok), 'object');
-  for (const bad of [{ ...Q, q: '' }, { ...Q, q: 'x'.repeat(501) }, { ...Q, lang: 'jp' }, { ...Q, history: Array(7).fill({ role: 'user', text: 'a' }) }, { ...Q, history: [{ role: 'system', text: 'a' }] }, { ...Q, history: [{ role: 'user', text: 'x'.repeat(1501) }] }, { ...Q, history: [{ role: 'model', text: 'a', cites: ['x'.repeat(61)] }] }, { ...Q, mine: { laws: 'B0000001' } }, { ...Q, mine: 3 }, { ...Q, pin: [{ p: 'B0000001', arts: ['456'] }, { p: 'B0000001', arts: ['1'] }, { p: 'B0000001', arts: ['2'] }] }, { ...Q, pin: [{ p: 'B0000001', arts: Array.from({ length: 9 }, (_, i) => String(i + 1)) }] }]) {
+  for (const bad of [{ ...Q, q: '' }, { ...Q, q: 'x'.repeat(501) }, { ...Q, lang: 'jp' }, { ...Q, history: Array(17).fill({ role: 'user', text: 'a' }) }, { ...Q, history: [{ role: 'system', text: 'a' }] }, { ...Q, history: [{ role: 'user', text: 'x'.repeat(1501) }] }, { ...Q, history: [{ role: 'model', text: 'a', cites: ['x'.repeat(61)] }] }, { ...Q, mine: { laws: 'B0000001' } }, { ...Q, mine: 3 }, { ...Q, pin: [{ p: 'B0000001', arts: ['456'] }, { p: 'B0000001', arts: ['1'] }, { p: 'B0000001', arts: ['2'] }] }, { ...Q, pin: [{ p: 'B0000001', arts: Array.from({ length: 9 }, (_, i) => String(i + 1)) }] }]) {
     assert.equal(typeof readChat(bad), 'string', JSON.stringify(bad).slice(0, 80));
   }
   const before = [reads.length, gemini.length];
@@ -521,4 +537,41 @@ test("Gemini's free tier: Flash failing, Flash-Lite answers and Flash is skipped
   const k = gemini.length;
   assert.equal((await chat({ ...Q, q: '押金何時還' })).status, 200);
   assert.deepEqual(gemini.slice(k).map(g => `${g.kind} ${g.model}`), ['plan gemini-3.5-flash-lite', 'plan gemini-3.5-flash-lite', 'answer gemini-3.6-flash']);
+});
+
+test("Sonnet answers, streamed, at its effort; failing or refusing, Gemini's Flash answers instead", async () => {
+  const env = { ...envOf(), ANTHROPIC_API_KEY: 'a' };
+  const n = gemini.length;
+  const r = await chat({ ...Q, q: '押金不還可以告嗎' }, { env });
+  assert.equal(r.status, 200);
+  const j = await r.json();
+  assert.equal(j.answer, '押金可以請求返還。');
+  assert.deepEqual(j.points.map(p => p.cites), [['B0000001:456']]);
+  const calls = gemini.slice(n);
+  assert.deepEqual(calls.map(g => `${g.kind} ${g.model}`), ['plan gemini-3.5-flash-lite', 'answer claude-sonnet-5-5']);
+  assert.equal(calls[1].stream, true);
+  assert.equal(calls[1].format, 'json_schema');
+  assert.ok(calls[1].prompt.includes('押金不還可以告嗎'));
+  for (const trouble of [{ status: 529, refuse: false }, { status: 200, refuse: true }]) {
+    claude = trouble;
+    try {
+      const m = gemini.length;
+      const r2 = await chat({ ...Q, q: `押金扣光了 ${trouble.status}${trouble.refuse}` }, { env });
+      assert.equal(r2.status, 200);
+      assert.deepEqual(gemini.slice(m).map(g => `${g.kind} ${g.model}`), ['plan gemini-3.5-flash-lite', 'answer claude-sonnet-5-5', 'answer gemini-3.6-flash']);
+    } finally {
+      claude = { status: 200, refuse: false };
+    }
+  }
+});
+
+test('a follow-up carries the conversation: up to 16 turns, and the prompt says to read the question in its light', async () => {
+  const env = { ...envOf(), ANTHROPIC_API_KEY: 'a' };
+  const history = Array.from({ length: 16 }, (_, i) => (i % 2 ? { role: 'model', text: `第${i}答：押金二年`, cites: ['B0000001:456'] } : { role: 'user', text: `第${i}問：我租屋` }));
+  const n = gemini.length;
+  assert.equal((await chat({ ...Q, q: '那機車呢？', history }, { env })).status, 200);
+  const answerCall = gemini.slice(n).find(g => g.kind === 'answer');
+  assert.ok(answerCall.prompt.includes('第0問：我租屋') && answerCall.prompt.includes('第15答：押金二年'));
+  assert.ok(answerCall.prompt.includes('follow up on the conversation'));
+  assert.ok(!(await import('../law-chat.js')).answerPrompt({ q: 'x', history: [], pin: [], lang: 'zh' }, [], () => '').includes('follow up on the conversation'));
 });
