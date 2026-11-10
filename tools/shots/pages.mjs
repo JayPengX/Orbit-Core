@@ -253,6 +253,12 @@ export const PAGES = {
     'hsr-book': { hash: 'times', args: click(wait(2500), '[data-view="train"]', wait(1000), "js:(async()=>{const pick=async(w,q)=>{document.querySelector(`[data-pick=${w}]`).click();await new Promise(r=>setTimeout(r,800));const i=document.querySelector('#s-q');i.value=q;i.dispatchEvent(new Event('input',{bubbles:true}));await new Promise(r=>setTimeout(r,900));([...document.querySelectorAll('#s-body [data-st]')].find(b=>/hsr|高鐵/.test(b.outerHTML))||document.querySelector('#s-body [data-st]')).click();await new Promise(r=>setTimeout(r,900))};await pick('from','新竹');await pick('to','台北')})()", wait(8000), "js:document.querySelectorAll('.ot-jny')[0]?.click()", wait(1200), "js:document.querySelector('[data-book]')?.scrollIntoView({block:'center'})", wait(600)) },
     // 查時刻 › 捷運: the metro map (台北 first), its line chips, the station card.
     metro: { hash: 'times', args: click(wait(2500), '[data-view="metro"]', wait(6000)) },
+    // The metro map's 搜尋車站 with 中山 typed (every system's stations, codes under each); one found, its sheet over the map
+    // (ringed on it); full screen; 高雄's map.
+    'metro-find': { hash: 'times', args: click(wait(2500), '[data-view="metro"]', wait(5000), '[data-find]', wait(2500), "js:(()=>{const q=document.querySelector('#mf-q');q.value=document.documentElement.lang==='en'?'Zhongshan':'中山';q.dispatchEvent(new Event('input',{bubbles:true}))})()", wait(1200)) },
+    'metro-station': { hash: 'times', args: click(wait(2500), '[data-view="metro"]', wait(5000), '[data-find]', wait(2500), "js:(()=>{const q=document.querySelector('#mf-q');q.value='BL12';q.dispatchEvent(new Event('input',{bubbles:true}))})()", wait(1000), '[data-mf]', wait(5000)) },
+    'metro-full': { hash: 'times', args: click(wait(2500), '[data-view="metro"]', wait(5000), '[data-full]', wait(1500)) },
+    'metro-kaohsiung': { hash: 'times', args: click(wait(2500), '[data-view="metro"]', wait(4000), '[data-map="kaohsiung"]', wait(5000)) },
     // 我的: trips, places, pins; then its 公車站牌 editor (groups, reorder, remove).
     me: { hash: 'me', args: click(wait(3000)) },
     stops: { hash: 'me', args: click(wait(3000), '[data-act="groups"]', wait(1500)) },
