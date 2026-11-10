@@ -186,10 +186,9 @@ the `q-` components; they don't restyle them.
 
 `worker.js` routes (`route()`, in the Runner for heavy ones); each route's work is in its own file;
 `http.js` is what every route answers with (who may call, CORS, JSON;
-`lineAnswer`: lines gzipped, each flushed). No
-placement: it runs near each caller; only Gemini goes through
-`gemini-relay.js`, pinned to Taiwan. Every answer carries `Server-Timing:
-w;dur=` (the Worker's own time), noted by the 除錯紀錄 when slow.
+`lineAnswer`: lines gzipped, each flushed). It runs near each caller;
+Gemini through `gemini-relay.js`, pinned to Taiwan. Every answer carries `Server-Timing:
+w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 
 | Route | File | What |
 | --- | --- | --- |
@@ -197,14 +196,14 @@ w;dur=` (the Worker's own time), noted by the 除錯紀錄 when slow.
 | `/stock` | `stock-fill.js`, `stock-check.js` | Securities' fills at the proxy's own quote; the account replayed on each save |
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
 | `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations), the township, scored hourly (`/weather/skill`); during a typhoon warning (NCDR's CAP feed), `dayOff`: each county's 停班停課 from 人事行政總處, else a chance fitted to past decisions, all 22 every 3 minutes |
-| `/transit/…` | `transit.js` | TDX (allowlist `TDX_RULES`; trains trimmed, `tdxTrim`), bus places (`gps`), map config, search, place, route, walk, book (高鐵's booking link); `/transit/status?sample=` (a session or dev door) |
+| `/transit/…` | `transit.js`, `transit-free.js` | TDX (allowlist `TDX_RULES`; trains trimmed, `tdxTrim`; YouBike from YouBike's own list), bus places (`gps`), map config, search, place, route, walk, book (高鐵's booking link); `/transit/status?sample=` (session or dev door) |
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `f1-people.js`, `fund-nav.js`, `taifex.js` | The data proxy (§4.1): sports, quotes, F1, Asian baseball, SITCA's fund NAVs, TAIFEX |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
 | `/law-ask` | `law.js`, `law-ruling.js`, `law-ground.js` | Orbit Law's questions on 1–8 articles, every point cited and checked, kept in KV by the law's version; `mode: 'bill'` (from its 對照表), `'diff'` (an amendment), `'ruling'` (from its own paragraphs); 40 Gemini calls a day a Pass, 300 in all with `/law-chat`'s (D1 `law_day`) |
 | `/law-chat` | `law-chat.js`, `law-ground.js`, `law-more.js` | 問法律: a plan, up to 14 articles from Orbit Law's lists and full-text index, an answer from those only, every cite checked; grounded by Law's `ai/facts.json`, `ai/news.json`, `bills/items.json` and `ly/budget.json` (`law-ground.js`) and the rulings and rules found beside them (`law-more.js`); 30 turns a day a Pass |
-| `/law-page` | `law-page.js`, `law-hosts.js` | A government page (gov.tw, www.edu.tw) read inside Orbit Law, cleaned, in its own charset (or a PDF's size); Cloudflare's cache only; Taiwan-only county sites through the Taiwan relay (`law-hosts.js`); 500 fresh reads a day a Pass |
-| `/law-live` | `law-live.js` | What 立法院's IVOD streams now (`{at, rooms}`), read on demand, 60 s at the edge, the last good read kept 30 minutes; our pages only, no Pass |
+| `/law-page` | `law-page.js`, `law-hosts.js` | A government page (gov.tw, www.edu.tw) read inside Orbit Law, cleaned, in its own charset (or a PDF's size); Cloudflare's cache only; Taiwan-only county sites through the Taiwan relay; 500 fresh reads a day a Pass |
+| `/law-live` | `law-live.js` | What 立法院's IVOD streams now (`{at, rooms}`), read on demand, 60 s at the edge, the last good read kept 30 minutes; our pages, no Pass |
 | `/money-read` | `money-read.js` | Orbit Money's 拍照記帳: one picture → `{ buys, left }`, read by Gemini (Flash-Lite, through the relay) and checked; only on a tap; 30 a day a Pass, 300 in all |
 | `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |
 | `/flight` | `flight.js`, `kit/flight.mjs` | Orbit Class's 專注飛行: real planes landing in about N minutes, then one followed |
@@ -234,7 +233,7 @@ w;dur=` (the Worker's own time), noted by the 除錯紀錄 when slow.
 
 - **Crons:** even minutes (notices, builders, weather scoring, capacity,
   the meter's copy), F1's laps on both, run by Runner alarms (`main`,
-  `slow`). Never new Cron Triggers: ones made since October 2026 never ran.
+  `slow`). Never new Cron Triggers (ones made since October 2026 never ran).
 - **The proxy is the only one adding money:** `eco.js appEntries` takes only
   spending from apps, dated by the Worker; Securities' cash and cost are the
   Worker's (`stock-check.js`).
