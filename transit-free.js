@@ -9,6 +9,7 @@
 //     at most and kept here; a city's list or the stations near a point.
 //   - 新竹's buses (竹塹交通資訊網), 臺北's and 新北's (the cities' open data).
 //   - 台鐵's day of trains (台鐵's own open data, ods.railway.gov.tw).
+//   - 臺北捷運's trains coming in (the metro's own open file).
 //   - 高鐵's day and the metros' maps and timetables: the weekly build's
 //     copies in R2 (rail/: TDX's GTFS, 0 points; the metros asked of TDX
 //     only when GTFS says they changed); the bus route lists and 台鐵's and
@@ -1055,6 +1056,60 @@ async function metroFree(path, q, { env, now }) {
   return { status: 200, body: got.val, age: Math.max(0, now - got.at), state: 'free' };
 }
 
+// ---- 臺北捷運's trains coming in now --------------------------------------------------------
+
+// TDX's TRTC LiveBoard is 臺北捷運's own open file (a row a train coming into a
+// station: where, toward where, when, each 30 s; its minutes always 0), read
+// here and put in TDX's shape by the lines' stations in R2 (StationOfLine,
+// Line). 環狀線 (新北's) isn't in it. Whole, by `$filter=StationID eq '…'`, `$top`.
+export const TRTC_LIVE = 'https://tcgmetro.blob.core.windows.net/stationnames/stations.json';
+const TRTC_ASK = /^basic\/v2\/Rail\/Metro\/LiveBoard\/TRTC$/;
+const TRTC_FRESH = 10_000;
+const TRTC_OLD = 3 * MIN; // (a row this old: that train gone)
+// (A name as the file writes it, 「台北車站」, else without its 站: 「忠孝復興站」.)
+const stationsOf = (at, s) => at.get(String(s || '').trim()) || at.get(String(s || '').trim().replace(/站$/, '')) || [];
+// The file's rows → TDX's. A row's line is the one through both its stations
+// (忠孝復興 toward 南港展覽館 on either: 文湖線's, the later listed, as TDX's own board).
+export function trtcRows(list, lines, names = [], now = Date.now()) {
+  const at = new Map();
+  for (const l of Array.isArray(lines) ? lines : []) for (const s of l.Stations || []) at.set(s.StationName?.Zh_tw, [...(at.get(s.StationName?.Zh_tw) || []), { l, s }]);
+  const lineName = Object.fromEntries((Array.isArray(names) ? names : []).map(l => [l.LineID, l.LineName]));
+  const out = [];
+  for (const r of Array.isArray(list) ? list : []) {
+    const m = /^(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)$/.exec(String(r?.UpdateTime || ''));
+    const src = m && `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}+08:00`;
+    if (!src || !(now - Date.parse(src) < TRTC_OLD)) continue;
+    const to = stationsOf(at, r.Destination);
+    const h = stationsOf(at, r.Station).filter(x => to.some(t => t.l === x.l)).at(-1);
+    if (!h) continue;
+    const t = to.find(x => x.l === h.l).s;
+    out.push({ LineNO: h.l.LineNo || h.l.LineID, LineID: h.l.LineID, LineName: lineName[h.l.LineID] || { Zh_tw: '', En: '' }, StationID: h.s.StationID, StationName: h.s.StationName, TripHeadSign: `往${t.StationName.Zh_tw}`, DestinationStaionID: t.StationID, DestinationStationID: t.StationID, DestinationStationName: t.StationName, ServiceStatus: 0, EstimateTime: 0, SrcUpdateTime: src, UpdateTime: twNow(now) });
+  }
+  return out;
+}
+async function trtcFree(path, q, { fetchFn, env, now }) {
+  if (!TRTC_ASK.test(path) || !env?.DATA) return undefined;
+  const keys = [...q.keys()].filter(k => k !== '$format');
+  const one = q.has('$filter') && METRO_STATION.exec(q.get('$filter'));
+  const top = q.has('$top') ? Number(q.get('$top')) : Infinity;
+  if (keys.some(k => k !== '$filter' && k !== '$top') || (q.has('$filter') && !one) || !(top >= 0)) return null;
+  const map = await held('trtc:lines', TRA_FRESH, 7 * DAY, async () => {
+    const read = async f => JSON.parse((await (await env.DATA.get(`rail/metro/TRTC/${f}.json`))?.text()) || 'null');
+    const [lines, names] = await Promise.all([read('StationOfLine'), read('Line')]);
+    if (!lines?.length) throw new Error('not copied');
+    return { lines, names };
+  }, now, 3000);
+  const got = await held('trtc:live', TRTC_FRESH, 2 * MIN, async () => {
+    const res = await fetchFn(TRTC_LIVE, { signal: AbortSignal.timeout?.(5000) });
+    if (!res.ok) throw new Error(`TRTC ${res.status}`);
+    const list = JSON.parse((await res.text()).replace(/^\uFEFF/, ''));
+    if (!Array.isArray(list)) throw new Error('TRTC: not a list');
+    return trtcRows(list, map.val.lines, map.val.names, now);
+  }, now);
+  const rows = got.val.filter(r => !one || r.StationID === one[1]);
+  return { status: 200, body: JSON.stringify(rows.slice(0, top)), age: Math.max(0, now - got.at), state: 'free' };
+}
+
 // ---- TDX's slow lists, copied ------------------------------------------------------------
 
 // What every phone asks the same way and seldom changes (a city's bus routes,
@@ -1098,7 +1153,7 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), 
   const q = new URLSearchParams(query);
   try {
     const p = decodeURIComponent(path);
-    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await copiedFree(p, q, { env, now }));
+    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await trtcFree(p, q, { fetchFn, env, now })) ?? (await copiedFree(p, q, { env, now }));
     if (got !== undefined) return got;
   } catch (err) {
     console.log('free source failed', path.slice(0, 80), String(err?.message || err).slice(0, 120));

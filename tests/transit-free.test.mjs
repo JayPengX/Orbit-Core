@@ -575,3 +575,40 @@ test("a 臺南 stop's routes the ways it's on from the city's own site, a route 
   assert.equal(g.rows.find(b => b.PlateNumb === 'EAL-2561').GPSTime, '2026-11-10T14:37:41+08:00');
   assert.equal(runsInRunner(new Request('https://w/transit/eta?city=Tainan&stops=TNN16077'), '/transit/eta'), true);
 });
+
+test("臺北捷運's trains coming in from its own open file, in TDX's shape (each row's line the one through both its stations); a station's by its filter; the file down past 2 minutes: TDX", async () => {
+  const { trtcRows, TRTC_LIVE } = await import('../transit-free.js');
+  const fx = JSON.parse(readFileSync(new URL('./fixtures/trtc-live.json', import.meta.url), 'utf8'));
+  const now = Date.parse('2026-11-10T16:25:00+08:00');
+  const rows = trtcRows(fx.blob, fx.StationOfLine, fx.Line, now);
+  const of = (st, to) => rows.filter(r => r.StationName.Zh_tw === st && r.DestinationStationName.Zh_tw === to).map(r => `${r.LineID} ${r.StationID}→${r.DestinationStationID}`);
+  assert.deepEqual(of('台北車站', '南港展覽館'), ['BL BL12→BL23']);
+  assert.deepEqual(of('忠孝復興', '動物園'), ['BR BR10→BR01']);
+  assert.deepEqual(of('忠孝復興', '南港展覽館'), ['BR BR10→BR24'], 'either line: 文湖線, as TDX says');
+  assert.equal(rows.filter(r => r.StationName.Zh_tw === '板橋').length, 0, '環狀線 (新北產業園區) is not TRTC');
+  assert.equal(rows.length, fx.blob.length - 1);
+  assert.deepEqual(rows.find(r => r.StationID === 'BR10' && r.DestinationStationID === 'BR01'), {
+    LineNO: 'BR', LineID: 'BR', LineName: { Zh_tw: '文湖線', En: 'Wenhu Line', Ja: '文湖線', Ko: '원후선' }, StationID: 'BR10', StationName: fx.StationOfLine.find(l => l.LineID === 'BR').Stations.find(s => s.StationID === 'BR10').StationName,
+    TripHeadSign: '往動物園', DestinationStaionID: 'BR01', DestinationStationID: 'BR01', DestinationStationName: fx.StationOfLine.find(l => l.LineID === 'BR').Stations.find(s => s.StationID === 'BR01').StationName,
+    ServiceStatus: 0, EstimateTime: 0, SrcUpdateTime: '2026-11-10T16:24:37+08:00', UpdateTime: '2026-11-10T16:25:00+08:00'
+  });
+  assert.equal(trtcRows(fx.blob, fx.StationOfLine, fx.Line, now + 4 * 60_000).length, 0, 'rows 3 minutes old: those trains gone');
+
+  resetFree();
+  const files = new Map([['rail/metro/TRTC/StationOfLine.json', JSON.stringify(fx.StationOfLine)], ['rail/metro/TRTC/Line.json', JSON.stringify(fx.Line)]]);
+  const env = { DATA: { get: async k => (files.has(k) ? { text: async () => files.get(k) } : null) } };
+  let asked = 0, down = false;
+  const fetchFn = async u => (assert.equal(String(u), TRTC_LIVE), asked++, down ? new Response('', { status: 503 }) : new Response('﻿' + JSON.stringify(fx.blob)));
+  const whole = await freeTdx('basic/v2/Rail/Metro/LiveBoard/TRTC', '$format=JSON', { env, fetchFn, now });
+  assert.equal(whole.state, 'free');
+  assert.equal(JSON.parse(whole.body).length, rows.length);
+  const one = await freeTdx('basic/v2/Rail/Metro/LiveBoard/TRTC', `%24filter=${encodeURIComponent("StationID eq 'BR10'")}&$format=JSON`, { env, fetchFn, now: now + 5000 });
+  assert.deepEqual(JSON.parse(one.body).map(r => r.DestinationStationID).sort(), ['BR01', 'BR24']);
+  assert.equal(asked, 1, 'read once in 10 s');
+  assert.equal(JSON.parse((await freeTdx('basic/v2/Rail/Metro/LiveBoard/TRTC', '%24top=2', { env, fetchFn, now })).body).length, 2);
+  assert.equal(await freeTdx('basic/v2/Rail/Metro/LiveBoard/TRTC', `%24filter=${encodeURIComponent("LineID eq 'BL'")}`, { env, fetchFn, now }), null, 'another ask: TDX');
+  assert.equal(await freeTdx('basic/v2/Rail/Metro/LiveBoard/KRTC', '', { env, fetchFn, now }), null);
+  down = true;
+  assert.equal((await freeTdx('basic/v2/Rail/Metro/LiveBoard/TRTC', '', { env, fetchFn, now: now + 60_000 })).state, 'free', 'its last copy a while');
+  assert.equal(await freeTdx('basic/v2/Rail/Metro/LiveBoard/TRTC', '', { env, fetchFn, now: now + 3 * 60_000 }), null);
+});
