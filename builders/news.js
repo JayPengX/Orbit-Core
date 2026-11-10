@@ -438,6 +438,7 @@ export function sameOf(pages, items) {
     pagePic: (o, u) => (n.get(`p ${o} ${u}`) || 0) < 2
   };
 }
+const SMALL_PIC = /[?&]width=(?:[1-3]\d\d)\b|\/(?:ace\/standard|news)\/240\//;
 const ytPicture = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 // A feed's small picture swapped for the outlet's own larger size of it.
 export const bigPicture = u =>
@@ -638,7 +639,8 @@ export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, i
   }
   // (Those that play here first, then the outlets' own video pages.)
   clips.sort((a, b) => Boolean(b[1]) - Boolean(a[1]));
-  const withImg = pics.find(Boolean) || (clips[0]?.[4] && [clips[0][4], clips[0][0]]);
+  // (A thumbnail's size, The Guardian's 140 kept from before, only when no other.)
+  const withImg = pics.find(p => p && !SMALL_PIC.test(p[0])) || pics.find(Boolean) || (clips[0]?.[4] && [clips[0][4], clips[0][0]]);
   const sides = region === 'tw' ? { g: 0, c: 0, b: 0 } : { l: 0, c: 0, r: 0 };
   for (const o of byOutlet.keys()) {
     const s = sideOf(o, region);
