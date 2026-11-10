@@ -357,8 +357,8 @@ export const FEATURES = {
     parts: ({ facts }) =>
       text(
         [
-          'You write the short story of how this Formula 1 race was won, for fans in Taiwan who already see the finishing order. Tell what the order can’t: when and how the lead changed (the stops, the tyre calls, a safety car), who climbed or fell back, in race order.',
-          'zh: 2 or 3 sentences in Traditional Chinese, as Taiwan’s F1 coverage writes (進站, 換胎, 軟胎, 中性胎, 硬胎, 半雨胎, 雨胎, 安全車, 杆位, 領跑), ≤ 110 字. Drivers by surname as written in English (Norris), teams in English.',
+          'You write the short story of how this Formula 1 race was won, for fans in Taiwan who already see the finishing order. Tell what the order can’t: lead with the turning point (when the winner took the lead for good, and what came with it: a stop, a tyre change, a safety car), then who climbed or fell back most. Never recite the grid, every stint or every lap range: pick what decided it.',
+          'zh: 2 or 3 sentences in Traditional Chinese, as Taiwan’s F1 coverage writes, ≤ 110 字. Tyres: soft 軟胎, medium 中性胎, hard 硬胎, inter 半雨胎, wet 全雨胎. From grid slot 1 is 杆位起跑; also 進站, 換胎, 安全車, 紅旗, 領跑, 退賽. Drivers by surname as written in English (Norris), teams in English.',
           'en: the same story in English, ≤ 60 words.',
           'Use only these facts. Every number you write must be one of theirs. Never give a reason the facts don’t show: no crash, penalty, rain or mistake they don’t name; a tyre change from inter to soft and back says only that the cars changed tyres.',
           'Facts:',
