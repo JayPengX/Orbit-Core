@@ -411,7 +411,7 @@ async function bodyText(res) {
   return new TextDecoder().decode(buf);
 }
 
-// Orbit's pack for a city → { route: Map(uid → name), stop: Map(uid → zh), ways: Map(stopUID@routeUID → [dir…]), sub, routes: Map(stopUID → [routeUID…]) }.
+// Orbit's pack for a city → { route: Map(uid → name), stop: Map(uid → zh), ways: Map(stopUID@routeUID → [dir…]), sub, routes: Map(stopUID → [routeUID…]), dirs: Map(routeUID → Set(dir)) }.
 async function cityPack(city, deps) {
   if (!deps.env?.DATA) return null;
   const got = await held(`pack:${city}`, 6 * 3_600_000, 14 * 86_400_000, async () => {
@@ -431,14 +431,15 @@ async function cityPack(city, deps) {
       }
     }
     const stop = new Map(Object.entries(j.stops || {}).map(([k, v]) => [k, v?.[0] || '']));
-    // (Each stop's routes: 臺中's stop is asked by its routes.)
+    // (Each stop's routes and each route's ways: 臺中's and 桃園's stops are asked by their routes.)
+    const dirs = new Map((j.routes || []).map(r => [r.uid, new Set((r.ways || []).map(w => w[2]))]));
     const routes = new Map();
     for (const k of ways.keys()) {
       const [st, r] = k.split('@');
       if (!routes.has(st)) routes.set(st, []);
       routes.get(st).push(r);
     }
-    return { route, stop, ways, sub, routes };
+    return { route, stop, ways, sub, routes, dirs };
   }, deps.now);
   return got.val;
 }
@@ -506,38 +507,52 @@ async function cityGpsList(city, deps) {
   return got;
 }
 
-// ---- 臺中's buses: the city's own bus site ---------------------------------------------------
+// ---- 臺中's and 桃園's buses: the cities' own bus sites -------------------------------------
 //
-// 臺中市's 公車動態 site (citybus.taichung.gov.tw/ebus) reads its buses from
-// an open GraphQL service, no key: a route's every stop with the buses coming
-// to it (estimateTimes: each bus's plate and minutes, the next timetabled
-// time), chosen stops' (stationEstimates: a route, a station and a way each),
-// each bus's GPS (buses). Its ids are TDX's: a route's xno is TDX's RouteID,
-// a stop's sid TDX's StopID, goBack 1 and 2 TDX's Direction 0 and 1; a stop's
-// station each way is its route's (stations, kept a day: 臺中酒廠 on 101 is
-// station 787 going, 786 back, and TDX's station lists know only one). Fresher than TDX's copy of it (2026-11-10: TDX a stop or
-// two behind the same bus's GPS) and it counts every bus coming, not one.
-// Read as often as its own page (20 s). A route it doesn't know answers id 0
-// (and some other route's buses): left to TDX.
-export const TC_GQL = 'https://citybus.taichung.gov.tw/ebus/graphql';
-const TC_FRESH = 20_000;
-const TC_KEEP = 2 * MIN;
-const TC_UID = /^TXG(\d{1,6})$/;
-const TC_ETA = 'comeTime isOperationDay isSuspended clogType etas { etaTime isLast busId }';
-const TC_TARGETS = 300; // (a stop's every route and way, 30 stops: one ask)
+// 臺中市's 公車動態 site (citybus.taichung.gov.tw/ebus) and 桃園市's
+// (ebus.tycg.gov.tw/ebus), one maker's, read their buses from an open
+// GraphQL service, no key: a route's every stop with the buses coming to it
+// (estimateTimes: each bus's plate and minutes, the next timetabled time),
+// chosen stops' (stationEstimates: a route, a station and a way each), each
+// bus's GPS (buses). Their ids are TDX's: a route's xno is TDX's RouteID;
+// 桃園's station id is TDX's StopID, 臺中's sid is (its station each way is
+// the route's: stations, kept a day; 臺中酒廠 on 101 is station 787 going,
+// 786 back, and TDX's station lists know only one); goBack 1 and 2 are TDX's
+// Direction 0 and 1, but a route TDX runs one way (a loop) is Direction 0
+// both halves. Fresher than TDX's copy (2026-11-10: TDX a stop or two behind
+// the same bus's GPS) and every bus coming, not one. Read as often as their
+// own pages (20 s). A route they don't know answers id 0 (and some other
+// route's buses): left to TDX.
+export const EBUS = {
+  Taichung: { gql: 'https://citybus.taichung.gov.tw/ebus/graphql', pre: 'TXG', bySid: true, eta: 'comeTime isOperationDay isSuspended clogType etas { etaTime isLast busId }', bus: 'id lat lon azimuth dataTime', chunk: 300, routes: 40 },
+  // (桃園's answers one part after another, ~0.1 s a stop's route and way, ~0.2 s a route: 12 and 6 an ask, the asks at once.)
+  Taoyuan: { gql: 'https://ebus.tycg.gov.tw/ebus/graphql', pre: 'TAO', bySid: false, eta: 'comeTime isOperationDay isSuspended isConstruction isEvent etas { etaTime isLast busId }', bus: 'id lat lon azimuth', chunk: 12, routes: 6 }
+};
+// A route's stops as the site has them, kept a day → [[TDX's StopID, goBack, station]…]: 臺中's stations
+// (a stop is its sid), 桃園's estimates (a stop is its station; asked a way it isn't on, 桃園 answers 今日未營運).
+const PLACES = { true: 'stations { edges { sid goBack node { id } } }', false: 'estimateTimes { edges { node { id goBack } } }' };
+const placesOf = (bySid, v) => (bySid ? (v?.stations?.edges || []).map(e => [String(e?.sid), e?.goBack, String(e?.node?.id)]) : (v?.estimateTimes?.edges || []).map(e => [String(e?.node?.id), e?.node?.goBack, String(e?.node?.id)])).filter(([, , st]) => /^\d+$/.test(st));
+const EB_FRESH = 20_000;
+const EB_KEEP = 2 * MIN;
+const ebUid = (city, u) => (String(u).startsWith(EBUS[city].pre) && /^\d{1,6}$/.test(String(u).slice(3)) ? String(u).slice(3) : '');
 
-async function tcAsk(fetchFn, query, variables) {
-  const res = await fetchFn(TC_GQL, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(variables ? { query, variables } : { query }), signal: AbortSignal.timeout?.(8000) });
-  if (!res.ok) throw new Error(`taichung ${res.status}`);
+async function ebAsk(city, fetchFn, query, variables) {
+  const res = await fetchFn(EBUS[city].gql, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(variables ? { query, variables } : { query }), signal: AbortSignal.timeout?.(8000) });
+  if (!res.ok) throw new Error(`${city} ${res.status}`);
   const j = await res.json();
-  if (!j?.data) throw new Error(`taichung: ${String(j?.errors?.[0]?.message || 'no data').slice(0, 80)}`);
+  if (!j?.data) throw new Error(`${city}: ${String(j?.errors?.[0]?.message || 'no data').slice(0, 80)}`);
   return j.data;
 }
 
-// One estimate (a stop, a route, a way) in TDX's words, as 臺中's own page
-// reads it: 今日未營運, 末班駛離, 施工改道 / 活動改道 / 取消停靠 (not stopping), the
-// buses coming (minutes, the soonest first), else the next timetabled time.
-export function tcRow(n, stopUID, routeUID, pack, at, now = at) {
+// A route TDX runs one way only (a loop: the sites halve it, goBack 1 and 2).
+const oneWay = (pack, route) => pack?.dirs.has(route) && !pack.dirs.get(route).has(1);
+const wayOf = (pack, route, goBack) => (oneWay(pack, route) || goBack !== 2 ? 0 : 1);
+
+// One estimate (a stop, a route, a way) in TDX's words, as the cities' own
+// pages read it: 今日未營運, 末班駛離, 施工改道 / 活動改道 / 取消停靠 (not
+// stopping), the buses coming (minutes, the soonest first), else the next
+// timetabled time.
+export function ebusRow(n, stopUID, routeUID, pack, at, now = at) {
   const name = pack?.route.get(routeUID) || routeUID.slice(3);
   const stopName = pack?.stop.get(stopUID);
   const etas = (n.etas || []).filter(e => Number.isFinite(e?.etaTime) && e.etaTime >= 0).sort((a, b) => a.etaTime - b.etaTime);
@@ -546,120 +561,141 @@ export function tcRow(n, stopUID, routeUID, pack, at, now = at) {
   let state;
   if (n.isOperationDay === false) state = { StopStatus: 4 };
   else if (n.isSuspended) state = { StopStatus: 3 };
-  else if ([-5, -6, -8].includes(n.clogType)) state = { StopStatus: 2 };
+  else if ([-5, -6, -8].includes(n.clogType) || n.isConstruction || n.isEvent) state = { StopStatus: 2 };
   else if (etas.length) state = { StopStatus: 0, EstimateTime: etas[0].etaTime * 60, PlateNumb: etas[0].busId || '', IsLastBus: etas[0].isLast === true, Estimates: etas.map(e => ({ PlateNumb: e.busId || '', EstimateTime: e.etaTime * 60, IsLastBus: e.isLast === true })), ...plan };
   else state = { StopStatus: 1, ...plan };
-  return { StopUID: stopUID, StopID: stopUID.slice(3), ...(stopName ? { StopName: { Zh_tw: stopName, En: stopName } } : {}), RouteUID: routeUID, RouteID: routeUID.slice(3), SubRouteUID: routeUID, RouteName: { Zh_tw: name, En: name }, Direction: n.goBack === 2 ? 1 : 0, ...state, DataTime: twNow(at) };
+  return { StopUID: stopUID, StopID: stopUID.slice(3), ...(stopName ? { StopName: { Zh_tw: stopName, En: stopName } } : {}), RouteUID: routeUID, RouteID: routeUID.slice(3), SubRouteUID: routeUID, RouteName: { Zh_tw: name, En: name }, Direction: wayOf(pack, routeUID, n.goBack), ...state, DataTime: twNow(at) };
+}
+// (One row a stop, route and way: a loop's two halves, or a stop at two stations the same way, the sooner.)
+function soonest(rows) {
+  const by = new Map();
+  const rank = r => (r.StopStatus === 0 ? r.EstimateTime : 1e7 + [0, 0, 2, 3, 4][r.StopStatus] * 10 + (r.NextBusTime ? 0 : 1));
+  for (const r of rows) {
+    const k = `${r.StopUID}|${r.RouteUID}|${r.Direction}`;
+    if (!by.has(k) || rank(r) < rank(by.get(k))) by.set(k, r);
+  }
+  return [...by.values()];
 }
 
-// Stops (TDX's StopUIDs) → Map(`tc:s:${uid}` → { at, val: [[routeUID, node]…] | null }), one ask for all not fresh.
-async function tcStops(uids, pack, deps) {
-  return heldMany(uids.map(u => `tc:s:${u}`), TC_FRESH, TC_KEEP, async keys => {
+// Stops (TDX's StopUIDs) → Map(uid → { at, val: [[routeUID, node]…] | null }), one ask for all not fresh.
+async function ebStops(city, uids, pack, deps) {
+  const { bySid, eta } = EBUS[city];
+  const keyOf = u => `eb:${city}:s:${u}`;
+  const got = await heldMany(uids.map(keyOf), EB_FRESH, EB_KEEP, async keys => {
     const asks = keys.map(key => {
-      const uid = key.slice(5);
-      return { key, uid, sid: uid.slice(3), routes: (pack.routes.get(uid) || []).filter(r => TC_UID.test(r)) };
+      const uid = key.slice(keyOf('').length);
+      return { key, uid, id: uid.slice(3), routes: (pack.routes.get(uid) || []).filter(r => ebUid(city, r)) };
     });
-    const places = await tcRoutes('p', [...new Set(asks.flatMap(a => a.routes))], 'stations { edges { sid goBack node { id } } }', deps, DAY);
+    const places = await ebRoutes(city, 'p', [...new Set(asks.flatMap(a => a.routes))], PLACES[bySid], deps, DAY);
     const want = new Map(); // `${xno}|${station}|${goBack}` → [[key, routeUID]…]
-    for (const { key, uid, sid, routes } of asks) {
+    const add = (xno, station, goBack, key, route) => {
+      const k = `${xno}|${station}|${goBack}`;
+      if (!want.has(k)) want.set(k, []);
+      want.get(k).push([key, route]);
+    };
+    for (const { key, uid, id, routes } of asks) {
       for (const route of routes) {
-        const edges = places.get(`tc:p:${route}`)?.val?.stations?.edges || [];
-        for (const d of pack.ways.get(`${uid}@${route}`) || []) {
-          // (The stop's station that way on that route; a loop's stop twice the same way, each.)
-          for (const e of edges) {
-            if (String(e?.sid) !== sid || e.goBack !== d + 1 || !/^\d+$/.test(e.node?.id || '')) continue;
-            const k = `${route.slice(3)}|${e.node.id}|${d + 1}`;
-            if (!want.has(k)) want.set(k, []);
-            want.get(k).push([key, route]);
-          }
-        }
+        const backs = oneWay(pack, route) ? [1, 2] : (pack.ways.get(`${uid}@${route}`) || []).map(d => d + 1);
+        // (The stop's station each way it's on: one stop can be two stations, a loop's stop on either half.)
+        for (const [stop, g, station] of placesOf(bySid, places.get(route)?.val)) if (stop === id && backs.includes(g)) add(route.slice(3), station, g, key, route);
       }
     }
     const targets = [...want.keys()].map(k => k.split('|').map(Number)).map(([xno, stationId, goBack]) => ({ xno, stationId, goBack }));
     const vals = new Map();
-    for (let i = 0; i < targets.length; i += TC_TARGETS) {
-      const d = await tcAsk(deps.fetchFn, `query($t: [EstimateStationInput!]!) { stationEstimates(targets: $t) { edges { node { xno id goBack ${TC_ETA} } } } }`, { t: targets.slice(i, i + TC_TARGETS) });
-      for (const { node: n } of d.stationEstimates?.edges || []) {
-        for (const [key, route] of want.get(`${n?.xno}|${n?.id}|${n?.goBack}`) || []) {
-          // (One row a route and way at a stop: the first.)
-          const v = vals.get(key) || [];
-          if (!v.some(([r, x]) => r === route && x.goBack === n.goBack)) vals.set(key, [...v, [route, n]]);
-        }
-      }
-    }
-    // (A stop with none of its routes answered: TDX's.)
+    const size = Math.max(EBUS[city].chunk, Math.ceil(targets.length / 6));
+    const parts = Array.from({ length: Math.ceil(targets.length / size) }, (_, i) => targets.slice(i * size, i * size + size));
+    const got = await Promise.allSettled(parts.map(t => ebAsk(city, deps.fetchFn, `query($t: [EstimateStationInput!]!) { stationEstimates(targets: $t) { edges { node { xno id goBack ${eta} } } } }`, { t })));
+    if (parts.length && got.every(g => g.status === 'rejected')) throw got[0].reason;
+    for (const g of got) for (const { node: n } of (g.status === 'fulfilled' && g.value.stationEstimates?.edges) || []) for (const [key, route] of want.get(`${n?.xno}|${n?.id}|${n?.goBack}`) || []) vals.set(key, [...(vals.get(key) || []), [route, n]]);
+    // (A stop with none of its routes answered, or its ask failed: TDX's.)
     return vals;
   }, deps.now);
+  return new Map(uids.map(u => [u, got.get(keyOf(u))]));
 }
 
-// Routes (TDX's RouteUIDs) → Map(`tc:${kind}:${uid}` → { at, val }), one ask for all not fresh (`fresh` long): `what` each route's fields.
-async function tcRoutes(kind, uids, what, deps, fresh = TC_FRESH) {
+// Routes (TDX's RouteUIDs) → Map(uid → { at, val }), one ask for all not fresh (`fresh` long): `what` each route's fields.
+async function ebRoutes(city, kind, uids, what, deps, fresh = EB_FRESH) {
   if (!uids.length) return new Map();
-  return heldMany(uids.map(u => `tc:${kind}:${u}`), fresh, Math.max(TC_KEEP, fresh * 14), async keys => {
-    const xs = keys.map(k => k.slice(kind.length + 7));
-    const d = await tcAsk(deps.fetchFn, `query { ${xs.map(x => `r${x}: route(xno: ${x}, lang: "zh") { id ${what} }`).join(' ')} }`);
+  const keyOf = u => `eb:${city}:${kind}:${u}`;
+  const got = await heldMany(uids.map(keyOf), fresh, Math.max(EB_KEEP, fresh * 14), async keys => {
+    const xs = keys.map(k => ebUid(city, k.slice(keyOf('').length)));
+    const size = Math.max(EBUS[city].routes, Math.ceil(xs.length / 12));
+    const parts = Array.from({ length: Math.ceil(xs.length / size) }, (_, i) => xs.slice(i * size, i * size + size));
+    const got = await Promise.allSettled(parts.map(p => ebAsk(city, deps.fetchFn, `query { ${p.map(x => `r${x}: route(xno: ${x}, lang: "zh") { id ${what} }`).join(' ')} }`)));
+    if (got.every(g => g.status === 'rejected')) throw got[0].reason;
+    const d = Object.assign({}, ...got.map(g => (g.status === 'fulfilled' ? g.value : {})));
     // (Only a route it says it is: an id it doesn't know answers 0.)
     return new Map(keys.map((k, i) => [k, d[`r${xs[i]}`]?.id === xs[i] ? d[`r${xs[i]}`] : null]).filter(([, v]) => v));
   }, deps.now);
+  return new Map(uids.map(u => [u, got.get(keyOf(u))]));
 }
 
-async function tcEta({ stops, routes }, deps) {
+async function ebEta(city, { stops, routes }, deps) {
+  const { pre, bySid, eta } = EBUS[city];
   const rows = [];
   const missing = { stops: [], routes: [] };
   let oldest = deps.now;
-  const pack = await cityPack('Taichung', deps).catch(() => null);
+  const pack = await cityPack(city, deps).catch(() => null);
   if (!pack) return { rows, missing: { stops, routes }, age: 0 };
-  const mine = stops.filter(u => TC_UID.test(u));
-  missing.stops.push(...stops.filter(u => !TC_UID.test(u)), ...mine.slice(MAX_STOPS));
+  const mine = stops.filter(u => ebUid(city, u));
+  missing.stops.push(...stops.filter(u => !ebUid(city, u)), ...mine.slice(MAX_STOPS));
   if (mine.length) {
-    const got = await tcStops(mine.slice(0, MAX_STOPS), pack, deps).catch(() => new Map());
+    const got = await ebStops(city, mine.slice(0, MAX_STOPS), pack, deps).catch(() => new Map());
     for (const u of mine.slice(0, MAX_STOPS)) {
-      const g = got.get(`tc:s:${u}`);
+      const g = got.get(u);
       if (!g?.val) {
         missing.stops.push(u);
         continue;
       }
-      for (const [route, n] of g.val) rows.push(tcRow(n, u, route, pack, g.at, deps.now));
+      for (const [route, n] of g.val) rows.push(ebusRow(n, u, route, pack, g.at, deps.now));
       oldest = Math.min(oldest, g.at);
     }
   }
-  const rs = routes.filter(u => TC_UID.test(u));
-  missing.routes.push(...routes.filter(u => !TC_UID.test(u)), ...rs.slice(MAX_ROUTES));
+  const rs = routes.filter(u => ebUid(city, u));
+  missing.routes.push(...routes.filter(u => !ebUid(city, u)), ...rs.slice(MAX_ROUTES));
   if (rs.length) {
-    const got = await tcRoutes('r', rs.slice(0, MAX_ROUTES), `estimateTimes { edges { node { sid goBack ${TC_ETA} } } }`, deps).catch(() => new Map());
+    const got = await ebRoutes(city, 'r', rs.slice(0, MAX_ROUTES), `estimateTimes { edges { node { ${bySid ? 'sid' : 'id'} goBack ${eta} } } }`, deps).catch(() => new Map());
     for (const u of rs.slice(0, MAX_ROUTES)) {
-      const g = got.get(`tc:r:${u}`);
+      const g = got.get(u);
       if (!g?.val) {
         missing.routes.push(u);
         continue;
       }
-      for (const e of g.val.estimateTimes?.edges || []) if (e?.node?.sid != null) rows.push(tcRow(e.node, `TXG${e.node.sid}`, u, pack, g.at, deps.now));
+      for (const e of g.val.estimateTimes?.edges || []) {
+        const id = bySid ? e?.node?.sid : e?.node?.id;
+        const stop = `${pre}${id}`;
+        // (Only a stop and way TDX has the route at, as the pack says.)
+        if (id == null || !(pack.ways.get(`${stop}@${u}`) || []).includes(wayOf(pack, u, e.node.goBack))) continue;
+        rows.push(ebusRow(e.node, stop, u, pack, g.at, deps.now));
+      }
       oldest = Math.min(oldest, g.at);
     }
   }
-  return { rows, missing, age: Math.max(0, deps.now - oldest) };
+  return { rows: soonest(rows), missing, age: Math.max(0, deps.now - oldest) };
 }
 
 // (A bus whose last place is older than this is parked, not on the road.)
-const TC_GPS_OLD = 10 * MIN;
-async function tcGps(routes, deps) {
+const EB_GPS_OLD = 10 * MIN;
+async function ebGps(city, routes, deps) {
   const rows = [];
   const missing = [];
   let oldest = deps.now;
-  const rs = routes.filter(u => TC_UID.test(u));
-  missing.push(...routes.filter(u => !TC_UID.test(u)), ...rs.slice(MAX_ROUTES));
-  const got = rs.length ? await tcRoutes('g', rs.slice(0, MAX_ROUTES), 'buses { edges { goBack node { id lat lon azimuth dataTime } } }', deps).catch(() => new Map()) : new Map();
+  const rs = routes.filter(u => ebUid(city, u));
+  missing.push(...routes.filter(u => !ebUid(city, u)), ...rs.slice(MAX_ROUTES));
+  const pack = await cityPack(city, deps).catch(() => null);
+  const got = rs.length ? await ebRoutes(city, 'g', rs.slice(0, MAX_ROUTES), `buses { edges { goBack node { ${EBUS[city].bus} } } }`, deps).catch(() => new Map()) : new Map();
   for (const u of rs.slice(0, MAX_ROUTES)) {
-    const g = got.get(`tc:g:${u}`);
+    const g = got.get(u);
     if (!g?.val) {
       missing.push(u);
       continue;
     }
     for (const e of g.val.buses?.edges || []) {
       const b = e?.node;
-      const t = Number(b?.dataTime) * 1000;
-      if (!b?.id || !Number.isFinite(b.lat) || !Number.isFinite(b.lon) || !(b.lat > 0) || !(t > g.at - TC_GPS_OLD)) continue;
-      rows.push({ RouteUID: u, SubRouteUID: u, PlateNumb: b.id, Direction: e.goBack === 2 ? 1 : 0, BusPosition: { PositionLat: b.lat, PositionLon: b.lon }, GPSTime: twNow(t), Speed: null, Azimuth: b.azimuth >= 0 && b.azimuth < 360 ? b.azimuth : null });
+      // (桃園's buses carry no time: the read's.)
+      const t = b?.dataTime != null ? Number(b.dataTime) * 1000 : g.at;
+      if (!b?.id || !Number.isFinite(b.lat) || !Number.isFinite(b.lon) || !(b.lat > 0) || !(t > g.at - EB_GPS_OLD)) continue;
+      rows.push({ RouteUID: u, SubRouteUID: u, PlateNumb: b.id, Direction: wayOf(pack, u, e.goBack), BusPosition: { PositionLat: b.lat, PositionLon: b.lon }, GPSTime: twNow(t), Speed: null, Azimuth: b.azimuth >= 0 && b.azimuth < 360 ? b.azimuth : null });
     }
     oldest = Math.min(oldest, g.at);
   }
@@ -667,7 +703,7 @@ async function tcGps(routes, deps) {
 }
 
 // The cities whose buses a free source reads (TDX's city names).
-export const FREE_BUS = /^(Hsinchu|HsinchuCounty|InterCity|Taipei|NewTaipei|Taichung)$/;
+export const FREE_BUS = /^(Hsinchu|HsinchuCounty|InterCity|Taipei|NewTaipei|Taichung|Taoyuan)$/;
 const MAX_STOPS = 30;
 const MAX_ROUTES = 12;
 
@@ -676,7 +712,7 @@ const MAX_ROUTES = 12;
 export async function freeEta(city, { stops = [], routes = [] }, { fetchFn = fetch, now = Date.now(), env = null } = {}) {
   if (!FREE_BUS.test(city)) return null;
   const deps = { fetchFn, now, env };
-  if (city === 'Taichung') return tcEta({ stops, routes }, deps);
+  if (EBUS[city]) return ebEta(city, { stops, routes }, deps);
   if (CITY_FEEDS[city]) {
     const got = await cityEtaIndex(city, deps).catch(() => null);
     if (!got) return { rows: [], missing: { stops, routes }, age: 0 };
@@ -715,7 +751,7 @@ export async function freeEta(city, { stops = [], routes = [] }, { fetchFn = fet
 export async function freeGps(city, routes, { fetchFn = fetch, now = Date.now(), env = null } = {}) {
   if (!FREE_BUS.test(city)) return null;
   const deps = { fetchFn, now, env };
-  if (city === 'Taichung') return tcGps(routes, deps);
+  if (EBUS[city]) return ebGps(city, routes, deps);
   if (CITY_FEEDS[city]) {
     const got = CITY_FEEDS[city].bus ? await cityGpsList(city, deps).catch(() => null) : null;
     if (!got) return { rows: [], missing: routes, age: 0 };
@@ -950,4 +986,4 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), 
 // isolate's 10 ms).
 export const freeHeavy = p => /^((basic|advanced)\/v2\/Bike\/|basic\/v3\/Rail\/TRA\/DailyTrainTimetable\/TrainDate\/)/.test(String(p || '').replace(/^\/+/, ''));
 // (A route's whole list of stops, or its buses, from 新竹's site: read in the Runner too.)
-export const freeRoutesHeavy = (path, q) => (path === '/transit/gps' || (path === '/transit/eta' && (q.get('routes') || q.get('route') || CITY_FEEDS[q.get('city')] || q.get('city') === 'Taichung'))) && FREE_BUS.test(q.get('city') || '');
+export const freeRoutesHeavy = (path, q) => (path === '/transit/gps' || (path === '/transit/eta' && (q.get('routes') || q.get('route') || CITY_FEEDS[q.get('city')] || EBUS[q.get('city')]))) && FREE_BUS.test(q.get('city') || '');
