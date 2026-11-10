@@ -422,7 +422,7 @@ export const HELP = {
         'Orbit 的音樂 App：按播放，App 用自己的樂器現做一首首新歌，不會重複；也可以自己做：放進節拍片段排成歌、在樂器上編鼓和旋律、即興，或玩節奏遊戲。全部在手機上算，聲音不上傳，沒有網路也能用。'
       ]],
       ['add', '放進片段', [
-        '一段錄音（片段之間留 0.2 秒以上的安靜，會自動切開）、一整包取樣，或用麥克風錄；WAV 最好，m4a、mp3 也可以。切出來的數量不對，到「切片」把「安靜門檻」調高（例如 -60 dB）。'
+        '一段錄音（片段之間有 0.2 秒以上的安靜，就在安靜處切開；沒有安靜的長錄音，依節拍一小節一小節切，或一下一下切）、一整包取樣，或用麥克風錄；WAV 最好，m4a、mp3 也可以。切出來的數量不對，到「切片」把「安靜門檻」調高（例如 -60 dB）。'
       ]],
       ['roles', '速度與角色', [
         '速度從片段聽出來；聽成一半或兩倍時按 ½ 或 ×2，也可以輸入或點拍子。每段的角色（Riff、樂句、貝斯、Hi-hat、過門、大鼓、808、小鼓、Tick、滾奏、不用）也是聽出來的，選單可以改，改過的不會被蓋掉。至少要有一段 Riff 或樂句。'
@@ -444,7 +444,7 @@ export const HELP = {
         'Orbit’s music app: press play and it makes new songs on its own instruments, never the same twice. Or make your own: beat pieces arranged into songs, drums and melody in the studio, a jam, or the rhythm game. It all runs on the phone: no sound is uploaded, and it works offline.'
       ]],
       ['add', 'Adding pieces', [
-        'One recording (0.2 s or more of silence between pieces, split for you), a whole sample pack, or the microphone; WAV is best, m4a and mp3 work too. If the count is off, raise Silence below under Splitting (say to -60 dB).'
+        'One recording (split at its silences of 0.2 s or more; a long take with none is cut on its beat, bar by bar or hit by hit), a whole sample pack, or the microphone; WAV is best, m4a and mp3 work too. If the count is off, raise Silence below under Splitting (say to -60 dB).'
       ]],
       ['roles', 'Tempo and roles', [
         'The tempo is heard from the pieces; if it hears half or double, tap ½ or ×2, type it, or tap it in. Each piece’s role (riff, phrase, bass, hats, fill, kick, 808, snare, tick, roll, not used) is heard too; change it in its menu, and a role set by hand stays. At least one riff or phrase is needed.'
