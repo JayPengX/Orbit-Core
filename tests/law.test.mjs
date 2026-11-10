@@ -26,6 +26,8 @@ globalThis.fetch = async (url, init) => {
   const u = String(url);
   if (u.includes('generativelanguage')) {
     gemini.push(JSON.parse(init.body));
+    // (Flash is read streamed, as Google sends it: server-sent events.)
+    if (u.includes(':streamGenerateContent?alt=sse&') && geminiStatus === 200) return new Response(`data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(reply) }] } }] })}\r\n\r\n`);
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(reply) }] } }] }), { status: geminiStatus, headers: { 'Content-Type': 'application/json' } });
   }
   if (u.startsWith('https://v2.ly.govapi.tw/bill/')) {

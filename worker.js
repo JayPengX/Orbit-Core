@@ -62,7 +62,7 @@ import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
 import { docStore, storeReady } from './doc-store.js';
 import { handleMoneyRead } from './money-read.js';
 import { handleCal } from './cal.js';
-import { logCall, callsSince, reliability } from './gemini-use.js';
+import { logCall, callsSince, reliability, lastFailed } from './gemini-use.js';
 import { handleFlight } from './flight.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
 // The F1 lap log's Durable Object (f1-live.js), bound as F1_LOG.
@@ -631,6 +631,8 @@ async function proxyGeminiRequest(model, parts, schema, env, headers, ctx, featu
       headers: { ...headers, 'Content-Type': 'application/json' }
     });
   } catch (error) {
+    // (Given up on, or the line failed: a failed call too, 504 in the log, so the panel and geminiAnswer see it.)
+    if (ctx) ctx.waitUntil(logCall(env, { feature, model, status: 504 }));
     return upstreamFailed(error, headers);
   }
 }
@@ -639,14 +641,18 @@ async function proxyGeminiRequest(model, parts, schema, env, headers, ctx, featu
 // the reply's text so far as each piece comes, so a route can show the answer
 // while it's still being written (/law-chat's verdict and answer). Returns the
 // whole reply as the plain call's JSON, so callers read it the same way.
-async function streamGeminiRequest(model, parts, schema, env, headers, ctx, feature, timeoutMs, onText, thinking = null) {
+// (firstMs: given up on when no text has come by then, a model stuck in Google's line.)
+async function streamGeminiRequest(model, parts, schema, env, headers, ctx, feature, timeoutMs, onText = null, thinking = null, firstMs = 0) {
+  const stop = new AbortController();
+  let text = '';
+  const slow = firstMs ? setTimeout(() => text || stop.abort(new Error(`no answer from ${model} in ${firstMs / 1000} s`)), firstMs) : null;
   try {
     const url = geminiUrl(model, env).replace(':generateContent?', ':streamGenerateContent?alt=sse&');
     const upstream = await geminiFetch(env, url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts }], generationConfig: buildGenerationConfig(model, schema, thinking) }),
-      signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined
+      signal: timeoutMs ? AbortSignal.any([stop.signal, AbortSignal.timeout(timeoutMs)]) : stop.signal
     });
     if (!upstream.ok || !upstream.body) {
       if (ctx) ctx.waitUntil(logCall(env, { feature, model, status: upstream.status }));
@@ -655,7 +661,6 @@ async function streamGeminiRequest(model, parts, schema, env, headers, ctx, feat
     const reader = upstream.body.getReader();
     const dec = new TextDecoder();
     let buf = '';
-    let text = '';
     let usage = null;
     let finish = null;
     const take = line => {
@@ -668,7 +673,7 @@ async function streamGeminiRequest(model, parts, schema, env, headers, ctx, feat
       if (piece) {
         text += piece;
         try {
-          onText(text);
+          onText?.(text);
         } catch {}
       }
     };
@@ -685,8 +690,43 @@ async function streamGeminiRequest(model, parts, schema, env, headers, ctx, feat
     if (ctx) ctx.waitUntil(logGeminiUsage(new Response(body).body, feature, model, env, ctx));
     return new Response(body, { status: 200, headers: { ...headers, 'Content-Type': 'application/json' } });
   } catch (error) {
+    if (ctx) ctx.waitUntil(logCall(env, { feature, model, status: 504 }));
     return upstreamFailed(error, headers);
+  } finally {
+    clearTimeout(slow);
   }
+}
+
+// Every Gemini call of the family's, kept answering on the free tier, where
+// (checked 11-10 through the relay) every Flash model sat in Google's line
+// past 20 s while Flash-Lite answered in 2 s, and Flash-Lite itself now and
+// then turned a call down 503 ("high demand"):
+// - Flash asked for: tried only if its last call in 10 minutes didn't fail
+//   (gemini-use.js lastFailed), and given FLASH_FIRST_MS to start writing;
+//   failing, Flash-Lite answers instead (a plainer answer rather than none);
+// - Flash-Lite turned down (5xx, or no answer): asked once more 1.5 s later.
+// A 4xx is the ask's own fault and goes back as it is. The answer is
+// Gemini's shape either way: { candidates: [{ content: { parts: [{ text }] } }] }.
+// opts: timeoutMs (Flash's whole call), liteMs (Flash-Lite's), thinking, onText (streamed).
+const FLASH_FIRST_MS = 12_000;
+const FLASH_SICK_MS = 10 * 60_000;
+const retryable = status => status >= 500 || status === 429;
+async function geminiAnswer(model, parts, schema, env, headers, ctx, feature, { timeoutMs = 0, liteMs = timeoutMs, thinking = null, onText = null } = {}) {
+  const lite = GEMINI_ALLOWED_MODELS[0];
+  const once = m =>
+    m === lite && !onText
+      ? proxyGeminiRequest(m, parts, schema, env, headers, ctx, feature, liteMs, thinking)
+      : streamGeminiRequest(m, parts, schema, env, headers, ctx, feature, m === lite ? liteMs : timeoutMs, onText, thinking, m === lite ? 0 : FLASH_FIRST_MS);
+  if (model !== lite && !(await lastFailed(env, model, FLASH_SICK_MS))) {
+    const res = await once(model);
+    if (res.ok || !retryable(res.status)) return res;
+    await res.body?.cancel().catch(() => {});
+  }
+  const res = await once(lite);
+  if (res.ok || res.status === 429 || !retryable(res.status)) return res;
+  await res.body?.cancel().catch(() => {});
+  await new Promise(r => setTimeout(r, 1500));
+  return once(lite);
 }
 
 // One log line per billed Gemini call, with the token counts Gemini itself
@@ -829,7 +869,7 @@ async function handleGeminiRequest(request, env, headers, ip, ctx, session = nul
       inline_data: { mime_type: file.mime_type, data: file.data }
     }))
   ];
-  return proxyGeminiRequest(model, parts, GEMINI_RESPONSE_SCHEMA, env, headers, ctx, 'gemini');
+  return geminiAnswer(model, parts, GEMINI_RESPONSE_SCHEMA, env, headers, ctx, 'gemini');
 }
 
 // ==== /nl-edit - natural-language schedule edits ============================
@@ -1121,15 +1161,7 @@ async function handleNlEditRequest(request, env, headers, ip, ctx, session = nul
     return errorJson('MISSING_API_KEY', 500, headers, request);
   }
 
-  return proxyGeminiRequest(
-    model,
-    [{ text: buildNlEditPrompt(text, context) }],
-    NL_EDIT_RESPONSE_SCHEMA,
-    env,
-    headers,
-    ctx,
-    'nl-edit'
-  );
+  return geminiAnswer(model, [{ text: buildNlEditPrompt(text, context) }], NL_EDIT_RESPONSE_SCHEMA, env, headers, ctx, 'nl-edit', { timeoutMs: 40_000, liteMs: 25_000 });
 }
 
 // ==== The Orbit Pass's store: D1 (doc-store.js) =============================
@@ -1295,9 +1327,9 @@ async function route(request, env, ctx, headers, origin) {
   // thinking: the model's thinking level, 'low' unless said.)
   const lawGemini = feature => (parts, schema, model = GEMINI_ALLOWED_MODELS[0], { onText = null, thinking = null } = {}) => {
     const m = GEMINI_ALLOWED_MODELS.includes(model) ? model : GEMINI_ALLOWED_MODELS[0];
-    const ms = m === GEMINI_ALLOWED_MODELS[0] ? 25_000 : 40_000;
     const level = ['minimal', 'low', 'medium'].includes(thinking) ? thinking : null;
-    return onText ? streamGeminiRequest(m, parts, schema, env, headers, ctx, feature, ms, onText, level) : proxyGeminiRequest(m, parts, schema, env, headers, ctx, feature, ms, level);
+    // (Flash stuck or failing: Flash-Lite's answer instead, geminiAnswer.)
+    return geminiAnswer(m, parts, schema, env, headers, ctx, feature, { timeoutMs: 40_000, liteMs: 25_000, thinking: level, onText });
   };
   if (path === '/law-ask') return handleLawAsk(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-ask'), await aiCap(env, ctx, 'law-ask'));
   if (path === '/law-chat') return handleLawChat(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-chat'), await aiCap(env, ctx, 'law-chat'));
