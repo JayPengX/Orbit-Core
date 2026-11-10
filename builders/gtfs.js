@@ -338,3 +338,29 @@ export function whereOf(packs, old, built, cell = 0.02) {
   }
   return { v: 1, built, cell, packs: names, cells: Object.fromEntries([...cells].map(([c, s]) => [c, [...s].sort((a, b) => a - b)])) };
 }
+
+// 高鐵's trains from GTFS (route THSR_<no>_<dir>, stops THSR_<id>, a date
+// each in calendar_dates) for transit-free.js hsrDay: { v, built, stations:
+// { id: [zh, en] }, trains: [[no, [[id, 'HH:MM', 'HH:MM']…]]], days: {
+// 'YYYY-MM-DD': [train…] } }, each train's timetable once.
+export const HSR_EN = { '0990': 'Nangang', 1000: 'Taipei', 1010: 'Banqiao', 1020: 'Taoyuan', 1030: 'Hsinchu', 1035: 'Miaoli', 1040: 'Taichung', 1043: 'Changhua', 1047: 'Yunlin', 1050: 'Chiayi', 1060: 'Tainan', 1070: 'Zuoying' };
+export function hsrPack(trips, names, built) {
+  const trains = [];
+  const at = new Map();
+  const days = {};
+  const used = new Set();
+  for (const t of trips) {
+    const stops = t.stops.map(([id, a, d]) => [String(id).replace(/^THSR_/, ''), a, d]);
+    if (stops.length < 2) continue;
+    const k = JSON.stringify([t.no, stops]);
+    if (!at.has(k)) at.set(k, trains.push([t.no, stops]) - 1);
+    for (const s of stops) used.add(s[0]);
+    for (const d of t.dates) {
+      const day = isoDay(d);
+      if (day) (days[day] ||= []).push(at.get(k));
+    }
+  }
+  for (const d of Object.values(days)) d.sort((a, b) => a - b);
+  const stations = Object.fromEntries([...used].sort().map(id => [id, [names[`THSR_${id}`] || names[id] || '', HSR_EN[id] || '']]));
+  return { v: 1, built, stations, trains, days: Object.fromEntries(Object.entries(days).sort()) };
+}
