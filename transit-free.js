@@ -702,8 +702,128 @@ async function ebGps(city, routes, deps) {
   return { rows, missing, age: Math.max(0, deps.now - oldest) };
 }
 
+// ---- 臺南's buses: the city's own bus site ---------------------------------------------------
+//
+// 臺南市's 大台南公車 site (2384.tainan.gov.tw) reads a route one way at a
+// time, no key (ajax_routeinfo_pathattr.jsp, goback 0 and 1 TDX's Direction):
+// each stop's estimate in seconds (infoId; -1 尚未發車, -2 交管不停靠, -3 末班已過,
+// -4 今日未營運, as 臺北's), its sub-route (TDX's SubRouteID), the plate of
+// the bus coming next to it (or the next trip's time); and that way's buses
+// (busData: plate, place). Its ids are TDX's (a route's id TDX's RouteID, a
+// stop's TDX's StopID). The same times as TDX's (2026-11-10: route 19 both
+// ways, a few seconds sooner), and the stops no bus is coming to yet, which
+// TDX leaves out. A stop is read by its routes (the pack's), each way one
+// read (~7 KB, a second), as often as its own page (20 s).
+export const TN_PATH = 'https://2384.tainan.gov.tw/IMP/jsp/rwd_api/ajax_routeinfo_pathattr.jsp';
+const TN_FRESH = 20_000;
+const TN_KEEP = 2 * MIN;
+const TN_UID = /^TNN(\d{1,7})$/;
+const TN_READS = 24; // (a board's every route and way at once, at most)
+
+async function tnWay(rid, dir, deps) {
+  return held(`tn:${rid}:${dir}`, TN_FRESH, TN_KEEP, async () => {
+    const res = await deps.fetchFn(`${TN_PATH}?prj=tn&id=${rid}&Lang=cht&goback=${dir}`, { method: 'POST', headers: { Accept: 'application/json' }, signal: AbortSignal.timeout?.(8000) });
+    if (!res.ok) throw new Error(`tainan ${res.status}`);
+    const j = await res.json();
+    if (j?.result !== true || !Array.isArray(j.data)) throw new Error('tainan: no data');
+    return j;
+  }, deps.now);
+}
+
+// One way's stops in TDX's words: the bus coming to each is the last one before it.
+export function tnRows(j, routeUID, dir, pack, at, now = at) {
+  const name = pack?.route.get(routeUID) || routeUID.slice(3);
+  const rows = [];
+  let plate = '';
+  for (const x of [...(j.data || [])].sort((a, b) => Number(a.seq) - Number(b.seq))) {
+    if (!/^\d+$/.test(String(x?.id ?? ''))) continue;
+    const car = String(x.carNo || '').trim();
+    const clock = /^\d{1,2}:\d{2}$/.test(car);
+    if (car && !clock) plate = car;
+    const est = Number(x.infoId);
+    const stopUID = `TNN${x.id}`;
+    const stopName = pack?.stop.get(stopUID);
+    const state = Number.isFinite(est) && est >= 0 ? { StopStatus: 0, EstimateTime: est, ...(plate ? { PlateNumb: plate } : {}) } : { StopStatus: SAID[String(est)] ?? 1, ...(clock ? { NextBusTime: hcTime(car, now).NextBusTime } : {}) };
+    rows.push({ StopUID: stopUID, StopID: String(x.id), ...(stopName ? { StopName: { Zh_tw: stopName, En: stopName } } : {}), RouteUID: routeUID, RouteID: routeUID.slice(3), ...(/^\d+$/.test(x.subRouteId || '') ? { SubRouteUID: `TNN${x.subRouteId}` } : {}), RouteName: { Zh_tw: name, En: name }, Direction: dir, ...state, DataTime: twNow(at) });
+  }
+  return rows;
+}
+
+// The ways to read (route, way) for these stops and routes, the pack's; at most TN_READS.
+function tnReads(stops, routes, pack) {
+  const reads = new Set();
+  const fits = more => reads.size + [...more].filter(k => !reads.has(k)).length <= TN_READS;
+  const per = { stops: new Map(), routes: new Map() };
+  for (const u of stops) {
+    const need = new Set((pack.routes.get(u) || []).filter(r => TN_UID.test(r)).flatMap(r => (pack.ways.get(`${u}@${r}`) || []).map(d => `${r}|${d}`)));
+    if (!need.size || !fits(need)) continue;
+    need.forEach(k => reads.add(k));
+    per.stops.set(u, need);
+  }
+  for (const r of routes) {
+    const need = new Set([...(pack.dirs.get(r) || [0, 1])].map(d => `${r}|${d}`));
+    if (!fits(need)) continue;
+    need.forEach(k => reads.add(k));
+    per.routes.set(r, need);
+  }
+  return { reads, per };
+}
+
+async function tnEta({ stops, routes }, deps) {
+  const missing = { stops: [], routes: [] };
+  const pack = await cityPack('Tainan', deps).catch(() => null);
+  if (!pack) return { rows: [], missing: { stops, routes }, age: 0 };
+  const mine = stops.filter(u => TN_UID.test(u)).slice(0, MAX_STOPS);
+  const rs = routes.filter(u => TN_UID.test(u)).slice(0, MAX_ROUTES);
+  const { reads, per } = tnReads(mine, rs, pack);
+  const got = new Map(await Promise.all([...reads].map(async k => [k, await tnWay(k.split('|')[0].slice(3), Number(k.split('|')[1]), deps).catch(() => null)])));
+  const rowsOf = new Map([...got].filter(([, g]) => g).map(([k, g]) => [k, tnRows(g.val, k.split('|')[0], Number(k.split('|')[1]), pack, g.at, deps.now)]));
+  const rows = [];
+  let oldest = deps.now;
+  const take = (need, keep) => {
+    const ok = [...need].filter(k => rowsOf.has(k));
+    if (!ok.length) return false;
+    for (const k of ok) {
+      rows.push(...rowsOf.get(k).filter(keep));
+      oldest = Math.min(oldest, got.get(k).at);
+    }
+    return true;
+  };
+  for (const u of stops) if (!per.stops.has(u) || !take(per.stops.get(u), r => r.StopUID === u)) missing.stops.push(u);
+  for (const r of routes) if (!per.routes.has(r) || !take(per.routes.get(r), () => true)) missing.routes.push(r);
+  return { rows: soonest(rows), missing, age: Math.max(0, deps.now - oldest) };
+}
+
+async function tnGps(routes, deps) {
+  const pack = await cityPack('Tainan', deps).catch(() => null);
+  const rs = routes.filter(u => TN_UID.test(u)).slice(0, MAX_ROUTES);
+  const rows = [];
+  const missing = routes.filter(u => !rs.includes(u));
+  let oldest = deps.now;
+  await Promise.all(
+    rs.map(async r => {
+      const dirs = [...(pack?.dirs.get(r) || [0, 1])];
+      const got = (await Promise.all(dirs.map(d => tnWay(r.slice(3), d, deps).catch(() => null)))).map((g, i) => [dirs[i], g]).filter(([, g]) => g);
+      if (!got.length) return missing.push(r);
+      for (const [d, g] of got) {
+        // (The way's own time when it's sane: when its buses were placed.)
+        const t = Math.abs(Number(g.val.time) - g.at) < 10 * MIN ? Number(g.val.time) : g.at;
+        for (const b of g.val.busData || []) {
+          const lat = Number(b.lat);
+          const lon = Number(b.lon);
+          if (!b.carNo || !(lat > 0) || !(lon > 0)) continue;
+          const sub = String(b.locId || '').split('_')[0];
+          rows.push({ RouteUID: r, ...(/^\d+$/.test(sub) ? { SubRouteUID: `TNN${sub}` } : {}), PlateNumb: b.carNo, Direction: d, BusPosition: { PositionLat: lat, PositionLon: lon }, GPSTime: twNow(t), Speed: null, Azimuth: null });
+        }
+        oldest = Math.min(oldest, g.at);
+      }
+    })
+  );
+  return { rows, missing, age: Math.max(0, deps.now - oldest) };
+}
+
 // The cities whose buses a free source reads (TDX's city names).
-export const FREE_BUS = /^(Hsinchu|HsinchuCounty|InterCity|Taipei|NewTaipei|Taichung|Taoyuan)$/;
+export const FREE_BUS = /^(Hsinchu|HsinchuCounty|InterCity|Taipei|NewTaipei|Taichung|Taoyuan|Tainan)$/;
 const MAX_STOPS = 30;
 const MAX_ROUTES = 12;
 
@@ -713,6 +833,7 @@ export async function freeEta(city, { stops = [], routes = [] }, { fetchFn = fet
   if (!FREE_BUS.test(city)) return null;
   const deps = { fetchFn, now, env };
   if (EBUS[city]) return ebEta(city, { stops, routes }, deps);
+  if (city === 'Tainan') return tnEta({ stops, routes }, deps);
   if (CITY_FEEDS[city]) {
     const got = await cityEtaIndex(city, deps).catch(() => null);
     if (!got) return { rows: [], missing: { stops, routes }, age: 0 };
@@ -752,6 +873,7 @@ export async function freeGps(city, routes, { fetchFn = fetch, now = Date.now(),
   if (!FREE_BUS.test(city)) return null;
   const deps = { fetchFn, now, env };
   if (EBUS[city]) return ebGps(city, routes, deps);
+  if (city === 'Tainan') return tnGps(routes, deps);
   if (CITY_FEEDS[city]) {
     const got = CITY_FEEDS[city].bus ? await cityGpsList(city, deps).catch(() => null) : null;
     if (!got) return { rows: [], missing: routes, age: 0 };
@@ -986,4 +1108,4 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), 
 // isolate's 10 ms).
 export const freeHeavy = p => /^((basic|advanced)\/v2\/Bike\/|basic\/v3\/Rail\/TRA\/DailyTrainTimetable\/TrainDate\/)/.test(String(p || '').replace(/^\/+/, ''));
 // (A route's whole list of stops, or its buses, from 新竹's site: read in the Runner too.)
-export const freeRoutesHeavy = (path, q) => (path === '/transit/gps' || (path === '/transit/eta' && (q.get('routes') || q.get('route') || CITY_FEEDS[q.get('city')] || EBUS[q.get('city')]))) && FREE_BUS.test(q.get('city') || '');
+export const freeRoutesHeavy = (path, q) => (path === '/transit/gps' || (path === '/transit/eta' && (q.get('routes') || q.get('route') || CITY_FEEDS[q.get('city')] || EBUS[q.get('city')] || q.get('city') === 'Tainan'))) && FREE_BUS.test(q.get('city') || '');
