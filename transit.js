@@ -2038,7 +2038,8 @@ async function transitRoute(request, env, headers, path, { session = null, limit
   const q = new URL(request.url).searchParams;
   // (Who spends Google's and TDX's counts when it isn't a person: our tools, the showcase's demo.)
   const by = session?.build ? 'build' : session?.dev ? 'dev' : session?.showcase ? 'show' : '';
-  const deps = { fetchFn, ctx, now, cache, by, free };
+  // (The weekly build asks TDX's own: the free sources answer from its own copies.)
+  const deps = { fetchFn, ctx, now, cache, by, free: free && !session?.build };
   if (path === '/transit/status') {
     const sample = q.get('sample');
     if (!sample) return send({ month: billingMonth(now), used: await usage(env, now), caps: CAPS, keys: { tdx: Boolean(env.TDX_CLIENT_ID && env.TDX_CLIENT_SECRET), mapsBrowser: Boolean(env.GOOGLE_MAPS_BROWSER_KEY), google: Boolean(googleKey(env)) }, tdxPerMin: Number(env.TDX_PER_MIN) || 5 });

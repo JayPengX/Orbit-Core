@@ -1346,3 +1346,22 @@ test("TDX's GTFS streamed through for our tools only (0 points): all Taiwan's, o
   assert.equal((await ask('../basic', { s: 'dev', dev: true })).status, 400);
   assert.deepEqual(asked, ['https://tdx.transportdata.tw/api/gtfs/V3/Map/GTFS/Static', 'https://tdx.transportdata.tw/api/gtfs/V3/Map/GTFS/Static/Rail/TRTC']);
 });
+
+test("the weekly build reads TDX's own lists, never the copies it wrote (a person's ask: the copy)", async () => {
+  fresh();
+  const copy = JSON.stringify([{ StationID: 'BL01', from: 'copy' }]);
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', RATE_LIMIT_KV: memKv(), DATA: { get: async k => (k === 'rail/metro/TRTC/Line.json' ? { text: async () => copy } : null) } };
+  let calls = 0;
+  const fetchFn = async url => {
+    if (url.includes('token')) return json({ access_token: 'T', expires_in: 86400 });
+    calls++;
+    return json([{ StationID: 'BL01', from: 'tdx' }]);
+  };
+  const ask = session => handleTransit(new Request(`https://w/transit/tdx?p=${encodeURIComponent('basic/v2/Rail/Metro/Line/TRTC')}`), env, {}, '/transit/tdx', { session, fetchFn, now: NOW, cache: memCache() });
+  const person = await ask({ s: 'person' });
+  assert.equal(person.headers.get('X-Transit-Cache'), 'free');
+  assert.equal((await person.json())[0].from, 'copy');
+  const build = await ask({ s: 'build', build: true });
+  assert.equal((await build.json())[0].from, 'tdx');
+  assert.equal(calls, 1);
+});

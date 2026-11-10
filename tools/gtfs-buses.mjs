@@ -24,7 +24,8 @@ import { createHash } from 'node:crypto';
 import { CITIES, squares, cityStations, TILE, simplify, schedOf } from '../builders/buses.js';
 import { CITY_CODE, CODE_CITY, calendarBits, tripDays, specialOf, gtfsMins, wayPlan, cityPack, tdxWays, cityLines, whereOf, specialSubs, hsrPack, METRO, METRO_KINDS, metroOf, metroDue, metroFiles } from '../builders/gtfs.js';
 import { fillNewTaipei } from '../builders/ntpc.js';
-import { tdxPlan } from '../transit.js';
+import { tdxPlan, tdxRequest } from '../transit.js';
+import { tdxCopies, copyFile } from '../transit-free.js';
 
 const args = process.argv.slice(2);
 const opt = (name, dflt = null) => {
@@ -441,8 +442,9 @@ async function main() {
       if (e?.budget) break;
     }
   }
-  // The metros last (the buses' asks first, on a small month).
+  // The metros and the slow lists last (the buses' asks first, on a small month).
   const metro = RAIL ? await metros(metroSigs, failed) : null;
+  const copied = await copies(packs, failed);
   if (stationsDone.length && CITIES.every(c => index.stations?.[c])) put('station/index.json', { v: 1, built, tile: TILE, cities: Object.fromEntries(CITIES.map(c => [c, index.stations[c].tiles])) });
   index.shapes = [...new Set([...(index.shapes || []).filter(s => !s.startsWith('shape/bus/InterCity/') || !packs.has('InterCity')), ...[...out.keys()].filter(p => p.startsWith('shape/'))])].sort();
   if (done.length || stationsDone.length) put('index.json', index);
@@ -452,7 +454,7 @@ async function main() {
   const changed = [];
   for (const [path, d] of out) {
     let was = old.get(path);
-    if (was === undefined && !/^(station|rail\/metro)\//.test(path)) was = await data(path).catch(() => null);
+    if (was === undefined && !/^(station|rail\/metro|tdx)\//.test(path)) was = await data(path).catch(() => null);
     if (path === 'index.json' || !was || meaning(was) !== meaning(d)) changed.push(path);
   }
   if (OUT) {
@@ -462,11 +464,49 @@ async function main() {
       writeFileSync(f, JSON.stringify(d));
     }
   }
-  const report = { built, gtfs: true, cities: done.length, failed, asked, metro, tdx: { calls: tdxCalls, mb: Math.round(tdxBytes / 1e4) / 100, points: Math.round((tdxBytes / 150e6 + tdxCalls / 1500) * 1000) / 1000 }, stations: stationsDone, files: out.size, changed: changed.length };
+  const report = { built, gtfs: true, cities: done.length, failed, asked, metro, copied, tdx: { calls: tdxCalls, mb: Math.round(tdxBytes / 1e4) / 100, points: Math.round((tdxBytes / 150e6 + tdxCalls / 1500) * 1000) / 1000 }, stations: stationsDone, files: out.size, changed: changed.length };
   if (PUSH && changed.length) report.pushed = await push(changed);
   log(JSON.stringify(report, null, 1));
   if (!opt('gtfs') && !opt('keep')) rmSync(dir, { recursive: true, force: true });
   if (!done.length && cities.length) process.exitCode = 1;
+}
+
+// ---- TDX's slow lists ---------------------------------------------------------------------
+
+// A city's bus routes (for search), 台鐵's and 高鐵's stations and lines, as
+// the phone asks them, copied for transit-free.js copiedFree (tdx/…): a month
+// on (each run while TDX is paid), or when a city's new pack has a route its
+// copied list hasn't. Under half the rows it had: the last copy stays.
+async function copies(packs, failed) {
+  const index = (await data('tdx/index.json')) || { v: 1, asks: {} };
+  old.set('tdx/index.json', JSON.parse(JSON.stringify(index)));
+  const done = [];
+  for (const ask of NO_TDX ? [] : tdxCopies(cities, RAIL)) {
+    const req = tdxRequest(ask);
+    const file = copyFile(decodeURIComponent(req.path), new URLSearchParams(req.query));
+    const was = index.asks[file];
+    const city = /\/Bus\/Route\/(?:City\/)?([A-Za-z]+)\?/.exec(ask)?.[1];
+    let due = paid || !was || now - (Date.parse(was.asked) || 0) > 28 * 86_400_000;
+    if (!due && city && packs.has(city)) {
+      const list = await data(file).catch(() => null);
+      const have = new Set((Array.isArray(list) ? list : []).map(r => r.RouteUID));
+      due = packs.get(city).routes.some(r => !have.has(r.uid));
+    }
+    if (!due) continue;
+    try {
+      const rows = await tdx(ask);
+      if (!Array.isArray(rows) || rows.length < (was?.rows || 1) / 2) throw new Error(`${Array.isArray(rows) ? rows.length : 'no'} rows, had ${was?.rows || 0}`);
+      const fp = createHash('sha1').update(JSON.stringify(rows)).digest('hex').slice(0, 12);
+      if (fp !== was?.fp) put(file, rows);
+      index.asks[file] = { asked: built, rows: rows.length, fp };
+      done.push(file);
+    } catch (e) {
+      failed[`copy:${file}`] = String(e?.message || e).slice(0, 160);
+      if (e?.budget) break;
+    }
+  }
+  if (done.length) put('tdx/index.json', { ...index, v: 1, built });
+  return { asked: done.length };
 }
 
 // ---- The metros ---------------------------------------------------------------------------

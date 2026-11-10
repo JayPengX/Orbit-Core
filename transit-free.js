@@ -11,7 +11,8 @@
 //   - 台鐵's day of trains (台鐵's own open data, ods.railway.gov.tw).
 //   - 高鐵's day and the metros' maps and timetables: the weekly build's
 //     copies in R2 (rail/: TDX's GTFS, 0 points; the metros asked of TDX
-//     only when GTFS says they changed).
+//     only when GTFS says they changed); the bus route lists and 台鐵's and
+//     高鐵's stations (tdx/: asked of TDX a month on).
 //
 // Nothing here is counted as TDX's: no points.
 
@@ -679,6 +680,41 @@ async function metroFree(path, q, { env, now }) {
   return { status: 200, body: got.val, age: Math.max(0, now - got.at), state: 'free' };
 }
 
+// ---- TDX's slow lists, copied ------------------------------------------------------------
+
+// What every phone asks the same way and seldom changes (a city's bus routes,
+// for search; 台鐵's and 高鐵's stations and lines), copied from TDX by the
+// weekly build (tools/gtfs-buses.mjs: a month on, or when a city's new pack
+// has a route its list hasn't; each run while TDX is paid) to R2
+// tdx/<ask>.json and answered from there. Asked any other way: TDX's.
+export const ROUTE_SELECT = 'RouteUID,RouteID,RouteName,DepartureStopNameZh,DestinationStopNameZh,BusRouteType';
+export const tdxCopies = (cities, rail = true) => [
+  ...cities.map(c => `basic/v2/Bus/Route/${c === 'InterCity' ? c : `City/${c}`}?$select=${ROUTE_SELECT}`),
+  ...(rail ? ['basic/v3/Rail/TRA/Station?$select=StationUID,StationID,StationName,StationPosition,StationAddress,StationClass', 'basic/v3/Rail/TRA/StationOfLine', 'basic/v3/Rail/TRA/Line', 'basic/v2/Rail/THSR/Station'] : [])
+];
+const COPIED = /^(basic\/v2\/Bus\/Route\/(City\/[A-Za-z]+|InterCity)|basic\/v3\/Rail\/TRA\/(Station|StationOfLine|Line)|basic\/v2\/Rail\/THSR\/Station)$/;
+const fnv = s => {
+  let h = 0x811c9dc5;
+  for (const c of new TextEncoder().encode(s)) h = Math.imul(h ^ c, 0x01000193) >>> 0;
+  return h.toString(36);
+};
+// An ask (its decoded path, its query) → its copy's R2 path, or undefined when not one copied.
+export function copyFile(path, q) {
+  if (!COPIED.test(path)) return undefined;
+  const query = [...q].filter(([k]) => k !== '$format').sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, v]) => `${k}=${v}`).join('&');
+  return `tdx/${path}${query ? `@${fnv(query)}` : ''}.json`;
+}
+async function copiedFree(path, q, { env, now }) {
+  const file = copyFile(path, q);
+  if (!file || !env?.DATA) return file === undefined ? undefined : null;
+  const got = await held(`copy:${file}`, TRA_FRESH, 7 * 86_400_000, async () => {
+    const obj = await env.DATA.get(file);
+    if (!obj) throw new Error('not copied');
+    return obj.text();
+  }, now, 3000);
+  return { status: 200, body: got.val, age: Math.max(0, now - got.at), state: 'free' };
+}
+
 // ---- One entry for tdxGet -----------------------------------------------------------------
 
 // A TDX ask (its path and query, as tdxRequest made them) answered from a free
@@ -687,7 +723,7 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), 
   const q = new URLSearchParams(query);
   try {
     const p = decodeURIComponent(path);
-    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now }));
+    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await copiedFree(p, q, { env, now }));
     if (got !== undefined) return got;
   } catch (err) {
     console.log('free source failed', path.slice(0, 80), String(err?.message || err).slice(0, 120));
