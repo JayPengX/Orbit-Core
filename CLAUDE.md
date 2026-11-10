@@ -204,7 +204,7 @@ w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
 | `/law-ask` | `law.js`, `law-ruling.js`, `law-town.js`, `law-ground.js` | Law's questions on 1–8 articles, every point cited and checked, kept in KV; modes `bill`, `diff`, `ruling`, `town`; 40 Gemini calls a day a Pass, 300 in all with `/law-chat`'s (D1 `law_day`) |
 | `/law-chat` | `law-chat.js`, `law-ground.js`, `law-more.js`, `ai-other.js` | 問法律: a plan (Flash-Lite), up to 14 articles from Law's lists and index, answered from those only by Claude Sonnet via the relay (failing: Gemini), cites checked; grounded by facts, news, bills, budget (`law-ground.js`), rulings, rules (`law-more.js`); 16 turns back; 30 a day a Pass |
-| `/law-page` | `law-page.js`, `law-hosts.js` | A government page (gov.tw, www.edu.tw) read in Law, cleaned; edge cache only; Taiwan-only sites via the Taiwan relay (the build's key: raw bytes, `file=1`); 500 a day a Pass |
+| `/law-page` | `law-page.js`, `law-hosts.js` | A government page (gov.tw, www.edu.tw) read in Law, cleaned; edge cache only; Taiwan-only sites via the Taiwan relay (build key: any gov.tw, raw `file=1`); 500 a day a Pass |
 | `/law-live` | `law-live.js` | What 立法院's IVOD streams now, 60 s at the edge, the last good read kept 30 minutes; our pages only, no Pass |
 | `/money-read` | `money-read.js` | Orbit Money's 拍照記帳: one picture → `{ buys, left }`, read by Gemini through the relay, checked; only on a tap; 30 a day a Pass, 300 in all |
 | `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |

@@ -132,3 +132,21 @@ test('the build reads a Taiwan-only site’s own JSON and raw page (file=1) as t
   assert.match(await (await ask('https://tccvideo.tcc.gov.tw/', '&file=1')).text(), /<script>/, 'its scripts kept for the build');
   assert.doesNotMatch((await (await ask('https://tccvideo.tcc.gov.tw/', '')).json()).html, /<script>/, 'cleaned without file=1');
 });
+
+test('the build reads any gov.tw page from Taiwan (a township’s site), never another host; a Pass’s read of one stays direct', async () => {
+  const { buildHost } = await import('../law-hosts.js');
+  assert.equal(buildHost('https://town.chcg.gov.tw/beidou/'), true);
+  assert.equal(buildHost('https://example.com/'), false);
+  assert.equal(buildHost('https://evilgov.tw/'), false);
+  assert.equal(buildHost('http://town.chcg.gov.tw/'), false);
+  assert.equal(buildHost('https://judgment.judicial.gov.tw/FJUD/data.aspx'), false, 'judgments stay a Pass\u2019s');
+  const KEY = 'k'.repeat(32);
+  let relayed = 0;
+  const env = { LAW_BUILD_KEY: KEY, GEMINI_RELAY: { fetch: async () => (relayed++, new Response('<p>代表會</p>', { headers: { 'Content-Type': 'text/html' } })) } };
+  const u = 'https://town.chcg.gov.tw/beidou/';
+  const r = await handleLawPage(new Request(`https://proxy.test/law-page?v=1&u=${encodeURIComponent(u)}`, { headers: { 'X-Build-Key': KEY } }), env, null, {}, null, async () => new Response('direct'));
+  assert.equal(r.status, 200);
+  assert.equal(relayed, 1);
+  const bad = await handleLawPage(new Request(`https://proxy.test/law-page?v=1&u=${encodeURIComponent('https://example.com/')}`, { headers: { 'X-Build-Key': KEY } }), env, null, {}, null, async () => new Response('direct'));
+  assert.equal(bad.status, 401);
+});
