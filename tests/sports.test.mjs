@@ -211,6 +211,15 @@ test("Polymarket's price history: only /prices-history, at the odds' pace", asyn
   assert.equal(other.status, 400);
 });
 
+test("經濟部's registers: the name behind one 統編, kept a week, nothing else", async () => {
+  const at = q => `https://proxy.test/sports-proxy?url=${encodeURIComponent(`https://data.gcis.nat.gov.tw/od/data/api/5F64D864-61CB-4D0D-8AD9-492047CC1EA6?${q}`)}`;
+  const ok = await get(at('$format=json&$filter=Business_Accounting_NO eq 22555003&$skip=0&$top=1'));
+  assert.equal(ok.status, 200);
+  assert.equal(ok.headers.get('X-Sports-Proxy-Cache-Tier'), 'career');
+  for (const q of ['$format=json&$filter=Business_Accounting_NO eq 22555003&$skip=0&$top=1000', '$format=json&$filter=Company_Name like 統一&$skip=0&$top=1', '$format=json&$filter=Business_Accounting_NO eq 22555003 or 1 eq 1&$skip=0&$top=1'])
+    assert.equal((await get(at(q))).status, 400, q);
+});
+
 test("Polymarket's games trimmed: each game's own event, its moneyline markets and token ids", async () => {
   const { trimPolymarketGames } = await import('../sports.js');
   const market = (type, q) => ({ sportsMarketType: type, question: q, groupItemTitle: q, outcomes: '["Yes","No"]', clobTokenIds: '["1","2"]', description: 'long' });

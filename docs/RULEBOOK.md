@@ -220,6 +220,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-28 A symbol's sheet opens on the app's teal focus card (as 資產's), the chart on it in white; 買進/賣出 two even buttons, the price not repeated. The order ticket keeps one floating button, the total on its second line, the page fading under it (Jay: "floating is ugly, need redesign (not stripping away floating)").
 
 ### Money (Jay's own books, real money)
+- 11-10 拍照記帳 reads a paper 電子發票's QR codes on the phone first (Jay, of the research list: "All yes I only care about result"): exact number, day, total and items with no AI read, the seller's name from 經濟部's register; nothing to tap or see added (10-31's no 發票 features stands: no 對獎, 手機條碼, scanner or 載具 file). Any other picture goes to the AI.
 - 10-27 Never invent entries, balances or categories; Jay started fresh 2026-11-01; never re-add the 天天記帳 import or commit his CSV.
 - 10-31 No 發票 features (Jay: "發票 feature is weak… a more general tool… remove 條碼、自動對獎"): one 拍照記帳 for any picture (receipt, invoice, bill, app screenshot, transfer notice, price tag). AI reads amount, day, store, items, category and way to pay; it opens as a filled entry to check before saving, and a matching entry already logged (same amount, within a day) is offered to merge, never added twice. No 手機條碼, 對獎, QR scanner or 載具 file. (Replaces 10-27's 發票 hero.)
 - 10-27 Categories have subs and are the person's to edit; auto-fill (自動帶入) is set per user, never hardcoded.

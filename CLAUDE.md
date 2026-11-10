@@ -198,7 +198,7 @@ w;dur=` (the Worker's own time), noted by the 除錯紀錄 when slow.
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
 | `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations), first hours by a station (`anchorHours`), the township, scored hourly (`/weather/skill`); during a typhoon warning (NCDR's CAP feed), `dayOff`: each county's 停班停課 from 人事行政總處, else a chance fitted to past decisions, all 22 every 3 minutes |
 | `/transit/…` | `transit.js` | TDX (allowlist `TDX_RULES`; trains trimmed, `tdxTrim`), bus places (`gps`), map config, search, place, route, walk; `/transit/status?sample=` (a session or dev door) |
-| `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `f1-people.js`, `fund-nav.js`, `taifex.js` | The data proxy (§4.1): sports, quotes, F1, Asian baseball, SITCA's fund NAVs, TAIFEX |
+| `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `f1-people.js`, `fund-nav.js`, `taifex.js` | The data proxy (§4.1): sports, quotes, F1, Asian baseball, SITCA's fund NAVs, TAIFEX, 統編 names |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
 | `/law-ask` | `law.js`, `law-ruling.js`, `law-ground.js` | Orbit Law's questions on 1–8 articles, every point cited and checked, kept in KV by the law's version; `mode: 'bill'` (from its 對照表), `'diff'` (an amendment), `'ruling'` (from its own paragraphs); 40 Gemini calls a day a Pass, 300 in all with `/law-chat`'s (D1 `law_day`) |

@@ -52,6 +52,16 @@ const FOTMOB_DATA_HOST = 'data.fotmob.com';
 const ROTOWIRE_HOST = 'www.rotowire.com';
 const ROTOWIRE_NBA = '/basketball/nba-lineups.php';
 const SPORTS_PROXY_FETCH_USER_AGENT = 'Orbit-Sports-Bot/1.0 (+https://github.com/JayPengX/Orbit-Sports)';
+// 經濟部商工登記: 公司 (by 統一編號) and 商業 (by 統一編號 too), one id a read.
+export const GCIS_HOST = 'data.gcis.nat.gov.tw';
+const GCIS_SETS = { '5F64D864-61CB-4D0D-8AD9-492047CC1EA6': 'Business_Accounting_NO', '7E6AFA72-AD6A-46D3-8681-ED77951D912D': 'President_No' };
+export function gcisOk(u) {
+  const set = /^\/od\/data\/api\/([0-9A-F-]{36})$/.exec(u.pathname)?.[1];
+  const field = set && GCIS_SETS[set];
+  if (!field) return false;
+  const q = u.searchParams;
+  return [...q.keys()].sort().join() === '$filter,$format,$skip,$top' && q.get('$format') === 'json' && q.get('$skip') === '0' && q.get('$top') === '1' && new RegExp(`^${field} eq \\d{8}$`).test(q.get('$filter') || '');
+}
 const SPORTS_PROXY_ALLOWED_HOSTS = [
   'site.api.espn.com',
   'statsapi.mlb.com',
@@ -78,6 +88,10 @@ const SPORTS_PROXY_ALLOWED_HOSTS = [
   // TWSE's 基本市況報導 (mis.twse.com.tw, the exchange's own live quotes):
   // Securities' warrants and 牛熊證 Yahoo has no price for (getStockInfo.jsp only).
   'mis.twse.com.tw',
+  // 經濟部's company and business registers (data.gcis.nat.gov.tw, no key, no
+  // CORS): the name behind a 統編, for Orbit Money's 拍照記帳 when a paper
+  // 電子發票's QR codes were read on the phone (one 統編 a read, kept a week).
+  GCIS_HOST,
   // Google's translate endpoint (the Chrome dictionary's, no key): a
   // company's description in the reader's language (Securities). Only
   // /translate_a/t; sent upstream as a POST (see fetchUpstream), kept a month.
@@ -313,6 +327,8 @@ function cachePolicyFor(url) {
       return CACHE_TEAM_SCHEDULE;
     case 'mis.twse.com.tw':
       return CACHE_QUOTES;
+    case GCIS_HOST:
+      return CACHE_CAREER;
     case 'clients5.google.com':
       return CACHE_TRANSLATE;
     case ELTA_HOST:
@@ -1315,6 +1331,7 @@ function parseTarget(target) {
     if (u.hostname === 'clob.polymarket.com' && u.pathname !== '/prices-history') return null;
     // TWSE's announcement lists: 公開申購 (publicForm), 處置 (punish), 注意 (notice).
     if (u.hostname === 'www.twse.com.tw' && !/^\/rwd\/zh\/announcement\/(publicForm|punish|notice)$/.test(u.pathname)) return null;
+    if (u.hostname === GCIS_HOST && !gcisOk(u)) return null;
     if (u.hostname === 'mis.twse.com.tw' && !(u.pathname === '/stock/api/getStockInfo.jsp' && [...u.searchParams.keys()].join() === 'ex_ch' && /^(tse|otc)_[0-9A-Z]{4,6}\.tw(\|(tse|otc)_[0-9A-Z]{4,6}\.tw){0,49}$/i.test(u.searchParams.get('ex_ch') || ''))) return null;
     if (u.hostname === ELTA_VOD_HOST && (!/^\/sports\/play\/1\/\d{1,6}$/.test(u.pathname) || u.search)) return null;
     // A search (its words, in English as seen from Taiwan) or a video's page, nothing else.
