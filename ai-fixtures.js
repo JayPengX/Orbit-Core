@@ -72,9 +72,9 @@ export const EXAMPLES = {
   ],
   'class-news': [
     {
-      name: 'a national school’s feed',
+      name: 'a senior high’s feed',
       input: {
-        school: 'www.ctsh.hcc.edu.tw',
+        school: 'www.example.edu.tw',
         today: '2026-11-11',
         items: [
           { id: 'n1', title: '【轉知】伊甸社會福利基金會2027伊甸服務學習寒假營隊', date: '2026-11-10', desc: '報名時間：於115年11月9日起開放營隊報名' },

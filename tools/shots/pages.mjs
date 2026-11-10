@@ -316,7 +316,15 @@ export const PAGES = {
     flight: { hash: 'tools', args: click('.cx-fly-card', wait(2500)) },
     // 工具's 分享 card: 分享金鑰 and 加到行事曆.
     cal: { hash: 'tools', args: click(wait(1500), "js:document.querySelector('.cx-way.is-cal')?.scrollIntoView({block:'center'})", wait(800)) },
-    sim: { args: click('js:window.openTestPanel()', wait(1200)) }
+    sim: { args: click('js:window.openTestPanel()', wait(1200)) },
+    // 待辦 and 學校公告 on 今天; a to-do's sheet; 工具's 學習: 讀書計畫 (planned in code, no AI here), 學校公告, its school picker.
+    // (Seeded: -- --store classFocusData=… with todos and school, --store class.news.v1=….)
+    todos: { args: click(wait(2000), "js:document.querySelector('#cx-todos')?.scrollIntoView({block:'start'})", wait(800)) },
+    todo: { args: click(wait(2000), "js:document.querySelector('#cx-todos .cx-todo')?.click()", wait(1200)) },
+    study: { hash: 'tools', args: click(wait(1500), '.cx-way.is-plan', wait(1500)) },
+    plan: { hash: 'tools', args: click(wait(1500), '.cx-way.is-plan', wait(1500), 'dialog[open] .q-sheet-foot button', wait(6000)) },
+    news: { hash: 'tools', args: click(wait(1500), '.cx-way.is-news', wait(1500)) },
+    school: { hash: 'tools', args: click(wait(1500), '.cx-way.is-news', wait(1500), '.cx-news-school', wait(1500)) }
   },
   money: {
     default: ['tabs'],
