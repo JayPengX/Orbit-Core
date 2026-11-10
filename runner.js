@@ -51,9 +51,11 @@ function patchFetch() {
 
 // The Worker's side: which requests the Runner answers.
 // (Cheap in the Logs, 2026-11-07 to 10: R2's files, /config, TDX's copies,
-// the notices' lists, Law's live rooms and pages. Yahoo's quotes stay in the
-// Worker too: Yahoo turned most reads from Taiwan's side away, 2026-10-14.)
-const STAY = /^\/(?:data\/(?!build$)|config$|guard$|transit\/tdx$|transit\/eta$|transit\/config$|transit\/status$|transit\/gtfs$|push\/|law-live$|law-page$|showcase\/|store\/check$|$)/;
+// the notices' lists, Law's live rooms. Yahoo's quotes stay in the
+// Worker too: Yahoo turned most reads from Taiwan's side away, 2026-10-14.
+// Bus times and Law's pages moved in, 2026-11-10: one in eight bus times
+// (the cities' own feeds read and matched) and one in twenty pages passed 10 ms.)
+const STAY = /^\/(?:data\/(?!build$)|config$|guard$|transit\/tdx$|transit\/config$|transit\/status$|transit\/gtfs$|push\/|law-live$|showcase\/|store\/check$|$)/;
 export function runsInRunner(request, path) {
   if (request.headers.has(RUNNER_MARK) || request.method === 'OPTIONS') return false;
   const p = path.replace(/^\/api(?=\/)/, '');
