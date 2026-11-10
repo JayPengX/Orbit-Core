@@ -72,12 +72,22 @@ const GROUND = {};
 const JUDGMENTS = {};
 let geminiStatus = 200;
 let textStatus = 200;
+// (A model's own answer status, and how many of its next calls fail 503: Google's free tier.)
+const MODEL_STATUS = {};
+const FAILS = {};
 globalThis.fetch = async (url, init) => {
   const u = String(url);
   if (u.includes('generativelanguage')) {
     const sent = JSON.parse(init.body);
     const kind = 'terms' in sent.generationConfig.response_schema.properties ? 'plan' : 'answer';
-    gemini.push({ kind, prompt: sent.contents[0].parts[0].text, stream: u.includes(':streamGenerateContent?alt=sse&') });
+    const model = u.match(/models\/([^:]+):/)[1];
+    gemini.push({ kind, model, prompt: sent.contents[0].parts[0].text, stream: u.includes(':streamGenerateContent?alt=sse&') });
+    if (FAILS[model] > 0) {
+      FAILS[model]--;
+      return new Response(JSON.stringify({ error: { message: 'high demand' } }), { status: 503 });
+    }
+    const status = MODEL_STATUS[model] ?? geminiStatus;
+    if (status !== 200) return new Response(JSON.stringify({ error: { message: 'x' } }), { status });
     // (The answer is streamed: its JSON in two pieces, as server-sent events.)
     if (u.includes('streamGenerateContent') && geminiStatus === 200) {
       const t = JSON.stringify(kind === 'plan' ? plan : answer);
@@ -489,4 +499,26 @@ test('only the judgments and rules the answer cites come back; a judgment is rea
   assert.deepEqual(lookOf({ budgets: [1], bills: [], news: [], facts: [] }, [], true), ['budget']);
   assert.deepEqual(lookOf({ budgets: [], bills: [], news: [], facts: [] }, [{ n: '林思銘' }], true), ['people']);
   assert.deepEqual(lookOf({ budgets: [], bills: [], news: [], facts: [] }, [], false), ['cases']);
+});
+
+test("Gemini's free tier: Flash failing, Flash-Lite answers and Flash is skipped 10 minutes; Flash-Lite's 503 asked once more", async () => {
+  const env = envOf();
+  MODEL_STATUS['gemini-3.6-flash'] = 503;
+  try {
+    const n = gemini.length;
+    const r = await chat({ ...Q, q: '押金退不回來' }, { env });
+    assert.equal(r.status, 200);
+    assert.deepEqual(gemini.slice(n).map(g => `${g.kind} ${g.model}`), ['plan gemini-3.5-flash-lite', 'answer gemini-3.6-flash', 'answer gemini-3.5-flash-lite']);
+    // (Flash's failure is in the log: the next answer goes straight to Flash-Lite.)
+    const m = gemini.length;
+    assert.equal((await chat({ ...Q, q: '押金被扣了' }, { env })).status, 200);
+    assert.deepEqual(gemini.slice(m).map(g => g.model), ['gemini-3.5-flash-lite', 'gemini-3.5-flash-lite']);
+  } finally {
+    delete MODEL_STATUS['gemini-3.6-flash'];
+  }
+  // Flash well again (another store, nothing failed): Flash answers; Flash-Lite's one 503 asked again.
+  FAILS['gemini-3.5-flash-lite'] = 1;
+  const k = gemini.length;
+  assert.equal((await chat({ ...Q, q: '押金何時還' })).status, 200);
+  assert.deepEqual(gemini.slice(k).map(g => `${g.kind} ${g.model}`), ['plan gemini-3.5-flash-lite', 'plan gemini-3.5-flash-lite', 'answer gemini-3.6-flash']);
 });

@@ -58,6 +58,22 @@ export async function logCall(env, { feature, model, status, usage = null, at = 
   }
 }
 
+// Did `model`'s last call within `withinMs` fail (anything but 200)? Then a
+// caller goes straight to Flash-Lite (worker.js geminiAnswer) until it's
+// that long since: on the free tier Flash is now and then queued for half a
+// minute or more (11-06: 3.7 and 3.8; 11-10: every Flash) while Flash-Lite
+// answers in two seconds. Not knowing (no store, a failed read): false.
+export async function lastFailed(env, model, withinMs, now = Date.now()) {
+  if (!env?.STORE) return false;
+  try {
+    await table(env);
+    const row = await env.STORE.prepare('SELECT status FROM gemini_call WHERE at >= ?1 AND model = ?2 ORDER BY at DESC LIMIT 1').bind(now - withinMs, String(model)).first();
+    return !!row && row.status !== 200;
+  } catch {
+    return false;
+  }
+}
+
 // The calls since `since` (ms), oldest first.
 export async function callsSince(env, since) {
   if (!env?.STORE) return [];
