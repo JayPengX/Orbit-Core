@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { lawNames, lawsOf, lawsPage } from '../builders/news-laws.js';
 
 const items = [
-  { k: '11:01139', n: '勞動基準法', p: 'N0030001', term: 11, passed: '' },
+  { k: '11:01139', n: '勞動基準法', p: 'N0030001', term: 11, open: 2, passed: '' },
   { k: '11:07162', n: '反滲透法', p: 'A0030317', term: 11, passed: '' },
   { k: '11:00001', n: '國家安全法', p: 'A0030028', term: 11 },
   { k: '11:00002', n: '民法', p: 'B0000001', term: 11 },
@@ -14,8 +14,8 @@ const names = lawNames(items);
 test('a law by its full name or the short one; a headline about changing it is its bill', () => {
   const s = { id: 'a', title: '勞基法修正草案今付委', items: [['x', '涉反滲透法 議員交保'], ['y', '勞動基準法 加班費上限']] };
   assert.deepEqual(lawsOf(s, names), [
-    { n: '勞動基準法', p: 'N0030001', k: '11:01139', bill: true, passed: '' },
-    { n: '反滲透法', p: 'A0030317', k: '11:07162', bill: false, passed: '' }
+    { n: '勞動基準法', p: 'N0030001', k: '11:01139', bill: true, open: 2, passed: '' },
+    { n: '反滲透法', p: 'A0030317', k: '11:07162', bill: false, open: 0, passed: '' }
   ]);
 });
 
