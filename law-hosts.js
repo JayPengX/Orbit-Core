@@ -26,6 +26,7 @@ export const COUNCIL_HOSTS = new Set([
   'www.ntp.gov.tw', // 新北市議會
   'www.tycc.gov.tw', // 桃園市議會
   'www.tcc.gov.tw', // 臺北市議會
+  'tccvideo.tcc.gov.tw', // 臺北市議會's recordings (not on YouTube)
   'www.ptcc.gov.tw', // 屏東縣議會
   'www.ilcc.gov.tw', // 宜蘭縣議會
   'www.mlcc.gov.tw', // 苗栗縣議會
