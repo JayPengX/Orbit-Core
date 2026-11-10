@@ -134,3 +134,11 @@ test('the build door: Law\'s key, a build feature, the day\'s cap', async () => 
   assert.equal((await call(ask('law-weekly'), 0)).error, 'cap', 'a cap of 0 pauses it');
   assert.equal((await call(new Request('https://w/ai/build'))).error, 'method');
 });
+
+test('numbers the law writes in words count as given: 百分之六, 三十日, 十萬元', async () => {
+  const { numbersFrom, cnNumber } = await import('../ai-util.js');
+  assert.deepEqual(['六', '三十', '二百五十', '一千零五', '十萬', '兩'].map(cnNumber), [6, 30, 250, 1005, 100000, 2]);
+  assert.ok(numbersFrom('雇主要提繳 6%', '雇主應按月提繳不低於其每月工資百分之六'));
+  assert.ok(numbersFrom('違約賠 100,000 元', '違者賠償新臺幣十萬元'));
+  assert.ok(!numbersFrom('最重 7 年', '處五年以下有期徒刑'));
+});

@@ -227,7 +227,8 @@ export const LAW_FEATURES = {
     }),
     clean(raw, input) {
       const arts = new Map((input.arts || []).map(a => [a.key, a]));
-      const given = [clauseList(input.clauses), ...(input.arts || []).map(a => a.text), ...(input.figs || [])].join('\n');
+      // (An article's own number, 第247條之1, may be named too.)
+      const given = [clauseList(input.clauses), ...(input.arts || []).map(a => `${a.key} ${a.label} ${a.text}`), ...(input.figs || [])].join('\n');
       const keyOf = c => String(c ?? '').replace(/[：\s]/g, m => (m === '：' ? ':' : '')).replace(/^\[|\]$/g, '');
       const citesOf = x => [...new Set(list(x?.cites, 4).map(keyOf))].filter(k => arts.has(k));
       const ids = new Set(input.clauses.map(c => c.id));
@@ -248,7 +249,7 @@ export const LAW_FEATURES = {
       const missing = list(raw?.missing, 3)
         .map(m => ({ what: str(m?.what, 80), cites: citesOf(m) }))
         .filter(m => m.what && m.cites.length && numbersFrom(m.what, given));
-      let summary = str(raw?.summary, 80);
+      let summary = str(raw?.summary, input.en ? 160 : 80);
       if (!numbersFrom(summary, given)) summary = '';
       if (!summary && !flags.length && !missing.length) return null;
       // Each cited article's law and number, for the cards' chips (opened in the app by its key).

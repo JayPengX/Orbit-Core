@@ -40,14 +40,15 @@ export async function aiPicture(file, { side = 1600, quality = 0.85 } = {}) {
   }
 }
 // A picture picked from the camera or the photos: the File, or null when
-// none was (the sheet closed). One hidden input, made once.
+// none was (the sheet closed). One hidden input, made once. multiple: the
+// Files (a contract's pages), [] when none; accept: other kinds too ('image/*,application/pdf').
 let fileInput = null;
-export function pickPicture({ camera = false } = {}) {
+export function pickPicture({ camera = false, multiple = false, accept = 'image/*' } = {}) {
   return new Promise(resolve => {
     fileInput?.remove();
-    fileInput = h('input', { type: 'file', accept: 'image/*', hidden: true, ...(camera ? { capture: 'environment' } : {}) });
-    fileInput.addEventListener('change', () => resolve(fileInput.files?.[0] || null), { once: true });
-    fileInput.addEventListener('cancel', () => resolve(null), { once: true });
+    fileInput = h('input', { type: 'file', accept, hidden: true, ...(multiple ? { multiple: true } : {}), ...(camera ? { capture: 'environment' } : {}) });
+    fileInput.addEventListener('change', () => resolve(multiple ? [...(fileInput.files || [])] : fileInput.files?.[0] || null), { once: true });
+    fileInput.addEventListener('cancel', () => resolve(multiple ? [] : null), { once: true });
     document.body.append(fileInput);
     fileInput.click();
   });

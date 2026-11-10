@@ -13,8 +13,21 @@ export const text = t => [{ text: t }];
 // from code; a model only puts them in words). Years and small counts too.
 // (1,290 is 1290: a thousands comma either side.)
 export const nums = t => String(t).replace(/(\d),(?=\d{3}(?!\d))/g, '$1').match(/\d+(?:\.\d+)?/g) || [];
+// (The law writes its numbers in words: 百分之六, 三十日, 二個月 count as 6, 30, 2 too.)
+const CN_DIGIT = { 零: 0, 〇: 0, 一: 1, 二: 2, 兩: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+const CN_UNIT = { 十: 10, 百: 100, 千: 1000 };
+export function cnNumber(t) {
+  let total = 0, wan = 0, digit = 0;
+  for (const ch of t) {
+    if (ch in CN_DIGIT) digit = CN_DIGIT[ch];
+    else if (ch in CN_UNIT) ((total += (digit || 1) * CN_UNIT[ch]), (digit = 0));
+    else if (ch === '萬') ((wan += (total + digit) * 10_000), (total = 0), (digit = 0));
+  }
+  return wan + total + digit;
+}
+const cnNums = t => (String(t).match(/[零〇一二兩三四五六七八九十百千萬]+/g) || []).map(w => String(cnNumber(w)));
 export function numbersFrom(out, given) {
-  const have = new Set(nums(given));
+  const have = new Set([...nums(given), ...cnNums(given)]);
   return nums(out).every(n => have.has(n));
 }
 
