@@ -1415,14 +1415,18 @@ async function route(request, env, ctx, headers, origin) {
   // data only, no account, 300 asks a minute an address (a search is dozens); Google's paid asks
   // stay under transit.js's monthly caps either way. TRANSIT_DEV = "off"
   // (wrangler.toml [vars]) closes it.
+  // Or the weekly bus build on GitHub (tools/gtfs-buses.mjs), Bearer
+  // DATA_PUSH_SECRET: GTFS's zip and TDX's asks GTFS can't answer, from the
+  // build's own month of TDX points (transit.js buildTdxRoom).
   if (path === '/transit' || path.startsWith('/transit/')) {
     const signed = await sessionOf(request, env, READ_GRACE_MS);
-    const dev = !signed && env.TRANSIT_DEV !== 'off' && LOCAL_ORIGIN.test(origin);
+    const build = !signed && Boolean(env.DATA_PUSH_SECRET) && request.headers.get('Authorization') === `Bearer ${env.DATA_PUSH_SECRET}`;
+    const dev = !signed && !build && env.TRANSIT_DEV !== 'off' && LOCAL_ORIGIN.test(origin);
     // (or the showcase's live demo, showcase.js: its paid asks from their own share, transit.js)
-    const show = !signed && !dev && (await showcaseOf(request, env, { ip, origin }));
-    const session = signed || (dev ? { s: 'dev', dev: true } : null) || show || null;
+    const show = !signed && !dev && !build && (await showcaseOf(request, env, { ip, origin }));
+    const session = signed || (build ? { s: 'build', build: true } : null) || (dev ? { s: 'dev', dev: true } : null) || show || null;
     if (await graceShut(env, signed)) return json(fullBody(), 503, headers);
-    return handleTransit(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `t:dev:${ip}` : `t:${session?.s}`, dev ? 300 : show ? SHOW_PER_MIN : limitOf(session, 90)) });
+    return handleTransit(request, env, headers, path, { session, ctx, limited: () => sessionLimited(dev ? `t:dev:${ip}` : `t:${session?.s}`, dev || build ? 300 : show ? SHOW_PER_MIN : limitOf(session, 90)) });
   }
   // Orbit Class's 專注飛行 (flight.js): real planes landing in about N
   // minutes, then one followed. A Pass session, or the dev door as Transit's.

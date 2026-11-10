@@ -97,25 +97,28 @@ export async function packCity(tdx, city, built) {
   });
   // (A big city's timetables: a few routes a page.)
   await tdx.pages(`basic/v2/Bus/Schedule/${scope}`, 30, rows => {
-    for (const r of rows) {
-      const order = [];
-      for (const t of r.Timetables || []) for (const st of (t.StopTimes || []).slice().sort((a, b) => (a.StopSequence || 0) - (b.StopSequence || 0))) if (!order.includes(st.StopUID)) order.push(st.StopUID);
-      const at = new Map(order.map((u, i) => [u, i]));
-      const trips = (r.Timetables || []).map(t => {
-        const times = Array(order.length).fill(-1);
-        for (const st of t.StopTimes || []) times[at.get(st.StopUID)] = mins(st.DepartureTime || st.ArrivalTime);
-        const set = new Set(times.filter(x => x >= 0));
-        const one = set.size <= 1 ? [...set][0] ?? -1 : null;
-        const trip = [daysOf(t.ServiceDay), one ?? times];
-        if (t.SpecialDays?.length) trip.push(t.SpecialDays);
-        return trip;
-      });
-      const freq = (r.Frequencys || []).map(f => [daysOf(f.ServiceDay), f.StartTime, f.EndTime, Number(f.MinHeadwayMins) || 0, Number(f.MaxHeadwayMins) || 0]);
-      for (const u of order) if (!stops[u]) stops[u] = [zh((r.Timetables || []).flatMap(t => t.StopTimes || []).find(s => s.StopUID === u)?.StopName), null, null];
-      route(r.RouteUID, zh(r.RouteName)).sched.push([r.SubRouteUID || '', Number(r.Direction) || 0, order, trips, freq]);
-    }
+    for (const r of rows) route(r.RouteUID, zh(r.RouteName)).sched.push(schedOf(r, stops));
   });
   return { v: 1, city, built, stops, routes: [...routes.values()] };
+}
+// One of TDX's Schedule rows made compact: [sub, dir, order, trips, freq]
+// (a stop not yet in `stops` added by its name).
+export function schedOf(r, stops = {}) {
+  const order = [];
+  for (const t of r.Timetables || []) for (const st of (t.StopTimes || []).slice().sort((a, b) => (a.StopSequence || 0) - (b.StopSequence || 0))) if (!order.includes(st.StopUID)) order.push(st.StopUID);
+  const at = new Map(order.map((u, i) => [u, i]));
+  const trips = (r.Timetables || []).map(t => {
+    const times = Array(order.length).fill(-1);
+    for (const st of t.StopTimes || []) times[at.get(st.StopUID)] = mins(st.DepartureTime || st.ArrivalTime);
+    const set = new Set(times.filter(x => x >= 0));
+    const one = set.size <= 1 ? [...set][0] ?? -1 : null;
+    const trip = [daysOf(t.ServiceDay), one ?? times];
+    if (t.SpecialDays?.length) trip.push(t.SpecialDays);
+    return trip;
+  });
+  const freq = (r.Frequencys || []).map(f => [daysOf(f.ServiceDay), f.StartTime, f.EndTime, Number(f.MinHeadwayMins) || 0, Number(f.MaxHeadwayMins) || 0]);
+  for (const u of order) if (!stops[u]) stops[u] = [zh((r.Timetables || []).flatMap(t => t.StopTimes || []).find(s => s.StopUID === u)?.StopName), null, null];
+  return [r.SubRouteUID || '', Number(r.Direction) || 0, order, trips, freq];
 }
 // The 公路客運 cut into squares: each route in every square one of its stops is in.
 export function squares(p) {

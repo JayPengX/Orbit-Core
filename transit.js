@@ -260,6 +260,15 @@ export async function tallyTdx(env, path, now = Date.now(), ctx = null, by = '',
 // day; on the free tier a sliver, the rest copies.)
 export const devTdxDay = (now = Date.now()) => (tdxPlan(now).paid ? 5 : 0.02);
 export const DEV_OLDEST = 10 * MIN;
+// The weekly bus build (tools/gtfs-buses.mjs, through the build door): its
+// own points a TDX month, past them copies only (BUILD_TDX_CAP). It asks
+// only what GTFS can't say (each city's sub-routes, a cheap select; new or
+// changed ones; special days; a few cities' stations): ~0.3 a month.
+export const buildTdxMonth = (now = Date.now()) => (tdxPlan(now).paid ? 40 : 0.6);
+export async function buildTdxRoom(env, now = Date.now()) {
+  // (Its own counts alone: TDX's book of a day is everyone's.)
+  return tdxPoints(await tdxUse(env, now, 'build:'), now, {}).month < buildTdxMonth(now);
+}
 const DEV_TDX = /^dev:tdx:(v?[bam]):(\d{4}-\d{2}-\d{2})$/;
 export async function devTdxRoom(env, now = Date.now()) {
   const day = twDay(now);
@@ -416,6 +425,8 @@ export const TDX_RULES = [
   { re: /^basic\/v2\/Bus\/Shape\/(City\/[A-Za-z]+(\/[^/]+)?|InterCity(\/[^/]+)?)$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
   { re: /^basic\/v2\/Rail\/((TRA|THSR)\/Shape|Metro\/Shape\/[A-Z]+)$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
   { re: /^advanced\/v2\/Bus\/(Station|Stop|Route)\/NearBy$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
+  // A city's bus stations (the bus build's station tiles, a few cities a week).
+  { re: /^basic\/v2\/Bus\/Station\/(City\/[A-Za-z]+|InterCity)$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
   { re: /^advanced\/v2\/Bus\/(Route|StopOfRoute)\/(City\/[A-Za-z]+|InterCity)\/PassThrough\/Station\/[^/]+$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
   { re: /^basic\/v2\/Bike\/Station\/City\/[A-Za-z]+$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
   { re: /^advanced\/v2\/Bike\/Station\/NearBy$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
@@ -1117,6 +1128,7 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
     if (inflight.has(url)) return inflight.get(url);
     const p = (async () => {
       if (dev && !(await devTdxRoom(env, now))) return { status: 429, state: 'devcap' };
+      if (by === 'build' && !(await buildTdxRoom(env, now))) return { status: 429, state: 'buildcap' };
       if (!paced(env, now)) return { status: 429, state: 'busy' };
       const token = await tdxAccess(env, fetchFn, now);
       if (!token) return { status: 503, state: 'nokey' };
@@ -1183,7 +1195,7 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
   if (got.status === 200) return got;
   // TDX busy or failing: the last copy, however old the cache (or KV) still has it.
   if (body != null) return { status: 200, body, age, state: 'stale' };
-  const code = got.state === 'nokey' ? 'TDX_NO_KEY' : got.state === 'devcap' ? 'DEV_TDX_CAP' : got.state === 'busy' || got.status === 429 ? 'TDX_BUSY' : 'TDX_FAILED';
+  const code = got.state === 'nokey' ? 'TDX_NO_KEY' : got.state === 'devcap' ? 'DEV_TDX_CAP' : got.state === 'buildcap' ? 'BUILD_TDX_CAP' : got.state === 'busy' || got.status === 429 ? 'TDX_BUSY' : 'TDX_FAILED';
   return { status: got.state === 'nokey' ? 503 : got.status === 429 || got.state === 'busy' ? 429 : 502, body: JSON.stringify({ code, upstream: got.status, why: got.why || '' }), state: got.state || 'error' };
 }
 
@@ -1987,7 +1999,7 @@ async function transitRoute(request, env, headers, path, { session = null, limit
   if (request.method !== 'GET') return send({ code: 'GET_ONLY' }, 405);
   const q = new URL(request.url).searchParams;
   // (Who spends Google's and TDX's counts when it isn't a person: our tools, the showcase's demo.)
-  const by = session?.dev ? 'dev' : session?.showcase ? 'show' : '';
+  const by = session?.build ? 'build' : session?.dev ? 'dev' : session?.showcase ? 'show' : '';
   const deps = { fetchFn, ctx, now, cache, by, free };
   if (path === '/transit/status') {
     const sample = q.get('sample');
@@ -2059,8 +2071,8 @@ async function transitRoute(request, env, headers, path, { session = null, limit
     // empty), or one operator's (p=Rail/TRTC). TDX's 0 points (計次 and
     // 計量 不計入, no review), streamed through as it comes: the weekly bus
     // build's source (tools/gtfs-buses.mjs, run by GitHub) and its checks.
-    // Our tools' only (the dev door).
-    if (!session.dev) return send({ code: 'NOT_ALLOWED' }, 403);
+    // Our tools' only (the build door, the dev door).
+    if (!session.dev && !session.build) return send({ code: 'NOT_ALLOWED' }, 403);
     const sub = q.get('p') || '';
     if (!/^(|(Rail|OperatorCode)\/[A-Z]{2,10})$/.test(sub)) return send({ code: 'BAD_PATH' }, 400);
     const token = await tdxAccess(env, fetchFn, now).catch(() => null);

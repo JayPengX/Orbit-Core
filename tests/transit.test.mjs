@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   tdxRequest, tdxGet, warmBikes, SLOW_MS, tdxAccess, resetTdxToken, resetPace, resetTurns, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
-  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta, tdxTrim, tdxUse, DEV_SHARE, ETA_ROWS, wholeAt, together, devTdxDay, DEV_OLDEST, tdxFamily, tdxPlan, TDX_PAID_UNTIL
+  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta, tdxTrim, tdxUse, DEV_SHARE, ETA_ROWS, wholeAt, together, devTdxDay, DEV_OLDEST, tdxFamily, tdxPlan, TDX_PAID_UNTIL, buildTdxMonth, buildTdxRoom
 } from '../transit.js';
 
 const NOW = Date.parse('2026-10-03T01:00:00Z');
@@ -1279,6 +1279,28 @@ test("TDX's API of each call (the month's count by it), and the plan: 銅級 til
   assert.equal(devTdxDay(TDX_PAID_UNTIL), 0.02);
 });
 
+test("the bus build's TDX asks come from its own month of points (BUILD_TDX_CAP past them), never people's or the dev door's", async () => {
+  fresh();
+  const kv = memKv();
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', RATE_LIMIT_KV: kv, TDX_PER_MIN: '100' };
+  let calls = 0;
+  const fetchFn = async url => (url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : (calls++, json([{ n: calls }])));
+  const get = (path, now, by = 'build') => tdxGet(env, path, { fetchFn, cache: memCache(), now, by });
+  const list = 'basic/v2/Bus/StopOfRoute/City/Hsinchu?$select=RouteUID,SubRouteUID,Direction&$top=20000';
+  assert.equal((await get(list, NOW)).state, 'miss');
+  assert.ok(tdxRequest('basic/v2/Bus/Station/City/Hsinchu?$top=250&$skip=0'), "a city's stations, for the build's tiles");
+  // Its month spent (people's and the dev door's counts aside): copies only.
+  fresh();
+  await kv.put(`transit:use:${billingMonth(NOW)}`, JSON.stringify({ 'tdx:b:2026-10-03': 1e6, 'dev:tdx:b:2026-10-03': 1e6, 'build:tdx:b:2026-10-03': buildTdxMonth(NOW) * 1500 - 3 }));
+  assert.equal(await buildTdxRoom(env, NOW), true);
+  fresh();
+  await kv.put(`transit:use:${billingMonth(NOW)}`, JSON.stringify({ 'build:tdx:b:2026-10-03': buildTdxMonth(NOW) * 1500 }));
+  assert.equal(await buildTdxRoom(env, NOW), false);
+  const none = await get('basic/v2/Bus/StopOfRoute/City/Yilan?$top=10', NOW + 60_000);
+  assert.deepEqual([none.status, JSON.parse(none.body).code, calls], [429, 'BUILD_TDX_CAP', 1]);
+  assert.ok(buildTdxMonth(Date.parse('2026-12-02T00:00:00+08:00')) < 1, "on TDX's free tier a fraction of its 3 points");
+});
+
 test("TDX's GTFS streamed through for our tools only (0 points): all Taiwan's, or one operator's; nothing else", async () => {
   fresh();
   const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', RATE_LIMIT_KV: memKv() };
@@ -1295,6 +1317,9 @@ test("TDX's GTFS streamed through for our tools only (0 points): all Taiwan's, o
   assert.equal(all.headers.get('Content-Type'), 'application/zip');
   assert.deepEqual([...new Uint8Array(await all.arrayBuffer())], [0x50, 0x4b, 3, 4]);
   assert.equal((await ask('Rail/TRTC', { s: 'dev', dev: true })).status, 200);
+  // (The weekly bus build on GitHub, its own door: tools/gtfs-buses.mjs.)
+  assert.equal((await ask(null, { s: 'build', build: true })).status, 200);
+  asked.pop();
   assert.equal((await ask('../basic', { s: 'dev', dev: true })).status, 400);
   assert.deepEqual(asked, ['https://tdx.transportdata.tw/api/gtfs/V3/Map/GTFS/Static', 'https://tdx.transportdata.tw/api/gtfs/V3/Map/GTFS/Static/Rail/TRTC']);
 });

@@ -6,8 +6,8 @@
 //   :16 hourly   watch links (light: what's new; in full at 20 UTC: the
 //                season, older highlights, Apple TV)
 //   :20 hourly   a few cutouts
-//   :24 hourly   the bus packs, a few cities at a time once a city's is a
-//                week old (one read of index.json when none is)
+//   (the bus packs: GitHub's weekly build from TDX's GTFS since 2026-11,
+//   tools/gtfs-buses.mjs; buses.js runBuses only by hand, POST /data/build?job=buses)
 //   :22 daily    15 UTC CPBL's tables and its month whole (23:00 in Taiwan);
 //                16 UTC the season packs (midnight in Taiwan); 18 UTC a few
 //                photo lists in turn (each about weekly); 23 UTC win
@@ -34,7 +34,7 @@ export const WINPROB_HOUR = 23;
 // `proxy(url, trim)`: a read through the data proxy's route (its trims and edge cache), its JSON or null.
 // One job a run (each run its own 30 s of CPU: the whole hour's work in one
 // went past it, 2026-10-13), each on its own even minute of the hour.
-export const SLOTS = { 6: 'f1kept', 16: 'watch', 20: 'cutouts', 22: 'daily', 24: 'buses', 26: 'f1kept', 46: 'f1kept' };
+export const SLOTS = { 6: 'f1kept', 16: 'watch', 20: 'cutouts', 22: 'daily', 26: 'f1kept', 46: 'f1kept' };
 
 // `proxy(url, trim)`: a read through the data proxy's route (its trims and edge cache), its JSON or null.
 // `pace` (pace.js): at 1 only what phones would miss runs, from 2 nothing

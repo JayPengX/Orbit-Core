@@ -1,0 +1,51 @@
+# The weekly bus build (tools/gtfs-buses.mjs): every city's bus pack, its
+# lines and where.json from TDX's GTFS (its free download, 0 points; 470 MB
+# zipped, past what a Worker holds), TDX asked through the proxy only for
+# what GTFS can't say, and only the files that changed written to R2
+# (/data/push). Sunday 03:00 in Taiwan; by hand any time (a city or two,
+# or without TDX at all).
+name: Bus packs from GTFS
+on:
+  schedule:
+    - cron: '7 19 * * 6'
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Cities only, e.g. Hsinchu,Taipei (empty: all)'
+        default: ''
+      tdx:
+        description: Ask TDX for what GTFS can't say
+        type: boolean
+        default: true
+      push:
+        description: Write what changed to R2 (off — only built and counted)
+        type: boolean
+        default: true
+# One at a time, never cancelled midway (a cancel mails Jay).
+concurrency:
+  group: buses
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      # main's tip, never the commit that started the run.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build (and push)
+        run: |
+          set --
+          [ -n "$ONLY" ] && set -- "$@" --only "$ONLY"
+          [ "$TDX" = "false" ] && set -- "$@" --no-tdx
+          [ "$PUSH" = "false" ] || set -- "$@" --push
+          node --max-old-space-size=6000 tools/gtfs-buses.mjs "$@"
+        env:
+          ONLY: ${{ inputs.only }}
+          TDX: ${{ inputs.tdx }}
+          PUSH: ${{ inputs.push }}
+          DATA_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET }}
