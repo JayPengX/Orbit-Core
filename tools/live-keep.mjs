@@ -88,7 +88,7 @@ export function makeKeep({ dir = process.env.ORBIT_LIVE_KEEP || '', ttlS = proce
   const settled = async key => {
     for (let t = 0; t < 100 && existsSync(lockOf(key)); t++) await wait(200);
   };
-  // One address of a Worker → { status, headers, body (Buffer), kept }.
+  // One address of a Worker → { status, headers, body (Buffer), kept, at (when a kept one was asked) }.
   async function liveFetch(url, { method = 'GET', headers = {}, body, keep = Boolean(dir) } = {}) {
     const ask = async () => {
       tally('q');
@@ -100,7 +100,7 @@ export function makeKeep({ dir = process.env.ORBIT_LIVE_KEEP || '', ttlS = proce
     if (!keep || !dir) return ask();
     const key = `${method} ${url} ${body || ''}`;
     const file = fileOf(key);
-    const out = got => (tally('k'), { status: got.status, headers: got.headers, body: Buffer.from(got.body, 'base64'), kept: true });
+    const out = got => (tally('k'), { status: got.status, headers: got.headers, body: Buffer.from(got.body, 'base64'), kept: true, at: got.at });
     let got = fresh(read(file));
     if (got) return out(got);
     const mine = claim(key);
