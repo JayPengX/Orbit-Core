@@ -552,9 +552,27 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
         }
       };
       const answerModel = tune.model === 'lite' ? undefined : ANSWER_MODEL;
+      const prompt = answerPrompt(chat, articles, nameOf, ground, more, ly);
+      // (The ops check's side by side: one prompt, every model's answer, each checked and timed, in tune.results.)
+      if (tune.compare) {
+        tune.results = Object.fromEntries(
+          await Promise.all(
+            Object.entries(tune.compare).map(async ([name, call]) => {
+              const t = Date.now();
+              try {
+                const raw = await modelJson(call, prompt, ANSWER);
+                return [name, { ms: Date.now() - t, ...checkChat(raw, articles, chat.lang, grounded, moreCites(more), ly) }];
+              } catch (e) {
+                return [name, { error: String(e?.message || e).slice(0, 200), ms: Date.now() - t }];
+              }
+            })
+          )
+        );
+        return json({ compared: true }, 200, headers);
+      }
       // (Flash failing, an answer from Flash-Lite rather than none: 3.6 Flash
       // now and then ends its JSON early on the free tier, 2026-11-06.)
-      const ask = model => modelJson((parts, schema) => gemini(parts, schema, model, { onText, thinking: tune.answer }), answerPrompt(chat, articles, nameOf, ground, more, ly), ANSWER);
+      const ask = model => modelJson((parts, schema) => gemini(parts, schema, model, { onText, thinking: tune.answer }), prompt, ANSWER);
       const raw = await ask(answerModel).catch(e => (answerModel ? ask(undefined) : Promise.reject(e)));
       out = checkChat(raw, articles, chat.lang, grounded, moreCites(more), ly);
     }
@@ -564,6 +582,21 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
   } catch {
     return fail('upstream', 502, headers, used ? { left: left(used) } : undefined);
   }
+}
+
+// The side by side (worker.js /ops?check=ai-compare): each question planned,
+// found and grounded once, then answered by every model in `calls`
+// ({ name: (parts, schema) => Response of Gemini's shape }) on the same
+// prompt; each answer checked as a reader would get it. qs: the questions.
+export const COMPARE_QS = ['房東不還押金怎麼辦', '酒駕被抓會怎樣', '公司沒給加班費可以告嗎', '高中生打工一小時最低多少錢', '網購收到的東西跟照片不一樣可以退嗎', '被機車撞到對方不賠怎麼辦', '在學校被同學霸凌可以怎麼處理', '未成年可以自己辦手機門號嗎', '鄰居半夜一直吵可以檢舉嗎', '在網路上罵人會被告嗎'];
+export async function lawCompare(env, ctx, headers, gemini, calls, qs = COMPARE_QS) {
+  const out = [];
+  for (const q of qs) {
+    const tune = { compare: calls };
+    const res = await answerChat(readChat({ q }), 'ops', env, ctx, headers, gemini, () => {}, LAW_LIMITS.perDay, {}, tune);
+    out.push({ q, status: res.status, results: tune.results || null });
+  }
+  return { at: new Date().toISOString(), out };
 }
 
 // The ops check (worker.js /ops?check=law-chat&try=…): real questions answered

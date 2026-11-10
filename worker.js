@@ -31,7 +31,8 @@
 // (First: the outside calls counted, sources.js, before anything keeps a fetch of its own.)
 import { watchRelay, flushSources, asSourceCall, pruneSources, takeBeacon } from './sources.js';
 import { handleLawAsk, useLawSite, addOne, twDay } from './law.js';
-import { handleLawChat, lawChatTimes } from './law-chat.js';
+import { handleLawChat, lawChatTimes, lawCompare, COMPARE_QS } from './law-chat.js';
+import { otherAnswer, makerOf, modelsOf } from './ai-other.js';
 import { DEV, aiSettingOf } from './kit/brand.mjs';
 import { handleLawPage } from './law-page.js';
 import { handleLawLive } from './law-live.js';
@@ -1384,6 +1385,25 @@ async function route(request, env, ctx, headers, origin) {
     // 問法律's steps timed on real questions, nothing kept read or written (law-chat.js).
     if (check === 'law-chat') return json(await lawChatTimes(env, ctx, headers, lawGemini('law-chat'), new URL(request.url).searchParams.get('try') || ''), 200, headers);
     if (check === 'system') return json(await systemReport(env, ECO_DEPS), 200, headers);
+    // The paid makers' keys and their models' names (ai-other.js).
+    if (check === 'ai-models') return json(await modelsOf(env), 200, headers);
+    // 問法律's answer by each model named (?models=a,b,…; Gemini's or ai-other.js's) on the
+    // same plan, articles and prompt; ?from=&n= the questions (law-chat.js COMPARE_QS).
+    if (check === 'ai-compare') {
+      const q = new URL(request.url).searchParams;
+      const names = (q.get('models') || '').split(',').filter(m => /^[a-z0-9.-]{3,40}$/.test(m)).slice(0, 6);
+      const calls = Object.fromEntries(
+        names.map(m => [
+          m,
+          makerOf(m)
+            ? (parts, schema) => otherAnswer(m, parts, schema, env, { effort: q.get('effort') || null })
+            : (parts, schema) => streamGeminiRequest(m, parts, schema, env, headers, ctx, 'compare', 60_000)
+        ])
+      );
+      const from = Math.max(0, Number(q.get('from')) || 0);
+      const qs = COMPARE_QS.slice(from, from + Math.min(10, Math.max(1, Number(q.get('n')) || 3)));
+      return json(await lawCompare(env, ctx, headers, lawGemini('compare'), calls, qs), 200, headers);
+    }
     // Every Gemini call of the last ?days= (30 at most) by day, feature, model and status.
     if (check === 'gemini-use') {
       const days = Math.min(30, Math.max(1, Number(new URL(request.url).searchParams.get('days')) || 7));

@@ -120,6 +120,8 @@ export const SOURCES = [
 
   // ---- AI 與地圖 ----
   { id: 'gemini', zh: 'Gemini', group: 'ai', apps: ['orbit', 'law', 'money'], feeds: '課表拍照、問法律、拍照記帳', hosts: ['generativelanguage.googleapis.com'], where: ['relay'], quota: 'gemini' },
+  { id: 'claude', zh: 'Claude', group: 'ai', apps: ['law'], feeds: '問法律（試用比較）', hosts: ['api.anthropic.com'], where: ['relay'] },
+  { id: 'openai', zh: 'OpenAI', group: 'ai', apps: ['law'], feeds: '問法律（試用比較）', hosts: ['api.openai.com'], where: ['relay'] },
   { id: 'google-maps', zh: 'Google 地圖', group: 'ai', apps: ['transit'], feeds: '地點、搜尋、路線、走路', hosts: ['places.googleapis.com', 'routes.googleapis.com', 'maps.googleapis.com'], where: ['worker', 'phone'], quota: 'google-maps' },
 
   // ---- 其他 ----
