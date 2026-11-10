@@ -37,12 +37,13 @@ const CHAT_TTL_S = 30 * 86_400;
 const BILL_WORDS = /修法|修正|草案|立法院|立委|三讀|二讀|一讀|法案|進度|提案|bill/i;
 // The answer's model (Jay 2026-11-10, after a blind side by side of five on ten
 // real questions: Claude Sonnet 5.5, the only one with no legal slip) at its
-// effort, and Gemini's Flash when it fails (Flash-Lite after that, geminiAnswer).
+// effort, and when it fails one of its own class from another maker: GPT's Sol
+// (Jay 11-10: "all three is paid by me so fallback better be designed well").
 export const ANSWER_MODEL = 'claude-sonnet-5-5';
 // (Measured live 11-10, three questions each: its default 'high' first wrote in 3.7–11.9 s and
 // ended in 9.3–16.5 s; 'medium' 3.4–4.3 s and 9.0–10.3 s, as quick as 'low' and thinking more.)
 export const ANSWER_EFFORT = 'medium';
-export const ANSWER_BACKUP = 'gemini-3.6-flash';
+export const ANSWER_BACKUP = 'gpt-6.1-sol';
 const CITE = /^([A-Z]\d{7}):(\d{1,4}(?:-\d{1,3})?)$/;
 
 // ---- The ask --------------------------------------------------------------------
@@ -569,7 +570,7 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
           stage({ stage: 'draft', ...d });
         }
       };
-      const answerModel = tune.model === 'lite' ? undefined : tune.model === 'flash' ? ANSWER_BACKUP : /^(claude|gemini)-[a-z0-9.-]+$/.test(tune.model || '') ? tune.model : ANSWER_MODEL;
+      const answerModel = tune.model === 'lite' ? undefined : tune.model === 'flash' ? ANSWER_BACKUP : /^(claude|gemini|gpt)-[a-z0-9.-]+$/.test(tune.model || '') ? tune.model : ANSWER_MODEL;
       const prompt = answerPrompt(chat, articles, nameOf, ground, more, ly, local);
       // (The ops check's side by side: one prompt, every model's answer, each checked and timed, in tune.results.)
       if (tune.compare) {
@@ -588,12 +589,11 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
         );
         return json({ compared: true }, 200, headers);
       }
-      // (Sonnet failing, refusing or cut short: Gemini's Flash answers, then
-      // Flash-Lite, rather than none; each JSON that doesn't parse is a failure too.)
+      // (Sonnet failing, refusing or cut short: GPT's Sol answers; each JSON
+      // that doesn't parse is a failure too.)
       const ask = (model, thinking = tune.answer) => modelJson((parts, schema) => gemini(parts, schema, model, { onText, thinking }), prompt, ANSWER);
       const raw = await ask(answerModel, tune.answer ?? (answerModel === ANSWER_MODEL ? ANSWER_EFFORT : null))
-        .catch(e => (answerModel && answerModel !== ANSWER_BACKUP ? ask(ANSWER_BACKUP, null) : Promise.reject(e)))
-        .catch(e => (answerModel ? ask(undefined, null) : Promise.reject(e)));
+        .catch(e => (answerModel && answerModel !== ANSWER_BACKUP ? ask(ANSWER_BACKUP, null) : Promise.reject(e)));
       out = checkChat(raw, articles, chat.lang, grounded, others, ly);
     }
     mark('answer');

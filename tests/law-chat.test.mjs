@@ -93,6 +93,13 @@ globalThis.fetch = async (url, init) => {
         ev({ type: 'message_stop' })
     );
   }
+  // (GPT's Sol, Sonnet's backup: one whole answer, as OpenAI's chat completions give it.)
+  if (u.startsWith('https://api.openai.com/')) {
+    const sent = JSON.parse(init.body);
+    gemini.push({ kind: 'answer', model: sent.model });
+    if (MODEL_STATUS[sent.model]) return new Response(JSON.stringify({ error: { message: 'x' } }), { status: MODEL_STATUS[sent.model] });
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(answer) }, finish_reason: 'stop' }], usage: { prompt_tokens: 900, completion_tokens: 120 } }));
+  }
   if (u.includes('generativelanguage')) {
     const sent = JSON.parse(init.body);
     const kind = 'terms' in sent.generationConfig.response_schema.properties ? 'plan' : 'answer';
@@ -136,7 +143,7 @@ function fakeKV() {
   const m = new Map();
   return { m, get: async (k, o) => (m.has(k) ? (o?.type === 'json' ? JSON.parse(m.get(k)) : m.get(k)) : null), put: async (k, v) => void m.set(k, v) };
 }
-const envOf = () => ({ GEMINI_API_KEY: 'k', ECO_TOKEN_SECRET: 'test-secret', STORE: fakeD1(), RATE_LIMIT_KV: fakeKV() });
+const envOf = () => ({ GEMINI_API_KEY: 'k', ANTHROPIC_API_KEY: 'a', OPENAI_API_KEY: 'o', ECO_TOKEN_SECRET: 'test-secret', STORE: fakeD1(), RATE_LIMIT_KV: fakeKV() });
 const qtOf = (d, { a = 'law', e = Date.now() + 600_000 } = {}) => signToken('test-secret', { k: 'ses', d, s: `s-${d}`, a, e });
 let passN = 0;
 const chat = async (body, { origin = 'https://jaypengx.github.io', pass = `acct${++passN}`, qt, ip = '198.51.100.1', env = envOf() } = {}) => {
@@ -489,7 +496,7 @@ test('only the judgments and rules the answer cites come back; a judgment is rea
   const relayed = [];
   const was = answer;
   answer = { ...answer, points: [{ text: '押金返還請求權二年消滅', cites: ['B0000001:456'] }] };
-  const env = { ...envOf(), GEMINI_RELAY: { fetch: async (u, init) => String(u).includes('generativelanguage') ? fetch(new URL(u).searchParams.get('to'), init) : (relayed.push(String(u)), new Response('<div class="htmlcontent"><div>主文</div><div>上訴駁回。</div><div>理由</div><div>一、押金應返還。</div></div>')) } };
+  const env = { ...envOf(), GEMINI_RELAY: { fetch: async (u, init) => /generativelanguage|api\.anthropic|api\.openai/.test(String(u)) ? fetch(new URL(u).searchParams.get('to'), init) : (relayed.push(String(u)), new Response('<div class="htmlcontent"><div>主文</div><div>上訴駁回。</div><div>理由</div><div>一、押金應返還。</div></div>')) } };
   try {
     // (Not cited: the judgment and the rules were read, but not shown.)
     const r = await chat({ q: '房東不還押金 租賃押金返還', lang: 'zh', city: ['台北市'] }, { env });
@@ -517,30 +524,26 @@ test('only the judgments and rules the answer cites come back; a judgment is rea
   assert.deepEqual(lookOf({ budgets: [], bills: [], news: [], facts: [] }, [], false), ['cases']);
 });
 
-test("Gemini's free tier: Flash failing, Flash-Lite answers and Flash is skipped 10 minutes; Flash-Lite's 503 asked once more", async () => {
-  const env = envOf();
-  MODEL_STATUS['gemini-3.6-flash'] = 503;
+test("no Gemini answers: Sonnet and Sol both failing is a 502, never Flash; the plan's Flash-Lite 503 asked once more", async () => {
+  MODEL_STATUS['gpt-6.1-sol'] = 503;
+  claude = { status: 529, refuse: false };
   try {
     const n = gemini.length;
-    const r = await chat({ ...Q, q: '押金退不回來' }, { env });
-    assert.equal(r.status, 200);
-    assert.deepEqual(gemini.slice(n).map(g => `${g.kind} ${g.model}`), ['plan gemini-3.5-flash-lite', 'answer gemini-3.6-flash', 'answer gemini-3.5-flash-lite']);
-    // (Flash's failure is in the log: the next answer goes straight to Flash-Lite.)
-    const m = gemini.length;
-    assert.equal((await chat({ ...Q, q: '押金被扣了' }, { env })).status, 200);
-    assert.deepEqual(gemini.slice(m).map(g => g.model), ['gemini-3.5-flash-lite', 'gemini-3.5-flash-lite']);
+    const r = await chat({ ...Q, q: '押金退不回來' });
+    assert.equal(r.status, 502);
+    assert.deepEqual(gemini.slice(n).map(g => `${g.kind} ${g.model}`), ['plan gemini-3.5-flash-lite', 'answer claude-sonnet-5-5', 'answer gpt-6.1-sol']);
   } finally {
-    delete MODEL_STATUS['gemini-3.6-flash'];
+    delete MODEL_STATUS['gpt-6.1-sol'];
+    claude = { status: 200, refuse: false };
   }
-  // Flash well again (another store, nothing failed): Flash answers; Flash-Lite's one 503 asked again.
   FAILS['gemini-3.5-flash-lite'] = 1;
   const k = gemini.length;
   assert.equal((await chat({ ...Q, q: '押金何時還' })).status, 200);
-  assert.deepEqual(gemini.slice(k).map(g => `${g.kind} ${g.model}`), ['plan gemini-3.5-flash-lite', 'plan gemini-3.5-flash-lite', 'answer gemini-3.6-flash']);
+  assert.deepEqual(gemini.slice(k).map(g => `${g.kind} ${g.model}`), ['plan gemini-3.5-flash-lite', 'plan gemini-3.5-flash-lite', 'answer claude-sonnet-5-5']);
 });
 
-test("Sonnet answers, streamed, at its effort; failing or refusing, Gemini's Flash answers instead", async () => {
-  const env = { ...envOf(), ANTHROPIC_API_KEY: 'a' };
+test("Sonnet answers, streamed, at its effort; failing or refusing, GPT's Sol answers instead (one of its class, another maker)", async () => {
+  const env = { ...envOf(), ANTHROPIC_API_KEY: 'a', OPENAI_API_KEY: 'o' };
   const n = gemini.length;
   const r = await chat({ ...Q, q: '押金不還可以告嗎' }, { env });
   assert.equal(r.status, 200);
@@ -559,7 +562,7 @@ test("Sonnet answers, streamed, at its effort; failing or refusing, Gemini's Fla
       const m = gemini.length;
       const r2 = await chat({ ...Q, q: `押金扣光了 ${trouble.status}${trouble.refuse}` }, { env });
       assert.equal(r2.status, 200);
-      assert.deepEqual(gemini.slice(m).map(g => `${g.kind} ${g.model}`), ['plan gemini-3.5-flash-lite', 'answer claude-sonnet-5-5', 'answer gemini-3.6-flash']);
+      assert.deepEqual(gemini.slice(m).map(g => `${g.kind} ${g.model}`), ['plan gemini-3.5-flash-lite', 'answer claude-sonnet-5-5', 'answer gpt-6.1-sol']);
     } finally {
       claude = { status: 200, refuse: false };
     }
