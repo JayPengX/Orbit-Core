@@ -1453,9 +1453,11 @@ async function tymcFree(path, q, { fetchFn, env, now }) {
 // ---- 台鐵's notices -------------------------------------------------------------------------
 
 // TDX's TRA Alert is 台鐵's 路線運行狀態 (railway.gov.tw tip711/blockList:
-// each line's state and its blocked stretches). Every line running whole
-// (the most of the time) is answered here as TDX words it; a line with a
-// stretch listed is TDX's to say, its stations and words as the app reads them.
+// each line's state and its blocked stretches, a row each: 日期, 線段, 受阻原因,
+// 預計通行時間). Every line running whole (the most of the time) is answered
+// as TDX words it; a line with stretches listed, a notice of them as TDX
+// writes its Description (「八斗子 <--> 菁桐 : …」, each stretch a block); a
+// page it can't read whole, TDX's.
 export const TRA_BLOCKS = 'https://www.railway.gov.tw/tra-tip-web/tip/tip007/tip711/blockList';
 const TRA_ALERT = /^basic\/v3\/Rail\/TRA\/Alert$/;
 // The page → TDX's answer when every line runs whole, else null.
@@ -1465,16 +1467,123 @@ export function traAllClear(html) {
   const [, d, t] = String(html).match(/更新時間：\s*(\d{4}\/\d\d\/\d\d)\s+(\d\d:\d\d)/) || [];
   return { Alerts: [{ Title: '全線營運正常', Status: 1, UpdateTime: d ? `${d.replace(/\//g, '-')}T${t}:00+08:00` : null }] };
 }
+const pageText = h =>
+  String(h)
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .trim();
+// The page → TDX's Alerts: every line whole (traAllClear's), else a notice
+// a line with its stretches; null when it can't be read whole.
+export function traAlerts(html) {
+  const clear = traAllClear(html);
+  if (clear) return clear;
+  const s = String(html);
+  const lines = [...s.matchAll(/<dl class="now_status">([\s\S]*?)<\/dl>\s*<table[^>]*>([\s\S]*?)<\/table>/g)];
+  if (lines.length < 8) return null;
+  const [, d, t] = s.match(/更新時間：\s*(\d{4}\/\d\d\/\d\d)\s+(\d\d:\d\d)/) || [];
+  const at = d ? `${d.replace(/\//g, '-')}T${t}:00+08:00` : null;
+  const out = [];
+  for (const [, head, table] of lines) {
+    const name = pageText((/<dt>([\s\S]*?)<\/dt>/.exec(head) || [])[1] || '');
+    const state = pageText((/<label>([\s\S]*?)<\/label>/.exec(head) || [])[1] || '');
+    const rows = [...table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)].map(r => [...r[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(c => pageText(c[1]))).filter(c => c.length);
+    if (!rows.length && state === '全線正常運行') continue;
+    // (A line said not whole with no stretch listed, or a row not of four: not read whole.)
+    if (!name || !rows.length || rows.some(c => c.length < 3)) return null;
+    const blocks = rows.map(([day, seg, why, until]) => {
+      const ends = seg.split(/\s*(?:<-+>|<->|[-－~～─—至↔]+)\s*/).filter(Boolean);
+      const head = ends.length === 2 ? `${ends[0]} <--> ${ends[1]} : ` : seg ? `${seg} : ` : '';
+      return `${head}${why}${until ? `\n預計通行時間：${until}` : ''}${day && !/\d{1,2}[:：]\d{2}/.test(why) ? `\n（${day}）` : ''}`;
+    });
+    out.push({ AlertID: `tra-${name}`, Title: `${name}${state && state !== '全線正常運行' ? `：${state}` : ''}`, Description: blocks.join('\n'), Status: 2, UpdateTime: at, Scope: {} });
+  }
+  return out.length ? { Alerts: out } : null;
+}
 async function traAlertFree(path, q, { fetchFn, now }) {
   if (!TRA_ALERT.test(path)) return undefined;
   if ([...q.keys()].some(k => k !== '$format')) return null;
   const got = await held('tra:alert', 5 * MIN, 30 * MIN, async () => {
     const res = await fetchFn(TRA_BLOCKS, { signal: AbortSignal.timeout?.(8000) });
     if (!res.ok) throw new Error(`TRA blocks ${res.status}`);
-    const all = traAllClear(await res.text());
+    const all = traAlerts(await res.text());
     return all ? JSON.stringify(all) : null;
   }, now, 3000);
   return got.val == null ? null : { status: 200, body: got.val, age: Math.max(0, now - got.at), state: 'free' };
+}
+
+// ---- 高鐵's and the metros' state ----------------------------------------------------------
+
+// TDX's THSR AlertInfo from 高鐵's own 列車運行狀況 (the header every page of
+// thsrc.com.tw carries: 「全線正常營運」, else its warning and words).
+export const THSR_STATE = 'https://www.thsrc.com.tw/ArticleContent/f7f05113-cd27-4dd9-8edc-014f4e920212/index.html';
+const THSR_ALERT = /^basic\/v2\/Rail\/THSR\/AlertInfo$/;
+// The page → TDX's AlertInfo list, or null when it isn't the page we know.
+export function thsrAlertOf(html, now = Date.now()) {
+  const s = String(html);
+  const head = /<div class="alert-text"[^>]*>([\s\S]*?)<\/div>/.exec(s);
+  const title = head ? pageText(head[1]) : '';
+  if (!title) return null;
+  const i = s.indexOf('class="alert-detail');
+  const detail = i < 0 ? '' : pageText(s.slice(s.indexOf('>', i) + 1, s.indexOf('<h1', i) > 0 ? s.indexOf('<h1', i) : undefined));
+  const warn = /class="header-alert[^"]*\bwarning\b/.test(s) || !!detail;
+  if (!warn && /正常/.test(title)) return [{ Title: title, Status: 1, Description: '', UpdateTime: twNow(now) }];
+  return [{ Title: title, Status: 2, Description: detail || title, UpdateTime: twNow(now) }];
+}
+async function thsrAlertFree(path, q, { fetchFn, now }) {
+  if (!THSR_ALERT.test(path)) return undefined;
+  if ([...q.keys()].some(k => k !== '$format')) return null;
+  const got = await held('thsr:alert', 5 * MIN, 30 * MIN, async () => {
+    const res = await fetchFn(THSR_STATE, { signal: AbortSignal.timeout?.(8000) });
+    const list = res.ok ? thsrAlertOf(await res.text(), now) : null;
+    if (!list) throw new Error(`THSR state ${res.status}`);
+    return JSON.stringify(list);
+  }, now, 3000);
+  return { status: 200, body: got.val, age: Math.max(0, now - got.at), state: 'free' };
+}
+
+// TDX's Metro Alert (each system's state) from the metros' own pages: 臺北's
+// 路線營運狀況 (web.metro.taipei) and 貓空纜車's board, 桃園's and 高雄's (捷運,
+// 輕軌) home pages' 營運狀態, 臺中's RunStatus. 「正常營運」 is TDX's Status
+// 1, else a notice in the site's words (Status 2); a page not as we know it: TDX's.
+export const METRO_STATE = {
+  TRTC: ['https://web.metro.taipei/pages2026/WebServiceStatus', s => [/<p class="realstatus__text">([\s\S]*?)<\/p>/.exec(s)?.[1]]],
+  TRTCMG: ['https://ssl.metro.taipei/gondolainfoboard/default.aspx', s => [/<span id="LabelOperation">([\s\S]*?)<\/span>/.exec(s)?.[1], (t => (t ? `今日營運時間 ${t}` : ''))(pageText(/<span id="LabelDisplayTime">([\s\S]*?)<\/span>/.exec(s)?.[1] || ''))]],
+  TYMC: ['https://www.tymetro.com.tw/tymetro-new/tw/', s => [/最新營運狀態\s*<span[^>]*>([\s\S]*?)<\/span>/.exec(s)?.[1]]],
+  TMRT: ['https://www.tmrt.com.tw/', s => [/"ConfigKey":"RunStatus","ConfigValue":"([^"]*)"/.exec(s)?.[1]]],
+  KRTC: ['https://www.krtc.com.tw/', s => [(/<div id="RtStatusMobile">([\s\S]*?)<\/div>\s*<\/div>/.exec(s)?.[1] || '').split(/<\/div>/).map(pageText).find(t => t.startsWith('捷運'))?.replace(/^捷運/, '')]],
+  KLRT: ['https://www.krtc.com.tw/', s => [(/<div id="RtStatusMobile">([\s\S]*?)<\/div>\s*<\/div>/.exec(s)?.[1] || '').split(/<\/div>/).map(pageText).find(t => t.startsWith('輕軌'))?.replace(/^輕軌/, '')]]
+};
+const METRO_ALERT = /^basic\/v2\/Rail\/Metro\/Alert\/([A-Z]+)$/;
+const NORMAL = /^(目前)?(全線)?正常(營運|行駛|運行)(中)?(（[^）]*）)?$/;
+// A system's page → TDX's Alert answer, or null.
+export function metroAlertOf(sys, html, now = Date.now()) {
+  const [title, more] = METRO_STATE[sys]?.[1](String(html)) || [];
+  const t = pageText(title || '');
+  if (!t) return null;
+  const ok = NORMAL.test(t);
+  // (臺中's 「全線正常營運（目前班距6分鐘）」: the state its title, the headway its words.)
+  const [, plain, aside] = /^(.*?)(?:（([^）]*)）)?$/.exec(t);
+  return { UpdateTime: twNow(now), Alerts: [{ AlertID: `${sys}-state`, Title: ok ? plain : t, Description: more || (ok ? aside || '' : t), Status: ok ? 1 : 2 }] };
+}
+async function metroAlertFree(path, q, { fetchFn, now }) {
+  const m = METRO_ALERT.exec(path);
+  if (!m) return undefined;
+  const site = METRO_STATE[m[1]];
+  if (!site || [...q.keys()].some(k => k !== '$format')) return null;
+  // (One read of a page for every system on it: 高雄's 捷運 and 輕軌.)
+  const page = await held(`metro:state:${site[0]}`, 5 * MIN, 30 * MIN, async () => {
+    const res = await fetchFn(site[0], { signal: AbortSignal.timeout?.(8000) });
+    if (!res.ok) throw new Error(`metro state ${res.status}`);
+    return res.text();
+  }, now, 3000);
+  const answer = metroAlertOf(m[1], page.val, page.at);
+  return answer ? { status: 200, body: JSON.stringify(answer), age: Math.max(0, now - page.at), state: 'free' } : null;
 }
 
 // ---- A 台鐵 train's delay -----------------------------------------------------------------
@@ -1702,7 +1811,7 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), 
   const q = new URLSearchParams(query);
   try {
     const p = decodeURIComponent(path);
-    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await trtcFree(p, q, { fetchFn, env, now })) ?? (await krtcFree(p, q, { fetchFn, env, now })) ?? (await tymcFree(p, q, { fetchFn, env, now })) ?? (await traAlertFree(p, q, { fetchFn, now })) ?? (await traTrainFree(p, q, { fetchFn, env, now })) ?? (await traFareFree(p, q, { fetchFn, env, now })) ?? (await thsrFareFree(p, q, { fetchFn, env, now })) ?? (await copiedFree(p, q, { env, now }));
+    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await trtcFree(p, q, { fetchFn, env, now })) ?? (await krtcFree(p, q, { fetchFn, env, now })) ?? (await tymcFree(p, q, { fetchFn, env, now })) ?? (await traAlertFree(p, q, { fetchFn, now })) ?? (await thsrAlertFree(p, q, { fetchFn, now })) ?? (await metroAlertFree(p, q, { fetchFn, now })) ?? (await traTrainFree(p, q, { fetchFn, env, now })) ?? (await traFareFree(p, q, { fetchFn, env, now })) ?? (await thsrFareFree(p, q, { fetchFn, env, now })) ?? (await copiedFree(p, q, { env, now }));
     if (got !== undefined) return got;
   } catch (err) {
     console.log('free source failed', path.slice(0, 80), String(err?.message || err).slice(0, 120));
@@ -1713,6 +1822,6 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), 
 // Whether a /transit/tdx ask is one the free sources answer (worker.js sends
 // those to the Runner: a list of all Taiwan read and kept there, not in each
 // isolate's 10 ms).
-export const freeHeavy = p => /^((basic|advanced)\/v2\/Bike\/|basic\/v3\/Rail\/TRA\/(DailyTrainTimetable\/TrainDate|ODFare)\/|basic\/v2\/Rail\/THSR\/ODFare\/)/.test(String(p || '').replace(/^\/+/, ''));
+export const freeHeavy = p => /^((basic|advanced)\/v2\/Bike\/|basic\/v3\/Rail\/TRA\/(DailyTrainTimetable\/TrainDate|ODFare)\/|basic\/v2\/Rail\/(THSR\/ODFare|Metro\/Alert)\/)/.test(String(p || '').replace(/^\/+/, ''));
 // (A route's whole list of stops, or its buses, from 新竹's site: read in the Runner too.)
 export const freeRoutesHeavy = (path, q) => (path === '/transit/gps' || (path === '/transit/eta' && (q.get('routes') || q.get('route') || CITY_FEEDS[q.get('city')] || EBUS[q.get('city')] || TB_CITIES[q.get('city')] || q.get('city') === 'Tainan'))) && FREE_BUS.test(q.get('city') || '');

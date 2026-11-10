@@ -696,7 +696,7 @@ test("桃園機場捷運's next trains from its own platform screens (PIDS), in 
   assert.equal(await freeTdx('basic/v2/Rail/Metro/LiveBoard/TYMC', '%24top=3', { env, fetchFn, now: said }), null);
 });
 
-test("台鐵's notices: every line running whole on its 路線運行狀態 page is TDX's 全線營運正常, no TDX; a line with a stretch listed, or the page down, is TDX's to say", async () => {
+test("台鐵's notices: every line running whole on its 路線運行狀態 page is TDX's 全線營運正常, no TDX; a line with a stretch listed, its notice (traAlerts); the page down: TDX's", async () => {
   const { traAllClear, TRA_BLOCKS } = await import('../transit-free.js');
   const page = readFileSync(new URL('./fixtures/tra-blocklist.html', import.meta.url), 'utf8');
   assert.deepEqual(traAllClear(page), { Alerts: [{ Title: '全線營運正常', Status: 1, UpdateTime: '2026-11-10T17:00:00+08:00' }] });
@@ -713,8 +713,12 @@ test("台鐵's notices: every line running whole on its 路線運行狀態 page 
   assert.equal(JSON.parse(got.body).Alerts[0].Status, 1);
   body = blocked;
   assert.equal((await freeTdx('basic/v3/Rail/TRA/Alert', '', { fetchFn, now: NOW + 60_000 })).state, 'free', 'read again each 5 minutes');
-  assert.equal(await freeTdx('basic/v3/Rail/TRA/Alert', '', { fetchFn, now: NOW + 6 * 60_000 }), null, 'a stretch blocked: TDX');
+  const stretch = JSON.parse((await freeTdx('basic/v3/Rail/TRA/Alert', '', { fetchFn, now: NOW + 6 * 60_000 })).body).Alerts;
+  assert.deepEqual(stretch.map(a => [a.Title, a.Status, a.Description]), [['平溪線', 2, '十分 <--> 菁桐 : 落石\n預計通行時間：17:30\n（2026/11/10）']], 'a stretch blocked: its notice');
   assert.equal(asked, 2);
+  resetFree();
+  body = '<html>維護中</html>';
+  assert.equal(await freeTdx('basic/v3/Rail/TRA/Alert', '', { fetchFn, now: NOW }), null, 'a page not as we know it: TDX');
 });
 
 test("a 台鐵 train's delay from 台鐵's own 車次查詢 (the station it last left and the next say 誤點 N 分), in TDX's TrainLiveBoard/TrainNo shape; the form read once, a train's page kept a minute; a train not running: no row", async () => {
@@ -953,4 +957,60 @@ test("高鐵's fares from 高鐵's own 時刻表與票價查詢 (its PriceTable)
   assert.ok(files.has('rail/fare/thsr/1000-1070.json'));
   assert.equal(await freeTdx('basic/v2/Rail/THSR/ODFare/1000/to/9999', '', { env, fetchFn, now }), null, 'a station it has not: TDX');
   assert.ok(freeHeavy('basic/v2/Rail/THSR/ODFare/1000/to/1070'));
+});
+
+// ---- Notices: 台鐵's stretches, 高鐵's and the metros' state ------------------------------------
+
+const nfx = JSON.parse(readFileSync(new URL('./fixtures/notices.json', import.meta.url), 'utf8'));
+test("台鐵's blocked stretches from its 路線運行狀態 as TDX's Description writes them (「A <--> B : …」, a block each); a line said not whole with nothing listed, or a row it can't read: TDX's", async () => {
+  const { traAlerts } = await import('../transit-free.js');
+  assert.equal(traAlerts(nfx.tra).Alerts[0].Status, 1, 'every line whole');
+  // (No disruption to copy on 2026-11-10: a row as the page's own summary describes its table — 日期, 線段, 受阻原因, 預計通行時間 — put in 平溪線's.)
+  const row = '<tr><td>2026/11/10</td><td>八堵-菁桐</td><td>因豪雨，十分=菁桐間停駛，以公路接駁。</td><td>2026/11/11 12:00</td></tr>';
+  const page = nfx.tra.replace(/(<dt>平溪線<\/dt>[\s\S]*?)<label>全線正常運行<\/label>([\s\S]*?<table[^>]*>[\s\S]*?<CAPTION[^>]*>[^<]*<\/CAPTION>)/, `$1<label>部分路段受阻</label>$2${row}`);
+  const got = traAlerts(page);
+  assert.equal(got.Alerts.length, 1);
+  assert.deepEqual([got.Alerts[0].Title, got.Alerts[0].Status], ['平溪線：部分路段受阻', 2]);
+  assert.equal(got.Alerts[0].Description, '八堵 <--> 菁桐 : 因豪雨，十分=菁桐間停駛，以公路接駁。\n預計通行時間：2026/11/11 12:00\n（2026/11/10）');
+  // (The app's own reader finds the stop in it: traRules, service.mjs.)
+  assert.match(got.Alerts[0].Description.split(' : ')[1], /停駛/);
+  assert.equal(traAlerts(nfx.tra.replace('<label>全線正常運行</label>', '<label>部分路段受阻</label>')), null, 'not whole, nothing listed: TDX');
+  assert.equal(traAlerts(page.replace(row, '<tr><td>八堵-菁桐</td></tr>')), null, 'a row of one: TDX');
+  assert.equal(traAlerts('<html>維護中</html>'), null);
+});
+
+test("高鐵's state from its own 列車運行狀況 (TDX's AlertInfo: 正常 is no notice; a warning in its words), the metros' from their own pages (臺北, 貓空, 桃園, 臺中, 高雄's two), each page read once a 5 minutes for every system on it", async () => {
+  const { thsrAlertOf, metroAlertOf, METRO_STATE, THSR_STATE } = await import('../transit-free.js');
+  const now = Date.parse('2026-11-10T18:40:00+08:00');
+  assert.deepEqual(thsrAlertOf(nfx.thsr, now), [{ Title: '全線正常營運', Status: 1, Description: '', UpdateTime: '2026-11-10T18:40:00+08:00' }]);
+  const warned = nfx.thsr.replace('class="header-alert"', 'class="header-alert warning"').replace(/<\/span>全線正常營運/, '</span>列車延誤').replace('<h1', '<div class="alert-detail"><div class="warning-msg">受地震影響，部分列車延誤約 10 分鐘。</div></div><h1');
+  assert.deepEqual(thsrAlertOf(warned, now).map(a => [a.Title, a.Status, a.Description]), [['列車延誤', 2, '受地震影響，部分列車延誤約 10 分鐘。']]);
+  assert.equal(thsrAlertOf('<html>維護中</html>', now), null);
+  const state = sys => metroAlertOf(sys, nfx[sys === 'KLRT' ? 'KRTC' : sys], now).Alerts[0];
+  assert.deepEqual(Object.keys(METRO_STATE).map(s => [s, state(s).Title, state(s).Status]), [['TRTC', '目前正常營運', 1], ['TRTCMG', '目前全線正常營運', 1], ['TYMC', '正常營運', 1], ['TMRT', '全線正常營運', 1], ['KRTC', '全線正常營運', 1], ['KLRT', '全線正常營運', 1]]);
+  assert.equal(state('TMRT').Description, '目前班距6分鐘', "臺中's headway its words, never a notice");
+  assert.equal(state('TRTCMG').Description, '今日營運時間 09:00-21:00');
+  // (Not running whole: a notice in the site's words.)
+  const off = metroAlertOf('TRTC', nfx.TRTC.replace('目前正常營運</p>', '文湖線 動物園站至大直站 暫停營運</p>'), now).Alerts[0];
+  assert.deepEqual([off.Title, off.Status, off.Description], ['文湖線 動物園站至大直站 暫停營運', 2, '文湖線 動物園站至大直站 暫停營運']);
+  assert.equal(metroAlertOf('KLRT', nfx.KRTC.replace('輕軌全線正常營運', '輕軌部分路段延誤'), now).Alerts[0].Title, '部分路段延誤');
+  assert.equal(metroAlertOf('TRTC', '<html></html>', now), null);
+  assert.equal(metroAlertOf('NTDLRT', nfx.TRTC, now), null, 'a system with no page here');
+
+  resetFree();
+  const asked = [];
+  const fetchFn = async u => {
+    asked.push(String(u));
+    if (String(u) === THSR_STATE) return new Response(nfx.thsr);
+    const sys = Object.keys(METRO_STATE).find(k => METRO_STATE[k][0] === String(u));
+    return new Response(nfx[sys === 'KLRT' ? 'KRTC' : sys]);
+  };
+  const ask = p => freeTdx(p, '$format=JSON', { fetchFn, now });
+  assert.equal(JSON.parse((await ask('basic/v2/Rail/THSR/AlertInfo')).body)[0].Title, '全線正常營運');
+  for (const sys of Object.keys(METRO_STATE)) assert.equal(JSON.parse((await ask(`basic/v2/Rail/Metro/Alert/${sys}`)).body).Alerts[0].Status, 1, sys);
+  await ask('basic/v2/Rail/Metro/Alert/KRTC');
+  assert.equal(asked.filter(u => u === METRO_STATE.KRTC[0]).length, 1, "高雄's page once for 捷運 and 輕軌");
+  assert.equal(asked.length, 6);
+  assert.equal(await ask('basic/v2/Rail/Metro/Alert/NTDLRT'), null, 'TDX');
+  assert.ok(freeHeavy('basic/v2/Rail/Metro/Alert/TMRT'), "read in the Runner (臺中's page is 700 KB)");
 });
