@@ -23,6 +23,9 @@ preview_urls = false
 PERIOD_DAY = "13"
 # Stop at 90% of any included amount (analytics' counts are estimates).
 STOP_AT = "0.9"
+# The Workers Free plan from this moment (guard.js FREE_PLAN): the owner
+# ended the $5 plan, which runs to 2026-11-13. Its amounts are a day's.
+FREE_FROM = "2026-11-13T00:00:00Z"
 
 # Its state (guard:state), read by the admin panel's 容量 through the main Worker.
 [[kv_namespaces]]

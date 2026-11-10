@@ -20,15 +20,15 @@
 //
 // Nothing here changes what a route answers or what a job does.
 
-import { AsyncLocalStorage } from "node:async_hooks";
+import { AsyncLocalStorage } from 'node:async_hooks';
 
-export const RUNNER_MARK = "x-orbit-runner";
-export const RELAY_MARK = "x-orbit-relay";
-const CF_HEADER = "x-orbit-cf";
+export const RUNNER_MARK = 'x-orbit-runner';
+export const RELAY_MARK = 'x-orbit-relay';
+const CF_HEADER = 'x-orbit-cf';
 export const SHARDS = 4;
 export const RELAYS = 16;
 export const DIRECT = 40;
-const HINT = "apac";
+const HINT = 'apac';
 
 const budget = new AsyncLocalStorage();
 const direct = (...a) => globalThis.__orbitDirectFetch.apply(globalThis, a);
@@ -42,11 +42,9 @@ function patchFetch() {
     if (!b || ++b.n <= DIRECT) return direct(input, init);
     const req = new Request(input, init);
     const headers = new Headers(req.headers);
-    headers.set(RELAY_MARK, "1");
+    headers.set(RELAY_MARK, '1');
     b.relayed++;
-    return b.ns
-      .get(b.ns.idFromName(`relay:${b.n % RELAYS}`))
-      .fetch(new Request(req, { headers }));
+    return b.ns.get(b.ns.idFromName(`relay:${b.n % RELAYS}`)).fetch(new Request(req, { headers }));
   };
 }
 
@@ -54,81 +52,52 @@ function patchFetch() {
 // (Cheap in the Logs, 2026-11-07 to 10: R2's files, /config, TDX's copies,
 // the notices' lists, Law's live rooms and pages. Yahoo's quotes stay in the
 // Worker too: Yahoo turned most reads from Taiwan's side away, 2026-10-14.)
-const STAY =
-  /^\/(?:data\/(?!build$)|config$|guard$|transit\/tdx$|transit\/eta$|transit\/config$|transit\/status$|push\/|law-live$|law-page$|showcase\/|store\/check$|$)/;
+const STAY = /^\/(?:data\/(?!build$)|config$|guard$|transit\/tdx$|transit\/eta$|transit\/config$|transit\/status$|push\/|law-live$|law-page$|showcase\/|store\/check$|$)/;
 export function runsInRunner(request, path) {
-  if (request.headers.has(RUNNER_MARK) || request.method === "OPTIONS")
-    return false;
-  if (STAY.test(path.replace(/^\/api(?=\/)/, ""))) return false;
+  if (request.headers.has(RUNNER_MARK) || request.method === 'OPTIONS') return false;
+  if (STAY.test(path.replace(/^\/api(?=\/)/, ''))) return false;
   if (/yahoo/i.test(request.url)) return false;
   return true;
 }
-const shardOf = (request) => {
-  const ip = request.headers.get("CF-Connecting-IP") || "";
+const shardOf = request => {
+  const ip = request.headers.get('CF-Connecting-IP') || '';
   let h = 0;
   for (let i = 0; i < ip.length; i++) h = (h * 31 + ip.charCodeAt(i)) | 0;
   return Math.abs(h) % SHARDS;
 };
-const CF_KEYS = [
-  "colo",
-  "country",
-  "latitude",
-  "longitude",
-  "city",
-  "region",
-  "regionCode",
-  "timezone",
-  "postalCode",
-  "asn",
-  "continent",
-];
+const CF_KEYS = ['colo', 'country', 'latitude', 'longitude', 'city', 'region', 'regionCode', 'timezone', 'postalCode', 'asn', 'continent'];
 export async function toRunner(request, env, fallback) {
   const cf = {};
   for (const k of CF_KEYS) if (request.cf?.[k] != null) cf[k] = request.cf[k];
   const headers = new Headers(request.headers);
-  headers.set(RUNNER_MARK, "1");
+  headers.set(RUNNER_MARK, '1');
   headers.set(CF_HEADER, JSON.stringify(cf));
-  const spare =
-    request.method === "GET" || request.method === "HEAD"
-      ? null
-      : request.clone();
+  const spare = request.method === 'GET' || request.method === 'HEAD' ? null : request.clone();
   try {
-    const stub = env.RUNNER.get(
-      env.RUNNER.idFromName(`route:${shardOf(request)}`),
-      { locationHint: HINT },
-    );
+    const stub = env.RUNNER.get(env.RUNNER.idFromName(`route:${shardOf(request)}`), { locationHint: HINT });
     return await stub.fetch(new Request(request, { headers }));
   } catch (e) {
     // (The Runner unreachable: answered here, as before it.)
-    console.log("runner failed", String(e?.message || e).slice(0, 200));
+    console.log('runner failed', String(e?.message || e).slice(0, 200));
     return fallback(spare || request);
   }
 }
 
 // The cron's side: each part woken with the tick.
-export const CRON_PARTS = ["main", "slow"];
-const SLOW_JOBS = new Set([
-  "store-backup",
-  "capacity",
-  "data-folders",
-  "gift-clean",
-  "weather-skill",
-]);
-export const partOf = (job) =>
-  job.startsWith("build:") || SLOW_JOBS.has(job) ? "slow" : "main";
+export const CRON_PARTS = ['main', 'slow'];
+const SLOW_JOBS = new Set(['store-backup', 'capacity', 'data-folders', 'gift-clean', 'weather-skill']);
+export const partOf = job => (job.startsWith('build:') || SLOW_JOBS.has(job) ? 'slow' : 'main');
 export function tickRunner(event, env, ctx) {
   for (const part of CRON_PARTS) {
     const body = JSON.stringify({
       cron: event.cron,
       at: event.scheduledTime || Date.now(),
-      part,
+      part
     });
     ctx.waitUntil(
       env.RUNNER.get(env.RUNNER.idFromName(`cron:${part}`))
-        .fetch("https://runner/__tick", { method: "POST", body })
-        .catch((e) =>
-          console.log("runner tick failed", part, String(e?.message || e)),
-        ),
+        .fetch('https://runner/__tick', { method: 'POST', body })
+        .catch(e => console.log('runner tick failed', part, String(e?.message || e)))
     );
   }
 }
@@ -138,11 +107,11 @@ function shimCtx() {
   const pending = [];
   return {
     pending,
-    waitUntil: (p) => pending.push(Promise.resolve(p).catch(() => {})),
+    waitUntil: p => pending.push(Promise.resolve(p).catch(() => {})),
     passThroughOnException() {},
     async settle() {
       while (pending.length) await Promise.all(pending.splice(0));
-    },
+    }
   };
 }
 
@@ -163,71 +132,50 @@ export function makeRunner(handle, cronTick) {
         return direct(new Request(request, { headers }));
       }
       const url = new URL(request.url);
-      if (url.pathname === "/__tick" && url.hostname === "runner") {
+      if (url.pathname === '/__tick' && url.hostname === 'runner') {
         const tick = await request.json().catch(() => null);
         if (tick) {
-          const ticks = ((await this.state.storage.get("ticks")) || [])
-            .concat([tick])
-            .slice(-3);
-          await this.state.storage.put("ticks", ticks);
-          if (!(await this.state.storage.getAlarm()))
-            await this.state.storage.setAlarm(Date.now());
+          const ticks = ((await this.state.storage.get('ticks')) || []).concat([tick]).slice(-3);
+          await this.state.storage.put('ticks', ticks);
+          if (!(await this.state.storage.getAlarm())) await this.state.storage.setAlarm(Date.now());
         }
-        return new Response("ok");
+        return new Response('ok');
       }
       // A route: the Worker's request as it came, its request.cf from the header.
       let cf = {};
       try {
-        cf = JSON.parse(request.headers.get(CF_HEADER) || "{}");
+        cf = JSON.parse(request.headers.get(CF_HEADER) || '{}');
       } catch {}
       const req = new Request(request);
-      Object.defineProperty(req, "cf", { value: cf, configurable: true });
+      Object.defineProperty(req, 'cf', { value: cf, configurable: true });
       const ctx = shimCtx();
-      const res = await budget.run(
-        { n: 0, relayed: 0, ns: this.env.RUNNER },
-        () => handle(req, this.env, ctx),
-      );
+      const res = await budget.run({ n: 0, relayed: 0, ns: this.env.RUNNER }, () => handle(req, this.env, ctx));
       // (What the route left to finish runs on after the answer, as in a Worker.)
       if (ctx.pending.length) ctx.settle();
-      return res;
+      // (Where it ran, for a look: x-orbit-ran.)
+      if (res.status === 101 || res.webSocket) return res;
+      const out = new Response(res.body, res);
+      out.headers.set('x-orbit-ran', 'runner');
+      return out;
     }
     async alarm() {
-      const ticks = (await this.state.storage.get("ticks")) || [];
-      await this.state.storage.put("ticks", []);
+      const ticks = (await this.state.storage.get('ticks')) || [];
+      await this.state.storage.put('ticks', []);
       const b = { n: 0, relayed: 0, ns: this.env.RUNNER };
       for (const t of ticks) {
         const ctx = shimCtx();
         try {
           await budget.run(b, async () => {
-            await cronTick(
-              { cron: t.cron, scheduledTime: t.at },
-              this.env,
-              ctx,
-              t.part || null,
-            );
+            await cronTick({ cron: t.cron, scheduledTime: t.at }, this.env, ctx, t.part || null);
             await ctx.settle();
           });
         } catch (e) {
-          console.log(
-            "cron failed",
-            t.part,
-            String(e?.message || e).slice(0, 200),
-          );
+          console.log('cron failed', t.part, String(e?.message || e).slice(0, 200));
         }
       }
-      if (b.relayed)
-        console.log(
-          "runner relayed",
-          ticks.map((t) => t.part).join(),
-          b.n,
-          b.relayed,
-        );
+      if (b.relayed) console.log('runner relayed', ticks.map(t => t.part).join(), b.n, b.relayed);
       // (Ticks that came while this ran: their turn now.)
-      if (
-        ((await this.state.storage.get("ticks")) || []).length &&
-        !(await this.state.storage.getAlarm())
-      )
-        await this.state.storage.setAlarm(Date.now());
+      if (((await this.state.storage.get('ticks')) || []).length && !(await this.state.storage.getAlarm())) await this.state.storage.setAlarm(Date.now());
     }
   };
 }

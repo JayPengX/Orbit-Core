@@ -89,6 +89,37 @@ export const PLAN = {
   d1RowsWritten: 50_000_000,
   d1Bytes: 5_000_000_000
 };
+// The Workers Free plan (from FREE_FROM, wrangler.guard.toml: Jay ended the
+// $5 plan on 2026-11-13; developers.cloudflare.com, read 2026-11-10): its
+// amounts are a UTC day's, reset at 00:00 UTC, and past one Cloudflare
+// refuses that kind of call (nothing is ever billed). CPU has no daily sum,
+// only 10 ms a request (runner.js). R2 keeps its own month (a thirtieth a
+// day here). Durable Objects: 100,000 requests a day (their 13,000 GB-s
+// aren't in analytics' counts). So on Free the period is the UTC day, the
+// pace works as before on these amounts, nothing is ever stopped (a stop
+// saves no money), and the owner hears only of 90%.
+export const FREE_PLAN = {
+  requests: 100_000,
+  cpuMs: 1e12,
+  kvRead: 100_000,
+  kvWrite: 1_000,
+  kvDelete: 1_000,
+  kvList: 1_000,
+  kvBytes: 1_000_000_000,
+  doRequests: 100_000,
+  doBytes: 5_000_000_000,
+  r2ClassA: 33_000,
+  r2ClassB: 330_000,
+  r2Bytes: 10_000_000_000,
+  d1RowsRead: 5_000_000,
+  d1RowsWritten: 100_000,
+  d1Bytes: 5_000_000_000
+};
+export const isFree = (env, now) => !!env.FREE_FROM && now >= Date.parse(env.FREE_FROM);
+export const dayPeriod = now => {
+  const start = Math.floor(now / DAY) * DAY;
+  return { start, end: start + DAY, from: start };
+};
 // R2's operations by class (developers.cloudflare.com/r2/pricing): reads
 // are Class B, deletes free, anything else counted as Class A (the dearer).
 export const R2_CLASS_B = new Set(['HeadBucket', 'HeadObject', 'GetObject', 'UsageSummary', 'GetBucketEncryption', 'GetBucketLocation', 'GetBucketCors', 'GetBucketLifecycleConfiguration']);
@@ -185,9 +216,7 @@ async function graphql(env, fetcher, query, variables) {
 // The period's use, every count the plan bills that analytics has. CPU
 // is the sum of each invocation's own (`cpuTimeUs`); where the API lacks it,
 // each Worker's requests × its 99th-percentile CPU (more than it was).
-export async function readUse(env, fetcher, now) {
-  const day = Number(env.PERIOD_DAY) || 1;
-  const p = period(now, day);
+export async function readUse(env, fetcher, now, p = period(now, Number(env.PERIOD_DAY) || 1)) {
   const use = { requests: 0, cpuMs: 0, kvRead: 0, kvWrite: 0, kvDelete: 0, kvList: 0, kvBytes: 0, doRequests: 0, doBytes: 0, r2ClassA: 0, r2ClassB: 0, r2Bytes: 0, d1RowsRead: 0, d1RowsWritten: 0, d1Bytes: 0 };
   const partial = {};
   let cpuWay = 'sum';
@@ -259,9 +288,9 @@ export async function readUse(env, fetcher, now) {
 }
 
 // Each count's share of the plan, the largest, and what's over the stop.
-export function judge(use, stopAt = STOP_AT) {
+export function judge(use, stopAt = STOP_AT, plan = PLAN) {
   const share = {};
-  for (const k of Object.keys(PLAN)) share[k] = (use[k] || 0) / PLAN[k];
+  for (const k of Object.keys(plan)) share[k] = (use[k] || 0) / plan[k];
   const over = Object.keys(share).filter(k => share[k] >= stopAt);
   const top = Object.keys(share).reduce((a, b) => (share[b] > share[a] ? b : a));
   return { share, over, top };
@@ -269,10 +298,10 @@ export function judge(use, stopAt = STOP_AT) {
 
 // Where the period ends up at the period's own pace (the panel's 預估, a
 // count at a time). `floor`: the least time counted as gone.
-export function projected(use, p, now, floor = DAY / 24) {
+export function projected(use, p, now, floor = DAY / 24, plan = PLAN) {
   const f = (p.end - p.from) / Math.max(floor, now - p.from);
   const out = {};
-  for (const k of Object.keys(PLAN)) out[k] = /Bytes$/.test(k) ? use[k] : Math.round((use[k] || 0) * f);
+  for (const k of Object.keys(plan)) out[k] = /Bytes$/.test(k) ? use[k] : Math.round((use[k] || 0) * f);
   return out;
 }
 
@@ -291,22 +320,22 @@ export function marksAfter(marks, use, now, newPeriod = false) {
 }
 // Each count's rate of the last days (a ms): since the oldest mark at
 // least MARK_MIN old; with none, the period's own (three days at least).
-export function rateOf(use, marks, p, now) {
+export function rateOf(use, marks, p, now, floor = 3 * DAY) {
   const m = (marks || []).find(([at]) => now - at >= MARK_MIN && now - at <= MARK_SPAN);
   const out = {};
-  for (const k of RATE_KEYS) out[k] = m ? Math.max(0, ((use[k] || 0) - (m[1][k] || 0)) / (now - m[0])) : (use[k] || 0) / Math.max(3 * DAY, now - p.from);
+  for (const k of RATE_KEYS) out[k] = m ? Math.max(0, ((use[k] || 0) - (m[1][k] || 0)) / (now - m[0])) : (use[k] || 0) / Math.max(floor, now - p.from);
   return out;
 }
 
 // The pace for what's been used (`use`), at `rate` (a ms) for the `left` of
 // the period (ms), with the last pace for the way down. `why`: the count
 // that set it, its share used and where it would end.
-export function paceFor(use, { rate = {}, left = 0, last = 0, stopAt = STOP_AT } = {}) {
+export function paceFor(use, { rate = {}, left = 0, last = 0, stopAt = STOP_AT, plan = PLAN } = {}) {
   let pace = 0;
   let why = null;
   for (const k of RATE_KEYS) {
-    const share = (use[k] || 0) / PLAN[k];
-    const end = ((use[k] || 0) + (rate[k] || 0) * Math.max(0, left)) / PLAN[k];
+    const share = (use[k] || 0) / plan[k];
+    const end = ((use[k] || 0) + (rate[k] || 0) * Math.max(0, left)) / plan[k];
     for (let i = PACES.length - 1; i > pace; i--) {
       const held = i <= last;
       if (share >= PACES[i].at - (held ? 0.05 : 0) && end >= stopAt - (held ? 0.1 : 0)) {
@@ -322,15 +351,15 @@ export function paceFor(use, { rate = {}, left = 0, last = 0, stopAt = STOP_AT }
 // The panel's warning (never a pace): the count that ends the period
 // highest at the last days' rate, its share then, and when it would reach
 // the stop (null if it doesn't).
-export function forecastOf(use, rate, p, now, stopAt = STOP_AT) {
+export function forecastOf(use, rate, p, now, stopAt = STOP_AT, plan = PLAN) {
   let top = null;
   for (const k of RATE_KEYS) {
-    const end = ((use[k] || 0) + (rate[k] || 0) * Math.max(0, p.end - now)) / PLAN[k];
+    const end = ((use[k] || 0) + (rate[k] || 0) * Math.max(0, p.end - now)) / plan[k];
     if (!top || end > top.end) top = { key: k, end };
   }
   if (!top) return null;
   const r = rate[top.key] || 0;
-  const at = top.end >= stopAt && r > 0 ? Math.round(now + Math.max(0, PLAN[top.key] * stopAt - (use[top.key] || 0)) / r) : null;
+  const at = top.end >= stopAt && r > 0 ? Math.round(now + Math.max(0, plan[top.key] * stopAt - (use[top.key] || 0)) / r) : null;
   return { key: top.key, end: r4(top.end), at, warn: top.end >= stopAt };
 }
 export const alertFor = share => ALERTS.filter(a => Object.values(share).some(v => v >= a)).length;
@@ -415,7 +444,9 @@ export async function guardRun(env, { fetcher = fetch, now = Date.now(), kv = en
   const prev = JSON.parse((await kv.get(STATE_KEY).catch(() => null)) || 'null') || {};
   let armed = !!env.CF_GUARD_TOKEN;
   const stopAt = Number(env.STOP_AT) || STOP_AT;
-  const state = { ...prev, at: now, armed, stopAt, plan: PLAN, paces: PACES };
+  const free = isFree(env, now);
+  const plan = free ? FREE_PLAN : PLAN;
+  const state = { ...prev, at: now, armed, stopAt, plan, free, paces: PACES };
   if (armed && !prev.account && !env.CF_ACCOUNT_ID)
     try {
       state.account = await accountOf(env, fetcher);
@@ -428,21 +459,25 @@ export async function guardRun(env, { fetcher = fetch, now = Date.now(), kv = en
     state.error = state.error || 'CF_GUARD_TOKEN not set: not watching the bill';
   } else {
     try {
-      const { use, period: p, cpuWay, partial } = await readUse(env, fetcher, now);
-      const j = judge(use, stopAt);
-      const newPeriod = !!prev.period && p.start > prev.period.start;
-      const marks = marksAfter(prev.marks, use, now, newPeriod);
-      const rate = rateOf(use, marks, p, now);
-      const pace = paceFor(use, { rate, left: p.end - now, last: newPeriod ? 0 : prev.pace || 0, stopAt });
-      const forecast = forecastOf(use, rate, p, now, stopAt);
+      const { use, period: p, cpuWay, partial } = await readUse(env, fetcher, now, free ? dayPeriod(now) : undefined);
+      const j = judge(use, stopAt, plan);
+      const newPeriod = !!prev.period && (p.start > prev.period.start || !!prev.free !== free);
+      // (On Free a day's own rate, two hours at least: the marks are for a month.)
+      const marks = free ? [] : marksAfter(prev.marks, use, now, newPeriod);
+      const rate = rateOf(use, marks, p, now, free ? 2 * 3_600_000 : undefined);
+      const pace = paceFor(use, { rate, left: p.end - now, last: newPeriod ? 0 : prev.pace || 0, stopAt, plan });
+      const forecast = forecastOf(use, rate, p, now, stopAt, plan);
       // (`paceTop`, the panel's 推估到月底: the forecast's share at the period's end.)
-      Object.assign(state, { use, period: p, cpuWay, partial, share: j.share, top: j.top, projected: projected(use, p, now), marks, forecast, pace: pace.pace, paceWhy: pace.why, paceTop: forecast?.end ?? null, alert: alertFor(j.share), error: null, blindSince: null });
-      if (j.over.length && !prev.stopped) state.stopped = { at: now, why: j.over, periodStart: p.start, saved: {} };
+      Object.assign(state, { use, period: p, cpuWay, partial, share: j.share, top: j.top, projected: projected(use, p, now, undefined, plan), marks, forecast, pace: pace.pace, paceWhy: pace.why, paceTop: forecast?.end ?? null, alert: free ? (j.over.length ? ALERTS.length : 0) : alertFor(j.share), error: null, blindSince: null });
+      // (On Free nothing is stopped: no bill to keep under; a stop from the paid plan ends.)
+      if (free) {
+        if (prev.stopped) state.restart = true;
+      } else if (j.over.length && !prev.stopped) state.stopped = { at: now, why: j.over, periodStart: p.start, saved: {} };
       else if (prev.stopped && p.start > prev.stopped.periodStart && !j.over.length) state.restart = true;
     } catch (e) {
       state.error = String(e.message || e).slice(0, 300);
       state.blindSince = prev.blindSince || now;
-      if (now - state.blindSince > BLIND_MS && !prev.stopped) state.stopped = { at: now, why: ['blind'], periodStart: prev.period?.start || period(now, Number(env.PERIOD_DAY) || 1).start, saved: {} };
+      if (!free && now - state.blindSince > BLIND_MS && !prev.stopped) state.stopped = { at: now, why: ['blind'], periodStart: prev.period?.start || period(now, Number(env.PERIOD_DAY) || 1).start, saved: {} };
     }
   }
   const acts = [];
