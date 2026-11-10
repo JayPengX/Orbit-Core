@@ -40,6 +40,12 @@ Change from last month to the same day, by category: 購物 more 3233 (0 → 323
 This week (from 2026-11-09): spent 1173; last week: 14504
 Monthly budget: 20000, left this month 4121`;
 
+// Orbit Law's 拍合約幫你看: the clauses of the two made-up contracts in site/ai-try/, as law-contract-read gives them.
+const LEASE = [{"n":"一","text":"租賃標的：〔個資略〕房屋一間，供承租人居住使用。"},{"n":"二","text":"租賃期間自民國115年9月1日起至116年8月31日止，共一年。"},{"n":"三","text":"租金每月新臺幣9,500元，承租人應於每月5日前支付，逾期一日加收滯納金500元。"},{"n":"四","text":"押金新臺幣28,500元（三個月租金），於租期屆滿、承租人遷出且無欠款時無息返還；承租人提前終止租約者，押金全數沒收。"},{"n":"五","text":"租賃期間房屋及設備之一切修繕，不論原因，均由承租人負擔。"},{"n":"六","text":"承租人不得申請設籍，亦不得申報租金支出扣除額。"},{"n":"七","text":"出租人得隨時進入房屋查看，無須事先通知承租人。"},{"n":"八","text":"水電費由承租人負擔，電費每度以新臺幣6元計收。"},{"n":"九","text":"承租人已詳閱本契約全部條款，同意放棄審閱期間。"}];
+const JOB = [{"n":"一","text":"乙方擔任甲方門市兼職人員，工作時間依甲方排班。"},{"n":"二","text":"時薪新臺幣180元，每月10日發放上月薪資。"},{"n":"三","text":"到職前三日為試做期，試做期間不支薪。"},{"n":"四","text":"乙方遲到一次扣薪新臺幣300元。"},{"n":"五","text":"乙方應服務滿六個月，未滿六個月離職者，最後一個月薪資不予發放。"},{"n":"六","text":"兼職人員不投保勞工保險，亦不提繳勞工退休金。"},{"n":"七","text":"國定假日照常排班，不另給加班費。"},{"n":"八","text":"乙方離職後一年內，不得至其他飲料店任職。"},{"n":"九","text":"乙方為民國98年出生，已取得法定代理人口頭同意。"}];
+// A real 議事錄 as Law's build cuts it (lib/minutes.mjs digest): 伸港's results sit in the chair's speeches.
+const MINUTES_SHENGANG = "時間：中華民國114年1月13日起至1月15止\n1月15日（星期三）：第三次會：討論提案、臨時動議、閉幕典禮。\n家好！這一次召開第21屆第11次臨時會，要審議公所提案，請代\n1月13日（星期一）：第一次會：報到、預備會議。\n1月14日（星期二）：第二次會：開幕典禮、討論提案。\n1月15日（星期三）：第三次會：討論提案、臨時動議、閉幕典禮。\n公所第1號提案。\n伸港鄉公所第1號提案\n提案人：鄉長黄永欽\n類別：社政\n案由：為本所辦理「伸港鄉海尾社區活動中心廁所及關懷據點簡\n易廚房新建工程」，彰化縣政府補助新台幣（下同）450萬\n元，及本所自籌配合款620萬1,186元，合計1,070萬\n1,186元，請同意先行墊付。\n理由：\n辦法：審議通過後先行墊付，俟辦理114年追加減預算或115年\n萬1,186元，請大會同意先行墊付，以上報告，敬請代表支持通過。\n代表同仁對公所第1號提案是否有意見？如無意見本案照原案\n通過。請陳秘書宣讀公所第2號提案。\n伸港鄉公所第2號提案\n提案人：鄉長黄永欽\n類別：環保\n案由：有關彰化縣環境保護局核定「114年公共設施改善-補助鄉\n鎮市購置垃圾車及資源回收車」案，補助本所垃圾車及資\n源回收車各1輛，彰化縣政府補助257萬2,350元(55%)，\n本所需自籌配合款210萬4,650元(45%)，合計新台幣467\n理由：\n辦法：審議通過後，先行墊付，俟辦理114年追加減預算或115年\n付支應，以上報告，請多多支持通過，謝謝。\n各位代表同仁對公所第2號提案是否有意見？如無意見本案照\n原案通過。請陳秘書宣讀公所第3號提案。\n伸港鄉公所第3號提案\n提案人：鄉長黄永欽\n類別：社政\n案由：為本所辦理「彰化縣伸港鄉老人文康中心屋頂防水修繕及\n牆面粉刷工程」，衛生福利部補助新台幣（下同）225萬元\n整，及本所自籌配合款25萬元整，合計250萬元整，請同\n意先行墊付。\n理由：\n辦法：審議通過後先行墊付，俟辦理114年追加減預算或115年\n萬元，請大會同意先行墊付，以上報告，敬請代表支持通過，謝謝。\n各位代表同仁對公所第3號提案是否有意見？如無意見本案照\n原案通過。\n各位代表是否要發言或臨時動議要提？若無，本次臨時會議到";
+
 export const EXAMPLES = {
   'money-ask': [
     { name: 'food this month', input: { question: '這個月吃飯花多少？', facts: MONEY_FACTS } },
@@ -154,6 +160,31 @@ export const EXAMPLES = {
         stories: [
           { id: 's1', lang: 'en', heads: ['立法院三讀通過電業法修正案 再生能源售電門檻放寬', '電業法修法三讀 綠電業者售電更彈性', '再生能源售電鬆綁 電業法三讀'] },
           { id: 's2', lang: 'zh', heads: ['Fed holds rates steady, signals two cuts in 2027', 'Federal Reserve keeps rates unchanged, sees two cuts next year'] }
+        ]
+      }
+    }
+  ],
+  // Law: the pictures are made-up contracts with planted faults (site/ai-try/), served by this repo's site.
+  'law-contract-read': [
+    { name: 'lease photo', input: { files: [{ url: 'https://orbit.jaypengx.com/Orbit-Core/ai-try/contract-lease.jpg', mime_type: 'image/jpeg' }] } },
+    { name: 'job photo', input: { files: [{ url: 'https://orbit.jaypengx.com/Orbit-Core/ai-try/contract-job.jpg', mime_type: 'image/jpeg' }] } }
+  ],
+  'law-contract': [
+    { name: 'lease, tenant', input: { kind: 'rent', side: '承租人', who: '房客', title: '房屋租賃契約書', clauses: LEASE } },
+    { name: 'job, minor worker', input: { kind: 'work', side: '乙方', who: '員工', minor: true, title: '兼職人員工作契約', clauses: JOB } },
+    { name: 'pledge, english', input: { kind: 'pledge', side: '立書人', who: '學生', lang: 'en', title: '切結書', clauses: [{ n: '一', text: '本人自願參加本次校外活動，活動期間如有任何意外或傷害，概由本人自行負責，與主辦單位無涉，絕無異議。' }, { n: '二', text: '本人同意主辦單位得將活動照片及本人姓名用於宣傳，不另支付報酬。' }] } }
+  ],
+  'law-minutes': [
+    { name: '伸港, results in the speeches', input: { town: '彰化縣伸港鄉民代表會', session: '第21屆第11次臨時會', text: MINUTES_SHENGANG } }
+  ],
+  'law-weekly': [
+    {
+      name: 'bills and a rule',
+      input: {
+        items: [
+          { id: '11:02513', kind: 'bill', name: '食品安全衛生管理法', about: '為了強化對業者食品安全查驗分工與合作管理機制、完善食品安全防護體系以保障國民健康；現行法令規定，食品業者若發現其產品有危害衛生安全之虞時，除應主動採取因應措施外，並同步通報主管機關', arts: ['第22條（8 案）', '第7條（3 案）'] },
+          { id: '11:01191', kind: 'bill', name: '都市更新條例', about: '為了協助民眾推動自主都更，放寬災後重建及自主都更；為了提高老舊房屋所有權人參與都更之意願', arts: [] },
+          { id: 'K0040075@20261030', kind: 'law', name: '酒駕毒駕防制教育及酒癮毒品戒癮治療實施管理辦法', about: '', arts: ['第2條：「依本條例第三十五條規定受吊銷」→「依本條例第三十五條第一項第一款、第二項至第五項規定受吊銷」', '第2條：新增「汽車駕駛人接受酒癮評估治療時應積極配合醫囑，未能配合醫囑於所定時間接受評估治療，超過二個月，醫療機構得終止評估治療，並不發給完成證明書」'] }
         ]
       }
     }

@@ -189,8 +189,7 @@ the `q-` components; they don't restyle them.
 
 `worker.js` routes (`route()`, heavy ones in the Runner); each route's work in its own file;
 `http.js` is what every route answers with (who may call, CORS, JSON;
-`lineAnswer`: lines gzipped, each flushed). It runs near each caller;
-Gemini, Claude via `gemini-relay.js`, pinned to Taiwan. Every answer carries `Server-Timing:
+`lineAnswer`: lines gzipped, each flushed). Every answer carries `Server-Timing:
 w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 
 | Route | File | What |
@@ -203,7 +202,8 @@ w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `f1-people.js`, `fund-nav.js`, `taifex.js` | The data proxy (§4.1): sports, quotes, F1, Asian baseball, SITCA's fund NAVs, TAIFEX |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
-| `/ai` | `ai.js`, `ai-features.js`, `ai-fixtures.js` | Every app's AI by name: fixed prompt, models in turn, lean input (`maxIn`), caps, asks back (`clarify`, `pick`); builders' `aiOnce`; ops `ai-try` |
+| `/ai` | `ai.js`, `ai-features.js`, `law-ai.js`, `ai-util.js`, `ai-fixtures.js` | Every app's AI by name: fixed prompt, models in turn, lean input (`maxIn`), caps, asks back (`clarify`, `pick`); builders' `aiOnce`; ops `ai-try` (`site/ai-try/`) |
+| `/ai/build` | `ai.js` | A repo's build runs its `build:` features (Law's key) on the day's cap |
 | `/law-ask` | `law.js`, `law-ruling.js`, `law-town.js`, `law-ground.js` | Law's questions on 1–8 articles, every point cited and checked, kept in KV; modes `bill`, `diff`, `ruling`, `town`; 40 Gemini calls a day a Pass, 300 in all with `/law-chat`'s (D1 `law_day`) |
 | `/law-chat` | `law-chat.js`, `law-ground.js`, `law-more.js`, `ai-other.js` | 問法律: a plan (Flash-Lite), up to 14 articles from Law's lists and index, answered from those only by Sonnet (failing: Gemini), cites checked; grounded by `law-ground.js`, `law-more.js`; 16 turns back; 30 a day a Pass |
 | `/law-page` | `law-page.js`, `law-hosts.js` | A gov.tw / edu.tw page read in Law, cleaned; edge cache only; Taiwan-only via the relay (build key: any gov.tw; `file=1`: raw); 500 a day a Pass |
@@ -338,8 +338,8 @@ A new Cloudflare product goes into `guard.js` `PLAN` with it.
 - **Each app's data** is one document in its own collection (§2), under the
   account's id, written only if it's still the version read (`updated`, a
   precondition; a lost race throws). `passSync` (§3.2) merges the Pass's
-  copy before any write, never over a copy it couldn't read: Weather,
-  Words, Money, Law; the rest write through the session.
+  copy before any write, never over a copy it couldn't read; the rest write
+  through the session.
 - **Nothing lost:** a save is refused if it would turn JSON data into
   anything else or was merged over an older copy (`base`). Every version a
   write or delete replaces goes to D1's `history` (whole 2 days, daily 30),
@@ -466,7 +466,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
 | `node tools/gate.mjs [app…]` | The quality gate (`gate-page.js`) on every tab: lift, stalls, dead taps, wraps, cuts, white, mixed language… |
 | `node tools/speed.mjs <app…>` | Before vs after (3G, CPU ×4, replayed) |
 | `node tools/live-scroll.mjs [app…] [--webkit]` | Nothing jumps: live refreshes, loading, scrolling, folding |
-| `node tools/test-apps.mjs [app…]` | Every app's tests against this kit (checkouts beside this one) |
+| `node tools/test-apps.mjs [app…]` | Every app's tests against this kit |
 
 `npm test` covers the Workers, kit and this map.
 
