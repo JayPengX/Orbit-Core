@@ -78,8 +78,12 @@ test('ask back: one short question with options, the answers sent again, three r
 test('what an answer may keep: numbers from the facts, words the notice wrote, cards for words asked', async () => {
   assert.equal(numbersFrom('洋基 7 比 3 擊敗紅襪', '7-3 洋基'), true);
   assert.equal(numbersFrom('第 9 局逆轉', '7-3'), false);
-  const recap = FEATURES['sports-recap'].clean({ line: '賈吉第 9 局再見全壘打' }, { facts: 'Judge HR 8th inning' });
+  const facts = 'Teams: {t:1} = home\n{t:1} ahead for good: inning 8, on {p:5} play\nPlayers: {p:5} = Aaron Judge';
+  const recap = FEATURES['sports-recap'].clean({ zh: '{p:5} 第 9 局再見全壘打', en: '{p:5} walked it off in the 9th' }, { facts });
   assert.equal(recap, null, 'a number the facts never gave');
+  assert.equal(FEATURES['sports-recap'].clean({ zh: '賈吉第 8 局', en: 'Judge in the 8th' }, { facts }), null, 'a player typed out, not his token');
+  assert.ok(FEATURES['sports-recap'].clean({ zh: '{p:5} 第 8 局超前', en: '{p:5} put {t:1} ahead in the 8th' }, { facts }));
+  assert.deepEqual(FEATURES['sports-recap'].clean({ zh: '', en: '' }, { facts }), { zh: '', en: '' }, 'nothing to tell: no line');
   const n = FEATURES['transit-notice'].clean({ routes: ['307', '999'], stops: ['臺北車站'], from: '2026-11-12 22:00', to: 'soon', kind: '改道', short: '307 改道' }, { title: '307 改道', body: '因施工，307 不停靠臺北車站' });
   assert.deepEqual([n.routes, n.stops, n.from, n.to], [['307'], ['臺北車站'], '2026-11-12 22:00', '']);
   const cards = FEATURES['words-cards'].clean({ cards: [{ w: 'Abandon', ex: [{ en: 'They abandoned the car.', zh: '他們棄車。' }, { en: 'No word here.', zh: '無' }], hook: 'a-band-on', confuse: ['abandon', 'abundant'] }, { w: 'extra', ex: [{ en: 'extra', zh: 'x' }] }] }, { words: [{ w: 'abandon', zh: '放棄' }] });

@@ -24,19 +24,20 @@ const claudeEnv = (answer, seen = []) => ({
   }
 });
 
-test('news: each story once, its outlets’ headlines lean, again when coverage doubles', async () => {
-  const story = (id, m) => ({ id, m, sum: 'x'.repeat(300), items: [['中央社', '標題一'], ['中央社', '標題二'], ['自由時報', '標題三'], ['聯合報', '標題四']] });
-  const f = storyFacts(story('a', 3));
-  assert.deepEqual(f.heads.map(h => h.outlet), ['中央社', '自由時報', '聯合報'], 'an outlet once');
-  assert.equal(f.heads[0].sum.length, 120);
-  const store = memStore({ 'news/index.json': { tw: [story('a', 3), story('b', 10)], intl: [] }, 'news/lines.json': { lines: { b: { line: '舊', zh: '舊', en: 'old', m: 6 }, gone: { line: 'x', m: 1 } } } });
+test('news: a title in the other language, once a story; no line under it; an old copy with a line made again', async () => {
+  const story = (id, m) => ({ id, m, sum: 'x'.repeat(300), items: [['中央社', '標題一'], ['中央社', '標題二'], ['自由時報', '標題三'], ['聯合報', '標題四'], ['ettoday', '標題五']] });
+  const f = storyFacts(story('a', 3), 'tw');
+  assert.deepEqual(f, { id: 'a', lang: 'en', heads: ['標題一', '標題三', '標題四'] }, 'an outlet once, three, no summary');
+  assert.equal(storyFacts(story('w', 1), 'intl').lang, 'zh');
+  const store = memStore({ 'news/index.json': { tw: [story('a', 3), story('b', 10), story('c', 2)], intl: [] }, 'news/lines.json': { lines: { b: { en: 'Old title', m: 6 }, c: { line: '舊的一句話', zh: '舊', en: 'old', m: 2 }, gone: { en: 'x', m: 1 } } } });
   const seen = [];
-  const env = claudeEnv(body => ({ items: JSON.parse(body.messages[0].content[0].text.split('\n').at(-1)).map(s => ({ id: s.id, line: `新聞 ${s.id}`, zh: '標題', en: 'Title' })) }), seen);
+  const env = claudeEnv(body => ({ items: JSON.parse(body.messages[0].content[0].text.split('\n').at(-1)).map(s => ({ id: s.id, title: `Title ${s.id}` })) }), seen);
   const r = await newsLines({ store, env, cap: 10, until: Date.now() + 60_000 });
-  assert.equal(r.made, 1, 'a is new; b’s coverage hasn’t doubled');
+  assert.equal(r.made, 2, 'a is new; c had a line (made again); b’s title kept');
   const lines = (await store.json('news/lines.json')).lines;
-  assert.deepEqual(Object.keys(lines).sort(), ['a', 'b'], 'a story gone from the front is dropped');
-  assert.equal(lines.a.line, '新聞 a');
+  assert.deepEqual(Object.keys(lines).sort(), ['a', 'b', 'c'], 'a story gone from the front is dropped');
+  assert.equal(lines.a.en, 'Title a');
+  assert.equal(lines.a.line, undefined);
   assert.equal(seen.length, 1);
 });
 
@@ -79,22 +80,31 @@ test('words: cards a batch at a time, each letter its own small file, a word tha
   assert.equal(r3.calls, 0, '“able” missed twice: not asked again');
 });
 
-test('a game’s facts: the score by period, leaders, the swings that decided it, lean', () => {
-  const summary = {
-    header: { competitions: [{ status: { type: { detail: 'Final' } }, competitors: [
-      { id: '1', homeAway: 'home', score: '108', team: { id: '1', displayName: 'Golden State Warriors', abbreviation: 'GS' }, record: [{ type: 'total', summary: '7-5' }], linescores: [{ displayValue: '31' }, { displayValue: '22' }, { displayValue: '30' }, { displayValue: '25' }] },
-      { id: '2', homeAway: 'away', score: '112', team: { id: '2', displayName: 'Los Angeles Lakers', abbreviation: 'LAL' }, record: [{ type: 'total', summary: '8-4' }], linescores: [{ displayValue: '28' }, { displayValue: '30' }, { displayValue: '25' }, { displayValue: '29' }] }
-    ] }] },
-    leaders: [{ team: { id: '2' }, leaders: [{ leaders: [{ displayValue: '31 PTS', athlete: { displayName: 'LeBron James' } }] }] }],
-    plays: Array.from({ length: 400 }, (_, i) => ({ id: String(i), sequenceNumber: i, text: `play ${i}`, period: { displayValue: '4th' }, clock: { displayValue: '1:00' } })),
-    winprobability: Array.from({ length: 400 }, (_, i) => ({ playId: String(i), homeWinPercentage: i === 390 ? 0.2 : i > 390 ? 0.1 : 0.6 }))
-  };
-  const e = { league: 'nba', id: '9', home: { id: '1', name: '勇士' }, away: { id: '2', name: '湖人' } };
-  const f = gameFacts(summary, e);
-  assert.match(f, /Final: 湖人 112 at 勇士 108/);
-  assert.match(f, /By period: LAL 28 30 25 29 \| GS 31 22 30 25/);
-  assert.match(f, /LeBron James 31 PTS/);
-  assert.match(f, /play 390 \(home win chance -40 pts\)/);
-  assert.ok(f.length < 1200, `lean: ${f.length}`);
+test('a game’s facts: only what the card doesn’t show (no leaders), players and teams as tokens, nothing when nothing explains it', () => {
+  const comp = (home, away, hl, al) => ({ header: { competitions: [{ competitors: [
+    { id: '1', homeAway: 'home', score: String(home), team: { id: '1', displayName: 'Golden State Warriors' }, linescores: hl.map(x => ({ displayValue: String(x) })) },
+    { id: '2', homeAway: 'away', score: String(away), team: { id: '2', displayName: 'Los Angeles Lakers' }, linescores: al.map(x => ({ displayValue: String(x) })) }
+  ] }] } });
+  const box = { boxscore: { players: [{ team: { id: '1' }, statistics: [{ athletes: [{ athlete: { id: '10', displayName: 'Stephen Curry', shortName: 'S. Curry' } }] }] }, { team: { id: '2' }, statistics: [{ athletes: [{ athlete: { id: '20', displayName: 'LeBron James', shortName: 'L. James' } }] }] }] } };
+  // The Lakers up 20–8, then the Warriors on a 14–0 run to the end (Curry 9 of it).
+  const plays = [];
+  let h = 0, a = 0, i = 0;
+  const add = (side, n, who, per = 1) => ((side === 'h' ? (h += n) : (a += n)), plays.push({ id: String(i), sequenceNumber: i++, scoringPlay: true, homeScore: h, awayScore: a, team: { id: side === 'h' ? '1' : '2' }, period: { number: per }, clock: { displayValue: '5:00' }, participants: [{ athlete: { id: who } }], text: `${who === '10' ? 'Stephen Curry' : 'LeBron James'} makes shot` }));
+  for (let k = 0; k < 4; k++) add('h', 2, '10'), add('a', 5, '20');
+  add('h', 3, '10', 4), add('h', 3, '10', 4), add('h', 3, '10', 4), add('h', 2, '10', 4), add('h', 3, '20', 4);
+  const s = { ...comp(h, a, [8, 0, 0, 14], [20, 0, 0, 0]), ...box, plays, leaders: [{ team: { id: '2' }, leaders: [{ leaders: [{ displayValue: '31 PTS', athlete: { displayName: 'LeBron James' } }] }] }] };
+  const e = { league: 'nba', id: '9', home: { id: '1' }, away: { id: '2' } };
+  const g = gameFacts(s, e);
+  assert.ok(g, 'a comeback is worth a line');
+  assert.match(g.facts, /\{t:1\} came back from 12 down/);
+  assert.match(g.facts, /Biggest run: \{t:1\} 14-0/);
+  assert.match(g.facts, /\{p:10\} 11 of them/);
+  assert.ok(!/31 PTS|leaders/i.test(g.facts), 'never the leaders the card shows');
+  assert.ok(g.people['10'], 'its players, for the app to draw');
+  // Never close, nothing special: no line at all.
+  const dull = [];
+  h = 0; a = 0;
+  for (let k = 0; k < 3; k++) (h += 3), dull.push({ id: String(k), scoringPlay: true, homeScore: h, awayScore: a + k, team: { id: '1' }, period: { number: 1 }, clock: { displayValue: '1:00' }, text: 'x' });
+  assert.equal(gameFacts({ ...comp(9, 2, [3, 2, 2, 2], [1, 1, 0, 0]), plays: dull }, e), null);
   assert.equal(swings({ winprobability: [] }).length, 0);
 });

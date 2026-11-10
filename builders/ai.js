@@ -29,31 +29,35 @@ export const letterOf = w => (/^[a-z]/i.test(w) ? w[0].toLowerCase() : '_');
 const WORDS_LIST = 'https://orbit.jaypengx.com/words/data/words.json';
 
 // ---- News: one line and two titles a story ----
-const NEWS_TOP = { tw: 40, intl: 25 };
-const NEWS_BATCH = 8;
+const NEWS_TOP = { tw: 15, intl: 25 };
+const NEWS_BATCH = 12;
 // A story as the AI is told it: its outlets' headlines (5 at most, the most
 // outlets' own), each with its summary only on the first, cut short.
-export function storyFacts(s) {
+// A story as the AI is told it: its outlets' headlines (an outlet once,
+// three at most), and the language its title is wanted in (a world story's
+// in Chinese, a Taiwan story's in English). Nothing else: a title is all
+// it writes (Jay 11-10: the one line under it only said the headline again).
+export function storyFacts(s, region = s.region) {
   const seen = new Set();
   const heads = [];
   for (const [outlet, title] of s.items || []) {
-    if (seen.has(outlet) || heads.length >= 5) continue;
+    if (seen.has(outlet) || heads.length >= 3) continue;
     seen.add(outlet);
-    heads.push({ outlet, title: String(title).slice(0, 90) });
+    heads.push(String(title).slice(0, 90));
   }
-  if (s.sum) heads[0] = { ...heads[0], sum: String(s.sum).slice(0, 120) };
-  return { id: s.id, heads };
+  return { id: s.id, lang: region === 'intl' ? 'zh' : 'en', heads };
 }
 export async function newsLines({ store, env, ctx, cap, until }) {
   const index = await store.json('news/index.json');
   if (!index) return { skipped: 'no index' };
   const was = (await store.json(NEWS_LINES))?.lines || {};
-  const front = [...(index.tw || []).slice(0, NEWS_TOP.tw), ...(index.intl || []).slice(0, NEWS_TOP.intl)];
+  const front = [...(index.tw || []).slice(0, NEWS_TOP.tw).map(x => ({ ...x, region: 'tw' })), ...(index.intl || []).slice(0, NEWS_TOP.intl).map(x => ({ ...x, region: 'intl' }))];
   const keep = {};
   const need = [];
   for (const s of front) {
     const old = was[s.id];
-    if (old && (s.m || 0) < (old.m || 0) * 2) keep[s.id] = old;
+    // (A title once; a copy from before titles alone, with its line, made again.)
+    if (old && !old.line && (old.zh || old.en)) keep[s.id] = old;
     else need.push(s);
   }
   let made = 0, calls = 0;

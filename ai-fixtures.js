@@ -91,44 +91,19 @@ export const EXAMPLES = {
     { name: 'sprint, safety car, no stops', input: { facts: "Sprint: Qatar Grand Prix, 19 laps, track 31°C.\nResult (place, driver, team, grid slot, stops, tyres and laps on each):\n1 Oscar Piastri (McLaren), from 1, 0 stops: medium 19\n2 George Russell (Mercedes), from 3, 0 stops: medium 19, +1.215\n3 Lando Norris (McLaren), from 2, 0 stops: medium 19, +2.904\n4 Max Verstappen (Red Bull Racing), from 6, 0 stops: medium 19, +4.501\n5 Yuki Tsunoda (Red Bull Racing), from 4, 0 stops: medium 19, +6.333\n6 Kimi Antonelli (Mercedes), from 5, 0 stops: medium 19, +7.120\nLed (laps): Piastri 1–19\nRetired: Pierre Gasly (lap 2)\nTrack: lap 2 safety car deployed\nFastest lap: Lando Norris 1:23.120 on lap 17" } }
   ],
   'sports-recap': [
-    {
-      name: 'nba late swing',
-      input: {
-        facts: [
-          'NBA (basketball)',
-          'Teams in English: 湖人 = Los Angeles Lakers; 勇士 = Golden State Warriors',
-          'Final: 湖人 112 at 勇士 108',
-          'Records now: 湖人 8-4, 勇士 7-5',
-          'By period: LAL 28 30 25 29 | GS 31 22 30 25',
-          '湖人 leaders: LeBron James 31 PTS; Anthony Davis 14 REB; LeBron James 9 AST',
-          '勇士 leaders: Stephen Curry 34 PTS; Draymond Green 10 REB; Stephen Curry 7 AST',
-          'Biggest swings:',
-          '4th 2:41 Stephen Curry misses 26-foot three point jumper (home win chance -12 pts)',
-          '4th 1:05 LeBron James makes 24-foot three point jumper (Anthony Davis assists) (home win chance -24 pts)',
-          '4th 0:32 Stephen Curry offensive foul (Charge) (home win chance -9 pts)'
-        ].join('\n')
-      }
-    },
-    {
-      name: 'epl goals and a red',
-      input: {
-        facts: [
-          'English Premier League (soccer)',
-          'Teams in English: 兵工廠 = Arsenal; 熱刺 = Tottenham Hotspur',
-          'Final: 熱刺 1 at 兵工廠 2',
-          'Records now: 熱刺 6-3-3, 兵工廠 9-2-1',
-          'Key events:',
-          "23' Goal: Son Heung-Min (Tottenham Hotspur) right footed shot from the centre of the box.",
-          "41' Red Card: Cristian Romero (Tottenham Hotspur) for a professional foul.",
-          "58' Goal: Bukayo Saka (Arsenal) penalty.",
-          "77' Goal: Martin Odegaard (Arsenal) left footed shot from outside the box."
-        ].join('\n')
-      }
-    }
+    {"name": "nuggets at rockets", "input": {"facts": "NBA (basketball)\nTeams: {t:10} = home (Houston Rockets); {t:7} = away (Denver Nuggets)\nLead changes: 3; ties: 2\n{t:10} ahead for good: Q3 4:14, 62-60, on {p:4433192}'s play (Tari Eason makes two point shot (Marcus Smart assists))\nBiggest run: {t:10} 14-0, Q1 2.6 to Q2 8:08 (from 29-24 for them), {p:4433192} 7 of them\nPlays that swung the win chance most:\n3rd Quarter 5:16 Kevin Durant misses 12-foot pullup jump shot (home win chance -7 pts)\n3rd Quarter 7:17 Aaron Gordon misses 1-foot tip shot (home win chance +18 pts)\n4th Quarter 8:48 Alperen Sengun shooting foul (home win chance -6 pts)\nPlayers: {p:3202} = Kevin Durant; {p:2990992} = Marcus Smart; {p:3064290} = Aaron Gordon; {p:4433192} = Tari Eason; {p:4871144} = Alperen Sengun"}},
+    {"name": "pacers at mavericks", "input": {"facts": "NBA (basketball)\nTeams: {t:6} = home (Dallas Mavericks); {t:11} = away (Indiana Pacers)\nLead changes: 5; ties: 6\n{t:6} came back from 13 down (50-63, Q2 1:36)\n{t:6} ahead for good: Q4 9:36, 98-97, on {p:6442}'s play (Kyrie Irving makes 23-foot three point jumper (Caleb Martin assists))\nBiggest run: {t:11} 13-0, Q2 5:18 to Q2 3:08 (from 45-48 for them), {p:3149673} 10 of them\n{t:6} trailed by 3 going into the Q4\nPlays that swung the win chance most:\n4th Quarter 38.6 Naji Marshall misses free throw 2 of 2 (home win chance -17 pts)\n4th Quarter 20.6 Aaron Nesmith makes 24-foot three pointer (Pascal Siakam assists) (home win chance -16 pts)\n4th Quarter 18.0 Aaron Nesmith personal foul (home win chance +16 pts)\nPlayers: {p:6442} = Kyrie Irving; {p:3138160} = Caleb Martin; {p:3149673} = Pascal Siakam; {p:4278594} = Naji Marshall; {p:4396909} = Aaron Nesmith"}},
+    {"name": "pelicans at warriors", "input": {"facts": "NBA (basketball)\nTeams: {t:9} = home (Golden State Warriors); {t:3} = away (New Orleans Pelicans)\nLead changes: 2; ties: 0\n{t:9} ahead for good: Q1 10:49, 5-3, on {p:5175737}'s play (Yaxel Lendeborg makes 26-foot three pointer)\nBiggest run: {t:9} 13-0, Q3 4:39 to Q3 2:26 (from 90-61 for them), {p:3975} 7 of them\n{t:9} won the Q3 40-22\nPlays that swung the win chance most:\n1st Quarter 11:02 Jeremiah Fears makes 26-foot three point jumper (Saddiq Bey assists) (home win chance -4 pts)\n1st Quarter 10:49 Yaxel Lendeborg makes 26-foot three pointer (home win chance +4 pts)\n1st Quarter 7:50 Stephen Curry makes 25-foot three point jumper (Draymond Green assists) (home win chance +3 pts)\nPlayers: {p:3975} = Stephen Curry; {p:6589} = Draymond Green; {p:4397136} = Saddiq Bey; {p:5144091} = Jeremiah Fears; {p:5175737} = Yaxel Lendeborg"}}
   ],
   'transit-notice': [
     { name: 'detour', input: { today: '2026-11-10', title: '307路線因道路施工改道', body: '自115年11月12日(三)22時起至11月14日(五)5時止，因忠孝西路施工，307往撫遠街方向改經中山北路行駛，暫停靠臺北車站(忠孝)站、北門站，請改至臺北車站(青島)站搭乘。' } },
     { name: 'stop', input: { today: '2026-11-10', title: '颱風停駛公告', body: '因颱風影響，本公司所有路線今日（11/10）下午4時起停駛，恢復時間另行公告。' } }
+  ],
+  'beats-say': [
+    { name: 'scene', input: { text: '考完試想放空一下的感覺' } },
+    { name: 'place', input: { text: '海邊夕陽' } },
+    { name: 'sound', input: { text: '有點像周杰倫那種中國風但要帶節奏' } },
+    { name: 'nonsense', input: { text: '明天幾點開會' } }
   ],
   'weather-ask': [
     { name: 'mountain', input: { question: '週六合歡山會下雪嗎', place: '合歡山' } },
@@ -142,11 +117,11 @@ export const EXAMPLES = {
   ],
   'news-lines': [
     {
-      name: 'two outlets',
+      name: 'both ways',
       input: {
         stories: [
-          { id: 's1', heads: [{ outlet: '中央社', title: '立法院三讀通過電業法修正案 再生能源售電門檻放寬', sum: '立法院會今天三讀通過電業法部分條文修正案，放寬再生能源售電業者門檻。' }, { outlet: '自由時報', title: '綠能新里程碑！電業法三讀 小型售電業者可直接賣電', sum: '電業法修正三讀，小型再生能源業者未來可直接售電給用戶。' }, { outlet: '聯合報', title: '電業法三讀 藍委批倉促：電價恐再漲', sum: '國民黨立委質疑修法倉促，擔憂電價上漲。' }] },
-          { id: 's2', heads: [{ outlet: 'Reuters', title: 'Fed holds rates steady, signals two cuts in 2027', sum: 'The Federal Reserve kept its benchmark rate unchanged on Wednesday and projected two quarter-point cuts next year.' }, { outlet: 'AP', title: 'Federal Reserve leaves interest rates unchanged', sum: 'The Fed held rates at 3.75% to 4% as inflation cooled.' }] }
+          { id: 's1', lang: 'en', heads: ['立法院三讀通過電業法修正案 再生能源售電門檻放寬', '電業法修法三讀 綠電業者售電更彈性', '再生能源售電鬆綁 電業法三讀'] },
+          { id: 's2', lang: 'zh', heads: ['Fed holds rates steady, signals two cuts in 2027', 'Federal Reserve keeps rates unchanged, sees two cuts next year'] }
         ]
       }
     }
