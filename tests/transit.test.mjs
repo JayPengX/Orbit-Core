@@ -51,6 +51,10 @@ test('the TDX allowlist takes the app’s paths and nothing else', () => {
   assert.equal(tdxRequest('basic/v3/Rail/TRA/DailyTrainTimetable/TrainDate/2026-10-03').rule.tier, 'timetable');
   assert.equal(tdxRequest('advanced/v2/Bike/Availability/NearBy?$spatialFilter=nearby(24.80, 120.97, 800)').rule.tier, 'live');
   assert.equal(tdxRequest('basic/v2/Rail/Metro/StationOfLine/TRTC').rule.tier, 'static');
+  // A route's fares (Transit's 票價), kept a week.
+  assert.equal(tdxRequest('basic/v2/Bus/RouteFare/InterCity/5608').rule.fresh, 7 * 86_400_000);
+  assert.equal(tdxRequest("basic/v2/Bus/RouteFare/City/Hsinchu?$filter=RouteID eq '182'").rule.tier, 'static');
+  assert.equal(tdxRequest('basic/v3/Bus/RouteFare/City/Tainan/0左').rule.tier, 'static');
   // Not allowed: other paths, other parameters, a bad spatial filter.
   assert.equal(tdxRequest('basic/v2/Tourism/ScenicSpot'), null);
   assert.equal(tdxRequest('basic/v2/Bus/Route/City/Hsinchu?$expand=x'), null);
