@@ -111,7 +111,8 @@ async function bytesOf(res) {
 }
 
 // The build's own read of a file (`&file=1`, its key only): a PDF's bytes passed straight through, never held
-// or encoded here (its text is read at build: a 代表會's 決議案 on a site that serves only Taiwan).
+// or encoded here (its text is read at build: a 代表會's 決議案 on a site that serves only Taiwan); any other
+// answer as it came too (臺北市議會's video lists, its JSON and pages).
 export async function readPage(url, fetchFn = fetch, { file = false } = {}) {
   const got = await fetchPage(url, fetchFn);
   if (got.error) return got;
@@ -121,6 +122,11 @@ export async function readPage(url, fetchFn = fetch, { file = false } = {}) {
     return { error: 'upstream', status: res.status };
   }
   const type = res.headers.get('Content-Type') || '';
+  // The build's file read takes any answer as it came (a Taiwan-only site's own JSON or page, scripts and all), up to a file's size.
+  if (file && !/pdf/i.test(type) && !/\.pdf$/i.test(new URL(got.url).pathname)) {
+    const size = Number(res.headers.get('Content-Length')) || null;
+    if (!size || size <= PAGE_LIMITS.fileBytes) return { url: got.url, type: 'file', size, body: res.body, ctype: type || 'application/octet-stream' };
+  }
   if (!/text\/html|application\/xhtml|text\/plain/i.test(type) && type) {
     const size = Number(res.headers.get('Content-Length')) || null;
     const kind = /pdf/i.test(type) || /\.pdf$/i.test(new URL(got.url).pathname) ? 'pdf' : 'file';
@@ -174,7 +180,7 @@ export async function handleLawPage(request, env, ctx, headers, session, fetchFn
   }
   if (out.error === 'host') return fail('host', 400, headers);
   if (out.error) return fail('upstream', 502, headers, { status: out.status });
-  if (out.body) return new Response(out.body, { status: 200, headers: { ...headers, 'Content-Type': 'application/pdf', 'Cache-Control': 'no-store', ...(out.size ? { 'Content-Length': String(out.size) } : {}) } });
+  if (out.body) return new Response(out.body, { status: 200, headers: { ...headers, 'Content-Type': out.ctype || 'application/pdf', 'Cache-Control': 'no-store', ...(out.size ? { 'Content-Length': String(out.size) } : {}) } });
   if (cache) ctx?.waitUntil?.(cache.put(key, new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `max-age=${ttlOf(url)}` } })).catch(() => {}));
   return json({ ...out, cached: false }, 200, headers);
 }
