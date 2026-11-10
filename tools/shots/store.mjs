@@ -95,6 +95,17 @@ export const STORE = {
       { zh: '越用越懂你的習慣', en: 'It learns your habits', dark: true, page: 'guessing' }
     ]
   },
+  news: {
+    app: 'news', brand: 'news', show: 'news', prefix: 'news',
+    shots: [
+      { zh: '今天的頭條，各家怎麼報', en: 'Today’s top stories, every side', wait: 9000 },
+      { zh: '同一則新聞，每一邊的標題', en: 'One story, each side’s headlines', dark: true, args: click("js:document.querySelector('.nw-lead')?.click()", wait(3000)), wait: 9000 },
+      { zh: '台灣新聞，依重要程度排', en: 'Taiwan’s news, by importance', hash: 'tw', args: click(tap('能源|Energy'), wait(2500)), wait: 9000 },
+      { zh: '國際新聞，左中右一眼看', en: 'World news, left to right', dark: true, hash: 'intl', args: click(tap('經濟|Economy'), wait(2500)), wait: 9000 },
+      { zh: '只有一邊在報的新聞', en: 'Stories only one side carries', hash: 'side', wait: 9000 },
+      { zh: '每家媒體的立場與來源', en: 'Every outlet’s place, and why', dark: true, hash: 'outlets', args: click(toTop("[...document.querySelectorAll('h2,h3,.q-section-head,header')].find(e=>e.offsetParent&&/^(台灣媒體|Taiwan’s outlets)/.test(e.textContent.trim()))", 40), wait(800)), wait: 9000 }
+    ]
+  },
   words: {
     app: 'words', brand: 'vocab', show: 'words', prefix: 'words', account: 'demo',
     shots: [
