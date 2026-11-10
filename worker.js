@@ -1343,12 +1343,12 @@ async function route(request, env, ctx, headers, origin) {
       return json(reliability(await callsSince(env, Date.now() - days * 86_400_000)), 200, headers);
     }
     // CPU by route from the Workers Logs (guard.js cpuByRoute): what passes the
-    // Free plan's 10 ms a request. ?group= a logs key, ?keys=1 the keys, ?script=, ?hours=.
+    // Free plan's 10 ms a request. ?group= a logs key, ?keys=1 the keys, ?script=, ?hours=, ?where=.
     if (check === 'cpu') {
       if (!env.GUARD) return json({ error: 'no guard' }, 200, headers);
       const q = new URL(request.url).searchParams;
       const u = new URL('https://quota-guard/cpu');
-      for (const k of ['group', 'keys', 'script', 'hours']) if (q.get(k)) u.searchParams.set(k, q.get(k));
+      for (const k of ['group', 'keys', 'script', 'hours', 'where']) if (q.get(k)) u.searchParams.set(k, q.get(k));
       return new Response(await (await env.GUARD.fetch(u.toString())).text(), { status: 200, headers: { ...headers, 'Content-Type': 'application/json' } });
     }
     // The admin panel's 容量 (capacity.js): people (counts only), every quota
