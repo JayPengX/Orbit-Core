@@ -3,7 +3,7 @@
 // answer may keep, and how a school's own list is read by code.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FEATURES, cleanBook } from '../ai-features.js';
+import { FEATURES, cleanBook, spanOf } from '../ai-features.js';
 import { schoolSite, schoolRead, dateIn, feedItems, ischoolItems, pageItems, pageLeads, settle, readSchool, mergeWorded, schoolNews, handleClassNews } from '../class-news.js';
 
 const ev = o => `event: ${o.type}\ndata: ${JSON.stringify(o)}\n\n`;
@@ -44,6 +44,9 @@ test('讀書計畫: every task a session of theirs, numbers only from the scope 
   assert.deepEqual(out.plans['數學'], ['2-1、2-2 課本例題', '2-3 到 3-2 習作', '總複習：錯題重做']);
   assert.deepEqual(out.plans['英文'], ['', '總複習'], 'a lesson the scope never named is dropped (the phone writes its own)');
   assert.equal(f.clean({ plans: [] }, input), null);
+  assert.equal(spanOf('L4-L6'), 'L4-L6 5', 'a range names what’s inside it');
+  const two = f.input({ today: '2026-11-11', subjects: [{ name: '英文', scope: 'L4-L6', n: 3, exam: '2026-11-26' }] });
+  assert.deepEqual(f.clean({ plans: [{ subject: '英文', tasks: ['L4 課文', 'L5 課文', 'L7 課文'] }] }, two).plans['英文'], ['L4 課文', 'L5 課文', '']);
   assert.ok(f.parts(input)[0].text.includes('數學: n 3, exam 2026-11-26, scope: 2-1~3-2'));
 });
 
