@@ -11,19 +11,17 @@
 // and 人事行政總處's 停班停課 page (typhoon.js), for Orbit Weather. And
 // TheSportsDB's CPBL day list for a game's final (push.js): its free key
 // answers the proxy's shared addresses with 429 most of the time, so a
-// second way out. And 高雄's live buses (transit-free.js khhQuery): its
-// site answers only Taiwan.
+// second way out.
 import { viaTaiwan } from './law-hosts.js';
 import { DGPA_NDS } from './typhoon.js';
 import { tsdbCpblDay } from './kit/catalog.mjs';
-import { khhQuery } from './transit-free.js';
 
 const GEMINI = 'https://generativelanguage.googleapis.com/';
 
 export default {
   async fetch(request) {
     const to = new URL(request.url).searchParams.get('to') || '';
-    if ((viaTaiwan(to) || to === DGPA_NDS || tsdbCpblDay(to) || khhQuery(to)) && request.method === 'GET') {
+    if ((viaTaiwan(to) || to === DGPA_NDS || tsdbCpblDay(to)) && request.method === 'GET') {
       const pick = ['User-Agent', 'Accept', 'Accept-Language'].filter(h => request.headers.get(h)).map(h => [h, request.headers.get(h)]);
       return fetch(to, { headers: Object.fromEntries(pick), redirect: 'manual' });
     }
