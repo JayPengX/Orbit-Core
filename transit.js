@@ -382,6 +382,10 @@ export const TDX_RULES = [
   { re: /^basic\/v2\/Bus\/Schedule\/(City\/[A-Za-z]+(\/[^/]+)?|InterCity(\/[^/]+)?)$/, fresh: 6 * HOUR, stale: 7 * DAY, tier: 'timetable' },
   // What changes rarely: routes, stops, stations, lines, fares.
   { re: /^basic\/v2\/Bus\/(Route|StopOfRoute)\/(City\/[A-Za-z]+(\/[^/]+)?|InterCity(\/[^/]+)?)$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
+  // A bus route's fares (Transit's 票價, stop to stop: 段次 with their buffer
+  // zones, OD, or stages), asked a route at a time, kept a week (they
+  // change once in years). Tainan's are v3 only.
+  { re: /^basic\/v[23]\/Bus\/RouteFare\/(City\/[A-Za-z]+(\/[^/]+)?|InterCity(\/[^/]+)?)$/, fresh: 7 * DAY, stale: 30 * DAY, tier: 'static' },
   // The lines' shapes, buses' and rails' (the bus builder's shape packs).
   { re: /^basic\/v2\/Bus\/Shape\/(City\/[A-Za-z]+(\/[^/]+)?|InterCity(\/[^/]+)?)$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
   { re: /^basic\/v2\/Rail\/((TRA|THSR)\/Shape|Metro\/Shape\/[A-Z]+)$/, fresh: DAY, stale: 7 * DAY, tier: 'static' },
