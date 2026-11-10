@@ -7,7 +7,9 @@
 //     there now (apis.youbike.com.tw/json/station-yb2.json: 9,800 stations,
 //     685 KB gzipped, refreshed by YouBike each minute), read once a minute
 //     at most and kept here; a city's list or the stations near a point.
-//   - 新竹's buses (竹塹交通資訊網), 臺北's and 新北's (the cities' open data).
+//   - 新竹's buses (竹塹交通資訊網), 臺北's and 新北's (the cities' open data),
+//     臺中's and 桃園's (their own bus sites; 高雄's, the same maker's,
+//     answers only Taiwan's own networks: read by the phones themselves).
 //   - 台鐵's day of trains (台鐵's own open data, ods.railway.gov.tw); its
 //     notices while every line runs whole (its 路線運行狀態 page); a train's
 //     delay (its 車次查詢).
@@ -20,6 +22,8 @@
 //     高鐵's stations (tdx/: asked of TDX a month on).
 //
 // Nothing here is counted as TDX's: no points.
+
+import { ebusState, twClock, twNow } from './kit/ebus.mjs';
 
 const MIN = 60_000;
 const DAY = 86_400_000;
@@ -288,13 +292,8 @@ export function hcTime(text, now = Date.now()) {
   if ((m = t.match(/^(\d+)\s*分/))) return { StopStatus: 0, EstimateTime: Number(m[1]) * 60 };
   if (/進站中|已到站|到站中/.test(t)) return { StopStatus: 0, EstimateTime: 0 };
   if (/即將|將到/.test(t)) return { StopStatus: 0, EstimateTime: 60 };
-  if ((m = t.match(/^(\d{1,2}):(\d{2})$/))) {
-    // (Taiwan's clock: a time long past is tomorrow's.)
-    const tw = new Date(now + 8 * 3_600_000);
-    let at = Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth(), tw.getUTCDate(), Number(m[1]), Number(m[2])) - 8 * 3_600_000;
-    if (at < now - 3 * 3_600_000) at += 86_400_000;
-    return { StopStatus: 1, NextBusTime: new Date(at + 8 * 3_600_000).toISOString().slice(0, 19) + '+08:00' };
-  }
+  // (Taiwan's clock: a time long past is tomorrow's.)
+  if (twClock(t, now)) return { StopStatus: 1, NextBusTime: twClock(t, now) };
   if (/末班/.test(t)) return { StopStatus: 3 };
   if (/未營運|停駛|停班/.test(t)) return { StopStatus: 4 };
   if (/不停靠|交管/.test(t)) return { StopStatus: 2 };
@@ -309,7 +308,6 @@ export function hcRoute(id) {
 }
 // (A route's own name: 5606A, 2支A are its branches' names.)
 const routeName = (no, sub) => (/0[12]$/.test(sub) ? no : String(no || '').replace(/(支.*|[A-Z])$/, '') || no);
-const twNow = now => new Date(now + 8 * 3_600_000).toISOString().slice(0, 19) + '+08:00';
 
 // A stop's next buses (TDX's StopUID) → TDX's ETA rows, or null (the site doesn't know it).
 async function hcStop(uid, deps) {
@@ -530,7 +528,8 @@ async function cityGpsList(city, deps) {
 // route's buses): left to TDX.
 // (高雄's, ibus.tbkc.gov.tw/ibus/graphql, is the same maker's but answers
 // only Taiwan's own networks: refused here and timed out (522) even from
-// Cloudflare in Taiwan, through gemini-relay.js, 2026-11-10. TDX's still.)
+// Cloudflare in Taiwan, through gemini-relay.js, 2026-11-10. Phones in
+// Taiwan read it themselves (Orbit Transit's khbus.mjs); the proxy's is TDX's.)
 export const EBUS = {
   Taichung: { gql: 'https://citybus.taichung.gov.tw/ebus/graphql', pre: 'TXG', bySid: true, eta: 'comeTime isOperationDay isSuspended clogType etas { etaTime isLast busId }', bus: 'id lat lon azimuth dataTime', chunk: 300, routes: 40 },
   // (桃園's answers one part after another, ~0.1 s a stop's route and way, ~0.2 s a route: 12 and 6 an ask, the asks at once.)
@@ -557,21 +556,11 @@ const oneWay = (pack, route) => pack?.dirs.has(route) && !pack.dirs.get(route).h
 const wayOf = (pack, route, goBack) => (oneWay(pack, route) || goBack !== 2 ? 0 : 1);
 
 // One estimate (a stop, a route, a way) in TDX's words, as the cities' own
-// pages read it: 今日未營運, 末班駛離, 施工改道 / 活動改道 / 取消停靠 (not
-// stopping), the buses coming (minutes, the soonest first), else the next
-// timetabled time.
+// pages read it (kit/ebus.mjs: the phones' read of 高雄's too).
 export function ebusRow(n, stopUID, routeUID, pack, at, now = at) {
   const name = pack?.route.get(routeUID) || routeUID.slice(3);
   const stopName = pack?.stop.get(stopUID);
-  const etas = (n.etas || []).filter(e => Number.isFinite(e?.etaTime) && e.etaTime >= 0).sort((a, b) => a.etaTime - b.etaTime);
-  const next = n.comeTime ? hcTime(n.comeTime, now) : null;
-  const plan = next?.NextBusTime ? { NextBusTime: next.NextBusTime } : {};
-  let state;
-  if (n.isOperationDay === false) state = { StopStatus: 4 };
-  else if (n.isSuspended) state = { StopStatus: 3 };
-  else if ([-5, -6, -8].includes(n.clogType) || n.isConstruction || n.isEvent) state = { StopStatus: 2 };
-  else if (etas.length) state = { StopStatus: 0, EstimateTime: etas[0].etaTime * 60, PlateNumb: etas[0].busId || '', IsLastBus: etas[0].isLast === true, Estimates: etas.map(e => ({ PlateNumb: e.busId || '', EstimateTime: e.etaTime * 60, IsLastBus: e.isLast === true })), ...plan };
-  else state = { StopStatus: 1, ...plan };
+  const state = ebusState(n, now);
   return { StopUID: stopUID, StopID: stopUID.slice(3), ...(stopName ? { StopName: { Zh_tw: stopName, En: stopName } } : {}), RouteUID: routeUID, RouteID: routeUID.slice(3), SubRouteUID: routeUID, RouteName: { Zh_tw: name, En: name }, Direction: wayOf(pack, routeUID, n.goBack), ...state, DataTime: twNow(at) };
 }
 // (One row a stop, route and way: a loop's two halves, or a stop at two stations the same way, the sooner.)

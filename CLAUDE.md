@@ -130,7 +130,7 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `f1live.mjs`, `postseason.mjs`, `sports-espn.mjs`, `sports-broadcast.mjs`, `sports-highlights.mjs`, `sports-winprob.mjs` | F1's own timing read one way everywhere; MLB's postseason; ESPN's scoreboards as events (one parser for the proxy and the phone); where to watch in Taiwan (past ELTA's list, `eltaGuess`: its usual line-up, said 預估); highlights; win probability (also run by the builders) |
 | `stock-account.mjs`, `stock-access.mjs`, `stock-credit.mjs`, `stock-markets.mjs`, `stock-quotes.mjs`, `stock-bonds.mjs`, `stock-savings.mjs`, `stock-ipo.mjs`, `stock-holidays.mjs`, `stock-hk-lots.mjs`, `stock-jp-lists.mjs`, `stock-codec.mjs` | Securities' ledger, broker rules, markets, prices, bonds, savings, IPOs, holidays, lot sizes, saved-copy codec; shared with the Worker |
 | `pay.mjs`, `gov.mjs` | The weekly pay and relief (rules only; the Worker alone writes them); what the government took and gave one account |
-| `flight.mjs` | A real plane in the air, on a sphere: the proxy's `/flight` and Class's 專注飛行 |
+| `flight.mjs`, `ebus.mjs` | A real plane in the air, on a sphere (`/flight`, Class's 專注飛行); bus sites' estimates in TDX's words (the proxy: 臺中, 桃園; phones: 高雄) |
 | `domain.mjs`, `devconfig.mjs`, `mirror.mjs` | The family's domain (one place); `DEV` for the Workers; the nightly mirror's addresses |
 | `sw.js`, `sw-images.js` | The one service worker every app imports (page and own pictures kept first, refreshed behind; `?v=` files from the cache, checked against their hash); other sites' pictures in one cache all apps share |
 | `apps.mjs`, `link.mjs`, `preload.mjs`, `stamp.mjs`, `stamp-app.mjs`, `hash.mjs`, `frame-guard.mjs`, `no-net.mjs` | Build tools, never served: the apps' snippets; `.kit` links; first-screen modulepreload; the kit's and each app's content-hashed build; `frameFaults` (apps' tests: only colours on the tab bar); tests offline |
@@ -272,7 +272,7 @@ OpenF1's tables (`openF1Raw`), kept in R2.
 
 | Worker | File, toml | What |
 | --- | --- | --- |
-| `quota-guard` | `guard-worker.js`, `guard.js`, `wrangler.guard.toml` | The bill's guard (§9); DO `GuardClock` (its 5-minute alarm), KV for its state; `/errors`, `/hours` (7 days hourly) for the panel, `/cpu` |
+| `quota-guard` | `guard-worker.js`, `guard.js`, `wrangler.guard.toml` | The bill's guard (§9); DO `GuardClock` (5-minute alarm), KV state; for the panel `/errors`, `/hours` (7 days), `/cpu` |
 | `gemini-relay` | `gemini-relay.js`, `wrangler.gemini.toml` | Gemini's calls from Taiwan (placement `gcp:asia-east1`) |
 | `orbit-site` | `site.js`, `site-closed.js`, `wrangler.site.toml` | The custom domains; Longshot's closed notice |
 | `orbit-<slug>`, `orbit-pass`, `orbit-home` | `deploy/cf-site.mjs` | Each repo's static site, an assets-only Worker on routes of its paths (§10) |
@@ -283,11 +283,10 @@ OpenF1's tables (`openF1Raw`), kept in R2.
 
 A read (`kit proxyJson`) goes down these until one answers:
 
-1. memory (500 keys; the same address within its `ttl`, or still on its way);
-2. the device's Cache Storage (`orbit-data-v1`, copies kept 4 days):
-   younger than its `ttl`, used as is;
-3. the failure hold (a source that just failed: 15 s, a minute after a
-   429 or 401, for the whole page);
+1. memory (500 keys; an address within its `ttl`, or on its way);
+2. the device's Cache Storage (`orbit-data-v1`, kept 4 days), within its `ttl`;
+3. the failure hold (a source that just failed: 15 s, after a 429 or 401
+   a minute, for the whole page);
 4. the family's data in R2 (`/data/`, `packJson`): seasons, game days,
    watch links, win probability, photos, bus packs, shapes;
 5. the proxy's edge cache, by tier (§4.1);
