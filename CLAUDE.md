@@ -213,7 +213,7 @@ w;dur=` (the Worker's own time), noted by the 除錯紀錄 with a slow read.
 | `/config` | `worker.js`, `kit/devconfig.mjs` | The live speeds (`DEV`), a minute in Cloudflare's cache |
 | `/guard` | `worker.js` | The bill's guard as it last read the bill (no key) |
 | `/store/check` | `worker.js`, `doc-store.js` | Each collection's count, from a localhost page only |
-| `/ops` | `ops.js`, `worker.js` | The repo's own checks (Bearer `DATA_PUSH_SECRET`): `?check=gemini`, `law-chat` (問法律's steps timed), `system`, `capacity` (容量), `purge-money-mail` |
+| `/ops` | `ops.js`, `worker.js` | The repo's own checks (Bearer `DATA_PUSH_SECRET`): `?check=gemini`, `law-chat`, `system`, `capacity`, `cpu` (CPU by route) |
 
 - **The gate:** every route needs a Pass session (`qt=`), counted per
   session and app in memory (600 a minute on the data proxy). Public routes
@@ -273,7 +273,7 @@ OpenF1's tables (`openF1Raw`), kept in R2.
 
 | Worker | File, toml | What |
 | --- | --- | --- |
-| `quota-guard` | `guard-worker.js`, `guard.js`, `wrangler.guard.toml` | The bill's guard (§9); DO `GuardClock` (its 5-minute alarm), KV for its state; `/errors`, `/hours` (7 days hourly) for the panel |
+| `quota-guard` | `guard-worker.js`, `guard.js`, `wrangler.guard.toml` | The bill's guard (§9); DO `GuardClock` (its 5-minute alarm), KV for its state; `/errors`, `/hours` (7 days hourly) for the panel, `/cpu` |
 | `gemini-relay` | `gemini-relay.js`, `wrangler.gemini.toml` | Gemini's calls from Taiwan (placement `gcp:asia-east1`) |
 | `orbit-site` | `site.js`, `site-closed.js`, `wrangler.site.toml` | The custom domains; Longshot's closed notice |
 | `orbit-<slug>`, `orbit-pass`, `orbit-home` | `deploy/cf-site.mjs` | Each repo's static site, an assets-only Worker on routes of its paths (§10) |

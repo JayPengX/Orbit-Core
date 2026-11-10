@@ -10,10 +10,10 @@ on:
       job:
         description: The job
         type: choice
-        options: [watch, watch-full, cutouts, buses, play, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, gemini-check, law-chat-time, system, capacity, purge-money-mail]
+        options: [watch, watch-full, cutouts, buses, play, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, gemini-check, law-chat-time, system, capacity, cpu, purge-money-mail]
         default: watch
       try:
-        description: "law-chat-time: settings to try, e.g. answer=minimal,plan=minimal,model=lite; gemini-check: a model name"
+        description: "law-chat-time: settings to try, e.g. answer=minimal,plan=minimal,model=lite; gemini-check: a model name; cpu: query, e.g. hours=24&group=…&keys=1&script=…"
         default: ''
 jobs:
   run:
@@ -28,6 +28,7 @@ jobs:
             law-chat-time) url="$base/ops?check=law-chat&try=$TRY" ;;
             system) url="$base/ops?check=system" ;;
             capacity) url="$base/ops?check=capacity" ;;
+            cpu) url="$base/ops?check=cpu&$TRY" ;;
             purge-money-mail) url="$base/ops?check=purge-money-mail" ;;
             watch-full) url="$base/data/build?job=watch&full=1" ;;
             watch|cutouts|buses) url="$base/data/build?job=$JOB" ;;
