@@ -364,3 +364,54 @@ export function hsrPack(trips, names, built) {
   const stations = Object.fromEntries([...used].sort().map(id => [id, [names[`THSR_${id}`] || names[id] || '', HSR_EN[id] || '']]));
   return { v: 1, built, stations, trains, days: Object.fromEntries(Object.entries(days).sort()) };
 }
+
+// ---- The metros ---------------------------------------------------------------------------
+
+// What Orbit Transit reads of each system (its lib/metro.mjs and
+// metroroute.mjs: TDX refuses the rest), copied whole from TDX to R2
+// (rail/metro/<SYS>/<Kind>.json; a station's timetable alone:
+// rail/metro/<SYS>/StationTimeTable/<StationID>.json, what TDX's
+// `$filter=StationID eq '…'` answers) for transit-free.js metroFree.
+const ALL = ['Station', 'StationOfLine', 'Line', 'StationOfRoute'];
+export const METRO_KINDS = {
+  TRTC: [...ALL, 'LineTransfer', 'StationExit', 'Frequency', 'S2STravelTime', 'StationTimeTable'],
+  NTMC: [...ALL, 'LineTransfer', 'StationExit', 'Frequency', 'S2STravelTime', 'StationTimeTable'],
+  NTDLRT: [...ALL, 'StationTimeTable'],
+  NTALRT: [...ALL, 'StationTimeTable'],
+  TRTCMG: [...ALL, 'StationExit'],
+  TYMC: [...ALL, 'StationExit', 'Frequency', 'S2STravelTime', 'StationTimeTable'],
+  TMRT: [...ALL, 'StationExit', 'Frequency', 'S2STravelTime'],
+  KRTC: [...ALL, 'LineTransfer', 'StationExit', 'Frequency', 'S2STravelTime', 'StationTimeTable'],
+  KLRT: [...ALL, 'S2STravelTime', 'StationTimeTable']
+};
+export const METRO = Object.keys(METRO_KINDS);
+// A GTFS id's system ('TRTC_BL_BL-1_0_T_…' → 'TRTC'), or '' when not a metro's.
+export const metroOf = id => {
+  const s = String(id).slice(0, String(id).indexOf('_'));
+  return Object.hasOwn(METRO_KINDS, s) ? s : '';
+};
+// The systems to ask again, the changed first, then the longest asked:
+// a system GTFS says changed (its trips, times, stops: `sig`), or a month on
+// (each run while TDX is paid).
+export function metroDue(index, sigs, { paid = false, now = Date.now(), days = 28 } = {}) {
+  const sys = index?.systems || {};
+  const age = s => now - (Date.parse(sys[s]?.asked || '') || 0);
+  const changed = s => !sys[s] || (sigs[s] && sys[s].sig !== sigs[s]);
+  return METRO.filter(s => paid || changed(s) || age(s) > days * 86_400_000).sort((a, b) => changed(b) - changed(a) || age(b) - age(a));
+}
+// A system's answers ({ Kind: rows }) → its files ([path, rows]): each kind
+// whole, the timetable a station at a time (every station of the system,
+// [] where TDX has none: what its filter answers).
+export function metroFiles(sys, got) {
+  const out = [];
+  for (const [kind, rows] of Object.entries(got)) {
+    if (kind !== 'StationTimeTable') {
+      out.push([`${kind}`, rows]);
+      continue;
+    }
+    const by = new Map((got.Station || []).map(s => [s.StationID, []]));
+    for (const r of rows) (by.get(r.StationID) || by.set(r.StationID, []).get(r.StationID)).push(r);
+    for (const [id, list] of by) if (/^[A-Za-z0-9-]+$/.test(id || '')) out.push([`StationTimeTable/${id}`, list]);
+  }
+  return out.map(([k, rows]) => [`rail/metro/${sys}/${k}.json`, rows]);
+}

@@ -20,8 +20,9 @@ import { createInterface } from 'node:readline';
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
 import { CITIES, squares, cityStations, TILE, simplify, schedOf } from '../builders/buses.js';
-import { CITY_CODE, CODE_CITY, calendarBits, tripDays, specialOf, gtfsMins, wayPlan, cityPack, tdxWays, cityLines, whereOf, specialSubs, hsrPack } from '../builders/gtfs.js';
+import { CITY_CODE, CODE_CITY, calendarBits, tripDays, specialOf, gtfsMins, wayPlan, cityPack, tdxWays, cityLines, whereOf, specialSubs, hsrPack, METRO, METRO_KINDS, metroOf, metroDue, metroFiles } from '../builders/gtfs.js';
 import { fillNewTaipei } from '../builders/ntpc.js';
 import { tdxPlan } from '../transit.js';
 
@@ -33,6 +34,8 @@ const opt = (name, dflt = null) => {
 const API = (process.env.ORBIT_API || 'https://orbit-workers-proxy.pengzjay.workers.dev').replace(/\/$/, '');
 const SECRET = process.env.DATA_PUSH_SECRET || '';
 const ONLY = opt('only') ? String(opt('only')).split(',') : null;
+// 高鐵's days and the metros: on a whole run, or `--only Rail`.
+const RAIL = !ONLY || ONLY.includes('Rail');
 const NO_TDX = Boolean(opt('no-tdx')) || !SECRET;
 const OUT = opt('out');
 const PUSH = Boolean(opt('push'));
@@ -42,7 +45,7 @@ const today = new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
 const paid = tdxPlan(now).paid;
 // TDX's bytes this run may read (its billed size: 150 MB a basic point): the
 // free tier's 3 points a month are people's first.
-const TDX_BYTES = Number(opt('tdx-mb', paid ? 60 : 6)) * 1e6;
+const TDX_BYTES = Number(opt('tdx-mb', paid ? 80 : 24)) * 1e6;
 // A city's stations asked again once this old, this many cities a run.
 const STATION_DAYS = paid ? 21 : 60;
 const STATIONS = Number(opt('stations', paid ? 23 : 2));
@@ -79,6 +82,9 @@ async function tdx(path) {
       return JSON.parse(text);
     }
     if (/BUILD_TDX_CAP/.test(text)) throw Object.assign(new Error('the build’s TDX month spent'), { budget: true });
+    // (TDX's own no, through the proxy: asked again it says no again.)
+    const up = /"upstream":(4\d\d)/.exec(text);
+    if (up && up[1] !== '429') throw Object.assign(new Error(`${path.slice(0, 90)}: TDX ${up[1]} ${text.slice(0, 160)}`), { status: Number(up[1]) });
     if (tries >= 5 || r.status === 400 || r.status === 404 || r.status === 403) throw Object.assign(new Error(`${path.slice(0, 90)}: ${r.status} ${text.slice(0, 120)}`), { status: r.status });
     await sleep(20_000 * (tries + 1));
   }
@@ -151,22 +157,31 @@ const clock = t => {
 };
 async function readGtfs(dir) {
   // (高鐵's too, THSR_…: its days for transit-free.js hsrDay.)
-  const codes = new Set([...cities.map(c => CITY_CODE[c]), ...(ONLY ? [] : ['THS'])]);
+  const codes = new Set([...cities.map(c => CITY_CODE[c]), ...(RAIL ? ['THS'] : [])]);
   const mine = id => codes.has(String(id).slice(0, 3));
+  // Each metro's GTFS (its stops, routes, trips, times, days: not the dates
+  // they're good from and to), as one fingerprint: asked of TDX again when it changes.
+  const sig = new Map();
+  const mark = (sys, c) => RAIL && sys && (sig.get(sys) || sig.set(sys, createHash('sha1')).get(sys)).update(`${c.join(',')}\n`);
+  const metroTrip = new Map();
   const stops = new Map();
   const intern = new Map();
   const sid = u => intern.get(u) || (intern.set(u, u), u);
   await eachRow(join(dir, 'stops.txt'), (c, h) => {
     const id = c[h.stop_id];
+    mark(metroOf(id), c);
     if (!mine(id) || (c[h.location_type] && c[h.location_type] !== '0')) return;
     const lat = Number(c[h.stop_lat]);
     const lon = Number(c[h.stop_lon]);
     stops.set(sid(id), [c[h.stop_name] || '', lat > 0 ? lat : null, lon > 0 ? lon : null]);
   });
   const routes = new Map();
-  await eachRow(join(dir, 'routes.txt'), (c, h) => mine(c[h.route_id]) && routes.set(c[h.route_id], c[h.route_short_name] || c[h.route_long_name] || ''));
+  await eachRow(join(dir, 'routes.txt'), (c, h) => (mark(metroOf(c[h.route_id]), c), mine(c[h.route_id]) && routes.set(c[h.route_id], c[h.route_short_name] || c[h.route_long_name] || '')));
   const cal = new Map();
-  await eachRow(join(dir, 'calendar.txt'), (c, h) => cal.set(c[h.service_id], calendarBits(Object.fromEntries(Object.entries(h).map(([k, i]) => [k, c[i]])))));
+  await eachRow(join(dir, 'calendar.txt'), (c, h) => {
+    mark(metroOf(c[h.service_id]), c.filter((_, i) => i !== h.start_date && i !== h.end_date));
+    cal.set(c[h.service_id], calendarBits(Object.fromEntries(Object.entries(h).map(([k, i]) => [k, c[i]]))));
+  });
   const ex = new Map();
   await eachRow(join(dir, 'calendar_dates.txt'), (c, h) => {
     const s = c[h.service_id];
@@ -176,10 +191,13 @@ async function readGtfs(dir) {
   const trips = new Map();
   await eachRow(join(dir, 'trips.txt'), (c, h) => {
     const r = c[h.route_id];
+    const ms = metroOf(r);
+    if (ms && RAIL) mark(ms, c), metroTrip.set(c[h.trip_id], ms);
     if (routes.has(r)) trips.set(c[h.trip_id], { route: r, service: c[h.service_id], shape: c[h.shape_id] || r, stops: null, times: null, rail: r.startsWith('THSR_') });
   });
   const freq = new Map();
   await eachRow(join(dir, 'frequencies.txt'), (c, h) => {
+    mark(metroTrip.get(c[h.trip_id]), c);
     if (!trips.has(c[h.trip_id])) return;
     (freq.get(c[h.trip_id]) || freq.set(c[h.trip_id], []).get(c[h.trip_id])).push({ start: c[h.start_time], end: c[h.end_time], secs: Number(c[h.headway_secs]) || 0 });
   });
@@ -211,7 +229,7 @@ async function readGtfs(dir) {
     const id = c[h.trip_id];
     if (id !== cur) flush(), (cur = id);
     const t = trips.get(id);
-    if (!t) return;
+    if (!t) return void mark(metroTrip.get(id), c);
     rows.push([Number(c[h.stop_sequence]), sid(c[h.stop_id]), gtfsMins(c[h.departure_time] || c[h.arrival_time]), ...(t.rail ? [clock(c[h.arrival_time]), clock(c[h.departure_time])] : [])]);
   });
   flush();
@@ -230,8 +248,8 @@ async function readGtfs(dir) {
   }
   const hsr = [...trips.values()].filter(t => t.rail && t.hm).map(t => ({ no: t.route.split('_')[1], dates: ex.get(t.service)?.add || [], stops: t.stops.map((u, i) => [u, ...t.hm[i]]) }));
   const hsrNames = Object.fromEntries([...stops].filter(([u]) => u.startsWith('THSR_')).map(([u, v]) => [u, v[0]]));
-  log(`GTFS: ${stops.size} stops, ${trips.size} trips, ${patterns.size} patterns, ${hsr.length} 高鐵 trips`);
-  return { stops, byCity, hsr, hsrNames };
+  log(`GTFS: ${stops.size} stops, ${trips.size} trips, ${patterns.size} patterns, ${hsr.length} 高鐵 trips, metros ${[...sig.keys()].join(' ')}`);
+  return { stops, byCity, hsr, hsrNames, metroSigs: Object.fromEntries([...sig].map(([k, v]) => [k, v.digest('hex').slice(0, 16)])) };
 }
 // GTFS's lines by shape id, simplified as they come (only the ones wanted).
 async function readLines(dir, want) {
@@ -274,9 +292,9 @@ async function main() {
   const index = (await data('index.json')) || { cities: {} };
   old.set('index.json', JSON.parse(JSON.stringify(index)));
   const dir = gtfsDir();
-  const { stops, byCity, hsr, hsrNames } = await readGtfs(dir);
+  const { stops, byCity, hsr, hsrNames, metroSigs } = await readGtfs(dir);
   // 高鐵's next four weeks (a day TDX's GTFS has, the proxy answers without TDX).
-  if (!ONLY) {
+  if (RAIL) {
     const p = hsrPack(hsr, hsrNames, built);
     if (Object.keys(p.days).length >= 7 && p.trains.length >= 100) put('rail/thsr.json', p);
     else log(`高鐵: ${Object.keys(p.days).length} days, ${p.trains.length} trains: not written`);
@@ -423,6 +441,8 @@ async function main() {
       if (e?.budget) break;
     }
   }
+  // The metros last (the buses' asks first, on a small month).
+  const metro = RAIL ? await metros(metroSigs, failed) : null;
   if (stationsDone.length && CITIES.every(c => index.stations?.[c])) put('station/index.json', { v: 1, built, tile: TILE, cities: Object.fromEntries(CITIES.map(c => [c, index.stations[c].tiles])) });
   index.shapes = [...new Set([...(index.shapes || []).filter(s => !s.startsWith('shape/bus/InterCity/') || !packs.has('InterCity')), ...[...out.keys()].filter(p => p.startsWith('shape/'))])].sort();
   if (done.length || stationsDone.length) put('index.json', index);
@@ -432,7 +452,7 @@ async function main() {
   const changed = [];
   for (const [path, d] of out) {
     let was = old.get(path);
-    if (was === undefined && !path.startsWith('station/')) was = await data(path).catch(() => null);
+    if (was === undefined && !/^(station|rail\/metro)\//.test(path)) was = await data(path).catch(() => null);
     if (path === 'index.json' || !was || meaning(was) !== meaning(d)) changed.push(path);
   }
   if (OUT) {
@@ -442,11 +462,67 @@ async function main() {
       writeFileSync(f, JSON.stringify(d));
     }
   }
-  const report = { built, gtfs: true, cities: done.length, failed, asked, tdx: { calls: tdxCalls, mb: Math.round(tdxBytes / 1e4) / 100, points: Math.round((tdxBytes / 150e6 + tdxCalls / 1500) * 1000) / 1000 }, stations: stationsDone, files: out.size, changed: changed.length };
+  const report = { built, gtfs: true, cities: done.length, failed, asked, metro, tdx: { calls: tdxCalls, mb: Math.round(tdxBytes / 1e4) / 100, points: Math.round((tdxBytes / 150e6 + tdxCalls / 1500) * 1000) / 1000 }, stations: stationsDone, files: out.size, changed: changed.length };
   if (PUSH && changed.length) report.pushed = await push(changed);
   log(JSON.stringify(report, null, 1));
   if (!opt('gtfs') && !opt('keep')) rmSync(dir, { recursive: true, force: true });
   if (!done.length && cities.length) process.exitCode = 1;
+}
+
+// ---- The metros ---------------------------------------------------------------------------
+
+// Each system TDX's GTFS says changed (or a month on; each run while TDX is
+// paid): its stations, lines, exits, headways and timetables asked whole
+// (builders/gtfs.js METRO_KINDS, ~14 MB for all nine), only the files that
+// changed written (rail/metro/index.json keeps each file's fingerprint).
+// A kind TDX didn't give, or gave under half of what it had: the last copy stays.
+async function metros(sigs, failed) {
+  const index = (await data('rail/metro/index.json')) || { v: 1, systems: {} };
+  old.set('rail/metro/index.json', JSON.parse(JSON.stringify(index)));
+  const due = NO_TDX ? [] : metroDue(index, sigs, { paid, now });
+  const done = [];
+  let spent = false;
+  for (const sys of due) {
+    const got = {};
+    const was = index.systems[sys] || { kinds: {}, files: {} };
+    let whole = true;
+    for (const kind of METRO_KINDS[sys]) {
+      try {
+        const rows = await tdx(`basic/v2/Rail/Metro/${kind}/${sys}`);
+        if (!Array.isArray(rows)) throw new Error('not a list');
+        if (rows.length < (was.kinds?.[kind] || 0) / 2) throw new Error(`${rows.length} rows, had ${was.kinds[kind]}`);
+        got[kind] = rows;
+      } catch (e) {
+        whole = false;
+        failed[`metro:${sys}:${kind}`] = String(e?.message || e).slice(0, 160);
+        if (e?.budget) {
+          spent = true;
+          break;
+        }
+      }
+    }
+    // (A timetable split by station needs the stations: without them, the last ones.)
+    if (got.StationTimeTable && !got.Station) delete got.StationTimeTable;
+    if (!Object.keys(got).length) {
+      if (spent) break;
+      continue;
+    }
+    const files = { ...was.files };
+    let changed = 0;
+    for (const [path, rows] of metroFiles(sys, got)) {
+      const text = JSON.stringify(rows);
+      const fp = createHash('sha1').update(text).digest('hex').slice(0, 12);
+      const k = path.slice(`rail/metro/${sys}/`.length, -'.json'.length);
+      if (files[k] !== fp) put(path, rows), changed++;
+      files[k] = fp;
+    }
+    // (Asked again next run when a kind was missed: `sig` only once all came.)
+    index.systems[sys] = { sig: whole ? sigs[sys] || '' : was.sig || '', asked: whole ? built : was.asked || '', kinds: { ...was.kinds, ...Object.fromEntries(Object.entries(got).map(([k, v]) => [k, v.length])) }, files };
+    done.push([sys, changed]);
+    if (spent) break;
+  }
+  if (done.length) put('rail/metro/index.json', { ...index, v: 1, built });
+  return { due, done: Object.fromEntries(done) };
 }
 
 // The changed files to R2 (data.js /data/push: frames of [u32 path length][path][u32 size][bytes]), ~20 MB a request.

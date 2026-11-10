@@ -98,3 +98,20 @@ test("where.json: every pack's stops in 0.02° cells, YouBike's cities as the la
   assert.deepEqual(w.cells, { '1240_6048': [0, 1], '1241_6048': [1] });
   assert.equal(longestPattern([trip(['A', 'B'], [1, 2]), trip(['A', 'B', 'C'], [1, 2, 3])]).length, 3);
 });
+
+test("The metros asked of TDX again only when GTFS says they changed, or a month on (every run while TDX is paid): the changed first, then the longest asked", async () => {
+  const { metroDue, METRO, metroOf } = await import('../builders/gtfs.js');
+  const now = Date.parse('2026-12-20T00:00:00Z');
+  const sigs = Object.fromEntries(METRO.map(s => [s, `s-${s}`]));
+  const systems = Object.fromEntries(METRO.map(s => [s, { sig: `s-${s}`, asked: '2026-12-10T00:00:00Z' }]));
+  systems.KRTC = { sig: 'old', asked: '2026-12-15T00:00:00Z' };
+  systems.TYMC = { sig: 's-TYMC', asked: '2026-11-01T00:00:00Z' };
+  delete systems.KLRT;
+  assert.deepEqual(metroDue({ systems }, sigs, { now }), ['KLRT', 'KRTC', 'TYMC']);
+  assert.equal(metroDue({ systems }, sigs, { now, paid: true }).length, METRO.length);
+  assert.deepEqual(metroDue(null, sigs, { now }).sort(), [...METRO].sort());
+  assert.equal(metroOf('TRTCMG_MK_MK-1_0'), 'TRTCMG');
+  assert.equal(metroOf('KLRT_C_C_0'), 'KLRT');
+  assert.equal(metroOf('THB180502_1'), '');
+  assert.equal(metroOf('TPE10001'), '');
+});
