@@ -63,6 +63,13 @@ export function cleanBook(raw, { today, subjects = [] }) {
   return { items };
 }
 
+// A scope's numbers with its ranges' insides (L4-L6 names L5 too; Ch3–Ch5, Ch4).
+export const spanOf = scope =>
+  String(scope || '').replace(/(\d+)\s*[-~～–—至到]\s*[A-Za-z]{0,4}\s*(\d+)(?![-.]\d)/g, (m, a, b) => {
+    const x = +a, y = +b;
+    return y > x && y - x <= 20 ? `${m} ${Array.from({ length: y - x - 1 }, (_, i) => x + i + 1).join(' ')}` : m;
+  });
+
 export const FEATURES = {
   // Orbit Money: 用說的記帳, the sentences the app's own parser couldn't
   // read ("跟同學吃火鍋花了三百五"). Entries for the person to look over, as 拍照記帳's.
@@ -265,7 +272,7 @@ export const FEATURES = {
         const p = list(raw?.plans, 20).find(x => str(x?.subject, 16) === s.name);
         if (!p) continue;
         // (Every number a task names is its scope's: a chapter, a lesson, a page.)
-        const tasks = list(p.tasks, s.n).map(t => str(t, 44)).map(t => (t && numbersFrom(t, s.scope) ? t : ''));
+        const tasks = list(p.tasks, s.n).map(t => str(t, 44)).map(t => (t && numbersFrom(t, spanOf(s.scope)) ? t : ''));
         if (tasks.filter(Boolean).length >= Math.ceil(s.n / 2)) out[s.name] = tasks;
       }
       return Object.keys(out).length ? { plans: out } : null;
@@ -286,7 +293,7 @@ export const FEATURES = {
         [
           `These are the newest announcements on a Taiwanese school’s website (${school}). Today is ${today}. For each, from its title, unit and the start of its text:`,
           'who: which of the school’s students it concerns, a list: "all" every student; "1", "2", "3" a grade (高一 / 一年級 / 1xx班 = "1"; 高三, 畢業班, 升學 = "3"); "jh" its 國中部 only; "some" only some (a team, a club, those who signed up, applicants for a scholarship or a contest). [] when it isn’t for students at all: teachers (研習, 甄選, 公開觀課, 會議), staff, bids (招標, 採購), parents only, results lists for the public.',
-          'line: one plain sentence for a student, ≤ 30 字: what happens or what they get, and when. Not the title again: drop 【轉知】, 公告, unit names and the school’s name; say it simply. Every date and number must be one the title or text gives.',
+          'line: one plain sentence for a student, ≤ 30 字: what happens or what they get, and when. Not the title again: drop 【轉知】, 公告, unit names and the school’s name; say it simply, no filler (請同學留意, 歡迎參加). Every date and number must be one the title or text gives.',
           'act: what they must do, ≤ 10 字 (報名, 繳回條, 上傳學習歷程, 帶…), "" when nothing.',
           'by: the deadline, or the day it happens, as YYYY-MM-DD when the title or text gives one (115年 = 2026; a month and day alone is the coming one), else "".',
           'Return one item per announcement with its id.',
