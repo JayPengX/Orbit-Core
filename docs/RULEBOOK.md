@@ -205,6 +205,9 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-30 問法律 has a place of its own ("dedicated place for Law AI"): the round action button beside the tab bar, lit while open; and it must be fast: the verdict and answer stream as written, nothing waits on what can run beside the plan.
 - 10-31 Rulings get an AI of their own, like an article's 白話解釋 ("We need AI tool for rulings as well"): what it decided, why, who it affects, and questions about it, from the ruling's own paragraphs only, each point citing them; not legal advice. A ruling reads like the rest of the app: no justified, letter-spaced text, inside its card's padding.
 - Rulings backfill runs 00:00–06:00 TW nightly; only `rulings.yml` writes that cache.
+- 11-10 Law brings every source in (Jay: "our goal is to have as least plain text and at least need open external source as possible, if we can format it and show it properly in app we do that"): whatever a source holds (a PDF, a council's page, a 議事錄, a recording) is read at build or on the phone and shown formatted in the app (its parts, names, decisions, days), the original only as a fallback link; a raw text dump or a bare link out is the last resort, and a source that can't be brought in is named to Jay.
+- 11-10 Council and 代表會 pages are for looking anything up, like 立法院's, not only what's recent (Jay: "right now it's focused heavily on 最近 unlike legislative yuan that I can basically look up anytime and anything"): every session of the term, every sitting, member, bill and recording, searchable; a long recording gets a short summary of its sitting.
+- 11-10 A recording plays straight from its source and starts within the tap (Jay: the 新竹縣議會 video and 竹北's 錄音 "slow when it can be serve fast").
 
 ### Weather
 - 10-22 Graphs: rain bars by amount, readout in the title line, no hint boxes, a graph never drags the sheet.
