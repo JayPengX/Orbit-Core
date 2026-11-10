@@ -19,7 +19,8 @@ export const TW_ONLY_HOSTS = new Set([
 const RULE_PAGE = /\/(LawQuery|LawCategoryContentList|LawContent)\.aspx$/i;
 
 // The 縣市議會 sites that serve only Taiwan (2026-11-10: the cloud box refused):
-// Orbit Law's nightly build reads their bill lists and 議事錄 through the same door.
+// Orbit Law's nightly build reads their bill lists and 議事錄 through the same door;
+// a 鄉鎮市民代表會's and its town hall's sites the same way.
 export const COUNCIL_HOSTS = new Set([
   'bms.ntp.gov.tw', // 新北市議會's 議案查詢
   'www.ntp.gov.tw', // 新北市議會
@@ -29,7 +30,9 @@ export const COUNCIL_HOSTS = new Set([
   'www.ilcc.gov.tw', // 宜蘭縣議會
   'www.mlcc.gov.tw', // 苗栗縣議會
   'www.mtcc.gov.tw', // 連江縣議會
-  'www.tthcc.gov.tw' // 臺東縣議會
+  'www.tthcc.gov.tw', // 臺東縣議會
+  'www.jbc.gov.tw', // 竹北市民代表會 (the first 鄉鎮市民代表會)
+  'www.chupei.gov.tw' // 竹北市公所
 ]);
 
 // A url of those sites' rule pages, or a council's page: https, no credentials or port.
