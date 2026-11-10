@@ -68,7 +68,7 @@ export const SOURCES = [
 
   // ---- 天氣 ----
   { id: 'cwa', zh: '中央氣象署', group: 'weather', apps: ['weather'], feeds: '鄉鎮預報、測站、警特報', hosts: ['opendata.cwa.gov.tw'], where: ['worker'] },
-  { id: 'cwa-radar', zh: '氣象署雷達降雨預報', group: 'weather', apps: ['weather'], feeds: '接下來一小時的雨', hosts: ['cwaopendata.s3.ap-northeast-1.amazonaws.com'], where: ['cron'], fresh: { job: 'radar', every: 30 * MIN }, steady: true },
+  { id: 'cwa-radar', zh: '氣象署雷達回波', group: 'weather', apps: ['weather'], feeds: '接下來兩小時的雨：何時來、多大、何時停', hosts: ['cwaopendata.s3.ap-northeast-1.amazonaws.com'], where: ['cron'], fresh: { job: 'radar', every: 30 * MIN }, steady: true },
   { id: 'google-weather', zh: 'Google 天氣', group: 'weather', apps: ['weather'], feeds: '逐時預報、體感、紫外線', hosts: ['weather.googleapis.com'], where: ['worker'], quota: 'google-weather' },
   { id: 'google-air', zh: 'Google 空氣品質', group: 'weather', apps: ['weather'], feeds: '空氣品質', hosts: ['airquality.googleapis.com'], where: ['worker'] },
   { id: 'moenv', zh: '環境部', group: 'weather', apps: ['weather', 'law'], feeds: '空品測站與預報', hosts: ['data.moenv.gov.tw'], where: ['worker'] },
