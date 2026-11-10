@@ -1,17 +1,25 @@
 # Publishes Orbit News (JayPengX/Orbit-News) to Cloudflare with this repo's
 # token: that repo has no CLOUDFLARE_API_TOKEN of its own (a secret can't be
 # read back to copy it; Jay 2026-11-10: Cloudflare goes out from Orbit-Core).
-# Every 15 minutes it asks whether News's main has a commit the live site
-# (news/version.json) doesn't, and builds it as News's own deploy.yml would:
-# its tests against this repo's kit, stamped, published with deploy/cf-site.mjs.
-# A commit is tried once (a failure mails once, not every 15 minutes); by
-# hand (workflow_dispatch) it publishes main's tip again whatever was tried.
+# The proxy's news builds start it (builders/news.js newsSite, `auto`) once
+# News's main has a new commit; GitHub's own timer, hourly, is only a spare
+# (it ran hours late or not at all here, 11-10). It asks whether News's main
+# has a commit the live site (news/version.json) doesn't, and builds it as
+# News's own deploy.yml would: its tests against this repo's kit, stamped,
+# published with deploy/cf-site.mjs. A commit is tried once (a failure mails
+# once); by hand (Run workflow, `auto` off) it publishes main's tip again
+# whatever was tried.
 name: Orbit News to Cloudflare
 
 on:
   schedule:
-    - cron: '7,22,37,52 * * * *'
+    - cron: '37 * * * *'
   workflow_dispatch:
+    inputs:
+      auto:
+        description: Publish only a commit not live and not tried yet
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -46,10 +54,11 @@ jobs:
           SHA: ${{ steps.news.outputs.sha }}
           LIVE: ${{ steps.news.outputs.live }}
           TRIED: ${{ steps.tried.outputs.cache-hit }}
+          AUTO: ${{ inputs.auto }}
         run: |
           go=false
           if [ -n "$SHA" ]; then
-            if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then go=true
+            if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ "$AUTO" != true ]; then go=true
             elif [ "$SHA" != "$LIVE" ] && [ "$TRIED" != true ]; then go=true; fi
           fi
           echo "go=$go"; echo "sha=$SHA" >> "$GITHUB_OUTPUT"; echo "go=$go" >> "$GITHUB_OUTPUT"

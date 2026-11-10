@@ -29,5 +29,5 @@ export async function paceOf(env, now = Date.now()) {
 export const forgetPace = () => (memo = { at: 0, v: null });
 
 // The builders that run at a pace: none past 1; at 1 only what phones would miss.
-export const KEEP_AT_PACE_1 = new Set(['watch', 'asia', 'cpbl', 'sports', 'news']);
+export const KEEP_AT_PACE_1 = new Set(['watch', 'asia', 'cpbl', 'sports', 'news', 'newsSite']);
 export const builderAllowed = (pace, name) => pace === 0 || (pace === 1 && KEEP_AT_PACE_1.has(name));

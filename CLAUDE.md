@@ -439,9 +439,9 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
 
 - `main` deploys:
   - `deploy.yml`: the proxy and `gemini-relay` (and `orbit-site`);
-  - `deploy-guard.yml`: the guard, only when its files change;
+  - `deploy-guard.yml`: the guard, when its files change;
   - `pages.yml`: the kit and `site/`, to Cloudflare (tests first);
-  - `news-site.yml`: News's site (this repo's token) when its main moved;
+  - `news-site.yml`: News's site (this repo's token), started by `newsSite`;
   - every app repo's deploy workflow: its own site, to Cloudflare.
 - By hand: `build.yml` (a builder now, a check), `tail.yml` (logs),
   `audit.yml` (secret names, the store counted), `zone-speed.yml` (the zone's
