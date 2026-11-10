@@ -2,7 +2,7 @@
 // is told (lean: code picks the facts), what's kept, what's asked again.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newsLines, storyFacts, wordsCards, cardsPath } from '../builders/ai.js';
+import { newsLines, storyFacts, wordsCards, cardsPath, sidesWanted, sideFacts, newsSides } from '../builders/ai.js';
 import { gameFacts, swings } from '../builders/recaps.js';
 
 const memStore = (seed = {}) => {
@@ -38,6 +38,27 @@ test('news: each story once, its outlets’ headlines lean, again when coverage 
   assert.deepEqual(Object.keys(lines).sort(), ['a', 'b'], 'a story gone from the front is dropped');
   assert.equal(lines.a.line, '新聞 a');
   assert.equal(seen.length, 1);
+});
+
+test('news sides: only stories sides frame and both ends carry; each side’s headlines, four outlets at most', async () => {
+  const items = [['ltn', '綠一'], ['ltn', '綠一再'], ['setn', '綠二'], ['cna', '中一'], ['udn', '藍一'], ['chinatimes', '藍二'], ['globaltimes', '官媒'], ['newtalk', 'n'], ['peoples', 'p'], ['ftv', 'f']];
+  const s = { id: 'x', m: 9, topics: ['pol'], sides: { g: 5, c: 1, b: 2 }, items };
+  assert.equal(sidesWanted(s, 'tw'), true);
+  assert.equal(sidesWanted({ ...s, topics: ['biz'] }, 'tw'), false, 'a company’s revenue reads the same from both ends');
+  assert.equal(sidesWanted({ ...s, sides: { g: 3, c: 2 } }, 'tw'), false, 'one end silent: nothing to compare');
+  const f = sideFacts(s, 'tw');
+  assert.deepEqual(f.sides.g, ['綠一', '綠二', 'n', 'p'], 'an outlet once, four a side');
+  assert.deepEqual(f.sides.b, ['藍一', '藍二']);
+  assert.ok(!JSON.stringify(f).includes('官媒'), 'state media has no side');
+  const store = memStore({ 'news/index.json': { tw: [s, { ...s, id: 'biz', topics: ['biz'] }], intl: [] } });
+  const env = claudeEnv(() => ({ items: [{ id: 'x', sides: [{ side: 'g', zh: '綠營強調', en: 'Green stress' }, { side: 'b', zh: '藍營強調', en: 'Blue stress' }, { side: 'r', zh: '不在', en: 'absent' }], diff: { zh: '差在 99 人', en: 'differ' } }] }));
+  const r = await newsSides({ store, env, cap: 10, until: Date.now() + 60_000 });
+  assert.equal(r.made, 1);
+  const out = (await store.json('news/sides.json')).sides.x;
+  assert.deepEqual(Object.keys(out.sides), ['g', 'b'], 'a side the story doesn’t have is dropped');
+  assert.equal(out.diff, null, 'a number not in the headlines drops the line');
+  const again = await newsSides({ store, env, cap: 10, until: Date.now() + 60_000 });
+  assert.equal(again.calls, 0, 'told once until coverage doubles and 6 hours pass');
 });
 
 test('words: cards a batch at a time, each letter its own small file, a word that fails twice let go', async () => {

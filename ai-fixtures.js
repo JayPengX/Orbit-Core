@@ -130,6 +130,10 @@ export const EXAMPLES = {
     { name: 'detour', input: { today: '2026-11-10', title: '307路線因道路施工改道', body: '自115年11月12日(三)22時起至11月14日(五)5時止，因忠孝西路施工，307往撫遠街方向改經中山北路行駛，暫停靠臺北車站(忠孝)站、北門站，請改至臺北車站(青島)站搭乘。' } },
     { name: 'stop', input: { today: '2026-11-10', title: '颱風停駛公告', body: '因颱風影響，本公司所有路線今日（11/10）下午4時起停駛，恢復時間另行公告。' } }
   ],
+  'news-sides': [
+    { name: 'taiwan two', input: { stories: [{"id": "1v8c6to", "region": "tw", "sides": {"g": ["蔣萬安要沈伯洋為兒虐道歉！律師喊「1原因」是應該道歉", "兒虐攻防不讓步！蔣萬安再批沈伯洋：不認錯的勇氣是哪來的？", "蔣萬安：接受廖玉蕙道歉、但不知道沈伯洋有啥理由不道歉"], "c": ["沈伯洋兒虐數字「用猜的」拒認錯 蔣萬安怒了：這勇氣哪來的？", "曾為兒虐案、市府不足處致歉 蔣萬安：沈伯洋永不認錯勇氣哪來的？", "兒虐數字「用猜的」遭逼道歉 沈伯洋回擊：該道歉的是蔣萬安", "台北市長選戰／蔣萬安要求沈伯洋為兒虐說道歉 沈：該道歉的是現任市長"], "b": ["合體張善政掃街延三夜市人潮擠爆！蔣萬安喊話沈伯洋：永不認錯的勇氣從哪來？", "沈伯洋指要道歉是他 蔣萬安反批兒虐用猜的「永不認錯勇氣哪來」", "沈伯洋不為猜兒虐數道歉還反嗆 蔣萬安：永不認錯的勇氣哪來的"]}}, {"id": "181cz57", "region": "tw", "sides": {"b": ["遭提案彈劾 赫塞斯強硬反擊"], "c": ["美防長遭自家人彈劾！赫格塞斯轟「鬧劇必敗」：再來一次仍會開戰", "美戰爭部長赫格塞斯遭同黨議員發動彈劾 稱是必敗鬧劇", "美防長赫格塞斯斥自家人彈劾他是「鬧劇」 堅稱伊朗戰爭是正確之舉", "控未經國會授權對伊朗動武 眾議員對赫格塞斯提彈劾案"], "g": ["美防長被同黨議員提彈劾 赫格塞斯：鬧劇終將失敗", "指控赫格塞斯違憲戰爭涉「八大罪」 美共和黨人提案彈劾"]}}] } },
+    { name: 'world', input: { stories: [{"id": "1iag6xn", "region": "intl", "sides": {"r": ["Democrats rally behind GOP lawmaker's Hegseth impeachment push, signal more to come in Jan", "Hegseth ties impeachment efforts against him to attacks on Trump and troops", "Vance: Question of Hegseth Impeachable Crimes 'Absurd'", "Pete Hegseth: Massie's Impeachment Effort Is a 'Political Spectacle,' 'Farce'"], "c": ["Massie Is Giving Over 300 Civilian War Dead a Voice In Hegseth's Impeachment", "Explainer: How would impeaching Pentagon chief Hegseth work?", "Pete Hegseth’s Low-T Tirade Against Impeachment: Dissected", "'It's a farce': Hegseth's defiant response to impeachment effort"], "l": ["Why Pete Hegseth Faces Impeachment", "Vance says Hegseth impeachment vote \"isn't about Iran\"", "As Pete Hegseth faces impeachment vote, a reminder about that military testosterone plan", "Hegseth Calls Massie Impeachment Bid an Attack on Troops"]}}] } }
+  ],
   'news-lines': [
     {
       name: 'two outlets',

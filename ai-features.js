@@ -398,6 +398,46 @@ export const FEATURES = {
     }
   },
 
+  // Orbit News' 各方怎麼說 (built once a story, builders/ai.js newsSides): how
+  // each side's outlets framed it, from their own headlines only, never
+  // which side is right. Sonnet: telling an angle from a fact is judgment.
+  'news-sides': {
+    models: ['sonnet', 'haiku'],
+    timeoutMs: 90_000,
+    maxIn: 9000,
+    parts: ({ stories }) =>
+      text(
+        [
+          'You compare how each side’s news outlets framed the same story, using only the headlines each side gave it. Sides: in Taiwan g = 偏綠 (green-leaning), c = 中間, b = 偏藍 (blue-leaning); for world news l = left-leaning, c = centre, r = right-leaning.',
+          'For each story, for each side it gives (and only those): what that side’s headlines stress or leave out: their angle, who they quote, the words they choose. Not the facts every side shares. zh: ≤ 30 字 in Traditional Chinese (台灣用語); en: ≤ 18 words. Quote a headline’s own word in 「」 where it shows the angle.',
+          'diff: the one difference between the sides that matters most (zh ≤ 40 字, en ≤ 24 words); both "" when the sides frame it the same way.',
+          'Never say which side is right, never call an outlet biased or propaganda, add no adjective of your own about anyone. Every number you write must be in the headlines. Names as the headlines write them.',
+          'Return one item per story with its id.',
+          JSON.stringify(stories)
+        ].join('\n')
+      ),
+    schema: obj({ items: arr(obj({ id: S, sides: arr(obj({ side: S, zh: S, en: S })), diff: obj({ zh: S, en: S }) })) }),
+    clean(raw, { stories }) {
+      const given = new Map(stories.map(s => [s.id, s]));
+      const out = {};
+      for (const it of list(raw?.items, 40)) {
+        const src = given.get(String(it?.id || ''));
+        if (!src) continue;
+        const text = JSON.stringify(src);
+        const sides = {};
+        for (const x of list(it.sides, 3)) {
+          const k = String(x?.side || '');
+          const zh = str(x?.zh, 60), en = str(x?.en, 160);
+          if (src.sides[k]?.length && zh && en && numbersFrom(zh + ' ' + en, text)) sides[k] = { zh, en };
+        }
+        if (Object.keys(sides).length < 2) continue;
+        const dz = str(it.diff?.zh, 80), de = str(it.diff?.en, 200);
+        out[src.id] = { sides, diff: dz && de && numbersFrom(dz + ' ' + de, text) ? { zh: dz, en: de } : null };
+      }
+      return out;
+    }
+  },
+
   // Orbit News: 一句話講清楚 and 國際新聞中文標題, made once a story
   // (builders/news.js), from the outlets' own headlines and summaries only.
   'news-lines': {
