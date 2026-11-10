@@ -61,14 +61,15 @@ export function jsonOf(text) {
 export async function askModel(env, ctx, feature, model, parts, schema, { effort = null, gemini = null, timeoutMs = 30_000 } = {}) {
   let res;
   const t0 = Date.now();
+  const keep = p => (ctx?.waitUntil ? ctx.waitUntil(p) : p);
   if (makerOf(model)) {
     res = await streamOther(model, parts, schema, env, { timeoutMs, firstMs: Math.min(timeoutMs, 20_000), effort });
     if (!res.ok) {
-      ctx?.waitUntil?.(logCall(env, { feature, model, status: res.status, ms: Date.now() - t0 }));
+      await keep(logCall(env, { feature, model, status: res.status, ms: Date.now() - t0 }));
       throw new Error(`${model} ${res.status}`);
     }
     const j = await res.json();
-    ctx?.waitUntil?.(logCall(env, { feature, model, status: 200, usage: j.usageMetadata, ms: Date.now() - t0 }));
+    await keep(logCall(env, { feature, model, status: 200, usage: j.usageMetadata, ms: Date.now() - t0 }));
     if (j?.candidates?.[0]?.finishReason === 'SAFETY') throw new Error(`${model} refused`);
     return jsonOf((j?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join(''));
   }
@@ -162,14 +163,15 @@ async function spendDay(env, name, cap, day) {
 }
 
 // A built-once job (a builder's recap, a title): the day's cap only.
-// → { out, model } or null (capped or failed; the builder tries next round).
+// → { out, model }; null when capped (the builder stops till tomorrow);
+// { error } when no model gave a usable answer (that one is tried again later).
 export async function aiOnce(env, ctx, name, input, cap) {
   if (!FEATURES[name]) return null;
   if (!(await spendDay(env, name, cap, twDay()))) return null;
   try {
     return await runFeature(env, ctx, name, input);
-  } catch {
-    return null;
+  } catch (e) {
+    return { error: String(e?.message || e).slice(0, 200) };
   }
 }
 
