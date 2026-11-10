@@ -526,3 +526,52 @@ test("桃園's site answers a part at a time: a board's stops 12 an ask and the 
   assert.ok(times.length > 1 && times.every(x => x.variables.t.length <= 12));
   assert.ok(log.filter(x => x.query && !x.variables).every(x => x.query.match(/route\(xno/g).length <= 6));
 });
+
+// ---- 臺南's buses: the city's own bus site ------------------------------------------------------
+
+import { tnRows, TN_PATH } from '../transit-free.js';
+const tn = JSON.parse(readFileSync(new URL('./fixtures/tainan-buses.json', import.meta.url), 'utf8'));
+const NOW_TN = Date.parse(tn.at);
+const tnEnv = { DATA: { get: async k => (k === 'bus/Tainan.json' ? { json: async () => tn.pack } : null) }, TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', TDX_PER_MIN: '300' };
+// (臺南's site answered from a real read of route 19 both ways, 2026-11-10; a route it doesn't know: 500, as it does.)
+function tnFetch(log) {
+  return async url => {
+    log.push(url);
+    if (url.includes('tdx.transportdata.tw')) return url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : json([]);
+    const u = new URL(url);
+    if (`${u.origin}${u.pathname}` !== TN_PATH) return assert.fail(`asked ${url}`);
+    const way = tn.ways[`${u.searchParams.get('id')}|${u.searchParams.get('goback')}`];
+    return way ? json(way) : new Response('<html>50x</html>', { status: 500 });
+  };
+}
+const askTn = async (path, qs, fetchFn, now = NOW_TN) => {
+  const res = await handleTransit(new Request(`https://w${path}?${qs}`), tnEnv, {}, path, { session: { s: 'S' }, fetchFn, now, cache: null });
+  return { status: res.status, rows: await res.json() };
+};
+
+test("臺南's way in TDX's words: seconds, the bus coming to each stop (the last one before it), 交管不停靠, its sub-route; the next trip's time is no plate", () => {
+  const rows = tnRows(tn.ways['10019|0'], 'TNN10019', 0, null, NOW_TN);
+  const at = id => rows.find(r => r.StopID === id);
+  assert.deepEqual([at('16077').StopStatus, at('16077').EstimateTime, at('16077').PlateNumb, at('16077').SubRouteUID, at('16077').Direction], [0, 0, 'EAL-2367', 'TNN100190', 0]);
+  assert.equal(at('16084').PlateNumb, 'EAL-2367', 'downstream: the same bus');
+  assert.equal(at('16089').PlateNumb, 'EAL-2561', 'past the next bus: that one');
+  assert.equal(at('16067').StopStatus, 2);
+  assert.equal(at('35512').PlateNumb, undefined, 'before any bus: none');
+  assert.equal(at('16932').PlateNumb, undefined, '16:30 is a time, not a plate');
+  assert.equal(at('16932').SubRouteUID, 'TNN100196');
+});
+
+test("a 臺南 stop's routes the ways it's on from the city's own site, a route both ways, its buses; a route it doesn't know (500): TDX's", async () => {
+  resetFree();
+  const log = [];
+  const a = await askTn('/transit/eta', 'city=Tainan&stops=TNN16077', tnFetch(log));
+  assert.deepEqual(a.rows.map(r => [r.RouteUID, r.Direction, r.EstimateTime, r.PlateNumb]), [['TNN10019', 0, 0, 'EAL-2367']]);
+  assert.deepEqual(log.map(u => new URL(u).searchParams.get('goback')), ['0'], 'only the way it is on');
+  const r = await askTn('/transit/eta', 'city=Tainan&routes=TNN10019,TNN99999', tnFetch(log));
+  assert.equal(r.rows.filter(x => x.RouteUID === 'TNN10019').length, new Set([...tn.ways['10019|0'].data.map(x => `${x.id}|0`), ...tn.ways['10019|1'].data.map(x => `${x.id}|1`)]).size);
+  assert.ok(log.some(u => u.includes('tdx') && u.includes('TNN99999') && !u.includes('TNN10019')), 'TDX for the one it doesn\'t know');
+  const g = await askTn('/transit/gps', 'city=Tainan&routes=TNN10019', tnFetch(log));
+  assert.deepEqual(g.rows.map(b => [b.PlateNumb, b.Direction, b.SubRouteUID]).sort(), [['EAL-2360', 1, 'TNN100191'], ['EAL-2367', 0, 'TNN100190'], ['EAL-2376', 1, 'TNN100197'], ['EAL-2561', 0, 'TNN100190']]);
+  assert.equal(g.rows.find(b => b.PlateNumb === 'EAL-2561').GPSTime, '2026-11-10T14:37:41+08:00');
+  assert.equal(runsInRunner(new Request('https://w/transit/eta?city=Tainan&stops=TNN16077'), '/transit/eta'), true);
+});
