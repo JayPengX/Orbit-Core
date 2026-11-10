@@ -9,7 +9,7 @@
 // here (a few KV reads and writes, no CPU to speak of).
 //
 //   POST   /cal  (Orbit Class's session)  { ics }  → { url }   kept, its address made once
-//   DELETE /cal  (the same)                          → { ok }   the address stops answering
+//   POST   /cal  { off: true } (or DELETE)           → { ok }   the address stops answering
 //   GET    /cal/<token>.ics  (anyone holding the address: the Calendar app)
 //
 // KV: `cal:who:<hash of the pass>` → the token; `cal:<token>` → the calendar,
@@ -45,10 +45,15 @@ export async function handleCal(request, env, headers, session, path) {
   }
   if (request.method !== 'POST') return json({ error: 'method' }, 405, headers);
   const text = await bodyText(request, CAL_MAX + 1000);
-  let ics = null;
+  let body = null;
   try {
-    ics = JSON.parse(text || 'null')?.ics;
+    body = JSON.parse(text || 'null');
   } catch {}
+  if (body?.off === true) {
+    if (token) await Promise.all([kv.delete(`cal:${token}`), kv.delete(whoKey)]);
+    return json({ ok: true }, 200, headers);
+  }
+  const ics = body?.ics;
   if (typeof ics !== 'string' || ics.length > CAL_MAX || !ics.startsWith('BEGIN:VCALENDAR') || !ics.trimEnd().endsWith('END:VCALENDAR')) return json({ error: 'ics' }, 400, headers);
   const t = token || newToken();
   await kv.put(`cal:${t}`, ics, { expirationTtl: CAL_KEEP_S });

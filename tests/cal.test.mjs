@@ -23,7 +23,7 @@ test('a Class session keeps its calendar at one address; the Calendar app reads 
   assert.match(got.headers.get('Content-Type'), /^text\/calendar/);
   assert.match(await got.text(), /X-A:1/);
   // Turned off: the address stops answering.
-  await handleCal(req('DELETE'), env, {}, ses, '/cal');
+  await handleCal(req('POST', { off: true }), env, {}, ses, '/cal');
   assert.equal((await handleCal(new Request(`https://api.test${first.url}`), env, {}, null, first.url)).status, 404);
 });
 
