@@ -38,7 +38,9 @@ const BILL_WORDS = /修法|修正|草案|立法院|立委|三讀|二讀|一讀|�
 // real questions: Claude Sonnet 5.5, the only one with no legal slip) at its
 // effort, and Gemini's Flash when it fails (Flash-Lite after that, geminiAnswer).
 export const ANSWER_MODEL = 'claude-sonnet-5-5';
-export const ANSWER_EFFORT = null;
+// (Measured live 11-10, three questions each: its default 'high' first wrote in 3.7–11.9 s and
+// ended in 9.3–16.5 s; 'medium' 3.4–4.3 s and 9.0–10.3 s, as quick as 'low' and thinking more.)
+export const ANSWER_EFFORT = 'medium';
 export const ANSWER_BACKUP = 'gemini-3.6-flash';
 const CITE = /^([A-Z]\d{7}):(\d{1,4}(?:-\d{1,3})?)$/;
 

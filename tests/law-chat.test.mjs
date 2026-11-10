@@ -551,6 +551,7 @@ test("Sonnet answers, streamed, at its effort; failing or refusing, Gemini's Fla
   assert.deepEqual(calls.map(g => `${g.kind} ${g.model}`), ['plan gemini-3.5-flash-lite', 'answer claude-sonnet-5-5']);
   assert.equal(calls[1].stream, true);
   assert.equal(calls[1].format, 'json_schema');
+  assert.equal(calls[1].effort, 'medium');
   assert.ok(calls[1].prompt.includes('押金不還可以告嗎'));
   for (const trouble of [{ status: 529, refuse: false }, { status: 200, refuse: true }]) {
     claude = trouble;
