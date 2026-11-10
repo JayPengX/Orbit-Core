@@ -1138,8 +1138,8 @@ test("a route's buses' places, had=<s>: a copy here no newer than the phone's is
   const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 'secret', RATE_LIMIT_KV: memKv(), TDX_PER_MIN: '100' };
   const cache = memCache();
   let n = 0;
-  // (台鐵's, 高鐵's and 臺北捷運's own notices pages down: TDX's.)
-  const fetchFn = async url => (url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : /railway\.gov\.tw|thsrc\.com\.tw|metro\.taipei/.test(url) ? new Response('', { status: 503 }) : json([{ PlateNumb: 'KKA-1', GPSTime: `t${n++}` }]));
+  // (台鐵's, 高鐵's, 臺北捷運's and 公路局's own notices pages down: TDX's.)
+  const fetchFn = async url => (url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : /railway\.gov\.tw|thsrc\.com\.tw|metro\.taipei|taiwanbus\.tw/.test(url) ? new Response('', { status: 503 }) : json([{ PlateNumb: 'KKA-1', GPSTime: `t${n++}` }]));
   const gps = encodeURIComponent("basic/v2/Bus/RealTimeByFrequency/City/Hsinchu?$filter=RouteUID eq 'HSZ10' or RouteUID eq 'HSZ20'&$select=RouteUID,PlateNumb,Direction,BusPosition,GPSTime");
   const ask = async (qs, now) => {
     const res = await handleTransit(new Request(`https://w/transit/tdx?${qs}`), env, {}, '/transit/tdx', { session: { s: 'S' }, fetchFn, now, cache });
