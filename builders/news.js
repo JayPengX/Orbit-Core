@@ -195,11 +195,22 @@ const timeOf = s => {
   const t = Date.parse(v);
   return Number.isFinite(t) ? t : null;
 };
-// A picture's address from the feed: its media, enclosure or the first <img>.
+// A picture's address from the feed: its widest media (The Guardian lists
+// 140, 460 and 700), enclosure or the first <img>.
+const widestMedia = block => {
+  let best = '';
+  let most = -1;
+  for (const m of block.matchAll(/<media:(?:content|thumbnail)\b[^>]*>/gi)) {
+    if (/\b(?:medium|type)=["'](?:video|audio)/i.test(m[0])) continue;
+    const url = /\burl=["']([^"']+)["']/i.exec(m[0])?.[1];
+    const w = Number(/\bwidth=["'](\d+)["']/i.exec(m[0])?.[1] || 0);
+    if (url && w > most) (best = url), (most = w);
+  }
+  return best;
+};
 function pictureOf(block) {
   const url =
-    attrOf(block, 'media:content', 'url') ||
-    attrOf(block, 'media:thumbnail', 'url') ||
+    widestMedia(block) ||
     (/<enclosure\b[^>]*type=["']image/i.test(block) ? attrOf(block, 'enclosure', 'url') : '') ||
     tagOf(block, 'image:loc') ||
     /<img\b[^>]*\bsrc=["']([^"']+)["']/i.exec(cdata(block))?.[1] ||
@@ -374,7 +385,8 @@ const ytPicture = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 export const bigPicture = u =>
   String(u || '')
     .replace(/^(https:\/\/attach\.setn\.com\/newsimages\/.+)-XS\.jpg$/, '$1-PH.jpg')
-    .replace(/^(https:\/\/s\.abcnews\.com\/images\/.+)_4x3_384\.jpg$/, '$1_16x9_992.jpg');
+    .replace(/^(https:\/\/s\.abcnews\.com\/images\/.+)_4x3_384\.jpg$/, '$1_16x9_992.jpg')
+    .replace(/^(https:\/\/ichef\.bbci\.co\.uk\/(?:ace\/standard|news))\/240\//, '$1/976/');
 
 // ---- Grouping headlines into stories ----------------------------------------
 
