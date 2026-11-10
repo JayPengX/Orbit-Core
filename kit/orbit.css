@@ -5120,13 +5120,14 @@ html.q-kb .q-kb-docked {
 .q-day-bar .q-day-strip.q-more-after {
   --q-fade-after: 6px;
 }
-/* A wide page (an iPad, a computer): a week of days at most, each about a phone's chip, the
-   📅 right after them, never every day the width could hold (Jay 2026-11-06, Sports on iPad:
-   fifteen at once, "the date has so many to show"). fit() still makes them whole days. */
+/* A wide page (an iPad, a computer): a week of days at most, never every day the width could
+   hold (Jay 2026-11-06, Sports on iPad: fifteen at once, "the date has so many to show"), the
+   week across the page's width with the 📅 at its end, never a phone's row left in a corner of
+   it (Jay 2026-11-10: "fix alignment and date placement to avoid unnecessary empty space").
+   fit() makes the seven share the row. */
 html.q-wide .q-day-bar .q-day-strip {
   --q-day-n: 7;
-  flex: 0 1 auto;
-  width: calc(7 * 84px + 6 * 4px + 12px);
+  flex: 1 1 auto;
 }
 /* Whole chips: dayStrip's fit() sets --q-day-w so a whole number of days fills the row. */
 .q-day-bar .q-day-strip .q-chip.day {

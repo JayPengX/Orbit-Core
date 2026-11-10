@@ -53,7 +53,9 @@ test('a wide page’s day strip holds a week at most', () => {
   const rule = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find(([, s]) => s.trim() === 'html.q-wide .q-day-bar .q-day-strip');
   assert.ok(rule, 'a rule for the strip on q-wide');
   assert.match(rule[2], /--q-day-n:\s*7;/);
-  assert.match(rule[2], /width:\s*calc\(/, 'its width a week of chips, not the page');
+  // (Jay 2026-11-10: the week across the page, not a phone's row in its corner.)
+  assert.match(rule[2], /flex:\s*1 1 auto;/, 'the week fills the row');
+  assert.doesNotMatch(rule[2], /width:\s*calc\(/);
   const ui = readFileSync(new URL('../kit/ui.mjs', import.meta.url), 'utf8');
   assert.match(ui, /getPropertyValue\('--q-day-n'\)/, 'fit() honours it');
 });
