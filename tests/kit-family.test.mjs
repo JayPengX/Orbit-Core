@@ -48,3 +48,9 @@ test('上課勿擾: a notice due in class waits for the break; Class’s and Tra
   assert.equal(classHold('weather', Date.parse('2026-11-12T11:05:00+08:00')), Date.parse('2026-11-12T11:05:00+08:00'), 'a break: on time');
   assert.equal(classHold('stock', inClass, inClass + 60_000), inClass, 'one that can’t wait past its end: on time');
 });
+
+test('planHash: Orbit Transit\'s trip to a place, there by a time', async () => {
+  const { planHash } = await import('../kit/family.mjs');
+  assert.equal(planHash({ lat: 25.11349, lon: 121.533285, name: '天母棒球場' }, Date.parse('2026-11-11T18:05:00+08:00')), `#plan?to=25.113490,121.533285,${encodeURIComponent('天母棒球場')}&by=${encodeURIComponent('2026-11-11T10:05:00.000Z')}`);
+  assert.equal(planHash({ lat: 24.7, lon: 121, name: '家' }), `#plan?to=24.700000,121.000000,${encodeURIComponent('家')}`);
+});

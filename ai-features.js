@@ -115,6 +115,45 @@ export const FEATURES = {
   // Orbit Money: 每月回顧's one suggestion. The figures are the phone's
   // (lib/month.mjs reviewFacts); the AI writes one honest, kind line from
   // them, asked once a month a phone.
+  // Orbit Class: 問我的課表, a question about the person's own timetable
+  // (the editor's AI box: one that's a question, not an edit). The app
+  // writes the next two weeks as held (調課, 單雙週, days off applied); the
+  // AI only reads them. Every time it writes must be one of theirs.
+  'class-ask': {
+    app: 'orbit',
+    tap: true,
+    models: ['haiku', 'luna'],
+    effort: { luna: 'low' },
+    maxIn: 5000,
+    perPass: 40,
+    perMinute: 10,
+    input(raw) {
+      const q = str(raw?.question, 200);
+      const facts = String(raw?.facts || '').slice(0, 4500);
+      if (!q || facts.length < 20) return null;
+      return { q, facts, en: raw?.lang === 'en' };
+    },
+    parts: ({ q, facts, en }) =>
+      text(
+        [
+          'You answer a student’s question about their own school timetable (Taiwan). The facts below are their next two weeks of classes exactly as they will be held: each day, each period’s number, start–end time and subject (swaps, odd/even weeks and days off already applied; a day not listed has no classes).',
+          'Answer only from the facts. A time you write must be one the facts give. Counting periods or days is fine; say which days. If the facts can’t answer it, say so in one line and what they do show.',
+          `Answer in ${en ? 'English' : 'Traditional Chinese (台灣用語)'}: at most 3 short sentences, the answer first, dates as 11/12（週四）, no markdown, no lists.`,
+          'Facts:',
+          facts,
+          `Question: ${q}`
+        ].join('\n')
+      ),
+    schema: obj({ answer: S }),
+    clean: (raw, { facts }) => {
+      const a = str(raw?.answer, 400);
+      // (Times must be the timetable's own; counts and dates the AI may say.)
+      const times = s => String(s).match(/\b\d{1,2}:\d{2}\b/g) || [];
+      const have = new Set(times(facts).map(t => t.padStart(5, '0')));
+      return a && times(a).every(t => have.has(t.padStart(5, '0'))) ? { answer: a } : null;
+    }
+  },
+
   'money-month': {
     app: 'money',
     tap: true,

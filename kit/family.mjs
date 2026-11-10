@@ -12,6 +12,7 @@
 //   classesOn(day)                   Class's periods that day [{ n, name, from, to, out }] (out: outdoors, 體育)
 //   classAt(t), breakAfter(t)        the period on now, when the next break begins
 //   schoolHours(day)                 { from, to } of the first and last period, or null (no school)
+//   planHash(place, at)              Orbit Transit's trip to a place (#plan…), there by `at` when given
 //
 // The facts each app tells (keep this list current):
 //   class.days      { 'YYYY-MM-DD': [{ n, name, from: 'HH:MM', to, out }] } the next two weeks' periods as held
@@ -22,6 +23,7 @@
 //   stock.holds     [{ code, name, market }] what the account holds (names only, never money)
 //   vocab.due       { day, n } words due for review today
 //   transit.trips   [{ name, from: { lat, lon, name }, to: {…} }] saved trips
+//   transit.ride    { id, at, name, fare, modes } the latest planned trip with a fare (Money's 車資記帳)
 //   weather.rain    { at, next: { from, to, mm, word } | null } the next rain at home, by the radar and the hour
 // Places (place.home / place.school / place.work) are the family's, written
 // by whichever app last learned them.
@@ -57,6 +59,13 @@ export function heard(app, key, { maxAge = Infinity, now = Date.now() } = {}) {
 export const heardAt = (app, key) => read()[`${app}.${key}`]?.at ?? null;
 
 const okPlace = p => p && Number.isFinite(+p.lat) && Number.isFinite(+p.lon);
+// A trip in Orbit Transit (its #plan, Transit's lib/links.mjs): from where
+// the phone is to `place`, there by `at` (a moment) when given. Sports'
+// 去球場, Class's 出門時間 open `/transit/` with it (the session's go).
+export function planHash({ lat, lon, name = '' }, at = null) {
+  const by = at != null && Number.isFinite(new Date(at).getTime()) ? `&by=${encodeURIComponent(new Date(at).toISOString())}` : '';
+  return `#plan?to=${Number(lat).toFixed(6)},${Number(lon).toFixed(6)},${encodeURIComponent(String(name))}${by}`;
+}
 export function setPlace(role, place, app = '') {
   if (!['home', 'school', 'work'].includes(role) || !okPlace(place)) return;
   tell('place', role, { lat: +(+place.lat).toFixed(5), lon: +(+place.lon).toFixed(5), name: String(place.name || '').slice(0, 40), from: app });
