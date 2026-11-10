@@ -756,3 +756,111 @@ test("a 台鐵 train's delay from 台鐵's own 車次查詢 (the station it last
   assert.equal(await one('9999'), null, 'no such train: TDX');
   assert.equal(await freeTdx('basic/v3/Rail/TRA/TrainLiveBoard', '', { env, fetchFn, now }), null, 'every train: TDX');
 });
+
+// ---- 公路客運's and the counties' buses: 公路局's site ----------------------------------------
+
+import { tbTime, tbRows, TB_URL } from '../transit-free.js';
+const tb = JSON.parse(readFileSync(new URL('./fixtures/taiwanbus.json', import.meta.url), 'utf8'));
+const NOW_TB = Date.parse(tb.at); // 18:04:30 in Taiwan
+const tbEnv = { DATA: { get: async k => (k === 'bus/InterCity/ways.json' ? { json: async () => tb.ways } : k === 'bus/Keelung.json' ? { json: async () => tb.keelung } : null) }, TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', TDX_PER_MIN: '300' };
+// (公路局's site answered from real reads of 1815 both ways, 1815A going and 基隆 107, 2026-11-10;
+// a sub-route it doesn't know answers []. 新竹's site doesn't know a stop by 臺北車站.)
+function tbFetch(log, { down = false } = {}) {
+  return async url => {
+    if (url.includes('tdx.transportdata.tw')) {
+      log.push(url);
+      return url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : json([]);
+    }
+    if (url.includes('/ibus_gis/')) return log.push('hc'), json({ status: 0 });
+    if (!url.startsWith(TB_URL)) return assert.fail(`asked ${url}`);
+    log.push(url.slice(TB_URL.length));
+    if (down) throw new Error('down');
+    return json(tb.answers[url.slice(TB_URL.length)] || []);
+  };
+}
+const askTb = async (path, qs, fetchFn, now = NOW_TB) => {
+  const res = await handleTransit(new Request(`https://w${path}?${qs}`), tbEnv, {}, path, { session: { s: 'S' }, fetchFn, now, cache: null });
+  return { status: res.status, rows: await res.json() };
+};
+
+test("公路局's times in TDX's words: minutes, hours and minutes, 即將進站, a departure time, 動態發車, its last gone, not today", () => {
+  assert.deepEqual(tbTime('4分', NOW_TB), { StopStatus: 0, EstimateTime: 240 });
+  assert.deepEqual(tbTime('1時5分', NOW_TB), { StopStatus: 0, EstimateTime: 3900 });
+  assert.deepEqual(tbTime('2時', NOW_TB), { StopStatus: 0, EstimateTime: 7200 });
+  assert.deepEqual(tbTime('即將進站', NOW_TB), { StopStatus: 0, EstimateTime: 60 });
+  assert.deepEqual(tbTime('進站中', NOW_TB), { StopStatus: 0, EstimateTime: 0 });
+  assert.deepEqual(tbTime('18:20發車', NOW_TB), { StopStatus: 1, NextBusTime: '2026-11-10T18:20:00+08:00' });
+  assert.deepEqual(tbTime('19:32', NOW_TB), { StopStatus: 1, NextBusTime: '2026-11-10T19:32:00+08:00' });
+  assert.deepEqual(tbTime('動態發車', NOW_TB), { StopStatus: 1 });
+  assert.deepEqual(tbTime('末班車駛離', NOW_TB), { StopStatus: 3 });
+  assert.deepEqual(tbTime('末班資訊', NOW_TB), { StopStatus: 3 });
+  assert.deepEqual(tbTime('今日未營運', NOW_TB), { StopStatus: 4 });
+});
+
+test('a stop on a 公路客運 way: one row, each bus coming to it the soonest first (TDX\'s Estimates)', () => {
+  const rows = tbRows(tb.answers['181501'], 'THB181501', 'THB1815', 0, null, NOW_TB, new Set(['THB292154']));
+  assert.equal(rows.length, 1);
+  const r = rows[0];
+  assert.deepEqual([r.StopUID, r.SubRouteUID, r.Direction, r.StopStatus, r.EstimateTime, r.PlateNumb, r.StopName.Zh_tw], ['THB292154', 'THB181501', 0, 0, 60, 'FAB-918', '自強橋頭']);
+  assert.deepEqual(
+    r.Estimates.map(e => [e.PlateNumb, e.EstimateTime]),
+    [
+      ['FAB-918', 60],
+      ['KKA-1052', 1140],
+      ['829-U5', 1560],
+      ['997-U5', 1920],
+      ['FAB-081', 3060]
+    ]
+  );
+  assert.equal(r.DataTime, '2026-11-10T18:04:19+08:00', "the site's own time");
+});
+
+test("公路客運 stops far from 新竹: 公路局's site, each sub-route through them one way; no TDX", async () => {
+  resetFree();
+  const log = [];
+  const a = await askTb('/transit/eta', 'city=InterCity&stops=THB292154,THB300516', tbFetch(log));
+  assert.equal(a.status, 200);
+  assert.ok(!log.some(x => x.includes?.('tdx.transportdata.tw')), 'no TDX');
+  // (Both on 1815 going and 1815A going, 臺北車站 1815 back's end too: three reads, each once.)
+  assert.deepEqual(log.filter(x => /^\w{6}$/.test(x)).sort(), ['181501', '181502', '1815A1']);
+  const at = (stop, sub) => a.rows.find(r => r.StopUID === stop && r.SubRouteUID === sub);
+  assert.deepEqual([at('THB292154', 'THB181501').EstimateTime, at('THB292154', 'THB181501').RouteName.Zh_tw], [60, '1815']);
+  assert.deepEqual([at('THB300516', 'THB1815A1').StopStatus, at('THB300516', 'THB1815A1').NextBusTime], [1, '2026-11-10T18:20:00+08:00']);
+  // Again within 20 s: no read.
+  log.length = 0;
+  await askTb('/transit/eta', 'city=InterCity&stops=THB292154', tbFetch(log), NOW_TB + 10_000);
+  assert.deepEqual(log.filter(x => /^\w{6}$/.test(x)), []);
+});
+
+test("a 公路客運 route's every stop both ways, and its buses; a sub-route the site doesn't know is left out, a route not in the ways TDX's", async () => {
+  resetFree();
+  const log = [];
+  const e = await askTb('/transit/eta', 'city=InterCity&route=THB1815', tbFetch(log));
+  const subs = new Set(e.rows.map(r => r.SubRouteUID));
+  assert.deepEqual([...subs].sort(), ['THB181501', 'THB181502', 'THB1815A1']);
+  assert.ok(e.rows.filter(r => r.SubRouteUID === 'THB181502').every(r => r.Direction === 1));
+  assert.ok(!log.some(x => x.includes?.('tdx.transportdata.tw')), 'no TDX');
+  log.length = 0;
+  const g = await askTb('/transit/gps', 'city=InterCity&routes=THB1815,THB9999', tbFetch(log));
+  const mine = g.rows.filter(r => r.RouteUID === 'THB1815');
+  assert.equal(mine.length, tb.answers['181501'].cars.length + tb.answers['181502'].cars.length + tb.answers['1815A1'].cars.length);
+  assert.deepEqual([mine[0].SubRouteUID, mine[0].Direction, mine[0].GPSTime], ['THB181501', 0, '2026-11-10T18:04:19+08:00']);
+  assert.ok(log.some(x => x.includes?.('RealTimeByFrequency') && x.includes('THB9999')), 'TDX for the route it has no ways for');
+});
+
+test("a county's buses (基隆 107) from 公路局's site; the site down: its last answer for 2 minutes, then TDX", async () => {
+  resetFree();
+  const log = [];
+  const a = await askTb('/transit/eta', 'city=Keelung&route=KEE0362', tbFetch(log));
+  assert.ok(a.rows.length > 20);
+  assert.deepEqual([a.rows[0].StopUID, a.rows[0].RouteName.Zh_tw, a.rows[0].NextBusTime], ['KEE306361', '107', '2026-11-10T19:30:00+08:00']);
+  assert.ok(!log.some(x => x.includes?.('tdx.transportdata.tw') || x === 'hc'), 'neither TDX nor 新竹');
+  log.length = 0;
+  const later = await askTb('/transit/eta', 'city=Keelung&route=KEE0362', tbFetch(log, { down: true }), NOW_TB + 60_000);
+  assert.equal(later.rows.length, a.rows.length, 'its last answer');
+  assert.ok(!log.some(x => x.includes?.('tdx.transportdata.tw')));
+  log.length = 0;
+  await askTb('/transit/eta', 'city=Keelung&route=KEE0362', tbFetch(log, { down: true }), NOW_TB + 5 * 60_000);
+  assert.ok(log.some(x => x.includes?.('tdx.transportdata.tw')), 'then TDX');
+  assert.equal(runsInRunner(new Request('https://w/transit/eta?city=Keelung&stops=KEE306361'), '/transit/eta'), true);
+});

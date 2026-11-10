@@ -415,18 +415,26 @@ async function bodyText(res) {
 }
 
 // Orbit's pack for a city → { route: Map(uid → name), stop: Map(uid → zh), ways: Map(stopUID@routeUID → [dir…]), sub, routes: Map(stopUID → [routeUID…]), dirs: Map(routeUID → Set(dir)) }.
+// (公路客運's: bus/InterCity/ways.json, every route's ways without their timetables: the
+// phones' packs are by square.) `subs`: each stop's and each route's sub-routes, [[sub, route, dir]…].
 async function cityPack(city, deps) {
   if (!deps.env?.DATA) return null;
   const got = await held(`pack:${city}`, 6 * 3_600_000, 14 * 86_400_000, async () => {
-    const o = await deps.env.DATA.get(`bus/${city}.json`);
+    const o = await deps.env.DATA.get(city === 'InterCity' ? 'bus/InterCity/ways.json' : `bus/${city}.json`);
     if (!o) throw new Error(`no pack ${city}`);
     const j = await o.json();
     const route = new Map();
     const ways = new Map();
     const sub = new Map(); // (a way's id → its route's: GetBusData names a bus's way)
+    const subs = new Map();
+    const addSub = (k, v) => (subs.get(k) || subs.set(k, []).get(k)).push(v);
     for (const r of j.routes || []) {
       route.set(r.uid, r.name);
       for (const [w] of r.ways || []) sub.set(w, r.uid);
+      for (const [w, , dir, stops] of r.ways || []) {
+        addSub(r.uid, [w, r.uid, dir]);
+        for (const st of new Set(stops || [])) addSub(st, [w, r.uid, dir]);
+      }
       for (const [, , dir, stops] of r.ways || []) for (const st of stops || []) {
         const k = `${st}@${r.uid}`;
         const d = ways.get(k) || [];
@@ -442,7 +450,7 @@ async function cityPack(city, deps) {
       if (!routes.has(st)) routes.set(st, []);
       routes.get(st).push(r);
     }
-    return { route, stop, ways, sub, routes, dirs };
+    return { route, stop, ways, sub, routes, dirs, subs };
   }, deps.now);
   return got.val;
 }
@@ -819,8 +827,194 @@ async function tnGps(routes, deps) {
   return { rows, missing, age: Math.max(0, deps.now - oldest) };
 }
 
+// ---- 公路客運's and the counties' buses: 公路局's own site ----------------------------------
+//
+// 公路局's 公路客運乘車資訊服務網 (www.taiwanbus.tw) reads a sub-route one way
+// at a time, no key (Query/ws/getRData.ashx?type=4&key=): each stop's time
+// in its own words, the bus coming to it (its plate) and the way's buses'
+// places (cars). It has every 公路客運 route and the city buses of the
+// counties 公路局 oversees (基隆, 苗栗, 彰化, 南投, 雲林, 嘉義, 屏東, 宜蘭, 花蓮,
+// 臺東, 澎湖; 新竹's too, after its own site), and its ids are TDX's: the key
+// is TDX's SubRouteID (the route's 4, its branch, the way: 1815A1, the code
+// one across the counties), a stop's sid TDX's StopID. Matched TDX stop for
+// stop and bus for bus (1815 both ways, 苗栗 101, 2026-11-10). Read as often
+// as its own page reads (20 s), a few at once; a sub-route it doesn't know
+// answers [] (not asked again for an hour).
+export const TB_CITIES = { InterCity: 'THB', Hsinchu: 'HSZ', HsinchuCounty: 'HSQ', Keelung: 'KEE', MiaoliCounty: 'MIA', ChanghuaCounty: 'CHA', NantouCounty: 'NAN', YunlinCounty: 'YUN', ChiayiCounty: 'CYQ', Chiayi: 'CYI', PingtungCounty: 'PIF', YilanCounty: 'ILA', HualienCounty: 'HUA', TaitungCounty: 'TTT', PenghuCounty: 'PEN' };
+export const TB_URL = 'https://www.taiwanbus.tw/eBUSPage/Query/ws/getRData.ashx?type=4&key=';
+const TB_FRESH = 20_000;
+const TB_KEEP = 2 * MIN;
+const TB_READS = 30; // (an ask's sub-routes and ways, at most: the rest TDX's)
+const TB_AT_ONCE = 6;
+const TB_SUB = /^([A-Z]{3})([0-9A-Z]{4}[0-9A-Z][12])$/;
+
+// '5分', '1時5分', '即將進站', '進站中', '18:20', '18:20發車', '動態發車' (not out yet),
+// '末班車駛離', '末班資訊' (its last gone), '今日未營運' → TDX's StopStatus, EstimateTime, NextBusTime.
+export function tbTime(text, now = Date.now()) {
+  const t = String(text ?? '').trim();
+  const m = t.match(/^(?:(\d+)\s*時)?\s*(?:(\d+)\s*分)?$/);
+  if (m && (m[1] || m[2])) return { StopStatus: 0, EstimateTime: (Number(m[1] || 0) * 60 + Number(m[2] || 0)) * 60 };
+  const go = t.match(/^(\d{1,2}:\d{2})\s*發車$/);
+  if (go) return hcTime(go[1], now);
+  if (/動態發車|尚未發車/.test(t)) return { StopStatus: 1 };
+  return hcTime(t, now);
+}
+
+// A sub-route one way (TDX's SubRouteUID) → { at, val: its answer | null (one it doesn't know) }.
+const tbUnknown = new Map();
+async function tbWay(sub, deps) {
+  const m = TB_SUB.exec(sub);
+  if (!m || deps.now - (tbUnknown.get(sub) ?? -Infinity) < 3_600_000) return { at: deps.now, val: null };
+  const got = await held(`tb:${sub}`, TB_FRESH, TB_KEEP, async () => {
+    const res = await deps.fetchFn(TB_URL + m[2], { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout?.(8000) });
+    if (!res.ok) throw new Error(`taiwanbus ${res.status}`);
+    const text = (await res.text()).replace(/^\uFEFF/, '').trim();
+    const j = text ? JSON.parse(text) : null;
+    if (Array.isArray(j) && !j.length) return null;
+    if (!Array.isArray(j?.data)) throw new Error('taiwanbus: no stops');
+    return j;
+  }, deps.now);
+  if (got.val === null) tbUnknown.set(sub, deps.now);
+  while (tbUnknown.size > 3000) tbUnknown.delete(tbUnknown.keys().next().value);
+  return got;
+}
+// Its answers' time ('17:57:55', Taiwan's) when it's sane, else the read's.
+function tbAt(j, at) {
+  const m = String(j?.time || '').match(/^(\d{1,2}):(\d{2}):(\d{2})$/);
+  if (!m) return at;
+  const tw = new Date(at + 8 * 3_600_000);
+  const t = Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth(), tw.getUTCDate(), +m[1], +m[2], +m[3]) - 8 * 3_600_000;
+  return Math.abs(t - at) < 10 * MIN ? t : at;
+}
+// One way's answer → TDX's ETA rows (`only`: just these stops). A stop is a
+// line for each bus coming to it (the soonest first: TDX's Estimates), else one.
+export function tbRows(j, sub, route, dir, pack, at, only = null) {
+  const pre = sub.slice(0, 3);
+  const name = pack?.route.get(route) || route.slice(3);
+  const t = tbAt(j, at);
+  const byStop = new Map();
+  for (const d of j?.data || []) {
+    const sid = String(d?.sid || '');
+    if (!/^\d+$/.test(sid) || (only && !only.has(pre + sid))) continue;
+    if (!byStop.has(sid)) byStop.set(sid, []);
+    byStop.get(sid).push(d);
+  }
+  const rows = [];
+  for (const [sid, list] of byStop) {
+    const said = list.map(d => ({ d, state: tbTime(d.ptime, at) }));
+    const buses = said.filter(x => x.state.StopStatus === 0).sort((x, y) => x.state.EstimateTime - y.state.EstimateTime);
+    const first = buses[0] || said[0];
+    const state = buses.length ? { ...first.state, PlateNumb: String(first.d.car || ''), Estimates: buses.map(x => ({ PlateNumb: String(x.d.car || ''), EstimateTime: x.state.EstimateTime })) } : first.state;
+    const d = first.d;
+    rows.push({ StopUID: pre + sid, StopID: sid, ...(d.na ? { StopName: { Zh_tw: d.na, En: d.ena || d.na } } : {}), RouteUID: route, RouteID: route.slice(3), SubRouteUID: sub, SubRouteID: sub.slice(3), RouteName: { Zh_tw: name, En: name }, Direction: dir, ...state, DataTime: twNow(t) });
+  }
+  return rows;
+}
+// Ways to read ([[sub, route, dir]…]) → Map(sub → { at, val }), a few at once.
+async function tbWays(list, deps) {
+  const out = new Map();
+  const todo = [...new Map(list.map(w => [w[0], w])).values()];
+  for (let i = 0; i < todo.length; i += TB_AT_ONCE) {
+    const got = await Promise.all(todo.slice(i, i + TB_AT_ONCE).map(([sub]) => tbWay(sub, deps).catch(() => null)));
+    got.forEach((g, k) => g?.val && out.set(todo[i + k][0], g));
+  }
+  return out;
+}
+
+async function tbEta(city, { stops, routes }, deps) {
+  const rows = [];
+  const missing = { stops: [], routes: [] };
+  let oldest = deps.now;
+  const pack = await cityPack(city, deps).catch(() => null);
+  if (!pack) return { rows, missing: { stops, routes }, age: 0 };
+  const pre = TB_CITIES[city];
+  // (Each stop's ways, the soonest asked first; past TB_READS, TDX's.)
+  const want = [];
+  const wayOf = new Map(); // stop → its ways' subs
+  for (const u of stops) {
+    const w = String(u).startsWith(pre) ? pack.subs.get(u) || [] : [];
+    if (!w.length || want.length + w.length > TB_READS) {
+      missing.stops.push(u);
+      continue;
+    }
+    want.push(...w);
+    wayOf.set(u, w.map(x => x[0]));
+  }
+  for (const u of routes) {
+    const w = String(u).startsWith(pre) ? pack.subs.get(u) || [] : [];
+    if (!w.length || want.length + w.length > TB_READS) {
+      missing.routes.push(u);
+      continue;
+    }
+    want.push(...w);
+    wayOf.set(u, w.map(x => x[0]));
+  }
+  const got = await tbWays(want, deps);
+  const info = new Map(want.map(w => [w[0], w]));
+  const only = new Set(stops);
+  const asked = new Set();
+  for (const [u, subs] of wayOf) {
+    const isStop = only.has(u);
+    const have = subs.filter(x => got.has(x));
+    if (!have.length) {
+      (isStop ? missing.stops : missing.routes).push(u);
+      continue;
+    }
+    for (const x of have) {
+      const key = `${x}|${isStop ? 's' : 'r'}`;
+      if (asked.has(key)) continue;
+      asked.add(key);
+      const [, route, dir] = info.get(x);
+      const g = got.get(x);
+      rows.push(...tbRows(g.val, x, route, dir, pack, g.at, isStop ? only : null));
+      oldest = Math.min(oldest, g.at);
+    }
+  }
+  // (A stop asked and on a route asked: once.)
+  const seen = new Set();
+  const out = rows.filter(r => {
+    const k = `${r.StopUID}|${r.SubRouteUID}|${r.Direction}`;
+    return !seen.has(k) && seen.add(k);
+  });
+  return { rows: out, missing, age: Math.max(0, deps.now - oldest) };
+}
+
+async function tbGps(city, routes, deps) {
+  const rows = [];
+  const missing = [];
+  let oldest = deps.now;
+  const pack = await cityPack(city, deps).catch(() => null);
+  if (!pack) return { rows, missing: routes, age: 0 };
+  const want = [];
+  for (const u of routes) {
+    const w = pack.subs.get(u) || [];
+    if (!w.length || want.length + w.length > TB_READS) missing.push(u);
+    else want.push(...w);
+  }
+  const got = await tbWays(want, deps);
+  for (const u of routes.filter(u => !missing.includes(u))) {
+    const ways = want.filter(w => w[1] === u && got.has(w[0]));
+    if (!ways.length) {
+      missing.push(u);
+      continue;
+    }
+    for (const [sub, , dir] of ways) {
+      const g = got.get(sub);
+      const t = tbAt(g.val, g.at);
+      for (const b of g.val.cars || []) {
+        const lat = Number(b?.lat);
+        const lon = Number(b?.lon);
+        if (!b?.car || !(lat > 21.5 && lat < 26.5) || !(lon > 118 && lon < 122.5)) continue;
+        rows.push({ RouteUID: u, SubRouteUID: sub, PlateNumb: String(b.car), Direction: dir, BusPosition: { PositionLat: lat, PositionLon: lon }, GPSTime: twNow(t), Speed: null, Azimuth: null });
+      }
+      oldest = Math.min(oldest, g.at);
+    }
+  }
+  return { rows, missing, age: Math.max(0, deps.now - oldest) };
+}
+
 // The cities whose buses a free source reads (TDX's city names).
-export const FREE_BUS = /^(Hsinchu|HsinchuCounty|InterCity|Taipei|NewTaipei|Taichung|Taoyuan|Tainan)$/;
+export const FREE_BUS = /^(Hsinchu|HsinchuCounty|InterCity|Taipei|NewTaipei|Taichung|Taoyuan|Tainan|Keelung|MiaoliCounty|ChanghuaCounty|NantouCounty|YunlinCounty|ChiayiCounty|Chiayi|PingtungCounty|YilanCounty|HualienCounty|TaitungCounty|PenghuCounty)$/;
 const MAX_STOPS = 30;
 const MAX_ROUTES = 12;
 
@@ -862,6 +1056,15 @@ export async function freeEta(city, { stops = [], routes = [] }, { fetchFn = fet
       oldest = Math.min(oldest, got.at);
     })
   );
+  // (What 新竹's site doesn't know, and the counties': 公路局's.)
+  if (TB_CITIES[city] && (missing.stops.length || missing.routes.length)) {
+    const tb = await tbEta(city, missing, deps).catch(() => null);
+    if (tb) {
+      rows.push(...tb.rows);
+      if (tb.rows.length) oldest = Math.min(oldest, now - tb.age);
+      return { rows, missing: tb.missing, age: Math.max(0, now - oldest) };
+    }
+  }
   return { rows, missing, age: Math.max(0, now - oldest) };
 }
 
@@ -890,6 +1093,14 @@ export async function freeGps(city, routes, { fetchFn = fetch, now = Date.now(),
       oldest = Math.min(oldest, got.at);
     })
   );
+  if (TB_CITIES[city] && missing.length) {
+    const tb = await tbGps(city, missing, deps).catch(() => null);
+    if (tb) {
+      rows.push(...tb.rows);
+      if (tb.rows.length) oldest = Math.min(oldest, now - tb.age);
+      return { rows, missing: tb.missing, age: Math.max(0, now - oldest) };
+    }
+  }
   return { rows, missing, age: Math.max(0, now - oldest) };
 }
 
@@ -1379,4 +1590,4 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), 
 // isolate's 10 ms).
 export const freeHeavy = p => /^((basic|advanced)\/v2\/Bike\/|basic\/v3\/Rail\/TRA\/DailyTrainTimetable\/TrainDate\/)/.test(String(p || '').replace(/^\/+/, ''));
 // (A route's whole list of stops, or its buses, from 新竹's site: read in the Runner too.)
-export const freeRoutesHeavy = (path, q) => (path === '/transit/gps' || (path === '/transit/eta' && (q.get('routes') || q.get('route') || CITY_FEEDS[q.get('city')] || EBUS[q.get('city')] || q.get('city') === 'Tainan'))) && FREE_BUS.test(q.get('city') || '');
+export const freeRoutesHeavy = (path, q) => (path === '/transit/gps' || (path === '/transit/eta' && (q.get('routes') || q.get('route') || CITY_FEEDS[q.get('city')] || EBUS[q.get('city')] || TB_CITIES[q.get('city')] || q.get('city') === 'Tainan'))) && FREE_BUS.test(q.get('city') || '');
