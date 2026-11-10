@@ -12,8 +12,5 @@ preview_urls = false
 [placement]
 region = "gcp:asia-east1"
 
-[limits]
-cpu_ms = 1000
-
 [observability]
 enabled = true
