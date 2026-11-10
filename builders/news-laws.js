@@ -3,7 +3,7 @@
 // so a story's sheet in Orbit News opens the law in Law, or its bill when a
 // headline speaks of changing it (修法, 草案, 三讀…). Code only: a law's
 // full name as written, or the short name the press uses (勞基法). Writes
-// news/laws.json: { built, stories: { id: [{ n, p, k, bill, passed }] },
+// news/laws.json: { built, stories: { id: [{ n, p, k, bill, open, passed }] },
 // bills: { k: [[id, title, at]] } } (the second for Law's bill page).
 
 import { DATA, lawFetch } from '../law.js';
@@ -39,7 +39,7 @@ export function lawNames(items = []) {
   return { re: new RegExp(`(?<![港區])(${[...byName.keys()].sort((a, b) => b.length - a.length).map(esc).join('|')})`, 'g'), byName };
 }
 
-// A story's laws: [{ n, p, k, bill, passed }], those its headlines speak of changing first.
+// A story's laws: [{ n, p, k, bill, open (its versions not yet passed), passed }], those its headlines speak of changing first.
 export function lawsOf(story, names, most = 3) {
   if (!names) return [];
   const found = new Map();
@@ -49,7 +49,7 @@ export function lawsOf(story, names, most = 3) {
     for (const m of s.matchAll(names.re)) {
       const it = names.byName.get(m[1]);
       const was = found.get(it.n);
-      found.set(it.n, { n: it.n, p: it.p, k: it.k, bill: !!(was?.bill || bill), passed: it.passed || '', hits: (was?.hits || 0) + 1 });
+      found.set(it.n, { n: it.n, p: it.p, k: it.k, bill: !!(was?.bill || bill), open: it.open || 0, passed: it.passed || '', hits: (was?.hits || 0) + 1 });
     }
   }
   return [...found.values()]
