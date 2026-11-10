@@ -1339,7 +1339,7 @@ test("on TDX's free tier, past 95% of the month TDX isn't asked: a copy of any a
   await kv.put(`transit:use:${billingMonth(at)}`, JSON.stringify({ 'tdx:b:2026-12-09': 2.9 * 1500 }));
   const old = await tdxGet(env, alert, { fetchFn, cache, now: at + 5 * 3_600_000 });
   assert.deepEqual([old.status, JSON.parse(old.body)[0].n, calls], [200, 1, 1]);
-  const none = await tdxGet(env, 'basic/v2/Bus/Alert/City/Taichung', { fetchFn, cache, now: at + 5 * 3_600_000 });
+  const none = await tdxGet(env, 'basic/v2/Bus/Alert/City/Taipei', { fetchFn, cache, now: at + 5 * 3_600_000 });
   assert.deepEqual([none.status, JSON.parse(none.body).code, calls], [429, 'TDX_BUSY', 1]);
 });
 
