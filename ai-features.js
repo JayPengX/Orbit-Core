@@ -281,7 +281,7 @@ export const FEATURES = {
       text(
         [
           `These are the newest announcements on a Taiwanese school’s website (${school}). Today is ${today}. For each, from its title, unit and the start of its text:`,
-          'who: which of the school’s students it concerns, a list: "all" every student; "1", "2", "3" a grade (高一 / 一年級 / 1xx班 = "1"; 高三, 畢業班, 升學 = "3"); "jh" its 國中部 only; "some" only some (a team, a club, those who signed up, applicants for a scholarship or a contest). [] when it isn’t for students at all: teachers (研習, 甄選, 公開觀課, 會議), staff, bids (招標, 採購), parents only, results lists for the public.',
+          'who: which of the school’s students it concerns, a list: "all" every student; "1", "2", "3" a grade (高一 / 一年級 / 1xx班 = "1"; 高三, 畢業班, 升學 = "3"); "jh" its 國中部 or a 國中 grade (國一–國三, 七–九年級); "some" only some (a team, a club, those who signed up, applicants for a scholarship or a contest). [] when it isn’t for students at all: teachers (研習, 甄選, 公開觀課, 會議), staff, bids (招標, 採購), parents only, results lists for the public.',
           'line: one plain sentence for a student, ≤ 30 字: what happens or what they get, and when. Not the title again: drop 【轉知】, 公告, unit names and the school’s name; say it simply, no filler (請同學留意, 歡迎參加). Every date and number must be one the title or text gives.',
           'act: what they must do, ≤ 10 字 (報名, 繳回條, 上傳學習歷程, 帶…), "" when nothing.',
           'by: the deadline, or the day it happens, as YYYY-MM-DD when the title or text gives one (115年 = 2026; a month and day alone is the coming one), else "".',
