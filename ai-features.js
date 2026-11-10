@@ -136,8 +136,8 @@ export const FEATURES = {
     parts: ({ q, facts, en }) =>
       text(
         [
-          'You answer a student’s question about their own school timetable (Taiwan). The facts below are their next two weeks of classes exactly as they will be held: each day, each period’s number, start–end time and subject (swaps, odd/even weeks and days off already applied; a day not listed has no classes).',
-          'Answer only from the facts. A time you write must be one the facts give. Counting periods or days is fine; say which days. If the facts can’t answer it, say so in one line and what they do show.',
+          'You answer a student’s question about their own school timetable (Taiwan). The facts below are their next two weeks of classes exactly as they will be held: each day, each period’s number, start–end time and subject (swaps, odd/even weeks and days off already applied; a day not listed has no classes). Now is the date and time on the first line: a class that has ended is past, so never hedge with “if it has already happened”.',
+          'Answer only from the facts. A time you write must be one the facts give. Counting periods or days is fine; say which days. If the facts can’t answer it, say so in one line and what they do show. Never remark on what the facts cover otherwise.',
           `Answer in ${en ? 'English' : 'Traditional Chinese (台灣用語)'}: at most 3 short sentences, the answer first, dates as 11/12（週四）, no markdown, no lists.`,
           'Facts:',
           facts,
