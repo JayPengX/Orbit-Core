@@ -3,6 +3,7 @@
 // sources.js counts the proxy's own outside calls and phones' beacons;
 // kit/sources.mjs names the sources and tells a state.
 import { test } from 'node:test';
+import { readFileSync, readdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { fakeD1 } from './fake-d1.mjs';
 import { noteSource, flushSources, readSources, pruneSources, takeBeacon, asSourceCall, _pending, _reset } from '../sources.js';
@@ -107,4 +108,14 @@ test('a state: broken when the last calls failed and nothing worked since; data 
   assert.equal(stateOf(undefined, { at: now - 3 * HOUR, late: lateOf(now - 3 * HOUR, HOUR, now) }, now), 'bad');
   assert.equal(stateOf(undefined, { at: now - 1.5 * HOUR, late: lateOf(now - 1.5 * HOUR, HOUR, now) }, now), 'warn');
   assert.equal(stateOf(undefined, { at: now - 10_000, late: 0 }, now), 'ok');
+});
+
+test('every outside host the Workers name has its source row (a new source: a row in kit/sources.mjs)', () => {
+  const root = new URL('../', import.meta.url);
+  // (News' outlets count as 新聞 by their builder's job; the guard is its own Worker.)
+  const files = [...readdirSync(root).filter(f => f.endsWith('.js') && f !== 'guard.js'), ...readdirSync(new URL('builders/', root)).filter(f => f.endsWith('.js') && f !== 'news.js').map(f => `builders/${f}`)];
+  const missing = new Set();
+  for (const f of files)
+    for (const [, h] of readFileSync(new URL(f, root), 'utf8').matchAll(/https:\/\/([a-z0-9.-]+\.[a-z]{2,})/gi)) if (sourceOf(h).startsWith('host:')) missing.add(`${h} (${f})`);
+  assert.deepEqual([...missing], []);
 });
