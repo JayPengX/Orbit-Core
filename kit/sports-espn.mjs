@@ -175,6 +175,8 @@ export function localSide(league, raw, lang = 'zh') {
   const side = nbaLogo(league, raw);
   if (!side || lang === 'en' || side.athlete) return side;
   const en = side.en || side.name;
+  // A place not filled yet (MLS's "TBD Away", the wild card's winner).
+  if (/^tbd( (away|home))?$/i.test(String(en || '').trim())) return { ...side, en, name: '待定', short: '待定' };
   const zh = teamNameZh(LEAGUES[league]?.play || league, en, LEAGUES[league]?.sport);
   if (zh) return { ...side, en, name: zh.full, short: zh.short };
   // A national side (England, Czechia): its country's name.
@@ -206,6 +208,8 @@ export function knockoutRound(e, comp, league) {
   const cup = Boolean(LEAGUES[league]?.cup);
   // The play-in's two steps: 7 v 8 and 9 v 10, then the 8th seed game.
   if (/play-?in/i.test(`${slug} ${note}`)) return cup ? null : { key: /8th seed/i.test(note) ? 'PLAYIN2' : 'PLAYIN', title: note || 'Play-In', leg: 0, through: [] };
+  const slugged = slugRound(slug);
+  if (slugged) return { key: slugged.key, title: slugged.title, leg: 0, through: (comp?.series?.competitors || []).filter(c => c.winner).map(c => String(c.id)) };
   const post = e?.season?.type === 3 || /post-?season/i.test(slug);
   if (!post && !(cup && slug && !/league-phase|group|regular|qualif|preliminary/i.test(slug))) return null;
   const key = cup ? slug : comp?.type?.abbreviation || slug;
@@ -321,7 +325,7 @@ const ROUNDS = [
   [/\b[an]lwc\b|wild ?card/i, '外卡賽'],
   [/conf(erence)?\.? finals|east finals|west finals|eastern finals|western finals/i, '分區冠軍賽'],
   [/conf(erence)?\.? semi|east semifinals|west semifinals|2nd round|second round/i, '分區準決賽'],
-  [/1st round|first round/i, '首輪'],
+  [/1st round|first round|round one/i, '首輪'],
   [/divisional/i, '分區賽'],
   [/play-?in/i, '附加賽'],
   [/quarter-?finals?/i, '八強'],
@@ -330,6 +334,7 @@ const ROUNDS = [
   [/round of 32/i, '32 強'],
   [/knockout round play-?offs?/i, '淘汰附加賽'],
   [/group stage|league phase|group [a-z]\b/i, '小組賽'],
+  [/^mls cup$/i, 'MLS 盃決賽'],
   [/\bfinal\b/i, '決賽'],
   [/all-?star/i, '明星賽'],
   // The NBA Cup's own words ("NBA Cup - Group Play", "NBA Cup Championship"), before its name alone.
@@ -352,8 +357,25 @@ export function roundName(text, lang = 'zh') {
   return `${side}${hit[1]}${game ? ` G${game}` : ''}${maybe ? '（如需）' : ''}`;
 }
 
+// MLS's play-offs: no season type 3, their round only in the season's slug
+// ("eastern-conference-playoffs---round-one", "mls-cup"): its key in Sports'
+// bracket (lib/playoffs.mjs FORMATS.mls) and a title roundName reads.
+const MLS_ROUNDS = { 'wild-card': ['wildcard', 'Wild Card'], 'round-one': ['round-one', 'Round One'], semifinals: ['conf-semis', 'Semifinals'], final: ['conf-finals', 'Finals'] };
+export function slugRound(slug) {
+  const s = String(slug || '');
+  if (s === 'mls-cup') return { key: 'final', title: 'MLS Cup' };
+  const m = /^(eastern|western)-conference-playoffs-+(.+)$/.exec(s);
+  const r = m && MLS_ROUNDS[m[2]];
+  return r ? { key: r[0], title: `${m[1][0].toUpperCase()}${m[1].slice(1)} Conference ${r[1]}` } : null;
+}
+
 export function stageFrom({ seasonType, seasonSlug = '', typeAbbr = '', note = '', name = '', cup = false } = {}) {
   const text = `${note} ${name}`;
+  const slugged = slugRound(seasonSlug);
+  if (slugged) {
+    const key = slugged.key === 'final' ? 'final' : 'post';
+    return { key, ...STAGES[key], round: { zh: roundName(slugged.title, 'zh'), en: slugged.title }, special: true };
+  }
   let key = '';
   if (/ALLSTAR/i.test(typeAbbr) || /all-?star/i.test(text)) key = 'allstar';
   else if (/play-?in/i.test(text)) key = 'playin';
