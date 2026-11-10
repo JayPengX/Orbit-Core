@@ -247,7 +247,7 @@ export async function tallyTdx(env, path, now = Date.now(), ctx = null, by = '',
   const day = twDay(now);
   const fam = tdxFamily(path);
   const adds = { [`tdx:${kind}:${day}`]: 1, [`tdx:v${kind}:${day}`]: read?.bytes || 0, [`tdx:gz:${day}`]: read?.zipped ? 1 : 0, [`tdx:z:${day}`]: read?.sent || 0, [`tdx:zn:${day}`]: read?.sent ? 1 : 0, [`tdxf:${fam}`]: 1, [`tdxfv:${fam}`]: read?.bytes || 0 };
-  if (by) Object.assign(adds, { [`${by}:tdx:${kind}:${day}`]: 1, [`${by}:tdx:v${kind}:${day}`]: read?.bytes || 0, [`${by}:tdxf:${fam}`]: 1 });
+  if (by) Object.assign(adds, { [`${by}:tdx:${kind}:${day}`]: 1, [`${by}:tdx:v${kind}:${day}`]: read?.bytes || 0, [`${by}:tdxf:${fam}`]: 1, [`${by}:tdxfv:${fam}`]: read?.bytes || 0 });
   await meterAdd(env, adds, now, ctx, true);
 }
 // Our own tools (the dev door: previews, screenshots, the layout check each

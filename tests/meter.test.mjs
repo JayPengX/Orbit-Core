@@ -35,6 +35,7 @@ test('two isolates counting at once both count: each adds in D1, never writes th
     [`tdx:vb:${DAY}`]: 3000,
     // (The month's by TDX's API: what still reads TDX.)
     'dev:tdxf:Bus/EstimatedTimeOfArrival/NearBy': 2,
+    'dev:tdxfv:Bus/EstimatedTimeOfArrival/NearBy': 1000,
     'tdxf:Bus/EstimatedTimeOfArrival/NearBy': 2,
     'tdxf:Bus/Route/Hsinchu': 3,
     'tdxfv:Bus/EstimatedTimeOfArrival/NearBy': 1000,
