@@ -215,6 +215,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 ### Weather
 - 10-22 Graphs: rain bars by amount, readout in the title line, no hint boxes, a graph never drags the sheet.
 - 10-22 Typhoon day-off chance: one number per county, the % is the only indicator (no accuracy shown), the official word wins; hidden under 5%.
+- 11-10 Rain coming is said so anyone gets it (Jay: "3mm I don't know how much that is", the pill "not so obvious", "the coverage is like the whole 竹北市?"): how hard in everyday words (毛毛雨, 小雨, 中雨, 大雨, 豪大雨, kit `rain-now.mjs`), never millimetres; when it starts and stops as clock times; what to do; how far it reaches (~1.5 km). Only rain the radar really sees, tracked as it moves (`weather-radar.js`), never CWA's hour-sum forecast alone (it said rain over 竹北 with no echo near). The sky card, the hours, 降雨 and the notice say the same.
 
 ### Securities
 - 10-21 List every securities product a person in Taiwan can legally buy; 10-23: with its real rules, applications and restrictions, however annoying (kit `stock-access.mjs` gates + the app's 開戶與交易資格 sheet, live).

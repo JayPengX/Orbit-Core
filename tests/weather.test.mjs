@@ -537,6 +537,10 @@ test('the rain alert answers only when the next 2 hours turn wet', async () => {
   const alert = await weatherCheck(e, { lat: 25.034, lon: 121.565, kind: 'rain' }, { fetchFn: upstream(), now: at });
   assert.equal(alert.title, '{title} · 13:00');
   assert.match(alert.body, /^降雨機率 75%/);
+  // A fresh radar frame with nothing coming for two hours: the wet hour within the hour waits (Jay 2026-11-10).
+  const still = btoa(String.fromCharCode(...new Uint8Array(2 * 14 * 18)));
+  const DATA = { get: async (k, o) => ({ customMetadata: { at: String(at - 10 * 60_000), motion: still }, arrayBuffer: async () => new ArrayBuffer(o.range.length) }) };
+  assert.equal(await weatherCheck({ ...e, DATA }, { lat: 25.034, lon: 121.565, kind: 'rain' }, { fetchFn: upstream(), now: at }), null);
   const brief = await weatherCheck(e, { lat: 25.034, lon: 121.565, kind: 'brief' }, { fetchFn: upstream(), now: at });
   assert.match(brief.title, /^\{title\} \d+°/);
 });

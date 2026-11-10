@@ -12,6 +12,7 @@
 //                          [--fresh]  (signed in on a pass someone handed over: the screen that replaces it)
 //                          [--entry '{json}']  (a wallet entry to add: an economy scenario)
 //                          [--clock 2026-10-06T10:05]  (the page's clock, Taipei time)
+//                          [--radar 3 [--radar-in 20] [--radar-for 30]]  (Weather: a shower that hard, mm an hour, coming on the radar)
 //                          [--snap '{json}']  (the wallet's snap to start with)
 //                          [--fixture 'text-in-url=file.json']  (repeatable: that saved answer
 //                          for any upstream URL containing the text, e.g. when Yahoo rate-limits;
@@ -143,6 +144,21 @@ for (let f = opt('fixture', ''); f; f = opt('fixture', '')) {
   // (Split at the last '=': the text can be a URL's own, 'dates=20261017'.)
   const i = f.lastIndexOf('=');
   fixtures.push([f.slice(0, i), resolve(f.slice(i + 1))]);
+}
+// --radar mm/h: Orbit Weather's radar sees a shower that hard coming (radarFake, put on /weather's answers).
+const radarMmh = Number(opt('radar', '')) || 0;
+const radarIn = Number(opt('radar-in', '20'));
+const radarFor = Number(opt('radar-for', '30'));
+const radarStart = Date.now();
+// The radar a /weather answer carries (weather-radar.js radarAt's shape), on the page's clock:
+// a frame 10 minutes old, the shower here `inMin` minutes from now for `forMin`.
+function radarFake(mmh, inMin, forMin) {
+  const now = (clockAt ? clockTime(clockAt).getTime() : radarStart) + (Date.now() - radarStart);
+  const at = Math.floor(now / 600_000) * 600_000 - 600_000;
+  const from = Math.round((now + inMin * 60_000 - at) / 300_000);
+  const rate = Array.from({ length: 25 }, (_, i) => (i >= from && i < from + Math.round(forMin / 5) ? (i === from || i === from + Math.round(forMin / 5) - 1 ? Math.round(mmh * 5) / 10 : mmh) : 0));
+  const mm = Math.round(rate.slice(0, 12).reduce((a, v) => a + v, 0) * (5 / 6)) / 10;
+  return { at, step: 5, rate, moving: true, mm, near: mm };
 }
 // --clock ISO: the page's time starts then (Taipei time, or the zone it names) (and runs on): a live session made up with --fixture, say.
 const clockAt = opt('clock', '');
@@ -669,6 +685,8 @@ await context.addInitScript(
 // for the run.
 const weatherKv = new Map();
 const weatherEnv = { GOOGLE_WEATHER_KEY: 'preview', CWA_KEY: 'preview', MOENV_KEY: 'preview', RATE_LIMIT_KV: { get: async k => weatherKv.get(k) ?? null, put: async (k, v) => void weatherKv.set(k, v) } };
+// --radar <mm an hour>: a shower that hard on the radar, here in ~20 minutes for ~30
+// (--radar-in, --radar-for: minutes), put on each /weather answer (radarFake).
 const weatherFetch = weatherFixtures();
 const curlText = url => new Promise(resolve => execFile('curl', ['-s', '-m', '20', url], (err, stdout) => resolve(err ? '' : stdout)));
 await context.route(live ? /^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/push/ : /^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(weather|push)/, async route => {
@@ -679,7 +697,19 @@ await context.route(live ? /^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.d
   if (u.pathname.startsWith('/push')) return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: u.pathname === '/push/key' ? '{"key":"BJAq2pf1eAmgD3fRzfyXE5dXeDlg2qUZDyIzQ-1SHCNkWr3UQvUtaHgtZ1eQPMl00SAGgejtNE5jkRQCS2Zi6lE"}' : '{"ok":true}' });
   const fetchFn = async (url, init) => (url.includes('api.nlsc.gov.tw') ? { ok: true, status: 200, text: async () => curlText(url) } : weatherFetch(url, init));
   const res = await handleWeather(new Request(req.url()), weatherEnv, cors, u.pathname, { session: { s: 'preview' }, fetchFn, cf: { latitude: '25.0478', longitude: '121.5319', city: 'Taipei' }, cache: null });
-  await route.fulfill({ status: res.status, contentType: 'application/json', headers: cors, body: await res.text() });
+  let body = await res.text();
+  if (radarMmh && u.pathname === '/weather')
+    body = body
+      .split('\n')
+      .map(line => {
+        try {
+          return JSON.stringify({ ...JSON.parse(line), radar: radarFake(radarMmh, radarIn, radarFor) });
+        } catch {
+          return line;
+        }
+      })
+      .join('\n');
+  await route.fulfill({ status: res.status, contentType: 'application/json', headers: cors, body });
 });
 // Orbit Transit's routes (see the top): transit.js on the made-up TDX answers;
 // or, with the real keys in Orbit-Core/.env (git-ignored; TDX_CLIENT_ID,

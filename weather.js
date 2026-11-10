@@ -48,6 +48,7 @@
 import { radarAt } from './weather-radar.js';
 import { STATIONS } from './weather-stations.js';
 import { twDay } from './kit/format.mjs';
+import { rainNow, rainWord } from './kit/rain-now.mjs';
 import { COUNTIES, readTyphoon, readDgpa, readSeatRain, dayOffFor, closuresFor, tradeClosed, stampSeen } from './typhoon.js';
 import { lineAnswer } from './http.js';
 
@@ -1122,10 +1123,22 @@ export function briefText(resp, now) {
 }
 
 // A notice's check (push.js): { weather: { lat, lon, kind: 'brief' | 'rain' } }.
-// 'brief' answers at once; 'rain' answers only when the next 2 hours reach
-// RAIN_ALERT (else null: push.js asks again in 15 minutes, until `until`).
+// 'brief' answers at once; 'rain' answers only when rain is coming (else
+// null: push.js asks again in 15 minutes, until `until`): first the radar's
+// tracked showers (weather-radar.js, read by the kit's rain-now.mjs as the
+// app reads them: when, how hard in plain words, until when; 小雨 or more,
+// starting within the hour), then an hour of the next 2 at RAIN_ALERT. A wet
+// hour the fresh radar sees nothing of within the hour waits (Jay
+// 2026-11-10: an alert said rain while the page said 晴).
 export const RAIN_ALERT = 60;
-export const RADAR_ALERT_MM = 1;
+export const RADAR_ALERT_MMH = 1;
+export function radarNotice(rain, now, tz) {
+  if (!rain || rain.kind !== 'start' || rain.peak < RADAR_ALERT_MMH || rain.from - now > HOUR) return null;
+  const word = rainWord(rain.peak);
+  const mins = Math.max(5, Math.round((rain.from - now) / (5 * MIN)) * 5);
+  const lasts = rain.to ? `約 ${clockIn(rain.to, tz)} 停（下 ${Math.max(5, Math.round((rain.to - rain.from) / (5 * MIN)) * 5)} 分鐘左右）` : `至少下到 ${clockIn(rain.until, tz)}`;
+  return { title: `{title} · ${clockIn(rain.from, tz)} 起${word.zh}`, body: `約 ${mins} 分鐘後開始，${lasts}，${word.tipZh}。雷達追蹤雨雲，約 1.5 公里內` };
+}
 export async function weatherCheck(env, w, { fetchFn = fetch, now = Date.now() } = {}) {
   const jobs = [];
   const resp = await cellForecast(env, { waitUntil: p => jobs.push(p) }, w.lat, w.lon, { fetchFn, now, freshMs: HOUR });
@@ -1133,14 +1146,15 @@ export async function weatherCheck(env, w, { fetchFn = fetch, now = Date.now() }
     await Promise.all(jobs);
     return briefText(resp, now);
   }
-  const soon = (resp.hours || []).filter(h => h.t + HOUR > now && h.t < now + 2 * HOUR && h.pop != null);
-  const wet = soon.find(h => h.pop >= RAIN_ALERT);
-  // (CWA's radar seeing rain reach the place within the hour: said even when the hours' numbers don't.)
-  const radar = wet ? null : await radarAt(env, w.lat, w.lon, now).catch(() => null);
+  const rain = rainNow(await radarAt(env, w.lat, w.lon, now).catch(() => null), now);
   await Promise.all(jobs);
-  if (!wet && radar?.mm >= RADAR_ALERT_MM) return { title: `{title} · 一小時內`, body: `雷達看到雨正接近，約 ${Math.round(radar.mm)} 毫米，出門記得帶傘`, place: resp.place?.town || '' };
+  const place = resp.place?.town || '';
+  const said = radarNotice(rain, now, resp.tz);
+  if (said) return { ...said, place };
+  const seen = rain?.kind === 'dry' ? Math.min(rain.until, now + HOUR) : rain ? Infinity : now;
+  const wet = (resp.hours || []).find(h => h.t + HOUR > now && h.t < now + 2 * HOUR && h.pop >= RAIN_ALERT && h.t >= seen);
   if (!wet) return null;
-  return { title: `{title} · ${clockIn(Math.max(wet.t, now), resp.tz)}`, body: `降雨機率 ${wet.pop}%，出門記得帶傘`, place: resp.place?.town || '' };
+  return { title: `{title} · ${clockIn(Math.max(wet.t, now), resp.tz)}`, body: `降雨機率 ${wet.pop}%，出門記得帶傘`, place };
 }
 
 // ---- Advice (plan section D; thresholds in one table) ---------------------------
