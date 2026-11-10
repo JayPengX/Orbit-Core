@@ -67,8 +67,8 @@ WEATHER_DEV = "on"
 SPORTS_DEV = "on"
 # The Runner (runner.js): heavy routes and the crons' work in a Durable
 # Object ("on"), or in the Worker as before ("off"; the paid plan's 30 s).
-RUNNER_ROUTES = "off"
-RUNNER_CRONS = "off"
+RUNNER_ROUTES = "on"
+RUNNER_CRONS = "on"
 
 # GEMINI_API_KEY (for /gemini and /nl-edit) and ECO_TOKEN_SECRET
 # (the Pass's sign-ins) are Secrets, not [vars] (the dashboard's Settings ->
