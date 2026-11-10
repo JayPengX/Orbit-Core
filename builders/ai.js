@@ -17,6 +17,7 @@
 // Lean input (Jay 11-10): code picks and trims the facts before any call.
 import { aiOnce } from '../ai.js';
 import { runRecaps } from './recaps.js';
+import { runF1Stories } from './f1story.js';
 
 const NEWS_LINES = 'news/lines.json';
 export const WORDS_CARDS = 'private/ai/words-cards.json';
@@ -118,6 +119,7 @@ export async function runAi({ store, env, proxy, now = Date.now(), cap = async (
   };
   await step('news', 'news-lines', c => newsLines({ store, env, ctx, cap: c, until }));
   await step('sports', 'sports-recap', c => runRecaps({ store, env, ctx, proxy, cap: c, now, until }));
+  await step('f1', 'f1-story', c => runF1Stories({ store, env, ctx, proxy, cap: c, now, until }));
   await step('words', 'words-cards', c => wordsCards({ store, env, ctx, cap: c, until }));
   return out;
 }

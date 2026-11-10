@@ -81,6 +81,10 @@ export const EXAMPLES = {
       input: { words: [{ w: 'able', zh: 'adj. 能夠的' }, { w: 'review', zh: 'v. 複習；檢討' }, { w: 'abandon', zh: 'v. 放棄、拋棄' }, { w: 'opt', zh: 'v. 選擇' }, { w: 'reluctant', zh: 'adj. 不情願的' }, { w: 'ambiguous', zh: 'adj. 模稜兩可的' }] }
     }
   ],
+  'f1-story': [
+    { name: 'brazil 2026, rain to slicks and back', input: { facts: "Grand Prix race: São Paulo Grand Prix, 71 laps, track 22°C.\nResult (place, driver, team, grid slot, stops, tyres and laps on each):\n1 Lando Norris (McLaren), from 1, 3 stops: inter 16, soft 33, soft 13, inter 9\n2 Max Verstappen (Red Bull Racing), from 21, 3 stops: inter 17, soft 28, soft 17, inter 9, +14.602\n3 Isack Hadjar (Red Bull Racing), from 5, 3 stops: inter 16, soft 34, soft 12, inter 9, +24.485\n4 George Russell (Mercedes), from 7, 2 stops: inter 16, soft 45, inter 10, +33.991\n5 Kimi Antonelli (Mercedes), from 2, 3 stops: inter 17, soft 36, soft 9, inter 9, +36.017\n6 Oscar Piastri (McLaren), from 10, 3 stops: inter 16, soft 35, soft 11, inter 9, +56.475\nBiggest climbs: Max Verstappen 21 → 2; Lewis Hamilton 20 → 9; Charles Leclerc 14 → 7\nDropped back: Liam Lawson 3 → 8; Nico Hulkenberg 4 → 10\nLed (laps): Antonelli 1–19, Norris 20–49, Antonelli 50–53, Norris 54–71\nRetired: Lance Stroll (lap 30), Valtteri Bottas (lap 1)\nFastest lap: Kimi Antonelli 1:12.689 on lap 55" } },
+    { name: 'sprint, safety car, no stops', input: { facts: "Sprint: Qatar Grand Prix, 19 laps, track 31°C.\nResult (place, driver, team, grid slot, stops, tyres and laps on each):\n1 Oscar Piastri (McLaren), from 1, 0 stops: medium 19\n2 George Russell (Mercedes), from 3, 0 stops: medium 19, +1.215\n3 Lando Norris (McLaren), from 2, 0 stops: medium 19, +2.904\n4 Max Verstappen (Red Bull Racing), from 6, 0 stops: medium 19, +4.501\n5 Yuki Tsunoda (Red Bull Racing), from 4, 0 stops: medium 19, +6.333\n6 Kimi Antonelli (Mercedes), from 5, 0 stops: medium 19, +7.120\nLed (laps): Piastri 1–19\nRetired: Pierre Gasly (lap 2)\nTrack: lap 2 safety car deployed\nFastest lap: Lando Norris 1:23.120 on lap 17" } }
+  ],
   'sports-recap': [
     {
       name: 'nba late swing',
