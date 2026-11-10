@@ -44,7 +44,7 @@ import { SHOWCASE_ORIGINS } from './showcase.js';
 import { cleanDev } from './kit/devconfig.mjs';
 import { twDay } from './kit/format.mjs';
 import { kvJson, kvPut } from './weather.js';
-import { freeTdx } from './transit-free.js';
+import { freeTdx, freeEta, freeGps } from './transit-free.js';
 
 export const TDX_BASE = 'https://tdx.transportdata.tw/api/';
 export const TDX_AUTH = 'https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token';
@@ -632,6 +632,22 @@ export async function etaRows(env, q, deps = {}) {
   const stops = (q.get('stops') || '').split(',').filter(u => UID.test(u)).slice(0, 400);
   const routes = [...new Set([q.get('route') || '', ...(q.get('routes') || '').split(',')].filter(u => UID.test(u)))].slice(0, 40);
   if (!stops.length && !routes.length) return { status: 400, body: { code: 'BAD_STOPS' } };
+  // (新竹's from 竹塹交通資訊網, no TDX: transit-free.js; what it doesn't know, TDX as before, and its rows beside them.)
+  if (deps.free !== false) {
+    const own = await freeEta(city, { stops, routes }, deps).catch(() => null);
+    if (own) {
+      const { stops: ms, routes: mr } = own.missing;
+      if (!ms.length && !mr.length) return { status: 200, body: own.rows, age: own.age, state: 'free' };
+      if (own.rows.length || ms.length < stops.length || mr.length < routes.length) {
+        const rest = new URLSearchParams({ city, ...(ms.length ? { stops: ms.join(',') } : { routes: mr.join(',') }), ...(q.get('had') ? { had: q.get('had') } : {}) });
+        // (Both kinds missing: the stops' TDX ask, then the routes'.)
+        const tdx = [await etaRows(env, rest, { ...deps, free: false })];
+        if (ms.length && mr.length) tdx.push(await etaRows(env, new URLSearchParams({ city, routes: mr.join(',') }), { ...deps, free: false }));
+        const ok = tdx.filter(t => t.status === 200);
+        return { status: 200, body: [...own.rows, ...ok.flatMap(t => t.body)], age: Math.max(own.age, ...ok.map(t => t.age || 0)), state: 'free' };
+      }
+    }
+  }
   // (`had=<s>`: the phone's copy is that many seconds old, so a copy here no
   // newer is no use to it: TDX is read then (given 3 s, then the copy as
   // before), not that copy answered with a read behind it. A phone asking
@@ -781,6 +797,14 @@ export async function gpsRows(env, q, deps = {}) {
   if (!RUN_CITY.test(city)) return { status: 400, body: { code: 'BAD_CITY' } };
   const routes = [...new Set((q.get('routes') || '').split(',').filter(u => UID.test(u)))].slice(0, 20);
   if (!routes.length) return { status: 400, body: { code: 'BAD_ROUTES' } };
+  if (deps.free !== false) {
+    const own = await freeGps(city, routes, deps).catch(() => null);
+    if (own && own.missing.length < routes.length) {
+      if (!own.missing.length) return { status: 200, body: own.rows, age: own.age, state: 'free' };
+      const rest = await gpsRows(env, new URLSearchParams({ city, routes: own.missing.join(','), ...(q.get('had') ? { had: q.get('had') } : {}) }), { ...deps, free: false });
+      return { status: 200, body: [...own.rows, ...(rest.status === 200 ? rest.body : [])], age: Math.max(own.age, rest.age || 0), state: 'free' };
+    }
+  }
   const had = Number(q.get('had')) || 0;
   const d = had > 0 ? { ...deps, stale: 0, young: Math.max(0, had * 1000 - 1500) } : deps;
   // (公路客運's routes asked together with every other route asked here this minute: the same reads for every phone.)
@@ -1896,13 +1920,13 @@ export async function handleTransit(request, env, headers, path, opts = {}) {
     return new Response(JSON.stringify({ code: 'TRANSIT_FAILED' }), { status: 502, headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8' } });
   }
 }
-async function transitRoute(request, env, headers, path, { session = null, limited = () => false, ctx = null, fetchFn = fetch, cache = globalThis.caches?.default, now = Date.now() } = {}) {
+async function transitRoute(request, env, headers, path, { session = null, limited = () => false, ctx = null, fetchFn = fetch, cache = globalThis.caches?.default, now = Date.now(), free = true } = {}) {
   const send = (data, status = 200, extra = {}) => new Response(typeof data === 'string' ? data : JSON.stringify(data), { status, headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8', ...extra } });
   if (request.method !== 'GET') return send({ code: 'GET_ONLY' }, 405);
   const q = new URL(request.url).searchParams;
   // (Who spends Google's and TDX's counts when it isn't a person: our tools, the showcase's demo.)
   const by = session?.dev ? 'dev' : session?.showcase ? 'show' : '';
-  const deps = { fetchFn, ctx, now, cache, by };
+  const deps = { fetchFn, ctx, now, cache, by, free };
   if (path === '/transit/status') {
     const sample = q.get('sample');
     if (!sample) return send({ month: billingMonth(now), used: await usage(env, now), caps: CAPS, keys: { tdx: Boolean(env.TDX_CLIENT_ID && env.TDX_CLIENT_SECRET), mapsBrowser: Boolean(env.GOOGLE_MAPS_BROWSER_KEY), google: Boolean(googleKey(env)) }, tdxPerMin: Number(env.TDX_PER_MIN) || 5 });
