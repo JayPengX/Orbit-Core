@@ -300,7 +300,22 @@ export async function aiTry(env, ctx, name, { models = [], from = 0, n = 3, gemi
   const examples = (EXAMPLES[name] || []).slice(from, from + Math.min(10, Math.max(1, n)));
   const out = [];
   for (const ex of examples) {
-    const input = f.input ? f.input(ex.input) : ex.input;
+    let given = ex.input;
+    // (A picture by its address: read and sent as the phone sends one.)
+    if (given?.imageUrl) {
+      try {
+        const res = await fetch(given.imageUrl);
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        let bin = '';
+        for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        given = { ...given, image: { mime_type: res.headers.get('Content-Type')?.split(';')[0] || 'image/jpeg', data: btoa(bin) } };
+      } catch {}
+    }
+    const input = f.input ? f.input(given) : given;
+    if (!input) {
+      out.push({ example: ex.name, error: 'input refused' });
+      continue;
+    }
     for (const m of models.length ? models : [null]) {
       const t0 = Date.now();
       try {

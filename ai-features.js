@@ -34,6 +34,35 @@ export function numbersFrom(out, given) {
 // Orbit Beats' grooves (its lib/names.mjs STYLE_NAMES), for beats-say.
 const BEATS_STYLES = "four (4-on-floor, 四拍), hiphop (Hip-hop, 嘻哈), trap (Trap), half (Half-time, 半速), broken (Breakbeat, 碎拍), house (House), dembow (Dembow), afro (Afro), drill (Drill), boombap (Boom Bap), jersey (Jersey), amapiano (Amapiano), lofi (Lo-fi), funk (Funk, 放克), garage (Garage, UK 車庫), dnb (D&B), reggae (Reggae, 雷鬼), phonk (Phonk), baile (Baile), techno (Techno), jazz (Jazz swing, 爵士搖擺), bossa (Bossa nova, 巴薩諾瓦), samba (Samba, 森巴), salsa (Salsa, 騷莎), rock (Rock, 搖滾), punk (Pop-punk, 流行龐克), metal (Metal, 金屬), citypop (City pop, City Pop), kpop (K-pop), synthwave (Synthwave, 合成器浪潮), disco (Disco, 迪斯可), gospel (Gospel, 福音), neosoul (Neo-soul, 新靈魂), ballad (Ballad, 抒情), ambient (Ambient, 氛圍), cinematic (Cinematic, 電影配樂), chiptune (Chiptune, 8-bit), kizomba (Kizomba), highlife (Highlife), cumbia (Cumbia, 昆比亞), bhangra (Bhangra, 班格拉), dubstep (Dubstep), footwork (Footwork), jungle (Jungle, 叢林), trance (Trance), hardstyle (Hardstyle), chinese (Chinese, 中國風), blues (Blues, 藍調), country (Country, 鄉村)";
 const BEATS_IDS = BEATS_STYLES.split(', ').map(x => x.split(' (')[0]);
+
+// 拍聯絡簿's items made safe: a kind, a subject only from the person's own
+// list (a short name matched: 數 → 數學), a due day from yesterday to five
+// months ahead, 24 at most, none twice.
+export function cleanBook(raw, { today, subjects = [] }) {
+  const t0 = Date.parse(`${today}T00:00:00Z`);
+  const near = d => DAY.test(d) && Date.parse(`${d}T00:00:00Z`) >= t0 - 86_400_000 && Date.parse(`${d}T00:00:00Z`) <= t0 + 150 * 86_400_000;
+  const subjectOf = v => {
+    const s = str(v, 16);
+    if (!s || !subjects.length) return subjects.length ? '' : s;
+    return subjects.find(x => x === s) || subjects.find(x => x.startsWith(s) || s.startsWith(x)) || subjects.find(x => x.includes(s) || s.includes(x)) || '';
+  };
+  const seen = new Set();
+  const items = [];
+  for (const x of list(raw?.items, 40)) {
+    const text = str(x?.text, 60);
+    if (!text) continue;
+    const subject = subjectOf(x?.subject);
+    const kind = ['test', 'hw', 'bring', 'do'].includes(x?.kind) ? x.kind : 'do';
+    const k = `${subject}|${text}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const due = near(x?.due) ? x.due : '';
+    items.push({ kind, subject, text, due, next: !due && x?.next === true });
+    if (items.length >= 24) break;
+  }
+  return { items };
+}
+
 export const FEATURES = {
   // Orbit Money: 用說的記帳, the sentences the app's own parser couldn't
   // read ("跟同學吃火鍋花了三百五"). Entries for the person to look over, as 拍照記帳's.
@@ -154,6 +183,136 @@ export const FEATURES = {
       const times = s => String(s).match(/\b\d{1,2}:\d{2}\b/g) || [];
       const have = new Set(times(facts).map(t => t.padStart(5, '0')));
       return a && times(a).every(t => have.has(t.padStart(5, '0'))) ? { answer: a } : null;
+    }
+  },
+
+  // Orbit Class: 拍聯絡簿變待辦. A photo of the 聯絡簿, the board or a teacher's
+  // note: each thing to do, its subject (one of the person's own), what, and
+  // when it's due as the note says it. Code does the rest on the phone: a
+  // "下次上課" or an undated one lands on that subject's next class (the
+  // timetable as held), and everything is looked over before it's kept.
+  'class-book': {
+    app: 'orbit',
+    tap: true,
+    models: ['flash', 'lite'],
+    effort: 'low',
+    timeoutMs: 40_000,
+    maxIn: 3000,
+    perPass: 20,
+    perMinute: 4,
+    input(raw) {
+      const data = typeof raw?.image?.data === 'string' ? raw.image.data : '';
+      const mime = /^image\/(jpeg|png|webp)$/.test(raw?.image?.mime_type || '') ? raw.image.mime_type : '';
+      const today = DAY.test(raw?.today) ? raw.today : '';
+      if (!mime || !today || data.length < 1000 || data.length > 2_400_000 || /[^A-Za-z0-9+/=]/.test(data.slice(0, 2000))) return null;
+      const subjects = [...new Set(list(raw?.subjects, 40).map(s => str(s, 16)).filter(Boolean))];
+      return { data, mime, today, subjects, en: raw?.lang === 'en' };
+    },
+    parts: ({ data, mime, today, subjects }) => [
+      {
+        text: [
+          'This is a photo of a Taiwanese student’s 聯絡簿 (contact book), the class board, or a teacher’s note of what to do.',
+          'List each thing the student must do, hand in, prepare or be tested on, one item each:',
+          'kind: "test" a quiz or exam (小考, 考試, 段考, 默寫, 聽寫, 抽背); "hw" homework to hand in (作業, 習作, 學習單, 講義, 訂正, 心得, 報告); "bring" something to bring or pay (帶…, 繳費, 回條); "do" anything else (簽名, 報名, 練習, 背…).',
+          subjects.length ? `subject: the subject it belongs to, written exactly as one of theirs: ${subjects.join('、')}. Match short names (數 → 數學, 英 → 英文). "" when the note doesn't say or none fits.` : 'subject: the subject as the note writes it, "" when it doesn’t say.',
+          'text: what to do, short (≤ 24 字), the note’s own words without the subject or the date (數學習作 p.32-35 明天交 → "習作 p.32-35").',
+          `due: the day it is due or held, YYYY-MM-DD, only from what the note says (明天, 下週二, 11/14, 週五…). Today is ${today} (${'日一二三四五六'[new Date(`${today}T12:00:00Z`).getUTCDay()]}); a weekday alone is the next one after today; 下週 is next week’s (weeks start on Monday). A date heading a day’s entries is when they were written, not a due date. "" when it isn’t said.`,
+          'next: true when it says next class (下次上課, 下堂課, 下次交) and gives no date; else false.',
+          'Only what is written: never add a task. A crossed-out or ticked-off line is done: skip it. No tasks: an empty list.'
+        ].join('\n')
+      },
+      { inlineData: { mimeType: mime, data } }
+    ],
+    schema: obj({ items: arr(obj({ kind: { type: 'string', enum: ['test', 'hw', 'bring', 'do'] }, subject: S, text: S, due: S, next: B })) }),
+    clean: (raw, input) => cleanBook(raw, input)
+  },
+
+  // Orbit Class: 考前讀書計畫. Code plans the time (which days, how many
+  // sessions a subject gets, the last one the day before its exam: the
+  // phone's plan.js); this writes only what to do in each session, from the
+  // scope the student typed. A chapter or lesson it names is one of theirs.
+  'class-plan': {
+    app: 'orbit',
+    tap: true,
+    models: ['haiku', 'luna'],
+    effort: { luna: 'low' },
+    maxIn: 4000,
+    perPass: 20,
+    perMinute: 6,
+    input(raw) {
+      const today = DAY.test(raw?.today) ? raw.today : '';
+      const subjects = list(raw?.subjects, 12)
+        .map(s => ({ name: str(s?.name, 16), scope: str(s?.scope, 120), n: Math.max(1, Math.min(14, Math.round(Number(s?.n) || 0))), exam: DAY.test(s?.exam) ? s.exam : '', weak: s?.weak === true }))
+        .filter(s => s.name && s.exam);
+      if (!today || !subjects.length) return null;
+      return { today, exam: str(raw?.exam, 30), subjects, en: raw?.lang === 'en' };
+    },
+    parts: ({ today, exam, subjects, en }) =>
+      text(
+        [
+          `A Taiwanese high-school student is preparing for ${exam || 'an exam'}. Today is ${today}. Their study time is already planned: each subject below has n sessions of about 30–50 minutes, in order, the last one on the day before that subject’s exam.`,
+          'For each subject write exactly n tasks, in order: what to do in that session, concrete and short (≤ 22 字): which part of the scope, and how (讀課文畫重點、整理筆記、做習作／講義、寫考古題、背單字、訂正錯題…).',
+          'Spread the scope evenly, in its own order, over the sessions before the last. The last session is a whole review (總複習: 錯題、重點、計時寫一回). A subject marked weak gets more practice than reading.',
+          'With no scope, plan sensible kinds of work for that subject without naming chapters. Name only chapters, lessons, units or pages the scope gives; never invent a number.',
+          `Write in ${en ? 'English' : 'Traditional Chinese (台灣用語)'}, no markdown.`,
+          ...subjects.map(s => `- ${s.name}: n ${s.n}, exam ${s.exam}${s.weak ? ', weak' : ''}, scope: ${s.scope || '(none)'}`)
+        ].join('\n')
+      ),
+    schema: obj({ plans: arr(obj({ subject: S, tasks: arr(S) })) }),
+    clean(raw, { subjects }) {
+      const out = {};
+      for (const s of subjects) {
+        const p = list(raw?.plans, 20).find(x => str(x?.subject, 16) === s.name);
+        if (!p) continue;
+        // (Every number a task names is its scope's: a chapter, a lesson, a page.)
+        const tasks = list(p.tasks, s.n).map(t => str(t, 44)).map(t => (t && numbersFrom(t, s.scope) ? t : ''));
+        if (tasks.filter(Boolean).length >= Math.ceil(s.n / 2)) out[s.name] = tasks;
+      }
+      return Object.keys(out).length ? { plans: out } : null;
+    }
+  },
+
+  // Orbit Class: 學校公告摘要, built once per school an hour (class-news.js):
+  // code reads the school's own list; this words each new title for a
+  // student: one line, which students it's for, what to do, by when. Every
+  // number and date it writes is the title's.
+  'class-news': {
+    models: ['haiku', 'luna'],
+    effort: { luna: 'low' },
+    timeoutMs: 60_000,
+    maxIn: 12_000,
+    parts: ({ school, today, items }) =>
+      text(
+        [
+          `These are the newest announcements on a Taiwanese school’s website (${school}). Today is ${today}. For each, from its title, unit and the start of its text:`,
+          'who: which of the school’s students it concerns, a list: "all" every student; "1", "2", "3" a grade (高一 / 一年級 / 1xx班 = "1"; 高三, 畢業班, 升學 = "3"); "jh" its 國中部 only; "some" only some (a team, a club, those who signed up, applicants for a scholarship or a contest). [] when it isn’t for students at all: teachers (研習, 甄選, 公開觀課, 會議), staff, bids (招標, 採購), parents only, results lists for the public.',
+          'line: one plain sentence for a student, ≤ 30 字: what happens or what they get, and when. Not the title again: drop 【轉知】, 公告, unit names and the school’s name; say it simply. Every date and number must be one the title or text gives.',
+          'act: what they must do, ≤ 10 字 (報名, 繳回條, 上傳學習歷程, 帶…), "" when nothing.',
+          'by: the deadline, or the day it happens, as YYYY-MM-DD when the title or text gives one (115年 = 2026; a month and day alone is the coming one), else "".',
+          'Return one item per announcement with its id.',
+          JSON.stringify(items.map(it => ({ id: it.id, title: it.title, unit: it.unit || it.kind || '', text: (it.desc || '').slice(0, 160) })))
+        ].join('\n')
+      ),
+    schema: obj({ items: arr(obj({ id: S, who: arr({ type: 'string', enum: ['all', '1', '2', '3', 'jh', 'some'] }), line: S, act: S, by: S })) }),
+    clean(raw, { items }) {
+      const given = new Map(items.map(it => [it.id, it]));
+      const out = {};
+      for (const x of list(raw?.items, 60)) {
+        const it = given.get(String(x?.id || ''));
+        if (!it) continue;
+        const src = `${it.title} ${it.desc || ''} ${it.date}`;
+        const line = str(x.line, 60);
+        const by = DAY.test(x.by) ? x.by : '';
+        // (A date written 11/20 or 115年11月20日 is its own numbers; the deadline's month and day must be in the source.)
+        const byOk = by && (by === it.date || [String(+by.slice(5, 7)), String(+by.slice(8, 10))].every(n => nums(src).includes(n)));
+        out[it.id] = {
+          line: line && numbersFrom(line, `${src} ${byOk ? by : ''}`) ? line : '',
+          who: [...new Set(list(x.who, 6).filter(w => ['all', '1', '2', '3', 'jh', 'some'].includes(w)))],
+          act: str(x.act, 20),
+          by: byOk ? by : ''
+        };
+      }
+      return Object.keys(out).length ? out : null;
     }
   },
 

@@ -111,7 +111,7 @@ modules for modulepreload. `node kit/apps.mjs` refreshes every app's snippets;
 | `orbit.mjs` | The core: the session, data reads and device storage (§5), the economy's tables, looks and milestones, notices, the frame (`tabBar`, `topActions`, `accountButton`, `ask`/`tell`), screens, fitting, live beats and break countdowns, recommendations (`rank`, `affinity`), the 除錯紀錄 (`rec`); on import it stops pinch zoom, lifts sheets over the keyboard (`watchKeyboard`), holds the lift for pictures, presses only when pressed; `switchGlide` |
 | `orbit.css` | The design system: iOS 27's tokens (colour, type, space, radius, Liquid Glass, springs) and every `q-` component; the apps' accents (`tools/accent-css.mjs`); at its end Orbit's own look (`data-look="native"`, DESIGN §11) |
 | `ui.mjs` | The builders (§3.3) and their HTML-string twins (`…Html`) for apps that draw with template strings; loads `hold-place.mjs` |
-| `hold-place.mjs` | A redraw never moves the page, a sheet or a panel (only code scrolls); a tap holds the control under the finger; never a drawing (`loose`); a sized sheet keeps its height (`--q-sheet-floor`); `scrollBusy()` holds `everyDev` under a finger; `freshScreen()`: a new screen at the top; `letGo()`: a drag carries its grip away |
+| `hold-place.mjs` | A redraw never moves the page, a sheet or a panel; a tap holds the control under the finger; never a drawing (`loose`); a sized sheet keeps its height (`--q-sheet-floor`); `scrollBusy()` holds `everyDev` under a finger; `freshScreen()`: a new screen at the top; `letGo()`: a drag carries its grip away |
 | `steady-pics.mjs` | A picture drawn again is eager and decoded at once |
 | `sources.mjs`, `source-watch.mjs` | Outside sources (`SOURCES`, `sourceOf`, `stateOf`: admin 外部來源); a phone's own outside reads, beaconed to `/sources` |
 | `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, before the app's modules); the cover held for it |
@@ -127,7 +127,7 @@ modules for modulepreload. `node kit/apps.mjs` refreshes every app's snippets;
 | `feedback.mjs` | Every app's picks, one engine: `shown`, `picked`, `passed`, `did` → weights per key (30-day half-life); `scorer`, `lifter`, `chance`, `whyOf` (常看), `hitRate`; on the Pass: `fb:<app>` |
 | `holidays.mjs`, `dayoff.mjs`, `rain-now.mjs` | Taiwan's days off; typhoon days off (停班停課) by who decides them; `radar` as rain (`rainNow`) |
 | `catalog.mjs`, `logos.mjs`, `names.mjs`, `photos.mjs`, `photo-urls.mjs` | Sports' leagues once; logos (ESPN, TheSportsDB, flags, F1, old names); teams in Chinese; studio headshots; photos' addresses alone |
-| `f1live.mjs`, `postseason.mjs`, `sports-espn.mjs`, `sports-broadcast.mjs`, `sports-highlights.mjs`, `sports-winprob.mjs` | F1's own timing read one way everywhere; MLB's postseason; ESPN's scoreboards as events (proxy and phone); where to watch in Taiwan (past ELTA's list, `eltaGuess`: its usual line-up, said 預估); highlights; win probability |
+| `f1live.mjs`, `postseason.mjs`, `sports-espn.mjs`, `sports-broadcast.mjs`, `sports-highlights.mjs`, `sports-winprob.mjs` | F1's own timing read one way everywhere; MLB's postseason; ESPN's scoreboards as events (proxy and phone); where to watch in Taiwan (past ELTA's list: `eltaGuess`, 預估); highlights; win probability |
 | `stock-account.mjs`, `stock-access.mjs`, `stock-credit.mjs`, `stock-markets.mjs`, `stock-quotes.mjs`, `stock-bonds.mjs`, `stock-savings.mjs`, `stock-ipo.mjs`, `stock-holidays.mjs`, `stock-hk-lots.mjs`, `stock-jp-lists.mjs`, `stock-codec.mjs` | Securities' ledger, broker rules, markets, prices, bonds, savings, IPOs, holidays, lot sizes, saved-copy codec; shared with the Worker |
 | `pay.mjs`, `gov.mjs` | The weekly pay and relief (rules only; the Worker alone writes them); what the government took and gave one account |
 | `flight.mjs`, `ebus.mjs`, `ebus-read.mjs` | A real plane in the air on a sphere (`/flight`, Class's 專注飛行); bus sites' ETAs, notices as TDX's (臺中, 桃園, 臺南: phones, then proxy; 高雄: phones) |
@@ -205,12 +205,13 @@ w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
 | `/ai` | `ai.js`, `ai-features.js`, `ai-fixtures.js` | Every app's AI by name: fixed prompt, models in turn, lean input (`maxIn`), caps, asks back (`clarify`, `pick`); builders' `aiOnce`; ops `ai-try` |
 | `/law-ask` | `law.js`, `law-ruling.js`, `law-town.js`, `law-ground.js` | Law's questions on 1–8 articles, every point cited and checked, kept in KV; modes `bill`, `diff`, `ruling`, `town`; 40 Gemini calls a day a Pass, 300 in all with `/law-chat`'s (D1 `law_day`) |
-| `/law-chat` | `law-chat.js`, `law-ground.js`, `law-more.js`, `ai-other.js` | 問法律: a plan (Flash-Lite), up to 14 articles from Law's lists and index, answered from those only by Claude Sonnet via the relay (failing: Gemini), cites checked; grounded by facts, news, bills, budget (`law-ground.js`), rulings, rules (`law-more.js`); 16 turns back; 30 a day a Pass |
+| `/law-chat` | `law-chat.js`, `law-ground.js`, `law-more.js`, `ai-other.js` | 問法律: a plan (Flash-Lite), up to 14 articles from Law's lists and index, answered from those only by Sonnet (failing: Gemini), cites checked; grounded by `law-ground.js`, `law-more.js`; 16 turns back; 30 a day a Pass |
 | `/law-page` | `law-page.js`, `law-hosts.js` | A gov.tw / edu.tw page read in Law, cleaned; edge cache only; Taiwan-only via the relay (build key: any gov.tw; `file=1`: raw); 500 a day a Pass |
 | `/law-live` | `law-live.js` | 立法院's IVOD streams now, 60 s at the edge (last good read 30 min); ours only |
-| `/money-read` | `money-read.js` | Orbit Money's 拍照記帳: one picture → `{ buys, left }`, read by Gemini through the relay, checked; only on a tap; 30 a day a Pass, 300 in all |
+| `/class-news` | `class-news.js` | Class's 學校公告: a school's list read via the relay, new titles worded once; R2, an hour |
+| `/money-read` | `money-read.js` | Money's 拍照記帳: a picture → `{ buys, left }`, read by Gemini, checked; on a tap; 30 a day a Pass, 300 in all |
 | `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |
-| `/flight` | `flight.js`, `kit/flight.mjs` | Orbit Class's 專注飛行: real planes landing in about N minutes, then one followed |
+| `/flight` | `flight.js`, `kit/flight.mjs` | Class's 專注飛行: real planes landing in about N minutes |
 | `/gift` | `gift.js` | 公開領取 at `/key/` (`site/key/`), set in admin; one a device (D1 `gift_claim`), `op: 'go'` a `#qh=` into an app; unreplaced back after `hold` hours |
 | `/showcase/pass` | `showcase.js` | The showcase's short pass for its live demos: reads only, capped per address and day |
 | `/data/…` | `data.js` | R2, public reads (§5.5); `/data/build` (POST, Bearer `DATA_PUSH_SECRET`, `build.yml`) runs a builder now |
@@ -275,7 +276,7 @@ OpenF1's tables (`openF1Raw`), kept in R2.
 | Worker | File, toml | What |
 | --- | --- | --- |
 | `quota-guard` | `guard-worker.js`, `guard.js`, `wrangler.guard.toml` | The bill's guard (§9); DO `GuardClock` (5-minute alarm), KV state; for the panel `/errors`, `/hours` (7 days), `/cpu` |
-| `gemini-relay` | `gemini-relay.js`, `wrangler.gemini.toml` | Gemini's calls from Taiwan (placement `gcp:asia-east1`) |
+| `gemini-relay` | `gemini-relay.js`, `wrangler.gemini.toml` | AI calls and Taiwan-only pages from Taiwan (`gcp:asia-east1`) |
 | `orbit-site` | `site.js`, `site-closed.js`, `wrangler.site.toml` | The custom domains; Longshot's closed notice |
 | `orbit-<slug>`, `orbit-pass`, `orbit-home` | `deploy/cf-site.mjs` | Each repo's static site, an assets-only Worker on routes of its paths (§10) |
 
@@ -313,7 +314,7 @@ A read (`kit proxyJson`) goes down these until one answers:
 | Store | Binding | What's in it |
 | --- | --- | --- |
 | D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data, the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced (§5.3); `gemini_call`: every Gemini call (`gemini-use.js`); `law_day`: the AI caps' counts a day; `gift`, `gift_claim`: the giveaway (`gift.js`); `beats`: each job's last run and failures (`ops.js`); `meter`: Google's and TDX's counts a month (`transit.js`); `push_kv`: notices' devices and lists (`push.js`); `sources`: outside calls by hour (`sources.js`) |
-| R2 `orbit-data` | `DATA` | Public: the builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `station/`, `rail/`, `tdx/`, `where.json`), the proxy's kept reads (`mirror/`), the radar's (`weather/`). Never served: `private/` (nightly backups `private/store/`, Firestore's last copy) |
+| R2 `orbit-data` | `DATA` | Public: the builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `station/`, `rail/`, `tdx/`, `where.json`), the proxy's kept reads (`mirror/`), the radar's (`weather/`), schools' news (`class-news/`). Never served: `private/` (nightly backups `private/store/`, Firestore's last copy) |
 | KV | `RATE_LIMIT_KV` | Counters (sign-ins, per-address limits); the guard's state, pace and alerts (`guard:*`); Google Weather's cells and calls a day (`weather:g:*`, `weather:google:<day>`); TDX's last reads (`tdx:warm:*`); the meter's copy (`transit:use:<month>`); Law's kept plans and answers (`law:*`); the showcase's passes a day (`showcase:passes:*`); the door's state (`door:state`); `ops:data-folders` |
 | Durable Objects | `F1_LOG`, `DOOR`, `RUNNER`, `CLOCK` | `F1Log`: F1's laps; `Door`: seats and the line; `Runner` (`runner.js`): heavy routes, crons by alarm, relays past 40 outside calls; `GuardClock`: the guard's alarm |
 | Edge cache | (Cache API) | The data proxy's answers by tier (§4.1), `/sports-today`, TDX's reads and routes (`transit.js`), the weather blend's cells (`weather.js`), `/law-live`, `/law-page`, `/config` |
