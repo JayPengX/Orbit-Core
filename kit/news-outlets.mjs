@@ -7,7 +7,8 @@
 //   tw  藍綠: −2 深綠, −1 偏綠, 0 中間, 1 偏藍, 2 深藍 (Taiwan's outlets)
 //   cs  統獨: −2 主張獨立, −1 偏獨, 0 不站邊, 1 偏統, 2 親北京
 //   lr  English outlets' left and right (AllSides): −2 Left … 2 Right;
-//       null where AllSides has none (most outlets outside the US)
+//       where AllSides has none, Media Bias/Fact Check's (`mbfc`); null
+//       only for China's state media, counted apart as 官媒
 //   kind  private | public (公共媒體) | gov (政府出資) | nonprofit | state (中國官媒)
 //
 // No outlet is placed as 白 (民眾黨): no study rates one so. A story says
@@ -37,10 +38,17 @@ export const BASIS = {
   pts: { zh: '公共電視法：公視須維持政治中立。', en: 'The Public Television Act requires PTS to stay politically neutral.', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=P0050001' },
   cna: { zh: '中央通訊社設置條例：國家通訊社，政府出資、董事會獨立。', en: 'The CNA Act: the national news agency, government-funded with an independent board.', url: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=P0050010' },
   allsides: {
-    zh: 'AllSides 媒體偏向評分（美國左右，依盲測問卷、編輯審閱與第三方資料；CC BY-NC 4.0）。',
-    en: 'AllSides Media Bias Ratings™ (US left and right, from blind surveys, editorial reviews and third-party data; CC BY-NC 4.0).',
+    zh: 'AllSides 媒體偏向評分（美國左右，依盲測問卷、編輯審閱與第三方資料；CC BY-NC 4.0）。美國以外的媒體多半是它自己標示信心較低的初評。',
+    en: 'AllSides Media Bias Ratings™ (US left and right, from blind surveys, editorial reviews and third-party data; CC BY-NC 4.0). Most outlets outside the US carry its own “low or initial confidence”.',
     url: 'https://www.allsides.com/media-bias/ratings'
   },
+  mbfc: {
+    zh: 'Media Bias/Fact Check 的評比（AllSides 沒評的才用）：Least Biased 記為中間，Left-Center 中間偏左，Right-Center 中間偏右。',
+    en: 'Media Bias/Fact Check’s rating, used only where AllSides has none: Least Biased as Centre, Left-Center as Lean Left, Right-Center as Lean Right.',
+    url: 'https://mediabiasfactcheck.com/'
+  },
+  rti: { zh: '中央廣播電臺設置條例：國家的對外廣播，政府捐助的財團法人。', en: 'The Radio Taiwan International Act: the national overseas broadcaster, a government-funded foundation.', url: 'https://zh.wikisource.org/wiki/%E4%B8%AD%E5%A4%AE%E5%BB%A3%E6%92%AD%E9%9B%BB%E8%87%BA%E8%A8%AD%E7%BD%AE%E6%A2%9D%E4%BE%8B' },
+  cts: { zh: '華視屬公廣集團：2006 年依無線電視事業公股處理條例，政府持有的股份捐給公視基金會（約七成）。', en: 'CTS belongs to the public broadcasting group: in 2006, under the act on government shares in terrestrial TV, the state’s shares (about 70%) went to the PTS Foundation.', url: 'https://info-material.pts.org.tw/annual/2025annual06cts.pdf' },
   state: { zh: '中國共產黨與政府所有、所管的媒體。', en: 'Owned and run by the Chinese Communist Party and state.', url: '' }
 };
 
@@ -64,6 +72,12 @@ const ROWS = [
   ['udn', '聯合報', 'United Daily News', 'udn.com', 'private', 1, 1, null, '聯合報系（王氏家族）', 'United Daily News Group (the Wang family)', ['chang2023'], false],
   ['chinatimes', '中時', 'China Times', 'chinatimes.com', 'private', 2, 2, null, '旺旺中時集團（蔡衍明）', 'Want Want China Times (Tsai Eng-meng)', ['chang2023', 'kao'], false],
   ['ctinews', '中天', 'CTi News', 'ctinews.com', 'private', 2, 2, null, '旺旺中時集團（蔡衍明）', 'Want Want China Times (Tsai Eng-meng)', ['teds-tv', 'chang2023'], false],
+  ['rti', '中央廣播電臺', 'Radio Taiwan International', 'rti.org.tw', 'gov', 0, 0, null, '財團法人中央廣播電臺（政府捐助）', 'Radio Taiwan International (government-funded)', ['rti'], false],
+  ['cts', '華視', 'CTS', 'cts.com.tw', 'public', 0, 0, null, '中華電視（公廣集團）', 'Chinese Television System (public broadcasting group)', ['cts'], true],
+  ['ithome', 'iThome', 'iThome', 'ithome.com.tw', 'private', 0, 0, null, 'iThome', 'iThome', ['stance'], true],
+  ['technews', '科技新報', 'TechNews', 'technews.tw', 'private', 0, 0, null, '科技新報', 'TechNews', ['stance'], true],
+  ['pansci', '泛科學', 'PanSci', 'pansci.asia', 'private', 0, 0, null, '泛科知識', 'PanSci Knowledge', ['stance'], true],
+  ['sportsv', '運動視界', 'Sports Vision', 'sportsv.net', 'private', 0, 0, null, '運動視界', 'Sports Vision', ['stance'], true],
   // English
   ['bbc', 'BBC', 'BBC', 'bbc.com', 'public', null, null, 0, '英國廣播公司（公共媒體）', 'British Broadcasting Corporation (public)', ['allsides'], false],
   ['wsj', '華爾街日報', 'The Wall Street Journal', 'wsj.com', 'private', null, null, 0, '新聞集團（梅鐸）', 'News Corp (Murdoch)', ['allsides'], false],
@@ -87,20 +101,32 @@ const ROWS = [
   ['dailycaller', 'Daily Caller', 'The Daily Caller', 'dailycaller.com', 'private', null, null, 2, 'Daily Caller', 'The Daily Caller, Inc.', ['allsides'], false],
   ['natreview', '國家評論', 'National Review', 'nationalreview.com', 'nonprofit', null, null, 2, '國家評論研究所', 'National Review Institute', ['allsides'], false],
   ['dailymail', '每日郵報', 'Daily Mail', 'dailymail.co.uk', 'private', null, null, 2, 'DMG Media', 'DMG Media', ['allsides'], false],
-  ['dw', '德國之聲', 'DW', 'dw.com', 'public', null, null, null, '德國公共國際廣播', 'Germany’s public international broadcaster', ['stance'], true],
-  ['f24', '法國 24', 'France 24', 'france24.com', 'public', null, null, null, '法國公共國際媒體', 'France Médias Monde (public)', ['stance'], true],
-  ['scmp', '南華早報', 'South China Morning Post', 'scmp.com', 'private', null, null, null, '阿里巴巴', 'Alibaba', ['stance'], true],
-  ['nikkei', '日經亞洲', 'Nikkei Asia', 'asia.nikkei.com', 'private', null, null, null, '日經', 'Nikkei', ['stance'], true],
-  ['japantimes', '日本時報', 'The Japan Times', 'japantimes.co.jp', 'private', null, null, null, 'News2u', 'News2u Holdings', ['stance'], true],
-  ['diplomat', '外交家', 'The Diplomat', 'thediplomat.com', 'private', null, null, null, 'Diplomat Media', 'Diplomat Media', ['stance'], true],
-  ['taipeitimes', '台北時報', 'Taipei Times', 'taipeitimes.com', 'private', -2, -2, null, '自由時報集團', 'Liberty Times group', ['chang2023'], false],
+  ['latimes', '洛杉磯時報', 'Los Angeles Times', 'latimes.com', 'private', null, null, -1, '黃馨祥', 'Patrick Soon-Shiong', ['allsides'], false],
+  ['bloomberg', '彭博', 'Bloomberg', 'bloomberg.com', 'private', null, null, -1, '彭博有限合夥企業', 'Bloomberg L.P.', ['allsides'], false],
+  ['bi', 'Business Insider', 'Business Insider', 'businessinsider.com', 'private', null, null, -1, '施普林格', 'Axel Springer', ['allsides'], false],
+  ['semafor', 'Semafor', 'Semafor', 'semafor.com', 'private', null, null, -1, 'Semafor', 'Semafor Inc.', ['allsides'], false],
+  ['pbs', 'PBS', 'PBS NewsHour', 'pbs.org', 'public', null, null, -1, '美國公共電視', 'PBS (public)', ['allsides'], false],
+  ['sky', '天空新聞', 'Sky News', 'news.sky.com', 'private', null, null, -1, '天空（康卡斯特）', 'Sky (Comcast)', ['allsides'], false],
+  ['huffpost', '哈芬登郵報', 'HuffPost', 'huffpost.com', 'private', null, null, -2, 'BuzzFeed', 'BuzzFeed', ['allsides'], false],
+  ['atlantic', '大西洋月刊', 'The Atlantic', 'theatlantic.com', 'private', null, null, -2, '鮑威爾．賈伯斯（愛默生集團）', 'Laurene Powell Jobs (Emerson Collective)', ['allsides'], false],
+  ['reason', 'Reason', 'Reason', 'reason.com', 'nonprofit', null, null, 0, '理性基金會', 'Reason Foundation', ['allsides'], false],
+  ['federalist', 'The Federalist', 'The Federalist', 'thefederalist.com', 'private', null, null, 2, 'FDRLST Media', 'FDRLST Media', ['allsides'], false],
+  ['dailywire', 'Daily Wire', 'The Daily Wire', 'dailywire.com', 'private', null, null, 2, 'Daily Wire', 'The Daily Wire', ['allsides'], false],
+  ['blaze', 'TheBlaze', 'TheBlaze', 'theblaze.com', 'private', null, null, 2, 'Blaze Media', 'Blaze Media', ['allsides'], false],
+  ['dw', '德國之聲', 'DW', 'dw.com', 'public', null, null, 0, '德國公共國際廣播', 'Germany’s public international broadcaster', ['allsides'], false],
+  ['f24', '法國 24', 'France 24', 'france24.com', 'public', null, null, 0, '法國公共國際媒體', 'France Médias Monde (public)', ['mbfc'], false],
+  ['scmp', '南華早報', 'South China Morning Post', 'scmp.com', 'private', null, null, 0, '阿里巴巴', 'Alibaba', ['allsides'], false],
+  ['nikkei', '日經亞洲', 'Nikkei Asia', 'asia.nikkei.com', 'private', null, null, 1, '日經', 'Nikkei', ['mbfc'], false],
+  ['japantimes', '日本時報', 'The Japan Times', 'japantimes.co.jp', 'private', null, null, 0, 'News2u', 'News2u Holdings', ['allsides'], false],
+  ['diplomat', '外交家', 'The Diplomat', 'thediplomat.com', 'private', null, null, 0, 'Diplomat Media', 'Diplomat Media', ['mbfc'], false],
+  ['taipeitimes', '台北時報', 'Taipei Times', 'taipeitimes.com', 'private', -2, -2, 0, '自由時報集團', 'Liberty Times group', ['chang2023', 'allsides'], false],
   ['globaltimes', '環球時報', 'Global Times', 'globaltimes.cn', 'state', null, 2, null, '人民日報社', 'People’s Daily (CCP)', ['state'], false],
   ['cgtn', 'CGTN', 'CGTN', 'cgtn.com', 'state', null, 2, null, '中央廣播電視總台', 'China Media Group (state)', ['state'], false],
   ['xinhua', '新華社', 'Xinhua', 'news.cn', 'state', null, 2, null, '中國國務院', 'China’s State Council', ['state'], false]
 ];
 
 // Taiwan's outlets come first in ROWS; the rest are the English ones.
-const TW_COUNT = 17;
+const TW_COUNT = 23;
 export const OUTLETS = Object.fromEntries(
   ROWS.map(([id, zh, en, site, kind, tw, cs, lr, ownerZh, ownerEn, basis, weak], i) => [id, { id, zh, en, site, kind, tw, cs, lr, owner: { zh: ownerZh, en: ownerEn }, basis, weak, region: i < TW_COUNT ? 'tw' : 'intl' }])
 );
@@ -149,11 +175,13 @@ export const PARTY_WORDS = { g: ['民進黨', 'DPP'], b: ['國民黨', 'KMT'], w
 
 // ---- Topics: what Orbit News covers -------------------------------------------
 //
-// A story is News' when outlets could take sides on it (Jay, 11-10:
-// politics in the wide sense, tech, the economy, society too); one with no
-// topic here (a game, a crash, a concert) isn't shown. `on: false` keeps a
-// topic listed but off; a new one widens what News covers. A story's topics
-// are those its headlines' words name (topicsOf), most named first.
+// A story is News' when it has a topic here: first the ones outlets take
+// sides on (Jay, 11-10: politics in the wide sense, tech, the economy,
+// society), then, from his 08:08 the same day, the kinds past the sides
+// (life, health, science, culture, sport: `spectrum: false`, never
+// one-sided); one with none (a game of Pokémon) isn't shown. `on: false`
+// keeps a topic listed but off. A story's topics are those its headlines'
+// words name (topicsOf), most named first.
 const rx = (...parts) => new RegExp(parts.join('|'));
 const rxi = (...parts) => new RegExp(`\\b(?:${parts.join('|')})\\b`, 'i');
 export const TOPICS = [
@@ -206,7 +234,34 @@ export const TOPICS = [
     id: 'soc', zh: '社會', en: 'Society', on: true,
     zh_: rx('教育|課綱|學校|校園|少子化|生育|育兒|托育|長照|醫療|健保|衛福部|疾管署|食藥署|衛生局|疫情|疫苗|流感|登革熱|醫護|護理|勞工|勞動部|移工|工時|過勞|罷工|工會|同婚|性別|性平|性騷|性侵|人權|原住民|新住民|移民|住宅|社宅|租屋|交通部|捷運|高鐵|台鐵|公車|交通安全|行人|酒駕|食安|消費者|動保|颱風|地震|停班停課|災害|災民|救災|工安|公安|毒品|治安|警政|長者|身障|兒少|虐童|霸凌|自殺|貧窮|弱勢|社福|社會|文化部|文化幣|人口|出生率|高齡|青年|婚姻|家暴|公衛|FDA'),
     en_: [/\b(?:ICE|FAA|FDA|CDC|FEMA)\b/, rxi('immigra\\w*|migrants?|migration|deport\\w*|border|asylum|abortion|health\\w*|vaccin\\w*|measles|flu|disease|outbreak|hospitals?|doctors?|nurses?|schools?|education|universit\\w*|colleges?|students?|teachers?|guns?|Glock|LGBTQ\\w*|transgender|gay|women|gender|race|racial|racism|civil rights|protest\\w*|strikes?|unions?|workers|labou?r|homeless\\w*|poverty|welfare|food|children|famil(?:y|ies)|religio\\w*|church\\w*|Muslims?|Jewish|antisemit\\w*|airlines?|flights?|airports?|drugs?')],
-    enAt: [rxi('hurricanes?|typhoons?|earthquakes?|floods?|flooding|storms?|disasters?')]
+  },
+  // The kinds past the sides (Jay 11-10, 08:08: "expand to support more
+  // kinds of news and let spectrum be one feature"): shown, ranked lighter
+  // where they'd crowd the front (`weight`), never counted as one-sided.
+  {
+    id: 'life', zh: '生活', en: 'Life', on: true, spectrum: false,
+    zh_: rx('天氣|氣象|颱風|豪雨|大雨|暴雨|寒流|冷氣團|東北季風|低溫|高溫|熱浪|乾旱|地震|海嘯|停班停課|塞車|車潮|國道|連假|疏運|返鄉|班機|航班|機場|觀光|旅遊|旅客|遊客|火災|火警|大火|起火|爆炸|氣爆|車禍|追撞|相撞|撞死|撞上|翻覆|墜機|墜落|溺水|失蹤|搜救|罹難|停水|垃圾|回收|寵物|流浪狗|流浪貓|動物|外送|物價|菜價|蛋價|房租|消費|超商|百貨|夜市|郵局|垃圾車|天然災害|災情'),
+    en_: [rxi('weather|storms?|hurricanes?|typhoons?|tornado\\w*|earthquakes?|tsunami|floods?|flooding|wildfires?|fires?|blaze|heat ?waves?|snow\\w*|blizzard|drought|disasters?|crash\\w*|collision|derail\\w*|accidents?|explosions?|rescue\\w*|travel\\w*|tourism|tourists?|airlines?|flights?|airports?|traffic|holiday\\w*|consumers?|shoppers?|recalls?|pets?|animals?|zoo')]
+  },
+  {
+    id: 'health', zh: '健康', en: 'Health', on: true, spectrum: false,
+    zh_: rx('健康|醫療|醫院|醫師|醫生|病患|患者|病人|癌|腫瘤|糖尿病|高血壓|心臟|中風|失智|疫苗|流感|新冠|COVID|確診|登革熱|疫情|腸病毒|猴痘|麻疹|傳染|感染|健保|衛福部|疾管署|食藥署|藥品|藥物|用藥|手術|長照|心理健康|憂鬱|睡眠|肥胖|減重|器官'),
+    en_: [/\b(?:FDA|CDC|WHO|GLP-1)\b/, rxi('health\\w*|hospitals?|doctors?|nurses?|patients?|cancers?|tumou?rs?|diabetes|heart|strokes?|dementia|Alzheimer\\w*|vaccin\\w*|flu|COVID|virus\\w*|outbreaks?|diseases?|infections?|measles|medic\\w*|surgery|mental health|depression|obesity|Ozempic|weight loss|nutrition|sleep')]
+  },
+  {
+    id: 'sci', zh: '科學', en: 'Science', on: true, spectrum: false,
+    zh_: rx('科學|研究團隊|研究人員|研究發現|新研究|論文|期刊|中研院|國科會|太空|NASA|天文|行星|彗星|流星|星系|黑洞|月球|登月|火星|恐龍|化石|考古|基因|DNA|物種|新種|演化|物理|化學|數學|諾貝爾|實驗室|望遠鏡|小行星|極光|日食|月食'),
+    en_: [/\b(?:NASA|DNA)\b/, rxi('scien\\w*|researchers?|study|studies|space|astronaut\\w*|astronom\\w*|planet\\w*|galax\\w*|black holes?|moon|lunar|Mars|comets?|asteroids?|meteor\\w*|telescopes?|dinosaurs?|fossils?|archaeolog\\w*|species|evolution\\w*|genes?|genetic\\w*|genom\\w*|physics|chemistry|Nobel|eclipse|aurora')]
+  },
+  {
+    id: 'culture', zh: '文化', en: 'Culture', on: true, spectrum: false, weight: 0.8,
+    zh_: rx('文化|藝術|藝文|展覽|特展|博物館|美術館|故宮|音樂會|交響|國家劇院|劇場|舞蹈|戲劇|電影|影展|金馬|金鐘|金曲|奧斯卡|坎城|導演|紀錄片|文學|作家|詩人|小說|出版|書展|圖書|書店|閱讀|台語|客語|族語|文資|古蹟|宗教|媽祖|佛教|節慶|祭典|建築|動畫|漫畫'),
+    en_: [rxi('arts?|artists?|museums?|exhibit\\w*|galler(?:y|ies)|films?|movies?|cinema|Oscars?|Cannes|directors?|documentar\\w*|music|musicians?|albums?|concerts?|orchestra|novel\\w*|books?|authors?|writers?|poets?|poetry|literature|theat(?:er|re)|Broadway|festivals?|culture|cultural|heritage|architect\\w*|anime|manga|video games?|religio\\w*|church\\w*')]
+  },
+  {
+    id: 'sport', zh: '運動', en: 'Sport', on: true, spectrum: false, weight: 0.6,
+    zh_: rx('運動員|選手|球員|球隊|教練|賽事|奪冠|冠軍|金牌|銀牌|銅牌|奧運|帕運|亞運|世大運|全運會|經典賽|世界盃|12強|中華隊|中職|日職|韓職|美職|大聯盟|MLB|NBA|NFL|NHL|PLG|TPBL|P\\.?LEAGUE|棒球|籃球|足球|網球|羽球|桌球|排球|高爾夫|田徑|游泳|舉重|跆拳|柔道|拳擊|射箭|自由車|馬拉松|鐵人|F1|賽車|大谷'),
+    en_: [/\b(?:NBA|NFL|MLB|NHL|FIFA|UEFA|F1)\b/, rxi('sports?|athletes?|coach(?:es)?|tournaments?|championships?|medals?|Olympic\\w*|Paralympic\\w*|World Cup|Premier League|soccer|football|basketball|baseball|tennis|golf|cricket|rugby|boxing|marathon|Formula 1|Super Bowl|World Series|playoffs?|Wimbledon')]
   }
 ];
 // A story's topics (ids, most named first): those named by a quarter of

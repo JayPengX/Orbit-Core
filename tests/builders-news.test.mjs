@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFeed, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, newsSite, NEWS_SITE } from '../builders/news.js';
+import { parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, newsSite, NEWS_SITE } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -22,6 +22,19 @@ test('RSS, Atom, RDF and a news sitemap are all read', () => {
   assert.equal(parseFeed(rdf)[0].at, Date.parse('2026-11-10T02:00:00Z'));
   const map = `<urlset><url><loc>https://news.tvbs.com.tw/politics/1</loc><news:news><news:publication_date>2026-11-10T10:36:53+08:00</news:publication_date><news:title>TVBS 標題</news:title></news:news></url></urlset>`;
   assert.deepEqual(parseFeed(map, 'map').map(x => [x.t, x.u]), [['TVBS 標題', 'https://news.tvbs.com.tw/politics/1']]);
+});
+
+test('a time without its zone is Taiwan\'s; a slow feed is read in its turn', () => {
+  const rss = `<rss><channel><item><title>iThome</title><link>https://www.ithome.com.tw/news/1</link><pubDate>2026-11-10  12:11:45</pubDate></item></channel></rss>`;
+  assert.equal(parseFeed(rss)[0].at, Date.parse('2026-11-10T04:11:45Z'));
+  const feeds = { a: [['https://a/1', 'rss'], ['https://a/2', 'rss', 3]], b: [['https://b/1', 'rss', 2]] };
+  const seen = [0, 1, 2, 3, 4, 5].map(k => feedsDue(feeds, k * 600_000).map(f => f[1]));
+  assert.ok(seen.every(list => list.includes('https://a/1')));
+  assert.equal(seen.filter(list => list.includes('https://a/2')).length, 2);
+  assert.equal(seen.filter(list => list.includes('https://b/1')).length, 3);
+  // (Every outlet has a feed; a build reads about 80 of them.)
+  for (const o of Object.keys(OUTLETS)) assert.ok(FEEDS[o]?.length, o);
+  assert.ok(feedsDue(FEEDS, NOW).length < 90);
 });
 
 test("an outlet's own marks come off a headline; full-width marks stay", () => {
@@ -93,18 +106,27 @@ test("a story counts outlets by side; one-sided names the side that carries none
   assert.equal(storyOf([...blue, { ...item('ltn', '柯志恩', NOW - 3 * H), near: 0.4 }], 'tw', NOW).blind, '');
   // A story keeps its id as headlines join it: its first headline's.
   assert.equal(s.id, idOf(blue[0].u));
+  // A kind sides don't take (a game): never one-sided, and ranked lighter.
+  const game = ['chinatimes', 'ctinews', 'udn'].map((o, i) => ({ ...item(o, `中華隊經典賽奪冠${i}`, NOW - 4 * H + i), near: 0.5 }));
+  const g = storyOf(game, 'tw', NOW);
+  assert.deepEqual(g.topics, ['sport']);
+  assert.equal(g.blind, '');
+  assert.ok(g.imp < storyOf(blue, 'tw', NOW).imp);
 });
 
-test('outlets: every one has a place or says it has none, and a reason', () => {
+test('outlets: every one has a place and a reason; only state media stand apart', () => {
   for (const o of Object.values(OUTLETS)) {
     assert.ok(o.basis.length, o.id);
     if (o.region === 'tw') assert.ok([-2, -1, 0, 1, 2].includes(o.tw), o.id);
+    // (No 未評 left, Jay 11-10: AllSides, else Media Bias/Fact Check.)
     if (o.kind === 'state') assert.equal(sideOf(o, 'intl'), null, o.id);
+    else assert.ok(sideOf(o, o.region), o.id);
   }
   assert.equal(sideOf('ltn', 'tw'), 'g');
   assert.equal(sideOf('chinatimes', 'tw'), 'b');
   assert.equal(sideOf('fox', 'intl'), 'r');
-  assert.equal(sideOf('dw', 'intl'), null);
+  assert.equal(sideOf('dw', 'intl'), 'c');
+  assert.equal(sideOf('xinhua', 'intl'), null);
   assert.deepEqual(partiesIn('藍白合作 民進黨團回應'), ['g', 'b', 'w']);
   assert.deepEqual(partiesIn('KMT and DPP lawmakers clash'), ['g', 'b']);
 });
@@ -156,7 +178,9 @@ test('filler is left out by its section or its words; light headlines are told a
   assert.equal(fillerOf({ u: 'https://x.tw/1', t: '12星座本週運勢 這3星座財運旺' }, 'zh'), 'fortune');
   assert.equal(fillerOf({ u: 'https://x.tw/1', t: '威力彩頭獎槓龜 下期上看5億' }, 'zh'), 'lottery');
   assert.equal(fillerOf({ u: 'https://x.tw/1', t: '女星曬比基尼身材 網友暴動' }, 'zh'), 'celebrity');
-  assert.equal(fillerOf({ u: 'https://x.tw/1', t: 'NBA／勇士逆轉湖人' }, 'zh'), 'sport');
+  // (Sport is news now, Jay 11-10.)
+  assert.equal(fillerOf({ u: 'https://x.tw/1', t: 'NBA／勇士逆轉湖人' }, 'zh'), '');
+  assert.ok(newsUrl('https://www.chinatimes.com/realtimenews/20261110000001-260403'));
   assert.equal(fillerOf({ u: 'https://x.tw/1', t: '立法院三讀通過預算案' }, 'zh'), '');
   assert.equal(fillerOf({ u: 'https://x.com/1', t: 'Powerball jackpot climbs to $900 million' }, 'en'), 'lottery');
   assert.equal(fillerOf({ u: 'https://x.com/1', t: 'Senate passes the budget' }, 'en'), '');
@@ -165,24 +189,28 @@ test('filler is left out by its section or its words; light headlines are told a
   assert.ok(!softOf('卓榮泰不副署老福法', 'zh'));
 });
 
-test('topics: a story outlets could take sides on has one; a game or a crash has none', () => {
+test('topics: the sides\' own, and the kinds past them; a game of Pokémon has none', () => {
   assert.deepEqual(topicsOf(['Pokémon Legends Z-A sales top 10 million'], 'en'), []);
-  assert.deepEqual(topicsOf(['國1麻豆段聯結車追撞 全線封閉'], 'zh'), []);
-  assert.deepEqual(topicsOf(['烏來瀑布觀景平台 6遊客遭蜂螫送醫'], 'zh'), []);
+  assert.deepEqual(topicsOf(['國1麻豆段聯結車追撞 全線封閉'], 'zh'), ['life']);
+  assert.deepEqual(topicsOf(['NBA／勇士逆轉湖人'], 'zh'), ['sport']);
+  assert.deepEqual(topicsOf(['金馬獎入圍名單出爐'], 'zh'), ['culture']);
+  assert.deepEqual(topicsOf(['NASA telescope spots water on an asteroid'], 'en'), ['sci']);
   assert.deepEqual(topicsOf(['賴清德出席國防論壇', '國軍漢光演習登場'], 'zh'), ['def', 'pol']);
   assert.ok(topicsOf(['台積電10月營收創新高'], 'zh').includes('tech'));
   assert.ok(topicsOf(['Trump tariffs hit Chinese chips'], 'en').includes('eco'));
   // A place abroad, a storm or a factory names a topic only beside another (11-10).
-  assert.deepEqual(topicsOf(['土耳其鋼鐵廠爆炸陷火海 疑天車砸熔爐釀16死13傷'], 'zh'), []);
-  assert.deepEqual(topicsOf(['Japan earthquake kills 10'], 'en'), []);
-  assert.deepEqual(topicsOf(['One killed in Indonesia helicopter crash during firefighting operation'], 'en'), []);
+  assert.deepEqual(topicsOf(['土耳其鋼鐵廠爆炸陷火海 疑天車砸熔爐釀16死13傷'], 'zh'), ['life', 'world']);
+  assert.deepEqual(topicsOf(['Japan earthquake kills 10'], 'en'), ['life', 'world']);
+  assert.deepEqual(topicsOf(['Pokémon fans in Japan line up'], 'en'), []);
   assert.deepEqual(topicsOf(['日本央行宣布升息'], 'zh'), ['eco', 'world']);
   assert.deepEqual(topicsOf(['外媒指立陶宛要求代表處更名 外交部：無更名計畫'], 'zh'), ['world']);
   assert.ok(topicsOf(['Hurricane aid stalls as FEMA cuts staff'], 'en').includes('soc'));
   for (const t of TOPICS) assert.ok(t.zh && t.en && t.zh_ instanceof RegExp && t.en_.length, t.id);
   // Not News': a story with no topic isn't listed, however many carry it.
+  const game = ['cna', 'ebc', 'tvbs', 'udn'].map((o, i) => item(o, `寶可夢新作預購破百萬套${i}`, NOW - H));
+  assert.equal(storiesOf(game, 'tw', NOW).length, 0);
   const crash = ['cna', 'ebc', 'tvbs', 'udn'].map((o, i) => item(o, `國1麻豆段聯結車追撞 全線封閉${i}`, NOW - H));
-  assert.equal(storiesOf(crash, 'tw', NOW).length, 0);
+  assert.deepEqual(storiesOf(crash, 'tw', NOW)[0].topics, ['life']);
 });
 
 test("an outlet's page gives its picture and its own YouTube clip; one on every page is its channel's", () => {
