@@ -82,16 +82,15 @@ const S3 = 3;
 // (Taiwan's channels post more, so are read more often.)
 const CHANNEL_EVERY = { tw: 2, intl: 4 };
 const sec = (list, url, every = S3) => list.map(x => [url(x), 'rss', every]);
-// Google News' feed of one site, its last day.
-export const gnews = (site, lang = 'en') =>
-  `https://news.google.com/rss/search?q=site:${site}+when:1d&${lang === 'zh' ? 'hl=zh-TW&gl=TW&ceid=TW:zh-Hant' : 'hl=en-US&gl=US&ceid=US:en'}`;
-// Bing News' feed of one site, newest first (Google News answers Cloudflare
+// Bing News' feed of one site, newest first (Google News' answers Cloudflare
 // 503): its 12 latest, each with the outlet's own link and summary.
 export const bing = site => `https://www.bing.com/news/search?q=site%3a${site}&format=rss&qft=sortbydate%3d%221%22&mkt=en-US&setlang=en-US&cc=US`;
 export const FEEDS = {
   ltn: [...['all', 'politics', 'society', 'life', 'world', 'local'].map(c => [`https://news.ltn.com.tw/rss/${c}.xml`, 'rss']), ...sec(['business', 'sports'], c => `https://news.ltn.com.tw/rss/${c}.xml`)],
   setn: [['https://www.setn.com/sitemapGoogleNews.xml', 'map']],
-  ftv: [[gnews('ftvnews.com.tw', 'zh'), 'gnews', S2]],
+  // (Its site answers only Taiwan, Google News' feed of it refuses Cloudflare:
+  // its YouTube channel's reports, each headline the clip's.)
+  ftv: [['https://www.youtube.com/feeds/videos.xml?channel_id=UC2VmWn8dAqkzlQqvy02E1PA', 'yt', S2]],
   newtalk: [['https://newtalk.tw/rss/all', 'rss']],
   peoples: [['https://www.peoplenews.tw/feed/', 'rss']],
   cna: [
@@ -178,7 +177,7 @@ export const FEEDS = {
   washtimes: [['https://www.washingtontimes.com/rss/headlines/news/', 'rss', S3]]
 };
 // (Outlets read only through a search's feed: their pages refuse us too.)
-const FAR = new Set(Object.entries(FEEDS).filter(([, list]) => list.every(([, kind]) => kind === 'bing' || kind === 'gnews')).map(([o]) => o));
+const FAR = new Set(Object.entries(FEEDS).filter(([, list]) => list.every(([, kind]) => kind === 'bing' || kind === 'yt')).map(([o]) => o));
 
 // The outlets' own YouTube channels (their news clips), read every 2nd build
 // (Taiwan's) or 4th (the world's); only those whose clips play in other
@@ -336,16 +335,11 @@ export function parseFeed(xml, kind = 'rss') {
     }
     return out;
   }
-  if (kind === 'gnews') {
-    // (Google News: "headline - Outlet", its own link to the story.)
-    for (const m of s.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/g)) {
-      const b = m[1];
-      const by = plain(tagOf(b, 'source'));
-      const t = plain(tagOf(b, 'title')).replace(by ? new RegExp(`\\s+[-–—]\\s+${by.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) : /$^/, '').trim();
-      const u = plain(tagOf(b, 'link')).replace(/\?oc=\d+$/, '');
-      if (t && /^https:\/\/news\.google\.com\//.test(u)) out.push({ t, u, d: '', at: timeOf(tagOf(b, 'pubDate')), img: '' });
-    }
-    return out;
+  if (kind === 'yt') {
+    // (An outlet's YouTube channel as its feed: each report's headline, its clip's address.)
+    return parseChannel(s)
+      .map(({ y, t, at }) => ({ t: clipTitle(t).replace(/\s*[－—–-]\s*[^－—–\s-]{0,8}新聞[網台]?$/, ''), u: `https://www.youtube.com/watch?v=${y}`, d: '', at, img: ytPicture(y) }))
+      .filter(it => it.t);
   }
   if (kind === 'bing') {
     // (Bing News: the outlet's link inside Bing's own, as url=; its time Los
@@ -1100,9 +1094,8 @@ export function pagesToRead(out, pages, most = PAGE_READS) {
   for (let i = 0; i < 40; i++) order.push(out.tw[2 * i], out.tw[2 * i + 1], out.intl[i]);
   const want = [];
   for (const s of order.filter(Boolean)) {
-    // (Google News' links aren't the outlet's page; those read through a
-    // search's feed refuse us their pages.)
-    const fresh = s.items.filter(([o, , u]) => !pages[u] && !want.includes(u) && !u.startsWith('https://news.google.com/') && !FAR.has(o));
+    // (Those read through a search's feed or a channel: no page of theirs to read.)
+    const fresh = s.items.filter(([o, , u]) => !pages[u] && !want.includes(u) && !FAR.has(o));
     const clip = !s.clips?.some(c => c[1]) && fresh.find(([o]) => CLIPS_AT.has(o));
     if (clip) want.push(clip[2]);
     const pic = !s.img && (fresh.find(([, , u]) => u === s.items[0]?.[2]) || fresh.find(([, , u]) => u !== clip?.[2]));
