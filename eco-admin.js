@@ -15,7 +15,7 @@
 // SHA-256; the token itself is never in the repo). Without the secret, no one gets in.
 
 import { doorReport, doorSet } from './door.js';
-import { systemReport, alertAccount, tell, OPS_DOC } from './ops.js';
+import { systemReport, alertAccount, tell, OPS_DOC, beats } from './ops.js';
 import { passAccount, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet } from './eco.js';
 import { sendPush, dueLists } from './push.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, TDX_BOOK, tdxPoints, tdxGuard, tdxUse, tdxPlan } from './transit.js';
@@ -31,6 +31,9 @@ import { govOf } from './kit/gov.mjs';
 import { listBackups, fromBackup } from './store-backup.js';
 import { PASSKEY_COLLECTION, passkeySummary, removePasskey } from './passkey.js';
 import { GIFT_TOOLS, mintPass } from './gift.js';
+import { readSources } from './sources.js';
+import { SOURCES } from './kit/sources.mjs';
+import { lawFetch, DATA as LAW_DATA } from './law.js';
 
 // The developer settings (kit/devconfig.mjs), one document; GET /config
 // answers them to everyone (worker.js), the panel's 開發 changes them.
@@ -874,6 +877,29 @@ export const ADMIN_TOOLS = {
     const job = String(body.job || '');
     if (!['watch', 'watch-full', 'cutouts', 'buses', 'asia', 'cpbl', 'sports', 'photos', 'winprob'].includes(job)) return { error: 'ECO_UNKNOWN_OP', status: 400 };
     return deps.build(env, job);
+  },
+  // 外部來源: each outside source's last 7 days as the proxy and phones
+  // counted them (sources.js), with the ages of what's built from them: the
+  // cron jobs' heartbeats, R2's files, Orbit Law's nightly parts. The panel
+  // puts them together with kit/sources.mjs and the usage (額度).
+  async sources({ env, deps }) {
+    const now = deps.now();
+    const files = [...new Set(SOURCES.map(s => s.fresh?.r2).filter(Boolean))];
+    const [rows, jobs, heads, law] = await Promise.all([
+      readSources(env, now).catch(e => ({ error: String(e?.message || e).slice(0, 160) })),
+      beats(env).catch(() => []),
+      Promise.all(files.map(f => (env.DATA ? env.DATA.head(f).catch(() => null) : null))),
+      lawFetch(`${LAW_DATA}status.json`, { signal: AbortSignal.timeout(5000) })
+        .then(r => (r.ok ? r.json() : null))
+        .catch(() => null)
+    ]);
+    return {
+      at: now,
+      rows,
+      jobs: Object.fromEntries((Array.isArray(jobs) ? jobs : []).map(b => [b.job, { at: b.at, ok: b.ok, okAt: b.okAt, fails: b.fails, note: b.note }])),
+      files: Object.fromEntries(files.map((f, i) => [f, heads[i]?.uploaded ? new Date(heads[i].uploaded).getTime() : 0])),
+      law: law?.parts || null
+    };
   },
   async health({ env } = {}) {
     const one = async ([name, url, use]) => {

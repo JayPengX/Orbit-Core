@@ -38,6 +38,8 @@ import { icons, tile, pullToRefresh, setSheetDetent, toast, h as node } from './
 import { scrollBusy } from './hold-place.mjs';
 // (A picture drawn again never flashes: steady-pics.mjs, on import.)
 import './steady-pics.mjs';
+// (A phone's own outside reads counted, and sent back when one fails: source-watch.mjs, on import.)
+import './source-watch.mjs';
 
 export const ECO_URL = `${API}/eco`;
 export const PROXY_URL = `${API}/sports-proxy`;
