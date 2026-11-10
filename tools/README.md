@@ -50,13 +50,15 @@ real state too (its welcome sheet): shoot that when it's what you changed.
 **One read for all its browsers.** A run opens the app in dozens of
 browsers, and each used to ask our Workers for everything again: our own
 screenshots were most of the Workers' CPU (2026-11-06). Now the run's
-browsers share what the Workers answered (`tools/live-keep.mjs`, a folder
-in the run's `ORBIT_LIVE_KEEP`): each address, or a data-proxy batch's
-item, is asked once in 90 s (`ORBIT_LIVE_KEEP_S`), so a before and its
-after also see the same data. The run ends with `our Workers: N reads by
-the pages, M sent`. Only a 200 is kept. The other tools (`preview.mjs`
-alone, `live-scroll.mjs`, `gate.mjs`) still ask fresh each time:
-live-scroll and the gate watch live data change.
+browsers share what the Workers answered (`tools/live-keep.mjs`). Since
+2026-11-10 every tool run (`preview.mjs` alone too) shares one folder,
+`/tmp/orbit-live-keep` (`ORBIT_LIVE_KEEP` names another, `off` none): each
+address, or a data-proxy batch's item, is asked once in 5 minutes
+(`ORBIT_LIVE_KEEP_S`), so a before and its after also see the same data.
+On 11-10 our own tools sent about nine in ten of the Workers' requests, and
+the Free plan has 100,000 a day for everyone. The run ends with `our
+Workers: N reads by the pages, M sent`. Only a 200 is kept. To watch a
+source change minute by minute, run with `ORBIT_LIVE_KEEP=off`.
 
 **TDX's month is people's.** Every tool's live read reaches TDX through the
 dev door, and on 2026-11-06 our tools made six of every seven TDX calls. So
