@@ -27,6 +27,7 @@
 import { json, sha256Hex } from './http.js';
 import { groundFor, groundKey, groundOut, groundPrompt, hasGround } from './law-ground.js';
 import { moreFor, moreKey, moreOut, morePrompt, moreCites, hasMore, readMine, matchPeople, asksLy, warmMore } from './law-more.js';
+import { localFor, localPrompt, localOut, localCites, localKey, hasLocal } from './law-local.js';
 import { viaTaiwan } from './law-hosts.js';
 import { matchBills, readGround } from './law-ground.js';
 import { LAW_LIMITS, PCODE, ART, fail, twDay, citeKey, cited, label, readData, readList, readLaw, askKey, opening, passOf, passKey, spend, countOf, kept, keep, modelJson } from './law.js';
@@ -303,12 +304,12 @@ const ANSWER = {
   required: ['covered', 'verdict', 'answer', 'points', 'next', 'followups']
 };
 
-export function answerPrompt(chat, articles, nameOf, ground = null, more = null, ly = false) {
+export function answerPrompt(chat, articles, nameOf, ground = null, more = null, ly = false, local = null) {
   const body = articles.map(a => `[cite "${a.p}:${a.key}"] 「${a.n}」${label(a.key, 'zh')}\n${a.text}`).join('\n\n');
   const before = turnsText(chat, nameOf, CHAT_LIMITS.maxTurn);
   const en = chat.lang === 'en';
-  const g = groundPrompt(ground) + morePrompt(more);
-  return `You are a careful Taiwanese lawyer answering a member of the public about Taiwan's law, from ONLY the material quoted below (Orbit Law's own data: articles${g ? ', and the rules, court cases, figures, notices, bills, legislators, votes and meetings after them' : ''}). Return JSON matching the schema.
+  const g = groundPrompt(ground) + morePrompt(more) + localPrompt(local);
+  return `You are a careful Taiwanese lawyer answering a member of the public about Taiwan's law, from ONLY the material quoted below (Orbit Law's own data: articles${g ? ', and the rules, court cases, figures, notices, bills, legislators, votes, meetings and local councils after them' : ''}). Return JSON matching the schema.
 
 Articles:
 ${body || '(none found)'}
@@ -423,6 +424,8 @@ export function shownOf(extra, out) {
   else delete res.cases;
   if (rules.length) res.rules = rules;
   else delete res.rules;
+  // A council or 代表會 stays (a way to its page); of its bills and rows, those cited.
+  if (extra.local) res.local = { councils: extra.local.councils.map(c => ({ ...c, bills: c.bills.filter(b => used.has(`cc:${b.id}`)) })), towns: extra.local.towns.map(t => ({ ...t, rows: t.rows.filter(r => used.has(r.id)) })) };
   return res;
 }
 
@@ -531,13 +534,18 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
     const fetcher = env?.GEMINI_RELAY ? (u, init) => (viaTaiwan(u) ? env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, { headers: init?.headers, signal: init?.signal }) : fetch(u, init)) : fetch;
     // (A judgment's gist, once read, kept 90 days: 司法院's site is the slowest read of a turn.)
     const gists = env.RATE_LIMIT_KV ? { get: jid => env.RATE_LIMIT_KV.get(`law:jd:v1:${jid}`, { type: 'json' }), put: (jid, t) => keep(env, ctx, `law:jd:v1:${jid}`, t, 90 * 86_400) } : null;
-    const more = await moreFor(`${asked} ${plan.terms.join(' ')}`, articles, { mine: chat.mine, items, today: day, cities: chat.city, fetcher, gists });
+    // (The councils and 代表會 a question names: law-local.js, alongside.)
+    const [more, local] = await Promise.all([
+      moreFor(`${asked} ${plan.terms.join(' ')}`, articles, { mine: chat.mine, items, today: day, cities: chat.city, fetcher, gists }),
+      localFor(asked, { terms: plan.terms, cities: chat.city }).catch(() => null)
+    ]);
     mark('more');
-    const grounded = hasGround(ground) || hasMore(more);
+    const grounded = hasGround(ground) || hasMore(more) || hasLocal(local);
+    const others = [...moreCites(more), ...localCites(local)];
     stage({ stage: 'write', arts: articles.length, cases: more.cases.length, rules: more.rules.length, people: more.people.map(p => p.n), votes: more.votes.length, bills: ground.bills.length, budgets: ground.budgets?.length || 0, news: ground.news.length + ground.facts.length });
-    const extra = { ...groundOut(ground), ...moreOut(more) };
+    const extra = { ...groundOut(ground), ...moreOut(more), ...localOut(local) };
     const versions = [...new Set(articles.map(a => `${a.p}@${a.m}`))].sort().join(',');
-    const answerKey = first && `law:chat:v2:${await sha256Hex([askKey(chat.q), pin, chat.lang, versions, groundKey(ground), moreKey(more)].join('|'))}`;
+    const answerKey = first && `law:chat:v2:${await sha256Hex([askKey(chat.q), pin, chat.lang, versions, groundKey(ground), moreKey(more), localKey(local)].join('|'))}`;
     const hit = answerKey && !ms && (await kept(env, answerKey));
     const leftNow = async () => left(used ?? (await countOf(env, who, day)));
     if (hit) return json({ ...hit, ...shownOf(extra, hit), cached: true, left: await leftNow() }, 200, headers);
@@ -562,7 +570,7 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
         }
       };
       const answerModel = tune.model === 'lite' ? undefined : tune.model === 'flash' ? ANSWER_BACKUP : /^(claude|gemini)-[a-z0-9.-]+$/.test(tune.model || '') ? tune.model : ANSWER_MODEL;
-      const prompt = answerPrompt(chat, articles, nameOf, ground, more, ly);
+      const prompt = answerPrompt(chat, articles, nameOf, ground, more, ly, local);
       // (The ops check's side by side: one prompt, every model's answer, each checked and timed, in tune.results.)
       if (tune.compare) {
         tune.results = Object.fromEntries(
@@ -571,7 +579,7 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
               const t = Date.now();
               try {
                 const raw = await modelJson(call, prompt, ANSWER);
-                return [name, { ms: Date.now() - t, ...checkChat(raw, articles, chat.lang, grounded, moreCites(more), ly) }];
+                return [name, { ms: Date.now() - t, ...checkChat(raw, articles, chat.lang, grounded, others, ly) }];
               } catch (e) {
                 return [name, { error: String(e?.message || e).slice(0, 200), ms: Date.now() - t }];
               }
@@ -586,7 +594,7 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
       const raw = await ask(answerModel, tune.answer ?? (answerModel === ANSWER_MODEL ? ANSWER_EFFORT : null))
         .catch(e => (answerModel && answerModel !== ANSWER_BACKUP ? ask(ANSWER_BACKUP, null) : Promise.reject(e)))
         .catch(e => (answerModel ? ask(undefined, null) : Promise.reject(e)));
-      out = checkChat(raw, articles, chat.lang, grounded, moreCites(more), ly);
+      out = checkChat(raw, articles, chat.lang, grounded, others, ly);
     }
     mark('answer');
     if (answerKey && !ms) keep(env, ctx, answerKey, out, CHAT_TTL_S);
