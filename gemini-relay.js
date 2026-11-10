@@ -17,6 +17,7 @@ import { DGPA_NDS } from './typhoon.js';
 import { tsdbCpblDay } from './kit/catalog.mjs';
 
 const GEMINI = 'https://generativelanguage.googleapis.com/';
+const OTHER_AI = ['https://api.anthropic.com/v1/', 'https://api.openai.com/v1/'];
 
 export default {
   async fetch(request) {
@@ -24,6 +25,11 @@ export default {
     if ((viaTaiwan(to) || to === DGPA_NDS || tsdbCpblDay(to)) && request.method === 'GET') {
       const pick = ['User-Agent', 'Accept', 'Accept-Language'].filter(h => request.headers.get(h)).map(h => [h, request.headers.get(h)]);
       return fetch(to, { headers: Object.fromEntries(pick), redirect: 'manual' });
+    }
+    // (Claude and OpenAI, Jay 11-10: both refuse Hong Kong too; their key headers passed on.)
+    if (OTHER_AI.some(x => to.startsWith(x))) {
+      const pick = ['Content-Type', 'x-api-key', 'anthropic-version', 'anthropic-beta', 'Authorization'].filter(h => request.headers.get(h)).map(h => [h, request.headers.get(h)]);
+      return fetch(to, { method: request.method, headers: Object.fromEntries(pick), body: request.method === 'GET' ? undefined : request.body });
     }
     if (!to.startsWith(GEMINI)) return new Response('', { status: 400 });
     return fetch(to, { method: request.method, headers: { 'Content-Type': request.headers.get('Content-Type') || 'application/json' }, body: request.method === 'GET' ? undefined : request.body });

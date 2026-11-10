@@ -216,7 +216,7 @@ w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 | `/config` | `worker.js`, `kit/devconfig.mjs` | The live speeds (`DEV`), a minute in Cloudflare's cache |
 | `/guard` | `worker.js` | The guard as it last read the bill (no key) |
 | `/store/check` | `worker.js`, `doc-store.js` | Each collection's count, localhost only |
-| `/ops` | `ops.js`, `worker.js` | The repo's own checks (Bearer `DATA_PUSH_SECRET`): `?check=gemini`, `gemini-use`, `law-chat`, `system`, `capacity`, `cpu` |
+| `/ops` | `ops.js`, `worker.js`, `ai-other.js` | The repo's own checks (Bearer `DATA_PUSH_SECRET`): `?check=gemini`, `gemini-use`, `law-chat`, `ai-models`, `ai-compare`, `system`, `capacity`, `cpu` |
 
 - **The gate:** every route needs a Pass session (`qt=`), counted per
   session and app in memory (600 a minute on the data proxy). Public routes
@@ -468,7 +468,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
 | `node tools/layout-check.mjs <app…>` | Every tab and `check` page at 320, iPad, laptop: a narrow band, a half empty, overflow (`layout-faults.mjs`); `push.sh` runs it |
 | `node tools/preview.mjs <app>` | The app with real data (`--live`, `--width`, `--timing`, `--webkit`…; `ORBIT_DATA=<dir>`: local /data/ files); prints `wraps:`, `cut:` |
 | `node tools/gate.mjs [app…]` | The quality gate (`gate-page.js`) on every tab: lift, stalls, dead taps, wraps, cuts, white, mixed language… |
-| `node tools/speed.mjs <app…>` | Before vs after (3G, CPU ×4, answers replayed): time, KB, requests, CPU, redraws, memory, proxy calls |
+| `node tools/speed.mjs <app…>` | Before vs after (3G, CPU ×4, answers replayed) |
 | `node tools/live-scroll.mjs [app…] [--webkit]` | Nothing jumps: live refreshes, pages as they load and scroll, taps folding |
 | `node tools/test-apps.mjs [app…]` | Every app's tests against this kit (checkouts beside this one) |
 
