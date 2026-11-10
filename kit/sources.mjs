@@ -53,7 +53,7 @@ export const SOURCES = [
   { id: 'hccg-bus', zh: '竹塹交通資訊網（新竹公車）', group: 'transit', apps: ['transit'], feeds: '新竹市公車到站與位置', hosts: ['hisatisfy.hccg.gov.tw', 'ibus.hsinchu.gov.tw'], where: ['worker'] },
   { id: 'tpe-bus', zh: '臺北市公車開放資料', group: 'transit', apps: ['transit'], feeds: '臺北公車到站與位置', hosts: ['tcgbusfs.blob.core.windows.net'], where: ['worker'] },
   { id: 'ntpc-bus', zh: '新北市公車開放資料', group: 'transit', apps: ['transit'], feeds: '新北公車到站', hosts: ['data.ntpc.gov.tw'], where: ['worker'] },
-  { id: 'tyc-bus', zh: '桃園市公車動態', group: 'transit', apps: ['transit'], feeds: '桃園公車到站', hosts: ['ebus.tycg.gov.tw'], where: ['worker'] },
+  { id: 'tyc-bus', zh: '桃園市公車動態', group: 'transit', apps: ['transit'], feeds: '桃園公車到站', hosts: ['ebus.tycg.gov.tw'], where: ['worker', 'phone'] },
   { id: 'txg-bus', zh: '臺中市公車動態', group: 'transit', apps: ['transit'], feeds: '臺中公車到站、通阻', hosts: ['citybus.taichung.gov.tw'], where: ['worker', 'phone'] },
   { id: 'tnn-bus', zh: '臺南市公車動態', group: 'transit', apps: ['transit'], feeds: '臺南公車到站', hosts: ['2384.tainan.gov.tw'], where: ['worker'] },
   { id: 'khh-bus', zh: '高雄市公車動態', group: 'transit', apps: ['transit'], feeds: '高雄公車到站、位置、通阻（只答臺灣的網路：手機自己讀）', hosts: ['ibus.tbkc.gov.tw'], where: ['phone'] },
