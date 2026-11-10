@@ -168,3 +168,36 @@ test("a city whose stations TDX refuses (連江縣's, 400; its search there find
   assert.deepEqual(list.cities.LienchiangCounty, []);
   assert.deepEqual(list.cities.Taipei, ['25.00_121.50']);
 });
+
+// Jay 2026-11-09: 988 往 新市站 at 新北板橋公車站, 沒有排班資料. TDX times
+// only the way out for 291 of 新北's 636 routes; 新北's own list has the rest.
+test('新北: a way TDX has no timetable for, filled from 新北’s own list (its times by sub-route, else its headway, else its first and last bus)', async () => {
+  const { parseCsv, fillMissing, timeLists } = await import('../builders/ntpc.js');
+  const head = 'namezh,pathattributename,gofirstbustime,backfirstbustime,golastbustime,backlastbustime,peakheadway,offpeakheadway,bustimedesc,headwaydesc,holidaygofirstbustime,holidaybackfirstbustime,holidaygolastbustime,holidaybacklastbustime,holidaybustimedesc,holidaypeakheadway,holidayoffpeakheadway,holidayheadwaydesc';
+  const csv = `﻿${head}
+988,988新市站,0530,0640,2230,2340,,,,"988新北板橋公車站班表:0640 0740 2340 988直新北板橋公車站班表:0810 1750",0600,0710,2230,2340,,,,"988新北板橋公車站班表:0710 2340"
+701,701,0530,0530,2200,2200,1215,2030,,,,,,,,,,
+242,242,0700,0700,1710,1710,,,,,,,,,,,,\r\n`;
+  const rows = parseCsv(csv);
+  assert.equal(rows.length, 3);
+  assert.equal(rows[0].headwaydesc.startsWith('988新北板橋公車站班表'), true, 'quoted, its BOM gone');
+  assert.deepEqual(timeLists('988新北板橋公車站班表:0640 2340 988直新北板橋公車站班表:0810 1750').map(l => l.name), ['988新北板橋公車站', '988直新北板橋公車站'], 'the next list’s name never taken for a time');
+  const way = (sub, name, dir, stops) => [sub, name, dir, stops];
+  const pack = {
+    stops: { X: ['新市站'], B: ['新北板橋公車站'], P: ['P站'], Q: ['Q站'], H: ['H站'], K: ['K站'] },
+    routes: [
+      { uid: 'NWT19783', name: '988', ways: [way('S1', '988新市站', 0, ['X', 'B']), way('S1', '988新市站', 1, ['B', 'X']), way('S2', '988直新市站', 0, ['X', 'B']), way('S2', '988直新市站', 1, ['B', 'X'])], sched: [['S1', 0, ['X'], [[62, 330]], []]] },
+      { uid: 'NWT1', name: '701', ways: [way('R', '701', 0, ['P', 'Q']), way('R', '701', 1, ['Q', 'P'])], sched: [['R', 0, ['P'], [[62, 330]], []]] },
+      { uid: 'NWT2', name: '242', ways: [way('G', '242', 0, ['H', 'K']), way('G', '242', 1, ['K', 'H'])], sched: [['G', 0, ['H'], [[62, 420]], []]] }
+    ]
+  };
+  assert.equal(fillMissing(pack, rows), 3);
+  const back = r => pack.routes[r].sched.filter(s => s[1] === 1);
+  // 988: each sub-route its own times, weekdays and holidays, at 新北板橋公車站.
+  assert.deepEqual(back(0), [['S1', 1, ['B'], [[62, 400], [62, 460], [62, 1420], [65, 430], [65, 1420]], []], ['S2', 1, ['B'], [[62, 490], [62, 1070]], []]]);
+  // 701: every 12–30 minutes from its first bus to its last.
+  assert.deepEqual(back(1), [['R', 1, ['Q'], [], [[62, '05:30', '22:00', 12, 30]]]]);
+  // 242: its first and last bus alone (no headway: 0).
+  assert.deepEqual(back(2), [['G', 1, ['K'], [], [[62, '07:00', '17:10', 0, 0]]]]);
+  assert.equal(fillMissing(pack, rows), 0, 'a way timed is never filled again');
+});

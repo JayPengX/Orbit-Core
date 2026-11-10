@@ -372,7 +372,7 @@ changes, writing a file only when it changed (`builders/store.js`):
 | `watch.js` | `sports/watch.json`, the season archive | hourly / daily 20:00 |
 | `winprob.js` | `winprob/…` | daily 23:00 |
 | `photos.js`, `official-photos.js` | photo lists, cutouts, official headshots | hourly / daily 18:00 |
-| `buses.js` | `bus/…`, `shape/…`, `station/…`, `where.json` | a city once a week |
+| `buses.js`, `ntpc.js` | `bus/…`, `shape/…`, `station/…`, `where.json` | weekly, a city |
 | `asia.js`, `cpbl.js` | CPBL's month and standings | daily 15:00 |
 | `f1kept.js` | each finished F1 session's 數據 and laps, kept before anyone opens them (via the proxy: OpenF1 refuses quick askers) | :06, :26, :46 |
 | `kept.js` | wipes the proxy's kept copies (`mirror/`) from before a league's first askable day | daily 17:00 |
@@ -471,7 +471,7 @@ can be turned off on its own.
 | `node tools/gate.mjs [app…]` | The quality gate (`gate-page.js`) on every tab: lift, stalls, dead taps, wraps, cuts, white, mixed language… |
 | `node tools/speed.mjs <app…>` | Before vs after (3G, CPU ×4, answers replayed): time, KB, requests, CPU, redraws, memory, proxy calls |
 | `node tools/live-scroll.mjs [app…] [--webkit]` | Nothing jumps: a live game's refreshes, pages as they load and scrolled, taps folding, a sheet showing less |
-| `node tools/test-apps.mjs [app…]` | Every app's tests against this kit (checkouts beside this one) |
+| `node tools/test-apps.mjs [app…]` | Every app's tests against this kit (checkouts beside it) |
 
 The rest: `tools/README.md`.
 

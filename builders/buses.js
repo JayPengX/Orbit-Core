@@ -21,6 +21,7 @@
 // where a trip is [days (7 bits, bit 0 Sunday), times, special?].
 
 import { tdxBody, tallyTdx } from '../transit.js';
+import { fillNewTaipei } from './ntpc.js';
 
 const TDX = 'https://tdx.transportdata.tw/api/';
 const AUTH = 'https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token';
@@ -341,6 +342,8 @@ export async function runBuses({ store, env, now = Date.now(), until = now + 8 *
     if (Date.now() >= until) break;
     try {
       const p = await packCity(tdx, city, built);
+      // (新北's ways TDX has no timetable for, from 新北's own list: ntpc.js.)
+      if (city === 'NewTaipei') await fillNewTaipei(p).catch(() => 0);
       // (A pack with no routes, or under half what it had, is a read gone wrong: the one there stays.)
       const had = index.cities?.[city]?.routes || 0;
       if (!p.routes.length || p.routes.length < had / 2) throw new Error(`${city}: ${p.routes.length} routes, had ${had}`);
