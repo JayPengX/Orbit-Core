@@ -134,6 +134,16 @@ export function askOf(raw, answers, lists = {}) {
   return options.length >= 2 ? { q, options } : null;
 }
 
+// Taiwan's characters: a model now and then writes a simplified one (罚 for
+// 罰). Only characters with one traditional form are mapped (never 后 发 里 干
+// 只 面 台 系 复 冲 余 历 准 制 范 松 云 钟), so a right one is never changed.
+const SIMP = '罚罰进進场場赛賽队隊员員胜勝负負对對个個这這们們为為时時点點门門战戰将將击擊连連获獲领領关關键鍵节節让讓帮幫选選总總说說读讀写寫车車费費钱錢买買卖賣记記账帳机機电電话話东東国國会會来來还還过過从從开開动動线線红紅黄黃绿綠蓝藍级級业業华華区區县縣长長军軍头頭号號两兩万萬亿億与與并並无無实實际際经經济濟证證价價涨漲资資产產报報闻聞议議举舉党黨应應该該网網络絡输輸赢贏换換传傳补補伤傷刚剛尔爾维維罗羅马馬乔喬达達杰傑兰蘭亚亞欧歐伦倫凯凱库庫热熱纳納饭飯课課学學练練习習题題义義词詞语語级級园園门門体體备備观觀众眾强強压壓双雙变變旧舊样樣认認识識边邊约約终終';
+const SIMP_MAP = new Map();
+for (let i = 0; i + 1 < SIMP.length; i += 2) SIMP_MAP.set(SIMP[i], SIMP[i + 1]);
+const SIMP_RE = new RegExp(`[${[...SIMP_MAP.keys()].join('')}]`, 'g');
+export const twChars = v =>
+  typeof v === 'string' ? v.replace(SIMP_RE, c => SIMP_MAP.get(c)) : Array.isArray(v) ? v.map(twChars) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, twChars(x)])) : v;
+
 // A feature's answer: each of its models in turn until one answers JSON
 // its check keeps (null from `clean`: nothing usable, the next model tried).
 export async function runFeature(env, ctx, name, input, { gemini = null, answers = [] } = {}) {
@@ -148,7 +158,7 @@ export async function runFeature(env, ctx, name, input, { gemini = null, answers
   for (const m of f.models) {
     const model = MODELS[m] || m;
     try {
-      const raw = await askModel(env, ctx, name, model, parts, schema, { effort: effortFor(f, m), gemini, timeoutMs: f.timeoutMs || 30_000 });
+      const raw = twChars(await askModel(env, ctx, name, model, parts, schema, { effort: effortFor(f, m), gemini, timeoutMs: f.timeoutMs || 30_000 }));
       const ask = f.clarify ? askOf(raw, answers, Object.fromEntries((f.pick || []).map(k => [k, input?.[`${k}s`] || []]))) : null;
       const out = await f.clean(raw, input);
       if (out != null || ask) return { out, ask, model };

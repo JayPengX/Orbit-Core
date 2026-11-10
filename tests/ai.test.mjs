@@ -120,3 +120,9 @@ test('effort: a word for every model, or only the models a map names', async () 
   assert.equal(effortFor({ effort: { luna: 'low' } }, 'haiku'), null);
   assert.equal(effortFor({}, 'haiku'), null);
 });
+
+test('a model\'s simplified characters are written as Taiwan\'s, and only those with one form', async () => {
+  const { twChars } = await import('../ai.js');
+  assert.deepEqual(twChars({ zh: '熱刺Romero遭紅牌罚下，兵工厂', list: ['进球', 3], en: 'Arsenal' }), { zh: '熱刺Romero遭紅牌罰下，兵工厂', list: ['進球', 3], en: 'Arsenal' });
+  assert.equal(twChars('皇后 頭髮 公里 台北'), '皇后 頭髮 公里 台北');
+});
