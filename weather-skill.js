@@ -11,7 +11,9 @@
 //   - each source's forecast for that hour is scored: rain by the Brier
 //     score (pop/100 − rained)², temperature by the absolute error, by lead
 //     time (0–6 h, 6–24 h), a day's sums kept 14 days in
-//     `weather:skill:<cell>`.
+//     `weather:skill:<cell>`; the temperature the app showed (`served`: the
+//     blend, its first hours anchored to the station) is scored beside them,
+//     never a weight, so the anchoring's worth can be read.
 // Daily, from all those scores: weights ∝ 1 / (score + ε), at least 0.15
 // each, moved at most 0.1 a day, written to `weather:weights` (which every
 // /weather blend reads). Until 3 days of scores exist, the starting weights.
@@ -63,6 +65,8 @@ export function scoreHour(sk, { rain, obs }, now) {
         if (!h || lead < 0 || lead >= 24 * HOUR) continue;
         const bucket = lead < 6 * HOUR ? 'short' : 'long';
         SOURCES.forEach((src, i) => h[3 + i] != null && add(sk.days, twDay(T), 'temp', bucket, src, Math.abs(h[3 + i] - obs.temp)));
+        // What the app showed (the blend, its first hours from the station): scored, never weighted.
+        if (h[5] != null) add(sk.days, twDay(T), 'temp', bucket, 'served', Math.abs(h[5] - obs.temp));
       }
       sk.lastTemp = T;
     }
@@ -78,7 +82,7 @@ export function takeSnapshot(sk, entry, now) {
   if (hours?.length && entry.at > (sk.snaps[sk.snaps.length - 1]?.at || 0)) {
     sk.snaps.push({
       at: entry.at,
-      h: hours.filter(x => x.t >= entry.at - HOUR && x.t < entry.at + 24 * HOUR).map(x => [x.t, x.pop?.google ?? null, x.pop?.cwa ?? null, x.temp?.google ?? null, x.temp?.cwa ?? null])
+      h: hours.filter(x => x.t >= entry.at - HOUR && x.t < entry.at + 24 * HOUR).map(x => [x.t, x.pop?.google ?? null, x.pop?.cwa ?? null, x.temp?.google ?? null, x.temp?.cwa ?? null, x.out ?? null])
     });
   }
   sk.snaps = sk.snaps.filter(s => now - s.at < 26 * HOUR);
