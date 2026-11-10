@@ -13,6 +13,9 @@ name = "orbit-workers-proxy"
 # kept unchanged on purpose - not a sign this is still Orbit-specific.
 main = "worker.js"
 compatibility_date = "2025-01-01"
+# AsyncLocalStorage (node:async_hooks) for the Runner's count of each
+# invocation's outside calls (runner.js).
+compatibility_flags = ["nodejs_als"]
 
 # The proxy at the apps' own address too (kit/domain.mjs API): orbit.<domain>/api/…
 # and the bare domain's (the showcase); worker.js viaSite takes /api off.
@@ -62,6 +65,10 @@ WEATHER_DEV = "on"
 # The sports proxy's dev door (sports.js checkSession): a local
 # page may read without a Orbit Pass, rate-limited. "off" closes it.
 SPORTS_DEV = "on"
+# The Runner (runner.js): heavy routes and the crons' work in a Durable
+# Object ("on"), or in the Worker as before ("off"; the paid plan's 30 s).
+RUNNER_ROUTES = "off"
+RUNNER_CRONS = "off"
 
 # GEMINI_API_KEY (for /gemini and /nl-edit) and ECO_TOKEN_SECRET
 # (the Pass's sign-ins) are Secrets, not [vars] (the dashboard's Settings ->
@@ -120,6 +127,18 @@ class_name = "Door"
 [[migrations]]
 tag = "door-main"
 new_sqlite_classes = ["Door"]
+
+# The Runner (runner.js): the heavy routes and every cron's work, each a
+# Durable Object request or alarm (30 s of CPU, 50 outside calls of its own,
+# past them through its relays) where the Free plan gives a Worker's request
+# 10 ms (2026-11-13 on).
+[[durable_objects.bindings]]
+name = "RUNNER"
+class_name = "Runner"
+
+[[migrations]]
+tag = "runner-1"
+new_sqlite_classes = ["Runner"]
 
 # Two crons, the even minutes and the odd: every minute between them. New
 # crons added on 2026-10-13 (F1's minute, the builders' hour, the guard's
