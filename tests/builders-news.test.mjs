@@ -229,6 +229,10 @@ test("an outlet's page gives its picture and its own YouTube clip; one on every 
   // (One page read: a clip can't yet be told from the channel's.)
   assert.equal(sameOf({ 'https://ebc/1': pages['https://ebc/1'] }, [a]).clip('ebc', 'OWN00000001'), false);
   assert.equal(bigPicture('https://attach.setn.com/newsimages/2026/11/10/5781919-XS.jpg'), 'https://attach.setn.com/newsimages/2026/11/10/5781919-PH.jpg');
+  assert.equal(bigPicture('https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/0303/live/a.png'), 'https://ichef.bbci.co.uk/ace/standard/976/cpsprodpb/0303/live/a.png');
+  // (The widest of a feed's pictures: The Guardian lists 140, 460 and 700; a clip's isn't one.)
+  const g = `<rss><channel><item><title>Guardian story</title><link>https://www.theguardian.com/world/1</link><media:content medium="video" url="https://g/v.mp4" width="1280"/><media:content width="140" url="https://i.guim.co.uk/a.jpg?width=140&amp;s=1"/><media:content width="700" url="https://i.guim.co.uk/a.jpg?width=700&amp;s=3"/><media:content width="460" url="https://i.guim.co.uk/a.jpg?width=460&amp;s=2"/></item></channel></rss>`;
+  assert.equal(parseFeed(g)[0].img, 'https://i.guim.co.uk/a.jpg?width=700&s=3');
   assert.ok(isVideo('https://www.cbsnews.com/video/abc/'));
   assert.ok(!isVideo('https://www.cbsnews.com/news/abc/'));
 });
