@@ -108,6 +108,11 @@ test("the scroll bar dragged moves the page; only Safari's own move after a redr
   assert.match(scroll, /chains\.set\(s, 'bar'\)/);
   assert.match(scroll, /barAt\.get\(s\)[^\n]*< BAR_MS/, "the bar's next grab, still in hand, is the bar's");
   assert.match(src, /touched\(s, list\) && drawnAt\.set\(s, Date\.now\(\)\)/, 'each redraw noted per scroller');
+  // Jay 2026-11-10: "holding the scrollbar forces the page upward during live games".
+  // The bar in hand holds live redraws as a finger does; Safari's move straight after a redraw is never the bar's.
+  assert.match(src, /export const scrollBusy = \(\) => [^\n]*barLast < BAR_HOLD_MS/);
+  assert.match(scroll, /barAt\.set\(s, \(barLast = now\)\)/);
+  assert.match(scroll, /!safari && now - \(barAt\.get\(s\) \|\| 0\) < BAR_MS/);
   // In a browser (WebKit): live-scroll's "bar" drags it and checks Safari's own move is still held.
   const guard = readFileSync(new URL('../tools/live-scroll.mjs', import.meta.url), 'utf8');
   assert.match(guard, /const bar = async inSheet/);
