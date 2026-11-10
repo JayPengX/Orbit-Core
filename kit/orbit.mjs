@@ -925,7 +925,11 @@ function proxyOrSelf(url, timeout, ask) {
 // the proxy's, and that host the proxy's for ten minutes after. Until the
 // device has read a host, its first reads get 6 s to start answering: a
 // network that drops them is never waited on for 20.
-const DEVICE_FIRST = new Set(['site.api.espn.com', 'site.web.api.espn.com', 'statsapi.mlb.com']);
+// Polymarket's price lines (a live game's every minute), OpenF1's tables,
+// Open-Meteo's forecast and ELTA's list (22 KB gzipped) answer any page as
+// well (CORS open, no key; 2026-11-10, Jay: "Everything in our apps that
+// could be read from our phone should be read from our phone"): the same.
+const DEVICE_FIRST = new Set(['site.api.espn.com', 'site.web.api.espn.com', 'statsapi.mlb.com', 'clob.polymarket.com', 'api.openf1.org', 'api.open-meteo.com', 'piceltaott-elta.cdn.hinet.net']);
 const proxyUntil = new Map();
 const deviceOk = new Set();
 async function deviceFirst(url, timeout, ask) {

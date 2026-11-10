@@ -161,6 +161,27 @@ test('a Jolpica read the proxy is turned away from is read from the device at on
 // device, no trip through the proxy; a trimmed read stays the proxy's (its
 // trim saves the phone's data); a read the device can't get is the proxy's
 // at once, and that host's reads the proxy's for a while; a 404 is the source's.
+// Polymarket's lines, OpenF1's tables, Open-Meteo's and ELTA's list answer
+// any page too (2026-11-10, Jay: what a phone can read, it reads): the device's.
+test("Polymarket's lines, OpenF1, Open-Meteo and ELTA's list are read from the device", async () => {
+  answer = () => new Response('[{"ok":1}]');
+  for (const url of [
+    'https://clob.polymarket.com/prices-history?market=1&interval=1d&fidelity=30',
+    'https://api.openf1.org/v1/meetings?year=2026',
+    'https://api.open-meteo.com/v1/forecast?latitude=25&longitude=121&daily=weather_code',
+    'https://piceltaott-elta.cdn.hinet.net/production/json/program_list/sports_live_program_list.json'
+  ]) {
+    asked.length = 0;
+    assert.deepEqual(await kit.proxyJson(url, { ttl: 1, alone: true }), [{ ok: 1 }]);
+    assert.deepEqual(asked, [url], `${new URL(url).hostname}: straight from the source`);
+  }
+  // (Polymarket's games list stays trimmed by the proxy.)
+  asked.length = 0;
+  const games = 'https://gamma-api.polymarket.com/events?series_id=3&limit=100';
+  await kit.proxyJson(games, { ttl: 1, trim: 'polymarket-games', alone: true });
+  assert.ok(asked[0].includes(encodeURIComponent(games)) && asked[0].includes('trim=polymarket-games'));
+});
+
 test("ESPN's site API and MLB's are read from the device; the proxy only for a trim or what the device can't get", async () => {
   const sb = 'https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/1/stats';
   asked.length = 0;

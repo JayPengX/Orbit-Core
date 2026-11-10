@@ -300,9 +300,9 @@ A read (`kit proxyJson`) goes down these until one answers:
 - A failed read is a failure, never "nothing there": the device's copy of
   any age answers, asked again soon; a failed batch item fails alone.
 - The phone reads some sources itself, no Worker request: ESPN's core
-  API always (it refuses the proxy); ESPN's site API and MLB's statsapi
-  untrimmed (`DEVICE_FIRST`; failing, the proxy, that host for ten
-  minutes); Jolpica when the proxy can't get it, then 10 minutes (`SELF_TOO`).
+  API always (it refuses the proxy); ESPN's site API, MLB, Polymarket's
+  lines, OpenF1, Open-Meteo, ELTA's list untrimmed (`DEVICE_FIRST`;
+  failing, the proxy, 10 minutes); Jolpica when the proxy can't (`SELF_TOO`).
 - Apps put live knowledge over slower copies (Sports' `liveTable`, F1's
   timing at the flag, MLB's postseason from MLB).
 
