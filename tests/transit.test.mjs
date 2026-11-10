@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   tdxRequest, tdxGet, warmBikes, SLOW_MS, tdxAccess, resetTdxToken, resetPace, resetTurns, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
-  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta, tdxTrim, tdxUse, DEV_SHARE, ETA_ROWS, wholeAt, together, DEV_TDX_DAY, DEV_OLDEST
+  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta, tdxTrim, tdxUse, DEV_SHARE, ETA_ROWS, wholeAt, together, devTdxDay, DEV_OLDEST, tdxFamily, tdxPlan, TDX_PAID_UNTIL
 } from '../transit.js';
 
 const NOW = Date.parse('2026-10-03T01:00:00Z');
@@ -449,9 +449,28 @@ test('TDX’s planner is read loosely: sections as a list or an object, missing 
   assert.ok(live[0].legs[0].dist > 30_000);
 });
 
-test('route plans: both sources, the same ride once, fastest first, shared for 5 minutes', async () => {
+test("TDX's planner is off unless TDX_MAAS is on: Google's plans alone, no TDX call", async () => {
   fresh();
   const env = { RATE_LIMIT_KV: memKv(), GOOGLE_MAPS_KEY: 'k', TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', TDX_PER_MIN: '300' };
+  const asked = [];
+  const fetchFn = async url => {
+    asked.push(url);
+    if (url.startsWith('https://routes.googleapis.com')) return json(GOOGLE);
+    assert.fail(`unexpected ${url}`);
+  };
+  const ask = src => handleTransit(new Request(`https://w/transit/route?from=24.8,120.97&to=24.84,121.012&at=${NOW}${src ? `&src=${src}` : ''}`), env, {}, '/transit/route', { session: { s: 'S' }, fetchFn, now: NOW, cache: memCache() });
+  const out = await (await ask('')).json();
+  assert.equal(out.sources.tdx, 'off');
+  assert.equal(out.sources.google, 'ok');
+  assert.ok(out.plans.length >= 1);
+  const t = await (await ask('tdx')).json();
+  assert.deepEqual({ tdx: t.sources.tdx, plans: t.plans.length }, { tdx: 'off', plans: 0 });
+  assert.ok(asked.every(u => !u.includes('tdx.transportdata.tw')));
+});
+
+test('route plans: both sources, the same ride once, fastest first, shared for 5 minutes', async () => {
+  fresh();
+  const env = { RATE_LIMIT_KV: memKv(), GOOGLE_MAPS_KEY: 'k', TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', TDX_PER_MIN: '300', TDX_MAAS: 'on' };
   const cache = memCache();
   let google = 0;
   let tdx = 0;
@@ -509,7 +528,7 @@ test('autocomplete and OpenStreetMap parsing drop what can’t be used', () => {
 
 test('a trip’s ways of moving: Google told which, TDX’s bike plan only with bikes, cached apart', async () => {
   fresh();
-  const env = { RATE_LIMIT_KV: memKv(), GOOGLE_MAPS_KEY: 'k', TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', TDX_PER_MIN: '300' };
+  const env = { RATE_LIMIT_KV: memKv(), GOOGLE_MAPS_KEY: 'k', TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', TDX_PER_MIN: '300', TDX_MAAS: 'on' };
   const bodies = [];
   const miles = [];
   const codes = [];
@@ -804,7 +823,7 @@ test("our tools (the dev door) yield TDX's month to people: a copy up to 10 minu
   assert.equal(kv.store.has('tdx:warm:active'), false, 'never kept warm for our tools');
   // Past half a point today (750 basic calls): ours get copies only, however old; none, DEV_TDX_CAP. People's go on.
   fresh();
-  await kv.put(`transit:use:${billingMonth(NOW)}`, JSON.stringify({ 'dev:tdx:b:2026-10-03': DEV_TDX_DAY * 1500 }));
+  await kv.put(`transit:use:${billingMonth(NOW)}`, JSON.stringify({ 'dev:tdx:b:2026-10-03': devTdxDay(NOW) * 1500 }));
   const old = await get(bikes, NOW + 60 * 60_000);
   assert.deepEqual([old.state, JSON.parse(old.body)[0].n, calls], ['stale', 2, 2]);
   const none = await get('basic/v2/Bike/Availability/City/Yilan', NOW + 60 * 60_000);
@@ -851,7 +870,7 @@ test('anything a transit ask throws is its failure in JSON with the CORS headers
 
 test("a route answer with a planner that failed isn't kept: the YouBike plans are back on the next ask, not missing for 5 minutes", async () => {
   fresh();
-  const env = { GOOGLE_MAPS_KEY: 'GK', TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', RATE_LIMIT_KV: memKv() };
+  const env = { GOOGLE_MAPS_KEY: 'GK', TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', RATE_LIMIT_KV: memKv(), TDX_MAAS: 'on' };
   const cache = memCache();
   let bikeUp = false;
   const plan = name => ({ data: { routes: [{ sections: [{ type: 'transit', transport: { mode: 'bus', name }, departure: { time: '2026-10-03T09:02:00', place: { name: 'C' } }, arrival: { time: '2026-10-03T09:10:00', place: { name: 'D' } } }] }] } });
@@ -1245,4 +1264,37 @@ test('高鐵 booking: a link into 高鐵’s own booking, the trip filled in, as
   assert.equal(refused.status, 502);
   assert.equal((await refused.json()).code, 'NOT_ALLOWED');
   assert.equal(linkIn({ result: 'success', data: { a: 'x', deeplink: 'texapp://book?x=1' } }), 'texapp://book?x=1');
+});
+
+test("TDX's API of each call (the month's count by it), and the plan: 銅級 till 2026-12-01, then the free tier's 3 points and 5 a minute", () => {
+  assert.equal(tdxFamily('basic/v2/Bus/EstimatedTimeOfArrival/City/Hsinchu?$filter=x'), 'Bus/EstimatedTimeOfArrival/Hsinchu');
+  assert.equal(tdxFamily('basic/v2/Bus/EstimatedTimeOfArrival/InterCity'), 'Bus/EstimatedTimeOfArrival/InterCity');
+  assert.equal(tdxFamily('advanced/v2/Bus/Station/NearBy'), 'Bus/Station/NearBy');
+  assert.equal(tdxFamily('basic/v3/Rail/TRA/StationLiveBoard/Station/1210'), 'Rail/TRA/StationLiveBoard');
+  assert.equal(tdxFamily('basic/v2/Rail/Metro/LiveBoard/TRTC'), 'Rail/Metro/LiveBoard/TRTC');
+  assert.equal(tdxFamily('maas/routing'), 'maas');
+  assert.equal(TDX_PAID_UNTIL, Date.parse('2026-11-30T16:00:00Z'));
+  assert.deepEqual(tdxPlan(TDX_PAID_UNTIL - 1), { month: 200, perMin: 300, paid: true });
+  assert.deepEqual(tdxPlan(TDX_PAID_UNTIL), { month: 3, perMin: 5, paid: false });
+  assert.equal(devTdxDay(TDX_PAID_UNTIL), 0.02);
+});
+
+test("TDX's GTFS streamed through for our tools only (0 points): all Taiwan's, or one operator's; nothing else", async () => {
+  fresh();
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', RATE_LIMIT_KV: memKv() };
+  const asked = [];
+  const fetchFn = async url => {
+    if (url.includes('token')) return json({ access_token: 'T', expires_in: 86400 });
+    asked.push(url);
+    return new Response(new Uint8Array([0x50, 0x4b, 3, 4]), { headers: { 'Content-Type': 'application/zip', 'Content-Length': '4' } });
+  };
+  const ask = (p, session) => handleTransit(new Request(`https://w/transit/gtfs${p == null ? '' : `?p=${p}`}`), env, {}, '/transit/gtfs', { session, fetchFn, now: NOW, cache: memCache() });
+  assert.equal((await ask(null, { s: 'person' })).status, 403);
+  const all = await ask(null, { s: 'dev', dev: true });
+  assert.equal(all.status, 200);
+  assert.equal(all.headers.get('Content-Type'), 'application/zip');
+  assert.deepEqual([...new Uint8Array(await all.arrayBuffer())], [0x50, 0x4b, 3, 4]);
+  assert.equal((await ask('Rail/TRTC', { s: 'dev', dev: true })).status, 200);
+  assert.equal((await ask('../basic', { s: 'dev', dev: true })).status, 400);
+  assert.deepEqual(asked, ['https://tdx.transportdata.tw/api/gtfs/V3/Map/GTFS/Static', 'https://tdx.transportdata.tw/api/gtfs/V3/Map/GTFS/Static/Rail/TRTC']);
 });
