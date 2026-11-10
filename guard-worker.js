@@ -71,7 +71,8 @@ async function answer(request, env) {
       hours: Number(q.get('hours')) || 24,
       group: q.get('group') || '',
       keys: q.get('keys') === '1',
-      script: q.get('script') || ''
+      script: q.get('script') || '',
+      where: q.get('where') || ''
     }).then(
       r => Response.json(r),
       e => Response.json({ error: String(e?.message || e).slice(0, 300) })

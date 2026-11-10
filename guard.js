@@ -643,7 +643,7 @@ export async function useByHour(env, { fetcher = fetch, now = Date.now(), kv = e
 // pass the Workers Free plan's 10 ms a request (2026-11-13 on). `group` is
 // the logs' key to group by (default the request's path); `keys=1` lists
 // the logs' keys instead. Asked by the proxy's /ops?check=cpu (build.yml).
-export async function cpuByRoute(env, { fetcher = fetch, now = Date.now(), hours = 24, group = '', keys = false, script = '' } = {}) {
+export async function cpuByRoute(env, { fetcher = fetch, now = Date.now(), hours = 24, group = '', keys = false, script = '', where = '' } = {}) {
   if (!env.CF_GUARD_TOKEN) return { off: true };
   const state = JSON.parse((await env.RATE_LIMIT_KV?.get(STATE_KEY).catch(() => null)) || 'null') || {};
   const a = env.CF_ACCOUNT_ID || state.account || (await accountOf(env, fetcher));
@@ -680,7 +680,17 @@ export async function cpuByRoute(env, { fetcher = fetch, now = Date.now(), hours
         { operator: 'p99', key: '$workers.cpuTimeMs', keyType: 'number', alias: 'p99' },
         { operator: 'max', key: '$workers.cpuTimeMs', keyType: 'number', alias: 'max' }
       ],
-      filters: [{ key: '$workers.scriptName', operation: 'eq', type: 'string', value: script || WORKERS[0] }],
+      // ?where=key,operation,value;… more filters (e.g. $workers.entrypoint,neq,Runner).
+      filters: [
+        { key: '$workers.scriptName', operation: 'eq', type: 'string', value: script || WORKERS[0] },
+        ...String(where || '')
+          .split(';')
+          .filter(Boolean)
+          .map(w => {
+            const [key, operation, value] = w.split(',');
+            return { key, operation, type: 'string', ...(value != null ? { value } : {}) };
+          })
+      ],
       groupBys: by.split(',').map(value => ({ type: 'string', value })),
       limit: 200
     }
