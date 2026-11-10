@@ -191,7 +191,7 @@ const accountName = opt('account');
 // (How long each is watched as it loads.)
 const LATE_MS = 9000;
 // (Orbit Class by either name: the family's `class`, its kit id `orbit`.)
-const list = (apps.length ? apps : ['sports', 'transit', 'weather', 'class', 'securities', 'law', 'words', 'money', 'beats']).map(a => (a === 'orbit' ? 'class' : a));
+const list = (apps.length ? apps : ['sports', 'transit', 'weather', 'class', 'securities', 'law', 'words', 'money', 'news', 'beats']).map(a => (a === 'orbit' ? 'class' : a));
 const require = createRequire(import.meta.url);
 const pw = require(process.env.PLAYWRIGHT || 'playwright');
 const webkit = args.includes('--webkit');

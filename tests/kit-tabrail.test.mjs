@@ -51,7 +51,7 @@ test('the app’s action is a true circle, on the bar and on the rail', () => {
 
 test("no app's CSS reshapes the tab bar or the rail (the apps checked out beside this one)", t => {
   const root = new URL('../../', import.meta.url).pathname;
-  const apps = ['Orbit-Sports', 'Orbit-Transit', 'Orbit-Weather', 'Orbit-Class', 'Orbit-Money', 'Orbit-Words', 'Orbit-Beats', 'Orbit-Law', 'Orbit-Securities'].filter(a => existsSync(join(root, a)));
+  const apps = ['Orbit-Sports', 'Orbit-Transit', 'Orbit-Weather', 'Orbit-Class', 'Orbit-Money', 'Orbit-News', 'Orbit-Words', 'Orbit-Beats', 'Orbit-Law', 'Orbit-Securities'].filter(a => existsSync(join(root, a)));
   if (!apps.length) return t.skip('no app checked out beside this repo');
   const faults = apps.flatMap(a => appFrameFaults(join(root, a)).map(x => `${a}/${x}`));
   assert.deepEqual(faults, []);

@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, symlinkSync, lstatSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-const APPS = ['Beats', 'Class', 'Law', 'Money', 'Securities', 'Showcase', 'Sports', 'Transit', 'Weather', 'Words'];
+const APPS = ['Beats', 'Class', 'Law', 'Money', 'News', 'Securities', 'Showcase', 'Sports', 'Transit', 'Weather', 'Words'];
 const kit = resolve(new URL('../kit', import.meta.url).pathname);
 const asked = process.argv.slice(2).map(a => a.toLowerCase());
 const failed = [];

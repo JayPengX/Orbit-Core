@@ -64,6 +64,7 @@ orbit-site (site.js): the domain's hosts as custom domains
 | Orbit Weather | `weather` | `/weather/` | Orbit-Weather | `orbit-weather` |
 | Orbit Class | `orbit` | `/class/` | Orbit-Class | `orbit-class` |
 | Orbit Money | `money` | `/money/` | Orbit-Money | `orbit-money` |
+| Orbit News | `news` | `/news/` | Orbit-News | `orbit-news` |
 | Orbit Words | `vocab` | `/words/` | Orbit-Words | `vocab-progress-sync` |
 | Orbit Beats | `beats` | `/beats/` | Orbit-Beats | `orbit-beats` |
 | Orbit Law | `law` | `/law/` | Orbit-Law | `orbit-law` |
@@ -112,13 +113,14 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `orbit.mjs` | The core: the session, data reads and device storage (§5), the economy's tables, looks and milestones, notices, the frame (`tabBar`, `topActions`, `accountButton`, `ask`/`tell`), screens, fitting, live beats and break countdowns, recommendations (`rank`, `affinity`), the 除錯紀錄 (`rec`); on import it stops pinch zoom, lifts sheets over the keyboard (`watchKeyboard`), holds the lift for pictures, presses only when pressed; `switchGlide` |
 | `orbit.css` | The design system: iOS 27's tokens (colour, type, space, radius, Liquid Glass, springs) and every `q-` component; the apps' accents (`tools/accent-css.mjs`); at its end Orbit's own look (`data-look="native"`, DESIGN §11) |
 | `ui.mjs` | The builders (§3.3) and their HTML-string twins (`…Html`) for apps that draw with template strings; loads `hold-place.mjs` |
-| `hold-place.mjs` | A redraw never moves the page, a sheet or a panel (only the code's scrolls do); a tap holds the control under the finger; never a drawing (`loose`); a content-sized sheet keeps its height (`--q-sheet-floor`); `scrollBusy()` holds `everyDev`'s beats under a finger; `freshScreen()`: a new screen at the top; `letGo()`: a drag carries its grip away |
+| `hold-place.mjs` | A redraw never moves the page, a sheet or a panel (only code scrolls); a tap holds the control under the finger; never a drawing (`loose`); a sized sheet keeps its height (`--q-sheet-floor`); `scrollBusy()` holds `everyDev` under a finger; `freshScreen()`: a new screen at the top; `letGo()`: a drag carries its grip away |
 | `steady-pics.mjs` | A picture drawn again is eager and decoded at once |
 | `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, before the app's modules); the cover held for it |
 | `loader.html` | The snippets every app's page carries (`kit:head`, `kit:boot`) |
 | `brand.mjs` | Families, names, colours, marks, repos, slugs, `APP_ORDER`, `DEV` (speeds, §9) |
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: never money); every app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
 | `passkey.mjs` | Passkeys in the browser: made, used, named (`passkeyHere()` false where a browser can't) |
+| `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, US left–right), sources (`BASIS`); `sideOf`, `partiesIn` |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs` is qrcode-generator 2.0.4 (MIT), vendored |
 | `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays` |
@@ -158,7 +160,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | Loading | `#loading` (boot.js) lifted once by `ready(firstScreen)` onto a finished screen (it waits for on-screen pictures); in place, `.q-skel` shimmers the size of what comes; a part read later holds its place as `waiting(shape)` |
 | Pictures | `logoTile` / `logoTileHtml` + `wireLogos`, `darkLogos`; `logos.mjs`, `photos.mjs`; never letter tiles |
 | Icons | `ICONS` (orbit.mjs) / `icons` (ui.mjs): one drawing per idea; new ones read as `kitUI.icons?.x` |
-| Live data | `everyDev(key, fn)` beats at the owner's speeds (they wait while a finger is down); `data-q-live` + `liveChanged` pop a number that changed; patch in place (the same nodes), never rebuild what didn't change; `hold-place.mjs` keeps the reader's place by itself; `steady-pics.mjs` the pictures |
+| Live data | `everyDev(key, fn)` beats at the owner's speeds (waiting while a finger is down); `data-q-live` + `liveChanged` pop a changed number; patch in place, never rebuild what didn't change; `hold-place.mjs` keeps the reader's place by itself; `steady-pics.mjs` the pictures |
 | Fitting | `fitNames` (`.q-fit`, `.q-fit-wrap`), `fitNumbers` / `watchFit`, `balanceRows` (`.q-balance`), `fullRows` (`.q-rows-full`/`-keep`), `.q-even` / `.q-even3` |
 | Every screen | `screenFit()` / `onScreen(fn)` mark `html.q-tabrail`, `q-float`, `q-desk`, `q-wide`, `q-w3`; `--q-page-max`, `--q-vw`. By their own width, anywhere (a page, a sheet, a pane): `.q-cols`, `.q-flow` + `flowColumns(root)` (columns of even height), `.q-grid` (cards), `.q-split` (list beside detail) (DESIGN §10) |
 | Pull to refresh, taps | `pullToRefresh`; `haptic()` / `tick()`; `PRESS_DELAY` / `pressSelector` |
@@ -195,20 +197,20 @@ w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 | `/eco` | `eco.js`, `eco-admin.js`, `money.js`, `passkey.js`, `webauthn.js`, `orbit-token.js` | The Pass (§6); `op: 'admin'` is the owner's panel |
 | `/stock` | `stock-fill.js`, `stock-check.js` | Securities' fills at the proxy's own quote; the account replayed on each save |
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
-| `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `weather-radar.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations) scored hourly (`/weather/skill`); `radar`: the next hour's rain (CWA's radar); in a typhoon (NCDR's CAP), `dayOff`: each county's 停班停課 from 人事行政總處, else a fitted chance |
+| `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `weather-radar.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations) scored hourly (`/weather/skill`); `radar`: the next hour's rain (CWA); in a typhoon (NCDR's CAP), `dayOff`: each county's 停班停課 (人事行政總處) or a fitted chance |
 | `/transit/…` | `transit.js`, `transit-free.js` | TDX (allowlist `TDX_RULES`; `tdxTrim`; YouBike, 新竹/臺北/新北's buses, 台鐵's day: own sites; 高鐵's: `rail/thsr.json`; `tdxf:*`), bus places (`gps`), map config, search, place, route (TDX's if `TDX_MAAS`), walk, book (高鐵), `gtfs` (dev, bus build); `status?sample=` |
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `f1-people.js`, `fund-nav.js`, `taifex.js` | The data proxy (§4.1): sports, quotes, F1, Asian baseball, SITCA's fund NAVs, TAIFEX |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
-| `/law-ask` | `law.js`, `law-ruling.js`, `law-ground.js` | Orbit Law's questions on 1–8 articles, every point cited and checked, kept in KV by the law's version; `mode: 'bill'` (from its 對照表), `'diff'` (an amendment), `'ruling'` (from its own paragraphs); 40 Gemini calls a day a Pass, 300 in all with `/law-chat`'s (D1 `law_day`) |
-| `/law-chat` | `law-chat.js`, `law-ground.js`, `law-more.js` | 問法律: a plan, up to 14 articles from Orbit Law's lists and full-text index, an answer from those only, every cite checked; grounded by Law's `ai/facts.json`, `ai/news.json`, `bills/items.json` and `ly/budget.json` (`law-ground.js`) and the rulings and rules found beside them (`law-more.js`); 30 turns a day a Pass |
-| `/law-page` | `law-page.js`, `law-hosts.js` | A government page (gov.tw, www.edu.tw) read inside Orbit Law, cleaned, in its own charset (or a PDF's size); Cloudflare's cache only; Taiwan-only county and council sites through the Taiwan relay; 500 a day a Pass |
-| `/law-live` | `law-live.js` | What 立法院's IVOD streams now (`{at, rooms}`), read on demand, 60 s at the edge, the last good read kept 30 minutes; our pages, no Pass |
-| `/money-read` | `money-read.js` | Orbit Money's 拍照記帳: one picture → `{ buys, left }`, read by Gemini (Flash-Lite, through the relay) and checked; only on a tap; 30 a day a Pass, 300 in all |
+| `/law-ask` | `law.js`, `law-ruling.js`, `law-ground.js` | Orbit Law's questions on 1–8 articles, every point cited and checked, kept in KV by the law's version; modes `bill`, `diff`, `ruling`; 40 Gemini calls a day a Pass, 300 in all with `/law-chat`'s (D1 `law_day`) |
+| `/law-chat` | `law-chat.js`, `law-ground.js`, `law-more.js` | 問法律: a plan, up to 14 articles from Law's lists and full-text index, an answer from those only, every cite checked; grounded by Law's `ai/` facts, news, bills and budget (`law-ground.js`) and rulings and rules beside them (`law-more.js`); 30 turns a day a Pass |
+| `/law-page` | `law-page.js`, `law-hosts.js` | A government page (gov.tw, www.edu.tw) read inside Orbit Law, cleaned, in its own charset; Cloudflare's cache only; Taiwan-only county and council sites through the Taiwan relay; 500 a day a Pass |
+| `/law-live` | `law-live.js` | What 立法院's IVOD streams now, 60 s at the edge, the last good read kept 30 minutes; our pages only, no Pass |
+| `/money-read` | `money-read.js` | Orbit Money's 拍照記帳: one picture → `{ buys, left }`, read by Gemini through the relay, checked; only on a tap; 30 a day a Pass, 300 in all |
 | `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |
 | `/flight` | `flight.js`, `kit/flight.mjs` | Orbit Class's 專注飛行: real planes landing in about N minutes, then one followed |
-| `/gift` | `gift.js` | 公開領取 at `/key/` (`site/key/`), set in the admin panel; one a device (a cookie, D1 `gift_claim`), `op: 'go'` a `#qh=` into an app; unreplaced passes back after `hold` hours; empty ones (wallet `gift`) cleared nightly if on |
-| `/showcase/pass` | `showcase.js` | The showcase's short pass for its live demos: reads only, per-address and daily caps, from the showcase's address only |
+| `/gift` | `gift.js` | 公開領取 at `/key/` (`site/key/`), set in the admin panel; one a device (a cookie, D1 `gift_claim`), `op: 'go'` a `#qh=` into an app; unreplaced passes back after `hold` hours |
+| `/showcase/pass` | `showcase.js` | The showcase's short pass for its live demos: reads only, capped per address and day |
 | `/data/…` | `data.js` | R2, public reads (§5.5); `/data/build` (POST, Bearer `DATA_PUSH_SECRET`, `build.yml`) runs a builder now |
 | `/config` | `worker.js`, `kit/devconfig.mjs` | The live speeds (`DEV`), a minute in Cloudflare's cache |
 | `/guard` | `worker.js` | The guard as it last read the bill (no key) |
@@ -373,6 +375,7 @@ writing a file only when it changed (`builders/store.js`):
 | `asia.js`, `cpbl.js` | CPBL's month and standings | daily 15:00 |
 | `f1kept.js` | each finished F1 session's 數據 and laps, kept before anyone opens them (via the proxy: OpenF1 refuses quick askers) | :06, :26, :46 |
 | `kept.js` | wipes the proxy's kept copies (`mirror/`) from before a league's first askable day | daily 17:00 |
+| `news.js` | `news/index.json`: stories by side from outlets' feeds (48 h in `private/news/`) | every 10 min |
 
 A season is kept whole until the next season's first game (preseason
 included), then wiped whole. `private/` is never served.
@@ -438,6 +441,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   - `deploy.yml`: the proxy and `gemini-relay` (and `orbit-site`);
   - `deploy-guard.yml`: the guard, only when its files change;
   - `pages.yml`: the kit and `site/`, to Cloudflare (tests first);
+  - `news-site.yml`: News's site with this repo's token when its main moved;
   - every app repo's deploy workflow: its own site, to Cloudflare.
 - By hand: `build.yml` (a builder now, a check), `tail.yml` (logs),
   `audit.yml` (secret names, the store counted), `zone-speed.yml` (the zone's
@@ -463,13 +467,13 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
 | Tool | What |
 | --- | --- |
 | `node tools/kit-find.mjs <word…>` | The kit's exports and CSS classes matching: look before writing a helper or a style |
-| `node tools/shots.mjs <app> [page…]` | Every screenshot a change needs (screens × light/dark, live data, signed in), a contact sheet, faults, `--before main` diff; pages in `tools/shots/pages.mjs` |
+| `node tools/shots.mjs <app> [page…]` | Every screenshot a change needs (light/dark, live data, signed in), a contact sheet, faults, `--before main`; pages in `tools/shots/pages.mjs` |
 | `node tools/layout-check.mjs <app…>` | Every tab and `check` page at 320, iPad, laptop: a narrow band, a half empty, overflow (`layout-faults.mjs`); `push.sh` runs it |
-| `node tools/preview.mjs <app>` | The app with real data (`--live`, `--width`, `--timing`, `--requests`, `--profile`, `--webkit`, `--reopen`…); prints `wraps:`, `cut:`, `scrolls sideways:` |
+| `node tools/preview.mjs <app>` | The app with real data (`--live`, `--width`, `--timing`, `--webkit`…; `ORBIT_DATA=<dir>`: local /data/ files); prints `wraps:`, `cut:` |
 | `node tools/gate.mjs [app…]` | The quality gate (`gate-page.js`) on every tab: lift, stalls, dead taps, wraps, cuts, white, mixed language… |
 | `node tools/speed.mjs <app…>` | Before vs after (3G, CPU ×4, answers replayed): time, KB, requests, CPU, redraws, memory, proxy calls |
-| `node tools/live-scroll.mjs [app…] [--webkit]` | Nothing jumps: a live game's refreshes, pages as they load and scrolled, taps folding, a sheet showing less |
-| `node tools/test-apps.mjs [app…]` | Every app's tests against this kit (checkouts beside it) |
+| `node tools/live-scroll.mjs [app…] [--webkit]` | Nothing jumps: live refreshes, pages as they load and scroll, taps folding |
+| `node tools/test-apps.mjs [app…]` | Every app's tests against this kit (checkouts beside this one) |
 
 The rest: `tools/README.md`.
 

@@ -1,0 +1,125 @@
+# Publishes Orbit News (JayPengX/Orbit-News) to Cloudflare with this repo's
+# token: that repo has no CLOUDFLARE_API_TOKEN of its own (a secret can't be
+# read back to copy it; Jay 2026-11-10: Cloudflare goes out from Orbit-Core).
+# Every 15 minutes it asks whether News's main has a commit the live site
+# (news/version.json) doesn't, and builds it as News's own deploy.yml would:
+# its tests against this repo's kit, stamped, published with deploy/cf-site.mjs.
+# A commit is tried once (a failure mails once, not every 15 minutes); by
+# hand (workflow_dispatch) it publishes main's tip again whatever was tried.
+name: Orbit News to Cloudflare
+
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.look.outputs.sha }}
+      go: ${{ steps.look.outputs.go }}
+    steps:
+      - name: News's main against the live site
+        id: news
+        run: |
+          sha=$(git ls-remote https://github.com/JayPengX/Orbit-News refs/heads/main | cut -f1)
+          live=$(curl -fsS --max-time 15 https://orbit.jaypengx.com/news/version.json 2>/dev/null | jq -r '.version // empty' 2>/dev/null || true)
+          echo "News main ${sha:-none}, live ${live:-none}"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "live=$live" >> "$GITHUB_OUTPUT"
+      - name: Tried already?
+        id: tried
+        if: steps.news.outputs.sha != ''
+        uses: actions/cache/restore@v4
+        with:
+          path: .tried
+          key: news-tried-${{ steps.news.outputs.sha }}
+          lookup-only: true
+      - name: Go or not
+        id: look
+        env:
+          SHA: ${{ steps.news.outputs.sha }}
+          LIVE: ${{ steps.news.outputs.live }}
+          TRIED: ${{ steps.tried.outputs.cache-hit }}
+        run: |
+          go=false
+          if [ -n "$SHA" ]; then
+            if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then go=true
+            elif [ "$SHA" != "$LIVE" ] && [ "$TRIED" != true ]; then go=true; fi
+          fi
+          echo "go=$go"; echo "sha=$SHA" >> "$GITHUB_OUTPUT"; echo "go=$go" >> "$GITHUB_OUTPUT"
+
+  # One publish at a time, without cancelling any (a cancelled run mails its
+  # pusher): a run waits for the earlier ones still going, and steps aside,
+  # quietly, when a newer run of this workflow will publish instead.
+  queue:
+    needs: check
+    if: needs.check.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    outputs:
+      go: ${{ steps.wait.outputs.go }}
+    steps:
+      - name: Wait for the earlier runs; step aside for a newer one
+        id: wait
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          api() { gh api "repos/$GITHUB_REPOSITORY/$1" --jq "$2" 2>/dev/null; }
+          wf=$(api "actions/runs/$GITHUB_RUN_ID" .workflow_id) || wf=
+          while [ -n "$wf" ]; do
+            runs=$(api "actions/workflows/$wf/runs?branch=$GITHUB_REF_NAME&per_page=30" "[.workflow_runs[] | select(.id != $GITHUB_RUN_ID) | {n: .run_number, done: (.status == \"completed\")}]") || runs='[]'
+            if [ "$(jq "[.[] | select(.n > $GITHUB_RUN_NUMBER)] | length" <<<"$runs")" != 0 ]; then
+              echo "A newer run publishes instead."; echo go=false >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            [ "$(jq "[.[] | select(.n < $GITHUB_RUN_NUMBER and (.done | not))] | length" <<<"$runs")" = 0 ] && break
+            echo "Waiting for an earlier run to finish."; sleep 20
+          done
+          echo go=true >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: [check, queue]
+    if: needs.queue.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Orbit News at the commit looked at
+        uses: actions/checkout@v4
+        with:
+          repository: JayPengX/Orbit-News
+          ref: ${{ needs.check.outputs.sha }}
+          path: app
+      - name: This repo's kit and deploy, as News's deploy reads them
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: app/.shared
+          sparse-checkout: |
+            kit
+            deploy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run News's tests
+        working-directory: app
+        run: ln -sfn .shared/kit .kit && npm test
+      - name: Minify, and address every file by its content
+        working-directory: app
+        run: node scripts/stamp-version.mjs "$(git rev-parse HEAD)"
+      - name: Publish to Cloudflare
+        working-directory: app
+        run: node .shared/deploy/cf-site.mjs Orbit-News public
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Note this commit as tried
+        if: always()
+        run: mkdir -p .tried && echo "${{ needs.check.outputs.sha }}" > .tried/sha
+      - if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .tried
+          key: news-tried-${{ needs.check.outputs.sha }}

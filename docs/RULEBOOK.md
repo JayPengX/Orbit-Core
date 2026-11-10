@@ -259,6 +259,12 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - Keep `noted()` hooks in `radio.mjs`; never a `.loading` class outside `#loading`; home cards static (nothing animates forever).
 - `engine.mjs` is the port of `passion_beats.py`: a change to the songs goes into both. Nothing of a kit's sound is sent anywhere.
 
+### News (started 11-10)
+- 11-10 Orbit News: Taiwan's and English news grouped into stories, each outlet's side shown (藍綠 and 統獨 for Taiwan, US left/right for English); "like Ground News but for Taiwan" is the idea only, never its name, look or words (its "Blindspot" is our 單邊).
+- 11-10 An outlet's place comes from a published source (`kit/news-outlets.mjs` BASIS) or its owner's stated stance marked weaker; never our own reading of its stories. No outlet placed 白: stories name the parties instead.
+- 11-10 Headlines, links, the outlet's short summary and feed picture only, each credited; every tap opens the outlet. No AI in the builder.
+- 11-10 Cloudflare goes out from Orbit-Core: News's site is published by Orbit-Core's `news-site.yml` with Orbit-Core's token (a secret can't be copied).
+
 ### Orbit Pass
 - 10-27 Pass card: avatar, 里程碑 n/30 (tiers reached), account number without prefix, the medal strip on one row however many; no money on the Pass. (Replaces 10-23's n/9.)
 - 10-27 Milestones (Jay: the two-row strip, "the achievement kind of suck"): one per app, bronze, silver and gold, each kept for good; 外觀 leads with what's worn now (a quiet line), then the nearest next medal (focal count, a progress ring round the medal drawn faint, never shown like a worn look: Jay 10-27 took it for his own), then one list row each (medal in its metal or the app icon, the goal in words, count and tier pips, 戴上 on earned rows). No locks, no greyed grid, no glows on milestone frames.

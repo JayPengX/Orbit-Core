@@ -28,6 +28,7 @@ export const APPS = {
   weather: { repo: 'Orbit-Weather', slug: 'weather', id: 'weather', account: 'weather-pins', geo: [25.034, 121.565] },
   class: { repo: 'Orbit-Class', slug: 'class', id: 'orbit', account: 'orbit-week', vite: true },
   money: { repo: 'Orbit-Money', slug: 'money', id: 'money', account: 'money' },
+  news: { repo: 'Orbit-News', slug: 'news', id: 'news' },
   words: { repo: 'Orbit-Words', slug: 'words', id: 'vocab', account: 'words-demo' },
   beats: { repo: 'Orbit-Beats', slug: 'beats', id: 'beats' },
   law: { repo: 'Orbit-Law', slug: 'law', id: 'law', account: 'law-follows' },

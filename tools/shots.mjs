@@ -101,7 +101,7 @@ if (!app || app.startsWith('--')) {
 }
 const ALIAS = { class: 'orbit', fixtures: 'sports', hub: 'words' };
 const key = ALIAS[app] || app.toLowerCase().replace(/^orbit-/, '');
-const REPOS = { sports: 'Orbit-Sports', securities: 'Orbit-Securities', words: 'Orbit-Words', orbit: 'Orbit-Class', weather: 'Orbit-Weather', transit: 'Orbit-Transit', beats: 'Orbit-Beats', law: 'Orbit-Law', money: 'Orbit-Money', admin: 'Orbit-Core' };
+const REPOS = { sports: 'Orbit-Sports', securities: 'Orbit-Securities', words: 'Orbit-Words', orbit: 'Orbit-Class', weather: 'Orbit-Weather', transit: 'Orbit-Transit', beats: 'Orbit-Beats', law: 'Orbit-Law', money: 'Orbit-Money', news: 'Orbit-News', admin: 'Orbit-Core' };
 if (!REPOS[key]) throw new Error(`no app ${app}: ${Object.keys(REPOS).join(' ')}`);
 const repo = REPOS[key];
 const book = PAGES[key] || {};

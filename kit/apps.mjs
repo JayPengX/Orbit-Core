@@ -29,7 +29,8 @@ const APPS = {
   'Orbit-Class': { id: 'orbit', site: '.', mods: ['orbit'] },
   'Orbit-Beats': { id: 'beats', site: 'public', mods: ['orbit'] },
   'Orbit-Law': { id: 'law', site: 'public', mods: ['orbit'] },
-  'Orbit-Money': { id: 'money', site: 'public', mods: ['orbit'] }
+  'Orbit-Money': { id: 'money', site: 'public', mods: ['orbit'] },
+  'Orbit-News': { id: 'news', site: 'public', mods: ['orbit'] }
 };
 const CHECKOUT = `      - name: The shared kit (Orbit-Core/kit), for the tests
         uses: actions/checkout@v4

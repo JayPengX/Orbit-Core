@@ -27,7 +27,7 @@
 //                          [--fake-yahoo]  (made-up Yahoo prices: spark and chart answers
 //                          for any symbol, for when Yahoo answers 429)
 //
-//   app   sports | securities | words | orbit | weather | transit | beats | law | money (or the repo's folder name)
+//   app   sports | securities | words | orbit | weather | transit | beats | law | money | news (or the repo's folder name)
 //         | admin [overview accounts money health usage dev tools]  (the admin panel, made-up accounts, --people n of them; money: the 證券的錢 sheet)
 //
 // Orbit Transit: /transit is answered by transit.js itself on made-up TDX
@@ -303,7 +303,7 @@ async function snapshotRoot(when, repos) {
 }
 const [appArg, ...hashes] = args;
 
-const APPS = { sports: ['Orbit-Sports', 'match'], securities: ['Orbit-Securities', 'stock'], words: ['Orbit-Words', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'], transit: ['Orbit-Transit', 'transit'], beats: ['Orbit-Beats', 'beats'], law: ['Orbit-Law', 'law'], money: ['Orbit-Money', 'money'], admin: ['Orbit-Core', 'admin'] };
+const APPS = { sports: ['Orbit-Sports', 'match'], securities: ['Orbit-Securities', 'stock'], words: ['Orbit-Words', 'vocab'], orbit: ['Orbit-Class', 'orbit'], weather: ['Orbit-Weather', 'weather'], transit: ['Orbit-Transit', 'transit'], beats: ['Orbit-Beats', 'beats'], law: ['Orbit-Law', 'law'], money: ['Orbit-Money', 'money'], news: ['Orbit-News', 'news'], admin: ['Orbit-Core', 'admin'] };
 // The admin panel's key in a preview: the run's own, never the owner's.
 const ADMIN_KEY = 'preview-admin-key-0123456789abcdef0123456789';
 // The old names still work.
@@ -1072,7 +1072,12 @@ if (googleMap) {
   });
 }
 // The family's data (the proxy's /data/, R2): the real files, as a phone reads them.
+// ORBIT_DATA=<folder>: a file there (at its /data/ path) answers instead, for a
+// pack its builder hasn't written yet (node builders/run.js's output, say).
+const dataDir = process.env.ORBIT_DATA || '';
 await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/data\//, async route => {
+  const own = dataDir && join(dataDir, decodeURIComponent(new URL(route.request().url()).pathname.replace(/^\/data\//, '')));
+  if (own && existsSync(own)) return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: readFileSync(own) });
   if (liveKeep.on) return keptAnswer(route);
   const body = await curlBin(route.request().url());
   if (!body) return route.fulfill({ status: 404, headers: { 'Access-Control-Allow-Origin': '*' }, body: '' });

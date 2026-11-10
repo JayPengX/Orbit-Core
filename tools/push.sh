@@ -36,7 +36,7 @@ fi
 changed=$(git diff --name-only origin/main HEAD)
 apps=""
 case "$name" in
-  Orbit-Core) echo "$changed" | grep -qE '^kit/(orbit\.css|ui\.mjs|orbit\.mjs|hold-place\.mjs)$' && apps="sports transit weather orbit money words beats law securities" ;;
+  Orbit-Core) echo "$changed" | grep -qE '^kit/(orbit\.css|ui\.mjs|orbit\.mjs|hold-place\.mjs)$' && apps="sports transit weather orbit money news words beats law securities" ;;
   Orbit-Class) echo "$changed" | grep -qE '^(src|css|public)/|^index\.html$' && apps=orbit ;;
   Orbit-Showcase) ;;
   Orbit-*) echo "$changed" | grep -qE '^public/' && apps=$(echo "${name#Orbit-}" | tr 'A-Z' 'a-z') ;;

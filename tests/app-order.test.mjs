@@ -6,7 +6,7 @@ import { APPS, MILESTONES } from '../kit/orbit.mjs';
 import { HELP_ORDER } from '../kit/help.mjs';
 
 // Jay 10-27: the everyday apps first, Securities last, the same everywhere.
-const ORDER = ['match', 'transit', 'weather', 'orbit', 'money', 'vocab', 'beats', 'law', 'stock'];
+const ORDER = ['match', 'transit', 'weather', 'orbit', 'money', 'news', 'vocab', 'beats', 'law', 'stock'];
 
 test('one app order: brand, Pass list, milestones, medals, help, family page', async () => {
   assert.deepEqual(APP_ORDER, ORDER);
