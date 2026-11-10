@@ -29,3 +29,22 @@ test("Class's periods: the one on now, the break after it, the school day's hour
   assert.equal(F.classAt(Date.parse('2026-11-10T09:05:00+08:00')), null, 'a break');
   assert.equal(F.breakAfter(Date.parse('2026-11-10T14:30:00+08:00')), Date.parse('2026-11-10T15:00:00+08:00'));
 });
+
+test("Class's days as held win over its week: a holiday empty, a swapped period moved", () => {
+  F.tell('class', 'days', { '2026-11-10': [], '2026-11-11': [{ n: 1, name: '體育', from: '08:10', to: '09:00', out: true }] });
+  assert.deepEqual(F.classesOn('2026-11-10'), [], 'a day off, though the week has classes on Tuesdays');
+  assert.equal(F.classesOn('2026-11-11')[0].name, '體育');
+  assert.equal(F.classesOn('2026-11-17').length, 3, 'past the days told: the week');
+});
+
+test('上課勿擾: a notice due in class waits for the break; Class’s and Transit’s on time', async () => {
+  const { classHold } = await import('../kit/orbit.mjs');
+  F.tell('class', 'days', { '2026-11-12': [{ n: 3, name: '英文', from: '10:10', to: '11:00' }] });
+  const inClass = Date.parse('2026-11-12T10:30:00+08:00');
+  const end = Date.parse('2026-11-12T11:00:00+08:00');
+  assert.equal(classHold('match', inClass), end + 15_000);
+  assert.equal(classHold('orbit', inClass), inClass);
+  assert.equal(classHold('transit', inClass), inClass);
+  assert.equal(classHold('weather', Date.parse('2026-11-12T11:05:00+08:00')), Date.parse('2026-11-12T11:05:00+08:00'), 'a break: on time');
+  assert.equal(classHold('stock', inClass, inClass + 60_000), inClass, 'one that can’t wait past its end: on time');
+});

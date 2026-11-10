@@ -121,7 +121,7 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: never money); every app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
 | `passkey.mjs` | Passkeys in the browser: made, used, named (`passkeyHere()` false where a browser can't) |
 | `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); topics (`TOPICS`); `sideOf`, `partiesIn`, `topicsOf` |
-| `ai.mjs`, `family.mjs` | AI on a phone: `aiCall`, `aiFlow` (its question back as chips), `pickList`/`picker` (the person's own lists), `aiBar`; the apps' notebook on the phone (`tell`/`heard`, places, Class's periods) |
+| `ai.mjs`, `family.mjs` | AI on a phone: `aiCall`, `aiFlow` (its question back as chips), `pickList`/`picker` (the person's own lists), `aiBar`, `aiPicture`; the apps' notebook on the phone (`tell`/`heard`, places, Class's periods) |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs`: qrcode-generator 2.0.4 (MIT), vendored |
 | `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays` |
@@ -306,7 +306,7 @@ A read (`kit proxyJson`) goes down these until one answers:
   lines, OpenF1, Open-Meteo, ELTA's list untrimmed (`DEVICE_FIRST`;
   failing, the proxy, 10 minutes); Jolpica when the proxy can't (`SELF_TOO`).
 - Apps put live knowledge over slower copies (Sports' `liveTable`, F1's
-  timing at the flag, MLB's postseason from MLB).
+  timing, MLB's postseason).
 
 ### 5.2 Where data lives
 
@@ -405,7 +405,7 @@ Broker rules (`stock-access.mjs`, `-credit`): Securities' MAP.md.
 ## 8. Notices (`/push`)
 
 Apps hand the Worker coming notices (`schedulePush`); it sends them by
-Web Push and can check first (an ESPN final, a price, weather, a bus). One device per person per app; each kind in `NOTICE_KINDS` can be off.
+Web Push and can check first (an ESPN final, a price, weather, a bus). One device per person per app; each kind in `NOTICE_KINDS` can be off; one due in class waits for the break (`classHold`).
 
 ## 9. Speeds, capacity and the bill
 
@@ -437,7 +437,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   - every app repo's deploy workflow: its own site, to Cloudflare.
 - By hand: `build.yml` (a builder now, a check), `tail.yml` (logs),
   `audit.yml` (secret names, the store counted), `zone-speed.yml` (the zone's
-  HTTP/3, 0-RTT, Early Hints, Brotli, Tiered Cache).
+  speed settings).
 - Never a cancelling `concurrency:` (a cancel mails Jay): copy the `queue`
   job; builds check out main's tip.
 - **Only what must stay secret is a secret** (the rest: code, tomls).
@@ -450,7 +450,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   `SHORT` in `kit/brand.mjs`; one origin, so one Pass sign-in), `orbit-pass`
   for `/`, `/pass/`, `/key/`, `/Orbit-Core/` and the old `/Shared-Proxy/`,
   `orbit-home` for `<DOMAIN>/`, `/showcase/` (Orbit-Showcase).
-  Plain static paths. Mail is refused. `deploy.yml`
+  Mail is refused. `deploy.yml`
   attaches the hostnames (its token needs the zone and D1 Edit); the guard
   takes them off with the proxy.
 

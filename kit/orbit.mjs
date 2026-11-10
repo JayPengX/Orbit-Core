@@ -36,6 +36,7 @@ import { API, SITE as HOME, isApi } from './domain.mjs';
 import { passkeyHere, passkeyName, deviceName, makePasskey, usePasskey, forgetPasskey, cancelled } from './passkey.mjs';
 import { icons, tile, pullToRefresh, setSheetDetent, toast, h as node } from './ui.mjs';
 import { scrollBusy } from './hold-place.mjs';
+import { breakAfter } from './family.mjs';
 // (A picture drawn again never flashes: steady-pics.mjs, on import.)
 import './steady-pics.mjs';
 // (A phone's own outside reads counted, and sent back when one fails: source-watch.mjs, on import.)
@@ -3142,6 +3143,16 @@ export async function enablePush(s, force = false) {
 // The app's coming notices, for the Worker to send while the app is closed:
 // [{ at, title, body, tag, hash, kind, check, until }] (check: see push.js). The
 // whole list each time (it replaces the last); sent only when it changed.
+// 上課勿擾 (the family's notebook, Jay 11-10): a notice due during a class
+// (Orbit Class's periods as held, told on this phone) waits for the break;
+// Class's own and Transit's (a bus, a train) come on time. No Class: on time.
+const ON_TIME = new Set(['orbit', 'transit']);
+export function classHold(app, at, until = 0) {
+  if (ON_TIME.has(app)) return at;
+  const end = breakAfter(at);
+  const held = end ? end + 15_000 : at;
+  return until && held > until ? at : held;
+}
 export async function schedulePush(s, items) {
   if (!s?.app) return;
   const storeKey = `orbit.push.list.${s.app}`;
@@ -3155,7 +3166,7 @@ export async function schedulePush(s, items) {
   const base = `${globalThis.location?.origin || SITE}${APPS[s.app]?.path || '/'}`;
   const list = items
     .filter(x => x && Number.isFinite(x.at) && kindOn(s.app, x.kind))
-    .map(x => ({ at: Math.round(x.at), title: x.title || '', body: x.body || '', tag: `${s.app}:${x.tag || x.title}`, ...(x.kind ? { kind: x.kind } : {}), url: `${base}${x.hash ? `#${x.hash}` : ''}`, ...(x.check ? { check: x.check } : {}), ...(x.until ? { until: Math.round(x.until) } : {}) }))
+    .map(x => ({ at: Math.round(classHold(s.app, x.at, x.until)), title: x.title || '', body: x.body || '', tag: `${s.app}:${x.tag || x.title}`, ...(x.kind ? { kind: x.kind } : {}), url: `${base}${x.hash ? `#${x.hash}` : ''}`, ...(x.check ? { check: x.check } : {}), ...(x.until ? { until: Math.round(x.until) } : {}) }))
     .sort((a, b) => a.at - b.at)
     .slice(0, 60);
   const text = JSON.stringify(list);

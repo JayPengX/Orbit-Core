@@ -14,6 +14,8 @@
 //   schoolHours(day)                 { from, to } of the first and last period, or null (no school)
 //
 // The facts each app tells (keep this list current):
+//   class.days      { 'YYYY-MM-DD': [{ n, name, from: 'HH:MM', to, out }] } the next two weeks' periods as held
+//                   (單/雙週, holidays, typhoon days and 調課 applied: Class's own); a day not in it, the week's
 //   class.week      { 1..7: [{ n, name, from: 'HH:MM', to, out }] } the week's periods by weekday (1 Monday)
 //   class.school    { name } the school's name
 //   sports.follows  [{ league, id, name, abbr }] the teams followed
@@ -73,8 +75,8 @@ const twParts = t => {
 const weekdayOf = day => new Date(`${day}T12:00:00Z`).getUTCDay() || 7;
 
 export function classesOn(day) {
-  const week = heard('class', 'week');
-  const list = week?.[weekdayOf(day)];
+  const days = heard('class', 'days');
+  const list = Array.isArray(days?.[day]) ? days[day] : heard('class', 'week')?.[weekdayOf(day)];
   return Array.isArray(list) ? list.filter(p => mins(p.from) != null && mins(p.to) != null).sort((a, b) => mins(a.from) - mins(b.from)) : [];
 }
 export function schoolHours(day) {

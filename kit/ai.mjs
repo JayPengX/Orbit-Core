@@ -25,6 +25,34 @@ export async function aiCall(feature, input, { answers = [], timeout = 40_000 } 
   return r || { error: 'offline' };
 }
 
+// A picture for the AI (a photo, a screenshot): drawn upright at most `side`
+// pixels on its long edge, as a JPEG: { mime_type, data } (base64), or null
+// when it can't be drawn (a HEIC outside Safari, a PDF).
+export async function aiPicture(file, { side = 1600, quality = 0.85 } = {}) {
+  try {
+    const img = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const k = Math.min(1, side / Math.max(img.width, img.height));
+    const c = Object.assign(document.createElement('canvas'), { width: Math.round(img.width * k), height: Math.round(img.height * k) });
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return { mime_type: 'image/jpeg', data: c.toDataURL('image/jpeg', quality).split(',')[1] };
+  } catch {
+    return null;
+  }
+}
+// A picture picked from the camera or the photos: the File, or null when
+// none was (the sheet closed). One hidden input, made once.
+let fileInput = null;
+export function pickPicture({ camera = false } = {}) {
+  return new Promise(resolve => {
+    fileInput?.remove();
+    fileInput = h('input', { type: 'file', accept: 'image/*', hidden: true, ...(camera ? { capture: 'environment' } : {}) });
+    fileInput.addEventListener('change', () => resolve(fileInput.files?.[0] || null), { once: true });
+    fileInput.addEventListener('cancel', () => resolve(null), { once: true });
+    document.body.append(fileInput);
+    fileInput.click();
+  });
+}
+
 export function aiSays(error, left = null) {
   if (error === 'cap') return W('今天這個 AI 的次數用完了，明天再試。', 'That’s all of this AI for today. Try again tomorrow.');
   if (error === 'signin') return W('登入 Orbit Pass 後才能用 AI。', 'Sign in with your Orbit Pass to use AI.');

@@ -24,9 +24,11 @@ const text = t => [{ text: t }];
 
 // Every number an answer writes must be one the input gave (numbers come
 // from code; a model only puts them in words). Years and small counts too.
+// (1,290 is 1290: a thousands comma either side.)
+const nums = t => String(t).replace(/(\d),(?=\d{3}(?!\d))/g, '$1').match(/\d+(?:\.\d+)?/g) || [];
 export function numbersFrom(out, given) {
-  const have = new Set(String(given).match(/\d+(?:\.\d+)?/g) || []);
-  return (String(out).match(/\d+(?:\.\d+)?/g) || []).every(n => have.has(n));
+  const have = new Set(nums(given));
+  return nums(out).every(n => have.has(n));
 }
 
 export const FEATURES = {
@@ -74,6 +76,73 @@ export const FEATURES = {
     }
   },
 
+  // Orbit Money: 問我的帳. The app adds up the person's own entries (lib/ask.mjs
+  // booksFacts: three months by category, the places, the largest, the
+  // changes, each number once); the AI only finds the answer in them and
+  // says it. Every number it writes must be one of those.
+  'money-ask': {
+    app: 'money',
+    tap: true,
+    models: ['haiku', 'luna'],
+    effort: { luna: 'low' },
+    maxIn: 6000,
+    perPass: 40,
+    perMinute: 10,
+    input(raw) {
+      const q = str(raw?.question, 200);
+      const facts = String(raw?.facts || '').slice(0, 5000);
+      if (!q || facts.length < 20) return null;
+      return { q, facts, en: raw?.lang === 'en' };
+    },
+    parts: ({ q, facts, en }) =>
+      text(
+        [
+          'You answer a question about a person’s own money book (NT$, Taiwan). The facts below are their real entries, already added up by the app.',
+          'Answer only from the facts: every number you write must appear in them exactly (no new sums, no percentages they don’t give, no thousands commas). If the facts can’t answer it, say so in one line and say what they do show.',
+          `Answer in ${en ? 'English' : 'Traditional Chinese (台灣用語)'}: at most 3 short sentences, the number they asked first, plain words, no markdown, no lists. Never advise investing or borrowing; a gentle observation is fine.`,
+          'Facts:',
+          facts,
+          `Question: ${q}`
+        ].join('\n')
+      ),
+    schema: obj({ answer: S }),
+    clean: (raw, { facts }) => {
+      const a = str(raw?.answer, 400);
+      return a && numbersFrom(a, facts) ? { answer: a } : null;
+    }
+  },
+
+  // Orbit Money: 每月回顧's one suggestion. The figures are the phone's
+  // (lib/month.mjs reviewFacts); the AI writes one honest, kind line from
+  // them, asked once a month a phone.
+  'money-month': {
+    app: 'money',
+    tap: true,
+    models: ['haiku', 'luna'],
+    effort: { luna: 'low' },
+    maxIn: 1500,
+    perPass: 4,
+    perMinute: 3,
+    input(raw) {
+      const facts = String(raw?.facts || '').slice(0, 1200);
+      return facts.length > 20 ? { facts, en: raw?.lang === 'en' } : null;
+    },
+    parts: ({ facts, en }) =>
+      text(
+        [
+          'A student or young person in Taiwan keeps their own money book. Here is last month, added up by the app.',
+          `Write ONE suggestion for next month in ${en ? 'English, ≤ 25 words' : 'Traditional Chinese (台灣用語), ≤ 45 字'}: honest, kind and concrete, about the biggest thing these figures show (a category that grew, a place visited often, how much was kept). Not a lecture; no investing or borrowing advice; no markdown.`,
+          'Any number you write must appear in the figures exactly (no thousands commas, no new sums or percentages).',
+          facts
+        ].join('\n')
+      ),
+    schema: obj({ tip: S }),
+    clean: (raw, { facts }) => {
+      const tip = str(raw?.tip, 160);
+      return tip && numbersFrom(tip, facts) ? { tip } : null;
+    }
+  },
+
   // Orbit Words: 檢查我的句子. A sentence the learner wrote with the word,
   // corrected, with one line on why (in Chinese, or English on English phones).
   'words-check': {
@@ -104,7 +173,40 @@ export const FEATURES = {
     clean: raw => (typeof raw?.fixed === 'string' && raw.fixed.trim() ? { ok: !!raw.ok, fixed: str(raw.fixed, 400), why: str(raw.why, 120), used: raw.used !== false } : null)
   },
 
-  // Orbit Words: 例句與記憶法, made once for the whole list (builders/words-cards.js)
+  // Orbit Words: 拍一頁變單字卡. A photo of a textbook page, a word list or
+  // a worksheet: the English words it teaches, base forms. The phone matches
+  // them to its own list (only those it has are kept) and stars them.
+  'words-photo': {
+    app: 'vocab',
+    tap: true,
+    models: ['flash', 'lite'],
+    effort: 'low',
+    timeoutMs: 40_000,
+    perPass: 20,
+    perMinute: 4,
+    input(raw) {
+      const data = typeof raw?.image?.data === 'string' ? raw.image.data : '';
+      const mime = /^image\/(jpeg|png|webp)$/.test(raw?.image?.mime_type || '') ? raw.image.mime_type : '';
+      if (!mime || data.length < 1000 || data.length > 2_400_000 || /[^A-Za-z0-9+/=]/.test(data.slice(0, 2000))) return null;
+      return { data, mime };
+    },
+    parts: ({ data, mime }) => [
+      {
+        text: [
+          'This is a photo of a page a Taiwanese high-school student studies English from: a textbook, a vocabulary list, a worksheet or notes.',
+          'List the English vocabulary it teaches: the words in a word list or in bold, the new words of a lesson; on a page of plain text, its less common words (not the, is, and, you, have…).',
+          'Each in its base form (studies → study, went → go), lower case, once. Phrases only when the page lists them as one (look forward to). At most 60. None: an empty list.'
+        ].join('\n')
+      },
+      { inlineData: { mimeType: mime, data } }
+    ],
+    schema: obj({ words: arr(S) }),
+    clean: raw => ({
+      words: [...new Set(list(raw?.words, 120).map(w => String(w || '').toLowerCase().trim().replace(/\s+/g, ' ')).filter(w => /^[a-z][a-z' .-]{0,40}$/.test(w)))].slice(0, 80)
+    })
+  },
+
+  // Orbit Words: 例句與記憶法, made once for the whole list (builders/ai.js)
   // and kept in R2: two example sentences, a memory hook, the words it's confused with.
   'words-cards': {
     models: ['haiku', 'luna'],
@@ -114,7 +216,7 @@ export const FEATURES = {
         [
           'For each English word below (with its meaning for a Taiwanese high-school student), write a study card.',
           'ex: two short, natural example sentences (≤ 14 words each) using the word in that meaning, each with a natural Traditional Chinese translation (台灣用語). Use the word itself or a plain form of it.',
-          'hook: one memory hook in Traditional Chinese, ≤ 30 字: a word root, a sound-alike or a picture that really helps remember it. No made-up etymology: a root only when it is real.',
+          'hook: one memory hook in Traditional Chinese, ≤ 30 字: a real word root or word parts (e.g. “re- 再 + view 看”), a sound-alike, or a vivid picture tying the spelling to the meaning. Never just restate the meaning or the example; no made-up roots. "" when there is no hook that truly helps (most easy words).',
           'confuse: up to 3 English words learners mix it up with (look or sound alike, or near meanings), [] when none.',
           'Return one card per word, the word spelled exactly as given.',
           ...words.map(w => `${w.w}: ${w.zh}`)
