@@ -7,6 +7,8 @@
 //     there now (apis.youbike.com.tw/json/station-yb2.json: 9,800 stations,
 //     685 KB gzipped, refreshed by YouBike each minute), read once a minute
 //     at most and kept here; a city's list or the stations near a point.
+//   - 新竹's buses (竹塹交通資訊網), 臺北's and 新北's (the cities' open data).
+//   - 台鐵's day of trains (台鐵's own open data, ods.railway.gov.tw).
 //
 // Nothing here is counted as TDX's: no points.
 
@@ -518,6 +520,90 @@ export async function freeGps(city, routes, { fetchFn = fetch, now = Date.now(),
   return { rows, missing, age: Math.max(0, now - oldest) };
 }
 
+// ---- 台鐵's day: 台鐵's own open data -------------------------------------------------------
+//
+// 台鐵's 鐵路時刻表 (ods.railway.gov.tw: a JSON file a day, today's and the
+// next 59 days', each listed on one page, 2 MB; the day's own changes in it,
+// updated daily) and its 車站基本資料集 (each station's names), made TDX's
+// day as the proxy trims it (transit.js tdxTrim: what Transit's rail.mjs
+// traTrips reads), so 台鐵's 4.4 MB a read no longer comes from TDX (a
+// point each 150 MB: the free tier's month in a few weeks of one person's
+// trips). Read in the Runner (freeHeavy), kept there and at the edge.
+export const TRA_LIST = 'https://ods.railway.gov.tw/tra-ods-web/ods/download/dataResource/railway_schedule/JSON/list';
+export const TRA_STATIONS = 'https://ods.railway.gov.tw/tra-ods-web/ods/download/dataResource/0518b833e8964d53bfea3f7691aea0ee';
+const TRA_FILE = 'https://ods.railway.gov.tw/tra-ods-web/ods/download/dataResource/exceptionDataResource/';
+const TRA_FRESH = 6 * 3_600_000;
+// A train's class (台鐵's CarClass, TDX's TrainTypeID) → TDX's TrainTypeCode
+// and its names (TDX's TrainType list, 2026-11-10). A class not here: TDX
+// answers that day (a new class is rare: a new train set).
+export const TRA_TYPES = {
+  '1100': ['3', '自強(DMU2800、2900、3000 型柴聯及 EMU 型電車)', 'Tze-Chiang Express'], '1101': ['1', '太魯閣(太魯閣)', 'Taroko Express'], '1102': ['3', '自強(推拉式自強號)', 'Tze-Chiang Express'],
+  '1103': ['3', '自強(DMU3100 型有身障座位柴聯)', 'Tze-Chiang Express'], '1104': ['3', '自強(專開列車)', 'Tze-Chiang Express'], '1105': ['3', '自強(郵輪式列車)', 'Tze-Chiang Express'],
+  '1106': ['3', '自強(商務專開列車)', 'Tze-Chiang Express'], '1107': ['2', '普悠瑪(普悠瑪)', 'Puyuma Express'], '1108': ['3', '自強(推拉式自強號且無自行車車廂)', 'Tze-Chiang Express'],
+  '1109': ['3', '自強(推拉式自強號且無自行車車廂)', 'Tze-Chiang Express'], '110A': ['3', '自強(推拉式自強號且有自行車車廂)', 'Tze-Chiang Express'], '110B': ['3', '自強(EMU1200 型電車)', 'Tze-Chiang Express'],
+  '110C': ['3', '自強(EMU300 型電車)', 'Tze-Chiang Express'], '110D': ['3', '自強(DMU2800 型柴聯)', 'Tze-Chiang Express'], '110E': ['3', '自強(DMU2900 型柴聯)', 'Tze-Chiang Express'],
+  '110F': ['3', '自強(DMU3100 型柴聯)', 'Tze-Chiang Express'], '110G': ['11', '自強(3000)(EMU3000 型電車)', 'Tze-Chiang 3000 Express '], '110H': ['11', '自強(3000)(EMU3000 型電車)', 'Tze-Chiang 3000 Express '],
+  '110K': ['11', '自強(3000)(EMU3000 型電車)', 'Tze-Chiang 3000 Express '], '110M': ['11', '自強(3000)(EMU3000 型電車)', 'Tze-Chiang 3000 Express '], '1110': ['4', '莒光(無身障座位)', 'Chu-Kuang Express'],
+  '1111': ['4', '莒光(有身障座位)', 'Chu-Kuang Express'], '1112': ['4', '莒光(專開列車)', 'Chu-Kuang Express'], '1113': ['4', '莒光(郵輪式列車)', 'Chu-Kuang Express'],
+  '1114': ['4', '莒光(無身障座位, 有自行車車廂)', 'Chu-Kuang Express'], '1115': ['4', '莒光(有身障座位, 有自行車車廂)', 'Chu-Kuang Express'], '1120': ['5', '復興', 'Fu-Hsing Semi Express'],
+  '1121': ['5', '復興(專開列車)', 'Fu-Hsing Semi Express'], '1122': ['5', '復興(郵輪式列車)', 'Fu-Hsing Semi Express'], '1130': ['6', '區間(專開列車)', 'Local Train'],
+  '1131': ['6', '區間', 'Local Train'], '1132': ['10', '區間快', 'Fast Local Train'], '1133': ['6', '區間(郵輪式列車)', 'Local Train'],
+  '1134': ['6', '區間(專開列車)', 'Local Train'], '1135': ['6', '區間(有身障座位, 有自行車車廂)', 'Local Train'], '113A': ['6', '區間(EMU500 型)', 'Local Train'],
+  '113B': ['6', '區間(EMU700 型)', 'Local Train'], '113C': ['6', '區間(EMU800 型)', 'Local Train'], '113D': ['6', '區間(EMU900 型)', 'Local Train'],
+  '1140': ['7', '普快', 'Ordinary Train'], '1141': ['6', '區間', 'Local Train'], '1150': ['7', '普快(專開列車)', 'Ordinary Train'],
+  '1151': ['7', '普快', 'Ordinary Train'], '1152': ['5', '復興', 'Fu-Hsing Semi Express'], '1154': ['6', '區間(專開列車)', 'Local Train'],
+  '1155': ['5', '復興(郵輪式列車)', 'Fu-Hsing Semi Express'], '1270': ['7', '普快', 'Ordinary Train'], '1280': ['7', '普快', 'Ordinary Train'],
+  '1281': ['7', '普快', 'Ordinary Train'], '1282': ['7', '普快', 'Ordinary Train'], '12A0': ['7', '普快', 'Ordinary Train'],
+  '12A1': ['7', '普快', 'Ordinary Train'], '12B0': ['7', '普快', 'Ordinary Train'], '4200': ['7', '普快', 'Ordinary Train'],
+  '5230': ['7', '普快', 'Ordinary Train']
+};
+
+// 台鐵's day list page → { '2026-11-10': fileId }.
+export function traDays(html) {
+  const out = {};
+  for (const m of String(html || '').matchAll(/exceptionDataResource\/([0-9a-f]{16,40})"[^>]*>\s*(\d{4})(\d{2})(\d{2})\.json/g)) out[`${m[2]}-${m[3]}-${m[4]}`] = m[1];
+  return out;
+}
+// '19:48:30' → '19:48' (TDX's minute).
+const hm = t => String(t || '').slice(0, 5);
+// 台鐵's day (its file), its stations (StationID → [zh, en]) and the date →
+// TDX's DailyTrainTimetable as tdxTrim leaves it, or null (a class or a
+// station it can't name: TDX's to answer).
+export function traDay(ods, names, date) {
+  const trains = [];
+  for (const t of ods?.TrainInfos || []) {
+    const type = TRA_TYPES[t.CarClass];
+    const stops = (t.TimeInfos || []).slice().sort((a, b) => Number(a.Order) - Number(b.Order));
+    const end = names[stops.at(-1)?.Station];
+    if (!type || !end || stops.length < 2) return null;
+    const info = { TrainNo: String(t.Train), TrainTypeCode: type[0], TrainTypeName: { Zh_tw: type[1], En: type[2] }, TripHeadSign: `往${end[0]}`, EndingStationName: { Zh_tw: end[0], En: end[1] }, TripLine: Number(t.Line) || 0, Note: String(t.Note || ''), BikeFlag: t.Bike === 'Y' ? 1 : 0 };
+    trains.push({ TrainInfo: info, StopTimes: stops.map(s => ({ StationID: String(s.Station), ArrivalTime: hm(s.ARRTime || s.DEPTime), DepartureTime: hm(s.DEPTime || s.ARRTime) })) });
+  }
+  return trains.length ? { TrainDate: date, TrainTimetables: trains } : null;
+}
+// 台鐵's stations' list → { StationID: [zh, en] }.
+export const traNames = list => Object.fromEntries((Array.isArray(list) ? list : []).filter(s => s?.stationCode).map(s => [String(s.stationCode), [String(s.stationName || s.name || ''), String(s.stationEName || s.ename || '')]]));
+
+const TRA_DAY = /^basic\/v3\/Rail\/TRA\/DailyTrainTimetable\/TrainDate\/(\d{4}-\d{2}-\d{2})$/;
+async function traFree(path, q, { fetchFn, now }) {
+  const m = path.match(TRA_DAY);
+  if (!m) return undefined;
+  if (q.has('$filter') || q.has('$select') || q.has('$top') || q.has('$skip') || q.has('$orderby')) return null;
+  const date = m[1];
+  const text = s => (r => (r.ok ? r.text() : Promise.reject(new Error(`tra ${r.status}`))))(s);
+  const ask = url => fetchFn(url, { headers: { Accept: '*/*' }, signal: AbortSignal.timeout?.(15_000) });
+  const days = await held('tra:list', TRA_FRESH, 2 * 86_400_000, async () => traDays(await text(await ask(TRA_LIST))), now, 4000);
+  const id = days.val[date];
+  if (!id) return null;
+  const names = await held('tra:names', 7 * 86_400_000, 30 * 86_400_000, async () => traNames(JSON.parse(await text(await ask(TRA_STATIONS)))), now, 4000);
+  const day = await held(`tra:day:${id}`, TRA_FRESH, 2 * 86_400_000, async () => {
+    const got = traDay(JSON.parse(await text(await ask(`${TRA_FILE}${id}`))), names.val, date);
+    if (!got) throw new Error(`tra ${date}: a class or station not known`);
+    return JSON.stringify(got);
+  }, now, 8000);
+  return { status: 200, body: day.val, age: Math.max(0, now - day.at), state: 'free' };
+}
+
 // ---- One entry for tdxGet -----------------------------------------------------------------
 
 // A TDX ask (its path and query, as tdxRequest made them) answered from a free
@@ -525,7 +611,8 @@ export async function freeGps(city, routes, { fetchFn = fetch, now = Date.now(),
 export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now() } = {}) {
   const q = new URLSearchParams(query);
   try {
-    const got = await bikes(decodeURIComponent(path), q, { fetchFn, now });
+    const p = decodeURIComponent(path);
+    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now }));
     if (got !== undefined) return got;
   } catch (err) {
     console.log('free source failed', path.slice(0, 80), String(err?.message || err).slice(0, 120));
@@ -536,6 +623,6 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now() }
 // Whether a /transit/tdx ask is one the free sources answer (worker.js sends
 // those to the Runner: a list of all Taiwan read and kept there, not in each
 // isolate's 10 ms).
-export const freeHeavy = p => /^(basic|advanced)\/v2\/Bike\//.test(String(p || '').replace(/^\/+/, ''));
+export const freeHeavy = p => /^((basic|advanced)\/v2\/Bike\/|basic\/v3\/Rail\/TRA\/DailyTrainTimetable\/TrainDate\/)/.test(String(p || '').replace(/^\/+/, ''));
 // (A route's whole list of stops, or its buses, from 新竹's site: read in the Runner too.)
 export const freeRoutesHeavy = (path, q) => (path === '/transit/gps' || (path === '/transit/eta' && (q.get('routes') || q.get('route') || CITY_FEEDS[q.get('city')]))) && FREE_BUS.test(q.get('city') || '');

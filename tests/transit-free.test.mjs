@@ -217,3 +217,58 @@ test("a city's feed slow: its last list at once (1.5 s), the new one for the nex
   assert.ok(log.some(u => u.includes('tdx') && u.includes('NWT1')));
   assert.equal(runsInRunner(new Request('https://w/transit/eta?city=Taipei&stops=TPE1'), '/transit/eta'), true, "a whole city's file read in the Runner");
 });
+
+// ---- 台鐵's day from 台鐵's own open data ------------------------------------------------------
+
+import { traDay, traDays, traNames, TRA_LIST, TRA_STATIONS } from '../transit-free.js';
+const tra = name => readFileSync(new URL(`./fixtures/tra-ods-2026-11-10/${name}`, import.meta.url), 'utf8');
+
+test("台鐵's own day (ods.railway.gov.tw) made TDX's: the same trains, classes, headsigns, lines, notes, bikes and every stop's times as TDX's day (real, 2026-11-10)", () => {
+  const mine = traDay(JSON.parse(tra('ods.json')), traNames(JSON.parse(tra('stations.json'))), '2026-11-10');
+  const tdx = JSON.parse(tra('tdx.json'));
+  assert.equal(mine.TrainDate, '2026-11-10');
+  const byNo = new Map(tdx.TrainTimetables.map(t => [t.TrainInfo.TrainNo, t]));
+  assert.equal(mine.TrainTimetables.length, byNo.size);
+  for (const t of mine.TrainTimetables) {
+    const want = byNo.get(t.TrainInfo.TrainNo);
+    assert.ok(want, t.TrainInfo.TrainNo);
+    assert.deepEqual(t.TrainInfo, want.TrainInfo, t.TrainInfo.TrainNo);
+    assert.deepEqual(t.StopTimes, want.StopTimes.map(({ SuspendedFlag, ...s }) => s), t.TrainInfo.TrainNo);
+  }
+  // A class it doesn't know: TDX's day instead.
+  const odd = JSON.parse(tra('ods.json'));
+  odd.TrainInfos[0].CarClass = 'ZZZZ';
+  assert.equal(traDay(odd, traNames(JSON.parse(tra('stations.json'))), '2026-11-10'), null);
+  assert.deepEqual(traDays(tra('list.html')), { '2026-11-11': '8ae4c984a1c0ece301a1c1d32c481b8e', '2026-11-10': '8ae4c984a1c0ece301a1c1d32c171b8d' });
+});
+
+test("a day's trains asked of TDX come from 台鐵's own site (read in the Runner, kept); a day it doesn't list, or a site that fails, is TDX's", async () => {
+  resetFree();
+  const asked = [];
+  const text = (b, status = 200) => new Response(b, { status });
+  const fetchFn = async url => {
+    asked.push(url);
+    if (url === TRA_LIST) return text(tra('list.html'));
+    if (url === TRA_STATIONS) return text(tra('stations.json'));
+    if (url.endsWith('8ae4c984a1c0ece301a1c1d32c171b8d')) return text(tra('ods.json'));
+    if (url.includes('token')) return json({ access_token: 'T', expires_in: 86400 });
+    if (url.includes('tdx.transportdata.tw')) return json({ TrainDate: 'x', TrainTimetables: [] });
+    return text('', 404);
+  };
+  const path = d => `basic/v3/Rail/TRA/DailyTrainTimetable/TrainDate/${d}`;
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', TDX_PER_MIN: '300' };
+  const got = await tdxGet(env, path('2026-11-10'), { fetchFn, now: NOW, cache: null });
+  assert.equal(got.state, 'free');
+  assert.equal(JSON.parse(got.body).TrainTimetables.length, 44);
+  assert.ok(asked.every(u => !u.includes('tdx.transportdata.tw')));
+  // Kept: asked again, nothing read.
+  const n = asked.length;
+  assert.equal((await tdxGet(env, path('2026-11-10'), { fetchFn, now: NOW + 60_000, cache: null })).state, 'free');
+  assert.equal(asked.length, n);
+  // A day 台鐵's list doesn't have: TDX's.
+  const far = await tdxGet(env, path('2027-03-01'), { fetchFn, now: NOW, cache: null });
+  assert.equal(far.state, 'miss');
+  assert.ok(asked.some(u => u.includes('tdx.transportdata.tw')));
+  assert.ok(freeHeavy(path('2026-11-10')), 'in the Runner: a 2 MB day');
+  assert.ok(!freeHeavy('basic/v3/Rail/TRA/StationLiveBoard'));
+});
