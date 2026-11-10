@@ -62,8 +62,8 @@ export function aiSays(error, left = null) {
   return W('AI 現在沒有回應，再試一次。', 'AI didn’t answer. Try again.') + (left != null && left <= 3 ? W(`（今天還剩 ${left} 次）`, ` (${left} left today)`) : '');
 }
 
-// The mark that says AI wrote or asks something: the kit's spark.
-const mark = () => h('span', { class: 'q-ai-mark', 'aria-hidden': 'true', html: icons.spark });
+// The mark that says AI wrote or asks something: Orbit AI's (icons.ai).
+const mark = () => h('span', { class: 'q-ai-mark', 'aria-hidden': 'true', html: icons.ai || icons.spark });
 
 export const aiNote = (text = W('AI 整理，存之前都可以改', 'Sorted by AI: change anything before saving')) => h('p', { class: 'q-ai-note' }, [mark(), h('span', { text })]);
 

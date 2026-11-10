@@ -114,13 +114,13 @@ modules for modulepreload. `node kit/apps.mjs` refreshes every app's snippets;
 | `hold-place.mjs` | A redraw never moves the page, a sheet or a panel; a tap holds the control under the finger; never a drawing (`loose`); a sized sheet keeps its height (`--q-sheet-floor`); `scrollBusy()` holds `everyDev` under a finger; `freshScreen()`: a new screen at the top; `letGo()`: a drag carries its grip away |
 | `steady-pics.mjs` | A picture drawn again is eager and decoded at once |
 | `sources.mjs`, `source-watch.mjs` | Outside sources (`SOURCES`, `sourceOf`, `stateOf`: admin 外部來源); a phone's own outside reads, beaconed to `/sources` |
-| `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, before the app's modules); the cover held for it |
+| `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, first); the cover held for it |
 | `loader.html` | The snippets every app's page carries (`kit:head`, `kit:boot`) |
 | `brand.mjs` | Families, names, colours, marks, repos, slugs, `APP_ORDER`, `DEV` (speeds, §9) |
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); each app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
 | `passkey.mjs` | Passkeys in the browser: made, used, named (`passkeyHere()` false where a browser can't) |
 | `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); `TOPICS`; `sideOf`, `partiesIn`, `topicsOf`, `namesRe` |
-| `ai.mjs`, `family.mjs`, `today.mjs` | AI: `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`; the phone's family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天 |
+| `ai.mjs`, `family.mjs`, `today.mjs` | AI (mark `icons.ai`, `--q-ai`): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`; the phone's family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天 |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs`: qrcode-generator 2.0.4 (MIT), vendored |
 | `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays` |

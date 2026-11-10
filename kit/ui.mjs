@@ -1418,6 +1418,8 @@ export const icons = {
   backpack: g('<path d="M6 10a6 6 0 0 1 12 0v10a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1zM9.5 4.5V3.5h5v1M9 14h6v4H9z"/>'),
   moon: g('<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5 7.5 7.5 0 1 0 19 14.5z"/>'),
   chat: g('<path d="M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5h-8.5l-4.5 3.6v-3.6H5A1.5 1.5 0 0 1 3.5 15V6A1.5 1.5 0 0 1 5 4.5z"/>'),
+  // Orbit AI: the spark inside Orbit's ring, a moon on it; in --q-ai's colours (orbit.css), on anything AI wrote or asks.
+  ai: '<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="12" rx="10.6" ry="5.2" transform="rotate(-28 12 12)" fill="none" style="stroke:var(--q-ai,currentColor)" stroke-width="1.7" stroke-opacity=".35"/><path style="fill:var(--q-ai-2,currentColor)" d="M12 3.2c.7 5.3 3.4 8 8.4 8.8-5 .8-7.7 3.5-8.4 8.8-.7-5.3-3.4-8-8.4-8.8 5-.8 7.7-3.5 8.4-8.8z"/><path d="M21.36 7.03A10.6 5.2 -28 0 1 2.64 16.97" fill="none" style="stroke:var(--q-ai,currentColor)" stroke-width="1.7" stroke-linecap="round"/><circle cx="18.9" cy="5.4" r="1.8" style="fill:var(--q-ai,currentColor)"/></svg>',
   spark: g('<path d="M12 2.5c.5 3.8 2.2 6.4 6.6 7.4-4.4 1-6.1 3.6-6.6 7.4-.5-3.8-2.2-6.4-6.6-7.4 4.4-1 6.1-3.6 6.6-7.4zM19 15c.3 1.9 1.1 3 3 3.5-1.9.5-2.7 1.6-3 3.5-.3-1.9-1.1-3-3-3.5 1.9-.5 2.7-1.6 3-3.5z"/>', true),
   share: g('<path d="M12 15V4M8 8l4-4 4 4M6 12H5.5A1.5 1.5 0 0 0 4 13.5v5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-5a1.5 1.5 0 0 0-1.5-1.5H18"/>'),
   trash: g('<path d="M4 7h16M9 7V4.5h6V7M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.5h6.4a1.5 1.5 0 0 0 1.5-1.5l.8-12M10 11v6M14 11v6"/>'),

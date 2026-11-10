@@ -147,6 +147,8 @@
   --q-border: transparent;
   --q-divider: rgba(60, 60, 67, 0.2);
   --q-good: #248a3d;
+  --q-ai: #5856d6;
+  --q-ai-2: #8b7cf6;
   --q-bad: #e5272c;
   --q-warn: #c25e00;
   --q-shadow-sm: none;
@@ -324,6 +326,8 @@
     --q-text-2: rgba(235, 235, 245, 0.86);
     --q-divider: rgba(84, 84, 88, 0.55);
     --q-good: #30d158;
+    --q-ai: #a5b4fc;
+    --q-ai-2: #c4b5fd;
     --q-bad: #ff4245;
     --q-warn: #ff9230;
     --q-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px -12px rgba(0, 0, 0, 0.6);
@@ -377,6 +381,8 @@
   --q-text-2: rgba(235, 235, 245, 0.86);
   --q-divider: rgba(84, 84, 88, 0.55);
   --q-good: #30d158;
+  --q-ai: #a5b4fc;
+  --q-ai-2: #c4b5fd;
   --q-bad: #ff4245;
   --q-warn: #ff9230;
   --q-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px -12px rgba(0, 0, 0, 0.6);
@@ -1679,7 +1685,8 @@ dialog.q-sheet.q-full {
 
 /* ---- AI (kit/ai.mjs): the box to type into, a thinking line, the AI's
    question back with chips, a picker for the person's own lists, the note
-   under what AI wrote. The spark marks anything AI wrote or asks. ---- */
+   under what AI wrote. Orbit AI's mark (icons.ai, --q-ai) marks anything AI
+   wrote or asks. ---- */
 .q-ai-mark {
   flex: none;
   display: inline-grid;
@@ -1691,6 +1698,13 @@ dialog.q-sheet.q-full {
 .q-ai-mark svg {
   width: 100%;
   height: 100%;
+}
+/* On a filled control the mark takes the control's own colour. */
+.q-ai-mono,
+.q-btn.primary,
+.q-cell-icon {
+  --q-ai: currentColor;
+  --q-ai-2: currentColor;
 }
 .q-ai-bar {
   display: flex;
