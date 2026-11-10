@@ -523,6 +523,9 @@ async function cityGpsList(city, deps) {
 // the same bus's GPS) and every bus coming, not one. Read as often as their
 // own pages (20 s). A route they don't know answers id 0 (and some other
 // route's buses): left to TDX.
+// (高雄's, ibus.tbkc.gov.tw/ibus/graphql, is the same maker's but answers
+// only Taiwan's own networks: refused here and timed out (522) even from
+// Cloudflare in Taiwan, through gemini-relay.js, 2026-11-10. TDX's still.)
 export const EBUS = {
   Taichung: { gql: 'https://citybus.taichung.gov.tw/ebus/graphql', pre: 'TXG', bySid: true, eta: 'comeTime isOperationDay isSuspended clogType etas { etaTime isLast busId }', bus: 'id lat lon azimuth dataTime', chunk: 300, routes: 40 },
   // (桃園's answers one part after another, ~0.1 s a stop's route and way, ~0.2 s a route: 12 and 6 an ask, the asks at once.)
@@ -542,24 +545,6 @@ async function ebAsk(city, fetchFn, query, variables) {
   const j = await res.json();
   if (!j?.data) throw new Error(`${city}: ${String(j?.errors?.[0]?.message || 'no data').slice(0, 80)}`);
   return j.data;
-}
-
-// 高雄's site (ibus.tbkc.gov.tw, the same maker) answers only Taiwan's
-// addresses (2026-11-10: the cloud box was refused): its GraphQL is asked by
-// GET (the maker's service takes a query in the address), from Taiwan,
-// through gemini-relay.js. A query only, never a change.
-export const KHH_GQL = 'https://ibus.tbkc.gov.tw/ibus/graphql';
-export function khhQuery(raw) {
-  let u;
-  try {
-    u = new URL(String(raw || ''));
-  } catch {
-    return false;
-  }
-  if (`${u.origin}${u.pathname}` !== KHH_GQL || u.username || u.password || u.port || u.hash) return false;
-  const keys = [...u.searchParams.keys()];
-  const query = u.searchParams.get('query') || '';
-  return keys.every(k => k === 'query' || k === 'variables') && /^\s*(query\b|\{)/.test(query) && !/\bmutation\b|\bsubscription\b/i.test(query);
 }
 
 // A route TDX runs one way only (a loop: the sites halve it, goBack 1 and 2).

@@ -575,15 +575,3 @@ test("a 臺南 stop's routes the ways it's on from the city's own site, a route 
   assert.equal(g.rows.find(b => b.PlateNumb === 'EAL-2561').GPSTime, '2026-11-10T14:37:41+08:00');
   assert.equal(runsInRunner(new Request('https://w/transit/eta?city=Tainan&stops=TNN16077'), '/transit/eta'), true);
 });
-
-test("高雄's site through the Taiwan relay: its GraphQL's queries only, by GET", async () => {
-  const { KHH_GQL, khhQuery } = await import('../transit-free.js');
-  const relay = (await import('../gemini-relay.js')).default;
-  const q = query => `${KHH_GQL}?${new URLSearchParams({ query })}`;
-  assert.equal(khhQuery(q('{ route(xno: 100, lang: "zh") { id } }')), true);
-  assert.equal(khhQuery(q('query($x: Int!) { route(xno: $x) { id } }')), true);
-  for (const bad of [q('mutation { x }'), q('{ a } mutation { b }'), `${q('{ a }')}&x=1`, 'https://ibus.tbkc.gov.tw/ibus/other?query=%7Ba%7D', 'http://ibus.tbkc.gov.tw/ibus/graphql?query=%7Ba%7D', 'https://evil.example/ibus/graphql?query=%7Ba%7D']) assert.equal(khhQuery(bad), false, bad);
-  // (The relay refuses anything else: never a POST.)
-  const at = to => new Request(`https://gemini-relay/?to=${encodeURIComponent(to)}`, { method: 'POST', body: '{}' });
-  assert.equal((await relay.fetch(at(q('{ a }')))).status, 400);
-});
