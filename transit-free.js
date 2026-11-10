@@ -544,6 +544,24 @@ async function ebAsk(city, fetchFn, query, variables) {
   return j.data;
 }
 
+// 高雄's site (ibus.tbkc.gov.tw, the same maker) answers only Taiwan's
+// addresses (2026-11-10: the cloud box was refused): its GraphQL is asked by
+// GET (the maker's service takes a query in the address), from Taiwan,
+// through gemini-relay.js. A query only, never a change.
+export const KHH_GQL = 'https://ibus.tbkc.gov.tw/ibus/graphql';
+export function khhQuery(raw) {
+  let u;
+  try {
+    u = new URL(String(raw || ''));
+  } catch {
+    return false;
+  }
+  if (`${u.origin}${u.pathname}` !== KHH_GQL || u.username || u.password || u.port || u.hash) return false;
+  const keys = [...u.searchParams.keys()];
+  const query = u.searchParams.get('query') || '';
+  return keys.every(k => k === 'query' || k === 'variables') && /^\s*(query\b|\{)/.test(query) && !/\bmutation\b|\bsubscription\b/i.test(query);
+}
+
 // A route TDX runs one way only (a loop: the sites halve it, goBack 1 and 2).
 const oneWay = (pack, route) => pack?.dirs.has(route) && !pack.dirs.get(route).has(1);
 const wayOf = (pack, route, goBack) => (oneWay(pack, route) || goBack !== 2 ? 0 : 1);

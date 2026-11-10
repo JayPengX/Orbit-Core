@@ -46,7 +46,7 @@ import { SHOWCASE_ORIGINS } from './showcase.js';
 import { cleanDev } from './kit/devconfig.mjs';
 import { twDay } from './kit/format.mjs';
 import { kvJson, kvPut } from './weather.js';
-import { freeTdx, freeEta, freeGps } from './transit-free.js';
+import { freeTdx, freeEta, freeGps, KHH_GQL, khhQuery } from './transit-free.js';
 
 export const TDX_BASE = 'https://tdx.transportdata.tw/api/';
 export const TDX_AUTH = 'https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token';
@@ -1834,6 +1834,13 @@ async function statusSample(env, name, dependencies) {
   // (A sample is a check: ours, whoever asks it.)
   const deps = { ...dependencies, by: 'dev' };
   const cut = text => String(text || '').slice(0, 6000);
+  // ibus: a query of 高雄's live buses, through the Taiwan relay (a query only).
+  if (name === 'ibus') {
+    const to = `${KHH_GQL}?${new URLSearchParams({ query: deps.query || '{ __typename }' })}`;
+    if (!khhQuery(to) || !env.GEMINI_RELAY) return { name, status: 400 };
+    const r = await env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(to)}`, { headers: { Accept: 'application/json' } });
+    return { name, status: r.status, body: (await r.text()).slice(0, 200_000) };
+  }
   if (SAMPLES[name]) {
     const got = await tdxGet(env, SAMPLES[name], deps);
     return { name, status: got.status, state: got.state, body: cut(got.body) };
@@ -2058,7 +2065,7 @@ async function transitRoute(request, env, headers, path, { session = null, limit
     if (SHOWCASE_PAID.has(path) && !(await spend(env, 'showcasePaid', 1, now, ctx))) return send({ code: 'CAP_REACHED' }, 429);
   }
   // A sample spends a real ask (Google's routes, TDX's points): a session's or the dev door's, never anyone's.
-  if (path === '/transit/status') return send(await statusSample(env, q.get('sample'), { ...deps, fresh: q.get('fresh') === '1', transit: q.get('transit') || '' }));
+  if (path === '/transit/status') return send(await statusSample(env, q.get('sample'), { ...deps, fresh: q.get('fresh') === '1', transit: q.get('transit') || '', query: q.get('q') || '' }));
   if (path === '/transit/config') {
     // One map load per call (the app asks once each time it opens).
     // (A dev page gets NLSC's map: the browser key works only on the site, and no map load is spent;
