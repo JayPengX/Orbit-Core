@@ -195,7 +195,7 @@ w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 | `/eco` | `eco.js`, `eco-admin.js`, `money.js`, `passkey.js`, `webauthn.js`, `orbit-token.js` | The Pass (§6); `op: 'admin'` is the owner's panel |
 | `/stock` | `stock-fill.js`, `stock-check.js` | Securities' fills at the proxy's own quote; the account replayed on each save |
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
-| `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations), the township, scored hourly (`/weather/skill`); during a typhoon warning (NCDR's CAP feed), `dayOff`: each county's 停班停課 from 人事行政總處, else a chance fitted to past decisions, all 22 every 3 minutes |
+| `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `weather-radar.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations) scored hourly (`/weather/skill`); `radar`: the next hour's rain (CWA's radar); in a typhoon (NCDR's CAP), `dayOff`: each county's 停班停課 from 人事行政總處, else a fitted chance |
 | `/transit/…` | `transit.js`, `transit-free.js` | TDX (allowlist `TDX_RULES`; trains trimmed, `tdxTrim`; YouBike from YouBike's own list), bus places (`gps`), map config, search, place, route, walk, book (高鐵's booking link); `/transit/status?sample=` (session or dev door) |
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `f1-people.js`, `fund-nav.js`, `taifex.js` | The data proxy (§4.1): sports, quotes, F1, Asian baseball, SITCA's fund NAVs, TAIFEX |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
@@ -231,9 +231,9 @@ w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
   TDX's copies 10 minutes old, `DEV_TDX_DAY` points a day): `tools/preview.mjs --live`,
   or `curl -H 'Origin: http://localhost:8123' '…/sports-proxy?url=…'`.
 
-- **Crons:** even minutes (notices, builders, weather scoring, capacity,
-  the meter's copy), F1's laps on both, run by Runner alarms (`main`,
-  `slow`). Never new Cron Triggers (ones made since October 2026 never ran).
+- **Crons:** even minutes (notices, builders, weather scoring and radar,
+  capacity, the meter's copy), F1's laps on both, run by Runner alarms.
+  Never new Cron Triggers: ones made since 10-2026 never ran.
 - **The proxy is the only one adding money:** `eco.js appEntries` takes only
   spending from apps, dated by the Worker; Securities' cash and cost are the
   Worker's (`stock-check.js`).
@@ -315,7 +315,7 @@ A read (`kit proxyJson`) goes down these until one answers:
 | Store | Binding | What's in it |
 | --- | --- | --- |
 | D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data, the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced (§5.3); `gemini_call`: every Gemini call (`gemini-use.js`); `law_day`: the AI caps' counts a day; `gift`, `gift_claim`: the giveaway (`gift.js`); `beats`: each job's last run and failures (`ops.js`); `meter`: Google's and TDX's counts a month (`transit.js`); `push_kv`: notices' devices and lists (`push.js`) |
-| R2 `orbit-data` | `DATA` | Public: the builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `station/`, `where.json`), the proxy's kept reads (`mirror/`). Never served: `private/` (nightly backups `private/store/<day>.jsonl.gz`, Firestore's last copy) |
+| R2 `orbit-data` | `DATA` | Public: the builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `station/`, `where.json`), the proxy's kept reads (`mirror/`), the radar's (`weather/`). Never served: `private/` (nightly backups `private/store/`, Firestore's last copy) |
 | KV | `RATE_LIMIT_KV` | Counters (sign-ins, per-address limits); the guard's state, pace and alerts (`guard:*`); Google Weather's cells and calls a day (`weather:g:*`, `weather:google:<day>`); TDX's last good reads (`tdx:warm:*`); the meter's copy (`transit:use:<month>`); Law's kept plans and answers (`law:*`); the showcase's passes a day (`showcase:passes:*`); the door's state (`door:state`); `ops:data-folders` |
 | Durable Objects | `F1_LOG`, `DOOR`, `RUNNER`, `CLOCK` | `F1Log`: F1's laps; `Door`: seats and the line; `Runner` (`runner.js`): heavy routes, crons by alarm, relays past 40 outside calls; `GuardClock`: the guard's alarm |
 | Edge cache | (Cache API) | The data proxy's answers by tier (§4.1), `/sports-today`, TDX's reads and routes (`transit.js`), the weather blend's cells (`weather.js`), `/law-live`, `/law-page`, `/config` |

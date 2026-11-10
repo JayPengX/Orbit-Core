@@ -43,6 +43,7 @@ import { handleShowcasePass, showcaseOf, SHOW_PER_MIN, SHOWCASE_ORIGINS } from '
 import { handlePush, sendDue } from './push.js';
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
+import { radarCron } from './weather-radar.js';
 import { handleTransit, tally, warmBikes, mirrorMeter } from './transit.js';
 import { readDev, capacityCron, CONFIG_COLLECTION, ADMIN_TOOLS } from './eco-admin.js';
 import { PASSKEY_COLLECTION } from './passkey.js';
@@ -1527,6 +1528,8 @@ async function cronTick(event, env, ctx, part) {
     run('notices', () => sendDue(env), r => (r.sent ? r : null));
     // Orbit Transit's YouBike: every city asked in the last 10 minutes kept warm (transit.js warmBikes).
     run('bikes', () => warmBikes(env), () => null);
+    // Orbit Weather's next hour of rain: CWA's radar forecast packed for R2 every 10 minutes (weather-radar.js).
+    if (pace < 2 && min % 10 === 6) run('radar', () => radarCron(env), r => (r.failed ? r : null));
     // Orbit Weather's scoring, once an hour (weather-skill.js).
     if (!pace && min === 10) run('weather-skill', () => weatherCron(env));
     if (!storeReady(env)) return;
