@@ -120,15 +120,15 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `brand.mjs` | Families, names, colours, marks, repos, slugs, `APP_ORDER`, `DEV` (speeds, §9) |
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: never money); every app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
 | `passkey.mjs` | Passkeys in the browser: made, used, named (`passkeyHere()` false where a browser can't) |
-| `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, US left–right), sources (`BASIS`); `sideOf`, `partiesIn` |
+| `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, US left–right), sources (`BASIS`); topics (`TOPICS`); `sideOf`, `partiesIn`, `topicsOf` |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law |
-| `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs` is qrcode-generator 2.0.4 (MIT), vendored |
+| `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs`: qrcode-generator 2.0.4 (MIT), vendored |
 | `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays` |
 | `feedback.mjs` | Every app's picks, one engine: `shown`, `picked`, `passed`, `did` → weights per key (30-day half-life); `scorer`, `lifter`, `chance`, `whyOf` (常看), `hitRate`; on the Pass: `fb:<app>` |
 | `holidays.mjs`, `dayoff.mjs` | Taiwan's days off; typhoon days off (停班停課) by the place that decides them for each app |
 | `catalog.mjs`, `logos.mjs`, `names.mjs`, `photos.mjs`, `photo-urls.mjs` | Sports' leagues once; logos (ESPN, TheSportsDB, flags, F1, old names); teams in Chinese; studio headshots; photos' addresses alone |
 | `f1live.mjs`, `postseason.mjs`, `sports-espn.mjs`, `sports-broadcast.mjs`, `sports-highlights.mjs`, `sports-winprob.mjs` | F1's own timing read one way everywhere; MLB's postseason; ESPN's scoreboards as events (one parser for the proxy and the phone); where to watch in Taiwan (past ELTA's list, `eltaGuess`: its usual line-up, said 預估); highlights; win probability (also run by the builders) |
-| `stock-account.mjs`, `stock-access.mjs`, `stock-credit.mjs`, `stock-markets.mjs`, `stock-quotes.mjs`, `stock-bonds.mjs`, `stock-savings.mjs`, `stock-ipo.mjs`, `stock-holidays.mjs`, `stock-hk-lots.mjs`, `stock-jp-lists.mjs`, `stock-codec.mjs` | Securities' ledger, broker rules, markets, prices, bonds, savings, IPOs, exchange holidays, lot sizes and saved-copy codec, shared with the Worker |
+| `stock-account.mjs`, `stock-access.mjs`, `stock-credit.mjs`, `stock-markets.mjs`, `stock-quotes.mjs`, `stock-bonds.mjs`, `stock-savings.mjs`, `stock-ipo.mjs`, `stock-holidays.mjs`, `stock-hk-lots.mjs`, `stock-jp-lists.mjs`, `stock-codec.mjs` | Securities' ledger, broker rules, markets, prices, bonds, savings, IPOs, holidays, lot sizes, saved-copy codec; shared with the Worker |
 | `pay.mjs`, `gov.mjs` | The weekly pay and relief (rules only; the Worker alone writes them); what the government took and gave one account |
 | `flight.mjs` | A real plane in the air, on a sphere: the proxy's `/flight` and Class's 專注飛行 |
 | `domain.mjs`, `devconfig.mjs`, `mirror.mjs` | The family's domain (one place); `DEV` for the Workers; the nightly mirror's addresses |
@@ -375,7 +375,7 @@ writing a file only when it changed (`builders/store.js`):
 | `asia.js`, `cpbl.js` | CPBL's month and standings | daily 15:00 |
 | `f1kept.js` | each finished F1 session's 數據 and laps, kept before anyone opens them (via the proxy: OpenF1 refuses quick askers) | :06, :26, :46 |
 | `kept.js` | wipes the proxy's kept copies (`mirror/`) from before a league's first askable day | daily 17:00 |
-| `news.js` | `news/index.json`: stories by side from outlets' feeds (48 h in `private/news/`) | every 10 min |
+| `news.js` | `news/index.json` (3 days), `past.json` (weeks): stories by importance, topic, side (`private/news/`) | every 10 min |
 
 A season is kept whole until the next season's first game (preseason
 included), then wiped whole. `private/` is never served.
@@ -402,11 +402,11 @@ The numbers live in `eco.js` and the kit's `orbit.mjs` (the same tables in
 both; RULEBOOK §4): NT$200,000 to open, NT$10,000 every Monday, 急難紓困
 (`kit/pay.mjs`), 財富等級 rewards, 1% a month overdraft, no personal loan.
 Money is shown and written only in Securities (資金), never on the Pass sheet; `eco:` ids are the Worker's alone.
-Securities' broker rules (`stock-access.mjs`, `stock-credit.mjs`): its MAP.md.
+Broker rules (`stock-access.mjs`, `-credit`): Securities' MAP.md.
 
 ## 8. Notices (`/push`)
 
-Apps hand the Worker their coming notices (`schedulePush`); it sends them by
+Apps hand the Worker coming notices (`schedulePush`); it sends them by
 Web Push and can check first (an ESPN final, a price, weather, a bus). One device per person per app; each kind in `NOTICE_KINDS` can be off.
 
 ## 9. Speeds, capacity and the bill
@@ -441,7 +441,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   - `deploy.yml`: the proxy and `gemini-relay` (and `orbit-site`);
   - `deploy-guard.yml`: the guard, only when its files change;
   - `pages.yml`: the kit and `site/`, to Cloudflare (tests first);
-  - `news-site.yml`: News's site with this repo's token when its main moved;
+  - `news-site.yml`: News's site (this repo's token) when its main moved;
   - every app repo's deploy workflow: its own site, to Cloudflare.
 - By hand: `build.yml` (a builder now, a check), `tail.yml` (logs),
   `audit.yml` (secret names, the store counted), `zone-speed.yml` (the zone's
@@ -457,7 +457,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   (§4.2): `orbit.<DOMAIN>/<slug>/` every app (`slug`,
   `SHORT` in `kit/brand.mjs`; one origin, so one Pass sign-in), `orbit-pass`
   for `/`, `/pass/`, `/key/`, `/Orbit-Core/` and the old `/Shared-Proxy/`,
-  `orbit-home` for `<DOMAIN>/` (Orbit-Showcase: Jay's homepage, `/showcase/`).
+  `orbit-home` for `<DOMAIN>/`, `/showcase/` (Orbit-Showcase).
   Plain static paths (`/law` → `/law/`). Mail is refused. `deploy.yml`
   attaches the hostnames (its token needs the zone and D1 Edit); the guard
   takes them off with the proxy.

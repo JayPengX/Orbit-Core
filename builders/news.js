@@ -13,16 +13,37 @@
 //      weighed by how rare it is that day; Chinese in two-character pieces),
 //      no AI: a headline joins the story it is nearest, if near enough and
 //      within a day of it;
-//   4. ranked by how many outlets carry a story, fading with its age.
+//   4. filler left out (entertainment, horoscopes, lottery, sport, viral
+//      and clickbait, by the outlet's own section or the headline's words:
+//      fillerOf); a story mostly of light headlines (promos, PR, "原因曝")
+//      sinks and, carried by few, goes (softOf); a story outlets couldn't
+//      take sides on (no topic: kit/news-outlets.mjs TOPICS) isn't News';
+//   5. each group added to the story it continues (deskOf: a headline of it
+//      already the story's, or, after a quiet spell, near its last day's),
+//      so a story is kept for days and weeks, growing as coverage comes
+//      (by how wide it went: 3, 14 or 30 days after its last headline);
+//   6. ranked by importance: how many outlets carry it, how much they
+//      wrote, for how many days, fading by half in 36 hours on the front;
+//   7. the top stories' own pages read, a few a build, each once (pageOf):
+//      the picture the outlet set for it (og:image) where the feed gave none,
+//      and the clip it published on YouTube (its VideoObject's embedUrl or
+//      the article's YouTube embed), played in the app by YouTube's player.
 //
-// → news/index.json: { built, tw: [story], intl: [story] }, a story:
-//   { id, title, sum, img, at, first, n, sides: { g, c, b } (or l, c, r),
-//     blind: 'g' | 'b' | 'l' | 'r' | '' (the side that carries none of a
-//     story the other side carries widely), parties: ['g','b','w'],
-//     items: [[outlet, title, url, at]] }  (each outlet's newest first).
+// → news/index.json: { built, tw: [story], intl: [story] } (heard of in
+//   the last 3 days); news/past.json the same for older ones, by
+//   importance, each outlet's newest headline only. A story:
+//   { id, title, sum, img, at, first, n (outlets), m (headlines), days:
+//     [['MM-DD', headlines]], sides: { g, c, b } (or l, c, r), blind: 'g' |
+//     'b' | 'l' | 'r' | '' (the side that carries none of a story the other
+//     side carries widely), parties: ['g','b','w'], topics: ['pol'…], imp,
+//     clips: [[outlet, youtubeId, url, title, picture]] (a YouTube clip, or
+//     an outlet's own video page when the id is ''),
+//     items: [[outlet, title, url, at, video?]] }  (each outlet's newest first).
+// State (private/news/items.json.gz): the 48 hours' headlines, feeds' ETags,
+// pages read, and the stories kept (recs).
 // Read by Orbit News through /data/ (data.js; index.json: 2 minutes at the edge).
 
-import { OUTLETS, sideOf, partiesIn } from '../kit/news-outlets.mjs';
+import { OUTLETS, sideOf, partiesIn, topicsOf } from '../kit/news-outlets.mjs';
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
 export const NEWS_PATH = 'news/index.json';
@@ -31,7 +52,23 @@ const HOUR = 3_600_000;
 export const KEEP_MS = 48 * HOUR;
 const WINDOW = { tw: 36 * HOUR, intl: 48 * HOUR };
 export const SUM_MAX = { zh: 80, en: 160 };
-const TOP = 120;
+// How many outlets a story needs (in Taiwan two only with the wire or the
+// public broadcaster among them); how many the front page lists (stories
+// heard of in the last 3 days) and the past (older ones, by importance).
+const FEWEST = { tw: 3, intl: 2 };
+const TOP = { tw: 120, intl: 80 };
+const PAST_TOP = { tw: 300, intl: 200 };
+export const NOW_MS = 72 * HOUR;
+export const NEWS_PAST = 'news/past.json';
+// A story is kept by how wide it went: carried by 6 outlets or more, 30
+// days after its last headline; by 4, 14 days; else 3. It takes new
+// headlines for 21 days from its first (then a new one starts), and keeps
+// 80 (its first 10 and its newest).
+const keepFor = n => (n >= 6 ? 30 : n >= 4 ? 14 : 3) * 24 * HOUR;
+const OPEN_MS = 21 * 24 * HOUR;
+const REC_ITEMS = 80;
+// Pages read a build (each once; the Runner relays past its own 40 calls).
+export const PAGE_READS = 12;
 
 // Each outlet's feeds: [url, kind] ('rss' RSS, RDF or Atom; 'map' a news sitemap).
 export const FEEDS = {
@@ -154,7 +191,9 @@ export function parseFeed(xml, kind = 'rss') {
 // Not news for a bar of sides: entertainment, sport, style, travel, opinion,
 // stock tips (by the outlet's own address for them).
 const SKIP_HOST = /^(?:star|ent|sports?|istyle|auto|speed|travel|house|health|pets?|game|fashion|beauty|food|talk|playing|3c|partners|fun|style)\./;
-const SKIP_PATH = /\/(?:entertainment|sports?|lifestyle|opinion|star|fashion|travel|horoscope|astro|recipes?|style|video|podcasts?|live|newsletters?)\//;
+const SKIP_PATH = /\/(?:entertainment|sports?|lifestyle|opinion|star|fashion|travel|horoscope|astro|recipes?|style|podcasts?|live|live-updates|newsletters?)\//;
+// A video report (the outlet's own video page): a story's clip.
+export const isVideo = u => /\/(?:videos?|clips)\/|\/video-/.test(u);
 // China Times' codes: 260403 sport, 260410 stock tips, 260417 the army's own, 260418 health tips, 2608xx history, 262xxx opinion.
 const CT_SKIP = /-(?:260403|260410|260417|260418|2608\d\d|262\d\d\d)$/;
 export function newsUrl(u) {
@@ -187,6 +226,7 @@ export function cleanTitle(t) {
       .replace(/^(?:【[^】]{1,10}】|\[[^\]]{1,10}\]|《[^》]{1,8}》|〈[^〉]{1,8}〉)\s*/, '')
       .replace(/^(?:快訊|獨家|最新|即時|影音?|圖|直播|更新|有片|焦點|專訪|獨|即|社論|評論|觀點|分析)\s*[／/》:：|｜]\s*/, '')
       .replace(/^[^\s》]{1,8}》\s*/, '')
+      .replace(/^(?:watch|video|live)\s*:\s*/i, '')
       .trim();
     if (s === before) break;
   }
@@ -195,6 +235,100 @@ export function cleanTitle(t) {
 const cut = (s, n) => (s.length > n ? `${s.slice(0, n - 1).trim()}…` : s);
 // A summary without its dateline: （中央社記者某某台南10日電）, (記者某某／台北報導).
 export const undated = s => s.replace(/^\s*[（(][^（()）]{2,40}?(?:電|報導)[)）]\s*/, '').trim();
+
+// ---- Filler ------------------------------------------------------------------------
+
+// Not worth a reader's time here, by the outlet's own section for it: udn's
+// horoscopes, lifestyle, viral, sport, opinion and stock tips; China Times'
+// entertainment and gadget reviews; Mirror's entertainment, food, health,
+// travel and tabloid; TVBS's and EBC's health, cars, gadgets, living; Up
+// Media's TV dramas, games and columns.
+const FILLER_SECTION = [
+  /udn\.com\/news\/story\/(?:7268|7270|121591|120911|120912|7332|7002|7001|7005|6999|122629|7338|7339|123006|12806|10103|7243|7255)\//,
+  /chinatimes\.com\/\w+\/\d+-2604(?:04|12)$/,
+  /mirrormedia\.mg\/story\/\d{8}(?:ent|pod|hea|tour|web|money|\d)/,
+  /news\.tvbs\.com\.tw\/(?:health|cars|tech|entertainment|fun|travel|sports?|focus|news-video|pack)\//,
+  /news\.ebc\.net\.tw\/news\/(?:health|living|fun|star|entertainment|travel|sport|house|car)\//,
+  /upmedia\.mg\/tw\/(?:popularity|game|commentary|master-forum|life)\//
+];
+// …or by the headline's own words (11-10, on that day's 4,900 headlines).
+const FILLER_WORDS = {
+  zh: [
+    ['fortune', /星座|生肖|運勢|命理|風水|塔羅|紫微|算命|開運|招財|犯太歲|農民曆|桃花劫|財運|面相/],
+    ['lottery', /威力彩|大樂透|今彩539|(?<!快)樂透|統一發票.{0,6}(?:號碼|中獎|開獎)|中獎號碼/],
+    ['celebrity', /女星|男星|藝人|韓星|偶像|網紅|直播主|YouTuber|正妹|辣妹|女神|比基尼|身材|事業線|性感|緋聞|戀情|閃婚|劇組|新歌|新劇|主演|綜藝|選秀|男團|女團|粉絲見面|劇迷|演藝圈|《[^》]{1,12}》(?:劇|女主|男主)/i],
+    ['viral', /網友|網狂|網曝|網推|網驚|網朝聖|網笑|網酸|網暴動|網讚|網淚|網嗨|網傻|網全|網敲碗|鄉民|PTT|Dcard|脆友|爆紅|瘋傳|神回|笑翻|獵奇|奇聞|萌翻|療癒/i],
+    ['sport', /^(?:NBA|MLB|NFL|NHL|中職|日職|韓職|美職|棒球|籃球|足球|網球|高爾夫|U\d+.{0,6}|亞冠賽|世界盃|經典賽|P\.?LEAGUE\+?|TPBL|PLG|拳擊|F1)[／/]/i]
+  ],
+  en: [
+    ['celebrity', /\b(?:Kardashians?|celebrity|celeb|stuns|flaunts|sizzles|bikini|red carpet|showbiz|Love Island|Strictly Come|Bake Off|influencer|TikTok star|reality star)\b/i],
+    ['fortune', /\b(?:horoscopes?|zodiac|astrolog\w*|tarot)\b/i],
+    ['lottery', /\b(?:Powerball|Mega Millions|lottery|jackpot)\b/i],
+    ['games', /\b(?:Wordle|crossword|puzzle|quiz|Connections hints?|sudoku)\b/i],
+    ['promo', /\b(?:best .{0,30} to buy|gift guide|coupon|promo code|sponsored|partner content|recipe)\b/i]
+  ]
+};
+// Filler: why ('section', 'fortune', …), or '' for news.
+export function fillerOf(it, lang) {
+  if (FILLER_SECTION.some(re => re.test(it.u))) return 'section';
+  for (const [why, re] of FILLER_WORDS[lang]) if (re.test(it.t)) return why;
+  return '';
+}
+// Light: clickbait ("原因曝", "這招"), tips, promos, PR. Not dropped alone,
+// but a story mostly of these sinks, and carried by few, goes.
+const LIGHT = {
+  zh: /(?:原因|真相|內幕|下場|價碼|身分|近況|現況|答案|結果|秘訣)曝|曝光(?:了)?[！!]?$|這樣說$|回應了$|說話了$|發聲了$|竟然|竟是|「這\d?[件招種樣個物檔]」|\d大(?:前兆|地雷|族群|習慣|徵兆|好處|秘訣|特徵|陷阱)|醫揭|營養師|中醫師|藥師揭|小撇步|妙招|冷知識|懶人包|一次看|必看|必吃|必買|開箱|千萬別|你中了嗎|傻眼|驚呆|嚇傻|嚇壞|崩潰|超狂|超扯|太狂|太扯|暖心|淚崩|優惠|折扣|限時|好市多|買一送一|開賣|新品|聯名|試吃|美食|年菜|打卡|景點|賞楓|賞花|花海|嘉年華|聖誕|耶誕|市集|抽獎|免費送|登場$|週年慶|促銷|榮獲|獲獎|奪金|金質獎|頒獎|表揚|揭牌|動土|啟用|典禮|研討會|捐贈|義診|公益|感恩/,
+  en: /\b(?:viral|internet reacts|you won't believe|jaw-dropping|hilarious|deal of the day)\b/i
+};
+export const softOf = (t, lang) => LIGHT[lang].test(t);
+
+// ---- An outlet's own page: its picture and its clip ------------------------------
+
+const metaOf = (html, name) => {
+  const m =
+    new RegExp(`<meta\\b[^>]*(?:property|name)=["']${name}["'][^>]*\\bcontent=["']([^"']+)["']`, 'i').exec(html) ||
+    new RegExp(`<meta\\b[^>]*\\bcontent=["']([^"']+)["'][^>]*(?:property|name)=["']${name}["']`, 'i').exec(html);
+  return m ? plain(m[1]) : '';
+};
+// A page's own picture (og:image) and the YouTube clips it says are its own:
+// a VideoObject's embedUrl, or a YouTube player in the article. { i, y }.
+export function pageOf(html) {
+  const s = String(html || '').slice(0, 600_000).replace(/\\\//g, '/');
+  const i = metaOf(s, 'og:image') || metaOf(s, 'twitter:image');
+  const y = [];
+  for (const m of s.matchAll(/embedUrl["']?\s*(?::|content=)\s*["']https?:\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/([\w-]{11})/g)) y.push(m[1]);
+  for (const m of s.matchAll(/<iframe\b[^>]*\bsrc=["'](?:https?:)?\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/([\w-]{11})/g)) y.push(m[1]);
+  return { i: /^https:\/\//.test(i) ? i : '', y: [...new Set(y)].slice(0, 2) };
+}
+// What one outlet puts on every page is its own, not a story's: a clip on
+// two of its pages or more (its live channel, a box beside each article), a
+// picture on two of its pages (its logo) or on three of its feed's items (a
+// stand-in). `ok(outlet, clip or picture)`; a clip counts only once two of
+// the outlet's pages were read, so a box beside them all can show.
+export function sameOf(pages, items) {
+  const n = new Map();
+  const read = new Map();
+  const count = k => n.set(k, (n.get(k) || 0) + 1);
+  for (const it of items) {
+    if (it.img) count(`f ${it.o} ${it.img}`);
+    const p = pages[it.u];
+    if (!p) continue;
+    read.set(it.o, (read.get(it.o) || 0) + 1);
+    if (p.i) count(`p ${it.o} ${p.i}`);
+    for (const id of p.y || []) count(`y ${it.o} ${id}`);
+  }
+  return {
+    clip: (o, id) => (read.get(o) || 0) >= 2 && (n.get(`y ${o} ${id}`) || 0) < 2,
+    feedPic: (o, u) => (n.get(`f ${o} ${u}`) || 0) < 3,
+    pagePic: (o, u) => (n.get(`p ${o} ${u}`) || 0) < 2
+  };
+}
+const ytPicture = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+// A feed's small picture swapped for the outlet's own larger size of it.
+export const bigPicture = u =>
+  String(u || '')
+    .replace(/^(https:\/\/attach\.setn\.com\/newsimages\/.+)-XS\.jpg$/, '$1-PH.jpg')
+    .replace(/^(https:\/\/s\.abcnews\.com\/images\/.+)_4x3_384\.jpg$/, '$1_16x9_992.jpg');
 
 // ---- Grouping headlines into stories ----------------------------------------
 
@@ -243,27 +377,39 @@ const GAP = 24 * HOUR;
 
 const add = (v, k, x) => v.set(k, (v.get(k) || 0) + x);
 
-// items: [{ o, t, u, d, at, img }] of one region → stories (unranked).
-export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lang] } = {}) {
-  const docs = items.map(it => ({ it, p: piecesOf(it.t, lang), s: lang === 'en' && it.d ? piecesOf(it.d, lang) : [] })).filter(d => d.p.length);
+// A headline's weighed pieces, each by how rare it is among these items':
+// weigh(items, lang) → it => Map(piece → weight).
+export function weigh(items, lang) {
+  const docOf = it => ({ p: piecesOf(it.t, lang), s: lang === 'en' && it.d ? piecesOf(it.d, lang) : [] });
   const df = new Map();
-  for (const d of docs) for (const p of new Set([...d.p, ...d.s])) df.set(p, (df.get(p) || 0) + 1);
+  for (const it of items) {
+    const d = docOf(it);
+    for (const p of new Set([...d.p, ...d.s])) df.set(p, (df.get(p) || 0) + 1);
+  }
   // Rarity counted as if among a day's headlines at least (a quiet hour's
   // few would weigh a shared piece below a stray one, or drop it).
-  const N = Math.max(docs.length, 600);
+  const N = Math.max(items.length, 600);
   // A piece in more than one headline in twelve says nothing of which story.
   const common = N / 12;
-  for (const d of docs) {
+  return it => {
+    const d = docOf(it);
     const v = new Map();
+    if (!d.p.length) return v;
     for (const [list, w] of [[d.p, 1], [d.s, SUM_WEIGHT]])
       for (const p of list) {
-        const n = df.get(p);
+        const n = df.get(p) || 1;
         if (n > common) continue;
         add(v, p, w * Math.log(N / n));
       }
-    d.v = v;
-    d.n = norm(v);
-  }
+    return v;
+  };
+}
+
+// items: [{ o, t, u, d, at, img }] of one region → stories (unranked).
+export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lang] } = {}) {
+  const vecOf = weigh(items, lang);
+  const docs = items.map(it => ({ it, v: vecOf(it) })).filter(d => d.v.size);
+  for (const d of docs) d.n = norm(d.v);
   docs.sort((a, b) => (a.it.at || 0) - (b.it.at || 0));
   let groups = [];
   const index = new Map(); // piece → groups holding it
@@ -330,18 +476,44 @@ export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lan
   });
 }
 
-// A story from its headlines: the plainest headline leads (nearest the
-// story's middle, a wire service or public broadcaster a little ahead).
+// A story from its headlines: the plainest of its last day's leads (nearest
+// the story's middle, a wire service or public broadcaster a little ahead),
+// so a story that runs for days is led by its latest turn.
 const STEADY = new Set(['gov', 'public']);
-export function storyOf(items, region, now) {
+const twDay = at => new Date(at + 8 * HOUR).toISOString().slice(5, 10);
+export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, items) } = {}) {
+  const lang = region === 'tw' ? 'zh' : 'en';
+  const newest = [...items].sort((a, b) => (b.at || 0) - (a.at || 0));
   const byOutlet = new Map();
-  for (const it of [...items].sort((a, b) => (b.at || 0) - (a.at || 0))) {
+  for (const it of newest) {
     if (!byOutlet.has(it.o)) byOutlet.set(it.o, []);
     if (byOutlet.get(it.o).length < 3) byOutlet.get(it.o).push(it);
   }
-  const lead = [...items].sort((a, b) => b.near + (STEADY.has(OUTLETS[b.o]?.kind) ? 0.12 : 0) - (a.near + (STEADY.has(OUTLETS[a.o]?.kind) ? 0.12 : 0)))[0];
-  const withSum = [lead, ...items].find(it => it.d);
-  const withImg = [lead, ...items].find(it => it.img);
+  const ats = items.map(it => it.at || now);
+  const at = Math.max(...ats);
+  const first = Math.min(...ats);
+  // (A video page doesn't lead: its headline is often "Watch: …".)
+  const rank = it => (it.near ?? 0) + (STEADY.has(OUTLETS[it.o]?.kind) ? 0.12 : 0) - (it.v ? 0.3 : 0);
+  const lead = items.filter(it => (it.at || now) >= at - 24 * HOUR).sort((a, b) => rank(b) - rank(a))[0];
+  const withSum = [lead, ...newest].find(it => it.d);
+  // The picture: a feed's own, else the one the outlet set on its page.
+  const pics = [lead, ...newest].flatMap(it => {
+    const p = pages[it.u]?.i;
+    return [it.img && same.feedPic(it.o, it.img) && [bigPicture(it.img), it.o], p && same.pagePic(it.o, p) && [p, it.o]];
+  });
+  // The story's clips: each outlet's own YouTube clip on its page, or its
+  // video page (played on the outlet's site), newest first, one a clip.
+  const clips = [];
+  const ids = new Set();
+  for (const it of newest) {
+    const y = (pages[it.u]?.y || []).filter(id => same.clip(it.o, id) && !ids.has(id));
+    for (const id of y) {
+      ids.add(id);
+      clips.push([it.o, id, it.u, cleanTitle(it.t), ytPicture(id)]);
+    }
+    if (it.v && !y.length) clips.push([it.o, '', it.u, cleanTitle(it.t), bigPicture(it.img || pages[it.u]?.i || '')]);
+  }
+  const withImg = pics.find(Boolean) || (clips[0]?.[4] && [clips[0][4], clips[0][0]]);
   const sides = region === 'tw' ? { g: 0, c: 0, b: 0 } : { l: 0, c: 0, r: 0 };
   for (const o of byOutlet.keys()) {
     const s = sideOf(o, region);
@@ -351,16 +523,26 @@ export function storyOf(items, region, now) {
   // 單邊 (one side): carried by 3 outlets or more for 2 hours or more, 2 or
   // more of them on one side and none on the other: `blind`, the side that
   // missed it.
-  const many = byOutlet.size >= 3 && now - Math.min(...items.map(it => it.at || now)) >= 2 * HOUR;
+  const many = byOutlet.size >= 3 && now - first >= 2 * HOUR;
   const blind = many && sides[left] >= 2 && !sides[right] ? right : many && sides[right] >= 2 && !sides[left] ? left : '';
-  const ats = items.map(it => it.at || now);
-  const at = Math.max(...ats);
-  const first = Math.min(...ats);
   const n = byOutlet.size;
-  // Many outlets first, fading by half every 8 hours since the last headline;
-  // carried by both sides, a little ahead.
-  const score = n * 0.5 ** ((now - at) / (8 * HOUR)) * (sides[left] && sides[right] ? 1.2 : 1);
-  const lang = region === 'tw' ? 'zh' : 'en';
+  const m = items.length;
+  const days = new Map();
+  for (const t of ats) days.set(twDay(t), (days.get(twDay(t)) || 0) + 1);
+  const parties = region === 'tw' ? partiesIn(items.map(it => it.t).join(' ')) : [];
+  // What it's about (a party named is politics); none: not News'.
+  let topics = topicsOf(items.map(it => it.t), lang);
+  if (!topics.length && lang === 'en') topics = topicsOf(items.map(it => `${it.t} ${it.d || ''}`), lang);
+  if (parties.length && !topics.includes('pol')) topics = [...topics, 'pol'].slice(0, 3);
+  // Light: a share of its headlines clickbait, tips, promos (softOf).
+  const light = items.filter(it => softOf(it.t, lang)).length / m;
+  // Importance: how many outlets carry it, how much they wrote, for how many
+  // days; carried by both sides a little ahead, a light one behind.
+  // (Headlines counted 4 an outlet at most: one prolific outlet doesn't make a story big.)
+  const per = new Map();
+  for (const it of items) per.set(it.o, Math.min(4, (per.get(it.o) || 0) + 1));
+  const wrote = [...per.values()].reduce((a, b) => a + b, 0);
+  const imp = (n + 2 * Math.log2(wrote) + 1.5 * Math.min(days.size - 1, 6)) * (sides[left] && sides[right] ? 1.2 : 1) * (1 - light * 0.7);
   return {
     id: idOf(items.reduce((a, b) => ((a.at || 0) <= (b.at || 0) ? a : b)).u),
     title: cleanTitle(lead.t),
@@ -369,16 +551,23 @@ export function storyOf(items, region, now) {
     by: lead.o,
     sum: withSum ? cut(undated(withSum.d), SUM_MAX[lang]) : '',
     sumBy: withSum?.o || '',
-    img: withImg?.img || '',
-    imgBy: withImg?.o || '',
+    img: withImg?.[0] || '',
+    imgBy: withImg?.[1] || '',
     at,
     first,
     n,
+    m,
+    days: [...days].sort((x, y) => (x[0] < y[0] ? -1 : 1)),
     sides,
     blind,
-    parties: region === 'tw' ? partiesIn(items.map(it => it.t).join(' ')) : [],
-    items: [...byOutlet.values()].flat().map(it => [it.o, cleanTitle(it.t), it.u, it.at || now]),
-    score
+    parties,
+    topics,
+    imp: Math.round(imp * 10) / 10,
+    clips: clips.slice(0, 4),
+    items: [...byOutlet.values()].flat().map(it => [it.o, cleanTitle(it.t), it.u, it.at || now, ...(it.v ? [1] : [])]),
+    // (Ranked on the front page by importance fading by half in 36 hours.)
+    score: imp * 0.5 ** ((now - at) / (36 * HOUR)),
+    light
   };
 }
 // A story's id: its first headline's address, hashed short (FNV-1a), so a
@@ -388,18 +577,104 @@ export function idOf(u) {
   for (let i = 0; i < u.length; i++) h = Math.imul(h ^ u.charCodeAt(i), 0x01000193) >>> 0;
   return h.toString(36);
 }
+const enough = (outlets, region) => outlets.size >= FEWEST[region] || (outlets.size >= 2 && [...outlets].some(o => STEADY.has(OUTLETS[o]?.kind)));
+const sumOf = vs => {
+  const v = new Map();
+  for (const x of vs) for (const [k, w] of x) add(v, k, w);
+  return v;
+};
+// What a story keeps of a headline.
+const keepOf = ({ o, t, u, at, d, img, v }) => ({ o, t, u, at, ...(d ? { d } : {}), ...(img ? { img } : {}), ...(v ? { v } : {}) });
 
-// The stories of one region, ranked; only those two outlets or more carry.
-export function storiesOf(items, region, now) {
-  const lang = region === 'tw' ? 'zh' : 'en';
-  const mine = items.filter(it => OUTLETS[it.o]?.region === region && now - (it.at || now) <= WINDOW[region]);
-  return groupStories(mine, lang)
-    .filter(g => new Set(g.map(it => it.o)).size >= 2)
-    .map(g => storyOf(g, region, now))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, TOP)
-    .map(({ score, ...s }) => s);
+// The desk: today's headlines grouped, each group added to the story it
+// continues (one of its headlines already that story's, or, after a quiet
+// spell, its last day's headlines near), else a new story if FEWEST outlets
+// carry it and it has a topic. recs: the stories kept, [{ id, r, first,
+// last, peak, items }]. → { tw, intl } (the front: heard of in NOW_MS,
+// ranked), past: { tw, intl } (older, by importance), recs (to keep).
+export function deskOf(items, recs = [], now, { pages = {} } = {}) {
+  const live = recs.filter(r => now - r.last <= keepFor(r.peak || 0)).map(r => ({ ...r, items: [...r.items] }));
+  const every = new Map();
+  for (const it of [...live.flatMap(r => r.items), ...items]) every.set(it.u, it);
+  const same = sameOf(pages, [...every.values()]);
+  const out = { tw: [], intl: [], past: { tw: [], intl: [] }, recs: live };
+  for (const region of ['tw', 'intl']) {
+    const lang = region === 'tw' ? 'zh' : 'en';
+    const mine = items.filter(it => OUTLETS[it.o]?.region === region && now - (it.at || now) <= WINDOW[region] && !fillerOf(it, lang));
+    const vecOf = weigh(mine, lang);
+    const recsHere = live.filter(r => r.r === region);
+    const owner = new Map();
+    for (const r of recsHere) for (const it of r.items) owner.set(it.u, r);
+    const open = r => now - r.first <= OPEN_MS;
+    // (Each kept story's last day, weighed once; only stories kept before
+    // this build: today's groups were already kept apart by groupStories.)
+    const lastDays = recsHere
+      .filter(open)
+      .map(r => {
+        const v = sumOf(r.items.filter(it => it.at >= r.last - 24 * HOUR).map(vecOf));
+        return { r, v, n: norm(v) };
+      });
+    for (const g of groupStories(mine, lang)) {
+      const hits = new Map();
+      for (const it of g) {
+        const r = owner.get(it.u);
+        if (r && open(r)) hits.set(r, (hits.get(r) || 0) + 1);
+      }
+      let rec = [...hits].sort((a, b) => b[1] - a[1])[0]?.[0];
+      if (!rec) {
+        const gFirst = Math.min(...g.map(it => it.at || now));
+        const gv = sumOf(g.map(vecOf));
+        const gn = norm(gv);
+        let best = null;
+        let bestSim = 0;
+        for (const { r, v, n } of lastDays) {
+          if (r.last < gFirst - GAP) continue;
+          const sim = cosine(gv, gn, v, n);
+          if (sim > bestSim) (bestSim = sim), (best = r);
+        }
+        if (bestSim >= MERGE[lang]) rec = best;
+      }
+      if (!rec) {
+        const texts = g.map(it => (lang === 'en' ? `${it.t} ${it.d || ''}` : it.t));
+        if (!enough(new Set(g.map(it => it.o)), region) || (!topicsOf(texts, lang).length && !partiesIn(texts.join(' ')).length)) continue;
+        const firstIt = g.reduce((a, b) => ((a.at || 0) <= (b.at || 0) ? a : b));
+        rec = { id: idOf(firstIt.u), r: region, first: firstIt.at || now, last: firstIt.at || now, peak: 0, items: [] };
+        live.push(rec);
+        recsHere.push(rec);
+      }
+      for (const it of g) {
+        if (owner.has(it.u)) continue;
+        rec.items.push(keepOf(it));
+        owner.set(it.u, rec);
+      }
+    }
+    for (const r of recsHere) {
+      r.items.sort((a, b) => a.at - b.at);
+      if (r.items.length > REC_ITEMS) r.items = [...r.items.slice(0, 10), ...r.items.slice(10 - REC_ITEMS)];
+      const vs = r.items.map(vecOf);
+      const c = sumOf(vs);
+      const cn = norm(c);
+      const s = storyOf(r.items.map((it, i) => ({ ...it, near: cosine(vs[i], norm(vs[i]), c, cn) })), region, now, { pages, same });
+      r.first = s.first;
+      r.last = s.at;
+      r.peak = Math.max(r.peak || 0, s.n);
+      s.id = r.id;
+      // Not News' (no topic), or light and carried by few: not shown.
+      if (!s.topics.length || (s.light >= 0.5 && s.n < 4)) continue;
+      (now - s.at <= NOW_MS ? out[region] : out.past[region]).push(s);
+    }
+    out[region] = out[region].sort((a, b) => b.score - a.score).slice(0, TOP[region]).map(({ score, light, ...s }) => s);
+    // (The past lighter: each outlet's newest headline only.)
+    out.past[region] = out.past[region]
+      .sort((a, b) => b.imp - a.imp)
+      .slice(0, PAST_TOP[region])
+      .map(({ score, light, items: list, ...s }) => ({ ...s, items: list.filter((x, i) => list.findIndex(y => y[0] === x[0]) === i) }));
+  }
+  return out;
 }
+
+// One region's stories from these headlines alone (no stories kept).
+export const storiesOf = (items, region, now, opts) => deskOf(items, [], now, opts)[region];
 
 // ---- The build -----------------------------------------------------------------
 
@@ -433,7 +708,7 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
             // (A time ahead of now is a feed's wrong zone: taken as now.)
             const at = Math.min(it.at ?? now, now);
             if (now - at > KEEP_MS) continue;
-            byUrl.set(u, { o, t: it.t, u, d: cut(it.d, SUM_MAX[lang] * 2), at, img: it.img });
+            byUrl.set(u, { o, t: it.t, u, d: cut(it.d, SUM_MAX[lang] * 2), at, img: it.img, ...(isVideo(u) ? { v: 1 } : {}) });
             fresh++;
           }
         } catch (e) {
@@ -448,9 +723,52 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
     const k = `${it.o}|${cleanTitle(it.t)}`;
     return !seen.has(k) && seen.add(k);
   });
-  await store.put(NEWS_STATE, { items, etag });
-  const out = { built: now, tw: storiesOf(items, 'tw', now), intl: storiesOf(items, 'intl', now) };
+  // The pages read before (still kept), then a few more for the top stories.
+  const recs = kept.recs || [];
+  const pages = {};
+  for (const it of [...items, ...recs.flatMap(r => r.items)]) if (kept.pages?.[it.u]) pages[it.u] = kept.pages[it.u];
+  let out = deskOf(items, recs, now, { pages });
+  const want = pagesToRead(out, pages);
+  const read = await Promise.all(want.map(u => readPage(u, { fetchImpl })));
+  want.forEach((u, i) => (pages[u] = read[i] || { i: '', y: [] }));
+  if (want.length) out = deskOf(items, recs, now, { pages });
+  const keep = new Set([...items, ...out.recs.flatMap(r => r.items)].map(it => it.u));
+  for (const u of Object.keys(pages)) if (!keep.has(u)) delete pages[u];
+  await store.put(NEWS_STATE, { items, etag, pages, recs: out.recs });
   // (Never an empty page over a good one: a build that read nothing keeps the last.)
-  if (out.tw.length || out.intl.length) await store.put(NEWS_PATH, out);
-  return { items: items.length, fresh, tw: out.tw.length, intl: out.intl.length, failed };
+  if (out.tw.length || out.intl.length) {
+    await store.put(NEWS_PATH, { built: now, tw: out.tw, intl: out.intl });
+    await store.put(NEWS_PAST, { built: now, ...out.past });
+  }
+  return { items: items.length, fresh, pages: want.length, kept: out.recs.length, tw: out.tw.length, intl: out.intl.length, past: out.past.tw.length + out.past.intl.length, failed };
+}
+
+// Outlets whose pages carry the story's own YouTube clip.
+const CLIPS_AT = new Set(['pts', 'ebc', 'ctinews']);
+// The pages a build reads, PAGE_READS at most, top stories first (two of
+// Taiwan's to one abroad): one with a clip where a story has none yet, and
+// the lead's (else any) where it has no picture.
+export function pagesToRead(out, pages, most = PAGE_READS) {
+  const order = [];
+  for (let i = 0; i < 40; i++) order.push(out.tw[2 * i], out.tw[2 * i + 1], out.intl[i]);
+  const want = [];
+  for (const s of order.filter(Boolean)) {
+    const fresh = s.items.filter(([, , u]) => !pages[u] && !want.includes(u));
+    const clip = !s.clips?.some(c => c[1]) && fresh.find(([o]) => CLIPS_AT.has(o));
+    if (clip) want.push(clip[2]);
+    const pic = !s.img && (fresh.find(([, , u]) => u === s.items[0]?.[2]) || fresh.find(([, , u]) => u !== clip?.[2]));
+    if (pic) want.push(pic[2]);
+    if (want.length >= most) break;
+  }
+  return want.slice(0, most);
+}
+// One page read for its picture and clip; null when it can't be.
+async function readPage(url, { fetchImpl = fetch } = {}) {
+  try {
+    const res = await fetchImpl(url, { headers: { 'User-Agent': UA, Accept: 'text/html' }, signal: AbortSignal.timeout(10_000) });
+    if (!res?.ok) return null;
+    return pageOf(await res.text());
+  } catch {
+    return null;
+  }
 }
