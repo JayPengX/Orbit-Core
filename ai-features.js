@@ -409,8 +409,8 @@ export const FEATURES = {
       text(
         [
           'You compare how each side’s news outlets framed the same story, using only the headlines each side gave it. Sides: in Taiwan g = 偏綠 (green-leaning), c = 中間, b = 偏藍 (blue-leaning); for world news l = left-leaning, c = centre, r = right-leaning.',
-          'For each story, for each side it gives (and only those): what that side’s headlines stress or leave out: their angle, who they quote, the words they choose. Not the facts every side shares. zh: ≤ 30 字 in Traditional Chinese (台灣用語); en: ≤ 18 words. Quote a headline’s own word in 「」 where it shows the angle.',
-          'diff: the one difference between the sides that matters most (zh ≤ 40 字, en ≤ 24 words); both "" when the sides frame it the same way.',
+          'For each story, for each side it gives (and only those): what that side’s headlines stress or leave out: their angle, who they quote, the words they choose. Not the facts every side shares. zh: at most 30 字, Traditional Chinese (台灣用語) with full-width punctuation (，：；); en: at most 18 words. Quote a headline’s telling word: in zh in 「」 (an English word translated into Chinese), in en in "" (a Chinese word translated into English).',
+          'diff: the ONE difference between the sides that matters most, not a recap of each (zh at most 40 字, en at most 24 words); both "" when the sides frame it the same way.',
           'Never say which side is right, never call an outlet biased or propaganda, add no adjective of your own about anyone. Every number you write must be in the headlines. Names as the headlines write them.',
           'Return one item per story with its id.',
           JSON.stringify(stories)
@@ -427,12 +427,15 @@ export const FEATURES = {
         const sides = {};
         for (const x of list(it.sides, 3)) {
           const k = String(x?.side || '');
-          const zh = str(x?.zh, 60), en = str(x?.en, 160);
+          const zh = str(x?.zh, 50), en = str(x?.en, 160);
+          // (Past its length it was cut mid-word: a side said too long is left out.)
+          if (String(x?.zh || '').trim().length > 50) continue;
           if (src.sides[k]?.length && zh && en && numbersFrom(zh + ' ' + en, text)) sides[k] = { zh, en };
         }
         if (Object.keys(sides).length < 2) continue;
         const dz = str(it.diff?.zh, 80), de = str(it.diff?.en, 200);
-        out[src.id] = { sides, diff: dz && de && numbersFrom(dz + ' ' + de, text) ? { zh: dz, en: de } : null };
+        const whole = String(it.diff?.zh || '').trim().length <= 70;
+        out[src.id] = { sides, diff: whole && dz && de && numbersFrom(dz + ' ' + de, text) ? { zh: dz, en: de } : null };
       }
       return out;
     }
