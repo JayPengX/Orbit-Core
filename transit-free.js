@@ -10,7 +10,8 @@
 //   - 新竹's buses (竹塹交通資訊網), 臺北's and 新北's (the cities' open data).
 //   - 台鐵's day of trains (台鐵's own open data, ods.railway.gov.tw).
 //   - 臺北捷運's trains coming in (the metro's own open file); 高雄捷運's and
-//     輕軌's next trains at a station (KRTC's 高捷e遊行).
+//     輕軌's next trains at a station (KRTC's 高捷e遊行); 機場捷運's (its
+//     platform screens).
 //   - 高鐵's day and the metros' maps and timetables: the weekly build's
 //     copies in R2 (rail/: TDX's GTFS, 0 points; the metros asked of TDX
 //     only when GTFS says they changed); the bus route lists and 台鐵's and
@@ -1197,6 +1198,56 @@ async function krtcFree(path, q, { fetchFn, env, now }) {
   return { status: 200, body: JSON.stringify(rows), age: Math.max(0, now - got.at), state: 'free' };
 }
 
+// ---- 桃園機場捷運's next trains ------------------------------------------------------------
+
+// TDX's TYMC LiveBoard from 桃園捷運's own platform screens (its site's
+// PIDS_cache.php: every station's platforms, their next trains to the
+// second, one file for the line): each train a row, by when it leaves its
+// first station and reaches the others; the whole line or a station.
+export const TYMC_PIDS = 'https://www.tymetro.com.tw/tymetro-new/tw/_pages/travel-guide/PIDS_cache.php';
+const TYMC_ASK = /^basic\/v2\/Rail\/Metro\/LiveBoard\/TYMC$/;
+const tymcId = s => String(s || '').replace(/^A0(\d)$/, 'A$1').replace(/^A14A$/, 'A14a');
+export function tymcRows(pids, lines, names = [], now = Date.now()) {
+  const at = new Map((Array.isArray(lines) ? lines : []).flatMap(line => (line.Stations || []).map(s => [s.StationID, { line, s }])));
+  const lineName = Object.fromEntries((Array.isArray(names) ? names : []).map(l => [l.LineID, l.LineName]));
+  const said = Date.parse(pids?.SystemDateTime || '');
+  if (!Number.isFinite(said)) return [];
+  const late = Math.max(0, (now - said) / 1000);
+  const out = [];
+  for (const [key, trains] of Object.entries(pids || {})) {
+    if (!Array.isArray(trains) || !/^A\d+a?_PL\d$/.test(key)) continue;
+    for (const t of trains) {
+      const here = at.get(tymcId(t?.Station)), to = at.get(tymcId(t?.EndStation));
+      const sec = Number(t?.EventType === 'D' ? t.EstDepartureCountdown : t?.EstArrivalCountdown);
+      if (!here || !to || here === to || t.TrainStatus === 'OOS' || t.nonstop !== 'stop' || t.EstArrivalCountdown === '' || !Number.isFinite(sec)) continue;
+      out.push({ LineNO: here.line.LineNo || here.line.LineID, LineID: here.line.LineID, LineName: lineName[here.line.LineID] || { Zh_tw: '' }, StationID: here.s.StationID, StationName: here.s.StationName, TripHeadSign: `往${to.s.StationName.Zh_tw}`, DestinationStaionID: to.s.StationID, DestinationStationID: to.s.StationID, DestinationStationName: to.s.StationName, ServiceStatus: 0, EstimateTime: Math.floor(Math.max(0, sec - late) / 60), SrcUpdateTime: twNow(said), UpdateTime: twNow(now) });
+    }
+  }
+  const order = s => at.get(s)?.s.Sequence ?? 99;
+  return out.sort((a, b) => order(a.StationID) - order(b.StationID) || a.EstimateTime - b.EstimateTime);
+}
+async function tymcFree(path, q, { fetchFn, env, now }) {
+  if (!TYMC_ASK.test(path) || !env?.DATA) return undefined;
+  const keys = [...q.keys()].filter(k => k !== '$format');
+  const one = q.has('$filter') && METRO_STATION.exec(q.get('$filter'));
+  if (keys.some(k => k !== '$filter') || (q.has('$filter') && !one)) return null;
+  const map = (await held('tymc:lines', TRA_FRESH, 7 * DAY, async () => {
+    const read = async f => JSON.parse((await (await env.DATA.get(`rail/metro/TYMC/${f}.json`))?.text()) || 'null');
+    const [lines, names] = await Promise.all([read('StationOfLine'), read('Line')]);
+    if (!lines?.length) throw new Error('not copied');
+    return { lines, names };
+  }, now, 3000)).val;
+  const got = await held('tymc:live', KRTC_FRESH, 2 * MIN, async () => {
+    const res = await fetchFn(TYMC_PIDS, { signal: AbortSignal.timeout?.(6000) });
+    if (!res.ok) throw new Error(`TYMC ${res.status}`);
+    const rows = tymcRows(await res.json(), map.lines, map.names, now);
+    if (!rows.length) throw new Error('TYMC: no trains');
+    return rows;
+  }, now);
+  const rows = got.val.filter(r => !one || r.StationID === one[1]);
+  return { status: 200, body: JSON.stringify(rows), age: Math.max(0, now - got.at), state: 'free' };
+}
+
 // ---- TDX's slow lists, copied ------------------------------------------------------------
 
 // What every phone asks the same way and seldom changes (a city's bus routes,
@@ -1240,7 +1291,7 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), 
   const q = new URLSearchParams(query);
   try {
     const p = decodeURIComponent(path);
-    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await trtcFree(p, q, { fetchFn, env, now })) ?? (await krtcFree(p, q, { fetchFn, env, now })) ?? (await copiedFree(p, q, { env, now }));
+    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await trtcFree(p, q, { fetchFn, env, now })) ?? (await krtcFree(p, q, { fetchFn, env, now })) ?? (await tymcFree(p, q, { fetchFn, env, now })) ?? (await copiedFree(p, q, { env, now }));
     if (got !== undefined) return got;
   } catch (err) {
     console.log('free source failed', path.slice(0, 80), String(err?.message || err).slice(0, 120));

@@ -665,3 +665,33 @@ test("高雄捷運's and 輕軌's next trains at a station from KRTC's 高捷e�
   assert.equal(asked.filter(a => a === 'form').length, 2, 'the form read again after a post found no board');
   assert.equal(await ask('KRTC', 'O5', now + 3 * 60_000), null);
 });
+
+test("桃園機場捷運's next trains from its own platform screens (PIDS), in TDX's shape: each train a row, minutes to when it leaves its first station or reaches the others, from when the file was said; the whole line or a station", async () => {
+  const { tymcRows, TYMC_PIDS } = await import('../transit-free.js');
+  const fx = JSON.parse(readFileSync(new URL('./fixtures/tymc-pids.json', import.meta.url), 'utf8'));
+  const said = Date.parse(fx.pids.SystemDateTime);
+  const rows = tymcRows(fx.pids, fx.StationOfLine, fx.Line, said);
+  const at = id => rows.filter(r => r.StationID === id).map(r => `${r.TripHeadSign} ${r.EstimateTime}`);
+  assert.deepEqual(at('A1'), ['往環北站 12', '往機場第二航廈站 27', '往機場第二航廈站 42', '往機場第二航廈站 57'], 'at its first station: when it leaves (the express to 環北 in at 16:49, out 17:00)');
+  assert.deepEqual(at('A13').slice(0, 3), ['往台北車站 0', '往台北車站 5', '往老街溪站 11'], 'trains ending here (no end said) left out');
+  assert.equal(at('A14').length, 0, 'a station TDX has no row for (第三航廈): none');
+  assert.ok(at('A14a').length > 0, 'A14A, A14a: one station');
+  assert.deepEqual(rows.find(r => r.StationID === 'A3' && r.DestinationStationID === 'A1'), {
+    LineNO: 'A', LineID: 'A', LineName: fx.Line[0].LineName, StationID: 'A3', StationName: fx.StationOfLine[0].Stations.find(s => s.StationID === 'A3').StationName, TripHeadSign: '往台北車站', DestinationStaionID: 'A1', DestinationStationID: 'A1', DestinationStationName: fx.StationOfLine[0].Stations.find(s => s.StationID === 'A1').StationName,
+    ServiceStatus: 0, EstimateTime: 6, SrcUpdateTime: '2026-11-10T16:48:19+08:00', UpdateTime: '2026-11-10T16:48:19+08:00'
+  });
+  assert.equal(tymcRows(fx.pids, fx.StationOfLine, fx.Line, said + 120_000).find(r => r.StationID === 'A3' && r.DestinationStationID === 'A1').EstimateTime, 4, 'read 2 minutes after it was said: 2 minutes sooner');
+
+  resetFree();
+  const files = new Map([['rail/metro/TYMC/StationOfLine.json', JSON.stringify(fx.StationOfLine)], ['rail/metro/TYMC/Line.json', JSON.stringify(fx.Line)]]);
+  const env = { DATA: { get: async k => (files.has(k) ? { text: async () => files.get(k) } : null) } };
+  let asked = 0;
+  const fetchFn = async u => (assert.equal(String(u), TYMC_PIDS), asked++, json(fx.pids));
+  const whole = await freeTdx('basic/v2/Rail/Metro/LiveBoard/TYMC', '$format=JSON', { env, fetchFn, now: said });
+  assert.equal(whole.state, 'free');
+  assert.equal(JSON.parse(whole.body).length, rows.length);
+  const one = await freeTdx('basic/v2/Rail/Metro/LiveBoard/TYMC', `%24filter=${encodeURIComponent("StationID eq 'A21'")}`, { env, fetchFn, now: said + 5000 });
+  assert.ok(JSON.parse(one.body).every(r => r.StationID === 'A21'));
+  assert.equal(asked, 1);
+  assert.equal(await freeTdx('basic/v2/Rail/Metro/LiveBoard/TYMC', '%24top=3', { env, fetchFn, now: said }), null);
+});
