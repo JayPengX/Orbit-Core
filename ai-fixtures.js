@@ -24,21 +24,23 @@ const money = (name, text, answers) => ({ name, input: { text, today: '2026-11-1
 
 const MONEY_FACTS = `Today: 2026-11-10. Amounts are NT$.
 Book starts: 2026-07-08
-2026-11 (to 2026-11-10): spent 15879, income 1860
-  spent by category: 居住 8000 (房租房貸 8000); 購物 3233 (服飾美妝 2043, 日用品 682); 數位 1940 (遊戲 1290, 工具訂閱 650); 餐飲 1814 (午餐 942, 飲料點心 227); 娛樂 677 (休閒 677); 交通 190 (搭車 190); 稅費 25 (手續費 25)
-  income by category: 投資 1860
-  places seen twice or more: Uniqlo 2043 (2 times); 全聯 682 (2 times); 威秀 677 (2 times); 路易莎 227 (3 times)
-  largest: 11-08 房租 8000; 11-04 Steam 1290; 11-05 Uniqlo 1025
-2026-10: spent 32103, income 104000
-  spent by category: 購物 12169 (服飾美妝 5058, 日用品 2648); 居住 8000 (房租房貸 8000); 餐飲 7423 (午餐 7066, 飲料點心 357); 交通 2605 (TPASS 2400, 搭車 205); 娛樂 1361 (休閒 1361); 數位 545 (影音串流 390, 專案維運 155)
-  income by category: 薪水 104000
-2026-09: spent 20703, income 52000
-  spent by category: 居住 8000 (房租房貸 8000); 餐飲 6060 (午餐 6060); 購物 5443; 交通 1200 (TPASS 1200)
-  income by category: 薪水 52000
-Last month to the same day (2026-10-10): spent 8000
-Change from last month to the same day, by category: 購物 more 3233 (0 → 3233); 數位 more 1940 (0 → 1940); 餐飲 more 1814 (0 → 1814); 娛樂 more 677 (0 → 677); 交通 more 190 (0 → 190); 稅費 more 25 (0 → 25)
-This week (from 2026-11-09): spent 1173; last week: 14504
-Monthly budget: 20000, left this month 4121`;
+Income this month: 1860
+[cat0] 11月（到今天）花在哪: 居住 8000; 購物 3233; 數位 1940; 餐飲 1814; 娛樂 677; 交通 190; 稅費 25
+[pay0] 11月（到今天）怎麼付的: 台新 Richart 8000 (1 times); 國泰CUBE •8812 4523 (6 times); LINE Pay 1690 (9 times); 現金 1216 (11 times); 悠遊卡 190 (7 times); 國泰CUBE Apple Pay 260 (2 times)
+[sub0.living] 11月（到今天）居住裡: 房租房貸 8000; 水電瓦斯 0
+[sub0.shop] 11月（到今天）購物裡: 服飾美妝 2043; 日用品 682; 3C 508
+[sub0.digital] 11月（到今天）數位裡: 遊戲 1290; 工具訂閱 650
+[inc0] 11月（到今天）收入: 投資 1860
+[place0] 11月（到今天）常去的地方: Uniqlo 2043 (2 times); 全聯 682 (2 times); 威秀 677 (2 times); 路易莎 227 (3 times)
+[big0] 11月（到今天）最大筆: 11/8 房租 8000; 11/4 Steam 1290; 11/5 Uniqlo 1025
+[cat1] 10月花在哪: 購物 12169; 居住 8000; 餐飲 7423; 交通 2605; 娛樂 1361; 數位 545
+[pay1] 10月怎麼付的: 國泰CUBE •8812 14230 (21 times); 台新 Richart 8000 (1 times); 現金 5210 (38 times); LINE Pay 2058 (17 times); 悠遊卡 2605 (30 times)
+[cat2] 9月花在哪: 居住 8000; 餐飲 6060; 購物 5443; 交通 1200
+[pay2] 9月怎麼付的: 台新 Richart 8000 (1 times); 現金 7203 (44 times); 國泰CUBE •8812 4300 (9 times); 悠遊卡 1200 (1 times)
+[months] 每月支出: 11月（到今天） 15879; 10月 32103; 9月 20703
+[vs] 比上個月同期（到 10/10）: 購物 3233 (was 0); 數位 1940 (was 0); 餐飲 1814 (was 0); 娛樂 677 (was 0); 交通 190 (was 0); 稅費 25 (was 0)
+[week] 這週和上週: 這週 1173; 上週 14504
+[budget] 這個月的預算: 預算 20000; 已花 15879; 還剩 4121`;
 
 // Orbit Law's 拍合約幫你看: the clauses of the two made-up contracts in site/ai-try/, as law-contract-read gives them.
 const LEASE = [{"n":"一","text":"租賃標的：〔個資略〕房屋一間，供承租人居住使用。"},{"n":"二","text":"租賃期間自民國115年9月1日起至116年8月31日止，共一年。"},{"n":"三","text":"租金每月新臺幣9,500元，承租人應於每月5日前支付，逾期一日加收滯納金500元。"},{"n":"四","text":"押金新臺幣28,500元（三個月租金），於租期屆滿、承租人遷出且無欠款時無息返還；承租人提前終止租約者，押金全數沒收。"},{"n":"五","text":"租賃期間房屋及設備之一切修繕，不論原因，均由承租人負擔。"},{"n":"六","text":"承租人不得申請設籍，亦不得申報租金支出扣除額。"},{"n":"七","text":"出租人得隨時進入房屋查看，無須事先通知承租人。"},{"n":"八","text":"水電費由承租人負擔，電費每度以新臺幣6元計收。"},{"n":"九","text":"承租人已詳閱本契約全部條款，同意放棄審閱期間。"}];
@@ -48,6 +50,8 @@ const MINUTES_SHENGANG = "時間：中華民國114年1月13日起至1月15止\n1
 
 export const EXAMPLES = {
   'money-ask': [
+    { name: 'how it was paid', input: { question: '這個月的錢都怎麼付出去的', facts: MONEY_FACTS } },
+    { name: 'card or cash', input: { question: '我用信用卡刷了多少', facts: MONEY_FACTS } },
     { name: 'food this month', input: { question: '這個月吃飯花多少？', facts: MONEY_FACTS } },
     { name: 'up on last month', input: { question: '比上個月多花在哪？', facts: MONEY_FACTS } },
     { name: 'budget', input: { question: '預算還剩多少？', facts: MONEY_FACTS } },

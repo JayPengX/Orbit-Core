@@ -172,7 +172,7 @@ export const LAW_FEATURES = {
   'law-contract': {
     app: 'law',
     tap: true,
-    models: ['sonnet', 'flash'],
+    models: ['sonnet', 'sol'],
     effort: { sonnet: 'medium', flash: 'low' },
     timeoutMs: 90_000,
     maxIn: 30_000,
@@ -263,7 +263,7 @@ export const LAW_FEATURES = {
   // in Orbit Law: 竹北's sittings, every proposal form with its 議決).
   'law-minutes': {
     build: 'law',
-    models: ['lite', 'flash'],
+    models: ['lite', 'luna'],
     effort: 'low',
     timeoutMs: 120_000,
     maxIn: 42_000,

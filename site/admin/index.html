@@ -544,8 +544,8 @@
         <div class="row" style="margin-top:14px"><select id="aim-prov" style="flex:none"><option value="anthropic">Anthropic (Claude)</option><option value="openai">OpenAI (GPT)</option><option value="google">Google (Gemini)</option></select><input id="aim-usd" type="number" min="0" step="0.01" placeholder="現在的餘額（US$）" class="grow" /><button id="aim-save" class="primary">儲存</button></div>
         <p id="aim-ok" class="ok"></p>
         <details class="note" open><summary>這個月每個功能花多少</summary>
-          <div class="tablewrap"><table id="aim-feat"><thead><tr><th>功能</th><th class="right">次數</th><th class="right">花費</th><th class="right">每次</th><th class="right">速度</th></tr></thead><tbody></tbody></table></div>
-          <p class="muted" style="margin:8px 0 0">速度：一半的呼叫在這之內完成 / 九成在這之內。紅色：今天有失敗，或常由備用的 AI 回答。</p>
+          <div class="tablewrap"><table id="aim-feat"><thead><tr><th>功能</th><th class="right">次數</th><th class="right">花費</th><th class="right">每次</th><th class="right">速度</th><th>回答的模型</th></tr></thead><tbody></tbody></table></div>
+          <p class="muted" style="margin:8px 0 0">速度：一半的呼叫在這之內完成 / 九成在這之內。紅色：今天有失敗，或常由備用的 AI 回答。回答的模型：每家的備用都是另一家同一級的（Sonnet ↔ GPT Sol、Haiku ↔ Luna、Flash → Haiku）。</p>
         </details>
       </div>
       <div class="pane-head"><div><h2>Gemini 今天</h2><p class="muted" id="google-note">Google 的每日額度照美國太平洋時間重置。</p></div></div>
@@ -2663,6 +2663,9 @@ $('bill-prices-save').onclick = () =>
 const AI_PROV = { anthropic: 'Claude', openai: 'GPT', google: 'Gemini' };
 const AI_FEATURES = { 'law-chat': '問法律（Law）', 'law-ask': '白話解釋（Law）', 'money-read': '拍照記帳（Money）', gemini: '課表照片匯入（Class）', 'nl-edit': '課表 AI 修改（Class）', 'money-say': '用說的記帳（Money）', 'money-ask': '問我的帳（Money）', 'money-month': '每月回顧（Money）', 'words-check': '檢查我的句子（Words）', 'words-cards': '例句與記憶法（Words）', 'words-photo': '拍一頁變單字卡（Words）', 'words-chat': '用新字聊天（Words）', 'sports-recap': '賽後三句話（Sports）', 'f1-story': 'F1 賽後故事（Sports）', 'sports-ask': '問比賽（Sports）', 'transit-notice': '通告讀成路線（Transit）', 'transit-say': '用說的查路線（Transit）', 'news-lines': '一句話與標題（News）', 'news-sides': '各方怎麼說（News）', 'weather-ask': '問天氣（Weather）', 'class-book': '拍聯絡簿（Class）', 'class-ask': '問我的課表（Class）', 'class-plan': '考前讀書計畫（Class）', 'class-news': '學校公告（Class）', 'law-contract': '拍合約幫你看（Law）', 'law-minutes': '會議紀錄變表格（Law）', 'law-weekly': '法案週報（Law）', 'sec-filing': '重大訊息白話（Securities）', 'sec-say': '用說的下單（Securities）', 'sec-lesson': '交易學到什麼（Securities）', 'beats-say': '用說的做節奏（Beats）', 'orbit-ask': 'Orbit 助理', 'showcase-ask': '問 Orbit（Showcase）', 'rec-weekly': '除錯週報', check: '管理面板的檢查' };
 const usd = v => (v == null ? '—' : `US$${(Math.round(v * 100) / 100).toLocaleString()}`);
+// Which model answered, most first: Sonnet 40 · Sol 2 (a backup's share shows here).
+const MODEL_NAMES = { 'claude-sonnet-5-5': 'Sonnet', 'claude-haiku-5-5': 'Haiku', 'gpt-6.1-sol': 'Sol', 'gpt-6-luna': 'Luna', 'gemini-3.6-flash': 'Flash', 'gemini-3.7-flash': 'Flash', 'gemini-3.5-flash-lite': 'Flash-Lite' };
+const modelsText = m => Object.entries(m || {}).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${MODEL_NAMES[k] || k} ${n}`).join(' · ') || '—';
 const secs = ms => (ms == null ? '—' : `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)} s`);
 let aim = null;
 function drawAiMoney() {
@@ -2680,9 +2683,9 @@ function drawAiMoney() {
       ? rows.map(([f, v]) => {
           const h = aim.health[f] || {};
           const sick = h.failToday > 0 || (h.n > 4 && h.backup / h.n > 0.2);
-          return el('tr', {}, [el('td', { text: AI_FEATURES[f] || f, class: sick ? 'neg' : '' }), el('td', { class: 'right', text: v.n.toLocaleString() }), el('td', { class: 'right', text: `NT$${(Math.round(v.usd * rate * 10) / 10).toLocaleString()}` }), el('td', { class: 'right muted', text: v.n ? `NT$${(Math.round((v.usd * rate * 100) / v.n) / 100).toLocaleString()}` : '—' }), el('td', { class: 'right muted', text: `${secs(h.mid)} / ${secs(h.slow)}${h.failToday ? ` · 失敗 ${h.failToday}` : ''}` })]);
+          return el('tr', {}, [el('td', { text: AI_FEATURES[f] || f, class: sick ? 'neg' : '' }), el('td', { class: 'right', text: v.n.toLocaleString() }), el('td', { class: 'right', text: `NT$${(Math.round(v.usd * rate * 10) / 10).toLocaleString()}` }), el('td', { class: 'right muted', text: v.n ? `NT$${(Math.round((v.usd * rate * 100) / v.n) / 100).toLocaleString()}` : '—' }), el('td', { class: 'right muted', text: `${secs(h.mid)} / ${secs(h.slow)}${h.failToday ? ` · 失敗 ${h.failToday}` : ''}` }), el('td', { class: 'muted', text: modelsText(h.models) })]);
         })
-      : [el('tr', {}, [el('td', { colspan: '5', class: 'muted', text: '這個月還沒有 AI 呼叫。' })])])
+      : [el('tr', {}, [el('td', { colspan: '6', class: 'muted', text: '這個月還沒有 AI 呼叫。' })])])
   );
 }
 async function loadAiMoney() {
