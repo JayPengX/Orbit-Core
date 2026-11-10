@@ -204,6 +204,7 @@ export const FEATURES = {
           `Their sentence: ${sentence}`,
           'Check the sentence. ok: true only when it is natural, correct English AND uses the word in the right meaning and form.',
           'fixed: the sentence corrected with the fewest changes (the same sentence when ok). Keep their idea; never write a new sentence.',
+          'When their English is right but the word is used in another meaning or part of speech than the one given: ok false, fixed is their sentence unchanged (never add a word to force the meaning), and why names the meaning they used and shows the asked one in a 2–5 word example (e.g. a novel idea).',
           `why: when not ok, one short line on the main mistake${en ? ', in English' : ', in Traditional Chinese (台灣用語), ≤ 40 字'}; when ok, one short line of praise naming what they did well. No markdown.`,
           'used: true when the word itself (any form: plural, tense) is in their sentence.'
         ].join('\n')
