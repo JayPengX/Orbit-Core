@@ -21,3 +21,26 @@ test("each maker's request from Gemini's parts, and its answer back in Gemini's 
   assert.equal(geminiShapeOf('claude-haiku-5-5', { content: [{ type: 'thinking', thinking: '' }, { type: 'text', text: '{"a":1}' }], stop_reason: 'end_turn', usage: { input_tokens: 5, output_tokens: 2 } }).candidates[0].content.parts[0].text, '{"a":1}');
   assert.equal(geminiShapeOf('gpt-6-luna', { choices: [{ message: { content: '{}' }, finish_reason: 'length' }] }).candidates[0].finishReason, 'MAX_TOKENS');
 });
+
+test("Claude streamed: each piece heard, the whole answer in Gemini's shape with its tokens; an SSE error a failure", async () => {
+  const { streamOther } = await import('../ai-other.js');
+  const ev = o => `event: ${o.type}\ndata: ${JSON.stringify(o)}\n\n`;
+  const sse = parts => new Response(parts.map(ev).join(''));
+  const real = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => sse([{ type: 'message_start', message: { usage: { input_tokens: 50, cache_read_input_tokens: 10 } } }, { type: 'content_block_delta', delta: { type: 'thinking_delta', thinking: '' } }, { type: 'content_block_delta', delta: { type: 'text_delta', text: '{"a":' } }, { type: 'content_block_delta', delta: { type: 'text_delta', text: '1}' } }, { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 7 } }]);
+    const heard = [];
+    const res = await streamOther('claude-sonnet-5-5', [{ text: 'q' }], null, { ANTHROPIC_API_KEY: 'k' }, { onText: t => heard.push(t) });
+    assert.equal(res.status, 200);
+    const j = await res.json();
+    assert.deepEqual(heard, ['{"a":', '{"a":1}']);
+    assert.equal(j.candidates[0].content.parts[0].text, '{"a":1}');
+    assert.equal(j.candidates[0].finishReason, 'STOP');
+    assert.deepEqual(j.usageMetadata, { promptTokenCount: 60, cachedContentTokenCount: 10, candidatesTokenCount: 7 });
+    globalThis.fetch = async () => sse([{ type: 'message_start', message: { usage: {} } }, { type: 'error', error: { message: 'overloaded' } }]);
+    assert.equal((await streamOther('claude-sonnet-5-5', [{ text: 'q' }], null, { ANTHROPIC_API_KEY: 'k' })).status, 502);
+    assert.equal((await streamOther('claude-sonnet-5-5', [{ text: 'q' }], null, {})).status, 503);
+  } finally {
+    globalThis.fetch = real;
+  }
+});

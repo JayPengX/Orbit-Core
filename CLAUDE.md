@@ -189,7 +189,7 @@ the `q-` components; they don't restyle them.
 `worker.js` routes (`route()`, heavy ones in the Runner); each route's work in its own file;
 `http.js` is what every route answers with (who may call, CORS, JSON;
 `lineAnswer`: lines gzipped, each flushed). It runs near each caller;
-Gemini through `gemini-relay.js`, pinned to Taiwan. Every answer carries `Server-Timing:
+Gemini, Claude via `gemini-relay.js`, pinned to Taiwan. Every answer carries `Server-Timing:
 w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 
 | Route | File | What |
@@ -203,8 +203,8 @@ w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
 | `/law-ask` | `law.js`, `law-ruling.js`, `law-town.js`, `law-ground.js` | Law's questions on 1–8 articles, every point cited and checked, kept in KV; modes `bill`, `diff`, `ruling`, `town`; 40 Gemini calls a day a Pass, 300 in all with `/law-chat`'s (D1 `law_day`) |
-| `/law-chat` | `law-chat.js`, `law-ground.js`, `law-more.js` | 問法律: a plan, up to 14 articles from Law's lists and full-text index, an answer from those only, every cite checked; grounded by Law's `ai/` facts, news, bills and budget (`law-ground.js`) and rulings and rules beside them (`law-more.js`); 30 turns a day a Pass |
-| `/law-page` | `law-page.js`, `law-hosts.js` | A government page (gov.tw, www.edu.tw) read in Law, cleaned, in its charset; edge cache only; Taiwan-only sites via the Taiwan relay (the build's key: a PDF's bytes, `file=1`); 500 a day a Pass |
+| `/law-chat` | `law-chat.js`, `law-ground.js`, `law-more.js`, `ai-other.js` | 問法律: a plan (Flash-Lite), up to 14 articles from Law's lists and index, answered from those only by Claude Sonnet via the relay (failing: Gemini), cites checked; grounded by facts, news, bills, budget (`law-ground.js`), rulings, rules (`law-more.js`); 16 turns back; 30 a day a Pass |
+| `/law-page` | `law-page.js`, `law-hosts.js` | A government page (gov.tw, www.edu.tw) read in Law, cleaned; edge cache only; Taiwan-only sites via the Taiwan relay (the build's key: a PDF's bytes, `file=1`); 500 a day a Pass |
 | `/law-live` | `law-live.js` | What 立法院's IVOD streams now, 60 s at the edge, the last good read kept 30 minutes; our pages only, no Pass |
 | `/money-read` | `money-read.js` | Orbit Money's 拍照記帳: one picture → `{ buys, left }`, read by Gemini through the relay, checked; only on a tap; 30 a day a Pass, 300 in all |
 | `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |
@@ -468,8 +468,8 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
 | `node tools/layout-check.mjs <app…>` | Every tab and `check` page at 320, iPad, laptop: a narrow band, a half empty, overflow (`layout-faults.mjs`); `push.sh` runs it |
 | `node tools/preview.mjs <app>` | The app with real data (`--live`, `--width`, `--timing`, `--webkit`…; `ORBIT_DATA=<dir>`: local /data/ files); prints `wraps:`, `cut:` |
 | `node tools/gate.mjs [app…]` | The quality gate (`gate-page.js`) on every tab: lift, stalls, dead taps, wraps, cuts, white, mixed language… |
-| `node tools/speed.mjs <app…>` | Before vs after (3G, CPU ×4, answers replayed) |
-| `node tools/live-scroll.mjs [app…] [--webkit]` | Nothing jumps: live refreshes, pages as they load and scroll, taps folding |
+| `node tools/speed.mjs <app…>` | Before vs after (3G, CPU ×4, replayed) |
+| `node tools/live-scroll.mjs [app…] [--webkit]` | Nothing jumps: live refreshes, loading, scrolling, folding |
 | `node tools/test-apps.mjs [app…]` | Every app's tests against this kit (checkouts beside this one) |
 
 The rest: `tools/README.md`.

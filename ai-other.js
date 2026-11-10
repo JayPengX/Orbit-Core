@@ -96,6 +96,70 @@ export async function otherAnswer(model, parts, schema, env, { timeoutMs = 60_00
   return new Response(JSON.stringify(geminiShapeOf(model, j)), { status: 200, headers: { 'Content-Type': 'application/json' } });
 }
 
+// One call streamed (Claude's SSE): onText hears the answer's text so far as
+// each piece comes (/law-chat's verdict and answer, shown while the rest is
+// written); the whole answer comes back as otherAnswer's, Gemini's shape, its
+// usage kept. firstMs: given up on when no text has come by then. A maker
+// without a stream here (OpenAI's) answers whole, as otherAnswer.
+export async function streamOther(model, parts, schema, env, { onText = null, timeoutMs = 60_000, firstMs = 0, effort = null } = {}) {
+  if (makerOf(model) !== 'anthropic') return otherAnswer(model, parts, schema, env, { timeoutMs, effort });
+  const req = requestOf(model, parts, schema, env, effort);
+  if (!env.ANTHROPIC_API_KEY) return new Response(JSON.stringify({ error: { message: 'no key' } }), { status: 503 });
+  const stop = new AbortController();
+  let text = '';
+  const slow = firstMs ? setTimeout(() => text || stop.abort(new Error(`no answer from ${model} in ${firstMs / 1000} s`)), firstMs) : null;
+  try {
+    const body = JSON.stringify({ ...JSON.parse(req.init.body), stream: true });
+    const res = await viaRelay(env, req.url, { ...req.init, body, signal: AbortSignal.any([stop.signal, AbortSignal.timeout(timeoutMs)]) });
+    if (!res.ok || !res.body) {
+      const j = await res.json().catch(() => null);
+      return new Response(JSON.stringify({ error: { message: String(j?.error?.message || res.status).slice(0, 300) } }), { status: res.status || 502 });
+    }
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    const usage = {};
+    let stopReason = null;
+    let failed = null;
+    const take = line => {
+      if (!line.startsWith('data:')) return;
+      let j;
+      try {
+        j = JSON.parse(line.slice(5));
+      } catch {
+        return;
+      }
+      if (j.type === 'message_start') Object.assign(usage, j.message?.usage || {});
+      else if (j.type === 'message_delta') {
+        Object.assign(usage, j.usage || {});
+        stopReason = j.delta?.stop_reason || stopReason;
+      } else if (j.type === 'error') failed = j.error?.message || 'stream error';
+      else if (j.type === 'content_block_delta' && j.delta?.type === 'text_delta' && j.delta.text) {
+        text += j.delta.text;
+        try {
+          onText?.(text);
+        } catch {}
+      }
+    };
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      lines.forEach(take);
+    }
+    take(buf.trim());
+    if (failed) return new Response(JSON.stringify({ error: { message: String(failed).slice(0, 300) } }), { status: 502 });
+    const shaped = geminiShapeOf(model, { content: [{ type: 'text', text }], stop_reason: stopReason, usage });
+    return new Response(JSON.stringify(shaped), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: { message: String(e?.message || e).slice(0, 300) } }), { status: 504 });
+  } finally {
+    clearTimeout(slow);
+  }
+}
+
 // The models each key can call (ids only): is the key there, and what's each model called.
 export async function modelsOf(env) {
   const out = {};

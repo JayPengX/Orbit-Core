@@ -1,5 +1,6 @@
 // ---- law-chat.js: POST /law-chat, Orbit Law's 問法律 ----
-// A question in plain words, with up to 6 turns before it and up to 2 laws'
+// A question in plain words, with up to 16 turns before it (8 questions and
+// their answers, each answer as its verdict, facts and points) and up to 2 laws'
 // articles the reader has open: { q, history: [{ role: 'user' | 'model',
 // text, cites?: ['p:key'] }], pin?: [{ p, arts }], mine?: { laws, items,
 // people, marks } (what the reader follows and marked), lang: 'zh' | 'en' }.
@@ -30,11 +31,15 @@ import { viaTaiwan } from './law-hosts.js';
 import { matchBills, readGround } from './law-ground.js';
 import { LAW_LIMITS, PCODE, ART, fail, twDay, citeKey, cited, label, readData, readList, readLaw, askKey, opening, passOf, passKey, spend, countOf, kept, keep, modelJson } from './law.js';
 
-export const CHAT_LIMITS = { maxQ: 500, maxTurns: 6, maxTurn: 1500, maxPins: 2, maxArts: 10, maxHits: 6, lyHits: 2, maxChars: 12_000, maxLaws: 6, maxBuckets: 16, maxCities: 3, maxBody: 40_000 };
+export const CHAT_LIMITS = { maxQ: 500, maxTurns: 16, maxTurn: 1500, maxPins: 2, maxArts: 10, maxHits: 6, lyHits: 2, maxChars: 12_000, maxLaws: 6, maxBuckets: 16, maxCities: 3, maxBody: 64_000 };
 const CHAT_TTL_S = 30 * 86_400;
 const BILL_WORDS = /修法|修正|草案|立法院|立委|三讀|二讀|一讀|法案|進度|提案|bill/i;
-// The answer's model: Gemini's second (Flash), for the reasoning; the plan stays on the first.
-export const ANSWER_MODEL = 'gemini-3.6-flash';
+// The answer's model (Jay 2026-11-10, after a blind side by side of five on ten
+// real questions: Claude Sonnet 5.5, the only one with no legal slip) at its
+// effort, and Gemini's Flash when it fails (Flash-Lite after that, geminiAnswer).
+export const ANSWER_MODEL = 'claude-sonnet-5-5';
+export const ANSWER_EFFORT = null;
+export const ANSWER_BACKUP = 'gemini-3.6-flash';
 const CITE = /^([A-Z]\d{7}):(\d{1,4}(?:-\d{1,3})?)$/;
 
 // ---- The ask --------------------------------------------------------------------
@@ -328,7 +333,8 @@ Rules:
 - covered: true when the material lets you give a reasoned answer, even by applying general articles (e.g. 民法 第184條) to the facts. Set it false only when nothing above bears on the question; then say plainly what's missing, and next may suggest a lawyer or 法律扶助基金會.
 ${ly ? `- Today is ${twDay()}. This is a question about what the 立法院 is doing, not a legal case: answer it as a well-informed news summary from the bills, votes, budgets and meetings above (what moved, what each does, who proposed or backed it, and when), newest first. The articles are background on the laws those bills change; don't make them the answer. covered is true whenever a bill, vote, budget or meeting above bears on it. If the reader means something none of the lines show, say in one line what the latest ones are instead; never say records are missing. next: only where to follow it (a bill's next step), never a lawyer or 法律扶助.
 ${ground?.recent?.length ? `- The reader asks what was done "for" an election, which reads two ways: changes to election law (the 立法院進度 lines), and what the 立法院 passed just before an election that voters will feel (the 最近三讀 lines). Cover both, briefly, each bill with what it does and who proposed it. State only what happened and when; never claim or guess a motive, and give no election date that isn't above.
-` : ''}` : ''}- Don't add a disclaimer; the app shows one.
+` : ''}` : ''}${before ? `- The question may follow up on the conversation (e.g. 「那機車呢？」「如果他不理我呢？」): read it in that light, keep the reader's facts from earlier turns unless they change them, and answer the new question; don't repeat what earlier answers already said.
+` : ''}- Don't add a disclaimer; the app shows one.
 - Write everything in ${en ? 'plain English' : 'Traditional Chinese as used in Taiwan (繁體中文)'}.`;
 }
 
@@ -542,7 +548,9 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
       // Streamed: the verdict and the answer go to the reader as they're
       // written, seconds before the points and the rest are done.
       let said = '';
+      // (Each model's own draft: a backup's starts again from nothing.)
       const onText = text => {
+        if (text.length < said.length) said = '';
         if (ms && !ms.first) mark('first');
         const d = draftOf(text);
         const now = `${d.verdict}\n${d.answer}`;
@@ -551,7 +559,7 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
           stage({ stage: 'draft', ...d });
         }
       };
-      const answerModel = tune.model === 'lite' ? undefined : ANSWER_MODEL;
+      const answerModel = tune.model === 'lite' ? undefined : tune.model === 'flash' ? ANSWER_BACKUP : /^(claude|gemini)-[a-z0-9.-]+$/.test(tune.model || '') ? tune.model : ANSWER_MODEL;
       const prompt = answerPrompt(chat, articles, nameOf, ground, more, ly);
       // (The ops check's side by side: one prompt, every model's answer, each checked and timed, in tune.results.)
       if (tune.compare) {
@@ -570,10 +578,12 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
         );
         return json({ compared: true }, 200, headers);
       }
-      // (Flash failing, an answer from Flash-Lite rather than none: 3.6 Flash
-      // now and then ends its JSON early on the free tier, 2026-11-06.)
-      const ask = model => modelJson((parts, schema) => gemini(parts, schema, model, { onText, thinking: tune.answer }), prompt, ANSWER);
-      const raw = await ask(answerModel).catch(e => (answerModel ? ask(undefined) : Promise.reject(e)));
+      // (Sonnet failing, refusing or cut short: Gemini's Flash answers, then
+      // Flash-Lite, rather than none; each JSON that doesn't parse is a failure too.)
+      const ask = (model, thinking = tune.answer) => modelJson((parts, schema) => gemini(parts, schema, model, { onText, thinking }), prompt, ANSWER);
+      const raw = await ask(answerModel, tune.answer ?? (answerModel === ANSWER_MODEL ? ANSWER_EFFORT : null))
+        .catch(e => (answerModel && answerModel !== ANSWER_BACKUP ? ask(ANSWER_BACKUP, null) : Promise.reject(e)))
+        .catch(e => (answerModel ? ask(undefined, null) : Promise.reject(e)));
       out = checkChat(raw, articles, chat.lang, grounded, moreCites(more), ly);
     }
     mark('answer');
@@ -610,9 +620,19 @@ export async function lawChatTimes(env, ctx, headers, gemini, tryOut = '') {
     const ms = {};
     const drafts = [];
     const chat = readChat({ q });
-    const res = await answerChat(chat, 'ops', env, ctx, headers, gemini, s => s.stage === 'draft' && drafts.push(s.verdict), LAW_LIMITS.perDay, ms, tune);
+    // (Each call's model tokens, in and out, as the bill counts them.)
+    const tokens = [];
+    const counted = async (...a) => {
+      const res = await gemini(...a);
+      if (res.ok) {
+        const u = (await res.clone().json().catch(() => null))?.usageMetadata || {};
+        tokens.push([u.promptTokenCount || 0, u.candidatesTokenCount || 0]);
+      }
+      return res;
+    };
+    const res = await answerChat(chat, 'ops', env, ctx, headers, counted, s => s.stage === 'draft' && drafts.push(s.verdict), LAW_LIMITS.perDay, ms, tune);
     const j = await res.json().catch(() => ({}));
-    out.push({ q, status: res.status, ms, drafts: drafts.length, arts: j.sources?.length ?? null, points: j.points?.length ?? null, cases: j.cases?.length ?? 0, verdict: j.verdict || j.error || '', answer: (j.answer || '').slice(0, 80) });
+    out.push({ q, status: res.status, ms, tokens, drafts: drafts.length, arts: j.sources?.length ?? null, points: j.points?.length ?? null, cases: j.cases?.length ?? 0, verdict: j.verdict || j.error || '', answer: (j.answer || '').slice(0, 80) });
   }
   return { at: new Date().toISOString(), tune, out };
 }
