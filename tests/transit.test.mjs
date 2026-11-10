@@ -1176,3 +1176,35 @@ test("a day's trains keep only what the phone reads (台鐵's 4 MB day to 40%): 
   assert.deepEqual(JSON.parse(got.body), lean);
   assert.deepEqual(JSON.parse((await tdxGet(env, path, { fetchFn: () => assert.fail('cached'), cache, now: NOW + 1000 })).body), lean);
 });
+
+// Jay 2026-11-10: TDX's 高鐵訂票導訂 approved for our key (臺鐵's pending).
+test('高鐵 booking: a link into 高鐵’s own booking, the trip filled in, asked of TDX on a tap and never kept; anything else refused', async () => {
+  const { bookPath, hsrName, linkIn } = await import('../transit.js');
+  fresh();
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', RATE_LIMIT_KV: memKv() };
+  const asked = [];
+  const fetchFn = async url => {
+    if (/openid-connect\/token$/.test(url)) return json({ access_token: 'T', expires_in: 86400 });
+    asked.push(decodeURIComponent(String(url)));
+    return json({ result: 'success', data: { url: 'https://irs.thsrc.com.tw/IMINT/?deeplinkToken=abc' } });
+  };
+  const ask = qs => handleTransit(new Request(`https://w/transit/book?${qs}`), env, {}, '/transit/book', { session: { s: 'S' }, fetchFn, now: NOW, cache: memCache() });
+  const web = await ask('sys=hsr&from=新竹&to=臺北&date=2026-11-10&time=13:10&no=123');
+  assert.equal(web.status, 200);
+  assert.deepEqual(await web.json(), { url: 'https://irs.thsrc.com.tw/IMINT/?deeplinkToken=abc' });
+  assert.match(asked[0], /maas-thsr\/booking\/deeplink\/web\/hsr\?/);
+  assert.match(asked[0], /start_station=新竹&end_station=台北&departure_date=20261110&departure_number=0123/, 'its own names (台 not 臺), the number in 4 digits');
+  assert.match(asked[0], /ticket_type=S&carriage_type=Y&adult_ticket=1/, 'one adult, one way, standard');
+  await ask('sys=hsr&from=高鐵新竹站&to=左營&date=2026-11-10&time=13:10&no=123&app=1');
+  assert.match(asked[1], /deeplink\/direct\/hsr\?start_station=新竹&end_station=左營&train_date=2026-11-10&train_time=13:10&train_number=123$/);
+  for (const bad of ['sys=tra&from=新竹&to=台北&date=2026-11-10&no=123', 'from=新竹&to=新竹&date=2026-11-10&no=123', 'from=竹北&to=台北&date=2026-11-10&no=123', 'from=新竹&to=台北&date=11/10&no=123', 'from=新竹&to=台北&date=2026-11-10&no=12345'])
+    assert.equal((await ask(bad)).status, 400, bad);
+  assert.equal(asked.length, 2, 'never asked for those');
+  assert.equal(hsrName('臺中'), '台中');
+  assert.equal(bookPath(new URLSearchParams('from=新竹&to=台北&date=2026-11-10&no=1&app=1')), null, 'the app’s needs its time');
+  // TDX refusing (not approved): said so, no link.
+  const refused = await handleTransit(new Request('https://w/transit/book?from=新竹&to=台北&date=2026-11-10&no=123'), env, {}, '/transit/book', { session: { s: 'S' }, fetchFn: async () => new Response(JSON.stringify({ result: 'fail', error: { code: 99999, msg: 'Forbidden' } }), { status: 403 }), now: NOW, cache: memCache() });
+  assert.equal(refused.status, 502);
+  assert.equal((await refused.json()).code, 'NOT_ALLOWED');
+  assert.equal(linkIn({ result: 'success', data: { a: 'x', deeplink: 'texapp://book?x=1' } }), 'texapp://book?x=1');
+});
