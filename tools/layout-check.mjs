@@ -35,7 +35,7 @@ const out = opt('out', '/tmp/orbit-layout');
 // (Each app's demo account, so its pages have something on them.)
 const ACCOUNT = { sports: 'fan', words: 'demo', money: 'demo', securities: 'demo', law: 'follows', weather: 'pins', transit: 'rides', orbit: 'week', class: 'week' };
 const BLOCKS = new Set(['layout', 'wide', 'scrolls sideways']);
-const apps = args.length ? args : ['sports', 'transit', 'weather', 'orbit', 'money', 'words', 'beats', 'law', 'securities'];
+const apps = args.length ? args : ['sports', 'transit', 'weather', 'orbit', 'money', 'news', 'words', 'beats', 'law', 'securities'];
 
 // (Every push's check shares what our Workers answered in the last 15
 // minutes, one keep for all of them (tools/live-keep.mjs), not one a run: a

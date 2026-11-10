@@ -15,8 +15,9 @@ export const FAMILY = { name: 'Orbit', from: '#312e81', to: '#020617', ink: '#1e
 // repo: the GitHub repo (and Pages path) each app lives at.
 // In the order the family shows its apps everywhere (Pass, family page,
 // milestones, medals, help): the everyday ones first: Sports, Transit,
-// Weather, Class, Money; then Words, Beats, Law; Securities, the play-money
-// game, last (Jay 2026-10-27). APP_ORDER is that order; anything listing
+// Weather, Class, Money, News; then Words, Beats, Law; Securities, the
+// play-money game, last (Jay 2026-10-27; News, new 2026-11-10, with the
+// everyday ones). APP_ORDER is that order; anything listing
 // the apps follows it.
 export const BRANDS = {
   match: { name: 'Orbit Sports', short: 'Sports', repo: 'Orbit-Sports', slug: 'sports', from: '#fdba74', to: '#9a3412', ink: '#c2410c', color: '#ea580c', paint: ['#fdba74', '#f97316', '#9a3412'], spot: '#fff', pitch: { zh: '每場比賽，即時比分', en: 'Every game, live' }, role: { zh: '賽程與比分', en: 'Scores and schedules' }, tag: { zh: '所有運動的賽程、比分與數據', en: 'Every sport, every match, every stat' } },
@@ -24,6 +25,7 @@ export const BRANDS = {
   weather: { name: 'Orbit Weather', short: 'Weather', repo: 'Orbit-Weather', slug: 'weather', from: '#a5b4fc', to: '#312e81', ink: '#4338ca', color: '#6366f1', paint: ['#93c5fd', '#2563eb', '#1e3a8a'], spot: '#fcd34d', pitch: { zh: '一個答案的天氣', en: 'One clear forecast' }, role: { zh: '天氣', en: 'Weather' }, tag: { zh: '一個答案的天氣：降雨、紫外線、空氣，跟著你的行程', en: 'One clear forecast for wherever you’ll be' } },
   orbit: { name: 'Orbit Class', short: 'Class', repo: 'Orbit-Class', slug: 'class', from: '#7dd3fc', to: '#0c4a6e', ink: '#0369a1', color: '#0ea5e9', paint: ['#67e8f9', '#0891b2', '#164e63'], spot: '#fde047', pitch: { zh: '今天的課，一眼看懂', en: 'Today’s classes at a glance' }, role: { zh: '課表', en: 'Class schedule' }, tag: { zh: '即時課表：現在、下一節與倒數', en: 'Your class schedule, live' } },
   money: { name: 'Orbit Money', short: 'Money', repo: 'Orbit-Money', slug: 'money', from: '#fde047', to: '#713f12', ink: '#a16207', color: '#ca8a04', paint: ['#facc15', '#ca8a04', '#713f12'], spot: GOLD, pitch: { zh: '每一筆，記得清楚', en: 'Every dollar, in its place' }, role: { zh: '記帳', en: 'Money tracker' }, tag: { zh: '記帳：月曆一眼看每天花多少，帳戶、悠遊卡、信用卡一起算，收據拍一下就記好', en: 'Your spending by day, every account and card, any receipt snapped in' } },
+  news: { name: 'Orbit News', short: 'News', repo: 'Orbit-News', slug: 'news', from: '#c4b5fd', to: '#3b0764', ink: '#6d28d9', color: '#7c3aed', paint: ['#a78bfa', '#7c3aed', '#3b0764'], spot: GOLD, pitch: { zh: '同一則新聞，各家怎麼報', en: 'One story, every side' }, role: { zh: '新聞', en: 'News' }, tag: { zh: '同一則新聞，偏綠、偏藍、中間的媒體各怎麼報，誰沒報一眼就知道', en: 'Each story as outlets of every side tell it, and who left it out' } },
   vocab: { name: 'Orbit Words', short: 'Words', repo: 'Orbit-Words', slug: 'words', from: '#f9a8d4', to: '#831843', ink: '#be185d', color: '#db2777', paint: ['#fda4af', '#e11d48', '#881337'], spot: '#fde047', pitch: { zh: '背得住的英文單字', en: 'Words that stay' }, role: { zh: '英文單字', en: 'English words' }, tag: { zh: '背得住的英文單字：大考 6000 字，真人發音', en: 'English words that stay with you' } },
   beats: { name: 'Orbit Beats', short: 'Beats', repo: 'Orbit-Beats', slug: 'beats', from: '#f0abfc', to: '#701a75', ink: '#a21caf', color: '#c026d3', paint: ['#f0abfc', '#c026d3', '#581c87'], spot: '#fde047', pitch: { zh: '做出你的節拍', en: 'Make your own beats' }, role: { zh: '節拍作曲', en: 'Beat maker' }, tag: { zh: '把你的節拍片段，排成一首首新歌', en: 'Your beat pieces, arranged into new songs' } },
   law: { name: 'Orbit Law', short: 'Law', repo: 'Orbit-Law', slug: 'law', from: '#a5b4fc', to: '#1e1b4b', ink: '#4338ca', color: '#4f46e5', paint: ['#6366f1', '#3730a3', '#1e1b4b'], spot: '#fcd34d', pitch: { zh: '法規、裁判、立法', en: 'Laws, rulings, bills' }, role: { zh: '法規與法案', en: 'Laws and bills' }, tag: { zh: '台灣的法規，每個條號都能點；立法院的法案，走到哪一步一眼就懂。', en: 'Taiwan\'s laws with linked references, and bills in the Legislative Yuan by stage' } },
@@ -66,9 +68,11 @@ export const GLYPHS = {
   beats: (c, a = GOLD) => `<path d="M22 52 V76 M43 36 V92 M64 18 V110 M85 36 V92 M106 52 V76" stroke="${c}" stroke-width="13" stroke-linecap="round"/><circle cx="64" cy="64" r="10" fill="${a}"/>`,
   // A pair of scales: a post, a beam, two gold pans.
   law: (c, a = GOLD) => `<path d="M64 20 V102 M42 108 H86 M26 34 H102" fill="none" stroke="${c}" stroke-width="11" stroke-linecap="round"/><circle cx="64" cy="22" r="8" fill="${c}"/><path d="M26 34 L12 70 M26 34 L40 70 M102 34 L88 70 M102 34 L116 70" fill="none" stroke="${c}" stroke-width="6" stroke-linecap="round"/><path d="M10 70 A16 16 0 0 0 42 70 Z M86 70 A16 16 0 0 0 118 70 Z" fill="${a}" stroke="${a}" stroke-width="4" stroke-linejoin="round"/>`,
-  // The pass: a card with its chip.
+  // A folded paper, its headline lit.
+  news: (c, a = GOLD) => `<rect x="16" y="20" width="80" height="88" rx="14" fill="none" stroke="${c}" stroke-width="11"/><path d="M96 44 H104 A8 8 0 0 1 112 52 V94 A14 14 0 0 1 98 108 H82" fill="none" stroke="${c}" stroke-width="11" stroke-linejoin="round"/><rect x="32" y="38" width="48" height="20" rx="7" fill="${a}"/><path d="M33 76 H79 M33 92 H63" stroke="${c}" stroke-width="10" stroke-linecap="round"/>`,
   // A wallet, its clasp lit.
   money: (c, a = GOLD) => `<path d="M30 34 L82 16 L90 34" fill="none" stroke="${c}" stroke-width="10" stroke-linejoin="round" stroke-linecap="round"/><rect x="14" y="34" width="100" height="72" rx="18" fill="none" stroke="${c}" stroke-width="11"/><rect x="70" y="56" width="44" height="28" rx="12" fill="${c}"/><circle cx="88" cy="70" r="7" fill="${a}"/>`,
+  // The pass: a card with its chip.
   pass: (c, a = GOLD) => `<rect x="12" y="28" width="104" height="72" rx="14" fill="none" stroke="${c}" stroke-width="11"/><rect x="28" y="48" width="26" height="20" rx="5" fill="${a}"/><path d="M28 82 H76" stroke="${c}" stroke-width="9" stroke-linecap="round"/>`
 };
 

@@ -416,6 +416,44 @@ export const HELP = {
       ]]
     ]
   },
+  news: {
+    zh: [
+      ['what', 'Orbit News 是什麼', [
+        '把台灣和國際的新聞，依「同一件事」歸成一則：每則看得到有幾家媒體報、偏綠、中間、偏藍（國際是偏左、中間、偏右）各幾家，和各家的標題並排。點標題就到那家媒體的網站看全文。'
+      ]],
+      ['sides', '媒體的位置怎麼定', [
+        '每家媒體在藍綠和統獨上的位置，依學術研究定：TEDS 調查裡各家觀眾的政黨傾向（Chiang & Shih）、報紙的研究（Kao、Chang & Fang 等）；比較新的網路媒體，依擁有者和公開立場判斷，標成「依據較弱」。國際媒體用 AllSides 的評等；它沒評的，不放進左中右。',
+        '「媒體」分頁看得到每一家的位置和依據。位置說的是一家媒體整體的傾向，不是每一篇報導。'
+      ]],
+      ['oneside', '單邊', [
+        '有三家以上報、超過兩小時，卻只有一邊的媒體在報（另一邊一家都沒有）的新聞。不一定是誰刻意不報，但值得看看另一邊少看到了什麼。'
+      ]],
+      ['read', '我的閱讀', [
+        '你點開過哪些媒體，依偏綠、中間、偏藍算成一條，看自己平常讀的是不是都在同一邊。只記哪一家、哪一天，不記哪一篇；存在你的 Orbit Pass 裡。'
+      ]],
+      ['money', '錢怎麼算', [
+        'Orbit News 免費，不用 Orbit 的錢。'
+      ]]
+    ],
+    en: [
+      ['what', 'What Orbit News is', [
+        'Taiwan’s and the world’s news, the same event from every outlet gathered into one story: how many outlets carry it, how many lean green, centre or blue (left, centre or right for English news), and their headlines side by side. A tap on a headline opens it on the outlet’s own site.'
+      ]],
+      ['sides', 'How outlets are placed', [
+        'Each Taiwanese outlet’s place on blue–green and on unification–independence comes from research: its audience’s party in the TEDS surveys (Chiang & Shih), studies of the papers (Kao; Chang & Fang); newer web outlets by owner and stated stance, marked as weaker. English outlets use AllSides’ ratings; ones it hasn’t rated stay out of left, centre and right.',
+        'The Outlets tab shows each one’s place and why. A place is an outlet’s lean as a whole, not each report’s.'
+      ]],
+      ['oneside', 'One side', [
+        'Stories that three or more outlets carry, over two hours old, with every one on one side and none on the other. Not always a choice to leave it out, but worth seeing what the other side’s readers miss.'
+      ]],
+      ['read', 'Your reading', [
+        'The outlets you opened, counted by side into one bar, to see whether what you read sits on one side. Only which outlet and which day, never which article; kept on your Orbit Pass.'
+      ]],
+      ['money', 'Money', [
+        'Orbit News is free and uses no Orbit money.'
+      ]]
+    ]
+  },
   beats: {
     zh: [
       ['what', 'Orbit Beats 是什麼', [

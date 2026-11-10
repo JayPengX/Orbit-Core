@@ -181,6 +181,9 @@
 :where(:root[data-app='money']) {
   --q-accent: #ca8a04;
 }
+:where(:root[data-app='news']) {
+  --q-accent: #7c3aed;
+}
 :where(:root[data-app='vocab']) {
   --q-accent: #db2777;
 }
@@ -209,6 +212,9 @@
   :where(:root[data-app='money']:not([data-theme='light'])) {
     --q-accent: #e4b526;
   }
+  :where(:root[data-app='news']:not([data-theme='light'])) {
+    --q-accent: #a078f5;
+  }
   :where(:root[data-app='vocab']:not([data-theme='light'])) {
     --q-accent: #ea68a6;
   }
@@ -236,6 +242,9 @@
 }
 :where(:root[data-app='money'][data-theme='dark']) {
   --q-accent: #e4b526;
+}
+:where(:root[data-app='news'][data-theme='dark']) {
+  --q-accent: #a078f5;
 }
 :where(:root[data-app='vocab'][data-theme='dark']) {
   --q-accent: #ea68a6;
@@ -2945,6 +2954,7 @@ dialog.q-moved::backdrop {
 .q-framed.q-ms-t1 { --q-frame: linear-gradient(135deg, #7c2d12, #fdba74, #b45309, #fed7aa); animation: none; }
 .q-framed.q-ms-t2 { --q-frame: linear-gradient(135deg, #64748b, #f8fafc, #94a3b8, #e2e8f0); animation: none; }
 .q-frame-ms-money { --q-frame: conic-gradient(from var(--q-spin), #fde047, #fbbf24, #713f12, #fef3c7, #fde047); animation: q-spin 9s linear infinite; }
+.q-frame-ms-news { --q-frame: conic-gradient(from var(--q-spin), #c4b5fd, #fbbf24, #3b0764, #fde68a, #c4b5fd); animation: q-spin 9s linear infinite; }
 .q-notice-sub {
   font: var(--q-t-footnote);
   color: var(--q-muted);

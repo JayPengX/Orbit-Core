@@ -10,6 +10,7 @@
 //   Orbit Words         vocab   English words
 //   Orbit Beats         beats   beat pieces arranged into songs
 //   Orbit Money         money   the person's own spending, accounts and invoices
+//   Orbit News          news    each story as every side's outlets tell it
 //
 // The names, colours and marks are brand.mjs's. The Orbit Pass (the
 // account, its looks, the truth about the money, every app and its guide) is the
@@ -231,7 +232,8 @@ export const MILESTONES = [
   { id: 'match', goals: [7, 30, 100], was: 2, days: true, zh: '鐵粉', en: 'Superfan', unit: { zh: '天', en: 'days' }, do: { zh: '{n} 天打開 Sports', en: 'Open Sports on {n} days' } },
   { id: 'weather', goals: [7, 30, 100], was: 2, days: true, zh: '看天的人', en: 'Sky watcher', unit: { zh: '天', en: 'days' }, do: { zh: '{n} 天看天氣', en: 'Check the weather on {n} days' } },
   { id: 'orbit', goals: [7, 30, 100], was: 2, days: true, zh: '全勤', en: 'Attendance', unit: { zh: '天', en: 'days' }, do: { zh: '{n} 天打開課表', en: 'Open Class on {n} days' } },
-  { id: 'money', goals: [7, 30, 100], was: 2, days: true, zh: '天天記帳', en: 'Daily books', unit: { zh: '天', en: 'days' }, do: { zh: '{n} 天記帳', en: 'Keep the books on {n} days' } }
+  { id: 'money', goals: [7, 30, 100], was: 2, days: true, zh: '天天記帳', en: 'Daily books', unit: { zh: '天', en: 'days' }, do: { zh: '{n} 天記帳', en: 'Keep the books on {n} days' } },
+  { id: 'news', goals: [7, 30, 100], was: 2, days: true, zh: '兼聽', en: 'Both sides', unit: { zh: '天', en: 'days' }, do: { zh: '{n} 天看新聞', en: 'Read the news on {n} days' } }
 ].sort((a, b) => (a.id === 'pass' ? -1 : b.id === 'pass' ? 1 : APP_ORDER.indexOf(a.id) - APP_ORDER.indexOf(b.id)));
 const MS_FRAMES = MILESTONES.map(m => ({ id: `ms-${m.id}`, ms: m.id }));
 const msKept = (wallet, id) => setting(wallet, `ms.${id}`, null) || {};
@@ -954,6 +956,9 @@ export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, 
 // what a phone kept before the move is still its copy.
 export const PACKS_URL = `${API}/data/`;
 const PACKS_KEY = 'https://jaypengx.github.io/Shared-Data/';
+// A pack's last copy on the device, of any age ({ at, data } or null): to
+// paint at once while packJson reads it again (as peekJson for proxyJson).
+export const peekPack = path => persistedSoon(dataKey(`${PACKS_KEY}${path}`, ''));
 export function packJson(path, { ttl = 3 * 3_600_000, timeout = 30_000 } = {}) {
   const url = `${PACKS_URL}${path}`;
   return keptJson(url, dataKey(`${PACKS_KEY}${path}`, ''), { ttl, keep: true }, async () => {

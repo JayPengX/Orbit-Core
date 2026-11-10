@@ -72,7 +72,7 @@ const wide = flag('wide');
 const darkOnly = flag('dark');
 // --quick --lang en: 390 in English, with its taps (the mixed-language check).
 const onlyLang = opt('lang', '');
-const ALL = ['sports', 'securities', 'words', 'orbit', 'weather', 'transit', 'beats', 'law', 'money'];
+const ALL = ['sports', 'securities', 'words', 'orbit', 'weather', 'transit', 'beats', 'law', 'money', 'news'];
 const apps = args.length ? args : ALL;
 const runs = [];
 if (!wide) for (const app of apps)
