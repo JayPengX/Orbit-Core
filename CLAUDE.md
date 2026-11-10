@@ -213,7 +213,7 @@ w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 | `/config` | `worker.js`, `kit/devconfig.mjs` | The live speeds (`DEV`), a minute in Cloudflare's cache |
 | `/guard` | `worker.js` | The guard as it last read the bill (no key) |
 | `/store/check` | `worker.js`, `doc-store.js` | Each collection's count, localhost only |
-| `/ops` | `ops.js`, `worker.js` | The repo's own checks (Bearer `DATA_PUSH_SECRET`): `?check=gemini`, `law-chat`, `system`, `capacity`, `cpu` (CPU by route) |
+| `/ops` | `ops.js`, `worker.js` | The repo's own checks (Bearer `DATA_PUSH_SECRET`): `?check=gemini`, `gemini-use`, `law-chat`, `system`, `capacity`, `cpu` |
 
 - **The gate:** every route needs a Pass session (`qt=`), counted per
   session and app in memory (600 a minute on the data proxy). Public routes

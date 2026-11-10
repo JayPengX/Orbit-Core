@@ -66,6 +66,18 @@ export async function callsSince(env, since) {
   return results || [];
 }
 
+// How reliable Gemini was (build.yml gemini-use): each Taiwan day's calls by
+// feature and model, counted by the answer's status (200 answered, 429 refused…).
+export function reliability(calls) {
+  const days = {};
+  for (const c of calls) {
+    const k = `${c.feature} ${c.model}`;
+    const d = ((days[twDay(c.at)] ||= {})[k] ||= {});
+    d[c.status] = (d[c.status] || 0) + 1;
+  }
+  return days;
+}
+
 // What the admin panel shows, from the calls:
 // - ai: each feature's calls on each of the last 7 Taiwan days (refusals not counted: nothing was answered);
 // - google: each model on Google's day so far (calls, the busiest minute, refusals) and when that day ends;

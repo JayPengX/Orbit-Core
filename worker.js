@@ -60,7 +60,7 @@ import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
 import { docStore, storeReady } from './doc-store.js';
 import { handleMoneyRead } from './money-read.js';
 import { handleCal } from './cal.js';
-import { logCall } from './gemini-use.js';
+import { logCall, callsSince, reliability } from './gemini-use.js';
 import { handleFlight } from './flight.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
 // The F1 lap log's Durable Object (f1-live.js), bound as F1_LOG.
@@ -1337,6 +1337,11 @@ async function route(request, env, ctx, headers, origin) {
     // 問法律's steps timed on real questions, nothing kept read or written (law-chat.js).
     if (check === 'law-chat') return json(await lawChatTimes(env, ctx, headers, lawGemini('law-chat'), new URL(request.url).searchParams.get('try') || ''), 200, headers);
     if (check === 'system') return json(await systemReport(env, ECO_DEPS), 200, headers);
+    // Every Gemini call of the last ?days= (30 at most) by day, feature, model and status.
+    if (check === 'gemini-use') {
+      const days = Math.min(30, Math.max(1, Number(new URL(request.url).searchParams.get('days')) || 7));
+      return json(reliability(await callsSince(env, Date.now() - days * 86_400_000)), 200, headers);
+    }
     // CPU by route from the Workers Logs (guard.js cpuByRoute): what passes the
     // Free plan's 10 ms a request. ?group= a logs key, ?keys=1 the keys, ?script=, ?hours=.
     if (check === 'cpu') {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeD1 } from './fake-d1.mjs';
-import { logCall, aiUse, ptDay, ptNextDay, ptMonthStart, summarize } from '../gemini-use.js';
+import { logCall, aiUse, ptDay, ptNextDay, ptMonthStart, summarize, reliability } from '../gemini-use.js';
 import { tdxUse, tallyTdx, flushUse, resetMeter } from '../transit.js';
 
 test("Google's day is Pacific's, summer time included: it ends 15:00 in Taiwan in summer, 16:00 in winter", () => {
@@ -52,4 +52,14 @@ test("TDX's month starts on the 1st in Taiwan and keeps the 1st's first 16 hours
   await tallyTdx(env, 'basic/x', at);
   const used = await tdxUse(env, at);
   assert.deepEqual(used, { 'tdx:a:2026-11-01': 200, 'tdx:b:2026-11-01': 1 });
+});
+
+test('reliability counts each day’s calls by feature, model and status', () => {
+  const at = Date.UTC(2026, 10, 10, 4);
+  const days = reliability([
+    { at, feature: 'law-chat', model: 'm', status: 200 },
+    { at, feature: 'law-chat', model: 'm', status: 429 },
+    { at, feature: 'law-chat', model: 'm', status: 200 },
+  ]);
+  assert.deepEqual(days['2026-11-10'], { 'law-chat m': { 200: 2, 429: 1 } });
 });
