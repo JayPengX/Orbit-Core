@@ -22,6 +22,7 @@ import { logCall } from './gemini-use.js';
 import { paceOf } from './pace.js';
 import { FEATURES } from './ai-features.js';
 import { EXAMPLES } from './ai-fixtures.js';
+import { buildKeyOk } from './law-hosts.js';
 
 // The models by job (the plan's table): Sonnet judges, Haiku and Luna
 // write and fill forms, Gemini reads pictures and PDFs.
@@ -223,6 +224,34 @@ export async function handleAi(request, env, ctx, headers, session, { cap = 0, g
   }
 }
 
+// POST /ai/build: an app's nightly build asks a built-once feature (Orbit
+// Law's 會議紀錄變表格 and 法案週報 lines, made on GitHub where the papers are
+// read). Its key in place of a Pass (X-Build-Key, the secret LAW_BUILD_KEY);
+// only features marked `build` with that app; the day's cap as aiOnce's.
+//   { feature, input } → { out, model } | { error: 'key' | 'feature' | 'input' | 'cap' | 'upstream' }
+const BUILD_KEYS = { law: 'LAW_BUILD_KEY' };
+export async function handleAiBuild(request, env, ctx, headers, { cap = 0, gemini = null } = {}) {
+  if (request.method !== 'POST') return json({ error: 'method' }, 405, headers);
+  const text = await bodyText(request, 13_000_000);
+  let body = null;
+  try {
+    body = text == null ? null : JSON.parse(text);
+  } catch {}
+  const name = String(body?.feature || '');
+  const f = FEATURES[name];
+  if (!f?.build || !BUILD_KEYS[f.build]) return json({ error: 'feature' }, 400, headers);
+  if (!buildKeyOk(request.headers.get('X-Build-Key'), env?.[BUILD_KEYS[f.build]])) return json({ error: 'key' }, 401, headers);
+  const input = f.input ? f.input(body?.input) : body?.input;
+  if (!input) return json({ error: 'input' }, 400, headers);
+  if (!(await spendDay(env, name, cap, twDay()))) return json({ error: 'cap' }, 429, headers);
+  try {
+    const { out, model } = await runFeature(env, ctx, name, input, { gemini });
+    return json({ out, model }, 200, headers);
+  } catch (e) {
+    return json({ error: 'upstream', why: String(e?.message || e).slice(0, 160) }, 502, headers);
+  }
+}
+
 // ---- What the admin panel's AI tab reads (eco-admin.js `ai`) ----
 
 // Spend in US$ of calls (gemini_call rows), by provider, model and feature.
@@ -291,6 +320,23 @@ export function healthOf(calls, firstModel = {}, now = Date.now()) {
   return out;
 }
 
+// An example's pictures and PDFs by address (site/ai-try/: a real-looking
+// contract photographed), read and sent as the phone would: { mime_type, data }.
+async function withFiles(input) {
+  if (!Array.isArray(input?.files) || !input.files.some(f => f?.url)) return input;
+  const files = await Promise.all(
+    input.files.map(async f => {
+      if (!f?.url) return f;
+      const res = await fetch(f.url, { signal: AbortSignal.timeout(15_000) });
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return { mime_type: f.mime_type || res.headers.get('content-type') || 'image/jpeg', data: btoa(bin) };
+    })
+  );
+  return { ...input, files };
+}
+
 // The ops check `ai-try` (build.yml): a feature's examples through each
 // model named (or its own chain), with answers given for any question back
 // (an example's `answers`), timed. Counts as calls in the log ('ai-try').
@@ -300,7 +346,7 @@ export async function aiTry(env, ctx, name, { models = [], from = 0, n = 3, gemi
   const examples = (EXAMPLES[name] || []).slice(from, from + Math.min(10, Math.max(1, n)));
   const out = [];
   for (const ex of examples) {
-    let given = ex.input;
+    let given = await withFiles(ex.input);
     // (A picture by its address: read and sent as the phone sends one.)
     if (given?.imageUrl) {
       try {

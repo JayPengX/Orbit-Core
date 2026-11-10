@@ -65,7 +65,7 @@ import { docStore, storeReady } from './doc-store.js';
 import { handleMoneyRead } from './money-read.js';
 import { handleCal } from './cal.js';
 import { logCall, callsSince, reliability, lastFailed } from './gemini-use.js';
-import { handleAi, aiTry } from './ai.js';
+import { handleAi, handleAiBuild, aiTry } from './ai.js';
 import { handleClassNews } from './class-news.js';
 import { FEATURES } from './ai-features.js';
 import { handleFlight } from './flight.js';
@@ -1383,6 +1383,14 @@ async function route(request, env, ctx, headers, origin) {
   if (path === '/cal' || path.startsWith('/cal/')) return handleCal(request, env, headers, path === '/cal' ? await sessionOf(request, env) : null, path);
   // …and its 讀圖: a picture of purchases read by Gemini, on a tap only (money-read.js).
   // The family's AI door (ai.js): every app's AI taps by feature name, each with its fixed prompt and caps.
+  // …and a build's built-once asks (Orbit Law's nightly build: 會議紀錄變表格, 法案週報), with its key.
+  if (path === '/ai/build') {
+    let feature = '';
+    try {
+      feature = String((await request.clone().json())?.feature || '');
+    } catch {}
+    return handleAiBuild(request, env, ctx, headers, { cap: FEATURES[feature]?.build ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai') });
+  }
   if (path === '/ai') {
     let feature = '';
     try {

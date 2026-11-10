@@ -1,6 +1,7 @@
 // Every AI feature of the family's, by name (ai.js runs them). Each is:
 //   app        the kit id whose session may tap it (taps only)
 //   tap        true: a person's tap through POST /ai; else built once by a builder (aiOnce)
+//   build      a repo's own build may call it through POST /ai/build with its key ('law': LAW_BUILD_KEY)
 //   models     tried in order (ai.js MODELS' names), the next when one fails or answers nothing usable
 //   effort     the model's effort ('low' | 'medium' | 'high'; Gemini's thinking), or per model
 //   clarify    may ask one short question back with options to tap, rather than guess (ai.js withAsk)
@@ -13,23 +14,11 @@
 // Code first (Jay 11-10): each is only what code can't do reliably; the
 // apps parse what they can themselves and ask here for the rest.
 import { cleanBuys } from './money-read.js';
+import { str, list, S, N, B, obj, arr, text, nums, numbersFrom, fileOf } from './ai-util.js';
+import { LAW_FEATURES } from './law-ai.js';
 
-const str = (v, max) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+export { numbersFrom };
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
-const list = (v, max) => (Array.isArray(v) ? v.slice(0, max) : []);
-const S = { type: 'string' }, N = { type: 'number' }, B = { type: 'boolean' };
-const obj = (properties, required = Object.keys(properties)) => ({ type: 'object', properties, required });
-const arr = items => ({ type: 'array', items });
-const text = t => [{ text: t }];
-
-// Every number an answer writes must be one the input gave (numbers come
-// from code; a model only puts them in words). Years and small counts too.
-// (1,290 is 1290: a thousands comma either side.)
-const nums = t => String(t).replace(/(\d),(?=\d{3}(?!\d))/g, '$1').match(/\d+(?:\.\d+)?/g) || [];
-export function numbersFrom(out, given) {
-  const have = new Set(nums(given));
-  return nums(out).every(n => have.has(n));
-}
 
 // Orbit Beats' grooves (its lib/names.mjs STYLE_NAMES), for beats-say.
 const BEATS_STYLES = "four (4-on-floor, 四拍), hiphop (Hip-hop, 嘻哈), trap (Trap), half (Half-time, 半速), broken (Breakbeat, 碎拍), house (House), dembow (Dembow), afro (Afro), drill (Drill), boombap (Boom Bap), jersey (Jersey), amapiano (Amapiano), lofi (Lo-fi), funk (Funk, 放克), garage (Garage, UK 車庫), dnb (D&B), reggae (Reggae, 雷鬼), phonk (Phonk), baile (Baile), techno (Techno), jazz (Jazz swing, 爵士搖擺), bossa (Bossa nova, 巴薩諾瓦), samba (Samba, 森巴), salsa (Salsa, 騷莎), rock (Rock, 搖滾), punk (Pop-punk, 流行龐克), metal (Metal, 金屬), citypop (City pop, City Pop), kpop (K-pop), synthwave (Synthwave, 合成器浪潮), disco (Disco, 迪斯可), gospel (Gospel, 福音), neosoul (Neo-soul, 新靈魂), ballad (Ballad, 抒情), ambient (Ambient, 氛圍), cinematic (Cinematic, 電影配樂), chiptune (Chiptune, 8-bit), kizomba (Kizomba), highlife (Highlife), cumbia (Cumbia, 昆比亞), bhangra (Bhangra, 班格拉), dubstep (Dubstep), footwork (Footwork), jungle (Jungle, 叢林), trance (Trance), hardstyle (Hardstyle), chinese (Chinese, 中國風), blues (Blues, 藍調), country (Country, 鄉村)";
@@ -503,10 +492,7 @@ export const FEATURES = {
     perPass: 20,
     perMinute: 4,
     input(raw) {
-      const data = typeof raw?.image?.data === 'string' ? raw.image.data : '';
-      const mime = /^image\/(jpeg|png|webp)$/.test(raw?.image?.mime_type || '') ? raw.image.mime_type : '';
-      if (!mime || data.length < 1000 || data.length > 2_400_000 || /[^A-Za-z0-9+/=]/.test(data.slice(0, 2000))) return null;
-      return { data, mime };
+      return fileOf(raw?.image);
     },
     parts: ({ data, mime }) => [
       {
@@ -711,5 +697,8 @@ export const FEATURES = {
       }
       return out;
     }
-  }
+  },
+
+  // Orbit Law's: 拍合約幫你看, 會議紀錄變表格, 法案週報 (law-ai.js).
+  ...LAW_FEATURES
 };
