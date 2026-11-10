@@ -55,8 +55,15 @@ const fingers = () => (touching > 0 && Date.now() - touchAt < FINGER_STALE_MS ? 
 // (For the tests: what the page counts after a touch event with these fingers still down.)
 export const countFingers = (left, now = Date.now()) => ((touching = Math.max(0, left | 0)), (touchAt = now), fingers());
 
-// A scroll still running, or a finger on the screen: a live redraw waits.
-export const scrollBusy = () => fingers() > 0 || Date.now() - lastScroll < SCROLL_IDLE_MS;
+// The scroll bar last moved (iOS's scroll indicator, held at the right edge:
+// no finger the page hears). While it's in hand a live redraw waits as for a
+// finger: Jay 2026-11-10, "holding the scrollbar forces the page upward
+// during live games" (a refresh under the held bar, Safari's own move after
+// it taken for the bar's and kept).
+const BAR_HOLD_MS = 2_500;
+let barLast = 0;
+// A scroll still running, a finger on the screen, or the scroll bar in hand: a live redraw waits.
+export const scrollBusy = () => fingers() > 0 || Date.now() - lastScroll < SCROLL_IDLE_MS || Date.now() - barLast < BAR_HOLD_MS;
 // The person did something just now: a change after it is theirs (a tab, a chip, a row opened).
 const theirs = () => Date.now() - lastGesture < GESTURE_MS;
 
@@ -225,6 +232,7 @@ const CODE_MS = 120;
 const REDRAWN_MS = 1500;
 const AGAIN_MS = 400;
 const BAR_MS = 2000;
+const SAFARI_MS = 150;
 const drawnAt = new WeakMap();
 const putBackAt = new WeakMap();
 const barAt = new WeakMap();
@@ -420,7 +428,9 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
       // chain theirs, and its next grab too while it's still in hand.
       const now = Date.now();
       const quiet = now - lastScroll > SCROLL_IDLE_MS;
-      if (quiet || !chains.has(s)) chains.set(s, theirs() || fingers() > 0 || codeScrolled(s) || (now - (barAt.get(s) || 0) < BAR_MS && 'bar'));
+      // (Safari's own move comes straight after a redraw: never the bar's, even with the bar just let go.)
+      const safari = now - (drawnAt.get(s) || 0) < SAFARI_MS;
+      if (quiet || !chains.has(s)) chains.set(s, theirs() || fingers() > 0 || codeScrolled(s) || (!safari && now - (barAt.get(s) || 0) < BAR_MS && 'bar'));
       if (st && !chains.get(s) && !settle.has(s)) {
         if (now - (drawnAt.get(s) || 0) < REDRAWN_MS && now - (putBackAt.get(s) || 0) > AGAIN_MS) {
           putBackAt.set(s, now);
@@ -428,7 +438,7 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
         }
         chains.set(s, 'bar');
       }
-      if (chains.get(s) === 'bar') barAt.set(s, now);
+      if (chains.get(s) === 'bar') barAt.set(s, (barLast = now));
       // (The code's own jump, no finger: held from where it landed at once,
       // not once it settles; a redraw just after it is kept too.)
       if (!theirs() && !fingers() && codeScrolled(s)) {
