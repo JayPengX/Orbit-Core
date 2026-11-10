@@ -18,7 +18,21 @@ export const TW_ONLY_HOSTS = new Set([
 ]);
 const RULE_PAGE = /\/(LawQuery|LawCategoryContentList|LawContent)\.aspx$/i;
 
-// A url of those sites' rule pages: https, no credentials or port.
+// The 縣市議會 sites that serve only Taiwan (2026-11-10: the cloud box refused):
+// Orbit Law's nightly build reads their bill lists and 議事錄 through the same door.
+export const COUNCIL_HOSTS = new Set([
+  'bms.ntp.gov.tw', // 新北市議會's 議案查詢
+  'www.ntp.gov.tw', // 新北市議會
+  'www.tycc.gov.tw', // 桃園市議會
+  'www.tcc.gov.tw', // 臺北市議會
+  'www.ptcc.gov.tw', // 屏東縣議會
+  'www.ilcc.gov.tw', // 宜蘭縣議會
+  'www.mlcc.gov.tw', // 苗栗縣議會
+  'www.mtcc.gov.tw', // 連江縣議會
+  'www.tthcc.gov.tw' // 臺東縣議會
+]);
+
+// A url of those sites' rule pages, or a council's page: https, no credentials or port.
 export function twOnly(raw) {
   let u;
   try {
@@ -26,7 +40,9 @@ export function twOnly(raw) {
   } catch {
     return false;
   }
-  return u.protocol === 'https:' && !u.username && !u.password && !u.port && TW_ONLY_HOSTS.has(u.hostname.toLowerCase()) && RULE_PAGE.test(u.pathname);
+  if (u.protocol !== 'https:' || u.username || u.password || u.port) return false;
+  const host = u.hostname.toLowerCase();
+  return (TW_ONLY_HOSTS.has(host) && RULE_PAGE.test(u.pathname)) || COUNCIL_HOSTS.has(host);
 }
 
 // 司法院's judgment pages (judgment.judicial.gov.tw/FJUD/data.aspx) turned
