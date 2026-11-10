@@ -31,6 +31,9 @@ export function numbersFrom(out, given) {
   return nums(out).every(n => have.has(n));
 }
 
+// Orbit Beats' grooves (its lib/names.mjs STYLE_NAMES), for beats-say.
+const BEATS_STYLES = "four (4-on-floor, 四拍), hiphop (Hip-hop, 嘻哈), trap (Trap), half (Half-time, 半速), broken (Breakbeat, 碎拍), house (House), dembow (Dembow), afro (Afro), drill (Drill), boombap (Boom Bap), jersey (Jersey), amapiano (Amapiano), lofi (Lo-fi), funk (Funk, 放克), garage (Garage, UK 車庫), dnb (D&B), reggae (Reggae, 雷鬼), phonk (Phonk), baile (Baile), techno (Techno), jazz (Jazz swing, 爵士搖擺), bossa (Bossa nova, 巴薩諾瓦), samba (Samba, 森巴), salsa (Salsa, 騷莎), rock (Rock, 搖滾), punk (Pop-punk, 流行龐克), metal (Metal, 金屬), citypop (City pop, City Pop), kpop (K-pop), synthwave (Synthwave, 合成器浪潮), disco (Disco, 迪斯可), gospel (Gospel, 福音), neosoul (Neo-soul, 新靈魂), ballad (Ballad, 抒情), ambient (Ambient, 氛圍), cinematic (Cinematic, 電影配樂), chiptune (Chiptune, 8-bit), kizomba (Kizomba), highlife (Highlife), cumbia (Cumbia, 昆比亞), bhangra (Bhangra, 班格拉), dubstep (Dubstep), footwork (Footwork), jungle (Jungle, 叢林), trance (Trance), hardstyle (Hardstyle), chinese (Chinese, 中國風), blues (Blues, 藍調), country (Country, 鄉村)";
+const BEATS_IDS = BEATS_STYLES.split(', ').map(x => x.split(' (')[0]);
 export const FEATURES = {
   // Orbit Money: 用說的記帳, the sentences the app's own parser couldn't
   // read ("跟同學吃火鍋花了三百五"). Entries for the person to look over, as 拍照記帳's.
@@ -158,6 +161,37 @@ export const FEATURES = {
   // by code (day, place, what) and answered from the forecast by code; only a
   // place code can't find among Taiwan's townships (a mountain, a park, a
   // school) is asked here, on a tap: where it is, nothing more.
+  // 用說的做節奏 (Beats, Jay 11-10): only words code can't place (lib/say.mjs
+  // reads lo-fi, 慢, 下雨, 跑步…); the grooves and a tempo, never a sound.
+  'beats-say': {
+    app: 'beats',
+    tap: true,
+    models: ['luna', 'haiku'],
+    effort: { luna: 'low' },
+    maxIn: 2000,
+    perPass: 30,
+    perMinute: 6,
+    input(raw) {
+      const t = str(raw?.text, 80);
+      return t ? { t } : null;
+    },
+    parts: ({ t }) =>
+      text(
+        [
+          'Someone describes the music they want to hear (a mood, a time, a place, an activity, a sound). Pick the grooves from this list that fit best, 1 to 5, best first, by their ids only, and the tempo: "slow" (under 95 BPM), "mid", "fast" (over 125), or "" when the words imply none.',
+          'If the words are not about music or a feeling at all, return no grooves and tempo "".',
+          `Grooves (id (name)): ${BEATS_STYLES}`,
+          `Their words: ${t}`
+        ].join('\n')
+      ),
+    schema: obj({ styles: arr(S), tempo: S }),
+    clean(raw) {
+      const ids = new Set(BEATS_IDS);
+      const styles = [...new Set(list(raw?.styles, 8).map(x => str(x, 20).toLowerCase()))].filter(x => ids.has(x)).slice(0, 5);
+      const tempo = ['slow', 'mid', 'fast'].includes(raw?.tempo) ? raw.tempo : '';
+      return { styles, tempo };
+    }
+  },
   'weather-ask': {
     app: 'weather',
     tap: true,
@@ -367,19 +401,28 @@ export const FEATURES = {
     parts: ({ facts }) =>
       text(
         [
-          'You write the one line of a game recap that the score can’t tell: WHY this game ended as it did. The reader already sees the final score, the teams and their records, so never repeat those.',
-          'Say the deciding moment or player, as a sports desk in Taiwan would: a late run, a swing play, a pitcher who shut them down, a goal against the run of play.',
-          'zh: ONE line in Traditional Chinese (台灣的體育報導用語), ≤ 40 字. Team names exactly as the facts write them (Chinese); players in English as written.',
-          'en: the same line in English, ≤ 22 words, teams by their English names given.',
-          'Use only these facts. Every number you write must be one of theirs. No adjectives the facts don’t support. When the facts don’t show why, say the plainest true thing (who led the scoring for the winner).',
+          'You write the one line of a game recap that the card above it can’t tell: HOW this game was decided. The reader already sees the final score, both records and each team’s top scorer with his points, rebounds and assists: never repeat any of those, and never name a player only for his totals.',
+          'From the facts below, say the turn that decided it, as a sports desk in Taiwan would: a run and who drove it, a comeback from how far down, when the winner went ahead for good and on whose play, the period that broke it open, a late swing. One idea, not a list.',
+          'Teams and players are tokens: write {t:<id>} for a team and {p:<id>} for a player exactly as the facts give them (the app shows them as their names), never their names in words.',
+          'zh: ONE line in Traditional Chinese (台灣的體育報導用語), ≤ 40 字 not counting tokens, no English words. en: the same line in English, ≤ 22 words.',
+          'Use only these facts. Every number you write must be one of theirs. No adjectives the facts don’t support.',
+          'If the facts hold nothing that explains the result beyond the final score, return zh "" and en "".',
           'Facts:',
           facts
         ].join('\n')
       ),
     schema: obj({ zh: S, en: S }),
     clean: (raw, { facts }) => {
-      const zh = str(raw?.zh, 80), en = str(raw?.en, 200);
-      return zh && en && numbersFrom(zh + ' ' + en, facts) ? { zh, en } : null;
+      const zh = str(raw?.zh, 160), en = str(raw?.en, 300);
+      if (!zh && !en) return { zh: '', en: '' };
+      // Every token one the facts give; no player or team typed out in words.
+      const toks = `${zh} ${en}`.match(/\{[pt]:[^}]+\}/g) || [];
+      if (!zh || !en || toks.some(t => !facts.includes(t))) return null;
+      const bare = t => t.replace(/\{[pt]:[^}]+\}/g, '');
+      if (/[A-Za-z]{3,}/.test(bare(zh))) return null;
+      const names = [...facts.matchAll(/\{p:[^}]+\} = ([^;\n]+)/g)].map(m => m[1].trim().split(/\s+/).pop()).filter(n => n.length >= 3);
+      if (names.some(n => bare(en).includes(n))) return null;
+      return numbersFrom(bare(zh) + ' ' + bare(en), facts) ? { zh, en } : null;
     }
   },
 
@@ -485,23 +528,20 @@ export const FEATURES = {
     parts: ({ stories }) =>
       text(
         [
-          'For each news story below (the headlines and short summaries different outlets gave it), write:',
-          'line: one neutral sentence in Traditional Chinese (台灣用語), ≤ 45 字, of what happened. Only facts every given outlet agrees on; no outlet’s adjectives or framing; no opinion; every number must be one the headlines or summaries give.',
-          'zh: a short Traditional Chinese headline (≤ 22 字), neutral.',
-          'en: a short neutral English headline (≤ 14 words).',
-          'Return one item per story with its id.',
+          'For each news story below (its outlets’ headlines), write one short neutral headline in the language asked: lang "zh": Traditional Chinese (台灣用語), ≤ 22 字; lang "en": English, ≤ 14 words.',
+          'Only what the headlines all say; no outlet’s adjectives or framing; every number must be one the headlines give. Return one item per story with its id.',
           JSON.stringify(stories)
         ].join('\n')
       ),
-    schema: obj({ items: arr(obj({ id: S, line: S, zh: S, en: S })) }),
+    schema: obj({ items: arr(obj({ id: S, title: S })) }),
     clean(raw, { stories }) {
-      const given = new Map(stories.map(s => [s.id, JSON.stringify(s)]));
+      const given = new Map(stories.map(s => [s.id, s]));
       const out = {};
       for (const it of list(raw?.items, 200)) {
-        const src = given.get(String(it?.id || ''));
-        if (!src) continue;
-        const line = str(it.line, 90), zh = str(it.zh, 40), en = str(it.en, 120);
-        if (line && numbersFrom(line + zh + en, src)) out[it.id] = { line, zh, en };
+        const s = given.get(String(it?.id || ''));
+        if (!s) continue;
+        const title = str(it.title, s.lang === 'zh' ? 40 : 120);
+        if (title && numbersFrom(title, JSON.stringify(s.heads))) out[s.id] = { [s.lang]: title };
       }
       return out;
     }
