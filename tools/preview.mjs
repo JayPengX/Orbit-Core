@@ -861,6 +861,42 @@ if (key === 'admin') {
   const { logCall } = await import('../gemini-use.js');
   const usage = { promptTokenCount: 1800, cachedContentTokenCount: 400, candidatesTokenCount: 220, thoughtsTokenCount: 90 };
   for (let i = 0; i < 60; i++) await logCall(env, { feature: ['law-ask', 'law-chat', 'money-read', 'nl-edit'][i % 4], model: i % 4 === 1 ? 'gemini-3.7-flash' : 'gemini-3.5-flash-lite', status: i === 7 ? 429 : 200, usage, at: Date.now() - i * 2.7 * 3_600_000 });
+  // (外部來源, made up: a day of the proxy's and phones' calls, one source
+  // broken for two hours, one unsteady; the jobs' heartbeats; R2's and Law's ages.)
+  {
+    const { noteSource, flushSources } = await import('../sources.js');
+    const { beat } = await import('../ops.js');
+    const { useLawSite } = await import('../law.js');
+    const H = 3_600_000;
+    const day = (src, side, perHour, { failEvery = 0, err = '', downFor = 0, from = 23 } = {}) => {
+      for (let h = from; h >= 0; h--)
+        for (let i = 0; i < perHour; i++) {
+          const t = now - h * H - i * Math.floor(H / perHour);
+          const bad = (downFor && h < downFor) || (failEvery && i % failEvery === 0);
+          noteSource(src, side, !bad, 180 + (i % 7) * 60, bad ? err : '', t);
+        }
+    };
+    day('tdx', 'worker', 6);
+    day('hccg-bus', 'worker', 20, { downFor: 2, err: 'hisatisfy.hccg.gov.tw 503 /ibus_gis/getStopRouteTime' });
+    day('tpe-bus', 'worker', 12);
+    day('youbike', 'phone', 10, { failEvery: 6, err: 'apis.youbike.com.tw no answer' });
+    day('cwa', 'worker', 8);
+    day('cwa-radar', 'cron', 6);
+    day('google-weather', 'worker', 3);
+    day('espn', 'phone', 30);
+    day('espn', 'worker', 8);
+    day('yahoo', 'worker', 15, { failEvery: 25, err: 'query1.finance.yahoo.com 429 /v8/finance/chart/2330.TW' });
+    day('news', 'cron', 60);
+    day('gemini', 'relay', 1, { from: 9 });
+    day('google-maps', 'worker', 4);
+    day('openf1', 'worker', 2, { failEvery: 2, err: 'api.openf1.org 401 /v1/sessions' , from: 5 });
+    day('host:api.example.org', 'worker', 1, { from: 3 });
+    await flushSources(env, null, { force: true });
+    for (const job of ['build:news', 'radar', 'build:daily', 'build:watch']) await beat(env, job, async () => (job === 'build:news' ? { items: 812, fresh: 40, failed: ['nypost: 403'] } : { ok: 1 }));
+    env.DATA = { head: async () => ({ uploaded: new Date(now - 2 * DAY) }) };
+    const part = (h, n) => ({ built: now - h * H, n });
+    useLawSite({ fetch: async () => new Response(JSON.stringify({ built: now - 9 * H, parts: { laws: part(9, 11843), bills: part(9, 3120), notices: part(9, 64), ly: part(9, 113), agenda: part(9, 40), councils: part(57, 22), agency: part(9, 18400), local: part(9, 9120), rulings: part(9, 2400), cons: part(9, 830), gov: part(9, 310) } })) });
+  }
   const stamp = () => new Date().toISOString();
   const deps = {
     now: () => Date.now(),

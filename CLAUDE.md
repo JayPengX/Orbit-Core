@@ -10,12 +10,11 @@ so that nothing is built twice and nothing breaks the core. Then:
 3. `docs/DESIGN.md`: how a screen looks. Read it before any visible change.
 4. The app's own `MAP.md` (what's where inside it) and `FEATURES.md` where it has one.
 
-**Keep it current.** A change to the architecture updates this file in the
-same push: a kit module, pattern or family of exports, a route, a Worker, a
-binding, a table, an R2 prefix or KV key family, a data or sync layer, a
-cron's work, a workflow. `npm test` fails on your machine when a kit file,
-Worker file, route, binding, D1 table, builder or workflow isn't named here
-(`tests/claude-map.test.mjs`; on GitHub only a warning). An app's own structure goes in its `MAP.md`.
+**Keep it current.** An architecture change (a kit module or pattern, a
+route, a Worker, a binding, a table, an R2 prefix or KV family, a data or
+sync layer, a cron's work, a workflow) updates this file in the same push;
+`npm test` fails locally when one isn't named (`tests/claude-map.test.mjs`); an app's own,
+its `MAP.md`.
 
 **Look before you write.** Before a helper, a component or a style, run
 `node tools/kit-find.mjs <word…>` (the kit's exports and CSS classes). Use
@@ -115,6 +114,7 @@ app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for test
 | `ui.mjs` | The builders (§3.3) and their HTML-string twins (`…Html`) for apps that draw with template strings; loads `hold-place.mjs` |
 | `hold-place.mjs` | A redraw never moves the page, a sheet or a panel (only code scrolls); a tap holds the control under the finger; never a drawing (`loose`); a sized sheet keeps its height (`--q-sheet-floor`); `scrollBusy()` holds `everyDev` under a finger; `freshScreen()`: a new screen at the top; `letGo()`: a drag carries its grip away |
 | `steady-pics.mjs` | A picture drawn again is eager and decoded at once |
+| `sources.mjs`, `source-watch.mjs` | Outside sources (`SOURCES`, `sourceOf`, `stateOf`: admin 外部來源); a phone's own outside reads, beaconed to `/sources` |
 | `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, before the app's modules); the cover held for it |
 | `loader.html` | The snippets every app's page carries (`kit:head`, `kit:boot`) |
 | `brand.mjs` | Families, names, colours, marks, repos, slugs, `APP_ORDER`, `DEV` (speeds, §9) |
@@ -212,6 +212,7 @@ w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 | `/gift` | `gift.js` | 公開領取 at `/key/` (`site/key/`), set in the admin panel; one a device (a cookie, D1 `gift_claim`), `op: 'go'` a `#qh=` into an app; unreplaced passes back after `hold` hours |
 | `/showcase/pass` | `showcase.js` | The showcase's short pass for its live demos: reads only, capped per address and day |
 | `/data/…` | `data.js` | R2, public reads (§5.5); `/data/build` (POST, Bearer `DATA_PUSH_SECRET`, `build.yml`) runs a builder now |
+| `/sources` | `sources.js` | Phones' beacons of their outside reads (the proxy's: `fetch` wrapped) |
 | `/config` | `worker.js`, `kit/devconfig.mjs` | The live speeds (`DEV`), a minute in Cloudflare's cache |
 | `/guard` | `worker.js` | The guard as it last read the bill (no key) |
 | `/store/check` | `worker.js`, `doc-store.js` | Each collection's count, localhost only |
@@ -251,25 +252,21 @@ on `SPORTS_PROXY_ALLOWED_HOSTS`. Two hosts are not real: `asia-baseball.orbit`
 OpenF1's tables (`openF1Raw`), kept in R2.
 
 - **Trims** (`&trim=`) return only what an app reads (ESPN, Polymarket, Jolpica, FotMob, ELTA, YouTube, F1).
-- **Batches** (`?batch=1&u=…&lines=1`): up to 24 reads in one request,
-  each written as it's ready. A slow item answers 504 and is asked alone.
-- **Edge cache tiers** (`sports.js` `CACHE_*`): each has `fresh` (as
-  is) and `stale`. Just past fresh (as long again, a minute at least) it's
-  served while read again behind it (stale-while-revalidate);
-  older but inside `stale`, it's read now and the old copy answers only if
-  that takes over 2 s or fails. Live 2–10 s, odds 10 s, quotes 30 s and F1
-  live 4 s never serve stale; final 24 h; schedule 10 min (+1 day);
-  standings 30 min (+1 day); history 30 min (+1 day); search a day; career a
-  week. `X-Sports-Proxy-Cache` says `HIT`, `STALE`, `MISS` or `KEPT`.
+- **Batches** (`?batch=1&u=…&lines=1`): up to 24 reads, each written when
+  ready; a slow one answers 504 and is asked alone.
+- **Edge cache tiers** (`sports.js` `CACHE_*`, their times there): past
+  `fresh` (as long again) served while read again behind
+  (stale-while-revalidate); inside `stale`, read now, the old copy answering
+  past 2 s or failing; live, odds, quotes, F1 live never stale.
+  `X-Sports-Proxy-Cache`: `HIT`, `STALE`, `MISS`, `KEPT`.
 - **Kept on demand:** what's over for good (an ESPN game, day or month all
   over; an Asian month; an F1 session, laps, a track's map; past results) is
   kept in R2 the first time it's read (`settleable`, `readKept`) and wiped
   with its season (`builders/kept.js`).
 - **A day in one answer** (`GET /sports-today?day=YYYY-MM-DD`,
   `sports-today.js`): Sports' first screen, built on demand from ESPN's
-  pages (`readThrough`, the kit's `sports-espn.mjs`); 60 s at the edge for
-  today and tomorrow, longer for older days, 10 s when a league was missed;
-  from pace 2, 503 `{error: 'paced'}`, the phone reads as before.
+  pages (`readThrough`, the kit's `sports-espn.mjs`), 60 s at the edge
+  (10 s with a league missed); from pace 2, 503 `{error: 'paced'}`.
 
 ### 4.2 The other Workers
 
@@ -314,7 +311,7 @@ A read (`kit proxyJson`) goes down these until one answers:
 
 | Store | Binding | What's in it |
 | --- | --- | --- |
-| D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data, the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced (§5.3); `gemini_call`: every Gemini call (`gemini-use.js`); `law_day`: the AI caps' counts a day; `gift`, `gift_claim`: the giveaway (`gift.js`); `beats`: each job's last run and failures (`ops.js`); `meter`: Google's and TDX's counts a month (`transit.js`); `push_kv`: notices' devices and lists (`push.js`) |
+| D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data, the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced (§5.3); `gemini_call`: every Gemini call (`gemini-use.js`); `law_day`: the AI caps' counts a day; `gift`, `gift_claim`: the giveaway (`gift.js`); `beats`: each job's last run and failures (`ops.js`); `meter`: Google's and TDX's counts a month (`transit.js`); `push_kv`: notices' devices and lists (`push.js`); `sources`: outside calls by hour (`sources.js`) |
 | R2 `orbit-data` | `DATA` | Public: the builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `station/`, `rail/`, `tdx/`, `where.json`), the proxy's kept reads (`mirror/`), the radar's (`weather/`). Never served: `private/` (nightly backups `private/store/`, Firestore's last copy) |
 | KV | `RATE_LIMIT_KV` | Counters (sign-ins, per-address limits); the guard's state, pace and alerts (`guard:*`); Google Weather's cells and calls a day (`weather:g:*`, `weather:google:<day>`); TDX's last reads (`tdx:warm:*`); the meter's copy (`transit:use:<month>`); Law's kept plans and answers (`law:*`); the showcase's passes a day (`showcase:passes:*`); the door's state (`door:state`); `ops:data-folders` |
 | Durable Objects | `F1_LOG`, `DOOR`, `RUNNER`, `CLOCK` | `F1Log`: F1's laps; `Door`: seats and the line; `Runner` (`runner.js`): heavy routes, crons by alarm, relays past 40 outside calls; `GuardClock`: the guard's alarm |
@@ -418,6 +415,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
 - **AI caps** are settings too (`DEV ai*`): calls a day for all, one
   count in D1 `law_day`, 0 pauses (`worker.js aiCap`). Each Gemini call is
   a row in `gemini_call` (`gemini-use.js`), only on a person's tap.
+- **Outside sources** (admin 外部來源): real calls only (not the dev door's), one D1 upsert an isolate every 5 min (1 failing); plus beats, R2 ages, Law's `data/status.json`, quotas.
 - **Errors**: each route's 5xx tallied (`err:<route>:<day>`), the guard's
   `/errors`; 部署 runs workflows (`GH_ACTIONS_TOKEN`).
 - **容量** (`capacity.js` `quotas`): people each quota holds = this

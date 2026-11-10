@@ -28,6 +28,8 @@
 // runs in Taiwan ([placement], wrangler.toml), where the people and most
 // sources are. The Orbit Pass is the only way anything is saved.
 
+// (First: the outside calls counted, sources.js, before anything keeps a fetch of its own.)
+import { watchRelay, flushSources, asSourceCall, pruneSources, takeBeacon } from './sources.js';
 import { handleLawAsk, useLawSite, addOne, twDay } from './law.js';
 import { handleLawChat, lawChatTimes } from './law-chat.js';
 import { DEV, aiSettingOf } from './kit/brand.mjs';
@@ -1306,6 +1308,19 @@ async function route(request, env, ctx, headers, origin) {
     if (request.method !== 'GET' || !isAllowedOrigin(origin)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
     return handleLawLive(ctx, headers);
   }
+  // A phone's count of its own outside reads (kit/source-watch.mjs → sources.js):
+  // a beacon from our own pages only (never a localhost one), one a minute an address.
+  if (path === '/sources') {
+    if (request.method !== 'POST' || !isAllowedOrigin(origin) || LOCAL_ORIGIN.test(origin)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
+    if (sessionLimited(`src:${ipBucket(ip)}`, 1)) return new Response(null, { status: 204, headers });
+    const text = await bodyText(request, 8_192).catch(() => '');
+    let body = null;
+    try {
+      body = JSON.parse(text);
+    } catch {}
+    takeBeacon(body);
+    return new Response(null, { status: 204, headers });
+  }
   // Orbit Class's 加到行事曆 (cal.js): the calendar its phone made, kept and handed to the Calendar app.
   if (path === '/cal' || path.startsWith('/cal/')) return handleCal(request, env, headers, path === '/cal' ? await sessionOf(request, env) : null, path);
   // …and its 讀圖: a picture of purchases read by Gemini, on a tap only (money-read.js).
@@ -1496,19 +1511,23 @@ export default {
 // The Worker's own answer to a request (in the Worker, or in the Runner).
 async function handle(request, env, ctx) {
     useLawSite(env.LAW_SITE);
+    watchRelay(env);
     request = viaSite(request);
     const origin = request.headers.get('Origin') || '';
     const headers = corsHeaders(origin, request.cf?.colo);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     const t0 = Date.now();
     try {
-      const res = await route(request, env, ctx, headers, origin);
+      // (Our tools' calls, a page on localhost, never count as a source's health: sources.js.)
+      const res = await (LOCAL_ORIGIN.test(origin) ? asSourceCall({ quiet: true }, () => route(request, env, ctx, headers, origin)) : route(request, env, ctx, headers, origin));
       if (res.status >= 500) countError(env, ctx, request);
       return timed(res, t0);
     } catch (error) {
       console.log('route failed', new URL(request.url).pathname, String(error?.message || error).slice(0, 200));
       countError(env, ctx, request);
       return errorJson('WORKER_FAILED', 500, headers, request);
+    } finally {
+      flushSources(env, ctx);
     }
 }
 
@@ -1516,10 +1535,20 @@ async function handle(request, env, ctx) {
 // runner.js partOf; null, all of it).
 async function cronTick(event, env, ctx, part) {
     useLawSite(env.LAW_SITE);
+    watchRelay(env);
     const tick = new Date(event.scheduledTime || Date.now());
     const min = tick.getUTCMinutes();
-    // Each job's heartbeat kept (ops.js: the admin panel's 系統); a failure logged.
-    const run = (job, fn, log = r => r) => (part && partOf(job) !== part ? null : ctx.waitUntil(beat(env, job, fn).then(r => (r = log(r)) && console.log(job, JSON.stringify(r))).catch(e => console.log(`${job} failed`, String(e?.message || e)))));
+    // Each job's heartbeat kept (ops.js: the admin panel's 系統); a failure logged;
+    // its outside calls counted as the cron's (sources.js), kept once it's done.
+    const run = (job, fn, log = r => r) =>
+      part && partOf(job) !== part
+        ? null
+        : ctx.waitUntil(
+            beat(env, job, () => asSourceCall({ job, side: 'cron' }, fn))
+              .then(r => (r = log(r)) && console.log(job, JSON.stringify(r)))
+              .catch(e => console.log(`${job} failed`, String(e?.message || e)))
+              .finally(() => flushSources(env, ctx))
+          );
     // F1's laps while a session runs (sports.js, f1-live.js): every minute of an F1 weekend.
     if (F1_DAYS.has(tick.getUTCDay())) run('f1', () => sportsCron(env, tick.getTime()), () => null);
     // (The bill's pace, pace.js: what can wait waits.)
@@ -1549,7 +1578,7 @@ async function cronTick(event, env, ctx, part) {
     // thinned (doc-store.js), then the whole store copied to R2 (store-backup.js).
     // The giveaway's (gift.js): passes never replaced back to the pool, and its empty accounts cleared if the owner turned that on, 03:50 Taiwan.
     if (min === 50 && tick.getUTCHours() === 19) run('gift-clean', () => giftNight(env, ECO_DEPS), r => (r.back || r.cleared ? r : null));
-    if (min === 30 && tick.getUTCHours() === 20) run('store-backup', async () => ({ pruned: await DOCS.prune(env), ...(await backupStore(env, DOCS, tick.getTime())) }));
+    if (min === 30 && tick.getUTCHours() === 20) run('store-backup', async () => ({ pruned: await DOCS.prune(env), sources: await pruneSources(env, tick.getTime()).catch(e => ({ failed: String(e?.message || e).slice(0, 80) })), ...(await backupStore(env, DOCS, tick.getTime())) }));
     // The live refreshes by how many people there are (capacity.js), every 6 hours.
     if (min === 20 && tick.getUTCHours() % 6 === 0) run('capacity', () => capacityCron(env, ECO_DEPS));
     // R2's folders for the panel's 健康 (ops.js countFolders), every 6 hours (and on the first run after a deploy).

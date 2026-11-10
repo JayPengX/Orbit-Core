@@ -116,6 +116,37 @@
   .checks .dot.off { background: var(--q-muted); }
   .checks span:nth-child(2) { flex: 1; font-weight: 600; min-width: 0; }
   .checks small { display: block; font-weight: 400; font-size: 12px; color: var(--q-muted); overflow-wrap: anywhere; }
+  /* 外部來源: a group a source kind, a row a source (open for its details); two columns when wide. */
+  .src-group h3 { display: flex; align-items: center; gap: 8px; margin: 16px 2px 8px; font-size: 15px; color: var(--q-text-2); }
+  .src-group h3 .tag { font-size: 12px; }
+  .src-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; align-items: start; }
+  @media (min-width: 700px) { .src-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  details.src { border-radius: 12px; background: var(--q-surface-2); }
+  details.src > summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; }
+  details.src > summary::-webkit-details-marker { display: none; }
+  details.src .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--q-good); flex: none; }
+  details.src .dot.bad { background: var(--q-bad); }
+  details.src .dot.slow { background: #d4a017; }
+  details.src .dot.off { background: var(--q-muted); opacity: .6; }
+  details.src .nm { flex: 1; min-width: 0; font-weight: 600; }
+  details.src small { display: block; font-weight: 400; font-size: 12px; color: var(--q-muted); }
+  details.src .nm small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  details.src .st { flex: none; text-align: right; font-size: 14px; }
+  details.src .st b { font-weight: 650; }
+  details.src.s-bad .st b { color: var(--q-bad); }
+  details.src.s-warn .st b { color: #b7791f; }
+  details.src.s-idle { opacity: .72; }
+  details.src.s-idle .st b { color: var(--q-muted); font-weight: 500; }
+  .src-more { padding: 0 12px 12px; }
+  details.src-idle { margin-top: 6px; }
+  details.src-idle > summary { cursor: pointer; padding: 8px 4px; font-size: 13px; color: var(--q-muted); line-height: 1.45; }
+  details.src-idle[open] > summary { margin-bottom: 4px; }
+  .src-more .kv { font-size: 13px; gap: 4px 12px; }
+  .src-strip { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 2px; margin: 2px 0 10px; height: 14px; }
+  .src-strip i { border-radius: 2px; background: rgba(127, 127, 127, 0.22); }
+  .src-strip i.h-ok { background: var(--q-good); }
+  .src-strip i.h-slow { background: #d4a017; }
+  .src-strip i.h-bad { background: var(--q-bad); }
   /* The account sheet */
   dialog.sheet { width: min(720px, 100vw); max-width: 100vw; max-height: 92vh; margin: auto auto 0; border: 0; padding: 0; border-radius: 22px 22px 0 0; background: var(--q-page); color: var(--q-text); box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.3); }
   @media (min-width: 760px) { dialog.sheet { margin: auto; border-radius: 22px; } }
@@ -454,9 +485,10 @@
     <!-- 健康 -->
     <section data-pane="health" hidden>
       <div class="attn" id="health-attn" hidden></div>
-      <div class="pane-head"><div><h2>資料來源</h2></div><button id="health-load" class="small">檢查</button></div>
+      <div class="pane-head"><div><h2>外部來源</h2><p class="muted" id="src-sum">讀取中…</p></div><button id="health-load" class="small">現在問一次</button></div>
       <p id="health-error" class="error"></p>
-      <ul id="health" class="checks"></ul>
+      <ul id="health" class="checks" hidden></ul>
+      <div id="sources" class="src-groups"></div>
       <div class="pane-head"><div><h2>排程工作</h2><p class="muted">黃色是比平常晚，紅色是失敗。</p></div></div>
       <ul class="checks" id="beats"></ul>
       <div class="pane-head"><div><h2>錯誤</h2><p class="muted">Cloudflare 數的是 24 小時，代理的路徑是今天和昨天。</p></div></div>
@@ -654,6 +686,7 @@ import { DEV, DEV_GROUPS, cleanDev, BRANDS, appIcon, familyMark, pathOf } from '
 import { icons, tileHtml, heroCardHtml, escHtml } from '../kit/ui.mjs';
 import { API, DOMAIN } from '../kit/domain.mjs';
 import { passkeyName } from '../kit/passkey.mjs';
+import { SOURCES, SOURCE_BY_ID, GROUPS as SOURCE_GROUPS, stateOf, lateOf } from '../kit/sources.mjs';
 const ECO_URL = `${API}/eco`;
 const KEY = 'orbit.admin';
 const $ = id => document.getElementById(id);
@@ -769,7 +802,7 @@ $('forget').onclick = () => {
 const VIEWS = {
   overview: () => loadOverview(),
   accounts: () => Promise.all([loadWallets(), loadDoor()]),
-  health: () => Promise.all([loadSystem(), loadHealth(), loadErrors()]),
+  health: () => Promise.all([loadSystem(), loadSources(), loadErrors()]),
   usage: () => Promise.all([loadCapacity(), loadSystem(), loadBilling(), loadUsage()]),
   dev: () => loadDev(),
   tools: () => Promise.all([loadGift(), loadPushes(), loadBackups()])
@@ -894,14 +927,14 @@ const HEALTH_CELLS = [
   ['guard', '帳單保護', 'lock'],
   ['pace', '用量推估', 'chart'],
   ['jobs', '排程工作', 'clock'],
-  ['sources', '資料來源', 'live'],
+  ['sources', '外部來源', 'live'],
   ['deploys', '部署', 'send'],
   ['secrets', '金鑰與綁定', 'key'],
   ['errors', '錯誤', 'flame'],
   ['ai', 'AI 今天', 'spark']
 ];
 // Where each cell's problem is shown (a part of 健康, or 用量 for AI).
-const HEALTH_AT = { guard: 'bill-guard', pace: 'bill-guard', jobs: 'beats', sources: 'health', deploys: 'deploys', secrets: 'secrets', errors: 'errs', ai: 'ai-use' };
+const HEALTH_AT = { guard: 'bill-guard', pace: 'bill-guard', jobs: 'beats', sources: 'sources', deploys: 'deploys', secrets: 'secrets', errors: 'errs', ai: 'ai-use' };
 const healthIssues = () =>
   HEALTH_CELLS.map(([k, name]) => [k, name, health.cells[k]])
     .filter(([, , c]) => c && (c.tone === 'bad' || c.tone === 'warn'))
@@ -984,15 +1017,12 @@ function healthSummary() {
     const real = missing - (r.secrets?.FIREBASE_PRIVATE_KEY ? 0 : 1);
     setHealth('secrets', real > 0 ? 'bad' : 'ok', real > 0 ? `${real} 個沒設定` : '都設定好了', real > 0 ? `${real} 個金鑰沒設定` : '');
   }, e => setHealth('guard', 'bad', e.message, '讀不到系統狀態'));
-  admin('health').then(h => {
-    const down = h.checks.filter(c => !c.ok && !c.busy), slow = h.checks.filter(c => c.busy || c.late || (c.ok && c.ms > 2500));
-    setHealth('sources', down.length ? 'bad' : slow.length ? 'warn' : 'ok', down.length ? `${down.map(c => c.name).join('、')} 沒回應` : slow.length ? `${slow.map(c => c.name).join('、')} ${slow.some(c => c.busy) ? '限流中' : '慢'}` : `${h.checks.length} 個都正常`, down.length ? `${down.length} 個資料來源沒回應` : '');
-  }, () => setHealth('sources', 'warn', '沒檢查到'));
+  sourcesNow().then(sourcesCell, () => setHealth('sources', 'warn', '沒檢查到'));
   admin('errors').then(r => {
     const [tone, words] = errSum(r);
     setHealth('errors', tone, words, tone === 'ok' ? '' : '錯誤變多了');
   }, () => setHealth('errors', 'warn', '沒檢查到'));
-  admin('usage').then(u => {
+  usageNow().then(u => {
     const ai = u.ai || [];
     const full = ai.filter(a => a.cap && a.days[6] >= a.cap), near = ai.filter(a => aiTone(a) === 'slow'), paused = ai.filter(a => !a.cap);
     const name = a => (DEV[a.key]?.zh || a.key).replace(/（.*）/, '');
@@ -1834,6 +1864,7 @@ function drawTdx(t, now) {
 }
 async function loadHealth() {
   $('health-error').textContent = '';
+  $('health').hidden = false;
   $('health').replaceChildren(el('li', {}, [el('span', { class: 'muted', text: '檢查中…' })]));
   try {
     const h = await admin('health');
@@ -1852,6 +1883,170 @@ async function loadHealth() {
   }
 }
 $('health-load').onclick = () => busy($('health-load'), loadHealth);
+// ---- 外部來源: every outside source's health (sources.js, kit/sources.mjs) ----
+// What the proxy and phones counted of each source's calls (no call of our
+// own: nothing is asked to look), the age of what's built from it, and its
+// quota; each a row that opens on the details.
+const nf = v => Math.round(v || 0).toLocaleString();
+const once = (fn, ms = 30_000) => {
+  let p = null;
+  return () => (p ||= fn().finally(() => setTimeout(() => (p = null), ms)));
+};
+const usageNow = once(() => admin('usage'));
+const sourcesNow = once(() => Promise.all([admin('sources'), usageNow().catch(() => null)]).then(([d, u]) => sourceRows(d, u)));
+const SIDE_WORD = { worker: 'Worker', cron: '排程', relay: '台灣中繼', phone: '手機', github: 'GitHub 建置' };
+const STATE_WORD = { bad: '壞了', warn: '不穩', ok: '正常', idle: '沒人用' };
+const STATE_DOT = { bad: 'bad', warn: 'slow', ok: '', idle: 'off' };
+const STATE_RANK = { bad: 0, warn: 1, ok: 2, idle: 3 };
+const MAPS_SKU = { maps: '地圖載入', autocomplete: '自動完成', details: '地點', detailsPro: '地點名稱', textSearch: '搜尋', routes: '路線', matrix: '走路（多站）' };
+const LAW_PART = { laws: '法規', bills: '法案', councils: '議會', local: '縣市法規', agency: '部會規則', rulings: '裁判', cons: '憲法法庭' };
+// A quota as { share, text }: our own cap's share used (Google's free month, TDX's points, the AI caps).
+function quotaOf(u, key) {
+  if (!u) return null;
+  if (key === 'google-maps') {
+    const top = Object.entries(MAPS_SKU)
+      .map(([k, name]) => ({ name, ...(u.transit?.[k] || {}) }))
+      .filter(t => t.cap)
+      .sort((a, b) => b.used / b.cap - a.used / a.cap)[0];
+    return top ? { share: top.used / top.cap, text: `本月最多的是${top.name}：${nf(top.used)} / ${nf(top.cap)}` } : null;
+  }
+  if (key === 'google-weather' && u.weather?.cap) return { share: (u.weather.googleToday || 0) / u.weather.cap, text: `今天 ${nf(u.weather.googleToday || 0)} / ${nf(u.weather.cap)} 次` };
+  if (key === 'tdx' && u.tdx?.plan?.month) return { share: (u.tdx.points || 0) / u.tdx.plan.month, text: `本月 ${(u.tdx.points || 0).toFixed(1)} / ${u.tdx.plan.month} 點` };
+  if (key === 'gemini' && u.ai?.length) {
+    const used = u.ai.reduce((n, a) => n + (a.days[6] || 0), 0);
+    const cap = u.ai.reduce((n, a) => n + (a.cap || 0), 0);
+    return { share: cap ? used / cap : 0, text: `今天 ${nf(used)} / ${nf(cap)} 次` };
+  }
+  return null;
+}
+// The age of what's built from a source: { at, every, late, what } or null.
+function freshOf(s, d) {
+  const f = s.fresh;
+  if (!f) return null;
+  if (f.job) {
+    const b = d.jobs?.[f.job];
+    return { at: b?.okAt || 0, every: f.every, late: lateOf(b?.okAt, f.every, d.at), what: b && !b.ok ? `上次建置失敗：${noteText(b.note)}` : b?.note ? noteText(b.note) : '', job: true };
+  }
+  if (f.r2) {
+    const at = d.files?.[f.r2] || 0;
+    return { at, every: f.every, late: lateOf(at, f.every, d.at), what: `R2 ${f.r2}` };
+  }
+  if (f.law) {
+    // (Orbit Law's status file comes with its first nightly build after 2026-11-10: till then, nothing to say.)
+    if (!d.law) return null;
+    const p = d.law[f.law] || { built: 0, n: 0 };
+    return { at: p.built, every: f.every, late: lateOf(p.built, f.every, d.at), what: `Orbit Law 每晚建置的${LAW_PART[f.law] || f.law}${p.n ? `（${nf(p.n)} 筆）` : ''}` };
+  }
+  return null;
+}
+function sourceRows(d, u) {
+  const rows = d.rows && !d.rows.error ? d.rows : {};
+  const known = SOURCES.map(s => ({ s, r: rows[s.id] }));
+  // (A host no source names: shown under 其他, by its name.)
+  const strangers = Object.keys(rows)
+    .filter(id => id.startsWith('host:'))
+    .map(id => ({ s: { id, zh: id.slice(5), group: 'other', apps: [], feeds: '還沒有歸類的來源', hosts: [], where: [] }, r: rows[id] }));
+  const out = [...known, ...strangers].map(({ s, r }) => {
+    const fresh = freshOf(s, d);
+    const quota = s.quota ? quotaOf(u, s.quota) : null;
+    let state = stateOf(r, fresh, d.at, s.steady);
+    if (quota && quota.share >= 1) state = 'bad';
+    else if (quota && quota.share >= 0.8 && state !== 'bad') state = 'warn';
+    if (fresh?.job && d.jobs?.[s.fresh.job] && !d.jobs[s.fresh.job].ok && state === 'ok') state = 'warn';
+    return { s, r, fresh, quota, state };
+  });
+  return { at: d.at, rows: out, error: d.rows?.error || '' };
+}
+function sourcesCell(x) {
+  const bad = x.rows.filter(o => o.state === 'bad'), warn = x.rows.filter(o => o.state === 'warn');
+  const n = x.rows.filter(o => o.state === 'ok').length;
+  const names = list => list.map(o => o.s.zh.replace(/（.*）/, '')).join('、');
+  setHealth('sources', bad.length ? 'bad' : warn.length ? 'warn' : 'ok', bad.length ? `${names(bad)} 壞了` : warn.length ? `${names(warn)} 不穩` : `${n} 個都正常`, bad.length ? (bad.length === 1 ? `${names(bad)} 壞了` : `${bad.length} 個外部來源壞了`) : warn.length ? (warn.length === 1 ? `${names(warn)} 不穩` : `${warn.length} 個外部來源不穩`) : '');
+}
+const pctOf = (f, n) => (n ? `${f / n >= 0.1 ? Math.round((f / n) * 100) : ((f / n) * 100).toFixed(1)}%` : '—');
+// The last 24 hours, an hour a bar: green answered, red failed, grey nobody asked.
+function stripOf(r, now) {
+  const at = Math.floor(now / 3_600_000);
+  const by = new Map((r?.hours || []).map(([h, ok, fail]) => [h, [ok, fail]]));
+  return el(
+    'span',
+    { class: 'src-strip', title: '最近 24 小時，每格一小時' },
+    Array.from({ length: 24 }, (_, i) => {
+      const [ok, fail] = by.get(at - 23 + i) || [0, 0];
+      const n = ok + fail;
+      return el('i', { class: !n ? '' : fail / n > 0.5 ? 'h-bad' : fail ? 'h-slow' : 'h-ok', title: n ? `${n} 次，失敗 ${fail}` : '沒有人問' });
+    })
+  );
+}
+function sourceRow(o, now) {
+  const { s, r, fresh, quota, state } = o;
+  const calls = r ? r.ok + r.fail : 0;
+  const sides = [...new Set([...(s.where || []), ...Object.keys(r?.sides || {})])];
+  // The line on the right: what matters most for its state.
+  const right =
+    state === 'idle'
+      ? r?.lastOk
+        ? `上次成功 ${ago(r.lastOk)}`
+        : '這週沒有呼叫'
+      : fresh?.late
+        ? `資料 ${ago(fresh.at)}`
+        : r?.lastFail > (r?.lastOk || 0)
+          ? `${ago(r.lastFail)}失敗`
+          : r?.lastOk
+            ? `${ago(r.lastOk)}成功`
+            : fresh
+              ? `資料 ${ago(fresh.at)}`
+              : '—';
+  const kv = [
+    ['從哪裡讀', sides.map(x => SIDE_WORD[x] || x).join('・') || '—'],
+    ['用在', s.apps.map(a => BRANDS[a]?.short || appName(a)).join('、') || '—'],
+    ['24 小時', calls ? `${nf(calls)} 次・失敗 ${nf(r.fail)}（${pctOf(r.fail, calls)}）・平均 ${Math.round(r.ms / calls).toLocaleString()} ms` : '沒有呼叫'],
+    ...(r && Object.keys(r.sides || {}).length > 1 ? [['各處', Object.entries(r.sides).map(([k, v]) => `${SIDE_WORD[k] || k} ${nf(v.ok + v.fail)} 次${v.fail ? `（失敗 ${nf(v.fail)}）` : ''}`).join('・')]] : []),
+    ['上次成功', r?.lastOk ? `${ago(r.lastOk)}（${fmt(r.lastOk)}）` : '這週沒有'],
+    ...(r?.lastFail ? [['上次失敗', `${ago(r.lastFail)}・${r.err || ''}`]] : []),
+    ...(fresh ? [['資料', `${fresh.at ? `${ago(fresh.at)}${fresh.job ? '建好' : '更新'}` : '沒有'}・應該每 ${every(fresh.every)}${fresh.what ? `・${fresh.what}` : ''}`]] : []),
+    ...(quota ? [['額度', `${quota.text}（${pctOf(quota.share, 1)}）`]] : []),
+    ...(s.hosts?.length ? [['網址', s.hosts.join('、')]] : [])
+  ];
+  return el('details', { class: `src s-${state}` }, [
+    el('summary', {}, [
+      el('span', { class: `dot ${STATE_DOT[state]}` }),
+      el('span', { class: 'nm' }, [s.zh, el('small', { text: s.feeds })]),
+      el('span', { class: 'st' }, [el('b', { text: STATE_WORD[state] }), el('small', { text: right })])
+    ]),
+    el('div', { class: 'src-more' }, [stripOf(r, now), el('dl', { class: 'kv' }, kv.flatMap(([k, v]) => [el('dt', { text: k }), el('dd', { text: v })]))])
+  ]);
+}
+const every = ms => (ms >= 86_400_000 ? `${Math.round(ms / 86_400_000)} 天` : ms >= 3_600_000 ? `${Math.round(ms / 3_600_000)} 小時` : `${Math.round(ms / 60_000)} 分鐘`);
+async function loadSources() {
+  $('health-error').textContent = '';
+  if (!$('sources').childElementCount) $('sources').replaceChildren(el('p', { class: 'muted', text: '讀取中…' }));
+  try {
+    const x = await sourcesNow();
+    sourcesCell(x);
+    const count = st => x.rows.filter(o => o.state === st).length;
+    $('src-sum').textContent = `${count('ok')} 個正常${count('warn') ? `・${count('warn')} 個不穩` : ''}${count('bad') ? `・${count('bad')} 個壞了` : ''}・${count('idle')} 個 24 小時沒人用。只算 App 平常的呼叫，點一列看細節。`;
+    if (x.error) $('health-error').textContent = x.error;
+    $('sources').replaceChildren(
+      ...SOURCE_GROUPS.map(([g, name]) => {
+        const list = x.rows.filter(o => o.s.group === g).sort((a, b) => STATE_RANK[a.state] - STATE_RANK[b.state]);
+        if (!list.length) return null;
+        const bad = list.filter(o => o.state === 'bad' || o.state === 'warn').length;
+        // (The ones nobody used in 24 hours folded under one line: what's in use comes first.)
+        const used = list.filter(o => o.state !== 'idle'), idle = list.filter(o => o.state === 'idle');
+        return el('section', { class: 'src-group' }, [
+          el('h3', {}, [name, bad ? el('span', { class: 'tag bad', text: `${bad} 個要注意` }) : null]),
+          used.length ? el('div', { class: 'src-list' }, used.map(o => sourceRow(o, x.at))) : null,
+          idle.length ? el('details', { class: 'src-idle' }, [el('summary', { text: `${used.length ? '還有' : ''} ${idle.length} 個 24 小時沒人用：${idle.map(o => o.s.zh.replace(/（.*）/, '')).join('、')}`.trim() }), el('div', { class: 'src-list' }, idle.map(o => sourceRow(o, x.at)))]) : null
+        ]);
+      }).filter(Boolean)
+    );
+  } catch (e) {
+    $('sources').replaceChildren();
+    $('health-error').textContent = e.message;
+  }
+}
+
 
 // ---- 資料整理 ----
 $('scan').onclick = () =>

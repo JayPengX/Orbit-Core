@@ -22,9 +22,12 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { freeHeavy, freeRoutesHeavy } from './transit-free.js';
+import { sourceCall, asSourceCall, flushSources } from './sources.js';
 
 export const RUNNER_MARK = 'x-orbit-runner';
 export const RELAY_MARK = 'x-orbit-relay';
+// (What a relayed call was made for, so the relay counts it as its caller would: sources.js.)
+const SOURCE_MARK = 'x-orbit-source-call';
 const CF_HEADER = 'x-orbit-cf';
 export const SHARDS = 4;
 export const RELAYS = 16;
@@ -44,6 +47,8 @@ function patchFetch() {
     const req = new Request(input, init);
     const headers = new Headers(req.headers);
     headers.set(RELAY_MARK, '1');
+    const call = sourceCall();
+    if (call) headers.set(SOURCE_MARK, JSON.stringify(call));
     b.relayed++;
     return b.ns.get(b.ns.idFromName(`relay:${b.n % RELAYS}`)).fetch(new Request(req, { headers }));
   };
@@ -55,7 +60,7 @@ function patchFetch() {
 // Worker too: Yahoo turned most reads from Taiwan's side away, 2026-10-14.
 // Bus times and Law's pages moved in, 2026-11-10: one in eight bus times
 // (the cities' own feeds read and matched) and one in twenty pages passed 10 ms.)
-const STAY = /^\/(?:data\/(?!build$)|config$|guard$|transit\/tdx$|transit\/config$|transit\/status$|transit\/gtfs$|push\/|law-live$|showcase\/|store\/check$|$)/;
+const STAY = /^\/(?:data\/(?!build$)|config$|sources$|guard$|transit\/tdx$|transit\/config$|transit\/status$|transit\/gtfs$|push\/|law-live$|showcase\/|store\/check$|$)/;
 export function runsInRunner(request, path) {
   if (request.headers.has(RUNNER_MARK) || request.method === 'OPTIONS') return false;
   const p = path.replace(/^\/api(?=\/)/, '');
@@ -138,7 +143,15 @@ export function makeRunner(handle, cronTick) {
       if (request.headers.has(RELAY_MARK)) {
         const headers = new Headers(request.headers);
         headers.delete(RELAY_MARK);
-        return direct(new Request(request, { headers }));
+        let call = null;
+        try {
+          call = JSON.parse(headers.get(SOURCE_MARK) || 'null');
+        } catch {}
+        headers.delete(SOURCE_MARK);
+        const req = new Request(request, { headers });
+        const res = await (call ? asSourceCall(call, () => direct(req)) : direct(req));
+        flushSources(this.env, this.state);
+        return res;
       }
       const url = new URL(request.url);
       if (url.pathname === '/__tick' && url.hostname === 'runner') {
