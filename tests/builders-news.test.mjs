@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gnews, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed } from '../builders/news.js';
+import { gnews, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -348,6 +348,23 @@ test('a Short is never a clip: its feed links it as /shorts/ (Jay 11-10: they wo
   const entry = (y, href) => `<entry><yt:videoId>${y}</yt:videoId><title>颱風來襲 東北角浪高</title><link rel="alternate" href="${href}"/><published>2026-11-10T08:00:00+00:00</published></entry>`;
   const xml = `<feed>${entry('AAAAAAAAAAA', 'https://www.youtube.com/watch?v=AAAAAAAAAAA')}${entry('BBBBBBBBBBB', 'https://www.youtube.com/shorts/BBBBBBBBBBB')}</feed>`;
   assert.deepEqual(parseChannel(xml).map(v => v.y), ['AAAAAAAAAAA']);
+});
+
+test('Bing News’ feed of a site: the outlet’s own link and summary, its Los Angeles time put right (NPR’s 09:35 EST read 06:36 “GMT”)', () => {
+  const link = 'http://www.bing.com/news/apiclick.aspx?ref=FexRss&amp;aid=&amp;tid=x&amp;url=https%3a%2f%2fwww.npr.org%2f2026%2f11%2f10%2fgas-prices&amp;c=1&amp;mkt=en-us';
+  const xml = `<rss><channel><item><title>Gas prices dip below $4 but inflation remains stubbornly high</title><link>${link}</link><description>Prices fell for a third week.</description><pubDate>Tue, 10 Nov 2026 06:36:00 GMT</pubDate><News:Source>NPR</News:Source></item><item><title>El papa insta a los argentinos a seguir el ejemplo de los santos</title><link>http://www.bing.com/news/apiclick.aspx?url=https%3a%2f%2fapnews.com%2farticle%2fpapa</link></item><item><title>No link</title><link>http://www.bing.com/news/apiclick.aspx?ref=FexRss</link></item></channel></rss>`;
+  assert.deepEqual(parseFeed(xml, 'bing'), [{ t: 'Gas prices dip below $4 but inflation remains stubbornly high', u: 'https://www.npr.org/2026/11/10/gas-prices', d: 'Prices fell for a third week.', at: Date.parse('2026-11-10T14:36:00Z'), img: '' }]);
+  assert.match(bing('reuters.com'), /q=site%3areuters\.com&format=rss/);
+  // (Summer time in Los Angeles: 7 hours behind; winter 8.)
+  assert.equal(laOffset(Date.parse('2026-07-01T12:00:00Z')), 7 * 3_600_000);
+  assert.equal(laOffset(Date.parse('2026-11-01T01:59:00Z')), 7 * 3_600_000);
+  assert.equal(laOffset(Date.parse('2026-11-01T02:00:00Z')), 8 * 3_600_000);
+  assert.equal(laOffset(Date.parse('2026-03-08T02:00:00Z')), 7 * 3_600_000);
+  assert.equal(laOffset(Date.parse('2026-01-15T12:00:00Z')), 8 * 3_600_000);
+  // (Their pages refuse us: never read for a picture.)
+  const s = { items: [['reuters', 'x', 'https://www.reuters.com/world/x-2026-11-10/', NOW]], clips: [], img: '' };
+  assert.deepEqual(pagesToRead({ tw: [], intl: [s] }, {}), []);
+  assert.equal(FEEDS.reuters[0][1], 'bing');
 });
 
 test('Google News’ feed of a site: the headline without " - Outlet", its link, no summary', () => {

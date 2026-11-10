@@ -85,6 +85,9 @@ const sec = (list, url, every = S3) => list.map(x => [url(x), 'rss', every]);
 // Google News' feed of one site, its last day.
 export const gnews = (site, lang = 'en') =>
   `https://news.google.com/rss/search?q=site:${site}+when:1d&${lang === 'zh' ? 'hl=zh-TW&gl=TW&ceid=TW:zh-Hant' : 'hl=en-US&gl=US&ceid=US:en'}`;
+// Bing News' feed of one site, newest first (Google News answers Cloudflare
+// 503): its 12 latest, each with the outlet's own link and summary.
+export const bing = site => `https://www.bing.com/news/search?q=site%3a${site}&format=rss&qft=sortbydate%3d%221%22&mkt=en-US&setlang=en-US&cc=US`;
 export const FEEDS = {
   ltn: [...['all', 'politics', 'society', 'life', 'world', 'local'].map(c => [`https://news.ltn.com.tw/rss/${c}.xml`, 'rss']), ...sec(['business', 'sports'], c => `https://news.ltn.com.tw/rss/${c}.xml`)],
   setn: [['https://www.setn.com/sitemapGoogleNews.xml', 'map']],
@@ -165,12 +168,17 @@ export const FEEDS = {
   msnow: [['https://www.ms.now/feed', 'rss', S2]],
   independent: [['https://www.independent.co.uk/news/world/rss', 'rss', S2]],
   cnbc: [['https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100727362', 'rss', S2]],
-  // (Their own feeds refuse a reader that isn't a browser: Google News'
-  // feed of their site, its headlines and its links.)
+  npr: [['https://feeds.npr.org/1001/rss.xml', 'rss', S2]],
+  // (Their own feeds refuse a reader that isn't a browser: Bing News' feed
+  // of their site, its headlines and their links.)
   ...Object.fromEntries(
-    [['reuters', 'reuters.com'], ['ap', 'apnews.com'], ['npr', 'npr.org'], ['usatoday', 'usatoday.com'], ['axios', 'axios.com'], ['newsweek', 'newsweek.com'], ['telegraph', 'telegraph.co.uk'], ['washtimes', 'washingtontimes.com'], ['newsmax', 'newsmax.com']].map(([o, site]) => [o, [[gnews(site), 'gnews', S3]]])
-  )
+    [['reuters', 'reuters.com'], ['ap', 'apnews.com'], ['usatoday', 'usatoday.com'], ['axios', 'axios.com'], ['newsweek', 'newsweek.com'], ['telegraph', 'telegraph.co.uk'], ['newsmax', 'newsmax.com']].map(([o, site]) => [o, [[bing(site), 'bing', S3]]])
+  ),
+  // (Bing's copy of it is months old.)
+  washtimes: [['https://www.washingtontimes.com/rss/headlines/news/', 'rss', S3]]
 };
+// (Outlets read only through a search's feed: their pages refuse us too.)
+const FAR = new Set(Object.entries(FEEDS).filter(([, list]) => list.every(([, kind]) => kind === 'bing' || kind === 'gnews')).map(([o]) => o));
 
 // The outlets' own YouTube channels (their news clips), read every 2nd build
 // (Taiwan's) or 4th (the world's); only those whose clips play in other
@@ -273,6 +281,17 @@ const attrOf = (block, name, attr) => {
   return m ? m[1] : '';
 };
 // (A time without its zone is Taiwan's: iThome's "2026-11-10  12:11:45".)
+const SPANISH = /(?<![\w’'])(el|los|las|del|una|que|por|para|según|sobre|tras|indicio)(?![\w’'])/gi;
+// Los Angeles' hours behind UTC at a time on its clock: 7 from the 2nd Sunday
+// of March, 2 am, to the 1st Sunday of November, 2 am; else 8.
+export function laOffset(clock) {
+  const y = new Date(clock).getUTCFullYear();
+  const sunday = (month, nth) => {
+    const first = new Date(Date.UTC(y, month, 1)).getUTCDay();
+    return Date.UTC(y, month, 1 + ((7 - first) % 7) + 7 * (nth - 1), 2);
+  };
+  return (clock >= sunday(2, 2) && clock < sunday(10, 1) ? 7 : 8) * 3_600_000;
+}
 const timeOf = s => {
   let v = String(s || '').trim().replace(/^(\w{3}),(?=\S)/, '$1, ');
   const bare = /^(\d{4}-\d\d-\d\d)[ T]+(\d\d:\d\d(?::\d\d)?)$/.exec(v);
@@ -325,6 +344,23 @@ export function parseFeed(xml, kind = 'rss') {
       const t = plain(tagOf(b, 'title')).replace(by ? new RegExp(`\\s+[-–—]\\s+${by.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) : /$^/, '').trim();
       const u = plain(tagOf(b, 'link')).replace(/\?oc=\d+$/, '');
       if (t && /^https:\/\/news\.google\.com\//.test(u)) out.push({ t, u, d: '', at: timeOf(tagOf(b, 'pubDate')), img: '' });
+    }
+    return out;
+  }
+  if (kind === 'bing') {
+    // (Bing News: the outlet's link inside Bing's own, as url=; its time Los
+    // Angeles' clock labelled GMT.)
+    for (const m of s.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/g)) {
+      const b = m[1];
+      const t = plain(tagOf(b, 'title'));
+      let u = '';
+      try {
+        u = new URL(plain(tagOf(b, 'link'))).searchParams.get('url') || '';
+      } catch {}
+      const at = timeOf(tagOf(b, 'pubDate'));
+      // (Not AP's Spanish service's.)
+      if ((t.match(SPANISH) || []).length > 1 || /[¿¡]/.test(t)) continue;
+      if (t && /^https:\/\//.test(u)) out.push({ t, u, d: plain(tagOf(b, 'description')), at: at == null ? null : at + laOffset(at), img: '' });
     }
     return out;
   }
@@ -1064,8 +1100,9 @@ export function pagesToRead(out, pages, most = PAGE_READS) {
   for (let i = 0; i < 40; i++) order.push(out.tw[2 * i], out.tw[2 * i + 1], out.intl[i]);
   const want = [];
   for (const s of order.filter(Boolean)) {
-    // (Google News' links aren't the outlet's page.)
-    const fresh = s.items.filter(([, , u]) => !pages[u] && !want.includes(u) && !u.startsWith('https://news.google.com/'));
+    // (Google News' links aren't the outlet's page; those read through a
+    // search's feed refuse us their pages.)
+    const fresh = s.items.filter(([o, , u]) => !pages[u] && !want.includes(u) && !u.startsWith('https://news.google.com/') && !FAR.has(o));
     const clip = !s.clips?.some(c => c[1]) && fresh.find(([o]) => CLIPS_AT.has(o));
     if (clip) want.push(clip[2]);
     const pic = !s.img && (fresh.find(([, , u]) => u === s.items[0]?.[2]) || fresh.find(([, , u]) => u !== clip?.[2]));
