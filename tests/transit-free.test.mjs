@@ -353,3 +353,107 @@ test("The slow lists every phone asks the same way (a city's bus routes, 台鐵'
   assert.equal(await freeTdx(other.path, other.query, opts), null);
   assert.equal(copyFile('basic/v2/Bus/Route/City/Taipei/307', new URLSearchParams()), undefined);
 });
+
+// ---- 臺中's buses: the city's own bus site ----------------------------------------------------
+
+import { tcRow, TC_GQL } from '../transit-free.js';
+const tc = JSON.parse(readFileSync(new URL('./fixtures/taichung-buses.json', import.meta.url), 'utf8'));
+const NOW_TC = Date.parse(tc.at);
+const tcEnv = { DATA: { get: async k => (k === 'bus/Taichung.json' ? { json: async () => tc.pack } : null) }, TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', TDX_PER_MIN: '300' };
+// (臺中's GraphQL answered from a real read of routes 101 and 300, 2026-11-10: a stop's estimate is its route's at that station and way.)
+function tcFetch(log, { down = false } = {}) {
+  return async (url, init) => {
+    if (url.includes('tdx.transportdata.tw')) {
+      log.push(url);
+      return url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : json([]);
+    }
+    if (url !== TC_GQL) return assert.fail(`asked ${url}`);
+    const body = JSON.parse(init.body);
+    log.push(body);
+    if (down) throw new Error('down');
+    if (body.variables?.t) {
+      const edges = body.variables.t.flatMap(t => (tc.routes[t.xno]?.estimateTimes.edges || []).filter(e => e.node.id === String(t.stationId) && e.node.goBack === t.goBack).map(e => ({ node: { xno: t.xno, ...e.node } })));
+      return json({ data: { stationEstimates: { edges } } });
+    }
+    const data = {};
+    for (const [, alias, x] of body.query.matchAll(/(r\d+): route\(xno: (\d+)/g)) {
+      const r = tc.routes[x];
+      const buses = r ? { edges: [...r.buses.edges, { goBack: 1, node: { id: 'OLD-1', lat: 24.2, lon: 120.6, azimuth: 0, dataTime: String(NOW_TC / 1000 - 3600) } }, { goBack: 2, node: { id: 'NOW-1', lat: 24.2, lon: 120.6, azimuth: 65535, dataTime: String(NOW_TC / 1000 - 5) } }] } : { edges: [{ goBack: 2, node: { id: 'SOMEONE-ELSE', lat: 24.2, lon: 120.6, azimuth: 0, dataTime: String(NOW_TC / 1000) } }] };
+      data[alias] = r ? { id: x, stations: r.stations, estimateTimes: r.estimateTimes, buses } : { id: '0', stations: { edges: [] }, estimateTimes: { edges: [] }, buses };
+    }
+    return json({ data });
+  };
+}
+const askTc = async (path, qs, fetchFn, now = NOW_TC) => {
+  const res = await handleTransit(new Request(`https://w${path}?${qs}`), tcEnv, {}, path, { session: { s: 'S' }, fetchFn, now, cache: null });
+  return { status: res.status, rows: await res.json() };
+};
+
+test("臺中's times in TDX's words, as its own page reads them: 今日未營運, 末班駛離, not stopping, the buses coming (soonest first), else the timetable's next", () => {
+  const n = x => ({ goBack: 1, comeTime: '', isOperationDay: true, isSuspended: false, clogType: 0, etas: [], ...x });
+  const row = x => tcRow(n(x), 'TXG8163', 'TXG101', null, NOW_TC);
+  const bus = [{ etaTime: 2, isLast: false, busId: 'A' }];
+  assert.equal(row({ isOperationDay: false, etas: bus }).StopStatus, 4);
+  assert.equal(row({ isSuspended: true, comeTime: '15:00' }).StopStatus, 3);
+  assert.equal(row({ clogType: -8, etas: bus }).StopStatus, 2, '取消停靠');
+  assert.equal(row({ clogType: -5 }).StopStatus, 2, '施工改道');
+  assert.equal(row({ clogType: -7, etas: bus }).EstimateTime, 120, '臨時站位: it still stops');
+  const coming = row({ comeTime: '15:44', etas: [{ etaTime: 34, isLast: false, busId: 'B' }, { etaTime: 3, isLast: true, busId: 'A' }] });
+  assert.deepEqual([coming.StopStatus, coming.EstimateTime, coming.PlateNumb, coming.IsLastBus, coming.Estimates.map(e => [e.PlateNumb, e.EstimateTime]), coming.NextBusTime], [0, 180, 'A', true, [['A', 180], ['B', 2040]], '2026-11-10T15:44:00+08:00']);
+  const planned = row({ comeTime: '15:44', goBack: 2 });
+  assert.deepEqual([planned.StopStatus, planned.NextBusTime, planned.Direction, planned.EstimateTime, planned.RouteUID, planned.StopID], [1, '2026-11-10T15:44:00+08:00', 1, undefined, 'TXG101', '8163']);
+  assert.equal(row({}).StopStatus, 1, '未發車');
+});
+
+test("a 臺中 stop's every route each way from the city's own site, each way at its own station (臺中酒廠 on 101: 787 going, 786 back); no TDX", async () => {
+  resetFree();
+  const log = [];
+  const a = await askTc('/transit/eta', 'city=Taichung&stops=TXG8163', tcFetch(log));
+  assert.equal(a.status, 200);
+  const back = a.rows.find(r => r.RouteUID === 'TXG101' && r.Direction === 1);
+  assert.deepEqual([back.StopStatus, back.EstimateTime, back.PlateNumb, back.StopName.Zh_tw, back.RouteName.Zh_tw], [0, 34 * 60, '901-U8', '臺中酒廠(復興路)', '101']);
+  assert.deepEqual([a.rows.find(r => r.RouteUID === 'TXG101' && r.Direction === 0).NextBusTime], ['2026-11-10T14:54:00+08:00']);
+  assert.ok(!log.some(x => typeof x === 'string'), 'no TDX');
+  const asked = log.find(x => x.variables).variables.t;
+  assert.deepEqual(asked.filter(t => t.xno === 101), [{ xno: 101, stationId: 787, goBack: 1 }, { xno: 101, stationId: 786, goBack: 2 }]);
+  // Again 30 s on: its times asked again, the routes' stations not (a day).
+  log.length = 0;
+  await askTc('/transit/eta', 'city=Taichung&stops=TXG8163', tcFetch(log), NOW_TC + 30_000);
+  assert.deepEqual(log.map(x => (x.variables ? 'times' : 'stations')), ['times']);
+  // A stop not in the pack beside it: TDX's, that one alone.
+  log.length = 0;
+  const b = await askTc('/transit/eta', 'city=Taichung&stops=TXG8163,TXG1', tcFetch(log), NOW_TC + 40_000);
+  assert.ok(b.rows.some(r => r.StopUID === 'TXG8163'));
+  assert.ok(log.some(x => typeof x === 'string' && x.includes('TXG1') && !x.includes('TXG8163')), 'TDX asked for the other stop only');
+});
+
+test("a 臺中 route's every stop, and its buses (parked ones left out); a route the site doesn't know (it answers id 0, and someone else's buses) is TDX's", async () => {
+  resetFree();
+  const log = [];
+  const e = await askTc('/transit/eta', 'city=Taichung&routes=TXG300,TXG999', tcFetch(log));
+  assert.equal(e.rows.filter(r => r.RouteUID === 'TXG300').length, tc.routes[300].estimateTimes.edges.length);
+  assert.ok(e.rows.every(r => r.RouteUID === 'TXG300'));
+  assert.ok(log.some(x => typeof x === 'string' && x.includes('TXG999') && !x.includes('TXG300')), 'TDX asked for TXG999 only');
+  log.length = 0;
+  const g = await askTc('/transit/gps', 'city=Taichung&routes=TXG300,TXG999', tcFetch(log));
+  const mine = g.rows.filter(r => r.RouteUID === 'TXG300');
+  assert.equal(mine.length, tc.routes[300].buses.edges.length + 1);
+  assert.ok(!g.rows.some(r => r.PlateNumb === 'OLD-1' || r.PlateNumb === 'SOMEONE-ELSE'));
+  const now1 = mine.find(r => r.PlateNumb === 'NOW-1');
+  assert.deepEqual([now1.Direction, now1.Azimuth, now1.GPSTime], [1, null, '2026-11-10T14:10:58+08:00']);
+  assert.ok(log.some(x => typeof x === 'string' && x.includes('RealTimeByFrequency')), 'TDX for TXG999');
+});
+
+test("臺中's site down: its last answer for 2 minutes, then TDX; a 臺中 stop is read in the Runner (the city's pack read there)", async () => {
+  resetFree();
+  const log = [];
+  await askTc('/transit/eta', 'city=Taichung&stops=TXG8163', tcFetch(log));
+  log.length = 0;
+  const later = await askTc('/transit/eta', 'city=Taichung&stops=TXG8163', tcFetch(log, { down: true }), NOW_TC + 60_000);
+  assert.ok(later.rows.some(r => r.RouteUID === 'TXG101' && r.EstimateTime === 34 * 60), 'its last answer');
+  assert.ok(!log.some(x => typeof x === 'string'));
+  log.length = 0;
+  await askTc('/transit/eta', 'city=Taichung&stops=TXG8163', tcFetch(log, { down: true }), NOW_TC + 5 * 60_000);
+  assert.ok(log.some(x => typeof x === 'string' && x.includes('TXG8163')), 'then TDX');
+  assert.equal(runsInRunner(new Request('https://w/transit/eta?city=Taichung&stops=TXG8163'), '/transit/eta'), true);
+});
