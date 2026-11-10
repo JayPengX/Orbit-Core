@@ -256,7 +256,7 @@ OpenF1's tables (`openF1Raw`), kept in R2.
   ready; a slow one answers 504 and is asked alone.
 - **Edge cache tiers** (`sports.js` `CACHE_*`, their times there): past
   `fresh` (as long again) served while read again behind
-  (stale-while-revalidate); inside `stale`, read now, the old copy answering
+  (SWR); inside `stale`, read now, the old copy answering
   past 2 s or failing; live, odds, quotes, F1 live never stale.
   `X-Sports-Proxy-Cache`: `HIT`, `STALE`, `MISS`, `KEPT`.
 - **Kept on demand:** what's over for good (an ESPN game, day or month all
@@ -371,7 +371,7 @@ writing a file only when it changed (`builders/store.js`):
 | `asia.js`, `cpbl.js` | CPBL's month and standings | daily 15:00 |
 | `f1kept.js` | each finished F1 session's 數據 and laps, kept before anyone opens them (via the proxy: OpenF1 refuses quick askers) | :06, :26, :46 |
 | `kept.js` | wipes the proxy's kept copies (`mirror/`) from before a league's first askable day | daily 17:00 |
-| `news.js` | `news/index.json` (3 days), `past.json` (weeks): stories by importance, topic, side (`private/news/`) | every 10 min |
+| `news.js`, `news-words.js` | `news/index.json` (3 days), `past.json` (weeks): stories by importance, topic, side, Taiwan's on the world's (`private/news/`) | every 10 min |
 
 A season is kept whole until the next season's first game (preseason
 included), then wiped whole. `private/` is never served.
@@ -471,8 +471,6 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
 | `node tools/speed.mjs <app…>` | Before vs after (3G, CPU ×4, replayed) |
 | `node tools/live-scroll.mjs [app…] [--webkit]` | Nothing jumps: live refreshes, loading, scrolling, folding |
 | `node tools/test-apps.mjs [app…]` | Every app's tests against this kit (checkouts beside this one) |
-
-The rest: `tools/README.md`.
 
 `npm test` covers the Workers, kit and this map.
 

@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed } from '../builders/news.js';
+import { gnews, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -339,8 +339,73 @@ test("the outlets' YouTube clips go to the story their title is nearest (Jay 11-
   const r = await runNews({ store, now: NOW, fetchImpl, feeds: {}, channels: { setn: CHANNELS.setn }, channelEvery: { tw: 1 } });
   assert.equal(r.clips, 1);
   assert.deepEqual(files.get(NEWS_STATE).vids.map(v => v.y), ['CLIP0000001']);
-  // (A build's calls, feeds and channels, stay near 90.)
-  const chans = Object.fromEntries(Object.entries(CHANNELS).map(([o, id]) => [o, [[ytFeed(id), 'yt', OUTLETS[o].region === 'tw' ? 2 : 3]]]));
-  assert.ok(feedsDue(FEEDS, NOW).length + feedsDue(chans, NOW).length < 95);
+  // (A build's calls, feeds and channels, stay under 100.)
+  const chans = Object.fromEntries(Object.entries(CHANNELS).map(([o, id]) => [o, [[ytFeed(id), 'yt', OUTLETS[o].region === 'tw' ? 2 : 4]]]));
+  for (let k = 0; k < 4; k++) assert.ok(feedsDue(FEEDS, NOW + k * 600_000).length + feedsDue(chans, NOW + k * 600_000).length < 100);
 });
 
+test('a Short is never a clip: its feed links it as /shorts/ (Jay 11-10: they won’t play well)', () => {
+  const entry = (y, href) => `<entry><yt:videoId>${y}</yt:videoId><title>颱風來襲 東北角浪高</title><link rel="alternate" href="${href}"/><published>2026-11-10T08:00:00+00:00</published></entry>`;
+  const xml = `<feed>${entry('AAAAAAAAAAA', 'https://www.youtube.com/watch?v=AAAAAAAAAAA')}${entry('BBBBBBBBBBB', 'https://www.youtube.com/shorts/BBBBBBBBBBB')}</feed>`;
+  assert.deepEqual(parseChannel(xml).map(v => v.y), ['AAAAAAAAAAA']);
+});
+
+test('Google News’ feed of a site: the headline without " - Outlet", its link, no summary', () => {
+  const xml = `<rss><channel><item><title>US consumer prices rise above expectations in October - Reuters</title><link>https://news.google.com/rss/articles/CBMiabc?oc=5</link><pubDate>Tue, 10 Nov 2026 13:46:16 GMT</pubDate><description>&lt;a href="x"&gt;US consumer prices&lt;/a&gt;</description><source url="https://www.reuters.com">Reuters</source></item></channel></rss>`;
+  assert.deepEqual(parseFeed(xml, 'gnews'), [{ t: 'US consumer prices rise above expectations in October', u: 'https://news.google.com/rss/articles/CBMiabc', d: '', at: Date.parse('2026-11-10T13:46:16Z'), img: '' }]);
+  assert.match(gnews('reuters.com'), /site:reuters\.com\+when:1d&hl=en-US/);
+  assert.match(gnews('ftvnews.com.tw', 'zh'), /hl=zh-TW/);
+  // (Its links aren't read for a picture: they aren't the outlet's page.)
+  const s = { items: [['reuters', 'x', 'https://news.google.com/rss/articles/CBMiabc', NOW]], clips: [], img: '' };
+  assert.deepEqual(pagesToRead({ tw: [], intl: [s] }, {}), []);
+});
+
+test('a story’s topic is what most of it names; another only where 40% name it (Jay 11-10: 健康 held a car crash)', () => {
+  // A doctor's car crash is life, not health.
+  const crash = ['高雄退休名醫「牛伯伯」車禍亡！妻悲痛相驗', '兒科名醫「牛伯伯」車禍亡！ 8月才退休 病患、後輩惋惜', '剛退休半年…高雄兒科名醫車禍驟逝 病患淚憶：最溫柔醫生', '高雄名醫「牛伯伯」剛退休遇死劫 逆向暴衝撞爛燈桿身亡', '術後退休！名醫「牛伯伯」車禍亡 病患：少1個好醫生', '高雄名醫駕車突逆向暴衝撞燈桿亡'];
+  assert.deepEqual(topicsOf(crash), ['life']);
+  // The flu is health, not 社會.
+  assert.deepEqual(topicsOf(['流感上週增103重症、38死 公費抗病毒藥再延長', '流感重症仍破百 疾管署暫緩宣布脫離流行期', '流感降溫卻未脫流行期 上周增103重症、38死']), ['health']);
+  // Two of four is enough for a second.
+  assert.deepEqual(topicsOf(['台積電10月營收創新高', '台積電營收年增6成 AI晶片助攻', '台積電10月營收5868億元', '聯發科營收創高 晶片出貨旺']).sort(), ['eco', 'tech']);
+});
+
+test('the front keeps each topic’s best past its cap (Jay 11-10: 科學 had one story)', () => {
+  const st = (id, t, score) => ({ id, topics: [t], score });
+  const many = Array.from({ length: 30 }, (_, i) => st(`p${i}`, 'pol', 100 - i));
+  const out = frontOf([...many, st('s1', 'sci', 1), st('s2', 'sci', 2)], 20);
+  assert.equal(out.length, 22);
+  assert.deepEqual(out.slice(20).map(s => s.id), ['s2', 's1']);
+  assert.ok(out.filter(s => s.topics[0] === 'pol').length === 20);
+  assert.ok(TOPIC_MIN >= 10);
+});
+
+
+test('Taiwan’s outlets on a world story: joined by the names and words they share, never by a lookalike (Jay 11-10)', () => {
+  const items = [
+    item('bbc', 'Pope Leo celebrates huge open-air Mass in Argentina', NOW - 6 * H),
+    item('ap', 'Pope Leo draws 2.5 million to Mass in Buenos Aires, Argentina', NOW - 5 * H),
+    item('reuters', 'Pope urges Argentines to follow saints at Buenos Aires Mass', NOW - 5.5 * H),
+    item('cnn', 'Pope Leo in Argentina: crowds fill Buenos Aires for Mass', NOW - 4 * H),
+    item('nbc', 'South Korea plans $880 billion AI build-out amid stock slump', NOW - 6 * H),
+    item('cnbc', 'South Korea AI infrastructure push meets market doubts', NOW - 5 * H),
+    item('pts', '教宗良十四訪問阿根廷 250萬名信徒共襄盛舉', NOW - 5 * H),
+    item('ctinews', '教宗良十四世阿根廷戶外彌撒吸引250萬人 籲米雷保障弱勢', NOW - 4.5 * H),
+    item('udn', '教宗良十四世阿根廷主持露天彌撒 籲重視家庭價值', NOW - 4 * H),
+    // (韓國瑜 is Taiwan's Speaker: not Korea.)
+    item('ltn', '韓國瑜：嘗試在民主治理中導入AI 開啟更多可能性', NOW - 5 * H),
+    item('cna', '韓國瑜談AI治理 立法院導入AI助理', NOW - 4.8 * H),
+    item('udn', '韓國瑜：立法院將導入AI 提升議事效率', NOW - 4.6 * H)
+  ];
+  const out = deskOf(items, [], NOW);
+  const pope = out.intl.find(s => /Pope/.test(s.title));
+  assert.equal(pope.tw?.n, 3);
+  assert.deepEqual(pope.tw.sides, { g: 0, c: 1, b: 2 });
+  assert.ok(pope.tw.items.every(it => /教宗/.test(it[1]) && it.length === 4));
+  // (Taiwan's story says which world story it's on.)
+  assert.equal(out.tw.find(s => /教宗/.test(s.title)).world, pope.id);
+  assert.ok(!out.intl.find(s => /Korea/.test(s.title))?.tw);
+  assert.ok(!out.tw.find(s => /韓國瑜/.test(s.title))?.world);
+  // (The world's own headlines stay the world's: Taiwan's are apart.)
+  assert.ok(pope.items.every(it => OUTLETS[it[0]].region === 'intl'));
+});

@@ -57,6 +57,7 @@ const ROWS = [
   // Taiwan, Chinese
   ['ltn', '自由時報', 'Liberty Times', 'ltn.com.tw', 'private', -2, -2, null, '林榮三家族', 'The Lin Rong-san family', ['chang2023'], false],
   ['setn', '三立新聞', 'SET News', 'setn.com', 'private', -1, -1, null, '三立電視（林崑海）', 'Sanlih E-Television (Lin Kun-hai)', ['teds-tv', 'chang2023'], false],
+  ['ftv', '民視', 'FTV News', 'ftvnews.com.tw', 'private', -1, -1, null, '民間全民電視（郭倍宏）', 'Formosa Television (Kuo Pei-hung)', ['teds-tv', 'chang2023'], false],
   ['newtalk', '新頭殼', 'Newtalk', 'newtalk.tw', 'private', -1, -1, null, '新頭殼（莊豐嘉）', 'Newtalk (Chuang Feng-chia)', ['stance'], true],
   ['peoples', '民報', 'PeoplesNews', 'peoplenews.tw', 'private', -2, -2, null, '民報文化（陳永興等創辦）', 'Founded by Chen Yung-hsing and others', ['stance'], true],
   ['cna', '中央社', 'CNA', 'cna.com.tw', 'gov', 0, 0, null, '國家通訊社（政府捐助）', 'National news agency (government-funded)', ['cna'], false],
@@ -122,11 +123,25 @@ const ROWS = [
   ['taipeitimes', '台北時報', 'Taipei Times', 'taipeitimes.com', 'private', -2, -2, 0, '自由時報集團', 'Liberty Times group', ['chang2023', 'allsides'], false],
   ['globaltimes', '環球時報', 'Global Times', 'globaltimes.cn', 'state', null, 2, null, '人民日報社', 'People’s Daily (CCP)', ['state'], false],
   ['cgtn', 'CGTN', 'CGTN', 'cgtn.com', 'state', null, 2, null, '中央廣播電視總台', 'China Media Group (state)', ['state'], false],
-  ['xinhua', '新華社', 'Xinhua', 'news.cn', 'state', null, 2, null, '中國國務院', 'China’s State Council', ['state'], false]
+  ['xinhua', '新華社', 'Xinhua', 'news.cn', 'state', null, 2, null, '中國國務院', 'China’s State Council', ['state'], false],
+  // (11-10, Jay: the big ones missing. Places from AllSides, as of 2025–26.)
+  ['cnn', 'CNN', 'CNN', 'cnn.com', 'private', null, null, -1, '華納兄弟探索', 'Warner Bros. Discovery', ['allsides'], false],
+  ['reuters', '路透社', 'Reuters', 'reuters.com', 'private', null, null, 0, '湯森路透', 'Thomson Reuters', ['allsides'], false],
+  ['ap', '美聯社', 'Associated Press', 'apnews.com', 'nonprofit', null, null, -2, '美聯社（各報的非營利合作社）', 'The AP (a not-for-profit cooperative)', ['allsides'], false],
+  ['npr', 'NPR', 'NPR', 'npr.org', 'public', null, null, -1, '全國公共廣播（非營利）', 'National Public Radio (nonprofit)', ['allsides'], false],
+  ['usatoday', '今日美國', 'USA Today', 'usatoday.com', 'private', null, null, -1, '甘尼特報業', 'Gannett', ['allsides'], false],
+  ['msnow', 'MS NOW', 'MS NOW (MSNBC)', 'ms.now', 'private', null, null, -2, 'Versant（自康卡斯特分出）', 'Versant (spun off from Comcast)', ['allsides'], false],
+  ['axios', 'Axios', 'Axios', 'axios.com', 'private', null, null, -1, '考克斯企業', 'Cox Enterprises', ['allsides'], false],
+  ['cnbc', 'CNBC', 'CNBC', 'cnbc.com', 'private', null, null, 0, 'Versant（自康卡斯特分出）', 'Versant (spun off from Comcast)', ['allsides'], false],
+  ['newsweek', '新聞週刊', 'Newsweek', 'newsweek.com', 'private', null, null, 0, '新聞週刊（Dev Pragad）', 'Newsweek (Dev Pragad)', ['allsides'], false],
+  ['independent', '獨立報', 'The Independent', 'independent.co.uk', 'private', null, null, -1, '列別捷夫家族等', 'The Lebedev family and partners', ['allsides'], false],
+  ['telegraph', '每日電訊報', 'The Telegraph', 'telegraph.co.uk', 'private', null, null, 1, '電訊傳媒集團', 'Telegraph Media Group', ['allsides'], true],
+  ['washtimes', '華盛頓時報', 'The Washington Times', 'washingtontimes.com', 'private', null, null, 1, '統一教的 Operations Holdings', 'Operations Holdings (Unification Church)', ['allsides'], false],
+  ['newsmax', 'Newsmax', 'Newsmax', 'newsmax.com', 'private', null, null, 2, 'Newsmax（Christopher Ruddy）', 'Newsmax Media (Christopher Ruddy)', ['allsides'], false]
 ];
 
 // Taiwan's outlets come first in ROWS; the rest are the English ones.
-const TW_COUNT = 23;
+const TW_COUNT = 24;
 export const OUTLETS = Object.fromEntries(
   ROWS.map(([id, zh, en, site, kind, tw, cs, lr, ownerZh, ownerEn, basis, weak], i) => [id, { id, zh, en, site, kind, tw, cs, lr, owner: { zh: ownerZh, en: ownerEn }, basis, weak, region: i < TW_COUNT ? 'tw' : 'intl' }])
 );
@@ -232,20 +247,20 @@ export const TOPICS = [
   },
   {
     id: 'soc', zh: '社會', en: 'Society', on: true,
-    zh_: rx('教育|課綱|學校|校園|少子化|生育|育兒|托育|長照|醫療|健保|衛福部|疾管署|食藥署|衛生局|疫情|疫苗|流感|登革熱|醫護|護理|勞工|勞動部|移工|工時|過勞|罷工|工會|同婚|性別|性平|性騷|性侵|人權|原住民|新住民|移民|住宅|社宅|租屋|交通部|捷運|高鐵|台鐵|公車|交通安全|行人|酒駕|食安|消費者|動保|颱風|地震|停班停課|災害|災民|救災|工安|公安|毒品|治安|警政|長者|身障|兒少|虐童|霸凌|自殺|貧窮|弱勢|社福|社會|文化部|文化幣|人口|出生率|高齡|青年|婚姻|家暴|公衛|FDA'),
-    en_: [/\b(?:ICE|FAA|FDA|CDC|FEMA)\b/, rxi('immigra\\w*|migrants?|migration|deport\\w*|border|asylum|abortion|health\\w*|vaccin\\w*|measles|flu|disease|outbreak|hospitals?|doctors?|nurses?|schools?|education|universit\\w*|colleges?|students?|teachers?|guns?|Glock|LGBTQ\\w*|transgender|gay|women|gender|race|racial|racism|civil rights|protest\\w*|strikes?|unions?|workers|labou?r|homeless\\w*|poverty|welfare|food|children|famil(?:y|ies)|religio\\w*|church\\w*|Muslims?|Jewish|antisemit\\w*|airlines?|flights?|airports?|drugs?')],
+    zh_: rx('教育|課綱|學校|校園|少子化|生育|育兒|托育|長照|勞工|勞動部|移工|工時|過勞|罷工|工會|同婚|性別|性平|性騷|性侵|人權|原住民|新住民|移民|住宅|社宅|租屋|交通部|捷運|高鐵|台鐵|公車|交通安全|行人|酒駕|食安|消費者|動保|工安|公安|毒品|治安|警政|長者|身障|兒少|虐童|霸凌|自殺|貧窮|弱勢|社福|社會|人口|出生率|高齡|青年|婚姻|家暴'),
+    en_: [/\b(?:ICE|FAA|FEMA)\b/, rxi('immigra\\w*|migrants?|migration|deport\\w*|border|asylum|abortion|schools?|education|universit\\w*|colleges?|students?|teachers?|guns?|Glock|LGBTQ\\w*|transgender|gay|women|gender|race|racial|racism|civil rights|protest\\w*|strikes?|unions?|workers|labou?r|homeless\\w*|poverty|welfare|food|children|famil(?:y|ies)|religio\\w*|church\\w*|Muslims?|Jewish|antisemit\\w*|drugs?')],
   },
   // The kinds past the sides (Jay 11-10, 08:08: "expand to support more
   // kinds of news and let spectrum be one feature"): shown, ranked lighter
   // where they'd crowd the front (`weight`), never counted as one-sided.
   {
     id: 'life', zh: '生活', en: 'Life', on: true, spectrum: false,
-    zh_: rx('天氣|氣象|颱風|豪雨|大雨|暴雨|寒流|冷氣團|東北季風|低溫|高溫|熱浪|乾旱|地震|海嘯|停班停課|塞車|車潮|國道|連假|疏運|返鄉|班機|航班|機場|觀光|旅遊|旅客|遊客|火災|火警|大火|起火|爆炸|氣爆|車禍|追撞|相撞|撞死|撞上|翻覆|墜機|墜落|溺水|失蹤|搜救|罹難|停水|垃圾|回收|寵物|流浪狗|流浪貓|動物|外送|物價|菜價|蛋價|房租|消費|超商|百貨|夜市|郵局|垃圾車|天然災害|災情'),
+    zh_: rx('天氣|氣象|颱風|豪雨|大雨|暴雨|寒流|冷氣團|東北季風|低溫|高溫|熱浪|乾旱|地震|海嘯|停班停課|塞車|車潮|國道|連假|疏運|返鄉|班機|航班|機場|觀光|旅遊|旅客|遊客|火災|火警|大火|起火|爆炸|氣爆|車禍|追撞|相撞|撞死|撞上|翻覆|墜機|墜落|溺水|失蹤|搜救|罹難|停水|垃圾|回收|寵物|流浪狗|流浪貓|動物|外送|菜價|蛋價|房租|超商|百貨|夜市|郵局|垃圾車|天然災害|災情'),
     en_: [rxi('weather|storms?|hurricanes?|typhoons?|tornado\\w*|earthquakes?|tsunami|floods?|flooding|wildfires?|fires?|blaze|heat ?waves?|snow\\w*|blizzard|drought|disasters?|crash\\w*|collision|derail\\w*|accidents?|explosions?|rescue\\w*|travel\\w*|tourism|tourists?|airlines?|flights?|airports?|traffic|holiday\\w*|consumers?|shoppers?|recalls?|pets?|animals?|zoo')]
   },
   {
     id: 'health', zh: '健康', en: 'Health', on: true, spectrum: false,
-    zh_: rx('健康|醫療|醫院|醫師|醫生|病患|患者|病人|癌|腫瘤|糖尿病|高血壓|心臟|中風|失智|疫苗|流感|新冠|COVID|確診|登革熱|疫情|腸病毒|猴痘|麻疹|傳染|感染|健保|衛福部|疾管署|食藥署|藥品|藥物|用藥|手術|長照|心理健康|憂鬱|睡眠|肥胖|減重|器官'),
+    zh_: rx('健康|醫療|醫護|醫界|醫學|醫師荒|護理|手術|開刀|治療|癌|腫瘤|糖尿病|高血壓|心臟|中風|失智|疫苗|流感|新冠|COVID|確診|登革熱|疫情|腸病毒|猴痘|麻疹|傳染|感染|健保|衛福部|疾管署|食藥署|藥品|藥物|用藥|長照|心理健康|憂鬱|睡眠|肥胖|減重|器官'),
     en_: [/\b(?:FDA|CDC|WHO|GLP-1)\b/, rxi('health\\w*|hospitals?|doctors?|nurses?|patients?|cancers?|tumou?rs?|diabetes|heart|strokes?|dementia|Alzheimer\\w*|vaccin\\w*|flu|COVID|virus\\w*|outbreaks?|diseases?|infections?|measles|medic\\w*|surgery|mental health|depression|obesity|Ozempic|weight loss|nutrition|sleep')]
   },
   {
@@ -264,11 +279,12 @@ export const TOPICS = [
     en_: [/\b(?:NBA|NFL|MLB|NHL|FIFA|UEFA|F1)\b/, rxi('sports?|athletes?|coach(?:es)?|tournaments?|championships?|medals?|Olympic\\w*|Paralympic\\w*|World Cup|Premier League|soccer|football|basketball|baseball|tennis|golf|cricket|rugby|boxing|marathon|Formula 1|Super Bowl|World Series|playoffs?|Wimbledon')]
   }
 ];
-// A story's topics (ids, most named first): those named by a quarter of
-// its headlines at least, three at most; [] when none (not News'). Some
+// A story's topics (ids, most named first): the one named most (by a
+// quarter of its headlines at least), then those 40% name, three at most; [] when none (not News'). Some
 // words (`zhAt`, `enAt`: a place abroad, a storm, a factory) name a topic
 // only beside another: a fire in Turkey has no sides, Japan's central bank
 // has (Jay, 11-10).
+export const SECOND = 0.4;
 export function topicsOf(texts, lang = 'zh') {
   const list = texts.map(String);
   const need = Math.max(1, list.length / 4);
@@ -283,7 +299,10 @@ export function topicsOf(texts, lang = 'zh') {
     if (n >= need) hits.push([t.id, m]);
     else if (m >= need) near.push([t.id, m]);
   }
-  return (hits.length ? [...hits, ...near] : []).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id]) => id);
+  // (The first is what it's about; another only where 40% of its headlines
+  // name it: a doctor's car crash isn't 健康, Jay 11-10.)
+  const ranked = (hits.length ? [...hits, ...near] : []).sort((a, b) => b[1] - a[1]);
+  return ranked.filter(([, m], i) => !i || m >= list.length * SECOND).slice(0, 3).map(([id]) => id);
 }
 // A topic's name: region 'intl' takes its own where it has one (中國, not 兩岸).
 export function topicWord(id, lang = 'zh', region = 'tw') {
