@@ -22,6 +22,8 @@
 //                         city's from one ask of its whole list, shared)
 //   GET /transit/route    plans from A to B: Google's transit routes and TDX's
 //                         planner, made one shape (the app adds YouBike plans)
+//   GET /transit/book     ?sys=hsr&from=&to=&date=&time=&no=[&app=1]: a link into
+//                         高鐵's own booking, the trip filled in (TDX 訂票導訂)
 //   GET /transit/status   (open) this month's use against each cap, which
 //                         keys are set; never a key itself. ?sample=<name>:
 //                         one fixed real ask (a session's or the dev door's)
@@ -1743,6 +1745,57 @@ const scrubKey = (text, env) => [env.GOOGLE_MAPS_KEY, env.GOOGLE_WEATHER_KEY, en
 
 // ---- Route --------------------------------------------------------------------------------
 
+// ---- Booking (TDX's 訂票導訂) ------------------------------------------------------------
+// GET /transit/book?sys=hsr&from=新竹&to=台北&date=2026-11-10&time=13:10&no=123[&app=1]
+// → { url }: 高鐵's own booking with the trip filled in, its website (with
+// app=1, its T-EX app's link). TDX's maas-thsr (0 points, never metered;
+// approved for our key 2026-11-10). Each link lasts minutes: asked on a tap,
+// never kept. Orbit sells nothing: the person books and pays there.
+// (臺鐵's, maas-tra, once TDX approves it.)
+const HSR_NAMES = ['南港', '台北', '板橋', '桃園', '新竹', '苗栗', '台中', '彰化', '雲林', '嘉義', '台南', '左營'];
+export const hsrName = s => {
+  const n = String(s || '').replace(/臺/g, '台').replace(/^高鐵/, '').replace(/(高鐵)?站$/, '').trim();
+  return HSR_NAMES.includes(n) ? n : null;
+};
+export function bookPath(q) {
+  if ((q.get('sys') || 'hsr') !== 'hsr') return null;
+  const [from, to] = [hsrName(q.get('from')), hsrName(q.get('to'))];
+  const [date, time, no] = ['date', 'time', 'no'].map(k => String(q.get(k) || ''));
+  if (!from || !to || from === to || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{1,4}$/.test(no)) return null;
+  if (q.get('app') === '1') {
+    if (!/^\d{2}:\d{2}$/.test(time)) return null;
+    return `maas-thsr/booking/deeplink/direct/hsr?${new URLSearchParams({ start_station: from, end_station: to, train_date: date, train_time: time, train_number: String(Number(no)) })}`;
+  }
+  const one = { ticket_type: 'S', carriage_type: 'Y', adult_ticket: '1', children_ticket: '0', disabled_ticket: '0', senior_ticket: '0', student_ticket: '0' };
+  return `maas-thsr/booking/deeplink/web/hsr?${new URLSearchParams({ ...one, start_station: from, end_station: to, departure_date: date.replaceAll('-', ''), departure_number: no.padStart(4, '0') })}`;
+}
+// The link in TDX's answer, wherever it keeps it (a key naming a url or link first).
+export function linkIn(j) {
+  const found = [];
+  const walk = (x, key = '') => {
+    if (typeof x === 'string') {
+      if (/^(https?:\/\/|[a-z][a-z0-9+.-]*:\/\/)/i.test(x.trim())) found.push({ url: x.trim(), named: /url|link/i.test(key) });
+    } else if (x && typeof x === 'object') for (const [k, v] of Object.entries(x)) walk(v, k);
+  };
+  walk(j);
+  return (found.find(f => f.named) || found[0])?.url || null;
+}
+async function book(env, q, { fetchFn, now }) {
+  const path = bookPath(q);
+  if (!path) return [{ code: 'BAD_TRIP' }, 400];
+  const token = await tdxAccess(env, fetchFn, now).catch(() => null);
+  if (!token) return [{ code: 'TDX_NO_KEY' }, 503];
+  const r = await fetchFn(TDX_BASE + path, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, signal: timeout(8000) }).catch(() => null);
+  if (!r) return [{ code: 'TIMEOUT' }, 504];
+  let j = null;
+  try {
+    j = await r.json();
+  } catch {}
+  const url = r.ok ? linkIn(j) : null;
+  if (url) return [{ url }, 200];
+  return [{ code: r.status === 401 || r.status === 403 ? 'NOT_ALLOWED' : 'TDX_FAILED', status: r.status, msg: String(j?.error?.msg || j?.message || '').slice(0, 200) }, 502];
+}
+
 // ---- Walks ----------------------------------------------------------------------------
 //
 // Walking from a spot to up to five others, by Google (it knows the lanes
@@ -1903,6 +1956,10 @@ async function transitRoute(request, env, headers, path, { session = null, limit
   }
   if (path === '/transit/walk') {
     const [body, status] = await walks(env, q, deps);
+    return send(body, status);
+  }
+  if (path === '/transit/book') {
+    const [body, status] = await book(env, q, deps);
     return send(body, status);
   }
   return send({ code: 'NOT_FOUND' }, 404);
