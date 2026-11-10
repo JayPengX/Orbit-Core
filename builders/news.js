@@ -772,3 +772,33 @@ async function readPage(url, { fetchImpl = fetch } = {}) {
     return null;
   }
 }
+
+// ---- News's site ------------------------------------------------------------
+//
+// News has no Cloudflare token of its own: this repo's news-site.yml publishes
+// it. GitHub's own timer runs hours late here, or not at all (11-10: none in
+// two hours), so each news build looks at News's main and, once a commit,
+// starts that workflow (`auto`: it publishes only what isn't live yet).
+export const NEWS_SITE = 'private/news/site.json';
+export async function newsSite({ store, env, now = Date.now(), fetchImpl = fetch }) {
+  if (!env?.GH_ACTIONS_TOKEN) return { off: 'no token' };
+  const gh = (path, { headers, ...init } = {}) =>
+    fetchImpl(`https://api.github.com/repos/JayPengX/${path}`, {
+      ...init,
+      headers: { Authorization: `Bearer ${env.GH_ACTIONS_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'orbit-news', ...headers },
+      signal: AbortSignal.timeout(10_000)
+    });
+  const res = await gh('Orbit-News/commits/main', { headers: { Accept: 'application/vnd.github.sha' } });
+  if (!res.ok) return { failed: `HTTP ${res.status}` };
+  const sha = (await res.text()).trim();
+  if (!/^[0-9a-f]{40}$/.test(sha)) return { failed: 'no commit' };
+  if ((await store.json(NEWS_SITE).catch(() => null))?.sha === sha) return { sha: sha.slice(0, 7) };
+  const go = await gh('Orbit-Core/actions/workflows/news-site.yml/dispatches', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ref: 'main', inputs: { auto: 'true' } })
+  });
+  if (!go.ok) return { failed: `start: HTTP ${go.status}` };
+  await store.put(NEWS_SITE, { sha, at: now });
+  return { sha: sha.slice(0, 7), started: true };
+}

@@ -8,7 +8,8 @@
 //   :20 hourly   a few cutouts
 //   (the bus packs: GitHub's weekly build from TDX's GTFS since 2026-11,
 //   tools/gtfs-buses.mjs; buses.js runBuses only by hand, POST /data/build?job=buses)
-//   :00 :10 :18 :30 :40 :50  Orbit News' stories (every outlet's feed, news.js)
+//   :00 :10 :18 :30 :40 :50  Orbit News' stories (every outlet's feed, news.js),
+//                and its site published when News's main moved (newsSite)
 //   :22 daily    15 UTC CPBL's tables and its month whole (23:00 in Taiwan);
 //                16 UTC the season packs (midnight in Taiwan); 18 UTC a few
 //                photo lists in turn (each about weekly); 23 UTC win
@@ -29,7 +30,7 @@ import { runPhotos, runCutouts, PHOTOS_HOUR } from './photos.js';
 import { runBuses } from './buses.js';
 import { runKept, KEPT_HOUR } from './kept.js';
 import { runF1Kept } from './f1kept.js';
-import { runNews } from './news.js';
+import { runNews, newsSite } from './news.js';
 
 export const WINPROB_HOUR = 23;
 
@@ -57,7 +58,10 @@ export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[ne
   if (job === 'watch') await step('watch', () => runWatch({ store, proxy, now, until: now + 8 * 60_000, full }));
   if (job === 'cutouts') await step('cutouts', () => runCutouts({ store, now }));
   if (job === 'buses') await step('buses', () => runBuses({ store, env, now, until: now + 6 * 60_000 }));
-  if (job === 'news' || only === 'news') await step('news', () => runNews({ store, now }));
+  if (job === 'news' || only === 'news') {
+    await step('news', () => runNews({ store, now }));
+    await step('newsSite', () => newsSite({ store, env, now }));
+  }
   // (f1kept-count: how many are kept, none read.)
   if (job === 'f1kept' || only === 'f1kept' || only === 'f1kept-count') await step('f1kept', () => runF1Kept({ store, proxy, now, ...(only === 'f1kept-count' ? { per: 0 } : {}) }));
   // (By hand, POST /data/build: one of the daily ones now.)

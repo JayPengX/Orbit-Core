@@ -171,8 +171,10 @@ export const TOPICS = [
   },
   {
     id: 'world', zh: '國際', en: 'World', on: true,
-    zh_: rx('外交|邦交|友邦|大使|代表處|駐美|駐日|AIT|美國|川普|拜登|賀錦麗|萬斯|歐巴馬|美方|美軍|美企|白宮|日本|日方|高市|石破|韓國|北韓|南韓|朝鮮|金正恩|李在明|歐盟|歐洲|俄羅斯|俄國|烏克蘭|普丁|澤倫斯基|以色列|加薩|哈瑪斯|伊朗|聯合國|世衛|WHO|APEC|G7|G20|北約|印太|菲律賓|越南|印度|泰國|印尼|馬來西亞|新加坡|澳洲|英國|德國|法國|立陶宛|捷克|梵蒂岡|教宗|委內瑞拉|巴西|墨西哥|加拿大|中東|敘利亞|黎巴嫩|土耳其|美中|中美|台美|台日'),
-    en_: [rxi('Ukrain\\w*|Russia\\w*|Putin|Zelensk\\w*|Israel\\w*|Gaza|Hamas|Hezbollah|Iran\\w*|Syria\\w*|Lebanon|Yemen|Houthis?|United Nations|European|Europe|diplomat\\w*|summit|sanctions?|embass\\w*|foreign|Japan\\w*|Korea\\w*|India\\w*|Pakistan\\w*|Bangladesh\\w*|Venezuela\\w*|Maduro|Mexic\\w*|Canad\\w*|Brazil\\w*|Africa\\w*|Sudan\\w*|Congo\\w*|refugees?|German\\w*|France|French|Britain|British|Australia\\w*|Philippin\\w*|Vietnam\\w*|Indonesia\\w*|Thai\\w*|Myanmar|Afghan\\w*|Turk\\w*|Saudi\\w*|Qatar\\w*|Egypt\\w*|Argentin\\w*|Colombia\\w*|Cuba\\w*|Pope|Vatican|Middle East|NATO|ASEAN|Poland|Polish|Nepal\\w*|Hungar\\w*|Ital\\w*|Spain|Spanish|Dutch|Netherlands|Swed\\w*|Norw\\w*|Danish|Denmark|Greenland|Ireland|Irish|Scot\\w*|Romania\\w*|Serbia\\w*|Greek|Greece|Chile\\w*|Peru\\w*|Ecuador\\w*|Haiti\\w*|Nigeria\\w*|Kenya\\w*|Ethiopia\\w*|Somalia\\w*|Libya\\w*|Iraq\\w*|Kurd\\w*|Armenia\\w*|Azerbaijan\\w*|Belarus\\w*|Uzbek\\w*|Kazakh\\w*|Moscow|Kyiv|Kremlin|Tehran|Jerusalem|West Bank|Palestin\\w*|Tokyo|Seoul|Pyongyang|Manila|Singapore\\w*|Malaysia\\w*|Cambodia\\w*|New Zealand|Brussels|Kashmir|international|global|world'), /\b(?:UN|EU|UK|G7|G20)\b/]
+    zh_: rx('外交|邦交|友邦|大使|代表處|駐美|駐日|AIT|川普|拜登|賀錦麗|萬斯|歐巴馬|美方|美軍|白宮|日方|高市|石破|北韓|朝鮮|金正恩|李在明|歐盟|烏克蘭|普丁|澤倫斯基|加薩|哈瑪斯|聯合國|世衛|WHO|APEC|G7|G20|北約|印太|梵蒂岡|教宗|美中|中美|台美|台日'),
+    zhAt: rx('美國|美企|日本|韓國|南韓|歐洲|俄羅斯|俄國|以色列|伊朗|菲律賓|越南|印度|泰國|印尼|馬來西亞|新加坡|澳洲|英國|德國|法國|立陶宛|捷克|委內瑞拉|巴西|墨西哥|加拿大|中東|敘利亞|黎巴嫩|土耳其'),
+    en_: [rxi('Ukrain\\w*|Putin|Zelensk\\w*|Gaza|Hamas|Hezbollah|Houthis?|United Nations|diplomat\\w*|summit|sanctions?|embass\\w*|foreign|Maduro|refugees?|Pope|Vatican|NATO|ASEAN|Kremlin|West Bank|Palestin\\w*'), /\b(?:UN|EU|G7|G20)\b/],
+    enAt: [rxi('Russia\\w*|Israel\\w*|Iran\\w*|Syria\\w*|Lebanon|Yemen|European|Europe|Japan\\w*|Korea\\w*|India\\w*|Pakistan\\w*|Bangladesh\\w*|Venezuela\\w*|Mexic\\w*|Canad\\w*|Brazil\\w*|Africa\\w*|Sudan\\w*|Congo\\w*|German\\w*|France|French|Britain|British|Australia\\w*|Philippin\\w*|Vietnam\\w*|Indonesia\\w*|Thai\\w*|Myanmar|Afghan\\w*|Turk\\w*|Saudi\\w*|Qatar\\w*|Egypt\\w*|Argentin\\w*|Colombia\\w*|Cuba\\w*|Middle East|Poland|Polish|Nepal\\w*|Hungar\\w*|Ital\\w*|Spain|Spanish|Dutch|Netherlands|Swed\\w*|Norw\\w*|Danish|Denmark|Greenland|Ireland|Irish|Scot\\w*|Romania\\w*|Serbia\\w*|Greek|Greece|Chile\\w*|Peru\\w*|Ecuador\\w*|Haiti\\w*|Nigeria\\w*|Kenya\\w*|Ethiopia\\w*|Somalia\\w*|Libya\\w*|Iraq\\w*|Kurd\\w*|Armenia\\w*|Azerbaijan\\w*|Belarus\\w*|Uzbek\\w*|Kazakh\\w*|Moscow|Kyiv|Tehran|Jerusalem|Tokyo|Seoul|Pyongyang|Manila|Singapore\\w*|Malaysia\\w*|Cambodia\\w*|New Zealand|Brussels|Kashmir|international|global|world'), /\bUK\b/]
   },
   {
     id: 'def', zh: '國防', en: 'Defense', on: true,
@@ -182,7 +184,8 @@ export const TOPICS = [
   {
     id: 'eco', zh: '經濟', en: 'Economy', on: true,
     zh_: rx('經濟|GDP|景氣|出口|進口|關稅|貿易|匯率|央行|升息|降息|利率|通膨|物價|油價|電價|水價|薪資|加薪|基本工資|最低工資|勞保|年金|退休金|稅|預算|財政|普發|補助|補貼|振興|紓困|股市|台股|美股|股價|房價|房市|打房|囤房|信用管制|失業|就業|缺工|產業|外資|投資|供應鏈|消費|零售|內需|營收|財報|經濟部|金管會|證交所|銀行|保險|壽險|台幣|美元|漲價|企業|台商|鴻海|侵權|337'),
-    en_: [rxi('econom\\w*|tariffs?|trade|trading|inflation|prices?|pricing|Fed|Federal Reserve|interest rates?|rates|jobs|jobless|unemployment|wages?|budget\\w*|tax|taxes|taxpayers?|debt|deficit|stocks?|markets?|Wall Street|recession|GDP|banks?|banking|housing|rent|mortgages?|oil|SNAP|Medicaid|Medicare|Social Security|earnings|profits?|revenue|investors?|investment|billion|trillion|dollar|currency|exports?|imports?|layoffs?|retail|consumers?|spending|costs?|affordab\\w*|insurance|compan(?:y|ies)|business\\w*|industr\\w*|CEO|bonds?|crypto\\w*|bitcoin|auto\\w*|plants?|factor(?:y|ies)|manufactur\\w*')]
+    en_: [rxi('econom\\w*|tariffs?|trade|trading|inflation|prices?|pricing|Fed|Federal Reserve|interest rates?|rates|jobs|jobless|unemployment|wages?|budget\\w*|tax|taxes|taxpayers?|debt|deficit|stocks?|markets?|Wall Street|recession|GDP|banks?|banking|housing|rent|mortgages?|oil|SNAP|Medicaid|Medicare|Social Security|earnings|profits?|revenue|investors?|investment|billion|trillion|dollar|currency|exports?|imports?|layoffs?|retail|consumers?|spending|costs?|affordab\\w*|insurance|compan(?:y|ies)|business\\w*|industr\\w*|CEO|bonds?|crypto\\w*|bitcoin|auto\\w*|manufactur\\w*')],
+    enAt: [rxi('plants?|factor(?:y|ies)')]
   },
   {
     id: 'tech', zh: '科技', en: 'Tech', on: true,
@@ -202,22 +205,30 @@ export const TOPICS = [
   {
     id: 'soc', zh: '社會', en: 'Society', on: true,
     zh_: rx('教育|課綱|學校|校園|少子化|生育|育兒|托育|長照|醫療|健保|衛福部|疾管署|食藥署|衛生局|疫情|疫苗|流感|登革熱|醫護|護理|勞工|勞動部|移工|工時|過勞|罷工|工會|同婚|性別|性平|性騷|性侵|人權|原住民|新住民|移民|住宅|社宅|租屋|交通部|捷運|高鐵|台鐵|公車|交通安全|行人|酒駕|食安|消費者|動保|颱風|地震|停班停課|災害|災民|救災|工安|公安|毒品|治安|警政|長者|身障|兒少|虐童|霸凌|自殺|貧窮|弱勢|社福|社會|文化部|文化幣|人口|出生率|高齡|青年|婚姻|家暴|公衛|FDA'),
-    en_: [/\b(?:ICE|FAA|FDA|CDC)\b/, rxi('immigra\\w*|migrants?|migration|deport\\w*|border|asylum|abortion|health\\w*|vaccin\\w*|measles|flu|disease|outbreak|hospitals?|doctors?|nurses?|schools?|education|universit\\w*|colleges?|students?|teachers?|guns?|Glock|LGBTQ\\w*|transgender|gay|women|gender|race|racial|racism|civil rights|protest\\w*|strikes?|unions?|workers|labou?r|homeless\\w*|hurricanes?|typhoons?|earthquakes?|floods?|flooding|storms?|disasters?|poverty|welfare|food|children|famil(?:y|ies)|religio\\w*|church\\w*|Muslims?|Jewish|antisemit\\w*|airlines?|flights?|airports?|drugs?')]
+    en_: [/\b(?:ICE|FAA|FDA|CDC|FEMA)\b/, rxi('immigra\\w*|migrants?|migration|deport\\w*|border|asylum|abortion|health\\w*|vaccin\\w*|measles|flu|disease|outbreak|hospitals?|doctors?|nurses?|schools?|education|universit\\w*|colleges?|students?|teachers?|guns?|Glock|LGBTQ\\w*|transgender|gay|women|gender|race|racial|racism|civil rights|protest\\w*|strikes?|unions?|workers|labou?r|homeless\\w*|poverty|welfare|food|children|famil(?:y|ies)|religio\\w*|church\\w*|Muslims?|Jewish|antisemit\\w*|airlines?|flights?|airports?|drugs?')],
+    enAt: [rxi('hurricanes?|typhoons?|earthquakes?|floods?|flooding|storms?|disasters?')]
   }
 ];
 // A story's topics (ids, most named first): those named by a quarter of
-// its headlines at least, three at most; [] when none (not News').
+// its headlines at least, three at most; [] when none (not News'). Some
+// words (`zhAt`, `enAt`: a place abroad, a storm, a factory) name a topic
+// only beside another: a fire in Turkey has no sides, Japan's central bank
+// has (Jay, 11-10).
 export function topicsOf(texts, lang = 'zh') {
   const list = texts.map(String);
+  const need = Math.max(1, list.length / 4);
   const hits = [];
+  const near = [];
   for (const t of TOPICS) {
     if (!t.on) continue;
     const words = lang === 'en' ? t.en_ : [t.zh_];
+    const at = (lang === 'en' ? t.enAt : t.zhAt && [t.zhAt]) || [];
     const n = list.filter(s => words.some(re => re.test(s))).length;
-    if (n) hits.push([t.id, n]);
+    const m = list.filter(s => [...words, ...at].some(re => re.test(s))).length;
+    if (n >= need) hits.push([t.id, m]);
+    else if (m >= need) near.push([t.id, m]);
   }
-  const need = Math.max(1, list.length / 4);
-  return hits.filter(([, n]) => n >= need).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id]) => id);
+  return (hits.length ? [...hits, ...near] : []).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id]) => id);
 }
 // A topic's name: region 'intl' takes its own where it has one (中國, not 兩岸).
 export function topicWord(id, lang = 'zh', region = 'tw') {

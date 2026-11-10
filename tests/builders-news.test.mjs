@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFeed, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead } from '../builders/news.js';
+import { parseFeed, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, newsSite, NEWS_SITE } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -172,6 +172,13 @@ test('topics: a story outlets could take sides on has one; a game or a crash has
   assert.deepEqual(topicsOf(['賴清德出席國防論壇', '國軍漢光演習登場'], 'zh'), ['def', 'pol']);
   assert.ok(topicsOf(['台積電10月營收創新高'], 'zh').includes('tech'));
   assert.ok(topicsOf(['Trump tariffs hit Chinese chips'], 'en').includes('eco'));
+  // A place abroad, a storm or a factory names a topic only beside another (11-10).
+  assert.deepEqual(topicsOf(['土耳其鋼鐵廠爆炸陷火海 疑天車砸熔爐釀16死13傷'], 'zh'), []);
+  assert.deepEqual(topicsOf(['Japan earthquake kills 10'], 'en'), []);
+  assert.deepEqual(topicsOf(['One killed in Indonesia helicopter crash during firefighting operation'], 'en'), []);
+  assert.deepEqual(topicsOf(['日本央行宣布升息'], 'zh'), ['eco', 'world']);
+  assert.deepEqual(topicsOf(['外媒指立陶宛要求代表處更名 外交部：無更名計畫'], 'zh'), ['world']);
+  assert.ok(topicsOf(['Hurricane aid stalls as FEMA cuts staff'], 'en').includes('soc'));
   for (const t of TOPICS) assert.ok(t.zh && t.en && t.zh_ instanceof RegExp && t.en_.length, t.id);
   // Not News': a story with no topic isn't listed, however many carry it.
   const crash = ['cna', 'ebc', 'tvbs', 'udn'].map((o, i) => item(o, `國1麻豆段聯結車追撞 全線封閉${i}`, NOW - H));
@@ -241,4 +248,30 @@ test('a story is kept for days, grows as coverage comes, and ranks by importance
   assert.equal(b5.tw.length, 0);
   assert.equal(b5.past.tw[0].id, id);
   assert.equal(deskOf([], b5.recs, T + 33 * day).past.tw.length, 0);
+});
+
+test('newsSite: News\'s site published once a commit, from the news builds', async () => {
+  const files = new Map();
+  const store = { json: async p => files.get(p) ?? null, put: async (p, d) => (files.set(p, d), true) };
+  let sha = 'a'.repeat(40);
+  const calls = [];
+  const fetchImpl = async (url, init = {}) => {
+    calls.push([init.method || 'GET', url, init.body && JSON.parse(init.body)]);
+    if (url.endsWith('/Orbit-News/commits/main')) return new Response(sha);
+    return new Response(null, { status: 204 });
+  };
+  const env = { GH_ACTIONS_TOKEN: 't' };
+  assert.deepEqual(await newsSite({ store, env: {}, fetchImpl }), { off: 'no token' });
+  assert.deepEqual(await newsSite({ store, env, now: 1, fetchImpl }), { sha: 'aaaaaaa', started: true });
+  assert.deepEqual(calls[1], ['POST', 'https://api.github.com/repos/JayPengX/Orbit-Core/actions/workflows/news-site.yml/dispatches', { ref: 'main', inputs: { auto: 'true' } }]);
+  assert.deepEqual(files.get(NEWS_SITE), { sha, at: 1 });
+  // The same commit again: looked at, not started.
+  assert.deepEqual(await newsSite({ store, env, fetchImpl }), { sha: 'aaaaaaa' });
+  assert.equal(calls.length, 3);
+  // A new one: started; a refused start isn't noted, so the next build tries again.
+  sha = 'b'.repeat(40);
+  const refused = async (url, init) => (url.endsWith('/main') ? new Response(sha) : new Response('', { status: 403 }));
+  assert.deepEqual(await newsSite({ store, env, fetchImpl: refused }), { failed: 'start: HTTP 403' });
+  assert.equal(files.get(NEWS_SITE).sha, 'a'.repeat(40));
+  assert.equal((await newsSite({ store, env, fetchImpl })).started, true);
 });
