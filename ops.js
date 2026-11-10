@@ -88,11 +88,13 @@ export function billNotice(g, lang) {
   const pace = g.pace || 0;
   const title = g.stopped
     ? en ? 'Cloudflare: the proxy is stopped until the next period' : 'Cloudflare：代理已停到下個週期'
-    : en ? `Cloudflare: ${top} at ${PCT(share)} of the $5 plan` : `Cloudflare：${ZH[top] || top} 已用 ${PCT(share)}`;
+    : g.free
+      ? en ? `Cloudflare: ${top} at ${PCT(share)} of today's free amount` : `Cloudflare：${ZH[top] || top} 已用今天免費額度的 ${PCT(share)}`
+      : en ? `Cloudflare: ${top} at ${PCT(share)} of the $5 plan` : `Cloudflare：${ZH[top] || top} 已用 ${PCT(share)}`;
   const slow = PACES[pace]?.slow || 1;
   const body = en
-    ? `Pace ${pace}${pace ? ` (live refreshes ×${slow} slower${pace === PACES.length - 1 ? ', basics first: nobody new let in' : ''})` : ' (as configured)'}; nothing is billed past $5.`
-    : `節流 ${pace}${pace ? `（即時更新放慢 ×${slow}${pace === PACES.length - 1 ? '，先顧基本功能：新的人先等' : ''}）` : '（照設定）'}；不會超過 $5。`;
+    ? `Pace ${pace}${pace ? ` (live refreshes ×${slow} slower${pace === PACES.length - 1 ? ', basics first: nobody new let in' : ''})` : ' (as configured)'}; ${g.free ? 'nothing is ever billed.' : 'nothing is billed past $5.'}`
+    : `節流 ${pace}${pace ? `（即時更新放慢 ×${slow}${pace === PACES.length - 1 ? '，先顧基本功能：新的人先等' : ''}）` : '（照設定）'}；${g.free ? '永遠不會收費。' : '不會超過 $5。'}`;
   return { title, body, tag: 'ops:bill', kind: 'bill', url: `${SITE}/Orbit-Core/admin/#health` };
 }
 // What's news: a higher alert, a stop, or a pace that changed (this period).

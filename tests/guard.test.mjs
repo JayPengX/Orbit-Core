@@ -468,3 +468,30 @@ test('who calls: with the Workers Logs, people are the proxy\'s hours × the sha
   // 05:00: everything 112 requests and 2,500 ms; people the proxy's fetches (its cron left out) × the pages' share.
   assert.deepEqual(r.hours, [[Date.parse('2026-11-03T05:00:00Z'), 112, 2500, 45, 400]]);
 });
+
+test('on the Free plan (from FREE_FROM): a UTC day against its free amounts, paced but never stopped; told only at 90%', async () => {
+  const { FREE_PLAN } = await import('../guard.js');
+  const free = { ...env, FREE_FROM: '2026-11-13T00:00:00Z' };
+  // Before FREE_FROM: the month of the $5 plan.
+  const paid = await guardRun(free, { fetcher: fakeCf({ requests: 95_000 }).fetcher, kv: fakeKv(), now: T('2026-11-12T12:00:00Z') });
+  assert.equal(paid.free, false);
+  assert.equal(paid.share.requests, 95_000 / 10e6);
+  // After: today's 95,000 of 100,000 requests is over 90%, but nothing goes off the air.
+  const cf = fakeCf({ requests: 95_000, kvWrite: 300 });
+  const kv = fakeKv();
+  const s = await guardRun(free, { fetcher: cf.fetcher, kv, now: T('2026-11-14T20:00:00Z') });
+  assert.equal(s.free, true);
+  assert.deepEqual(s.plan, FREE_PLAN);
+  assert.equal(s.period.start, T('2026-11-14T00:00:00Z'));
+  assert.equal(s.period.end, T('2026-11-15T00:00:00Z'));
+  assert.equal(s.share.requests, 0.95);
+  assert.equal(s.share.kvWrite, 0.3);
+  assert.ok(!s.stopped);
+  assert.ok(cf.workers['orbit-workers-proxy'].on);
+  assert.equal(s.alert, 3);
+  assert.equal(s.pace, 3);
+  // A quiet day: no alert, no pace.
+  const q = await guardRun(free, { fetcher: fakeCf({ requests: 9_000, kvWrite: 200 }).fetcher, kv: fakeKv(), now: T('2026-11-15T20:00:00Z') });
+  assert.equal(q.alert, 0);
+  assert.equal(q.pace, 0);
+});

@@ -51,7 +51,7 @@ orbit-workers-proxy (worker.js, near each caller): every route in §4
  ├─ gemini-relay (Gemini, placed in Taiwan: gcp:asia-east1), service GEMINI_RELAY
  ├─ orbit-law (Orbit Law's site), service LAW_SITE: its data read by the proxy
  └─ quota-guard, service GUARD: reads the bill every 5 minutes (a DO alarm),
-     paces, then stops the proxy at 90% of the $5 plan
+     paces (Free plan from 11-13: a day's amounts, no stop)
 orbit-site (site.js): the domain's hosts as custom domains
 ```
 
@@ -211,7 +211,7 @@ w;dur=` (the Worker's own time), noted by the 除錯紀錄 when slow.
 | `/showcase/pass` | `showcase.js` | The showcase's short pass for its live demos: reads only, per-address and daily caps, from the showcase's address only |
 | `/data/…` | `data.js` | R2, public reads (§5.5); `/data/build` (POST, Bearer `DATA_PUSH_SECRET`, `build.yml`) runs a builder now |
 | `/config` | `worker.js`, `kit/devconfig.mjs` | The live speeds (`DEV`), a minute in Cloudflare's cache |
-| `/guard` | `worker.js` | The bill's guard as it last read the bill (no key) |
+| `/guard` | `worker.js` | The guard as it last read the bill (no key) |
 | `/store/check` | `worker.js`, `doc-store.js` | Each collection's count, localhost only |
 | `/ops` | `ops.js`, `worker.js` | The repo's own checks (Bearer `DATA_PUSH_SECRET`): `?check=gemini`, `law-chat`, `system`, `capacity`, `cpu` (CPU by route) |
 
