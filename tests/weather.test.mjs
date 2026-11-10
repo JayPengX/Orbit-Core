@@ -850,3 +850,33 @@ test('the air card\'s forecast reads the new shape: 4 days, no day twice', () =>
     Date.now = realNow;
   }
 });
+
+test('the first hours start from the station and fade back to the blend by ANCHOR_H', async () => {
+  const { anchorHours, tempAt, ANCHOR_H } = await import('../weather.js');
+  const H = 3_600_000;
+  const t0 = Date.parse('2026-11-10T10:00:00+08:00');
+  const now = t0 + 20 * 60_000;
+  const hours = Array.from({ length: 10 }, (_, i) => ({ t: t0 + i * H, temp: 19 + i * 0.3, feels: 18 + i * 0.3 }));
+  const raw = hours.map(h => h.temp);
+  assert.ok(Math.abs(tempAt(hours, now) - 19.1) < 1e-9, 'between the hours either side');
+  assert.equal(anchorHours(hours, 18.1, now), -1);
+  assert.equal(hours[0].temp, 18, 'the hour under way: the whole error');
+  assert.equal(hours[0].feels, 17);
+  assert.ok(hours[1].temp < raw[1] && hours[1].temp > raw[1] - 1, 'fading');
+  for (let i = ANCHOR_H + 1; i < 10; i++) assert.equal(hours[i].temp, raw[i], `${i} h on: the blend as it was`);
+  const odd = hours.map(h => ({ ...h }));
+  assert.equal(anchorHours(odd, 30, now), 0, 'a station 10° off is an oddity, left alone');
+  assert.equal(anchorHours(odd, null, now), 0);
+});
+
+test('a whole cell: the hours carry the measured "now", today holds it, the served hours are kept for scoring', async () => {
+  const e = { ...env, RATE_LIMIT_KV: memKv() };
+  const { resp, bySource } = await buildCell(e, 25.034, 121.565, { fetchFn: upstream(), now: NOW });
+  const next = resp.hours.find(h => h.t > NOW);
+  const cur = [...resp.hours].reverse().find(h => h.t <= NOW);
+  const at = cur.temp + ((next.temp - cur.temp) * (NOW - cur.t)) / (next.t - cur.t);
+  assert.ok(Math.abs(at - resp.now.temp) < 0.15, `the track at now (${at}) is the big number (${resp.now.temp})`);
+  const today = resp.days.find(d => d.date === twDay(NOW));
+  assert.ok(today.hi >= resp.now.temp && today.lo <= resp.now.temp);
+  assert.ok(bySource.hours.every(h => 'out' in h));
+});

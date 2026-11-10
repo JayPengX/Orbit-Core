@@ -905,6 +905,45 @@ export function apparentTemp(temp, humidity, windKmh) {
   return Math.round((temp + 0.33 * e - 0.7 * ((windKmh ?? 0) / 3.6) - 4) * 10) / 10;
 }
 
+// ---- The first hours from what's measured ------------------------------------------
+//
+// A model's temperature for the coming hours is off by about what it's off
+// by now: forecast error at short leads persists (observation-anchored
+// correction, as NOAA's National Blend and Europe's services do it: the
+// observed-minus-forecast error at analysis time, decaying to nothing a few
+// hours on). So with a station close and fresh (`measured`, the same reading
+// "now" shows), the blend's error now is added to each hour, in full for the
+// hour under way and fading in a straight line to none ANCHOR_H hours on.
+// An error past ANCHOR_MAX is a station's oddity, not the air: left alone.
+// weather-skill.js scores the hours served (`out`) beside each source, so
+// /weather/skill says whether it helps.
+export const ANCHOR_H = 6;
+export const ANCHOR_MAX = 5;
+export const anchorWeight = (t, now) => (t <= now ? 1 : Math.max(0, 1 - (t - now) / (ANCHOR_H * HOUR)));
+// The blend's temperature at `now`, between the hours either side.
+export function tempAt(hours, now) {
+  const a = [...hours].reverse().find(h => h.t <= now && h.temp != null);
+  const b = hours.find(h => h.t > now && h.temp != null);
+  if (a && b && b.t - a.t <= 3 * HOUR) return a.temp + ((b.temp - a.temp) * (now - a.t)) / (b.t - a.t);
+  if (a && now - a.t < HOUR) return a.temp;
+  if (b && b.t - now < HOUR) return b.temp;
+  return null;
+}
+export function anchorHours(hours, measured, now) {
+  if (measured == null || !hours?.length) return 0;
+  const f = tempAt(hours, now);
+  if (f == null) return 0;
+  const err = measured - f;
+  if (Math.abs(err) < 0.05 || Math.abs(err) > ANCHOR_MAX) return 0;
+  for (const h of hours) {
+    const w = anchorWeight(h.t, now);
+    if (!w) continue;
+    if (h.temp != null) h.temp = r1(h.temp + err * w);
+    if (h.feels != null) h.feels = r1(h.feels + err * w);
+  }
+  return Math.round(err * 10) / 10;
+}
+
 // → { resp: the one-truth answer, bySource: each source's values (KV only) }.
 export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFAULT_WEIGHTS, partial = false }) {
   const bySource = { hours: [], days: [], now: null };
@@ -992,6 +1031,20 @@ export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFA
     station: st ? { name: st.name, km: st.km, temp: st.temp, at: st.at } : null,
     gauge: cwa?.gauge ? { name: cwa.gauge.name, km: cwa.gauge.km, at: cwa.gauge.at } : null
   };
+
+  // The hours start from what's measured: the error now carried into the
+  // first hours and faded out (`anchorHours`), so the hour track's first dot
+  // is the big number and the day turns from there.
+  anchorHours(hours, measured, now);
+  bySource.hours.forEach((x, i) => (x.out = hours[i]?.temp ?? null));
+  const today = twDay(now);
+  const d0 = days.find(d => d.date === today);
+  if (d0 && measured != null) {
+    // Today's high and low hold what the hours ahead and the station say.
+    const temps = [measured, ...hours.filter(h => h.t >= now - HOUR && twDay(h.t) === today && h.temp != null).map(h => h.temp)];
+    if (d0.hi != null) d0.hi = r1(Math.max(d0.hi, ...temps));
+    if (d0.lo != null) d0.lo = r1(Math.min(d0.lo, ...temps));
+  }
 
   bySource.now = { temp: { google: g?.temp ?? null, station: st?.temp ?? null } };
   const resp = {

@@ -17,7 +17,7 @@ test('a snapshot keeps what each source said for the next 24 hours', () => {
   const sk = takeSnapshot({ snaps: [], days: {}, lastRain: 0, lastTemp: 0 }, entry, T0);
   assert.equal(sk.snaps.length, 1);
   assert.equal(sk.snaps[0].h.length, 24);
-  assert.deepEqual(sk.snaps[0].h[0], [T0, 80, 20, 25, 27]);
+  assert.deepEqual(sk.snaps[0].h[0], [T0, 80, 20, 25, 27, null]);
   takeSnapshot(sk, entry, T0 + H);
   assert.equal(sk.snaps.length, 1, 'the same refresh once');
   takeSnapshot(sk, { ...entry, at: T0 + 2 * H }, T0 + 27 * H);
@@ -32,6 +32,10 @@ test('scores: rain by Brier, temperature by absolute error, by lead time, each h
   assert.deepEqual(d.pop.short, { google: [0.04, 1], cwa: [0.64, 1] });
   assert.deepEqual(d.pop.long, { google: [0.16, 1], cwa: [0.16, 1] });
   assert.deepEqual(d.temp.short, { google: [2, 1], cwa: [1, 1] });
+  const served = { snaps: [{ at: T0, h: [[T0 + 2 * H, 80, 20, 25, 28, 26.5]] }], days: {}, lastRain: 0, lastTemp: 0 };
+  scoreHour(served, { obs: { at: T0 + 2 * H, temp: 27 } }, T0 + 3 * H);
+  assert.deepEqual(served.days['2026-10-02'].temp.short.served, [0.5, 1], 'what the app showed, scored beside the sources');
+  assert.deepEqual(nextWeights({ google: 0.6, cwa: 0.4 }, { google: 2, cwa: 1, served: 0.5 }, 'temp'), nextWeights({ google: 0.6, cwa: 0.4 }, { google: 2, cwa: 1 }, 'temp'), 'never a weight');
   scoreHour(sk, { rain: { at: T0 + 3 * H, h1: 3 }, obs: { at: T0 + 2 * H, temp: 27 } }, T0 + 3 * H);
   assert.deepEqual(d.pop.short.google, [0.04, 1], 'not twice');
   // Under 0.5 mm: dry.
