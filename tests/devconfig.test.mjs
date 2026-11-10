@@ -59,3 +59,22 @@ test("TDX's points and the guard: a month's 200 last, slower never off", async (
   assert.equal(tdxGuard({ month: 105, today: 100 }, now).advanced, 1);
   assert.deepEqual(tdxGuard({ month: 192, today: 1 }, now), { advanced: 30, basic: 3, why: 'month' });
 });
+
+test("TDX's free tier (from 12-01, 3 points): a day's share for people, slower as it's used, the build's and our tools' kept apart, TDX not asked past 95%", async () => {
+  const { tdxGuard, buildTdxMonth, devTdxDay } = await import('../transit.js');
+  const now = Date.parse('2026-12-10T04:00:00Z'); // the 10th, 22 days left with today
+  // 2.85 to spend, 0.48 before today, the build's 0.6 and our tools' 0.02 a day kept: 1.33 over 22 days.
+  const share = (2.85 - 0.48 - buildTdxMonth(now) - devTdxDay(now) * 22) / 22;
+  const g = used => tdxGuard({ month: 0.48 + used, today: used }, now);
+  assert.ok(Math.abs(g(0.01).share - share) < 1e-9);
+  assert.equal(g(share * 0.4).advanced, 1);
+  assert.equal(g(share * 0.6).basic, 2);
+  assert.equal(g(share * 0.9).basic, 4);
+  assert.deepEqual([g(share * 1.2).basic, g(share * 1.2).why], [30, 'day']);
+  // The weekly build's points today aren't people's (its month is kept apart).
+  assert.equal(tdxGuard({ month: 0.98, today: 0.5, build: { month: 0.5, today: 0.5 } }, now).basic, 1);
+  // Past 95% of the month: copies only.
+  assert.equal(tdxGuard({ month: 2.86, today: 0.1 }, now).stop, true);
+  // (銅級 until then: the 200 points' guard as before.)
+  assert.equal(tdxGuard({ month: 0.5, today: 0.5 }, Date.parse('2026-11-20T04:00:00Z')).stop, undefined);
+});
