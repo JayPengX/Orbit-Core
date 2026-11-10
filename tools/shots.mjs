@@ -40,7 +40,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve, relative, basename } from 'node:path';
 import { createRequire } from 'node:module';
 import { PAGES } from './shots/pages.mjs';
-import { makeKeep } from './live-keep.mjs';
+import { makeKeep, SHARED_KEEP } from './live-keep.mjs';
 
 const HERE = new URL('.', import.meta.url).pathname;
 const ROOT = resolve(HERE, '../..');
@@ -272,12 +272,16 @@ async function diff(a, b, to) {
 }
 
 // ---- Run ----
-// The browsers of this run share what our Workers answer (tools/live-keep.mjs):
-// each read asked once in 90 s rather than once a browser (our screenshots
-// were most of the Workers' CPU, 2026-11-06), and a before and its after see
-// the same data.
-const keepDir = fixtures || process.env.ORBIT_LIVE_KEEP ? '' : await mkdtemp(join(tmpdir(), 'orbit-live-'));
-if (keepDir) process.env.ORBIT_LIVE_KEEP = keepDir;
+// The browsers of this run, and the runs before it, share what our Workers
+// answer (tools/live-keep.mjs, one folder, 5 minutes): each read asked once
+// rather than once a browser (our screenshots were most of the Workers' CPU,
+// 2026-11-06, and nine in ten of their requests, 11-10), and a before and its
+// after see the same data.
+const keepDir = fixtures || process.env.ORBIT_LIVE_KEEP ? '' : SHARED_KEEP;
+if (keepDir) {
+  process.env.ORBIT_LIVE_KEEP = keepDir;
+  rmSync(join(keepDir, 'tally'), { force: true });
+}
 const pages = await pagesWanted();
 const variants = [{ name: 'after', ref: at }, ...(before ? [{ name: 'before', ref: before }] : [])];
 for (const v of variants) v.root = await rootFor(v.ref);
@@ -302,9 +306,8 @@ await Promise.all(
 process.stdout.write('\n');
 if (process.env.ORBIT_LIVE_KEEP) {
   const n = makeKeep({ dir: process.env.ORBIT_LIVE_KEEP }).counts();
-  if (n.reads) console.log(`our Workers: ${n.reads} reads by the pages, ${n.sent} sent (the rest from this run's keep)`);
+  if (n.reads) console.log(`our Workers: ${n.reads} reads by the pages, ${n.sent} sent (the rest kept from this run or the last 5 minutes)`);
 }
-if (keepDir) rmSync(keepDir, { recursive: true, force: true });
 
 // The comparison: with --before the ref's shots, with --against an earlier run's.
 const earlier = against ? JSON.parse(readFileSync(join(resolve(against), 'manifest.json'), 'utf8')) : null;

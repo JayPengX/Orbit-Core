@@ -12,9 +12,15 @@
 // after shot also see the same data. Only a 200 is kept. Runs asking for the
 // same address at once wait for the first one's answer (a lock file) rather
 // than asking again. Without the folder, every read goes to the Worker.
+//
+// Since 2026-11-10 every tool run shares one folder by default (SHARED_KEEP,
+// 5 minutes): on 11-10 our own tools sent about nine in ten of the Workers'
+// requests, the people using Orbit one in twenty, and the Free plan has
+// 100,000 a day for all of it. ORBIT_LIVE_KEEP=off sends every read.
 import { createHash } from 'node:crypto';
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 // (Node decodes the body; the browser is answered by preview.mjs with CORS of its own.)
 const DROP = /^(content-encoding|content-length|transfer-encoding|connection|keep-alive|access-control-allow-origin|set-cookie)$/i;
@@ -117,4 +123,6 @@ export function makeKeep({ dir = process.env.ORBIT_LIVE_KEEP || '', ttlS = proce
   return { on: Boolean(dir), dir, ttl, liveFetch, kept, keep: keepValue, claim, release, settled, tally, counts };
 }
 
-export const liveKeep = makeKeep();
+export const SHARED_KEEP = join(tmpdir(), 'orbit-live-keep');
+const envDir = process.env.ORBIT_LIVE_KEEP;
+export const liveKeep = makeKeep({ dir: envDir === 'off' ? '' : envDir || SHARED_KEEP, ttlS: process.env.ORBIT_LIVE_KEEP_S || 300 });
