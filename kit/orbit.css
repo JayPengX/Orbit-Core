@@ -6678,3 +6678,12 @@ html[data-look='native'] :is(.q-reorder-lift, .q-reorder-land) {
     scale: none;
   }
 }
+
+/* A page swiped in from the left edge (ui.mjs edgeBack): its shadow over what shows beneath. */
+.q-edge-back {
+  position: relative;
+  z-index: 1;
+  box-shadow: -12px 0 24px rgba(0, 0, 0, 0.18);
+  background: var(--q-bg);
+  will-change: transform;
+}

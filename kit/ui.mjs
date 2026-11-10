@@ -1906,3 +1906,77 @@ export function panelGridHtml(items) {
 export function leagueTile({ logo = '', name = '', sub = '', onOpen = null, data = null } = {}) {
   return h('button', { class: 'q-league', type: 'button', ...dataProps(data), ...(onOpen ? { onclick: onOpen } : {}) }, [logoTile(logo, { size: 56, alt: name, fallbackText: name }), h('strong', { text: name }), sub ? h('small', { text: sub }) : null]);
 }
+
+// A swipe in from the screen's left edge goes back, as iOS's own back gesture does (a Home
+// Screen app has none of Safari's): the page follows the finger, the one under it shows through
+// its shadow, and past a third of the width, or flicked, it slides off and back() runs; short of
+// that it glides home. target(): the page to move (the screen's open page with a way back), or
+// null when there is nowhere to go back to (a tab's first screen). Never under an open sheet, a
+// field, or a row that scrolls sideways. Returns a function that stops it.
+export function edgeBack({ target, back, edge = 24 } = {}) {
+  if (typeof document === 'undefined' || !target || !back) return () => {};
+  let el = null, x0 = 0, y0 = 0, t0 = 0, dx = 0, on = false;
+  const clear = () => {
+    if (!el) return;
+    el.style.removeProperty('transform');
+    el.style.removeProperty('transition');
+    el.classList.remove('q-edge-back');
+    el = null;
+  };
+  const down = e => {
+    const t = e.touches?.[0];
+    if (!t || e.touches.length > 1 || t.clientX > edge || document.querySelector('dialog[open]')) return;
+    if (e.target.closest?.('input, textarea, select, [contenteditable], [data-noswipe]')) return;
+    const page = target();
+    if (!page) return;
+    el = page;
+    x0 = t.clientX;
+    y0 = t.clientY;
+    t0 = performance.now();
+    dx = 0;
+    on = false;
+  };
+  const move = e => {
+    if (!el) return;
+    const t = e.touches[0];
+    const mx = t.clientX - x0, my = t.clientY - y0;
+    if (!on) {
+      if (Math.abs(my) > 10 && Math.abs(my) > Math.abs(mx)) return void (el = null); // a scroll, not a swipe
+      if (mx < 8) return;
+      on = true;
+      el.classList.add('q-edge-back');
+      el.style.transition = 'none';
+    }
+    e.preventDefault();
+    dx = Math.max(0, mx);
+    el.style.transform = `translateX(${dx}px)`;
+  };
+  const up = () => {
+    if (!el) return;
+    if (!on) return void (el = null);
+    const page = el;
+    const w = innerWidth;
+    const fast = dx / Math.max(1, performance.now() - t0) > 0.5 && dx > 40;
+    const go = dx > w / 3 || fast;
+    page.style.transition = `transform ${go ? 220 : 260}ms cubic-bezier(.2,.8,.2,1)`;
+    page.style.transform = `translateX(${go ? w : 0}px)`;
+    setTimeout(() => {
+      el = page;
+      if (go) {
+        back();
+        // (The page drawn again for where back() lands: shown in place, no slide in.)
+        requestAnimationFrame(() => (clear(), tick()));
+      } else clear();
+    }, go ? 210 : 260);
+  };
+  addEventListener('touchstart', down, { passive: true });
+  addEventListener('touchmove', move, { passive: false });
+  addEventListener('touchend', up, { passive: true });
+  addEventListener('touchcancel', up, { passive: true });
+  return () => {
+    removeEventListener('touchstart', down);
+    removeEventListener('touchmove', move);
+    removeEventListener('touchend', up);
+    removeEventListener('touchcancel', up);
+  };
+}

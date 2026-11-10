@@ -69,8 +69,7 @@ orbit-site (site.js): the domain's hosts as custom domains
 | Orbit Law | `law` | `/law/` | Orbit-Law | `orbit-law` |
 | Orbit Securities | `stock` | `/securities/` | Orbit-Securities | `stock-study-accounts` |
 
-The family's order everywhere is this table's (`APP_ORDER`, `BRANDS`' order). Orbit-Showcase is Jay's homepage (`jaypengx.com/`)
-and `/showcase/` (open to all). This repo's site has the family page
+The family's order everywhere is this table's (`APP_ORDER`, `BRANDS`' order). Orbit-Showcase is Jay's homepage and `/showcase/`. This repo's site has the family page
 (`/pass/`) and the admin page (`site/admin/`). A new app: a `slug` in
 `kit/brand.mjs` and a collection in `eco.js` `ECO_APPS`.
 
@@ -91,8 +90,8 @@ deploy workflow tests against main's kit, stamps every file with its hash
 
 Served from this repo's site, never copied. Each app's page carries
 `kit/loader.html`'s snippets; `kit/preload.mjs` lists the first screen's
-modules for modulepreload. `node kit/apps.mjs` refreshes the snippets in every
-app checked out beside this one; `node kit/link.mjs` links `<app>/.kit` for tests.
+modules for modulepreload. `node kit/apps.mjs` refreshes every app's snippets;
+`node kit/link.mjs` links `<app>/.kit` for tests.
 
 - **Addresses by content.** The kit's deploy (`kit/stamp.mjs`) and every
   app's (`kit/stamp-app.mjs`) minify each file and address it by its hash
@@ -149,6 +148,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | A tab's title | `navTitle` / `navTitleHtml` + `wireNavTitles` (the 34 pt large title), `pageHead` |
 | Switching a view | `view()` (cross-faded with View Transitions); `segmented` / `segHtml` + `settleSegs` for a whole tab's view (at most 4); a single-choice filter row is `.q-chips.q-texttabs` (text tabs) |
 | A day | `dayBar` + `dayStrip` + `daySwipe` (`dayStep`, `dayList`, `dayTop`, `dayNum`, `dayToday`): the one date selector (a week at most on a wide page); a swipe anywhere on the page, its empty space too, outside a sheet |
+| Going back | `edgeBack({ target, back })`: a swipe from the left edge |
 | A page on top | `sheet({ detent, foot, lead, trailing })`, `bindSheet`, `setSheetDetent`; `closeSheet` (orbit.mjs) slides it out; `sheetHero`, `sheetFoot` / `.q-sheet-foot`; a whole page (a game, a team, a law) in `.q-sheet-wide` with `.q-sheet-cols` / `.q-sheet-pair` |
 | A question | `ask()` / `tell()` (orbit.mjs), `confirm()` (ui.mjs): never the browser's popups; a one-tap delete gets a `toast` with 復原 |
 | Rows | `list` / `cell` (grouped), `rowCard`, `section` / `sectionHead` / `sectionHtml`, `.q-list-head` |
@@ -164,7 +164,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | Live data | `everyDev(key, fn)` beats at the owner's speeds (waiting while a finger is down); `data-q-live` + `liveChanged` pop a changed number; patch in place, never rebuild what didn't change; `hold-place.mjs` keeps the reader's place by itself; `steady-pics.mjs` the pictures |
 | Fitting | `fitNames` (`.q-fit`, `.q-fit-wrap`), `fitNumbers` / `watchFit`, `balanceRows` (`.q-balance`), `fullRows` (`.q-rows-full`/`-keep`), `.q-even` / `.q-even3` |
 | Every screen | `screenFit()` / `onScreen(fn)` mark `html.q-tabrail`, `q-float`, `q-desk`, `q-wide`, `q-w3`; `--q-page-max`, `--q-vw`. By their own width, anywhere (a page, a sheet, a pane): `.q-cols`, `.q-flow` + `flowColumns(root)` (columns of even height), `.q-grid` (cards), `.q-split` (list beside detail) (DESIGN §10) |
-| Pull to refresh, taps, links | `pullToRefresh`; `haptic()` / `tick()`; `PRESS_DELAY` / `pressSelector`; links out: `<a target=_blank>`, `openLink` (Pass 連結) |
+| Pull to refresh, taps, links | `pullToRefresh`; `haptic()` / `tick()`; `PRESS_DELAY` / `pressSelector`; links out: `openLink` (Pass 連結) |
 | Offline | `onlineOnly` (live apps: Securities, Transit, Sports), `keepOffline` (the rest open on what they kept), `netState` / `netVerdict` |
 | Picks for you | `rank` + `feedback.mjs` (`lifter`, `shown`, `picked`, `did`, `keep`); measured: `tools/picks-backtest.mjs` |
 | Language | `W`, `makeT`, `place` (lang.mjs): every page in one language |
