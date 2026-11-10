@@ -124,6 +124,12 @@ export const PAGES = {
         ])
       )
     ),
+    // A basketball player's season in depth (Sports' hoops.mjs, Jay 2026-11-09): Reaves' 每場得分 on 概況, then 數據's 投籃效率 and 分項數據.
+    'player-hoops': { args: click("js:import('./sheets.js').then(m=>m.openPlayer('nba','4066457'))", wait(9000), "js:[...document.querySelectorAll('dialog.q-sheet[open]')].pop().querySelector('.hp-form')?.closest('.q-card').scrollIntoView({block:'start'})", wait(800)) },
+    'player-hoops-stats': { args: click("js:import('./sheets.js').then(m=>m.openPlayer('nba','4066457'))", wait(9000), tap('數據|Stats'), wait(5000), "js:[...[...document.querySelectorAll('dialog.q-sheet[open]')].pop().querySelectorAll('.card-h')].find(c=>/投籃效率|Shooting/.test(c.textContent))?.scrollIntoView({block:'start'})", wait(800)) },
+    'player-hoops-splits': { args: click("js:import('./sheets.js').then(m=>m.openPlayer('nba','4066457'))", wait(9000), tap('數據|Stats'), wait(5000), "js:[...document.querySelectorAll('dialog.q-sheet[open]')].pop().querySelector('.hp-highs')?.closest('.q-card').scrollIntoView({block:'start'})", wait(800)) },
+    // A close game's last minute by stoppage (Lakers–Pistons 2026-11-08: a free-throw trip one row, its foul under it).
+    'nba-plays-end': { args: click("js:import('./lib/espn.mjs').then(async E=>{const l=await E.scoreboard('nba',['20261108']);const e=l.find(x=>/Pistons|Detroit/.test(x.home?.en||x.home?.name||''))||l[0];(await import('./sheets.js')).openMatch(e)})", wait(8000), tap('過程|Plays'), wait(4000), tap('第4節|Q4|4th'), wait(2500), "js:(d=>d.scrollTop=d.scrollHeight)([...document.querySelectorAll('dialog.q-sheet[open]')].pop())", wait(2500), "js:(d=>d.scrollTop=d.scrollHeight)([...document.querySelectorAll('dialog.q-sheet[open]')].pop())", wait(2500), "js:(d=>d.scrollTop=d.scrollHeight)([...document.querySelectorAll('dialog.q-sheet[open]')].pop())", wait(1500)) },
     // Leclerc (F1) on 資料: 生涯車隊 (Sauber's logo, 2018).
     'f1-driver-bio': { args: click("js:import('./sheets.js').then(m=>m.openPlayer('f1','5498'))", wait(9000), "js:[...document.querySelectorAll('dialog.q-sheet[open] button,dialog.q-sheet[open] [role=tab]')].find(b=>/^(資料|Bio)$/.test(b.textContent.trim()))?.click()", wait(4000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/生涯車隊|Teams/.test(c.textContent))?.scrollIntoView({block:'center'})", wait(1500)) },
     'team-nba': { args: click("js:import('./sheets.js').then(m=>m.openTeam('nba','13'))", wait(7000)) },
