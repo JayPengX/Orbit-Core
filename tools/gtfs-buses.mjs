@@ -495,10 +495,12 @@ async function copies(packs, failed) {
     if (!due) continue;
     try {
       const rows = await tdx(ask);
-      if (!Array.isArray(rows) || rows.length < (was?.rows || 1) / 2) throw new Error(`${Array.isArray(rows) ? rows.length : 'no'} rows, had ${was?.rows || 0}`);
+      // (台鐵's v3 answers wrap their list: { …, Stations: [ … ] }.)
+      const list = Array.isArray(rows) ? rows : Object.values(rows || {}).find(Array.isArray);
+      if (!list || list.length < (was?.rows || 1) / 2) throw new Error(`${list ? list.length : 'no'} rows, had ${was?.rows || 0}`);
       const fp = createHash('sha1').update(JSON.stringify(rows)).digest('hex').slice(0, 12);
       if (fp !== was?.fp) put(file, rows);
-      index.asks[file] = { asked: built, rows: rows.length, fp };
+      index.asks[file] = { asked: built, rows: list.length, fp };
       done.push(file);
     } catch (e) {
       failed[`copy:${file}`] = String(e?.message || e).slice(0, 160);
