@@ -89,24 +89,24 @@ test('TDX answers are shared: fresh from the cache, stale while refreshing, the 
     return json([{ StationUID: 'HSZ1', AvailableRentBikes: log.length }]);
   };
   const path = 'basic/v2/Bike/Availability/City/Hsinchu';
-  const a = await tdxGet(env, path, { fetchFn, cache, now: NOW });
+  const a = await tdxGet(env, path, { fetchFn, cache, now: NOW, free: false });
   assert.equal(a.state, 'miss');
   assert.match(log[0], /^https:\/\/tdx\.transportdata\.tw\/api\/basic\/v2\/Bike\/Availability\/City\/Hsinchu\?\$format=JSON$/);
-  const b = await tdxGet(env, path, { fetchFn, cache, now: NOW + 10_000 });
+  const b = await tdxGet(env, path, { fetchFn, cache, now: NOW + 10_000, free: false });
   assert.equal(b.state, 'hit');
   assert.equal(log.length, 1);
   // Past fresh (50 s), inside stale: the old copy at once, a refresh behind.
   const waits = [];
-  const c = await tdxGet(env, path, { fetchFn, cache, now: NOW + 70_000, ctx: { waitUntil: p => waits.push(p) } });
+  const c = await tdxGet(env, path, { fetchFn, cache, now: NOW + 70_000, ctx: { waitUntil: p => waits.push(p) }, free: false });
   assert.equal(c.state, 'stale');
   assert.equal(JSON.parse(c.body)[0].AvailableRentBikes, 1);
   await Promise.all(waits);
   assert.equal(log.length, 2);
   // Over this Worker's own pace: the copy it has, however old.
-  const d = await tdxGet(env, 'basic/v2/Bike/Station/City/Hsinchu', { fetchFn, cache, now: NOW + 70_500 });
+  const d = await tdxGet(env, 'basic/v2/Bike/Station/City/Hsinchu', { fetchFn, cache, now: NOW + 70_500, free: false });
   assert.equal(d.status, 429);
   assert.equal(JSON.parse(d.body).code, 'TDX_BUSY');
-  const e = await tdxGet(env, path, { fetchFn, cache, now: NOW + 70_000 + 5 * 60_000 });
+  const e = await tdxGet(env, path, { fetchFn, cache, now: NOW + 70_000 + 5 * 60_000, free: false });
   assert.equal(e.status, 200);
 });
 
@@ -124,26 +124,26 @@ test('YouBike is kept warm in KV: another colo answers at once from it while TDX
   const path = 'basic/v2/Bike/Availability/City/Kaohsiung';
   const waits = [];
   const ctx = { waitUntil: p => waits.push(p) };
-  await tdxGet(env, path, { fetchFn, cache: memCache(), now: NOW, ctx });
+  await tdxGet(env, path, { fetchFn, cache: memCache(), now: NOW, ctx, free: false });
   for (let i = 0; i < 3; i++) await Promise.all(waits);
   // Another colo (an empty cache), TDX hanging: KV's copy at once.
   hang = true;
   const t0 = Date.now();
-  const other = await tdxGet(env, path, { fetchFn, cache: memCache(), now: NOW + 20_000, ctx });
+  const other = await tdxGet(env, path, { fetchFn, cache: memCache(), now: NOW + 20_000, ctx, free: false });
   assert.ok(Date.now() - t0 < 500, 'not waiting on TDX');
   assert.equal(other.state, 'hit');
   assert.equal(JSON.parse(other.body)[0].AvailableRentBikes, 1);
   // Two minutes on, the cron: Kaohsiung was asked, so its counts are asked again and kept.
   hang = false;
   for (let i = 0; i < 3; i++) await Promise.all(waits);
-  const warmed = await warmBikes(env, { fetchFn, cache: memCache(), now: NOW + 2 * 60_000 });
+  const warmed = await warmBikes(env, { fetchFn, cache: memCache(), now: NOW + 2 * 60_000, free: false });
   assert.deepEqual(warmed, { 'Availability/City/Kaohsiung': 'miss' });
   hang = true;
-  const third = await tdxGet(env, path, { fetchFn, cache: memCache(), now: NOW + 2 * 60_000 + 5000, ctx });
+  const third = await tdxGet(env, path, { fetchFn, cache: memCache(), now: NOW + 2 * 60_000 + 5000, ctx, free: false });
   assert.equal(third.state, 'hit');
   assert.ok(JSON.parse(third.body)[0].AvailableRentBikes > 1, 'the cron’s copy');
   // Not asked for 10 minutes: no longer kept warm (half an hour before 2026-11-06: 15 reads no one saw).
-  assert.deepEqual(await warmBikes(env, { fetchFn, cache: memCache(), now: NOW + 11 * 60_000 }), {});
+  assert.deepEqual(await warmBikes(env, { fetchFn, cache: memCache(), now: NOW + 11 * 60_000, free: false }), {});
 });
 
 test('TDX slow past a copy’s stale time: that copy after SLOW_MS (its age said), TDX’s answer kept for the next ask', async () => {
@@ -159,19 +159,19 @@ test('TDX slow past a copy’s stale time: that copy after SLOW_MS (its age said
     return json([{ StopUID: 'S1', EstimateTime: 60 * n }]);
   };
   const path = 'basic/v2/Bus/EstimatedTimeOfArrival/City/Taipei';
-  await tdxGet(env, path, { fetchFn, cache, now: NOW });
+  await tdxGet(env, path, { fetchFn, cache, now: NOW, free: false });
   hang = true;
   const waits = [];
   const t0 = Date.now();
   // 3 minutes on: past its stale minute, still kept (a live copy 10 minutes).
-  const old = await tdxGet(env, path, { fetchFn, cache, now: NOW + 3 * 60_000, ctx: { waitUntil: p => waits.push(p) } });
+  const old = await tdxGet(env, path, { fetchFn, cache, now: NOW + 3 * 60_000, ctx: { waitUntil: p => waits.push(p) }, free: false });
   assert.ok(Date.now() - t0 < SLOW_MS + 800, 'answered after SLOW_MS, not when TDX did');
   assert.equal(old.state, 'stale');
   assert.equal(old.age, 3 * 60_000);
   assert.equal(JSON.parse(old.body)[0].EstimateTime, 60);
   // (The refresh, then the cache write it hands to waitUntil.)
   for (let i = 0; i < 3; i++) await Promise.all(waits);
-  const next = await tdxGet(env, path, { fetchFn, cache, now: NOW + 3 * 60_000 + 1000 });
+  const next = await tdxGet(env, path, { fetchFn, cache, now: NOW + 3 * 60_000 + 1000, free: false });
   assert.equal(next.state, 'hit');
   assert.equal(JSON.parse(next.body)[0].EstimateTime, 120);
 });
@@ -189,7 +189,7 @@ test('on a paid plan TDX calls wait their turn (a second’s worth at a time) an
     return json([]);
   };
   const cities = ['Hsinchu', 'HsinchuCounty', 'Taipei', 'Taichung', 'Tainan', 'Kaohsiung'];
-  const got = await Promise.all(cities.map(c => tdxGet(env, `basic/v2/Bike/Station/City/${c}`, { fetchFn, cache: memCache(), now: NOW })));
+  const got = await Promise.all(cities.map(c => tdxGet(env, `basic/v2/Bike/Station/City/${c}`, { fetchFn, cache: memCache(), now: NOW, free: false })));
   assert.deepEqual(got.map(g => g.status), cities.map(() => 200), 'every one answered, none busy');
   assert.equal(times.length, 7, 'Taipei asked twice');
   const sorted = times.slice().sort((a, b) => a - b);
@@ -546,7 +546,7 @@ test('a TDX answer that fails with a 5xx is asked once more', async () => {
     n++;
     return n === 1 ? new Response('busy', { status: 503 }) : json([{ StationUID: 'A' }]);
   };
-  const got = await tdxGet(env, 'basic/v2/Bike/Station/City/Hsinchu', { fetchFn, now: NOW, cache: memCache() });
+  const got = await tdxGet(env, 'basic/v2/Bike/Station/City/Hsinchu', { fetchFn, now: NOW, cache: memCache(), free: false });
   assert.equal(got.status, 200);
   assert.equal(n, 2);
 });

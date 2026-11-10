@@ -44,6 +44,7 @@ import { SHOWCASE_ORIGINS } from './showcase.js';
 import { cleanDev } from './kit/devconfig.mjs';
 import { twDay } from './kit/format.mjs';
 import { kvJson, kvPut } from './weather.js';
+import { freeTdx } from './transit-free.js';
 
 export const TDX_BASE = 'https://tdx.transportdata.tw/api/';
 export const TDX_AUTH = 'https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token';
@@ -1001,11 +1002,16 @@ export async function warmBikes(env, deps = {}) {
 // One TDX answer, from the shared cache when it's fresh enough.
 // → { status, body (text), age (ms), state: 'hit' | 'miss' | 'stale' | 'busy' | 'error' }
 // `warm` (the cron's): refreshed when its copy is past its fresh time, else 'warm'.
-export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.caches?.default, ctx = null, now = Date.now(), warm = false, stale = null, young = null, oldest = 0, by = '' } = {}) {
+export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.caches?.default, ctx = null, now = Date.now(), warm = false, stale = null, young = null, oldest = 0, by = '', free = true } = {}) {
   const req = tdxRequest(raw);
   // (`stale`: served at once that long, instead of the rule's.)
   const staleMs = stale ?? req?.rule.stale;
   if (!req) return { status: 400, body: JSON.stringify({ code: 'TDX_NOT_ALLOWED' }), state: 'error' };
+  // (What the operators' own free sources answer: no TDX, no points; transit-free.js. `free: false`: TDX's own.)
+  if (free) {
+    const own = await freeTdx(req.path, req.query, { fetchFn, now });
+    if (own) return warm ? { status: own.status, age: own.age, state: 'free' } : own;
+  }
   const url = `${TDX_BASE}${req.path}?${req.query}`;
   const key = new Request(`https://transit-cache.orbit/${req.path}?${req.query}`);
   const keepWarm = WARM.test(req.path);
