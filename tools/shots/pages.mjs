@@ -47,6 +47,8 @@ export const PAGES = {
     // MLS 排名: the East's race card (a clinch said as results), then the West's foot (faded rows, the lock and their key).
     'mls-table': { args: click('#tab-matches', '[data-league=mls]', wait(2500), tap('排名|Table'), wait(9000), "js:document.querySelector('.title-race')?.scrollIntoView({block:'start'})", wait(1500)) },
     'mls-playoffs': { args: click('#tab-matches', '[data-league=mls]', wait(2500), tap('季後賽|Playoffs'), wait(6000)) },
+    // MLS Round One, a best of three: the first series' sheet, its three games (Jay 2026-11-10).
+    'mls-series': { args: click('#tab-matches', '[data-league=mls]', wait(2500), tap('季後賽|Playoffs'), wait(6000), "js:[...document.querySelectorAll('.br-col')][1]?.querySelector('button.br-tie')?.click()", wait(2500)) },
     'mls-key': { args: click('#tab-matches', '[data-league=mls]', wait(2500), tap('排名|Table'), wait(9000), "js:[...document.querySelectorAll('.zone-legend')].pop()?.scrollIntoView({block:'center'})", wait(1500)) },
     'nba-leaders': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('數據|Stats'), wait(5000)) },
     // 數據 of each kind of league (laid out wide: the stats down the side, the chosen one's ranking beside them).
@@ -84,6 +86,9 @@ export const PAGES = {
     'matches-fill': { args: click('#tab-matches', '.all-chip', wait(2500), "js:[...document.querySelectorAll('[data-day=\"2026-11-08\"]')].filter(e=>e.matches('.q-chip.day')&&e.offsetParent).pop()?.click()", wait(9000), "js:document.querySelector('.event-row.fill-pick')?.scrollIntoView({block:'center'})", wait(1200)) },
     // 首頁 on Sunday 11/8 (with --account fill): 我的比賽 with the games 填滿空檔 put in (a quiet line, a hollow star at its end), scrolled to the first.
     'home-fill': { args: click(wait(3000), "js:document.querySelector('.q-day-bar [data-day=\"2026-11-08\"]')?.click()", wait(9000), "js:document.querySelector('.event-row.filled')?.scrollIntoView({block:'center'})", wait(1200)) },
+    // 首頁 on Sunday 11/8 (with --account leagues: F1, NBA, 英超, 美職足 followed, no teams): 已結束 as 推薦給你 then 其他比賽 (Jay 2026-11-10); then the second group's head.
+    'home-ended': { args: click(wait(3000), "js:document.querySelector('.q-day-bar [data-day=\"2026-11-08\"]')?.click()", wait(9000), "js:document.querySelector('.ended-groups')?.scrollIntoView({block:'start'});scrollBy(0,-200)", wait(1200)) },
+    'home-ended-rest': { args: click(wait(3000), "js:document.querySelector('.q-day-bar [data-day=\"2026-11-08\"]')?.click()", wait(9000), "js:[...document.querySelectorAll('.ended-groups > .ended-head')].pop()?.scrollIntoView({block:'center'})", wait(1200)) },
     'home-far': { args: click(wait(3000), "js:document.querySelector('.q-day-bar [data-day=\"2026-11-22\"]')?.click()", wait(9000)) },
     // That game's page: 台灣轉播 with the guess (依愛爾達往例預估), scrolled to it.
     'game-far': { args: click("js:import('./lib/espn.mjs').then(async E=>{const l=await E.scoreboard('epl',['20261121']);const e=l.find(x=>/Arsenal/.test(x.away?.en||x.away?.name||''))||l.at(-1);(await import('./sheets.js')).openMatch(e)})", wait(10000), "js:[...document.querySelectorAll('dialog.q-sheet[open] .q-card')].find(c=>/台灣轉播|Watch in Taiwan/.test(c.textContent))?.scrollIntoView({block:'center'})", wait(1500)) },
