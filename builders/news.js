@@ -45,7 +45,8 @@
 // pages read, and the stories kept (recs).
 // Read by Orbit News through /data/ (data.js; index.json: 2 minutes at the edge).
 
-import { OUTLETS, TOPICS, sideOf, partiesIn, topicsOf } from '../kit/news-outlets.mjs';
+import { OUTLETS, TOPICS, SECOND, sideOf, partiesIn, topicsOf } from '../kit/news-outlets.mjs';
+import { enOf, NAMES } from './news-words.js';
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
 export const NEWS_PATH = 'news/index.json';
@@ -79,11 +80,15 @@ export const PAGE_READS = 12;
 const S2 = 2;
 const S3 = 3;
 // (Taiwan's channels post more, so are read more often.)
-const CHANNEL_EVERY = { tw: 2, intl: 3 };
+const CHANNEL_EVERY = { tw: 2, intl: 4 };
 const sec = (list, url, every = S3) => list.map(x => [url(x), 'rss', every]);
+// Google News' feed of one site, its last day.
+export const gnews = (site, lang = 'en') =>
+  `https://news.google.com/rss/search?q=site:${site}+when:1d&${lang === 'zh' ? 'hl=zh-TW&gl=TW&ceid=TW:zh-Hant' : 'hl=en-US&gl=US&ceid=US:en'}`;
 export const FEEDS = {
   ltn: [...['all', 'politics', 'society', 'life', 'world', 'local'].map(c => [`https://news.ltn.com.tw/rss/${c}.xml`, 'rss']), ...sec(['business', 'sports'], c => `https://news.ltn.com.tw/rss/${c}.xml`)],
   setn: [['https://www.setn.com/sitemapGoogleNews.xml', 'map']],
+  ftv: [[gnews('ftvnews.com.tw', 'zh'), 'gnews', S2]],
   newtalk: [['https://newtalk.tw/rss/all', 'rss']],
   peoples: [['https://www.peoplenews.tw/feed/', 'rss']],
   cna: [
@@ -121,7 +126,7 @@ export const FEEDS = {
   nyt: [['https://rss.nytimes.com/services/xml/rss/nyt/World.xml', 'rss'], ...sec(['US', 'Business', 'Technology', 'Science', 'Health'], s => `https://rss.nytimes.com/services/xml/rss/nyt/${s}.xml`)],
   wapo: [['https://feeds.washingtonpost.com/rss/world', 'rss'], ...sec(['politics', 'business/technology'], s => `https://feeds.washingtonpost.com/rss/${s}`)],
   aljazeera: [['https://www.aljazeera.com/xml/rss/all.xml', 'rss']],
-  economist: [['https://www.economist.com/asia/rss.xml', 'rss'], ['https://www.economist.com/china/rss.xml', 'rss']],
+  economist: [['https://www.economist.com/asia/rss.xml', 'rss', S2], ['https://www.economist.com/china/rss.xml', 'rss', S2]],
   politico: [['https://rss.politico.com/politics-news.xml', 'rss']],
   time: [['https://time.com/feed/', 'rss']],
   nbc: [['https://feeds.nbcnews.com/nbcnews/public/world', 'rss'], ...sec(['politics'], s => `https://feeds.nbcnews.com/nbcnews/public/${s}`)],
@@ -148,18 +153,29 @@ export const FEEDS = {
   blaze: [['https://www.theblaze.com/feeds/feed.rss', 'rss', S2]],
   dw: [['https://rss.dw.com/rdf/rss-en-all', 'rss']],
   f24: [['https://www.france24.com/en/asia-pacific/rss', 'rss']],
-  scmp: [['https://www.scmp.com/rss/4/feed', 'rss'], ['https://www.scmp.com/rss/3/feed', 'rss']],
+  scmp: [['https://www.scmp.com/rss/4/feed', 'rss'], ['https://www.scmp.com/rss/3/feed', 'rss', S2]],
   nikkei: [['https://asia.nikkei.com/rss/feed/nar', 'rss']],
   japantimes: [['https://www.japantimes.co.jp/feed/', 'rss']],
   diplomat: [['https://thediplomat.com/feed/', 'rss']],
   taipeitimes: [['https://www.taipeitimes.com/xml/index.rss', 'rss']],
   globaltimes: [['https://www.globaltimes.cn/rss/outbrain.xml', 'rss']],
   cgtn: [['https://www.cgtn.com/subscribe/rss/section/world.xml', 'rss']],
-  xinhua: [['https://english.news.cn/rss/worldrss.xml', 'rss']]
+  xinhua: [['https://english.news.cn/rss/worldrss.xml', 'rss']],
+  cnn: [['https://www.cnn.com/sitemap/news.xml', 'map', S2]],
+  msnow: [['https://www.ms.now/feed', 'rss', S2]],
+  independent: [['https://www.independent.co.uk/news/world/rss', 'rss', S2]],
+  cnbc: [['https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100727362', 'rss', S2]],
+  // (Their own feeds refuse a reader that isn't a browser: Google News'
+  // feed of their site, its headlines and its links.)
+  ...Object.fromEntries(
+    [['reuters', 'reuters.com'], ['ap', 'apnews.com'], ['npr', 'npr.org'], ['usatoday', 'usatoday.com'], ['axios', 'axios.com'], ['newsweek', 'newsweek.com'], ['telegraph', 'telegraph.co.uk'], ['washtimes', 'washingtontimes.com'], ['newsmax', 'newsmax.com']].map(([o, site]) => [o, [[gnews(site), 'gnews', S3]]])
+  )
 };
 
 // The outlets' own YouTube channels (their news clips), read every 2nd build
-// (Taiwan's) or 3rd (the world's):
+// (Taiwan's) or 4th (the world's); only those whose clips play in other
+// pages (YouTube's oEmbed answers), and not those posting mostly Shorts
+// (The New York Times', The Journal's, The Post's: 11-10):
 // each clip goes to the story its title is nearest, as that story's clip
 // (Jay 11-10: video and news together). Resolved from each channel's
 // handle; 自由時報's and the SCMP's are not their news.
@@ -186,12 +202,23 @@ export const CHANNELS = {
   f24: 'UCQfwfsi5VrQ8yKZ-UWmAEFg',
   cgtn: 'UCgrNz-aDmcr2uuto8_DL2jg',
   guardian: 'UCIRYBXDze5krPDzAEOxFGVA',
-  nyt: 'UCqnbDFdCpuN8CMEg0VuEBqA',
-  wsj: 'UCK7tptUDHh-RYDsdxO1-5QQ',
-  bloomberg: 'UCIALMKvObZNtJ6AmdCLP7Lg'
+  bloomberg: 'UCIALMKvObZNtJ6AmdCLP7Lg',
+  ftv: 'UC2VmWn8dAqkzlQqvy02E1PA',
+  cnn: 'UCupvZG-5ko_eiXAupbDfxWw',
+  msnow: 'UCaXkIU1QidjPwiAYu6GcHjg',
+  reuters: 'UChqUTb7kYRX8-EiaN3XFrSQ',
+  ap: 'UC52X5wxOL_s5yw0dQk7NtgA',
+  cnbc: 'UCrp_UI8XtuYfpiqluWLD7Lw',
+  newsmax: 'UCx6h-dWzJ5NpAlja1YsApdg',
+  independent: 'UCshwRhftzkiov5wKR7M_LsQ',
+  telegraph: 'UCPgLNge0xqQHWM5B5EFH9Cg',
+  hill: 'UCPWXiRWZ29zrxPFIQT7eHSA',
+  wexam: 'UC8BxSGcBKriJvoeyKOnJ6tA',
+  nikkei: 'UCg5HQ8yI3f43ogvFJyVMfhQ'
 };
 export const ytFeed = id => `https://www.youtube.com/feeds/videos.xml?channel_id=${id}`;
-// (Not a story's clip: a live stream, a whole broadcast, a podcast, a short.)
+// (Not a story's clip: a live stream, a whole broadcast, a podcast, a
+// Short: its feed links it as /shorts/; tall, it won't play well here, Jay 11-10.)
 const NOT_A_CLIP = /#shorts|\blive\b|直播|podcast|完整版/i;
 // A channel's feed: [{ y, t, at }], its clips only.
 export function parseChannel(xml) {
@@ -201,7 +228,7 @@ export function parseChannel(xml) {
     const y = plain(tagOf(b, 'yt:videoId'));
     const t = plain(tagOf(b, 'title'));
     const at = timeOf(tagOf(b, 'published'));
-    if (/^[\w-]{11}$/.test(y) && t && at && !NOT_A_CLIP.test(t)) out.push({ y, t, at });
+    if (/^[\w-]{11}$/.test(y) && t && at && !NOT_A_CLIP.test(t) && !/youtube\.com\/shorts\//.test(b)) out.push({ y, t, at });
   }
   return out;
 }
@@ -290,6 +317,17 @@ export function parseFeed(xml, kind = 'rss') {
     }
     return out;
   }
+  if (kind === 'gnews') {
+    // (Google News: "headline - Outlet", its own link to the story.)
+    for (const m of s.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/g)) {
+      const b = m[1];
+      const by = plain(tagOf(b, 'source'));
+      const t = plain(tagOf(b, 'title')).replace(by ? new RegExp(`\\s+[-–—]\\s+${by.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) : /$^/, '').trim();
+      const u = plain(tagOf(b, 'link')).replace(/\?oc=\d+$/, '');
+      if (t && /^https:\/\/news\.google\.com\//.test(u)) out.push({ t, u, d: '', at: timeOf(tagOf(b, 'pubDate')), img: '' });
+    }
+    return out;
+  }
   const atom = /<feed\b/.test(s.slice(0, 2000));
   for (const m of s.matchAll(atom ? /<entry\b[^>]*>([\s\S]*?)<\/entry>/g : /<item\b[^>]*>([\s\S]*?)<\/item>/g)) {
     const b = m[1];
@@ -307,7 +345,7 @@ export function parseFeed(xml, kind = 'rss') {
 // Not News': entertainment, style, travel, opinion, stock tips (by the
 // outlet's own address for them). Sport and health are news (Jay 11-10).
 const SKIP_HOST = /^(?:star|ent|istyle|auto|speed|travel|house|pets?|game|fashion|beauty|food|talk|playing|3c|partners|fun|style)\./;
-const SKIP_PATH = /\/(?:entertainment|lifestyle|opinion|star|fashion|travel|horoscope|astro|recipes?|style|podcasts?|live|live-updates|newsletters?)\//;
+const SKIP_PATH = /\/(?:entertainment|lifestyle|opinion|star|fashion|travel|horoscope|astro|recipes?|style|podcasts?|live|live-updates|newsletters?|cnn-underscored|deals|shopping)\//;
 // A video report (the outlet's own video page): a story's clip.
 export const isVideo = u => /\/(?:videos?|clips)\/|\/video-/.test(u);
 // China Times' codes: 260410 stock tips, 260417 the army's own, 260418 health tips, 2608xx history, 262xxx opinion.
@@ -392,7 +430,7 @@ export function fillerOf(it, lang) {
 // Light: clickbait ("原因曝", "這招"), tips, promos, PR. Not dropped alone,
 // but a story mostly of these sinks, and carried by few, goes.
 const LIGHT = {
-  zh: /(?:原因|真相|內幕|下場|價碼|身分|近況|現況|答案|結果|秘訣)曝|曝光(?:了)?[！!]?$|這樣說$|回應了$|說話了$|發聲了$|竟然|竟是|「這\d?[件招種樣個物檔]」|\d大(?:前兆|地雷|族群|習慣|徵兆|好處|秘訣|特徵|陷阱)|醫揭|營養師|中醫師|藥師揭|小撇步|妙招|冷知識|懶人包|一次看|必看|必吃|必買|開箱|千萬別|你中了嗎|傻眼|驚呆|嚇傻|嚇壞|崩潰|超狂|超扯|太狂|太扯|暖心|淚崩|優惠|折扣|限時|好市多|買一送一|開賣|新品|聯名|試吃|美食|年菜|打卡|景點|賞楓|賞花|花海|嘉年華|聖誕|耶誕|市集|抽獎|免費送|登場$|週年慶|促銷|榮獲|獲獎|奪金|金質獎|頒獎|表揚|揭牌|動土|啟用|典禮|研討會|捐贈|義診|公益|感恩/,
+  zh: /(?:原因|真相|內幕|下場|價碼|身分|近況|現況|答案|結果|秘訣)曝|曝光(?:了)?[！!]?$|這樣說$|回應了$|說話了$|發聲了$|竟然|竟是|「這\d?[件招種樣個物檔]」|\d大(?:前兆|地雷|族群|習慣|徵兆|好處|秘訣|特徵|陷阱)|醫揭|營養師|中醫師|藥師揭|小撇步|妙招|冷知識|懶人包|一次看|必看|必吃|必買|開箱|千萬別|你中了嗎|傻眼|驚呆|嚇傻|嚇壞|崩潰|超狂|超扯|太狂|太扯|暖心|淚崩|優惠|折扣|限時|好市多|買一送一|開賣|新品|聯名|試吃|美食|年菜|打卡|景點|賞楓|賞花|花海|嘉年華|聖誕|耶誕|市集|抽獎|免費送|登場$|週年慶|促銷|榮獲|獲獎|金質獎|頒獎|表揚|揭牌|動土|啟用|典禮|研討會|捐贈|義診|公益|感恩/,
   en: /\b(?:viral|internet reacts|you won't believe|jaw-dropping|hilarious|deal of the day)\b/i
 };
 export const softOf = (t, lang) => LIGHT[lang].test(t);
@@ -455,13 +493,17 @@ const EN_STOP = new Set('a an the and or but of to in on at for from by with as 
 const stem = w => w.slice(0, 6);
 // A headline's pieces: Chinese in two-character pieces, other words whole
 // (English stemmed lightly, short words and numbers of one digit left out).
+// The words of a company's monthly report (營收, 年增, 創新高…): every
+// company's, so they'd make one story of a day's reports (Jay 11-10: 台積電's
+// sheet held 豆府's, 大東電's, 全家's).
+const ZH_STOP = new Set('營收 月營 收月 收年 收創 月增 年增 增率 月減 年減 創新 新高 同期 期新 累計 億元 單月 歷史 史新 合併 併營 前十 財報 獲利 毛利 每股'.split(' '));
 export function piecesOf(title, lang) {
   const s = cleanTitle(title).normalize('NFKC').toLowerCase();
   const out = [];
   if (lang === 'zh') {
     for (const run of s.match(/[㐀-鿿]+/g) || []) {
       if (run.length === 1) out.push(run);
-      for (let i = 0; i + 1 < run.length; i++) out.push(run.slice(i, i + 2));
+      for (let i = 0; i + 1 < run.length; i++) if (!ZH_STOP.has(run.slice(i, i + 2))) out.push(run.slice(i, i + 2));
     }
     for (const w of s.match(/[a-z][a-z0-9.+-]*[a-z0-9]|\d{2,}/g) || []) out.push(w);
     return out;
@@ -655,7 +697,9 @@ export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, i
   // What it's about (a party named is politics); none: not News'.
   let topics = topicsOf(items.map(it => it.t), lang);
   if (!topics.length && lang === 'en') topics = topicsOf(items.map(it => `${it.t} ${it.d || ''}`), lang);
-  if (parties.length && !topics.includes('pol')) topics = [...topics, 'pol'].slice(0, 3);
+  // (A party named is politics where none else is, or 40% of its headlines name one.)
+  const named = parties.length ? items.filter(it => partiesIn(it.t).length).length / items.length : 0;
+  if (parties.length && !topics.includes('pol') && (!topics.length || named >= SECOND)) topics = [...topics, 'pol'].slice(0, 3);
   const kinds = topics.map(id => TOPIC[id]).filter(Boolean);
   // 單邊 (one side): a story of a topic sides take, carried by 3 outlets or
   // more for 2 hours or more, 2 or more of them on one side and none on the
@@ -798,7 +842,12 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
       }
       if (!rec) {
         const texts = g.map(it => (lang === 'en' ? `${it.t} ${it.d || ''}` : it.t));
-        if (!enough(new Set(g.map(it => it.o)), region) || (!topicsOf(texts, lang).length && !partiesIn(texts.join(' ')).length)) continue;
+        const kinds = topicsOf(texts, lang);
+        if (!kinds.length && !partiesIn(texts.join(' ')).length) continue;
+        // (A kind past the sides, health, science, sport…, needs only two:
+        // its tab isn't empty, and there's no side to weigh, Jay 11-10.)
+        const outlets = new Set(g.map(it => it.o));
+        if (!enough(outlets, region) && !(outlets.size >= 2 && TOPIC[kinds[0]]?.spectrum === false)) continue;
         const firstIt = g.reduce((a, b) => ((a.at || 0) <= (b.at || 0) ? a : b));
         rec = { id: idOf(firstIt.u), r: region, first: firstIt.at || now, last: firstIt.at || now, peak: 0, items: [] };
         live.push(rec);
@@ -818,6 +867,8 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
       return { r, vs, c, cn: norm(c), first: r.items[0]?.at || now, last: r.items.at(-1)?.at || now };
     });
     const clipsOf = matchClips(vids.filter(v => OUTLETS[v.o]?.region === region), sized, vecOf, lang);
+    // (The world's stories: Taiwan's outlets' on each, from Taiwan's front.)
+    const twOn = region === 'intl' ? taiwanOn(out.tw, sized, vecOf) : new Map();
     for (const { r, vs, c, cn } of sized) {
       const s = storyOf(r.items.map((it, i) => ({ ...it, near: cosine(vs[i], norm(vs[i]), c, cn) })), region, now, { pages, same, vids: clipsOf.get(r) || [] });
       r.first = s.first;
@@ -826,9 +877,14 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
       s.id = r.id;
       // Not News' (no topic), or light and carried by few: not shown.
       if (!s.topics.length || (s.light >= 0.5 && s.n < 4)) continue;
+      if (twOn.has(r)) {
+        s.tw = twPart(twOn.get(r));
+        // (Taiwan's story says which world story it's on: 國際媒體怎麼報.)
+        for (const t of twOn.get(r)) t.world = s.id;
+      }
       (now - s.at <= NOW_MS ? out[region] : out.past[region]).push(s);
     }
-    out[region] = out[region].sort((a, b) => b.score - a.score).slice(0, TOP[region]).map(({ score, light, ...s }) => s);
+    out[region] = frontOf(out[region], TOP[region]).map(({ score, light, ...s }) => s);
     // (The past lighter: each outlet's newest headline only.)
     out.past[region] = out.past[region]
       .sort((a, b) => b.imp - a.imp)
@@ -836,6 +892,76 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
       .map(({ score, light, items: list, ...s }) => ({ ...s, items: list.filter((x, i) => list.findIndex(y => y[0] === x[0]) === i) }));
   }
   return out;
+}
+
+// The front: the TOP stories by score, then each topic's best past them
+// to TOPIC_MIN (its first topic's), so a quiet day's 科學 or 運動 isn't cut
+// for the 150th politics story (Jay 11-10: tabs nearly empty).
+export const TOPIC_MIN = 12;
+export function frontOf(stories, top) {
+  const ranked = [...stories].sort((a, b) => b.score - a.score);
+  const front = ranked.slice(0, top);
+  const have = new Map();
+  for (const s of front) have.set(s.topics[0], (have.get(s.topics[0]) || 0) + 1);
+  for (const s of ranked.slice(top)) {
+    const n = have.get(s.topics[0]) || 0;
+    if (n >= TOPIC_MIN) continue;
+    have.set(s.topics[0], n + 1);
+    front.push(s);
+  }
+  return front;
+}
+
+// Taiwan's stories about the world, each joined to the world story its
+// headlines are nearest, put in the English words world headlines use
+// (news-words.js), weighed as the world's: near enough (TW_NEAR), a name
+// and two more words shared (or a name and one, nearer), within a day of it. → Map(world rec → [Taiwan's stories]).
+export const TW_NEAR = 0.4;
+const NAME_KEYS = new Set(Object.values(NAMES).flatMap(v => piecesOf(v, 'en')));
+function taiwanOn(twStories, sized, vecOf) {
+  const index = new Map();
+  for (const z of sized) for (const k of z.c.keys()) (index.get(k) || index.set(k, []).get(k)).push(z);
+  const out = new Map();
+  for (const s of twStories) {
+    const v = new Map();
+    for (const it of s.items) {
+      const en = enOf(it[1]);
+      if (en) for (const [k, w] of vecOf({ t: en })) add(v, k, w);
+    }
+    if (v.size < 2) continue;
+    const vn = norm(v);
+    const shared = new Map();
+    for (const k of v.keys()) for (const z of index.get(k) || []) (shared.get(z) || shared.set(z, []).get(z)).push(k);
+    let best = null;
+    let bestSim = 0;
+    for (const [z, keys] of shared) {
+      // (A name shared, a place, a person, a body abroad, and a word more.)
+      if (keys.length < 2 || !keys.some(k => NAME_KEYS.has(k)) || s.at < z.first - GAP || s.first > z.last + GAP) continue;
+      const sim = cosine(v, vn, z.c, z.cn);
+      if (sim > bestSim && (keys.length >= 3 || sim >= TW_NEAR + 0.15)) (bestSim = sim), (best = z);
+    }
+    if (best && bestSim >= TW_NEAR) (out.get(best.r) || out.set(best.r, []).get(best.r)).push(s);
+  }
+  return out;
+}
+// What a world story shows of Taiwan's: how many outlets, each side's count,
+// their headlines (three an outlet, newest first).
+function twPart(stories) {
+  const seen = new Set();
+  const per = new Map();
+  const items = [];
+  for (const it of stories.flatMap(s => s.items).sort((a, b) => b[3] - a[3])) {
+    if (seen.has(it[2]) || (per.get(it[0]) || 0) >= 3) continue;
+    seen.add(it[2]);
+    per.set(it[0], (per.get(it[0]) || 0) + 1);
+    items.push(it.slice(0, 4));
+  }
+  const sides = { g: 0, c: 0, b: 0 };
+  for (const o of per.keys()) {
+    const side = sideOf(o, 'tw');
+    if (side) sides[side]++;
+  }
+  return { n: per.size, sides, items };
 }
 
 // One region's stories from these headlines alone (no stories kept).
@@ -938,7 +1064,8 @@ export function pagesToRead(out, pages, most = PAGE_READS) {
   for (let i = 0; i < 40; i++) order.push(out.tw[2 * i], out.tw[2 * i + 1], out.intl[i]);
   const want = [];
   for (const s of order.filter(Boolean)) {
-    const fresh = s.items.filter(([, , u]) => !pages[u] && !want.includes(u));
+    // (Google News' links aren't the outlet's page.)
+    const fresh = s.items.filter(([, , u]) => !pages[u] && !want.includes(u) && !u.startsWith('https://news.google.com/'));
     const clip = !s.clips?.some(c => c[1]) && fresh.find(([o]) => CLIPS_AT.has(o));
     if (clip) want.push(clip[2]);
     const pic = !s.img && (fresh.find(([, , u]) => u === s.items[0]?.[2]) || fresh.find(([, , u]) => u !== clip?.[2]));
