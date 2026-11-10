@@ -761,6 +761,60 @@ test("a 台鐵 train's delay from 台鐵's own 車次查詢 (the station it last
   assert.equal(await freeTdx('basic/v3/Rail/TRA/TrainLiveBoard', '', { env, fetchFn, now }), null, 'every train: TDX');
 });
 
+test("a 台鐵 station's board from 台鐵's own 車站時刻 (each way, 準點 or 誤點 N 分 on a train on its way), in TDX's StationLiveBoard shape: two hours back (those on their way) to three on; no platforms; a page kept a minute, read in the Runner; not the page: TDX", async () => {
+  const { traBoardRows, traBoardAnswer, TRA_TRAIN, copyFile, tdxCopies } = await import('../transit-free.js');
+  const page = readFileSync(new URL('./fixtures/tra-board.html', import.meta.url), 'utf8');
+  const fx = JSON.parse(readFileSync(new URL('./fixtures/tra-trains.json', import.meta.url), 'utf8'));
+  // (新竹, read 2026-11-10 19:01; ten trains of 順行, seven of 逆行.)
+  const rows = traBoardRows(page);
+  assert.deepEqual(rows.slice(0, 3), [
+    { no: '3252', type: '區間', at: '00:20', dir: 0, end: '新竹', late: 0, off: false },
+    { no: '1262', type: '區間', at: '19:01', dir: 0, end: '基隆', late: null, off: false },
+    { no: '2548', type: '區間', at: '19:05', dir: 0, end: '新竹', late: 1, off: false }
+  ]);
+  assert.deepEqual(rows.filter(r => r.dir === 1).map(r => [r.no, r.late]), [['139', 4], ['2033', 3], ['277', null], ['145', 2], ['2273', null], ['2561', null]], '逆行: Direction 1');
+  assert.equal(traBoardRows('<html>維護中</html>'), null);
+  assert.equal(traBoardRows(page.replace('<td>19:05</td>', '<td>晚上</td>')), null, 'a row not as we know it: none');
+  const st = { StationID: '1210', StationName: { Zh_tw: '新竹' } };
+  const now = Date.parse('2026-11-10T19:02:00+08:00');
+  const board = traBoardAnswer(rows, st, now - 60_000, now).StationLiveBoards;
+  assert.deepEqual(board.map(r => [r.TrainNo, r.ScheduleDepartureTime, r.DelayTime ?? '-']), [
+    ['2548', '19:05:00', 1], ['2042', '19:11:00', 0], ['138', '19:16:00', 1], ['142', '19:58:00', '-'], ['288', '20:18:00', '-'], ['2046', '21:52:00', '-'],
+    ['139', '18:05:00', 4], ['2033', '18:56:00', 3], ['277', '19:10:00', '-'], ['145', '19:21:00', 2], ['2273', '21:59:00', '-']
+  ], "00:20's gone, and 19:01 with no word on it; 22:03 and 22:08 past three hours; 18:05 on its way, kept");
+  assert.deepEqual(board[0], { StationID: '1210', StationName: { Zh_tw: '新竹' }, TrainNo: '2548', Direction: 0, TrainTypeName: { Zh_tw: '區間' }, EndingStationName: { Zh_tw: '新竹' }, Platform: '', ScheduleArrivalTime: '19:05:00', ScheduleDepartureTime: '19:05:00', DelayTime: 1, RunningStatus: 1, UpdateTime: '2026-11-10T19:01:00+08:00' });
+  assert.equal(traBoardAnswer(traBoardRows(page.replace('<td>誤點 1 分</td>', '<td>停駛</td>')), st, now, now).StationLiveBoards.find(r => r.TrainNo === '2548').RunningStatus, 2, 'cancelled');
+
+  resetFree();
+  const ask = tdxCopies([]).find(a => a.startsWith('basic/v3/Rail/TRA/Station?'));
+  const file = copyFile('basic/v3/Rail/TRA/Station', new URLSearchParams(ask.split('?')[1]));
+  const env = { DATA: { get: async k => (k === file ? { text: async () => JSON.stringify(fx.Stations) } : null) } };
+  const asked = [];
+  let body = page;
+  const fetchFn = async (u, o = {}) => {
+    assert.ok(String(u).startsWith(TRA_TRAIN));
+    if (!o.method) return asked.push('form'), new Response('<input type="hidden" name="_csrf" value="tok-1"/>', { headers: { 'Set-Cookie': 'T4TIPSESSIONID=abc; path=/' } });
+    assert.ok(String(u).endsWith('/querybystation'));
+    const b = new URLSearchParams(o.body);
+    assert.equal(b.get('_csrf'), 'tok-1');
+    assert.equal(b.get('rideDate'), '2026/11/10');
+    asked.push(b.get('station'));
+    return new Response(body);
+  };
+  const at = (id, t = now) => freeTdx(`basic/v3/Rail/TRA/StationLiveBoard/Station/${id}`, '$format=JSON', { env, fetchFn, now: t });
+  const got = await at('1210');
+  assert.equal(got.state, 'free');
+  assert.equal(JSON.parse(got.body).StationLiveBoards.length, 11);
+  await at('1210', now + 30_000);
+  assert.deepEqual(asked, ['form', '1210-新竹'], 'the form once; a station once a minute');
+  assert.equal(await at('9999'), null, 'a station TDX doesn\'t list: TDX');
+  resetFree();
+  body = '<html>維護中</html>';
+  assert.equal(await at('1210'), null, 'not the board: TDX');
+  assert.ok(freeHeavy('basic/v3/Rail/TRA/StationLiveBoard/Station/1210'), 'in the Runner: a megabyte a page');
+  assert.equal(await freeTdx('basic/v3/Rail/TRA/StationLiveBoard', '', { env, fetchFn, now }), null, 'every station: TDX');
+});
+
 // ---- 公路客運's and the counties' buses: 公路局's site ----------------------------------------
 
 import { tbTime, tbRows, TB_URL } from '../transit-free.js';

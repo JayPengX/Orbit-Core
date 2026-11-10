@@ -1660,6 +1660,21 @@ export function traTrainRow(html, no, ids, now = Date.now()) {
   if (!st || !Number.isFinite(late)) return null;
   return { TrainNo: String(no), TrainTypeName: { Zh_tw: head[1].trim() }, StationID: st.StationID, StationName: st.StationName, TrainStationStatus: said.length > 1 ? 2 : 1, DelayTime: late, UpdateTime: twNow(now) };
 }
+// 台鐵's stations (TDX's list, copied to R2): name → { StationID, StationName }, and `id:<StationID>` → the same.
+const traIds = async (env, now) =>
+  (await held('tra:ids', TRA_FRESH, 7 * DAY, async () => {
+    const obj = await env.DATA.get(copyFile(TRA_STATIONS_ASK, new URLSearchParams(tdxCopies([]).find(a => a.startsWith(`${TRA_STATIONS_ASK}?`)).split('?')[1])));
+    const list = obj ? JSON.parse(await obj.text()) : null;
+    const rows = Array.isArray(list) ? list : list?.Stations;
+    if (!rows?.length) throw new Error('not copied');
+    const out = new Map();
+    for (const r of rows) {
+      const st = { StationID: r.StationID, StationName: r.StationName };
+      if (!out.has(zhSt(r.StationName?.Zh_tw))) out.set(zhSt(r.StationName?.Zh_tw), st);
+      out.set(`id:${r.StationID}`, st);
+    }
+    return out;
+  }, now, 3000)).val;
 // The site's form token and its session (one for every form of the site: 車次查詢, 票價試算), read each 20 minutes.
 const traForm = (fetchFn, now) =>
   held('tra:form', 20 * MIN, 20 * MIN, async () => {
@@ -1672,15 +1687,7 @@ async function traTrainFree(path, q, { fetchFn, env, now }) {
   const m = TRA_ONE.exec(path);
   if (!m || !env?.DATA) return m ? null : undefined;
   if ([...q.keys()].some(k => k !== '$format')) return null;
-  const ids = (await held('tra:ids', TRA_FRESH, 7 * DAY, async () => {
-    const obj = await env.DATA.get(copyFile(TRA_STATIONS_ASK, new URLSearchParams(tdxCopies([]).find(a => a.startsWith(`${TRA_STATIONS_ASK}?`)).split('?')[1])));
-    const list = obj ? JSON.parse(await obj.text()) : null;
-    const rows = Array.isArray(list) ? list : list?.Stations;
-    if (!rows?.length) throw new Error('not copied');
-    const out = new Map();
-    for (const r of rows) if (!out.has(zhSt(r.StationName?.Zh_tw))) out.set(zhSt(r.StationName?.Zh_tw), { StationID: r.StationID, StationName: r.StationName });
-    return out;
-  }, now, 3000)).val;
+  const ids = await traIds(env, now);
   const form = await traForm(fetchFn, now);
   const got = await held(`tra:train:${m[1]}`, MIN, 3 * MIN, async () => {
     const day = twNow(now).slice(0, 10).replace(/-/g, '/');
@@ -1692,6 +1699,85 @@ async function traTrainFree(path, q, { fetchFn, env, now }) {
     return JSON.stringify({ UpdateTime: twNow(now), AuthorityCode: 'TRA', TrainLiveBoards: row ? [row] : [] });
   }, now);
   return { status: 200, body: got.val, age: Math.max(0, now - got.at), state: 'free' };
+}
+
+// ---- A 台鐵 station's board ---------------------------------------------------------------
+
+// TDX's StationLiveBoard of one station (`/Station/<id>`) from 台鐵's own
+// 車站時刻 (tip112 querybystation: every train stopping there today, 順行 and
+// 逆行, and on those on their way 準點 or 誤點 N 分): the trains due there from
+// two hours back (a late one still to come; a train's delay now, for the
+// trains through it) to three hours on, a delay only on a train on its way.
+// No platforms: the site gives none. The page is a megabyte (five seconds),
+// so it's read in the Runner (freeHeavy), a station's kept a minute, one
+// station at a time.
+const TRA_BOARD = /^basic\/v3\/Rail\/TRA\/StationLiveBoard\/Station\/(\d{4})$/;
+// The page → every train of the day there: { no, type, at: 'HH:MM', dir (0 順行, 1 逆行), end, late (minutes; null not on its way), off (cancelled) },
+// or null (not the page we know).
+export function traBoardRows(html) {
+  const s = String(html);
+  const a = s.indexOf('id="tab1"');
+  const b = s.indexOf('id="tab2"', a);
+  if (a < 0 || b < 0) return null;
+  const out = [];
+  for (const [dir, part] of [[0, s.slice(a, b)], [1, s.slice(b, s.indexOf('</table>', b))]]) {
+    for (const [, row] of part.matchAll(/<tr>([\s\S]*?)<\/tr>/g)) {
+      if (row.includes('<th')) continue;
+      const t = row.match(/querybytrainno\?rideDate=[\d/]+&amp;trainNo=(\d+)[^>]*>\s*([^<]*?)\s*\d+\s*<\/a>/);
+      const tds = [...row.matchAll(/<td>\s*([^<]*?)\s*<\/td>/g)].map(m => m[1].trim());
+      if (!t || tds.length !== 3 || !/^\d\d:\d\d$/.test(tds[0])) return null;
+      const said = tds[2];
+      const late = /^準點$/.test(said) ? 0 : /^誤點\s*\d+\s*分$/.test(said) ? Number(said.match(/\d+/)[0]) : null;
+      out.push({ no: t[1], type: t[2].trim(), at: tds[0], dir, end: zhSt(tds[1]), late, off: /取消|停駛/.test(said) });
+    }
+  }
+  return out;
+}
+// The trains of `rows` due from two hours back (those on their way) to three on, in TDX's words.
+export function traBoardAnswer(rows, st, at, now = Date.now()) {
+  const clock = twNow(now).slice(11, 16);
+  const min = hm => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
+  const n = min(clock);
+  const boards = rows
+    // (Gone by with no word on it: nothing to say.)
+    .filter(r => min(r.at) >= n - 120 && min(r.at) <= n + 180 && (min(r.at) >= n || r.late != null))
+    .map(r => ({
+      StationID: st.StationID,
+      StationName: st.StationName,
+      TrainNo: r.no,
+      Direction: r.dir,
+      TrainTypeName: { Zh_tw: r.type },
+      EndingStationName: { Zh_tw: r.end },
+      Platform: '',
+      ScheduleArrivalTime: `${r.at}:00`,
+      ScheduleDepartureTime: `${r.at}:00`,
+      ...(r.off ? { RunningStatus: 2 } : r.late != null ? { DelayTime: r.late, RunningStatus: r.late ? 1 : 0 } : {}),
+      UpdateTime: twNow(at)
+    }));
+  return { UpdateTime: twNow(at), AuthorityCode: 'TRA', StationLiveBoards: boards };
+}
+let traBoardLine = Promise.resolve();
+async function traBoardFree(path, q, { fetchFn, env, now }) {
+  const m = TRA_BOARD.exec(path);
+  if (!m || !env?.DATA) return m ? null : undefined;
+  if ([...q.keys()].some(k => k !== '$format')) return null;
+  const st = (await traIds(env, now)).get(`id:${m[1]}`);
+  if (!st) return null;
+  const got = await held(`tra:board:${m[1]}`, MIN, 5 * MIN, () => {
+    // (One station's page at a time: a megabyte each.)
+    const job = traBoardLine.then(async () => {
+      const form = await traForm(fetchFn, now);
+      const day = twNow(now).slice(0, 10).replace(/-/g, '/');
+      const res = await fetchFn(`${TRA_TRAIN}/querybystation`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...(form.val.cookie ? { cookie: form.val.cookie } : {}) }, body: new URLSearchParams({ _csrf: form.val.token, rideDate: day, station: `${m[1]}-${st.StationName?.Zh_tw || ''}` }), signal: AbortSignal.timeout?.(20000) });
+      const rows = res.ok ? traBoardRows(await res.text()) : null;
+      // (Not the board: the form gone stale, or the page changed; the form read again for the next ask.)
+      if (!rows?.length) throw (kept.delete('tra:form'), new Error(`TRA board ${res.status}`));
+      return rows;
+    });
+    traBoardLine = job.catch(() => {});
+    return job;
+  }, now, 2500);
+  return { status: 200, body: JSON.stringify(traBoardAnswer(got.val, st, got.at, now)), age: Math.max(0, now - got.at), state: 'free' };
 }
 
 // ---- 台鐵's fares -------------------------------------------------------------------------
@@ -1859,7 +1945,7 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), 
   const q = new URLSearchParams(query);
   try {
     const p = decodeURIComponent(path);
-    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await trtcFree(p, q, { fetchFn, env, now })) ?? (await krtcFree(p, q, { fetchFn, env, now })) ?? (await tymcFree(p, q, { fetchFn, env, now })) ?? (await traAlertFree(p, q, { fetchFn, now })) ?? (await thsrAlertFree(p, q, { fetchFn, now })) ?? (await metroAlertFree(p, q, { fetchFn, now })) ?? (await tbNoticeFree(p, q, { fetchFn, now })) ?? (await traTrainFree(p, q, { fetchFn, env, now })) ?? (await traFareFree(p, q, { fetchFn, env, now })) ?? (await thsrFareFree(p, q, { fetchFn, env, now })) ?? (await copiedFree(p, q, { env, now }));
+    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await trtcFree(p, q, { fetchFn, env, now })) ?? (await krtcFree(p, q, { fetchFn, env, now })) ?? (await tymcFree(p, q, { fetchFn, env, now })) ?? (await traAlertFree(p, q, { fetchFn, now })) ?? (await thsrAlertFree(p, q, { fetchFn, now })) ?? (await metroAlertFree(p, q, { fetchFn, now })) ?? (await tbNoticeFree(p, q, { fetchFn, now })) ?? (await traTrainFree(p, q, { fetchFn, env, now })) ?? (await traBoardFree(p, q, { fetchFn, env, now })) ?? (await traFareFree(p, q, { fetchFn, env, now })) ?? (await thsrFareFree(p, q, { fetchFn, env, now })) ?? (await copiedFree(p, q, { env, now }));
     if (got !== undefined) return got;
   } catch (err) {
     console.log('free source failed', path.slice(0, 80), String(err?.message || err).slice(0, 120));
@@ -1870,6 +1956,6 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), 
 // Whether a /transit/tdx ask is one the free sources answer (worker.js sends
 // those to the Runner: a list of all Taiwan read and kept there, not in each
 // isolate's 10 ms).
-export const freeHeavy = p => /^((basic|advanced)\/v2\/Bike\/|basic\/v3\/Rail\/TRA\/(DailyTrainTimetable\/TrainDate|ODFare)\/|basic\/v2\/Rail\/(THSR\/ODFare|Metro\/Alert)\/|basic\/v2\/Bus\/News\/InterCity$)/.test(String(p || '').replace(/^\/+/, ''));
+export const freeHeavy = p => /^((basic|advanced)\/v2\/Bike\/|basic\/v3\/Rail\/TRA\/(DailyTrainTimetable\/TrainDate|ODFare|StationLiveBoard\/Station)\/|basic\/v2\/Rail\/(THSR\/ODFare|Metro\/Alert)\/|basic\/v2\/Bus\/News\/InterCity$)/.test(String(p || '').replace(/^\/+/, ''));
 // (A route's whole list of stops, or its buses, from 新竹's site: read in the Runner too.)
 export const freeRoutesHeavy = (path, q) => (path === '/transit/gps' || (path === '/transit/eta' && (q.get('routes') || q.get('route') || CITY_FEEDS[q.get('city')] || EBUS[q.get('city')] || TB_CITIES[q.get('city')] || q.get('city') === 'Tainan'))) && FREE_BUS.test(q.get('city') || '');
