@@ -48,6 +48,8 @@ export const PAGES = {
     'mls-table': { args: click('#tab-matches', '[data-league=mls]', wait(2500), tap('排名|Table'), wait(9000), "js:document.querySelector('.title-race')?.scrollIntoView({block:'start'})", wait(1500)) },
     'mls-playoffs': { args: click('#tab-matches', '[data-league=mls]', wait(2500), tap('季後賽|Playoffs'), wait(6000)) },
     // MLS Round One, a best of three: the first series' sheet, its three games (Jay 2026-11-10).
+    // 英超's 賽程 scrolled down on a full day (11/7), then a lighter one (11/3): the new day from the top, never a screen of black (Jay 2026-11-10).
+    'epl-day-switch': { args: click('#tab-matches', '[data-league=epl]', wait(3000), "js:[...document.querySelectorAll('.q-chip.day')].filter(e=>e.offsetParent&&e.dataset.day==='2026-11-07').pop()?.click()", wait(4000), 'js:scrollTo(0,900)', wait(800), "js:[...document.querySelectorAll('.q-chip.day')].filter(e=>e.offsetParent&&e.dataset.day==='2026-11-03').pop()?.click()", wait(4000)) },
     'mls-series': { args: click('#tab-matches', '[data-league=mls]', wait(2500), tap('季後賽|Playoffs'), wait(6000), "js:[...document.querySelectorAll('.br-col')][1]?.querySelector('button.br-tie')?.click()", wait(2500)) },
     'mls-key': { args: click('#tab-matches', '[data-league=mls]', wait(2500), tap('排名|Table'), wait(9000), "js:[...document.querySelectorAll('.zone-legend')].pop()?.scrollIntoView({block:'center'})", wait(1500)) },
     'nba-leaders': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('數據|Stats'), wait(5000)) },
