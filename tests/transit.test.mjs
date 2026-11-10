@@ -880,8 +880,8 @@ test("buses due: a city's stops (or routes) asked alone, a big one never whole h
     const named = [...decodeURIComponent(url).matchAll(/(StopUID|RouteUID) eq '([^']+)'/g)];
     return json(named.length ? all.filter(r => named.some(([, f, v]) => r[f] === v)) : all);
   };
-  const ask = (qs, now = NOW) => handleTransit(new Request(`https://w/transit/eta?${qs}`), env, {}, '/transit/eta', { session: { s: 'S' }, fetchFn, now, cache });
-  const runningAt = (city, now) => handleTransit(new Request(`https://w/transit/running?city=${city}`), env, {}, '/transit/running', { session: { s: 'S' }, fetchFn, now, cache }).then(r => r.json());
+  const ask = (qs, now = NOW) => handleTransit(new Request(`https://w/transit/eta?${qs}`), env, {}, '/transit/eta', { session: { s: 'S' }, fetchFn, now, cache, free: false });
+  const runningAt = (city, now) => handleTransit(new Request(`https://w/transit/running?city=${city}`), env, {}, '/transit/running', { session: { s: 'S' }, fetchFn, now, cache, free: false }).then(r => r.json());
   const a = await (await ask('city=Taipei&stops=TPE1,TPE3')).json();
   assert.deepEqual(a.map(r => r.RouteUID), ['TPE10', 'TPE11', 'TPE12']);
   assert.equal(log.length, 1, 'a quiet city: these stops alone, not the whole city');
@@ -939,7 +939,7 @@ test("buses due, had=<s> (the phone's copy that old): a copy here no newer is re
   let n = 0;
   const fetchFn = async url => (url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : json([{ StopUID: 'HSZ1', RouteUID: 'HSZ10', EstimateTime: 600 - 30 * n++ }]));
   const ask = async (qs, now) => {
-    const res = await handleTransit(new Request(`https://w/transit/eta?${qs}`), env, {}, '/transit/eta', { session: { s: 'S' }, fetchFn, now, cache });
+    const res = await handleTransit(new Request(`https://w/transit/eta?${qs}`), env, {}, '/transit/eta', { session: { s: 'S' }, fetchFn, now, cache, free: false });
     return { est: (await res.json()).map(r => r.EstimateTime), age: Number(res.headers.get('X-Transit-Age')) };
   };
   assert.deepEqual(await ask('city=Hsinchu&stops=HSZ1', NOW), { est: [600], age: 0 });
@@ -982,7 +982,7 @@ test("buses due in a small city (新竹市): its whole list read once more stop 
     return new Response(JSON.stringify(all(t)).padEnd(590_000, ' '), { headers: { 'Content-Type': 'application/json' } });
   };
   const ask = async (qs, now) => {
-    const res = await handleTransit(new Request(`https://w/transit/eta?${qs}`), env, {}, '/transit/eta', { session: { s: 'S' }, fetchFn, now, cache });
+    const res = await handleTransit(new Request(`https://w/transit/eta?${qs}`), env, {}, '/transit/eta', { session: { s: 'S' }, fetchFn, now, cache, free: false });
     return { stops: (await res.json()).map(r => `${r.StopUID} ${r.DataTime}`), age: Number(res.headers.get('X-Transit-Age')) };
   };
   const whole = u => /EstimatedTimeOfArrival\/City\/\w+\?\$select=StopUID,[^&]*&\$top=60000(&|$)/.test(u);
@@ -1034,8 +1034,8 @@ test("公路客運's stops and routes asked together: a crowd at its own stops s
     if (u.includes('RealTimeByFrequency')) return json(named.map(id => ({ RouteUID: id, PlateNumb: `${id}-bus`, Direction: 0, BusPosition: { PositionLat: 24.7, PositionLon: 121.1 }, GPSTime: 't' })));
     return json(named.map(id => ({ StopUID: id, RouteUID: 'THB5700', EstimateTime: 60 })));
   };
-  const eta = async (stops, now, had = 0) => (await (await handleTransit(new Request(`https://w/transit/eta?city=InterCity&stops=${stops.join(',')}${had ? `&had=${had}` : ''}`), env, {}, '/transit/eta', { session: { s: 'S' }, fetchFn, now, cache })).json()).map(r => r.StopUID);
-  const gps = async (routes, now, had = 0) => (await (await handleTransit(new Request(`https://w/transit/gps?city=InterCity&routes=${routes.join(',')}${had ? `&had=${had}` : ''}`), env, {}, '/transit/gps', { session: { s: 'S' }, fetchFn, now, cache })).json()).map(r => r.RouteUID);
+  const eta = async (stops, now, had = 0) => (await (await handleTransit(new Request(`https://w/transit/eta?city=InterCity&stops=${stops.join(',')}${had ? `&had=${had}` : ''}`), env, {}, '/transit/eta', { session: { s: 'S' }, fetchFn, now, cache, free: false })).json()).map(r => r.StopUID);
+  const gps = async (routes, now, had = 0) => (await (await handleTransit(new Request(`https://w/transit/gps?city=InterCity&routes=${routes.join(',')}${had ? `&had=${had}` : ''}`), env, {}, '/transit/gps', { session: { s: 'S' }, fetchFn, now, cache, free: false })).json()).map(r => r.RouteUID);
   // One phone alone: its own stops' read, as before.
   assert.deepEqual(await eta(['THB102', 'THB101'], NOW), ['THB102', 'THB101']);
   assert.equal(log.length, 1);
@@ -1122,7 +1122,7 @@ test("buses' places, /transit/gps: a city's whole list read once for every route
     return json(ids.map(id => ({ RouteUID: id, PlateNumb: `${id}-${reads.length}`, Direction: 0, BusPosition: { PositionLat: 24.8, PositionLon: 120.97, GeoHash: 'wsqh' }, Speed: 30, Azimuth: 90, DutyStatus: 1, GPSTime: 't', UpdateTime: 'u' })));
   };
   const ask = async (qs, now) => {
-    const res = await handleTransit(new Request(`https://w/transit/gps?${qs}`), env, {}, '/transit/gps', { session: { s: 'S' }, fetchFn, now, cache });
+    const res = await handleTransit(new Request(`https://w/transit/gps?${qs}`), env, {}, '/transit/gps', { session: { s: 'S' }, fetchFn, now, cache, free: false });
     return { status: res.status, plates: (await res.json()).map?.(r => r.PlateNumb), age: res.headers.get('X-Transit-Age') };
   };
   // Two stop cards' lagging routes, a moment apart: one read of the city's whole list.
@@ -1131,7 +1131,7 @@ test("buses' places, /transit/gps: a city's whole list read once for every route
   assert.equal(reads.length, 1);
   assert.match(reads[0], /RealTimeByFrequency\/City\/Hsinchu\?\$select=RouteUID,PlateNumb,Direction,BusPosition,GPSTime/);
   // Each bus only as the phone reads it.
-  const one = await (await handleTransit(new Request('https://w/transit/gps?city=Hsinchu&routes=HSZ10'), env, {}, '/transit/gps', { session: { s: 'S' }, fetchFn, now: NOW + 3000, cache })).json();
+  const one = await (await handleTransit(new Request('https://w/transit/gps?city=Hsinchu&routes=HSZ10'), env, {}, '/transit/gps', { session: { s: 'S' }, fetchFn, now: NOW + 3000, cache, free: false })).json();
   assert.deepEqual(one, [{ RouteUID: 'HSZ10', PlateNumb: 'HSZ10-1', Direction: 0, BusPosition: { PositionLat: 24.8, PositionLon: 120.97 }, GPSTime: 't' }]);
   assert.doesNotMatch(reads[0], /filter/);
   // A phone whose copy is 20 s old, 20 s on: no newer here, so read now.

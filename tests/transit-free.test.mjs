@@ -61,3 +61,94 @@ test('a bike ask goes to the Runner (all Taiwan read there, not in an isolate\'s
   assert.equal(runsInRunner(req('basic/v2/Bike/Availability/City/Hsinchu'), '/transit/tdx'), true);
   assert.equal(runsInRunner(req('basic/v3/Rail/TRA/Alert'), '/transit/tdx'), false);
 });
+
+// ---- 新竹's buses ----
+import { hcTime, hcRoute, resetFree } from '../transit-free.js';
+import { handleTransit } from '../transit.js';
+const hc = JSON.parse(readFileSync(new URL('./fixtures/hsinchu-ibus.json', import.meta.url), 'utf8'));
+
+test("新竹's site's times in TDX's words: minutes to seconds, 即將進站, 進站中, a departure time Taiwan's today, 末班已過", () => {
+  const now = Date.parse('2026-11-10T02:50:00Z'); // 10:50 in Taiwan
+  assert.deepEqual(hcTime('5分', now), { StopStatus: 0, EstimateTime: 300 });
+  assert.deepEqual(hcTime('即將進站', now), { StopStatus: 0, EstimateTime: 60 });
+  assert.deepEqual(hcTime('進站中', now), { StopStatus: 0, EstimateTime: 0 });
+  assert.deepEqual(hcTime('11:30', now), { StopStatus: 1, NextBusTime: '2026-11-10T11:30:00+08:00' });
+  assert.deepEqual(hcTime('05:40', now), { StopStatus: 1, NextBusTime: '2026-11-11T05:40:00+08:00' }, "long past: tomorrow's");
+  assert.deepEqual(hcTime('末班已過', now), { StopStatus: 3 });
+  assert.deepEqual(hcRoute('THB5606A1_1'), { sub: 'THB5606A1', route: 'THB5606', dir: 0, pre: 'THB' });
+  assert.deepEqual(hcRoute('HSZ000702_2'), { sub: 'HSZ000702', route: 'HSZ0007', dir: 1, pre: 'HSZ' });
+});
+
+const NOW2 = Date.parse('2026-11-10T02:50:00Z');
+function hcFetch(log, { down = false } = {}) {
+  return async (url, init = {}) => {
+    log.push(url);
+    if (url.includes('tdx.transportdata.tw')) {
+      if (url.includes('token')) return json({ access_token: 'T', expires_in: 86400 });
+      return json([{ StopUID: 'THB99999', RouteUID: 'THB1818', Direction: 0, EstimateTime: 600 }]);
+    }
+    if (down) return new Response('down', { status: 503 });
+    if (url.includes('getStopRouteTime')) return json(url.includes('stopId=21282') ? hc.stop : { stop: null, status: 0, error: '找不到指定站牌' });
+    if (url.includes('getRoutesByClass')) return json(JSON.parse(init.body).class === '20' ? hc.class20 : { routes: [] });
+    if (url.includes('getRouteDetails')) return json(hc.route);
+    if (url.includes('getObuLls')) return json(JSON.parse(init.body).RouteId === 'THB560801_1' ? hc.obu : { Status: 1, Data: [] });
+    return assert.fail(`asked ${url}`);
+  };
+}
+const ask = async (path, qs, fetchFn, now = NOW2) => {
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', TDX_PER_MIN: '300' };
+  const res = await handleTransit(new Request(`https://w${path}?${qs}`), env, {}, path, { session: { s: 'S' }, fetchFn, now, cache: null });
+  return { status: res.status, rows: await res.json() };
+};
+
+test("a 新竹 stop's buses from 竹塹交通資訊網, TDX's rows, no TDX; a stop it doesn't know is TDX's, and not asked of the site again that day", async () => {
+  resetFree();
+  const log = [];
+  const fetchFn = hcFetch(log);
+  const a = await ask('/transit/eta', 'city=InterCity&stops=THB21282', fetchFn);
+  assert.equal(a.status, 200);
+  const r5608 = a.rows.find(r => r.RouteUID === 'THB5608');
+  assert.deepEqual({ ...r5608, DataTime: undefined }, { StopUID: 'THB21282', StopID: '21282', RouteUID: 'THB5608', SubRouteUID: 'THB560801', RouteName: { Zh_tw: '5608', En: '5608' }, Direction: 0, StopStatus: 1, NextBusTime: '2026-11-10T11:00:00+08:00', DataTime: undefined });
+  assert.equal(a.rows.find(r => r.SubRouteUID === 'THB5606A1').RouteName.Zh_tw, '5606', "a branch's route by its route's name");
+  assert.ok(!log.some(u => u.includes('tdx')), 'no TDX');
+  // Again within 20 s: the same read.
+  await ask('/transit/eta', 'city=InterCity&stops=THB21282', fetchFn, NOW2 + 10_000);
+  assert.equal(log.length, 1);
+  // A stop far from 新竹 beside it: TDX for that one only, both answered.
+  log.length = 0;
+  const b = await ask('/transit/eta', 'city=InterCity&stops=THB21282,THB99999', fetchFn, NOW2 + 30_000);
+  assert.ok(b.rows.some(r => r.StopUID === 'THB99999') && b.rows.some(r => r.StopUID === 'THB21282'));
+  assert.ok(log.some(u => u.includes('tdx') && u.includes('THB99999') && !u.includes('THB21282')), 'TDX asked for the far stop only');
+  log.length = 0;
+  await ask('/transit/eta', 'city=InterCity&stops=THB99999', fetchFn, NOW2 + 90_000);
+  assert.ok(!log.some(u => u.includes('getStopRouteTime')), 'not asked of the site again');
+});
+
+test("a 新竹 route's every stop with its bus's plate, and its buses' GPS, from the site; the site down past 2 minutes: TDX", async () => {
+  resetFree();
+  const log = [];
+  const e = await ask('/transit/eta', 'city=InterCity&routes=THB5608', hcFetch(log));
+  const at = e.rows.find(r => r.StopUID === 'THB135010');
+  assert.equal(at.EstimateTime, 300);
+  assert.equal(at.PlateNumb, 'KKA-3061');
+  assert.equal(e.rows.find(r => r.StopUID === 'THB135007').EstimateTime, 0);
+  const g = await ask('/transit/gps', 'city=InterCity&routes=THB5608', hcFetch(log));
+  assert.deepEqual(g.rows.map(r => [r.PlateNumb, r.Direction, r.BusPosition.PositionLat]), [['KKA-3061', 0, 24.7832]]);
+  assert.match(g.rows[0].GPSTime, /^2026-11-10T10:52:18\+08:00$/);
+  assert.ok(!log.some(u => u.includes('tdx')), 'no TDX');
+  log.length = 0;
+  const later = await ask('/transit/gps', 'city=InterCity&routes=THB5608', hcFetch(log, { down: true }), NOW2 + 60_000);
+  assert.equal(later.rows.length, 1, 'its last answer');
+  assert.ok(!log.some(u => u.includes('tdx')));
+  log.length = 0;
+  await ask('/transit/gps', 'city=InterCity&routes=THB5608', hcFetch(log, { down: true }), NOW2 + 5 * 60_000);
+  assert.ok(log.some(u => u.includes('tdx')), 'then TDX');
+});
+
+test("a route's whole stops or its buses go to the Runner (新竹's whole routes read there); a stop's times stay in the Worker", () => {
+  const req = qs => new Request(`https://api.jaypengx.com/transit/x?${qs}`);
+  assert.equal(runsInRunner(req('city=Hsinchu&routes=HSZ0007'), '/transit/gps'), true);
+  assert.equal(runsInRunner(req('city=InterCity&routes=THB5608'), '/transit/eta'), true);
+  assert.equal(runsInRunner(req('city=InterCity&stops=THB21282'), '/transit/eta'), false);
+  assert.equal(runsInRunner(req('city=Taichung&routes=TXG300'), '/transit/gps'), true, 'gps was the Runner\'s already');
+});

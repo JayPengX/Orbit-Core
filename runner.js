@@ -21,7 +21,7 @@
 // Nothing here changes what a route answers or what a job does.
 
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { freeHeavy } from './transit-free.js';
+import { freeHeavy, freeRoutesHeavy } from './transit-free.js';
 
 export const RUNNER_MARK = 'x-orbit-runner';
 export const RELAY_MARK = 'x-orbit-relay';
@@ -58,7 +58,8 @@ export function runsInRunner(request, path) {
   if (request.headers.has(RUNNER_MARK) || request.method === 'OPTIONS') return false;
   const p = path.replace(/^\/api(?=\/)/, '');
   // (A free source's list of all Taiwan, YouBike's, read and kept in the Runner: transit-free.js.)
-  if (p === '/transit/tdx' && freeHeavy(new URL(request.url).searchParams.get('p'))) return true;
+  const q = new URL(request.url).searchParams;
+  if ((p === '/transit/tdx' && freeHeavy(q.get('p'))) || freeRoutesHeavy(p, q)) return true;
   if (STAY.test(p)) return false;
   if (/yahoo/i.test(request.url)) return false;
   return true;
