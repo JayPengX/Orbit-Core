@@ -110,8 +110,11 @@ test('a phone whose Cache Storage never answers still reads; a read that never e
 });
 
 test("the family's packs: read from R2, kept under their old address, a missing pack a failure", async () => {
-  answer = url => (url.endsWith('/sports/mlb/2026.json') ? new Response('{"season":2026}') : new Response('', { status: 404 }));
+  let mode;
+  answer = (url, init) => ((mode = init?.cache), url.endsWith('/sports/mlb/2026.json') ? new Response('{"season":2026}') : new Response('', { status: 404 }));
   assert.deepEqual(await kit.packJson('sports/mlb/2026.json'), { season: 2026 });
+  // (Past the browser's own copy: the domain gives it 4 hours where the pack says 2 minutes.)
+  assert.equal(mode, 'no-cache');
   const old = k => k.includes(encodeURIComponent('https://jaypengx.github.io/Shared-Data/sports/mlb/2026.json'));
   await until(() => kept().some(old));
   assert.ok(kept().some(k => k.includes(encodeURIComponent('https://jaypengx.github.io/Shared-Data/sports/mlb/2026.json'))));

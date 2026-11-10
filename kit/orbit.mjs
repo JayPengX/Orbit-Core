@@ -970,7 +970,10 @@ export function packJson(path, { ttl = 3 * 3_600_000, timeout = 30_000 } = {}) {
   const url = `${PACKS_URL}${path}`;
   return keptJson(url, dataKey(`${PACKS_KEY}${path}`, ''), { ttl, keep: true }, async () => {
     const wait = patient(timeout);
-    const res = await fetch(url, { signal: wait.signal }).catch(error => (wait.done(), Promise.reject(error)));
+    // (Asked of the server each time: the domain hands a browser 4 hours
+    // (Cloudflare's Browser Cache TTL) where a pack says 2 minutes, so the
+    // browser's own copy would answer for hours; a pack unchanged is a 304.)
+    const res = await fetch(url, { signal: wait.signal, cache: 'no-cache' }).catch(error => (wait.done(), Promise.reject(error)));
     if (!res.ok) throw (wait.done(), Object.assign(new Error(`HTTP ${res.status}`), { status: res.status }));
     return wait.text(res);
   });
