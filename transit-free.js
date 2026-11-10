@@ -9,7 +9,8 @@
 //     at most and kept here; a city's list or the stations near a point.
 //   - 新竹's buses (竹塹交通資訊網), 臺北's and 新北's (the cities' open data).
 //   - 台鐵's day of trains (台鐵's own open data, ods.railway.gov.tw); its
-//     notices while every line runs whole (its 路線運行狀態 page).
+//     notices while every line runs whole (its 路線運行狀態 page); a train's
+//     delay (its 車次查詢).
 //   - 臺北捷運's trains coming in (the metro's own open file); 高雄捷運's and
 //     輕軌's next trains at a station (KRTC's 高捷e遊行); 機場捷運's (its
 //     platform screens).
@@ -1276,6 +1277,63 @@ async function traAlertFree(path, q, { fetchFn, now }) {
   return got.val == null ? null : { status: 200, body: got.val, age: Math.max(0, now - got.at), state: 'free' };
 }
 
+// ---- A 台鐵 train's delay -----------------------------------------------------------------
+
+// TDX's TrainLiveBoard of one train (`/TrainNo/<n>`) from 台鐵's own 車次查詢
+// (railway.gov.tw tip112 querybytrainno: the train's stops, and on the one it
+// last left and the next, 準點 or 誤點 N 分): the site's form token read each
+// 20 minutes, a train's page kept a minute. Every train at once is TDX's still.
+export const TRA_TRAIN = 'https://www.railway.gov.tw/tra-tip-web/tip/tip001/tip112';
+const TRA_ONE = /^basic\/v3\/Rail\/TRA\/TrainLiveBoard\/TrainNo\/(\d{1,5})$/;
+const TRA_STATIONS_ASK = 'basic/v3/Rail/TRA/Station';
+const zhSt = s => String(s || '').trim().replace(/台/g, '臺');
+// A train's page → TDX's row ({ TrainNo, TrainTypeName, StationID, StationName,
+// TrainStationStatus: 2 left it, 1 at it, DelayTime, UpdateTime }), or null
+// (not running now); `ids`: station name → { StationID, StationName }.
+export function traTrainRow(html, no, ids, now = Date.now()) {
+  const s = String(html);
+  const head = s.match(/icon-train[^"]*">\s*<\/span>\s*<span>\s*([^<]*?)\s*(\d+)\s*<\/span>/);
+  if (!head || head[2] !== String(no)) return null;
+  const i = s.indexOf('狀態</th>');
+  const table = i < 0 ? '' : s.slice(i, s.indexOf('</table>', i));
+  const said = [...table.matchAll(/<tr>\s*<td>([^<]*)<\/td>\s*<td>[^<]*<\/td>\s*<td>[^<]*<\/td>\s*<td>([^<]*)<\/td>/g)].map(m => [zhSt(m[1]), m[2].trim()]).filter(([, t]) => t);
+  const [name, text] = said[0] || [];
+  const st = ids.get(name);
+  const late = /^準點$/.test(text || '') ? 0 : Number((/^誤點\s*(\d+)\s*分$/.exec(text || '') || [])[1]);
+  if (!st || !Number.isFinite(late)) return null;
+  return { TrainNo: String(no), TrainTypeName: { Zh_tw: head[1].trim() }, StationID: st.StationID, StationName: st.StationName, TrainStationStatus: said.length > 1 ? 2 : 1, DelayTime: late, UpdateTime: twNow(now) };
+}
+async function traTrainFree(path, q, { fetchFn, env, now }) {
+  const m = TRA_ONE.exec(path);
+  if (!m || !env?.DATA) return m ? null : undefined;
+  if ([...q.keys()].some(k => k !== '$format')) return null;
+  const ids = (await held('tra:ids', TRA_FRESH, 7 * DAY, async () => {
+    const obj = await env.DATA.get(copyFile(TRA_STATIONS_ASK, new URLSearchParams(tdxCopies([]).find(a => a.startsWith(`${TRA_STATIONS_ASK}?`)).split('?')[1])));
+    const list = obj ? JSON.parse(await obj.text()) : null;
+    const rows = Array.isArray(list) ? list : list?.Stations;
+    if (!rows?.length) throw new Error('not copied');
+    const out = new Map();
+    for (const r of rows) if (!out.has(zhSt(r.StationName?.Zh_tw))) out.set(zhSt(r.StationName?.Zh_tw), { StationID: r.StationID, StationName: r.StationName });
+    return out;
+  }, now, 3000)).val;
+  const form = await held('tra:form', 20 * MIN, 20 * MIN, async () => {
+    const res = await fetchFn(`${TRA_TRAIN}/gobytime`, { signal: AbortSignal.timeout?.(8000) });
+    const token = res.ok ? ((await res.text()).match(/name="_csrf" value="([^"]+)"/) || [])[1] : '';
+    if (!token) throw new Error(`TRA form ${res.status}`);
+    return { token, cookie: (res.headers.getSetCookie?.() || []).map(c => c.split(';')[0]).join('; ') };
+  }, now, 3000);
+  const got = await held(`tra:train:${m[1]}`, MIN, 3 * MIN, async () => {
+    const day = twNow(now).slice(0, 10).replace(/-/g, '/');
+    const res = await fetchFn(`${TRA_TRAIN}/querybytrainno`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...(form.val.cookie ? { cookie: form.val.cookie } : {}) }, body: new URLSearchParams({ _csrf: form.val.token, rideDate: day, trainNo: m[1] }), signal: AbortSignal.timeout?.(8000) });
+    const html = res.ok ? await res.text() : '';
+    // (No timetable at all: the form gone stale, or no such train today; read the form again for the next ask.)
+    if (!html.includes('狀態</th>')) throw (kept.delete('tra:form'), new Error(`TRA train ${res.status}`));
+    const row = traTrainRow(html, m[1], ids, now);
+    return JSON.stringify({ UpdateTime: twNow(now), AuthorityCode: 'TRA', TrainLiveBoards: row ? [row] : [] });
+  }, now);
+  return { status: 200, body: got.val, age: Math.max(0, now - got.at), state: 'free' };
+}
+
 // ---- TDX's slow lists, copied ------------------------------------------------------------
 
 // What every phone asks the same way and seldom changes (a city's bus routes,
@@ -1319,7 +1377,7 @@ export async function freeTdx(path, query, { fetchFn = fetch, now = Date.now(), 
   const q = new URLSearchParams(query);
   try {
     const p = decodeURIComponent(path);
-    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await trtcFree(p, q, { fetchFn, env, now })) ?? (await krtcFree(p, q, { fetchFn, env, now })) ?? (await tymcFree(p, q, { fetchFn, env, now })) ?? (await traAlertFree(p, q, { fetchFn, now })) ?? (await copiedFree(p, q, { env, now }));
+    const got = (await bikes(p, q, { fetchFn, now })) ?? (await traFree(p, q, { fetchFn, now })) ?? (await hsrFree(p, q, { env, now })) ?? (await metroFree(p, q, { env, now })) ?? (await trtcFree(p, q, { fetchFn, env, now })) ?? (await krtcFree(p, q, { fetchFn, env, now })) ?? (await tymcFree(p, q, { fetchFn, env, now })) ?? (await traAlertFree(p, q, { fetchFn, now })) ?? (await traTrainFree(p, q, { fetchFn, env, now })) ?? (await copiedFree(p, q, { env, now }));
     if (got !== undefined) return got;
   } catch (err) {
     console.log('free source failed', path.slice(0, 80), String(err?.message || err).slice(0, 120));
