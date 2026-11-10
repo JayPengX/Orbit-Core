@@ -3,8 +3,8 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFeed, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, runNews, NEWS_PATH, NEWS_STATE, idOf, undated } from '../builders/news.js';
-import { OUTLETS, sideOf, partiesIn } from '../kit/news-outlets.mjs';
+import { parseFeed, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead } from '../builders/news.js';
+import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
 const NOW = Date.parse('2026-11-10T03:00:00Z');
@@ -135,6 +135,7 @@ test('a build reads every feed, keeps what it read, never writes an empty page o
   const r3 = await runNews({ store, now: NOW + 1_200_000, fetchImpl: async () => new Response('', { status: 500 }), feeds });
   assert.equal(r3.failed.length, 3);
   assert.equal(files.get(NEWS_PATH), before);
+  assert.ok(files.get(NEWS_PAST));
 });
 
 test('only stories two outlets or more carry are listed, the widest and newest first', () => {
@@ -148,4 +149,96 @@ test('only stories two outlets or more carry are listed, the widest and newest f
   ];
   const s = storiesOf(items, 'tw', NOW);
   assert.deepEqual(s.map(x => x.n), [3, 2]);
+});
+
+test('filler is left out by its section or its words; light headlines are told apart', () => {
+  assert.equal(fillerOf({ u: 'https://udn.com/news/story/7268/1', t: '今日運勢' }, 'zh'), 'section');
+  assert.equal(fillerOf({ u: 'https://x.tw/1', t: '12星座本週運勢 這3星座財運旺' }, 'zh'), 'fortune');
+  assert.equal(fillerOf({ u: 'https://x.tw/1', t: '威力彩頭獎槓龜 下期上看5億' }, 'zh'), 'lottery');
+  assert.equal(fillerOf({ u: 'https://x.tw/1', t: '女星曬比基尼身材 網友暴動' }, 'zh'), 'celebrity');
+  assert.equal(fillerOf({ u: 'https://x.tw/1', t: 'NBA／勇士逆轉湖人' }, 'zh'), 'sport');
+  assert.equal(fillerOf({ u: 'https://x.tw/1', t: '立法院三讀通過預算案' }, 'zh'), '');
+  assert.equal(fillerOf({ u: 'https://x.com/1', t: 'Powerball jackpot climbs to $900 million' }, 'en'), 'lottery');
+  assert.equal(fillerOf({ u: 'https://x.com/1', t: 'Senate passes the budget' }, 'en'), '');
+  assert.ok(softOf('全聯年菜開賣 買一送一', 'zh'));
+  assert.ok(softOf('他退黨原因曝', 'zh'));
+  assert.ok(!softOf('卓榮泰不副署老福法', 'zh'));
+});
+
+test('topics: a story outlets could take sides on has one; a game or a crash has none', () => {
+  assert.deepEqual(topicsOf(['Pokémon Legends Z-A sales top 10 million'], 'en'), []);
+  assert.deepEqual(topicsOf(['國1麻豆段聯結車追撞 全線封閉'], 'zh'), []);
+  assert.deepEqual(topicsOf(['烏來瀑布觀景平台 6遊客遭蜂螫送醫'], 'zh'), []);
+  assert.deepEqual(topicsOf(['賴清德出席國防論壇', '國軍漢光演習登場'], 'zh'), ['def', 'pol']);
+  assert.ok(topicsOf(['台積電10月營收創新高'], 'zh').includes('tech'));
+  assert.ok(topicsOf(['Trump tariffs hit Chinese chips'], 'en').includes('eco'));
+  for (const t of TOPICS) assert.ok(t.zh && t.en && t.zh_ instanceof RegExp && t.en_.length, t.id);
+  // Not News': a story with no topic isn't listed, however many carry it.
+  const crash = ['cna', 'ebc', 'tvbs', 'udn'].map((o, i) => item(o, `國1麻豆段聯結車追撞 全線封閉${i}`, NOW - H));
+  assert.equal(storiesOf(crash, 'tw', NOW).length, 0);
+});
+
+test("an outlet's page gives its picture and its own YouTube clip; one on every page is its channel's", () => {
+  const ld = `<meta property="og:image" content="https://img.pts.org.tw/1.jpg"><script type="application/ld+json">{"@type":"VideoObject","embedUrl":"https:\/\/www.youtube.com\/embed\/AbCdEfGhIjK"}</script>`;
+  assert.deepEqual(pageOf(ld), { i: 'https://img.pts.org.tw/1.jpg', y: ['AbCdEfGhIjK'] });
+  assert.deepEqual(pageOf('<iframe width="560" src="https://www.youtube.com/embed/ZyXwVuTsRqP?rel=0"></iframe>').y, ['ZyXwVuTsRqP']);
+  assert.deepEqual(pageOf('<meta content="http://x/1.jpg" property="og:image">'), { i: '', y: [] });
+  const a = { o: 'ebc', u: 'https://ebc/1' };
+  const b = { o: 'ebc', u: 'https://ebc/2' };
+  const c = { o: 'ebc', u: 'https://ebc/3' };
+  const pages = { 'https://ebc/1': { i: 'https://logo.png', y: ['LIVE0000000', 'OWN00000001'] }, 'https://ebc/2': { i: 'https://logo.png', y: ['LIVE0000000'] } };
+  const same = sameOf(pages, [a, b, c]);
+  assert.equal(same.clip('ebc', 'OWN00000001'), true);
+  assert.equal(same.clip('ebc', 'LIVE0000000'), false);
+  assert.equal(same.pagePic('ebc', 'https://logo.png'), false);
+  // (One page read: a clip can't yet be told from the channel's.)
+  assert.equal(sameOf({ 'https://ebc/1': pages['https://ebc/1'] }, [a]).clip('ebc', 'OWN00000001'), false);
+  assert.equal(bigPicture('https://attach.setn.com/newsimages/2026/11/10/5781919-XS.jpg'), 'https://attach.setn.com/newsimages/2026/11/10/5781919-PH.jpg');
+  assert.ok(isVideo('https://www.cbsnews.com/video/abc/'));
+  assert.ok(!isVideo('https://www.cbsnews.com/news/abc/'));
+});
+
+test("a story's clips and picture come from its outlets' pages; the build reads the top stories' pages", () => {
+  const its = ['pts', 'ebc', 'ltn'].map((o, i) => item(o, `立法院三讀通過總預算${i}`, NOW - H - i, { near: 0.5 }));
+  const pages = {
+    [its[0].u]: { i: 'https://pts/pic.jpg', y: ['OWNCLIP0001'] },
+    'https://pts.example/other': { i: '', y: [] }
+  };
+  const all = [...its, { o: 'pts', u: 'https://pts.example/other' }];
+  const s = storyOf(its, 'tw', NOW, { pages, same: sameOf(pages, all) });
+  assert.equal(s.img, 'https://pts/pic.jpg');
+  assert.deepEqual(s.clips[0].slice(0, 3), ['pts', 'OWNCLIP0001', its[0].u]);
+  // Pages to read: a clip outlet's for a story with no clip, the lead's for one with no picture.
+  const want = pagesToRead({ tw: [{ items: its.map(x => [x.o, x.t, x.u, x.at]), clips: [], img: '' }], intl: [] }, {});
+  assert.ok(want.includes(its[1].u) || want.includes(its[0].u));
+  assert.ok(want.length <= 12);
+});
+
+test('a story is kept for days, grows as coverage comes, and ranks by importance, not newness', () => {
+  const day = 24 * H;
+  const T = NOW - 3 * day;
+  const words = ['卓榮泰不副署老福法 批破壞憲政', '不副署老福法 卓榮泰：破壞憲政秩序', '老福法不副署 卓榮泰批憲政'];
+  const first = ['cna', 'udn', 'ltn'].map((o, i) => item(o, words[i], T + i * H));
+  const b1 = deskOf(first, [], T + 4 * H);
+  assert.equal(b1.tw.length, 1);
+  const id = b1.tw[0].id;
+  // The next day: three more outlets on it, with the first day's still in the window.
+  const second = ['tvbs', 'setn', 'chinatimes'].map((o, i) => item(o, `${words[i]} 藍委反擊`, T + 20 * H + i * H));
+  const b2 = deskOf([...first, ...second], b1.recs, T + 23 * H);
+  assert.equal(b2.tw[0].id, id);
+  assert.equal(b2.tw[0].n, 6);
+  assert.equal(b2.tw[0].days.length, 2);
+  // Two days on, the first day's headlines gone from the window: still that story.
+  const b3 = deskOf(second, b2.recs, T + 46 * H);
+  assert.equal(b3.tw[0].id, id);
+  assert.equal(b3.tw[0].m, 6);
+  // A fresh small story doesn't push it down: it carried six outlets over two days.
+  const fresh = ['pts', 'ebc', 'ettoday'].map((o, i) => item(o, `易遊網遭駭個資外洩${i}`, T + 46 * H));
+  const b4 = deskOf([...second, ...fresh], b3.recs, T + 47 * H);
+  assert.equal(b4.tw[0].id, id);
+  // Past three days with nothing new: the past's, kept 30 days (six outlets).
+  const b5 = deskOf([], b4.recs, T + 7 * day);
+  assert.equal(b5.tw.length, 0);
+  assert.equal(b5.past.tw[0].id, id);
+  assert.equal(deskOf([], b5.recs, T + 33 * day).past.tw.length, 0);
 });

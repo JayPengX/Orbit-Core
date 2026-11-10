@@ -264,6 +264,9 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 11-10 An outlet's place comes from a published source (`kit/news-outlets.mjs` BASIS) or its owner's stated stance marked weaker; never our own reading of its stories. No outlet placed 白: stories name the parties instead.
 - 11-10 Headlines, links, the outlet's short summary and feed picture only, each credited; every tap opens the outlet. No AI in the builder.
 - 11-10 Cloudflare goes out from Orbit-Core: News's site is published by Orbit-Core's `news-site.yml` with Orbit-Core's token (a secret can't be copied).
+- 11-10 News is a hub for any story outlets could take sides on: politics in the wide sense, tech, the economy, society too. A story with no topic (a game, a crash, a concert) isn't shown; the topics are one table (`kit/news-outlets.mjs` TOPICS), so widening is a line each.
+- 11-10 Stories rank by importance (how many outlets, how much they wrote, for how many days), not newness; a big story stays for weeks (`builders/news.js` keepFor), its page growing as coverage comes.
+- 11-10 Filler is left out (gossip, fortune, lottery, sport, viral, clickbait, promos: `fillerOf`, `softOf`). Every story with a picture shows it; an outlet's own YouTube clip (found on its article page) plays in YouTube's player; never a channel's page read, never a clip or picture kept.
 
 ### Orbit Pass
 - 10-27 Pass card: avatar, 里程碑 n/30 (tiers reached), account number without prefix, the medal strip on one row however many; no money on the Pass. (Replaces 10-23's n/9.)
