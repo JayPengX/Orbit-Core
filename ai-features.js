@@ -213,6 +213,48 @@ export const FEATURES = {
     clean: raw => (typeof raw?.fixed === 'string' && raw.fixed.trim() ? { ok: !!raw.ok, fixed: str(raw.fixed, 400), why: str(raw.why, 120), used: raw.used !== false } : null)
   },
 
+  // Orbit Words: 用新字聊天. A short chat that has the student use the
+  // words they're learning: each turn the AI fixes their last line (fewest
+  // changes, one line why) and answers with a question that invites one of
+  // the words not used yet. The phone keeps the chat and sends its last turns.
+  'words-chat': {
+    app: 'vocab',
+    tap: true,
+    models: ['haiku', 'luna'],
+    effort: { luna: 'low' },
+    maxIn: 3000,
+    perPass: 120,
+    perMinute: 20,
+    input(raw) {
+      const words = list(raw?.words, 6).map(w => str(w, 40)).filter(Boolean);
+      const turns = list(raw?.turns, 8)
+        .map(x => ({ who: x?.who === 'me' ? 'me' : 'ai', text: str(x?.text, 300) }))
+        .filter(x => x.text);
+      if (!words.length || !turns.length || turns.at(-1).who !== 'me') return null;
+      return { words, used: list(raw?.used, 6).map(w => str(w, 40)), turns: turns.slice(-8), en: raw?.lang === 'en' };
+    },
+    parts: ({ words, used = [], turns, en }) =>
+      text(
+        [
+          'You chat in English with a Taiwanese high-school student so they practise the words they are learning. Be warm, curious and brief, about everyday things a teenager in Taiwan knows (school, food, friends, weekends).',
+          `Their words: ${words.join(', ')}. Used well already: ${used.length ? used.join(', ') : 'none'}.`,
+          'fixed: their last line corrected with the fewest changes, "" when it is already natural and correct. Keep their idea.',
+          `why: when fixed, one short line on the main mistake${en ? ', in English' : ', in Traditional Chinese (台灣用語), ≤ 30 字'}; "" otherwise.`,
+          'used: which of their words their last line uses correctly (in a right meaning, any form).',
+          'reply: your next line, ≤ 25 words, simple English (CEFR B1): react to what they said, then one question that gives them a natural chance to use one word not used yet. Never use their words yourself, never explain them, never list them.',
+          'The chat so far (me = the student):',
+          ...turns.map(x => `${x.who}: ${x.text}`)
+        ].join('\n')
+      ),
+    schema: obj({ fixed: S, why: S, used: arr(S), reply: S }),
+    clean: (raw, { words }) => {
+      const reply = str(raw?.reply, 240);
+      if (!reply) return null;
+      const known = new Map(words.map(w => [w.toLowerCase(), w]));
+      return { fixed: str(raw?.fixed, 400), why: str(raw?.why, 120), used: [...new Set(list(raw?.used, 6).map(w => known.get(String(w).toLowerCase().trim())).filter(Boolean))], reply };
+    }
+  },
+
   // Orbit Words: 拍一頁變單字卡. A photo of a textbook page, a word list or
   // a worksheet: the English words it teaches, base forms. The phone matches
   // them to its own list (only those it has are kept) and stars them.

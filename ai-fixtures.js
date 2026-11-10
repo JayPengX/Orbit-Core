@@ -75,6 +75,11 @@ export const EXAMPLES = {
     { name: 'word missing', input: { word: 'reluctant', meaning: '不情願的', sentence: 'She did not want to go to school.' } },
     { name: 'english phone', input: { word: 'brief', meaning: '簡短的', sentence: 'Please make your speech more brief.', lang: 'en' } }
   ],
+  'words-chat': [
+    { name: 'first line, two words used', input: { words: ['reluctant', 'abandon', 'brief', 'deserve'], turns: [{ who: 'ai', text: 'Hi! How was school today? Tell me something that happened.' }, { who: 'me', text: 'I was reluctant to go to school because we had a test, and the teacher gave a brief talk.' }] } },
+    { name: 'a mistake to fix', input: { words: ['reluctant', 'abandon', 'brief', 'deserve'], used: ['reluctant'], turns: [{ who: 'ai', text: 'Hi! How was school today?' }, { who: 'me', text: 'I was reluctant to go.' }, { who: 'ai', text: 'Oh no, why? Did something make you want to give up?' }, { who: 'me', text: 'I want abandon my math homework yesterday because it too hard.' }] } },
+    { name: 'english phone', input: { words: ['generous', 'compete'], lang: 'en', turns: [{ who: 'ai', text: 'What did you do last weekend?' }, { who: 'me', text: 'My uncle is very generous, he buyed me a new bike.' }] } }
+  ],
   'words-cards': [
     {
       name: 'six words, easy to hard',
