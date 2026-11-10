@@ -356,7 +356,8 @@ test("The slow lists every phone asks the same way (a city's bus routes, 台鐵'
 
 // ---- 臺中's buses: the city's own bus site ----------------------------------------------------
 
-import { tcRow, TC_GQL } from '../transit-free.js';
+import { ebusRow, EBUS } from '../transit-free.js';
+const TC_GQL = EBUS.Taichung.gql;
 const tc = JSON.parse(readFileSync(new URL('./fixtures/taichung-buses.json', import.meta.url), 'utf8'));
 const NOW_TC = Date.parse(tc.at);
 const tcEnv = { DATA: { get: async k => (k === 'bus/Taichung.json' ? { json: async () => tc.pack } : null) }, TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', TDX_PER_MIN: '300' };
@@ -391,7 +392,7 @@ const askTc = async (path, qs, fetchFn, now = NOW_TC) => {
 
 test("臺中's times in TDX's words, as its own page reads them: 今日未營運, 末班駛離, not stopping, the buses coming (soonest first), else the timetable's next", () => {
   const n = x => ({ goBack: 1, comeTime: '', isOperationDay: true, isSuspended: false, clogType: 0, etas: [], ...x });
-  const row = x => tcRow(n(x), 'TXG8163', 'TXG101', null, NOW_TC);
+  const row = x => ebusRow(n(x), 'TXG8163', 'TXG101', null, NOW_TC);
   const bus = [{ etaTime: 2, isLast: false, busId: 'A' }];
   assert.equal(row({ isOperationDay: false, etas: bus }).StopStatus, 4);
   assert.equal(row({ isSuspended: true, comeTime: '15:00' }).StopStatus, 3);
@@ -456,4 +457,72 @@ test("臺中's site down: its last answer for 2 minutes, then TDX; a 臺中 stop
   await askTc('/transit/eta', 'city=Taichung&stops=TXG8163', tcFetch(log, { down: true }), NOW_TC + 5 * 60_000);
   assert.ok(log.some(x => typeof x === 'string' && x.includes('TXG8163')), 'then TDX');
   assert.equal(runsInRunner(new Request('https://w/transit/eta?city=Taichung&stops=TXG8163'), '/transit/eta'), true);
+});
+
+// ---- 桃園's buses: the same maker's site as 臺中's ---------------------------------------------
+
+const ty = JSON.parse(readFileSync(new URL('./fixtures/taoyuan-buses.json', import.meta.url), 'utf8'));
+const NOW_TY = Date.parse(ty.at);
+const tyEnv = { DATA: { get: async k => (k === 'bus/Taoyuan.json' ? { json: async () => ty.pack } : null) }, TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', TDX_PER_MIN: '300' };
+// (桃園's GraphQL answered from a real read of routes 712 (a loop: TDX's one way, the site's two halves) and 3550, 2026-11-10.
+// Asked a way a stop isn't on, 桃園 answers 今日未營運, as it does.)
+function tyFetch(log) {
+  return async (url, init) => {
+    if (url.includes('tdx.transportdata.tw')) {
+      log.push(url);
+      return url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : json([]);
+    }
+    if (url !== EBUS.Taoyuan.gql) return assert.fail(`asked ${url}`);
+    const body = JSON.parse(init.body);
+    log.push(body);
+    if (body.variables?.t) {
+      const edges = body.variables.t.map(t => ({ node: { xno: t.xno, ...((ty.routes[t.xno]?.estimateTimes.edges || []).find(e => e.node.id === t.stationId && e.node.goBack === t.goBack)?.node || { comeTime: '', isOperationDay: false, isSuspended: false, isConstruction: false, isEvent: false, etas: [], goBack: t.goBack }), id: String(t.stationId) } }));
+      return json({ data: { stationEstimates: { edges } } });
+    }
+    const data = {};
+    for (const [, alias, x] of body.query.matchAll(/(r\d+): route\(xno: (\d+)/g)) data[alias] = ty.routes[x] ? { id: x, ...ty.routes[x] } : { id: '0', estimateTimes: { edges: [] }, buses: { edges: [] } };
+    return json({ data });
+  };
+}
+const askTy = async (path, qs, fetchFn, now = NOW_TY) => {
+  const res = await handleTransit(new Request(`https://w${path}?${qs}`), tyEnv, {}, path, { session: { s: 'S' }, fetchFn, now, cache: null });
+  return { status: res.status, rows: await res.json() };
+};
+
+test("桃園's buses from its own site (臺中's maker): a stop's routes only the ways it's on, a loop's two halves TDX's one way (the sooner), a route's stops, its buses; no TDX", async () => {
+  resetFree();
+  const log = [];
+  const halves = ty.routes[712].estimateTimes.edges.filter(e => e.node.id === 9566).map(e => e.node);
+  assert.equal(halves.length, 2, 'the loop turns at 9566: on both halves');
+  const a = await askTy('/transit/eta', 'city=Taoyuan&stops=TAO9566,TAO611', tyFetch(log));
+  const loop = a.rows.filter(r => r.StopUID === 'TAO9566' && r.RouteUID === 'TAO712');
+  assert.equal(loop.length, 1);
+  assert.equal(loop[0].Direction, 0);
+  const soon = Math.min(...halves.flatMap(n => n.etas.map(e => e.etaTime * 60)));
+  if (Number.isFinite(soon)) assert.equal(loop[0].EstimateTime, soon);
+  const first = a.rows.find(r => r.StopUID === 'TAO611' && r.RouteUID === 'TAO3550');
+  assert.equal(first.Direction, 1);
+  assert.notEqual(first.StopStatus, 4, 'never the way it isn\'t on (桃園: 今日未營運)');
+  const asked = log.filter(x => x.variables).flatMap(x => x.variables.t);
+  assert.deepEqual(asked.filter(t => t.stationId === 611), [{ xno: 3550, stationId: 611, goBack: 2 }]);
+  assert.ok(!log.some(x => typeof x === 'string'), 'no TDX');
+  // A route's every stop, one row a stop and way; its buses one way, timed by the read.
+  const r = await askTy('/transit/eta', 'city=Taoyuan&routes=TAO712', tyFetch(log));
+  const keys = r.rows.map(x => `${x.StopUID}|${x.Direction}`);
+  assert.equal(new Set(keys).size, keys.length);
+  assert.ok(r.rows.length > 40 && r.rows.every(x => x.Direction === 0 && x.RouteUID === 'TAO712'));
+  const g = await askTy('/transit/gps', 'city=Taoyuan&routes=TAO712', tyFetch(log));
+  assert.equal(g.rows.length, ty.routes[712].buses.edges.length);
+  assert.ok(g.rows.every(b => b.Direction === 0 && b.GPSTime === '2026-11-10T14:28:09+08:00'));
+});
+
+test("桃園's site answers a part at a time: a board's stops 12 an ask and the asks at once, a route's stops 6 routes an ask", async () => {
+  resetFree();
+  const log = [];
+  const stops = [...new Set(ty.pack.routes.flatMap(r => r.ways.flatMap(w => w[3])))].slice(0, 20);
+  const a = await askTy('/transit/eta', `city=Taoyuan&stops=${stops.join(',')}`, tyFetch(log));
+  assert.ok(a.rows.length >= 20);
+  const times = log.filter(x => x.variables);
+  assert.ok(times.length > 1 && times.every(x => x.variables.t.length <= 12));
+  assert.ok(log.filter(x => x.query && !x.variables).every(x => x.query.match(/route\(xno/g).length <= 6));
 });
