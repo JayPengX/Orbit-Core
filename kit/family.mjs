@@ -22,7 +22,7 @@
 //   sports.follows  [{ league, id, name, abbr }] the teams followed
 //   stock.holds     [{ code, name, market }] what the account holds (names only, never money)
 //   vocab.due       { day, n } words due for review today
-//   transit.trips   [{ name, from: { lat, lon, name }, to: {…} }] saved trips
+//   transit.trips   [{ name, from: { lat, lon, name } or null (from here), to: {…} }] saved trips
 //   transit.ride    { id, at, name, fare, modes } the latest planned trip with a fare (Money's 車資記帳)
 //   weather.rain    { at, next: { from, to, mm, word } | null } the next rain at home, by the radar and the hour
 // Places (place.home / place.school / place.work) are the family's, written
