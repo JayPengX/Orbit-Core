@@ -716,3 +716,43 @@ test("台鐵's notices: every line running whole on its 路線運行狀態 page 
   assert.equal(await freeTdx('basic/v3/Rail/TRA/Alert', '', { fetchFn, now: NOW + 6 * 60_000 }), null, 'a stretch blocked: TDX');
   assert.equal(asked, 2);
 });
+
+test("a 台鐵 train's delay from 台鐵's own 車次查詢 (the station it last left and the next say 誤點 N 分), in TDX's TrainLiveBoard/TrainNo shape; the form read once, a train's page kept a minute; a train not running: no row", async () => {
+  const { traTrainRow, TRA_TRAIN, copyFile, tdxCopies } = await import('../transit-free.js');
+  const fx = JSON.parse(readFileSync(new URL('./fixtures/tra-trains.json', import.meta.url), 'utf8'));
+  const now = Date.parse('2026-11-10T17:08:00+08:00');
+  const ids = new Map(fx.Stations.Stations.map(s => [s.StationName.Zh_tw, { StationID: s.StationID, StationName: s.StationName }]));
+  assert.deepEqual(traTrainRow(fx.pages['2194'], '2194', ids, now), { TrainNo: '2194', TrainTypeName: { Zh_tw: '區間' }, StationID: '1000', StationName: fx.Stations.Stations.find(s => s.StationID === '1000').StationName, TrainStationStatus: 2, DelayTime: 4, UpdateTime: '2026-11-10T17:08:00+08:00' });
+  const brief = r => r && [r.StationID, r.TrainStationStatus, r.DelayTime];
+  assert.deepEqual(brief(traTrainRow(fx.pages['3247'], '3247', ids, now)), ['3470', 2, 5], '斗六 left, 5 late');
+  const lastOnly = fx.pages['3247'].replace(/<td>誤點 5 分<\/td>(?![\s\S]*<td>誤點 5 分<\/td>)/, '<td></td>');
+  assert.deepEqual(brief(traTrainRow(lastOnly, '3247', ids, now)), ['3470', 1, 5], 'one stop said: at it');
+  assert.equal(traTrainRow(fx.pages['1754'], '1754', ids, now), null, 'run its course: none');
+  assert.equal(traTrainRow(fx.pages['2194'], '2195', ids, now), null, "another train's page");
+  assert.equal(traTrainRow(fx.pages['2194'].replace('誤點 4 分', '準點').replace('誤點 4 分', '準點'), '2194', ids, now).DelayTime, 0);
+  assert.equal(traTrainRow(fx.pages['2194'].replace('icon-train"', 'icon-train tzechiang"').replace('區間2194', '自強2194'), '2194', ids, now).TrainTypeName.Zh_tw, '自強', "a class's own mark");
+
+  resetFree();
+  const ask = tdxCopies([]).find(a => a.startsWith('basic/v3/Rail/TRA/Station?'));
+  const file = copyFile('basic/v3/Rail/TRA/Station', new URLSearchParams(ask.split('?')[1]));
+  const env = { DATA: { get: async k => (k === file ? { text: async () => JSON.stringify(fx.Stations) } : null) } };
+  const asked = [];
+  const fetchFn = async (u, o = {}) => {
+    assert.ok(String(u).startsWith(TRA_TRAIN));
+    if (!o.method) return asked.push('form'), new Response('<input type="hidden" name="_csrf" value="tok-1"/>', { headers: { 'Set-Cookie': 'T4TIPSESSIONID=abc; path=/' } });
+    const b = new URLSearchParams(o.body);
+    assert.equal(b.get('_csrf'), 'tok-1');
+    assert.equal(b.get('rideDate'), '2026/11/10');
+    asked.push(b.get('trainNo'));
+    return new Response(fx.pages[b.get('trainNo')] || '<html>查無資料</html>');
+  };
+  const one = no => freeTdx(`basic/v3/Rail/TRA/TrainLiveBoard/TrainNo/${no}`, '$format=JSON', { env, fetchFn, now });
+  const got = await one('2194');
+  assert.equal(got.state, 'free');
+  assert.deepEqual(JSON.parse(got.body).TrainLiveBoards.map(r => [r.TrainNo, r.StationID, r.DelayTime]), [['2194', '1000', 4]]);
+  assert.deepEqual(JSON.parse((await one('1754')).body).TrainLiveBoards, []);
+  await one('2194');
+  assert.deepEqual(asked, ['form', '2194', '1754'], 'the form once; a train once a minute');
+  assert.equal(await one('9999'), null, 'no such train: TDX');
+  assert.equal(await freeTdx('basic/v3/Rail/TRA/TrainLiveBoard', '', { env, fetchFn, now }), null, 'every train: TDX');
+});
