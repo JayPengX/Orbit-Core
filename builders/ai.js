@@ -108,17 +108,20 @@ export async function newsSides({ store, env, ctx, cap, until, now = Date.now() 
     else need.push([s, r]);
   }
   let made = 0, calls = 0;
+  const missed = [];
   for (let i = 0; i < need.length && Date.now() < until; i += SIDES_BATCH) {
     const batch = need.slice(i, i + SIDES_BATCH);
     const r = await aiOnce(env, ctx, 'news-sides', { stories: batch.map(([s, reg]) => sideFacts(s, reg)) }, cap);
     calls++;
     if (!r) break;
-    if (r.error) continue;
-    for (const [s] of batch) if (r.out[s.id]) (keep[s.id] = { ...r.out[s.id], m: s.m || 0, at: now }), made++;
+    // (What failed, said in the run's result: an error, or the stories its check let go.)
+    if (r.error) missed.push(r.error);
+    else for (const [s] of batch) if (r.out?.[s.id]) (keep[s.id] = { ...r.out[s.id], m: s.m || 0, at: now }), made++;
+    else missed.push(`dropped ${s.id}`);
   }
   for (const [s] of need) if (!keep[s.id] && was[s.id]) keep[s.id] = was[s.id];
   await store.put(NEWS_SIDES, { built: now, sides: keep });
-  return { made, calls, kept: Object.keys(keep).length };
+  return { made, calls, kept: Object.keys(keep).length, ...(missed.length ? { missed: missed.slice(0, 6) } : {}) };
 }
 
 // ---- Words: the list's study cards, made once ----
