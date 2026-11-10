@@ -105,6 +105,7 @@ export function resetMeter() {
   Object.assign(lastMeter, { month: '', stored: null, readAt: 0 });
   mirrored.clear();
   googleDay.outUntil = 0;
+  resetGuard();
 }
 // Google's day used up: Compute Routes answers 429 past 100 asks a day on
 // this project (ComputeRoutesRequestsPerDay, seen 2026-11-10: gone by 10:50
@@ -997,10 +998,33 @@ export function tdxPoints(used, now = Date.now(), book = TDX_BOOK) {
 // up to 10% short of it, 4x to 25%, 8x past; the month's last 5% of points:
 // an advanced answer every 5 minutes at most (30x), basic ones 3x. Slower,
 // never off.
-export function tdxGuard({ month, today }, now = Date.now()) {
+//
+// On the free tier (tdxPlan: 3 points a month from 12-01) a day's share for
+// people instead: the month's points to 95% (TDX stops at 105%), less what
+// the bus build and our tools may still take (their own caps), over the days
+// left. People's use today against it keeps every TDX answer longer: under
+// half as it is, to 80% 2x, to the share 4x, past it 30x (a bus estimate's
+// 15 s kept 7 minutes, a notice's 10 minutes 5 hours), their month's share
+// spent 120x; past 95% of the month TDX isn't asked at all (`stop`: copies
+// only, whatever their age). Slower, never off while a copy is there.
+// `build`, `dev`: their own counts ({ month, today } points, tdxPoints's).
+export function tdxGuard({ month, today, build = null, dev = null }, now = Date.now()) {
   const tw = new Date(now + 8 * HOUR);
   const day = tw.getUTCDate();
   const monthDays = new Date(Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth() + 1, 0)).getUTCDate();
+  const plan = tdxPlan(now);
+  if (!plan.paid) {
+    if (month >= plan.month * 0.95) return { advanced: 120, basic: 120, why: 'month', stop: true };
+    const daysLeft = monthDays - day + 1;
+    const buildLeft = Math.max(0, buildTdxMonth(now) - ((build?.month || 0) - (build?.today || 0)));
+    const pool = plan.month * 0.95 - (month - today) - buildLeft - devTdxDay(now) * daysLeft;
+    const share = pool / daysLeft;
+    const used = Math.max(0, today - (build?.today || 0) - (dev?.today || 0));
+    if (share <= 0) return { advanced: 120, basic: 120, why: 'share', share: 0, used };
+    const r = used / share;
+    const k = r < 0.5 ? 1 : r < 0.8 ? 2 : r < 1 ? 4 : 30;
+    return { advanced: k, basic: k, why: k > 1 ? 'day' : '', share, used };
+  }
   const left = TDX_POINTS.month - month;
   if (left <= TDX_POINTS.month * 0.05) return { advanced: 30, basic: 3, why: 'month' };
   const pace = Math.max(1, day > 1 ? (month - today) / (day - 1) : 0);
@@ -1010,14 +1034,26 @@ export function tdxGuard({ month, today }, now = Date.now()) {
   const short = -room / Math.max(need, 1);
   return { advanced: short < 0.1 ? 2 : short < 0.25 ? 4 : 8, basic: 1, why: 'day', room, pace };
 }
+// The guard now, from the meter (people's, the build's, our tools'), a few seconds kept.
+let guardKept = { at: 0, env: null, g: null };
+export async function guardNow(env, now = Date.now()) {
+  if (guardKept.env === env && now - guardKept.at < 5000 && now >= guardKept.at) return guardKept.g;
+  const pts = async prefix => tdxPoints(await tdxUse(env, now, prefix).catch(() => ({})), now, prefix ? {} : TDX_BOOK);
+  const g = tdxGuard({ ...(await pts('')), build: await pts('build:'), dev: await pts('dev:') }, now);
+  guardKept = { at: now, env, g };
+  return g;
+}
+export const resetGuard = () => (guardKept = { at: 0, env: null, g: null });
 // A rule's fresh time now: a live one's from the settings (YouBike its own),
-// stretched by the guard for its kind; the rest as written.
+// stretched by the guard for its kind; the rest as written (on the free tier
+// stretched too).
 export async function freshOf(rule, env = null, path = '', now = Date.now()) {
-  if (rule.tier !== 'live' || /THSR/.test(rule.re.source)) return rule.fresh;
-  const d = await devNow();
-  const base = (/Bike/.test(rule.re.source) ? d.tdxBike : d.tdxLive) * 1000;
+  const live = rule.tier === 'live' && !/THSR/.test(rule.re.source);
+  if (!live && (!env || tdxPlan(now).paid)) return rule.fresh;
+  const d = live ? await devNow() : null;
+  const base = live ? (/Bike/.test(rule.re.source) ? d.tdxBike : d.tdxLive) * 1000 : rule.fresh;
   if (!env) return base;
-  const g = tdxGuard(tdxPoints(await tdxUse(env, now).catch(() => ({})), now), now);
+  const g = await guardNow(env, now);
   return base * (tdxKind(path) === 'b' ? g.basic : g.advanced);
 }
 
@@ -1129,6 +1165,8 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
     const p = (async () => {
       if (dev && !(await devTdxRoom(env, now))) return { status: 429, state: 'devcap' };
       if (by === 'build' && !(await buildTdxRoom(env, now))) return { status: 429, state: 'buildcap' };
+      // (The free tier's month all but spent: TDX not asked, copies only.)
+      if (!tdxPlan(now).paid && (await guardNow(env, now)).stop) return { status: 429, state: 'busy' };
       if (!paced(env, now)) return { status: 429, state: 'busy' };
       const token = await tdxAccess(env, fetchFn, now);
       if (!token) return { status: 503, state: 'nokey' };

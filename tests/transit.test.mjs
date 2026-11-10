@@ -1301,6 +1301,29 @@ test("the bus build's TDX asks come from its own month of points (BUILD_TDX_CAP 
   assert.ok(buildTdxMonth(Date.parse('2026-12-02T00:00:00+08:00')) < 1, "on TDX's free tier a fraction of its 3 points");
 });
 
+test("on TDX's free tier, past 95% of the month TDX isn't asked: a copy of any age answers, none is TDX_BUSY; a notice kept longer as the day's share goes", async () => {
+  fresh();
+  const kv = memKv();
+  const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', RATE_LIMIT_KV: kv, TDX_PER_MIN: '100' };
+  const cache = memCache();
+  let calls = 0;
+  const fetchFn = async url => (url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : (calls++, json([{ n: calls }])));
+  const at = Date.parse('2026-12-10T04:00:00Z');
+  const alert = 'basic/v2/Bus/Alert/City/Taoyuan';
+  assert.equal((await tdxGet(env, alert, { fetchFn, cache, now: at })).state, 'miss');
+  // Over half the day's share used: a notice's 10 minutes kept 20.
+  resetMeter();
+  await kv.put(`transit:use:${billingMonth(at)}`, JSON.stringify({ 'tdx:b:2026-12-10': 0.05 * 1500 }));
+  assert.equal((await tdxGet(env, alert, { fetchFn, cache, now: at + 15 * 60_000 })).state, 'hit');
+  // The month all but spent.
+  resetMeter();
+  await kv.put(`transit:use:${billingMonth(at)}`, JSON.stringify({ 'tdx:b:2026-12-09': 2.9 * 1500 }));
+  const old = await tdxGet(env, alert, { fetchFn, cache, now: at + 5 * 3_600_000 });
+  assert.deepEqual([old.status, JSON.parse(old.body)[0].n, calls], [200, 1, 1]);
+  const none = await tdxGet(env, 'basic/v2/Bus/Alert/City/Taichung', { fetchFn, cache, now: at + 5 * 3_600_000 });
+  assert.deepEqual([none.status, JSON.parse(none.body).code, calls], [429, 'TDX_BUSY', 1]);
+});
+
 test("TDX's GTFS streamed through for our tools only (0 points): all Taiwan's, or one operator's; nothing else", async () => {
   fresh();
   const env = { TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', RATE_LIMIT_KV: memKv() };
