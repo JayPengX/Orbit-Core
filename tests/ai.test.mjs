@@ -112,3 +112,11 @@ test('the AI tab: spend by provider, money left from the balance typed, speed an
   assert.equal(h['money-say'].failToday, 1);
   assert.equal(h['law-chat'].mid, 9000);
 });
+
+test('effort: a word for every model, or only the models a map names', async () => {
+  const { effortFor } = await import('../ai.js');
+  assert.equal(effortFor({ effort: 'low' }, 'haiku'), 'low');
+  assert.equal(effortFor({ effort: { luna: 'low' } }, 'luna'), 'low');
+  assert.equal(effortFor({ effort: { luna: 'low' } }, 'haiku'), null);
+  assert.equal(effortFor({}, 'haiku'), null);
+});

@@ -58,6 +58,11 @@ export function jsonOf(text) {
 // One model's answer to a feature's parts. Claude's and OpenAI's straight
 // (through the Taiwan relay); Gemini's through `gemini` (worker.js's, with
 // its Flash-Lite fallback) when the caller has one. → the parsed JSON, or a throw.
+// A feature's effort for one model: a word for all, or a map by model; a
+// model the map doesn't name gets its own default (the map itself sent to
+// Claude was a 400, and every tap feature fell to its second model).
+export const effortFor = (f, m) => (typeof f.effort === 'string' ? f.effort : f.effort && typeof f.effort === 'object' ? (f.effort[m] ?? null) : null);
+
 export async function askModel(env, ctx, feature, model, parts, schema, { effort = null, gemini = null, timeoutMs = 30_000 } = {}) {
   let res;
   const t0 = Date.now();
@@ -143,7 +148,7 @@ export async function runFeature(env, ctx, name, input, { gemini = null, answers
   for (const m of f.models) {
     const model = MODELS[m] || m;
     try {
-      const raw = await askModel(env, ctx, name, model, parts, schema, { effort: f.effort?.[m] ?? f.effort ?? null, gemini, timeoutMs: f.timeoutMs || 30_000 });
+      const raw = await askModel(env, ctx, name, model, parts, schema, { effort: effortFor(f, m), gemini, timeoutMs: f.timeoutMs || 30_000 });
       const ask = f.clarify ? askOf(raw, answers, Object.fromEntries((f.pick || []).map(k => [k, input?.[`${k}s`] || []]))) : null;
       const out = await f.clean(raw, input);
       if (out != null || ask) return { out, ask, model };
