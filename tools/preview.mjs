@@ -14,7 +14,8 @@
 //                          [--clock 2026-10-06T10:05]  (the page's clock, Taipei time)
 //                          [--radar 3 [--radar-in 20] [--radar-for 30]]  (Weather: a shower that hard, mm an hour, coming on the radar)
 //                          [--snap '{json}']  (the wallet's snap to start with)
-//                          [--fixture 'text-in-url=file.json']  (repeatable: that saved answer
+//                          [--ai-log file]  (each AI ask without a saved answer, a JSON line: build.yml as-phone)
+//                          [--fixture 'text-in-url=file.json']  (repeatable: that saved answer; 'feature:<name>=' an AI feature's
 //                          for any upstream URL containing the text, e.g. when Yahoo rate-limits;
 //                          the file is read at each ask, so swapping it mid-run changes the game)
 //                          [--timing]  (loading speed: when the loading screen went away, how
@@ -140,6 +141,7 @@ const payloadFile = opt('payload', '');
 // back on the next sign-in or reopen: a demo account built by using the app
 // (follows, a watchlist, a timetable), for --payload later (tools/shots.mjs --account).
 const keepAccount = opt('keep-account', '');
+const aiLog = opt('ai-log', '');
 const fixtures = [];
 for (let f = opt('fixture', ''); f; f = opt('fixture', '')) {
   // (Split at the last '=': the text can be a URL's own, 'dates=20261017'.)
@@ -792,7 +794,11 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
   const body = req.postDataJSON?.() || {};
   // The AI (/law-ask, /law-chat, the family's /ai) has no dev door (it costs): a
   // saved answer only when one is given (--fixture 'law-ask=file.json', '/ai=file.json'), for a sheet's layout.
-  const aiFixture = fixtures.find(([text]) => ['/law-ask', '/law-chat', '/ai'].includes(new URL(req.url()).pathname) && req.url().includes(text));
+  // ('feature:<name>' matches an /ai ask's feature or a /law-ask's mode instead of the URL.)
+  const aiPath = new URL(req.url()).pathname;
+  const aiFixture = fixtures.find(([text]) => ['/law-ask', '/law-chat', '/ai', '/class-news'].includes(aiPath) && (text.startsWith('feature:') ? [body.feature, body.mode].includes(text.slice(8)) : req.url().includes(text)));
+  // --ai-log file: each AI ask without a saved answer, as the phone sent it (for tools/shots/ai/, build.yml as-phone).
+  if (!aiFixture && aiLog && ['/law-ask', '/law-chat', '/ai', '/class-news'].includes(aiPath)) writeFileSync(aiLog, `${JSON.stringify({ path: aiPath, body })}\n`, { flag: 'a' });
   if (aiFixture) return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: readFileSync(aiFixture[1], 'utf8') });
   // Orbit Securities' orders, plans and 新股申購 (stock-fill.js): the
   // Worker's own code on a store of the run's, today's real data.
