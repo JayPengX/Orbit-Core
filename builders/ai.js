@@ -87,6 +87,7 @@ export async function newsLines({ store, env, ctx, cap, until }) {
 const NEWS_SIDES = 'news/sides.json';
 export const SIDES_TOP = { tw: 8, intl: 4 };
 const SIDES_BATCH = 4;
+export const SIDES_RETRY = 2 * 3_600_000, SIDES_TRIES = 3;
 // (The topics sides frame: a company's revenue or a typhoon reads the same from both ends.)
 const FRAMED = new Set(['pol', 'cs', 'world', 'def', 'law']);
 const ENDS = { tw: ['g', 'b'], intl: ['l', 'r'] };
@@ -107,14 +108,22 @@ export function sideFacts(s, region) {
 export async function newsSides({ store, env, ctx, cap, until, now = Date.now() }) {
   const index = await store.json('news/index.json');
   if (!index) return { skipped: 'no index' };
-  const was = (await store.json(NEWS_SIDES))?.sides || {};
+  const prev = await store.json(NEWS_SIDES);
+  const was = prev?.sides || {};
+  // (A story no answer could be kept for is asked again only after SIDES_RETRY, SIDES_TRIES times at
+  // most: before, a story the check kept dropping was asked every run, a Sonnet call each 10–20 minutes.)
+  const tries = {};
   const front = ['tw', 'intl'].flatMap(r => (index[r] || []).filter(s => sidesWanted(s, r)).slice(0, SIDES_TOP[r]).map(s => [s, r]));
   const keep = {};
   const need = [];
   for (const [s, r] of front) {
     const old = was[s.id];
+    const t = prev?.tries?.[s.id];
+    if (t) tries[s.id] = t;
     if (old && ((s.m || 0) < (old.m || 0) * 2 || now - (old.at || 0) < 6 * 3_600_000)) keep[s.id] = old;
-    else need.push([s, r]);
+    else if (t && (t.n >= SIDES_TRIES || now - t.at < SIDES_RETRY) && (s.m || 0) < (t.m || 0) * 2) {
+      if (old) keep[s.id] = old;
+    } else need.push([s, r]);
   }
   let made = 0, calls = 0;
   const missed = [];
@@ -125,11 +134,18 @@ export async function newsSides({ store, env, ctx, cap, until, now = Date.now() 
     if (!r) break;
     // (What failed, said in the run's result: an error, or the stories its check let go.)
     if (r.error) missed.push(r.error);
-    else for (const [s] of batch) if (r.out?.[s.id]) (keep[s.id] = { ...r.out[s.id], m: s.m || 0, at: now }), made++;
-    else missed.push(`dropped ${s.id}`);
+    else
+      for (const [s] of batch)
+        if (r.out?.[s.id]) ((keep[s.id] = { ...r.out[s.id], m: s.m || 0, at: now }), made++, delete tries[s.id]);
+        else {
+          missed.push(`dropped ${s.id}`);
+          // (Coverage doubling since the last try starts the count again: there's more to compare.)
+          const t = tries[s.id];
+          tries[s.id] = { n: t && (s.m || 0) < (t.m || 0) * 2 ? t.n + 1 : 1, at: now, m: s.m || 0 };
+        }
   }
   for (const [s] of need) if (!keep[s.id] && was[s.id]) keep[s.id] = was[s.id];
-  await store.put(NEWS_SIDES, { built: now, sides: keep });
+  await store.put(NEWS_SIDES, { built: now, sides: keep, ...(Object.keys(tries).length ? { tries } : {}) });
   return { made, calls, kept: Object.keys(keep).length, ...(missed.length ? { missed: missed.slice(0, 6) } : {}) };
 }
 

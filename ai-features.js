@@ -943,7 +943,8 @@ export const FEATURES = {
     app: '*',
     tap: true,
     models: ['sonnet', 'sol'],
-    effort: { sol: 'low' },
+    // (Low, measured 11-11 on its examples, judged blind by Opus: as good as Sonnet's default high, a fifth cheaper.)
+    effort: { sonnet: 'low', sol: 'low' },
     perPass: 30,
     perMinute: 6,
     maxIn: 6000,
