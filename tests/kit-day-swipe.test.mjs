@@ -230,3 +230,30 @@ test('the page’s empty space swipes too, never a bar beside the panel or a hid
   fire('touchstart', { target: root, touches: [{ clientX: 0, clientY: 0 }] });
   assert.equal(docListeners.touchstart.length, n - 1);
 });
+
+test('nothing that way: the page never follows the finger (Jay 2026-11-11, Law 議會: "it can swipe but it does nothing")', () => {
+  const steps = [];
+  const panel = new El();
+  const part = new El('part');
+  panel.append(part);
+  daySwipe(panel, dir => (steps.push(dir), true), { can: dir => dir < 0 });
+  // Toward a next day there is none: no drag, no step, no glide home.
+  panel.listeners.touchstart({ touches: [{ clientX: 200, clientY: 300 }], target: part });
+  panel.listeners.touchmove({ touches: [{ clientX: 150, clientY: 300 }], preventDefault() {} });
+  assert.ok(!panel.classList.contains('swiping'));
+  panel.listeners.touchend({ changedTouches: [{ clientX: 0, clientY: 300 }] });
+  assert.deepEqual(steps, []);
+  assert.ok(!panel.classList.contains('swipe-back'));
+  // The other way there is: it follows and steps.
+  drag(panel, 200);
+  assert.deepEqual(steps, [-1]);
+});
+
+test('page: false: only a finger on the panel, never the page around it', () => {
+  const n = (docListeners.touchstart || []).length;
+  const panel = new El();
+  panel.append(new El('part'));
+  daySwipe(panel, () => true, { page: false });
+  assert.equal((docListeners.touchstart || []).length, n);
+  assert.ok(panel.listeners.touchstart, 'its own still swipes');
+});
