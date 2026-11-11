@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { distKm, bearing, along, gcLine, etaMin, onRoute, aheadOf, landedFix, turn } from '../kit/flight.mjs';
 import { choose } from '../kit/flight.mjs';
-import { candidates, flightOf, pickFlights, trackFlight, handleFlight, AREAS } from '../flight.js';
+import { candidates, flightOf, pickFlights, trackFlight, handleFlight, poolNow, AREAS } from '../flight.js';
 
 const TPE = { lat: 25.0777, lon: 121.233 };
 const NRT = { lat: 35.7647, lon: 140.386 };
@@ -150,4 +150,32 @@ test('a source that hangs is left out within the budget, never waited on', async
   const out = await pickFlights(25, { fetchFn: hang, now });
   assert.equal(out[0].no, 'BR190');
   assert.ok(Date.now() - t0 < 1000);
+});
+
+// R2's copy, as GitHub Actions writes it (tools/flight-pool.mjs).
+const r2 = pool => ({ get: async key => (key === 'flight/pool.json' && pool ? { json: async () => pool } : null) });
+const up = (min, hex) => ({ hex, cs: 'EVA1', no: 'BR1', airline: { icao: 'EVA' }, from: { iata: 'TPE', ...TPE }, to: { iata: 'NRT', ...NRT }, fix: along(TPE, NRT, 0.5), eta: now + min * 60_000 });
+
+test('the pool: R2 copy while young, no source asked', async () => {
+  const { fn, calls } = fakeFetch();
+  const pool = await poolNow({ fetchFn: fn, now, data: r2({ at: now - 5 * 60_000, flights: [up(30, 'aaaaaa'), up(-5, 'bbbbbb')] }) });
+  assert.deepEqual(pool.map(f => f.hex), ['aaaaaa']);
+  assert.equal(calls.length, 0);
+});
+
+test('the pool: an old R2 copy is built over, and answers when the build fails', async () => {
+  const old = r2({ at: now - 60 * 60_000, flights: [up(30, 'aaaaaa')] });
+  assert.equal((await poolNow({ fetchFn: fakeFetch().fn, now, data: old }))[0].no, 'BR190');
+  assert.deepEqual((await poolNow({ fetchFn: fakeFetch({ areas: false }).fn, now, data: r2({ at: now - 60 * 60_000, flights: [up(30, 'aaaaaa')] }) })).map(f => f.hex), ['aaaaaa']);
+  // (All landed, or too old: a failure.)
+  assert.equal(await poolNow({ fetchFn: fakeFetch({ areas: false }).fn, now, data: r2({ at: now - 60 * 60_000, flights: [up(0.5, 'aaaaaa')] }) }), null);
+  assert.equal(await poolNow({ fetchFn: fakeFetch({ areas: false }).fn, now, data: r2({ at: now - 5 * 3_600_000, flights: [up(30, 'aaaaaa')] }) }), null);
+});
+
+test('?pool=1 answers the R2 copy when every source fails', async () => {
+  const req = new Request('https://api.example/flight?pool=1');
+  const live = { ...up(0, 'aaaaaa'), eta: Date.now() + 30 * 60_000 };
+  const res = await handleFlight(req, {}, { session: { s: 'x' }, limited: () => false, fetchFn: fakeFetch({ areas: false }).fn, data: r2({ at: Date.now() - 2 * 3_600_000, flights: [live] }) });
+  assert.equal(res.status, 200);
+  assert.deepEqual((await res.json()).flights.map(f => f.hex), ['aaaaaa']);
 });
