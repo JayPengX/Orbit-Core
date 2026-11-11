@@ -66,7 +66,7 @@ import { handleMoneyRead } from './money-read.js';
 import { handleCal } from './cal.js';
 import { logCall, callsSince, reliability, lastFailed } from './gemini-use.js';
 import { handleAi, handleAiBuild, aiTry } from './ai.js';
-import { handleClassNews } from './class-news.js';
+import { handleClassNews, classNewsTry } from './class-news.js';
 import { FEATURES } from './ai-features.js';
 import { handleFlight } from './flight.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
@@ -1451,6 +1451,8 @@ async function route(request, env, ctx, headers, origin) {
     // (ai.js MODELS' names): what each answered, asked back, how long it took. Nothing kept.
     if (check === 'ai-try') {
       const q = new URL(request.url).searchParams;
+      // class-news on a school's live site (&site=): read and worded as a phone asks, kept as it would be.
+      if (q.get('feature') === 'class-news' && q.get('site')) return json(await classNewsTry(env, q.get('site'), await aiCap(env, ctx, 'class-news')), 200, headers);
       return json(await aiTry(env, ctx, q.get('feature') || '', { models: (q.get('models') || '').split(',').filter(Boolean), from: Number(q.get('from')) || 0, n: Number(q.get('n')) || 3, gemini: lawGemini('ai-try') }), 200, headers);
     }
     // Every Gemini call of the last ?days= (30 at most) by day, feature, model and status.

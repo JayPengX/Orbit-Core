@@ -392,3 +392,21 @@ export async function handleClassNews(request, env, ctx, headers, session, { cap
   if (body.items.length && !body.wording && !unworded(body)) ctx?.waitUntil?.(edge()?.put(ck, new Response(JSON.stringify(body), { headers: { 'Cache-Control': `max-age=${NEWS.edgeS}` } })).catch(() => {}));
   return json(body, 200, headers);
 }
+
+// The ops check (ai-try, feature=class-news&site=): a school read and worded
+// now, as a phone's first ask then its ask again; what each answered and when.
+export async function classNewsTry(env, raw, cap) {
+  const site = schoolSite(raw);
+  if (!site) return { error: 'site' };
+  const via = env.GEMINI_RELAY ? (u, init) => env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, init) : fetch;
+  const pending = [];
+  const ctx = { waitUntil: p => pending.push(p) };
+  const t0 = Date.now();
+  const first = await schoolNews(env, ctx, site, { cap, fetchFn: via });
+  const firstMs = Date.now() - t0;
+  while (pending.length) await Promise.all(pending.splice(0));
+  const doneMs = Date.now() - t0;
+  const out = await schoolNews(env, ctx, site, { cap, fetchFn: via });
+  while (pending.length) await Promise.all(pending.splice(0));
+  return { site, how: out?.how, firstMs, wording: !!first?.wording, stale: !!first?.stale, firstLines: (first?.items || []).filter(it => it.line).length, doneMs, items: (out?.items || []).map(({ desc, ...it }) => it) };
+}
