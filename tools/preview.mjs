@@ -799,7 +799,7 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
   const aiFixture = fixtures.find(([text]) => ['/law-ask', '/law-chat', '/ai', '/class-news'].includes(aiPath) && (text.startsWith('feature:') ? [body.feature, body.mode].includes(text.slice(8)) : req.url().includes(text)));
   // --ai-log file: each AI ask without a saved answer, as the phone sent it (for tools/shots/ai/, build.yml as-phone).
   if (!aiFixture && aiLog && ['/law-ask', '/law-chat', '/ai', '/class-news'].includes(aiPath)) writeFileSync(aiLog, `${JSON.stringify({ path: aiPath, body })}\n`, { flag: 'a' });
-  if (aiFixture) return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: readFileSync(aiFixture[1], 'utf8') });
+  if (aiFixture) return route.fulfill({ status: 200, contentType: aiFixture[1].endsWith('.ndjson') ? 'application/x-ndjson' : 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: readFileSync(aiFixture[1], 'utf8') });
   // Orbit Securities' orders, plans and 新股申購 (stock-fill.js): the
   // Worker's own code on a store of the run's, today's real data.
   if (new URL(req.url()).pathname === '/stock') {

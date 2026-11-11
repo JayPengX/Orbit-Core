@@ -41,6 +41,8 @@ The family page and Orbit Pass sign-in are at [orbit.jaypengx.com/pass](https://
 ## Features
 
 - **The proxy** (`api.jaypengx.com`): one Cloudflare Worker for every live read the apps make (sports, transit, weather, markets, law, Class's planes in the air, 立法院's live sittings), answering at each app's own address (`orbit.jaypengx.com/api`, so no cross-site calls), with the apps' AI features behind it, so no key ever reaches a phone.
+- **Orbit AI, one door for every app** (`/ai`): each feature named, its prompt fixed on the server, its input lean, its answer's shape checked, a cap a day; when something is missing it asks back with options. Code first: what code can read or add up, it does, and the AI gets a small digest and writes a line; answers are drawn (logos, faces, tiles, bars) under Orbit AI's mark, never a paragraph. Each model is backed by one of its class from another maker (Claude, GPT, Gemini), and what everyone reads (game recaps, F1's deciding moments, each side's angle on the news, word cards, Law's explanations) is made once ahead by the builders.
+- **The family notebook** (`kit/family.mjs`, on the phone only): apps tell each other what helps (Weather where rain is due, Class the next classes, Securities the names held, Words the words being learned), so Transit avoids rain, News leads with what you follow, and the Pass's 今天 sums up the day; 問 Orbit on the Pass opens the app that answers a question, asked there.
 - **The Orbit Pass:** one sign-in and one wallet for every app, with each app's saved data, kept in Cloudflare D1.
 - **Notices** that reach a phone while the app is closed: game starts, class reminders, bus arrivals, rain, price alerts.
 - **Data builds** on the proxy's cron into Cloudflare R2: seasons, game days, bus routes and shapes, photos, highlights, the news stories and CWA's rain radar.
@@ -62,7 +64,7 @@ The family page and Orbit Pass sign-in are at [orbit.jaypengx.com/pass](https://
 | --- | --- |
 | Workers | Cloudflare Workers, plain JavaScript (ES modules), no runtime dependencies |
 | Storage | D1 (`orbit-store`: the Pass, notices), R2 (`orbit-data`: built data and kept reads), KV (caches and limits), Durable Objects (the Runner, the door, the guard's clock, F1 timing log) |
-| AI | Gemini through `gemini-relay`, pinned to Taiwan |
+| AI | Claude, GPT and Gemini on one door (`/ai`), through `gemini-relay`, pinned to Taiwan |
 | Kit and site | Cloudflare: `kit/` and `site/` (the family page and the admin page) |
 | CI/CD | GitHub Actions: tests, then Wrangler deploys from `main` |
 | Tools | Node.js 22 and Playwright (Chromium and WebKit) |
@@ -81,7 +83,8 @@ orbit-workers-proxy (one Worker)
    /weather       Google + CWA + MOENV blended (KV cells)
    /transit       the operators' own sites first (transit-free.js), TDX's free tier as backup, Google Maps / Places / Routes
    /sports-proxy  live data reads for the apps, by host, trimmed and cached
-   /gemini, /nl-edit, /law-ask, /law-chat   Gemini via gemini-relay
+   /ai            every app's AI by feature name (Claude, GPT, Gemini via gemini-relay)
+   /gemini, /nl-edit, /law-ask, /law-chat   Class's import, Law's questions
    /data          the family's data in R2, built by builders/ on the cron (News's stories too)
    /cal           Class's timetable as a calendar subscription
    /showcase/pass a short read-only pass for the showcase's live demos
