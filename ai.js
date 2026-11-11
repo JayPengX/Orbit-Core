@@ -71,12 +71,12 @@ export function jsonOf(text) {
 // Claude was a 400, and every tap feature fell to its second model).
 export const effortFor = (f, m) => (typeof f.effort === 'string' ? f.effort : f.effort && typeof f.effort === 'object' ? (f.effort[m] ?? null) : null);
 
-export async function askModel(env, ctx, feature, model, parts, schema, { effort = null, gemini = null, timeoutMs = 30_000 } = {}) {
+export async function askModel(env, ctx, feature, model, parts, schema, { effort = null, gemini = null, timeoutMs = 30_000, firstMs = Math.min(timeoutMs, 20_000) } = {}) {
   let res;
   const t0 = Date.now();
   const keep = p => (ctx?.waitUntil ? ctx.waitUntil(p) : p);
   if (makerOf(model)) {
-    res = await streamOther(model, parts, schema, env, { timeoutMs, firstMs: Math.min(timeoutMs, 20_000), effort });
+    res = await streamOther(model, parts, schema, env, { timeoutMs, firstMs, effort });
     if (!res.ok) {
       await keep(logCall(env, { feature, model, status: res.status, ms: Date.now() - t0 }));
       throw new Error(`${model} ${res.status}`);
@@ -166,7 +166,10 @@ export async function runFeature(env, ctx, name, input, { gemini = null, answers
   for (const m of f.models) {
     const model = MODELS[m] || m;
     try {
-      const raw = twChars(await askModel(env, ctx, name, model, parts, schema, { effort: effortFor(f, m), gemini, timeoutMs: f.timeoutMs || 30_000 }));
+      // (A tap gives up on a model silent for 20 s, a person waits; a build waits its whole time:
+      // a long answer's thinking passed 20 s and every such call was paid for twice, 11-11's words cards 177 times.)
+      const timeoutMs = f.timeoutMs || 30_000;
+      const raw = twChars(await askModel(env, ctx, name, model, parts, schema, { effort: effortFor(f, m), gemini, timeoutMs, firstMs: f.tap ? Math.min(timeoutMs, 20_000) : timeoutMs }));
       const ask = f.clarify ? askOf(raw, answers, Object.fromEntries((f.pick || []).map(k => [k, input?.[`${k}s`] || []]))) : null;
       const out = await f.clean(raw, input);
       if (out != null || ask) return { out, ask, model };

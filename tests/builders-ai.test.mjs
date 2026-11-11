@@ -62,6 +62,27 @@ test('news sides: only stories sides frame and both ends carry; each side’s he
   assert.equal(again.calls, 0, 'told once until coverage doubles and 6 hours pass');
 });
 
+test('news sides: a story whose answer the check drops is asked again only after 2 hours, 3 times at most, until its coverage doubles', async () => {
+  const s = { id: 'y', m: 4, topics: ['pol'], sides: { g: 2, b: 2 }, items: [['ltn', '綠'], ['udn', '藍']] };
+  const store = memStore({ 'news/index.json': { tw: [s], intl: [] } });
+  let asked = 0;
+  // (One side only: the check keeps nothing.)
+  const env = claudeEnv(() => (asked++, { items: [{ id: 'y', sides: [{ side: 'g', zh: '綠營強調', en: 'Green stress' }], diff: { zh: '', en: '' } }] }));
+  const t0 = Date.parse('2026-11-11T00:00:00Z');
+  const run = (now, idx) => (idx && store.put('news/index.json', idx), newsSides({ store, env, cap: 10, until: Date.now() + 60_000, now }));
+  await run(t0);
+  assert.equal(asked, 1);
+  await run(t0 + 20 * 60_000);
+  assert.equal(asked, 1, 'not again 20 minutes later');
+  await run(t0 + 2 * 3_600_000);
+  await run(t0 + 4 * 3_600_000);
+  assert.equal(asked, 3);
+  await run(t0 + 6 * 3_600_000);
+  assert.equal(asked, 3, 'three tries, then let go');
+  await run(t0 + 7 * 3_600_000, { tw: [{ ...s, m: 8 }], intl: [] });
+  assert.equal(asked, 4, 'its coverage doubled: asked again');
+});
+
 test('words: cards a batch at a time, each letter its own small file, a word that fails twice let go', async () => {
   const store = memStore();
   const rows = [['abandon', 'v.', 4, 'v. 放棄、拋棄', 'x'], ['able', 'adj.', 1, 'adj. 能夠的\nadj. 能幹的', 'x'], ['bake', 'v.', 1, 'v. 烘烤', 'x']];
