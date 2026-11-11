@@ -215,6 +215,7 @@ node tools/preview.mjs sports --live --width 375
 | `--width`, `--height`, `--full`, `--dark`, `--lang en` | The screen |
 | `--click "<selector>"` or `--click "js:…"` | Act before the shot (repeatable) |
 | `--eval "<js>"`, `--wait ms` | Read something out; wait first |
+| `--script file.mjs` | Run a scenario after the clicks: its default export gets `{ page, context, base, out, errors, hash }` (Playwright), taps on and prints what it found |
 | `--store key=value`, `--payload file.json` | Start with this localStorage or Pass payload |
 | `--keep-account file` | Save what the app writes to its account during the run (a demo account for `shots.mjs --account`) |
 | `--out dir` | Where shots go (default `/tmp/orbit-preview`) |
