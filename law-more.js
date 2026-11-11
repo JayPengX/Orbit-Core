@@ -22,7 +22,7 @@ import { readData } from './law.js';
 // A small file read for one answer (a day at the edge, not kept here); null when it can't be.
 const readOne = path => readData(path).catch(() => null);
 
-export const MORE_LIMITS = { cases: 6, caseTexts: 3, caseChars: 900, people: 3, votes: 6, meets: 3, rules: 3, ruleChars: 1500, mine: 8 };
+export const MORE_LIMITS = { cases: 6, caseTexts: 3, caseChars: 900, people: 3, votes: 6, meets: 3, rules: 4, ruleChars: 1200, mine: 8 };
 const JUDGMENT = 'https://judgment.judicial.gov.tw/FJUD/data.aspx?ty=JD&id=';
 export const CONS_ID = /^(s\d{1,4}|j\d{3}-\d{1,3})$/;
 export const JID = /^[A-Z]{3,5},\d{2,3},[^,\s]{1,12},\d{1,6},\d{8},\d{1,3}$/u;
@@ -234,22 +234,56 @@ export function matchMeets(meets, text, lawNames, today) {
 
 // The rules the question is about: its pairs in their names (2 each), an
 // article found that they rest on (3), a law found (0.5); 6 at least.
-export function matchRules(rows, text, cites) {
+// How rare each pair of characters is among the rules' names (a pair every rule has, 規定 or
+// 臺北, says little; 騎樓 says a lot): log(N / rules with it), worked out once per list.
+const idfMemo = new WeakMap();
+function idfOf(rows) {
+  if (idfMemo.has(rows)) return idfMemo.get(rows);
+  const df = new Map();
+  for (const r of rows) for (const p of hanPairs(r[1])) df.set(p, (df.get(p) || 0) + 1);
+  const n = rows.length || 1;
+  const idf = p => Math.log(n / (df.get(p) || 0.5));
+  idf.rare = Math.log(n) * 0.35;
+  idf.floor = Math.log(n) * 0.45;
+  idfMemo.set(rows, idf);
+  return idf;
+}
+// The rules (行政規則, 地方法規) a question is about: its words (the plan's terms
+// with them) weighed by how rare they are among the names, plus the articles found.
+// A staff table or a unit's own office rules only when asked for by name.
+const PLUMBING = /編制表|編組表|組織規程|處務規程|辦事細則|組織準則|員額/;
+export function matchRules(rows, text, cites, every = null) {
   const arts = new Set(cites);
   const laws = new Set(cites.map(c => c.split(':')[0]));
   const want = hanPairs(text);
+  const ok = (Array.isArray(rows) ? rows : []).filter(r => Array.isArray(r) && typeof r[0] === 'string' && typeof r[1] === 'string' && RULE_ID.test(r[0]) && (!PLUMBING.test(r[1]) || String(text).includes(r[1])));
+  const idf = idfOf(every || ok);
   const scored = [];
-  for (const r of Array.isArray(rows) ? rows : []) {
-    if (!Array.isArray(r) || typeof r[0] !== 'string' || typeof r[1] !== 'string' || !RULE_ID.test(r[0])) continue;
-    let s = shared(r[1], want) * 2;
-    for (const c of r[5] || []) if (arts.has(c)) s += 3;
+  for (const r of ok) {
+    // (Rare words shared, a short name over a long one that shares them by the way.)
+    const pairs = [...hanPairs(r[1])];
+    const hit = pairs.filter(p => want.has(p) && idf(p) >= idf.rare);
+    let s = hit.reduce((a, p) => a + idf(p), 0) / Math.max(1, pairs.length) ** 0.35;
+    for (const c of r[5] || []) if (arts.has(c)) s += 6;
     for (const p of r[6] || []) if (laws.has(p)) s += 0.5;
-    if (s >= 6) scored.push([s, r]);
+    // (The reader's own city's rule over a ministry's that shares a word.)
+    if (r.dir === 'local') s *= 1.5;
+    if (s >= idf.floor) scored.push([s, r]);
   }
   return scored
     .sort((a, b) => b[0] - a[0] || String(b[1][3]).localeCompare(String(a[1][3])))
     .slice(0, MORE_LIMITS.rules)
     .map(([, r]) => ({ id: r[0], n: r[1], agency: String(r[2] || ''), d: String(r[3] || ''), url: /^https:\/\//.test(r[4]) ? r[4] : '', dir: r.dir || 'agency' }));
+}
+// Every rule's name, ministries' and cities', once per copy of the lists: how rare a word is, counted over all.
+const everyMemo = new WeakMap();
+function everyRule(agency, local) {
+  if (!Array.isArray(agency) || !Array.isArray(local)) return null;
+  const was = everyMemo.get(agency);
+  if (was?.local === local) return was.all;
+  const all = [...agency, ...local].filter(r => Array.isArray(r) && typeof r[1] === 'string');
+  everyMemo.set(agency, { local, all });
+  return all;
 }
 // The cities' 地方法規 (local/all.json: [id, name, city, date, url, laws]) as
 // rule rows: only those of the cities given (a city's rules bind only who
@@ -366,7 +400,7 @@ export async function moreFor(text, articles, { mine = null, items = [], today =
   texts.forEach((t, i) => (cases[i].gist = t));
   // The ministries' 行政規則 and the cities' 地方法規, one list; a text kept on the site is read from there.
   const mineCities = new Set([...cities, ...citiesIn(text, localF?.rules)].map(tai));
-  let rules = ly ? [] : matchRules([...(rulesF?.rules || []), ...localRows(localF?.rules, mineCities)], text, cites);
+  let rules = ly ? [] : matchRules([...(rulesF?.rules || []), ...localRows(localF?.rules, mineCities)], text, cites, everyRule(rulesF?.rules, localF?.rules));
   const ruleTexts = await Promise.all(rules.map(r => readOne(`${r.dir}/text/${textFile(r.id)}.json`)));
   ruleTexts.forEach((j, i) => ((rules[i].text = typeof j?.t === 'string' ? cut(j.t, MORE_LIMITS.ruleChars) : ''), (rules[i].kept = Boolean(rules[i].text))));
   // A rule asked by its name that the nightly build hasn't reached: found on its ministry's site now.

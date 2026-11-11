@@ -8,13 +8,15 @@
 //   all.cc.govapi.tw  the councils' bills this term, searched by the question's words;
 //   council/reps.json, council/town/<tc>.json, council/town/<tc>/<paper>.json
 //                     every 代表會's members, sessions and what its papers said:
-//                     proposals and their 議決 (會議紀錄), 決議案, 質詢, 書面質詢.
-// Each bill or row is quoted by an id the answer may cite ("cc:…", "tw:…") and
+//                     proposals and their 議決 (會議紀錄), 決議案, 質詢, 書面質詢;
+//   …/meet_transcripts  what councillors said in their council's sittings (質詢), a
+//                     named councillor's newest, or anyone's on the question's words.
+// Each bill, turn or row is quoted by an id the answer may cite ("cc:…", "cq:…", "tw:…") and
 // carried back as a link into the app.
 import { readGround } from './law-ground.js';
 import { readData } from './law.js';
 
-export const LOCAL_LIMITS = { councils: 2, towns: 2, bills: 6, billChars: 200, people: 3, sessions: 6, rows: 8, rowChars: 160 };
+export const LOCAL_LIMITS = { councils: 2, towns: 2, bills: 6, billChars: 200, people: 3, sessions: 6, rows: 8, rowChars: 160, talks: 4, talkChars: 220 };
 const CC_API = 'https://all.cc.govapi.tw/api/';
 const LOCAL_WORDS = /議會|議員|議長|縣議|市議|代表會|代表|公所|鄉長|鎮長|臨時會|定期會|議事錄|質詢|提案|決議/;
 export const asksLocal = text => LOCAL_WORDS.test(String(text || ''));
@@ -85,6 +87,38 @@ async function apiBills(c, words, get) {
   );
   return found.flat();
 }
+// What councillors said (質詢, 發言): one row a councillor's sitting, the turn that best
+// matches the question (else the longest) as its gist. The chair's and officials' turns left out.
+const TALK_WORDS = /質詢|發言|說了|問了|講了|怎麼說|說什麼|問什麼|立場|關心|主張/;
+export function talksOf(rows, want) {
+  const meets = new Map();
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!r?.['發言內容'] || !r['代碼'] || (r['身分類別'] ? r['身分類別'] !== '議員' : !/議員/.test(r['職稱'] || ''))) continue;
+    const k = `${r['會議代碼'] || r['日期']}|${r['姓名']}`;
+    if (!meets.has(k)) meets.set(k, []);
+    meets.get(k).push(r);
+  }
+  return [...meets.values()]
+    .map(turns => {
+      const best = turns.map(t => [shared(t['發言內容'], want) * 40 + Math.min(String(t['發言內容']).length, 400) / 10, t]).sort((a, b) => b[0] - a[0])[0];
+      const t = best[1];
+      // (Long turns from where the question's words come up.)
+      const said = String(t['發言內容']).replace(/\s+/g, ' ');
+      const at = Math.max(0, ...[...want].map(w => said.indexOf(w)).filter(i => i >= 0).slice(0, 1).map(i => i - 50));
+      return { id: String(t['代碼']), d: String(t['日期'] || '').slice(0, 10), who: String(t['姓名'] || ''), t: (at ? '…' : '') + cut(said.slice(at), LOCAL_LIMITS.talkChars), url: /^https:\/\//.test(t['來源網址'] || '') ? t['來源網址'] : '', score: best[0] };
+    })
+    .filter(x => x.t.length >= 12)
+    .sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : b.score - a.score))
+    .slice(0, LOCAL_LIMITS.talks)
+    .map(({ score, ...x }) => x);
+}
+async function apiTalks(c, people, words, text, get) {
+  if (!people.length && !(TALK_WORDS.test(text) && words.length)) return [];
+  const q = people.length ? { 姓名: people[0].n, limit: '150' } : { q: words[0], limit: '60' };
+  const r = await get(`${CC_API}meet_transcripts?${new URLSearchParams({ 議會代碼: c.c, sort: '日期>', ...q })}`).catch(() => null);
+  return talksOf(r?.meet_transcripts, hanPairs(words.join(' ')));
+}
+
 const apiJson = url => fetch(url, { cf: { cacheTtlByStatus: { '200-299': 3600, 404: 60, '500-599': 0 }, cacheEverything: true }, signal: AbortSignal.timeout(5000) }).then(r => (r.ok ? r.json() : null));
 
 // A council: its people the question names, and its bills on the question's words.
@@ -93,7 +127,7 @@ async function councilFor(c, text, words, { read, get }) {
   const want = hanPairs(`${text} ${words.join(' ')}`);
   const t = tai(text);
   const people = (file?.people || []).filter(p => p?.n && t.includes(p.n)).slice(0, LOCAL_LIMITS.people);
-  const live = file?.own && !file.own.add ? [] : await apiBills({ ...c, term: file?.term || c.term }, [...people.map(p => p.n), ...words].slice(0, 2), get);
+  const [live, talks] = await Promise.all([file?.own && !file.own.add ? [] : apiBills({ ...c, term: file?.term || c.term }, [...people.map(p => p.n), ...words].slice(0, 2), get), apiTalks(c, people, words, text, get)]);
   const kept = (file?.bills || []).map(keptBill).filter(b => shared(b.t, want) >= 3 || people.some(p => b.by.includes(p.n)));
   const seen = new Set();
   // (A row the API split wrong, 「法」部分條文案，敬請查照。, is left out.)
@@ -110,7 +144,8 @@ async function councilFor(c, text, words, { read, get }) {
     next: file?.next || c.next || null,
     last: last ? { n: last.n, from: last.from, to: last.to } : null,
     people: people.map(p => ({ id: String(p.id || ''), n: p.n, party: p.party || '', area: p.area || '', bills: p.bills || 0 })),
-    bills
+    bills,
+    talks
   };
 }
 
@@ -151,9 +186,9 @@ async function townFor(x, text, words, { read }) {
 }
 
 // { councils, towns } for a question (empty when it names none); each read only when asked.
-export async function localFor(text, { terms = [], cities = [], read = readData, get = apiJson } = {}) {
+export async function localFor(text, { terms = [], cities = [], read = readData, get = apiJson, ground = readGround } = {}) {
   if (!asksLocal(text)) return { councils: [], towns: [] };
-  const [idx, reps] = await Promise.all([readGround('council/index.json'), readGround('council/reps.json')]);
+  const [idx, reps] = await Promise.all([ground('council/index.json'), ground('council/reps.json')]);
   const { councils, towns } = placesIn(text, idx, reps, cities);
   if (!councils.length && !towns.length) return { councils: [], towns: [] };
   const words = searchWords(text, terms);
@@ -162,9 +197,9 @@ export async function localFor(text, { terms = [], cities = [], read = readData,
 }
 
 export const hasLocal = l => Boolean(l && (l.councils.length || l.towns.length));
-export const localKey = l => (hasLocal(l) ? [...l.councils.flatMap(c => [c.c, ...c.bills.map(b => b.id)]), ...l.towns.flatMap(t => [t.tc, ...t.rows.map(r => `${r.s}${r.no}${r.t.slice(0, 12)}`)])].join('|') : '');
+export const localKey = l => (hasLocal(l) ? [...l.councils.flatMap(c => [c.c, ...c.bills.map(b => b.id), ...(c.talks || []).map(x => x.id)]), ...l.towns.flatMap(t => [t.tc, ...t.rows.map(r => `${r.s}${r.no}${r.t.slice(0, 12)}`)])].join('|') : '');
 // The ids an answer may cite: each bill and row given.
-export const localCites = l => (hasLocal(l) ? [...l.councils.flatMap(c => c.bills.map(b => `cc:${b.id}`)), ...l.towns.flatMap(t => t.rows.map(r => r.id))] : []);
+export const localCites = l => (hasLocal(l) ? [...l.councils.flatMap(c => [...c.bills.map(b => `cc:${b.id}`), ...(c.talks || []).map(x => `cq:${x.id}`)]), ...l.towns.flatMap(t => t.rows.map(r => r.id))] : []);
 
 const span = (a, b) => [a, b].filter(Boolean).join('–');
 export function localPrompt(l) {
@@ -176,6 +211,7 @@ export function localPrompt(l) {
     for (const p of c.people) lines.push(`- 議員 ${p.n}（${p.party || '無黨籍'}，${p.area}）：本屆提案 ${p.bills} 件`);
     for (const b of c.bills) lines.push(`[cite "cc:${b.id}"] ${[b.no, b.cat, b.d].filter(Boolean).join('，')}${b.by ? `，提案：${b.by}` : ''}\n案由：${b.t}${b.res ? `\n議決：${b.res}` : ''}`);
     if (!c.bills.length) lines.push('（這屆的提案中沒有找到與問題相關的）');
+    for (const x of c.talks || []) lines.push(`[cite "cq:${x.id}"] ${x.d}，議員 ${x.who} 在議會發言（速記錄節錄）：${x.t}`);
     blocks.push(lines.join('\n'));
   }
   for (const t of l.towns) {
@@ -186,7 +222,7 @@ export function localPrompt(l) {
     if (!t.rows.length) lines.push('（這個代表會的議事錄還沒有可讀的內容）');
     blocks.push(lines.join('\n'));
   }
-  return `地方議會與代表會 (what Orbit Law shows of the councils the reader named: their bills and minutes as published; cite a bill or row by its id in quotes; say a council's own decision is not a law):\n${blocks.join('\n\n')}\n\n`;
+  return `地方議會與代表會 (what Orbit Law shows of the councils the reader named: their bills, councillors' words in sittings and minutes as published; cite a bill or row by its id in quotes; say a council's own decision is not a law):\n${blocks.join('\n\n')}\n\n`;
 }
 
 // What the answer carries: links into the app (a council bill opens its sheet; a 代表會 opens its page).
@@ -194,7 +230,7 @@ export function localOut(l) {
   if (!hasLocal(l)) return {};
   return {
     local: {
-      councils: l.councils.map(c => ({ c: c.c, n: c.n, people: c.people.map(p => ({ id: p.id, n: p.n })), bills: c.bills.map(b => ({ id: b.id, t: cut(b.t, 80), by: b.by, res: cut(b.res, 20), d: b.d })) })),
+      councils: l.councils.map(c => ({ c: c.c, n: c.n, people: c.people.map(p => ({ id: p.id, n: p.n })), bills: c.bills.map(b => ({ id: b.id, t: cut(b.t, 80), by: b.by, res: cut(b.res, 20), d: b.d })), talks: (c.talks || []).map(x => ({ id: x.id, who: x.who, d: x.d, t: cut(x.t, 80) })) })),
       towns: l.towns.map(t => ({ tc: t.tc, n: t.n, rows: t.rows.map(r => ({ id: r.id, k: r.k, s: r.s, t: cut(r.t, 80), by: r.by, r: cut(r.r, 20) })) }))
     }
   };

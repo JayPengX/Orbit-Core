@@ -2,7 +2,7 @@
 // names, the words it searches, the rows of a 代表會's papers, what may be cited.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { placesIn, searchWords, paperRows, localPrompt, localCites, localOut, asksLocal } from '../law-local.js';
+import { placesIn, searchWords, paperRows, localPrompt, localCites, localOut, asksLocal, talksOf, localFor } from '../law-local.js';
 import { shownOf } from '../law-chat.js';
 
 const idx = { councils: [{ c: 'tpe', n: '臺北市議會', city: '臺北市' }, { c: 'cha', n: '彰化縣議會', city: '彰化縣' }, { c: 'hsq', n: '新竹縣議會', city: '新竹縣' }, { c: 'hsz', n: '新竹市議會', city: '新竹市' }] };
@@ -40,4 +40,31 @@ test('each bill and row quoted by an id the answer may cite; only those cited sh
   const shown = shownOf(localOut(l), { cited: ['cc:cha-2'] });
   assert.deepEqual(shown.local.councils[0].bills.map(b => b.id), ['cha-2']);
   assert.deepEqual(shown.local.towns[0].rows, [], 'the 代表會 stays, its rows only when cited');
+});
+
+test('what councillors said: a row a councillor\'s sitting, the turn on the question\'s words, never the chair\'s', () => {
+  const t = (id, d, who, kind, text, meet = 'm1') => ({ 代碼: id, 日期: d, 姓名: who, 身分類別: kind, 會議代碼: meet, 發言內容: text, 來源網址: 'https://obas.example/x.pdf' });
+  const rows = [
+    t('a1', '2026-08-25', '林世宗', '議員', '局長，我們繼續質詢。'),
+    t('a2', '2026-08-25', '林世宗', '議員', '公有停車場的收費太高，晚上空著也不開放，請交通局檢討停車費率與夜間開放。'),
+    t('a3', '2026-08-25', '林世宗', '議員', '另外里民反映路燈不亮已經三個月，請工務局盡快處理，這是很基本的事情。'),
+    t('b1', '2026-08-25', '蔣萬安', '政府機關首長', '謝謝議員關心停車的問題，我們會研議。'),
+    t('c1', '2026-08-21', '張文潔', '議員', '建管處不是沒有工具，只是選擇不用，違章停車場應該要處理。', 'm2')
+  ];
+  const out = talksOf(rows, new Set(['停車', '車場', '費率']));
+  assert.deepEqual(out.map(x => [x.id, x.who]), [['a2', '林世宗'], ['c1', '張文潔']]);
+  const l = { councils: [{ c: 'tpe', n: '臺北市議會', term: 14, people: [], bills: [], talks: out }], towns: [] };
+  assert.deepEqual(localCites(l), ['cq:a2', 'cq:c1']);
+  assert.ok(localPrompt(l).includes('[cite "cq:a2"] 2026-08-25，議員 林世宗'));
+  assert.deepEqual(shownOf(localOut(l), { cited: ['cq:c1'] }).local.councils[0].talks.map(x => x.id), ['c1']);
+});
+
+test('a question about what a councillor said asks the transcripts, by name', async () => {
+  const asked = [];
+  const read = async p => (p === 'council/tpe.json' ? { n: '臺北市議會', term: 14, people: [{ id: '1', n: '林世宗', party: '國民黨', area: '第一選區' }], bills: [] } : null);
+  const get = async url => (asked.push(decodeURIComponent(url)), url.includes('meet_transcripts') ? { meet_transcripts: [{ 代碼: 'x1', 日期: '2026-08-25', 姓名: '林世宗', 身分類別: '議員', 會議代碼: 'm', 發言內容: '公有停車場的收費太高，晚上空著也不開放。' }] } : { bills: [] });
+  const ground = async p => (p === 'council/index.json' ? idx : reps);
+  const l = await localFor('臺北市議員林世宗質詢過停車費嗎', { terms: ['停車費'], read, get, ground });
+  assert.ok(asked.some(u => u.includes('meet_transcripts') && u.includes('姓名=林世宗')));
+  assert.deepEqual(l.councils[0].talks.map(x => x.id), ['x1']);
 });

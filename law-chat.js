@@ -426,7 +426,7 @@ export function shownOf(extra, out) {
   if (rules.length) res.rules = rules;
   else delete res.rules;
   // A council or 代表會 stays (a way to its page); of its bills and rows, those cited.
-  if (extra.local) res.local = { councils: extra.local.councils.map(c => ({ ...c, bills: c.bills.filter(b => used.has(`cc:${b.id}`)) })), towns: extra.local.towns.map(t => ({ ...t, rows: t.rows.filter(r => used.has(r.id)) })) };
+  if (extra.local) res.local = { councils: extra.local.councils.map(c => ({ ...c, bills: c.bills.filter(b => used.has(`cc:${b.id}`)), talks: (c.talks || []).filter(x => used.has(`cq:${x.id}`)) })), towns: extra.local.towns.map(t => ({ ...t, rows: t.rows.filter(r => used.has(r.id)) })) };
   return res;
 }
 
