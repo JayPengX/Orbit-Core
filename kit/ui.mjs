@@ -1500,6 +1500,40 @@ export function flowCount(w, two = false) {
   return w >= 960 && !two ? 3 : w >= 600 ? 2 : 1;
 }
 let flowSeen = null;
+let partSeen = null;
+// Each part's column, as flowColumns deals them: to the shortest column so
+// far, one under 100px under the one before it. hs: each part's height.
+function dealParts(hs, n) {
+  const cols = Array.from({ length: n }, () => ({ h: 0, kids: [] }));
+  let last = null;
+  hs.forEach((x, i) => {
+    const c = last && x < 100 ? last : cols.reduce((a, b) => (b.h < a.h - 1 ? b : a));
+    c.kids.push(i);
+    c.h += x;
+    last = c;
+  });
+  return cols;
+}
+// (.q-flow-refit: a flow whose parts fill in after it's dealt (a section
+// read later, a list that grows) is dealt again when that would move a
+// part, never while something in it is being typed in. Jay's iPad
+// 2026-11-11: Class's 今天 dealt while its to-dos and notices were empty
+// left one class on the left beside a long right column.)
+function refitFlow(f) {
+  clearTimeout(f.__qRefit);
+  f.__qRefit = setTimeout(() => {
+    if (!f.isConnected || !f.classList.contains('q-flow-laid') || !f.getClientRects().length) return;
+    const a = document.activeElement;
+    if (a && f.contains(a) && a.matches('input, textarea, select, [contenteditable]')) return a.addEventListener('focusout', () => refitFlow(f), { once: true });
+    const items = f.__qItems || [];
+    const hs = items.map((it, i) => it.getBoundingClientRect().height + (f.__qMargins?.[i] || 0));
+    const now = items.map(it => [...f.children].indexOf(it.parentNode)).join();
+    const next = dealParts(hs, f.__qFlowN || 1);
+    const want = new Array(items.length);
+    next.filter(c => c.kids.length).forEach((c, k) => c.kids.forEach(i => (want[i] = k)));
+    if (want.join() !== now) flowColumns(f);
+  }, 150);
+}
 function watchFlow(f) {
   if (typeof ResizeObserver === 'undefined') return;
   flowSeen ||= new ResizeObserver(rows => {
@@ -1512,6 +1546,16 @@ function watchFlow(f) {
     f.__qFlowWatched = true;
     flowSeen.observe(f);
   }
+  if (!f.classList.contains('q-flow-refit')) return;
+  partSeen ||= new ResizeObserver(rows => {
+    const flows = new Set(rows.map(r => r.target.__qFlowOf).filter(Boolean));
+    for (const f of flows) if (f.classList.contains('q-flow-laid')) refitFlow(f);
+  });
+  for (const it of f.__qItems || []) {
+    if (it.__qFlowOf === f) continue;
+    it.__qFlowOf = f;
+    partSeen.observe(it);
+  }
 }
 export function flowColumns(root = document) {
   if (typeof document === 'undefined') return;
@@ -1519,11 +1563,11 @@ export function flowColumns(root = document) {
   for (const f of list) {
     // (Not shown, it has no size: dealt when it's drawn again shown.)
     if (!f.getClientRects().length) continue;
-    watchFlow(f);
     const n = flowCount(f.clientWidth, f.classList.contains('q-flow-2'));
     f.__qFlowN = n;
     const items = f.__qItems?.every(i => i.parentNode?.parentNode === f || i.parentNode === f) ? f.__qItems : [...f.children].flatMap(c => (c.classList.contains('q-flow-col') ? [...c.children] : [c]));
     f.__qItems = items;
+    watchFlow(f);
     // (Dealt again while read (a live game every few seconds): the page and its
     // sheet stay where they were scrolled. The columns' height is held while
     // they're taken apart, so the box never shrinks and drops the reader to the
@@ -1548,17 +1592,11 @@ export function flowColumns(root = document) {
     f.style.setProperty('--q-flow-n', n);
     f.classList.add('q-flow-measure');
     f.replaceChildren(...items);
-    const hs = items.map(i => i.getBoundingClientRect().height + (parseFloat(getComputedStyle(i).marginTop) || 0));
+    f.__qMargins = items.map(i => parseFloat(getComputedStyle(i).marginTop) || 0);
+    const hs = items.map((it, i) => it.getBoundingClientRect().height + f.__qMargins[i]);
     f.classList.remove('q-flow-measure');
-    const cols = Array.from({ length: n }, () => ({ h: 0, kids: [] }));
-    let last = null;
-    items.forEach((it, i) => {
-      const c = last && hs[i] < 100 ? last : cols.reduce((a, b) => (b.h < a.h - 1 ? b : a));
-      c.kids.push(it);
-      c.h += hs[i];
-      last = c;
-    });
-    f.replaceChildren(...cols.filter(c => c.kids.length).map(c => h('div', { class: 'q-flow-col' }, c.kids)));
+    const cols = dealParts(hs, n);
+    f.replaceChildren(...cols.filter(c => c.kids.length).map(c => h('div', { class: 'q-flow-col' }, c.kids.map(i => items[i]))));
     f.classList.add('q-flow-laid');
     settle();
   }

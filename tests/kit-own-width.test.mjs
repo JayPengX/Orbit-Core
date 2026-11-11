@@ -29,9 +29,13 @@ const PAGE = `<!doctype html><html lang="zh-Hant" data-look="native"><head><meta
 <div class="q-flow">${[200, 120, 160, 90, 140].map(card).join('')}</div>
 </div>`)
   .join('')}
+<div id="lone" style="width:1000px"><div class="q-grid q-rows-full q-rows-snug">${card(40)}</div><div class="q-grid q-rows-full q-rows-snug">${card(40).repeat(3)}</div><div class="q-grid q-rows-full">${card(40)}</div></div>
+<div id="refit" style="width:640px"><div class="q-flow q-flow-refit">${[120, 300, 120, 120].map((n, i) => `<div class="card" id="part${i}" style="height:${n}px;background:#333"></div>`).join('')}</div></div>
 <script type="module">
 import { flowColumns } from '/kit/ui.mjs';
+import { fullRows } from '/kit/orbit.mjs';
 flowColumns(document);
+fullRows(document);
 globalThis.ready = true;
 </script></body></html>`;
 
@@ -66,6 +70,19 @@ test('columns, grids, splits and flows count their own width', async t => {
     // (A box that narrows deals its flow again by itself.)
     await page.evaluate(() => (document.querySelector('.box[data-w="1000"]').style.width = '640px'));
     await page.waitForFunction(() => document.querySelector('.box[data-w="1000"] .q-flow').querySelectorAll(':scope > .q-flow-col').length === 2);
+    // (Pictures (.q-rows-snug) in a row shorter than the row widen at most to twice
+    // their size: one song to come stood a cover the page's width in Beats, 2026-11-11;
+    // a row of figures still fills its card.)
+    const lone = await page.evaluate(() => [...document.querySelectorAll('#lone .q-grid')].map(g => Math.round(g.firstElementChild.getBoundingClientRect().width)));
+    assert.ok(lone[0] <= 2 * 240 + 12, `a lone tile ${lone[0]} wide`);
+    assert.ok(lone[1] > 300 && lone[1] < 340, `three tiles fill the row: ${lone[1]}`);
+    assert.equal(lone[2], 1000);
+    // (.q-flow-refit: a part that fills in after the deal deals the flow again,
+    // so one column isn't left one class long beside a long one: Class's 今天, 2026-11-11.)
+    const colOf = id => page.evaluate(i => [...document.querySelectorAll('#refit .q-flow-col')].indexOf(document.getElementById(i).parentNode), id);
+    assert.equal(await colOf('part2'), 0);
+    await page.evaluate(() => (document.getElementById('part0').style.height = '600px'));
+    await page.waitForFunction(() => document.getElementById('part2').parentNode === document.querySelectorAll('#refit .q-flow-col')[1]);
   } finally {
     await browser.close();
     server.close();
