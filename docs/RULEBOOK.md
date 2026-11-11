@@ -267,6 +267,7 @@ Dates are Taiwan's calendar day of Jay's message (UTC times in memory files).
 - 10-23 Easy listening: keep `eased()` and the quieter master; no choir beds or glassy doublings.
 - Keep `noted()` hooks in `radio.mjs`; never a `.loading` class outside `#loading`; home cards static (nothing animates forever).
 - `engine.mjs` is the port of `passion_beats.py`: a change to the songs goes into both. Nothing of a kit's sound is sent anywhere.
+- 11-11 Beats yields: another sound (Law's live video, any app, a call) stops it, and it never starts again by itself (no retry, no resume on return or when the session frees): only a tap. Same for any Orbit app's sound.
 
 ### News (started 11-10)
 - 11-10 Orbit News: Taiwan's and English news grouped into stories, each outlet's side shown (藍綠 and 統獨 for Taiwan, US left/right for English); "like Ground News but for Taiwan" is the idea only, never its name, look or words (its "Blindspot" is our 單邊).
