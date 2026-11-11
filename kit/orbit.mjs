@@ -4574,7 +4574,7 @@ export function fitNames(root = document) {
 }
 // A grid of like tiles (.q-rows-full) never ends on a part row (Jay
 // 2026-11-03: "no more uneven grid anywhere"): as many tiles as fit a row
-// stay one row; past that, fewer columns where they divide the tiles evenly
+// stay one row, widened to fill it (.q-rows-snug: at most to twice their size); past that, fewer columns where they divide the tiles evenly
 // (no fewer than 60% of what fits), else the tiles past the last full row
 // are left out (.q-cut): a grid lists its most telling first. A grid whose
 // every tile must stay (.q-rows-keep: choices, a category or a station to
@@ -4595,8 +4595,10 @@ export function fullRows(root = document) {
     const fit = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length;
     if (!n || fit < 2 || n % fit === 0) continue;
     if (n < fit) {
-      // (Things to pick widen at most to twice their size: a lone 立委 fills a phone's row, never a computer's.)
-      if (grid.classList.contains('q-rows-keep') && fit > n * 2) continue;
+      // (Things to pick, and pictures (.q-rows-snug), widen at most to twice their size: a lone
+      // 立委 fills a phone's row, never a computer's; a lone song to come in Beats stood a cover
+      // the page's width, Jay's iPad 2026-11-11. A row of figures still fills its card.)
+      if ((grid.classList.contains('q-rows-keep') || grid.classList.contains('q-rows-snug')) && fit > n * 2) continue;
       grid.style.gridTemplateColumns = `repeat(${n}, minmax(0, 1fr))`;
       continue;
     }

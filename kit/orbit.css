@@ -5615,6 +5615,13 @@ html.q-kb .q-kb-docked {
   -webkit-mask-image: linear-gradient(90deg, transparent, black var(--q-fade-before, 0px), black calc(100% - var(--q-fade-after, 0px)), transparent);
   mask-image: linear-gradient(90deg, transparent, black var(--q-fade-before, 0px), black calc(100% - var(--q-fade-after, 0px)), transparent);
 }
+/* One row that scrolls, whatever an app does to chips around it: Law's
+   columns wrapped their chips, and a council's term of days stood down the
+   page as a wall of dates (Jay's iPad, 2026-11-11). */
+.q-day-bar .q-chips.q-day-strip.q-day-strip {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
 /* (A fade only on a side with more days to scroll to: none at the start, the first chip whole.) */
 .q-day-bar .q-day-strip.q-more-before {
   --q-fade-before: 6px;

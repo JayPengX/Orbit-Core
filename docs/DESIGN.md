@@ -249,7 +249,11 @@ and `--q-col-r` (beside it), `--q-mid` (its middle); never `100vw`.
   beside a long one. A small one (a link row) stays under the one before it.
   It goes by its own width (two from 600, three from 960, `.q-flow-2` two
   at most) and deals itself again when that crosses one, so a game's 概況 has level tops and even ends (CSS columns
-  left one side a card lower: Jay 2026-11-01).
+  left one side a card lower: Jay 2026-11-01). Sections drawn after the deal
+  (a list read later) want `.q-flow-refit`: dealt again when that would move
+  one, never while typing (Class's 今天 left one class on the left beside a
+  long right column: Jay's iPad 2026-11-11). A fixed two-column split of a
+  page's sections is the same mistake: deal them.
 - **A phone on its side shows more**: heads, day strips and rows a size
   tighter so the first cards are on the first screen; nothing a hero.
 - **A sheet** stays a phone's width (600 at most, one column), except one

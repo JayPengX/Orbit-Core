@@ -162,8 +162,8 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | Pictures | `logoTile` / `logoTileHtml` + `wireLogos`, `darkLogos`; `logos.mjs`, `photos.mjs`; never letter tiles |
 | Icons | `ICONS` (orbit.mjs) / `icons` (ui.mjs): one drawing per idea; new ones read as `kitUI.icons?.x` |
 | Live data | `everyDev(key, fn)` beats at the owner's speeds (waiting while a finger is down); `data-q-live` + `liveChanged` pop a changed number; patch in place, never rebuild what didn't change; `hold-place.mjs` keeps the reader's place by itself; `steady-pics.mjs` the pictures |
-| Fitting | `fitNames` (`.q-fit`, `.q-fit-wrap`), `fitNumbers` / `watchFit`, `balanceRows` (`.q-balance`), `fullRows` (`.q-rows-full`/`-keep`), `.q-even` / `.q-even3` |
-| Every screen | `screenFit()` / `onScreen(fn)` mark `html.q-tabrail`, `q-float`, `q-desk`, `q-wide`, `q-w3`; `--q-page-max`, `--q-vw`. By their own width, anywhere (a page, a sheet, a pane): `.q-cols`, `.q-flow` + `flowColumns(root)` (columns of even height), `.q-grid` (cards), `.q-split` (list beside detail) (DESIGN §10) |
+| Fitting | `fitNames` (`.q-fit`, `.q-fit-wrap`), `fitNumbers` / `watchFit`, `balanceRows` (`.q-balance`), `fullRows` (`.q-rows-full`/`-keep`/`-snug`), `.q-even` / `.q-even3` |
+| Every screen | `screenFit()` / `onScreen(fn)` mark `html.q-tabrail`, `q-float`, `q-desk`, `q-wide`, `q-w3`; `--q-page-max`, `--q-vw`. By their own width, anywhere (a page, a sheet, a pane): `.q-cols`, `.q-flow` + `flowColumns(root)` (even; `-refit`), `.q-grid` (cards), `.q-split` (list beside detail) (DESIGN §10) |
 | Pull to refresh, taps, links | `pullToRefresh`; `haptic()` / `tick()`; `PRESS_DELAY` / `pressSelector`; links out: `openLink` (Pass 連結) |
 | Offline | `onlineOnly` (live apps: Securities, Transit, Sports), `keepOffline` (the rest open on what they kept), `netState` / `netVerdict` |
 | Picks for you | `rank` + `feedback.mjs` (`lifter`, `shown`, `picked`, `did`, `keep`); measured: `tools/picks-backtest.mjs` |
