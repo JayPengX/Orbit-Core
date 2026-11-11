@@ -138,6 +138,21 @@ const school = (pages, seen = []) => async (u, init = {}) => {
   return new Response(p.body ?? p, { headers: { 'Content-Type': p.type || 'text/html; charset=utf-8' } });
 };
 
+test('a site with a feed for each board: every board read, each post named by its board, one copy of each', async () => {
+  const feed = items => ({ type: 'application/xml', body: `<rss><channel>${items.map(([t, d, n]) => `<item><title>${t}</title><link>https://www.c.hc.edu.tw/content?a=${n}</link><pubDate>${d} 08:00:00</pubDate></item>`).join('')}</channel></rss>` });
+  const pages = {
+    'https://www.c.hc.edu.tw/': `<a class="rssIcon" href="/rssfeeds?a=all" title="RSS訂閱此分類-all">RSS</a><a class="rssIcon" href="/rssfeeds?a=adm" title="RSS訂閱此分類-行政消息">RSS</a><a class="rssIcon" href="/rssfeeds?a=act" title="RSS訂閱此分類-活動消息">RSS</a><a class="rssIcon" href="/rssfeeds?a=t" title="RSS訂閱此分類-教職員專區">RSS</a>`,
+    'https://www.c.hc.edu.tw/rssfeeds?a=all': feed([['第二次期中考考程表', '2026-11-10', 1], ['寒假營隊', '2026-11-09', 2]]),
+    'https://www.c.hc.edu.tw/rssfeeds?a=adm': feed([['第二次期中考考程表', '2026-11-10', 1], ['減免學雜費申請', '2026-10-20', 3]]),
+    'https://www.c.hc.edu.tw/rssfeeds?a=act': feed([['寒假營隊', '2026-11-09', 2], ['校慶運動會', '2026-10-15', 4]]),
+    'https://www.c.hc.edu.tw/rssfeeds?a=t': feed([['教師研習', '2026-11-10', 5]])
+  };
+  const seen = [];
+  const read = await readSchool('https://www.c.hc.edu.tw/', school(pages, seen), '2026-11-11');
+  assert.deepEqual(read.items.map(x => [x.title, x.kind || '']), [['第二次期中考考程表', '行政消息'], ['寒假營隊', '活動消息'], ['減免學雜費申請', '行政消息'], ['校慶運動會', '活動消息']]);
+  assert.ok(!seen.some(u => u.includes('a=t')), 'a board for teachers not read');
+});
+
 test('a school read by code at once, worded behind, kept an hour; a title worded before never sent again', async () => {
   const pages = { 'https://www.s.hcc.edu.tw/': '<html><a class="rssIcon" href="/rssfeeds?a=1" title="RSS">RSS</a></html>', 'https://www.s.hcc.edu.tw/rssfeeds?a=1': { body: RSS, type: 'application/xml' } };
   const read = await readSchool('https://www.s.hcc.edu.tw/', school(pages), '2026-11-11');
