@@ -410,3 +410,16 @@ export async function classNewsTry(env, raw, cap) {
   while (pending.length) await Promise.all(pending.splice(0));
   return { site, how: out?.how, firstMs, wording: !!first?.wording, stale: !!first?.stale, firstLines: (first?.items || []).filter(it => it.line).length, doneMs, items: (out?.items || []).map(({ desc, ...it }) => it) };
 }
+
+// The ops check (ai-try, feature=class-news&peek=<a school's page>): that
+// page as the relay reads it, to see how a school lays out its lists: its
+// links (text, address) and a slice of its text (from, n).
+export async function classNewsPeek(env, raw, { from = 0, n = 4000, method = 'GET', body = '' } = {}) {
+  const url = schoolSite(raw);
+  if (!url) return { error: 'site' };
+  const via = env.GEMINI_RELAY ? (u, init) => env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, init) : fetch;
+  const got = await getPage(url, via, method === 'POST' ? { method, headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body } : {});
+  if (!got) return { url, error: 'unread' };
+  const links = [...got.text.matchAll(/<a\b[^>]*href=["']([^"'#][^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)].map(m => [textOf(m[2]).slice(0, 40), m[1].slice(0, 160)]).filter(([t]) => t).slice(0, 300);
+  return { url: got.url, type: got.type, length: got.text.length, feeds: [...got.text.matchAll(/<link\b[^>]*(?:rss|atom)[^>]*>/gi)].map(m => m[0]).slice(0, 10), links, text: got.text.slice(+from || 0, (+from || 0) + Math.min(+n || 4000, 20000)) };
+}
