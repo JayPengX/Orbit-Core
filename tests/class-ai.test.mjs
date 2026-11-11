@@ -186,8 +186,16 @@ test('a school read by code at once, worded behind, kept an hour; a title worded
   assert.equal(asked.length, 2);
   assert.equal(asked[1].length, 1, 'only the new title asked');
   assert.ok(later.items.every(x => x.line), 'the old ones keep their words');
+  // The school's feed shows only its newest: what it showed before stays (45 days), with its words.
+  pages['https://www.s.hcc.edu.tw/rssfeeds?a=1'].body = RSS.replace(/<item>[\s\S]*<\/item>/, '<item><title>最新一則</title><link>https://www.s.hcc.edu.tw/content?a=10</link><pubDate>2026-11-11 12:00:00</pubDate></item>');
+  await schoolNews(env, ctx, 'https://www.s.hcc.edu.tw/', { cap: 10, fetchFn: school(pages), now: now + 4 * 3_600_000 });
+  await settle();
+  const fuller = await schoolNews(env, ctx, 'https://www.s.hcc.edu.tw/', { cap: 10, fetchFn: school(pages), now: now + 4 * 3_600_000 + 20_000 });
+  assert.deepEqual(fuller.items.map(x => x.title), ['最新一則', '新的公告標題', '【轉知】寒假營隊', '第二次期中考考程表']);
+  assert.ok(fuller.items.every(x => x.line), 'each worded, the older ones not asked again');
+  assert.equal(asked.length, 3);
   const capped = await schoolNews({ ...env, DATA: { get: async () => null, put: async () => {} } }, ctx, 'https://www.s.hcc.edu.tw/', { cap: 0, fetchFn: school(pages), now });
-  assert.equal(capped.items.length, 3, 'capped: the titles alone');
+  assert.equal(capped.items.length, 1, 'capped: the titles alone');
   assert.equal(capped.items[0].line, undefined);
   await settle();
   assert.deepEqual(mergeWorded([{ id: 'x', title: 't' }], [{ id: 'x', line: 'l', who: [], act: '', by: '' }]), [{ id: 'x', title: 't', line: 'l', who: [], act: '', by: '' }]);
