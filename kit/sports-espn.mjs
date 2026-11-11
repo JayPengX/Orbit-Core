@@ -103,6 +103,26 @@ export function overByRule(status, away, home, league) {
 // a final is first asked for (Orbit Sports' result notices),
 // then every 2 minutes. A quick game is under its usual length (a 2 h 20
 // baseball game, a blowout), so never that.
+// A final told in a notice (Orbit Sports' own, and the Worker's push.js),
+// one way in every sport (Jay 2026-11-11: "塞爾提克 123 : 101 76 人" ran
+// the scores into the names, the second's number into 76 人): who won in
+// the title, in words, and the score alone in the body, the winner's first.
+// title 塞爾提克 擊敗 76 人 / Celtics beat 76ers; a draw 曼城 與 兵工廠 平手 /
+// Man City and Arsenal draw. result: 123–101; a shootout's too, 1–1，PK 4–3.
+// `away`, `home`: { name, score }; `winner`: 'away' | 'home' when the feed says
+// (a shootout), else the scores; null without both scores.
+export function finalWords({ away, home, winner = null, shootout = null } = {}, lang = 'zh') {
+  const en = lang === 'en';
+  const [as, hs] = [away?.score, home?.score].map(x => (x === '' || x == null ? NaN : Number(x)));
+  if (!Number.isFinite(as) || !Number.isFinite(hs)) return null;
+  const won = winner === 'away' || winner === 'home' ? winner : as > hs ? 'away' : hs > as ? 'home' : null;
+  if (!won) return { title: en ? `${away.name} and ${home.name} draw` : `${away.name} 與 ${home.name} 平手`, result: `${as}–${hs}` };
+  const [w, l] = won === 'away' ? [away, home] : [home, away];
+  const [ws, ls] = won === 'away' ? [as, hs] : [hs, as];
+  const pk = shootout && Number.isFinite(Number(shootout.away)) && Number.isFinite(Number(shootout.home)) ? (won === 'away' ? [shootout.away, shootout.home] : [shootout.home, shootout.away]).join('–') : '';
+  return { title: en ? `${w.name} beat ${l.name}` : `${w.name} 擊敗 ${l.name}`, result: `${ws}–${ls}${pk ? (en ? ` (pens ${pk})` : `，PK ${pk}`) : ''}` };
+}
+
 export const SHORTEST_MIN = { soccer: 105, baseball: 110, basketball: 110, racing: 90 };
 
 const logoOf = team => team?.logo || team?.logos?.[0]?.href || null;

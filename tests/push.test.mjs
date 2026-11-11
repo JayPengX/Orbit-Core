@@ -439,7 +439,7 @@ test("a CPBL game's final from TheSportsDB's day list (ESPN doesn't carry CPBL),
     status = 'IN7';
     assert.equal(await runCheck(item.check, 'zh', {}), null);
     status = 'FT';
-    assert.deepEqual(await runCheck(item.check, 'zh', {}), { title: '味全龍 0 : 5 中信兄弟', body: '中信兄弟 贏了', result: '中信兄弟 贏了' });
+    assert.deepEqual(await runCheck(item.check, 'zh', {}), { title: '中信兄弟 擊敗 味全龍', body: '5–0', result: '5–0' });
     status = 'POST';
     assert.equal((await runCheck(item.check, 'en', {})).result, 'Postponed');
   } finally {
@@ -455,7 +455,7 @@ test("a CPBL final when TheSportsDB turns the proxy away (429): asked again thro
   const via = [];
   const env = { GEMINI_RELAY: { fetch: async url => (via.push(String(url)), new Response(JSON.stringify({ events: [{ idEvent: '2618131', strStatus: 'FT', intHomeScore: '5', intAwayScore: '4' }] }), { status: 200 })) } };
   try {
-    assert.equal((await runCheck(check, 'zh', env)).title, '味全龍 4 : 5 中信兄弟');
+    assert.equal((await runCheck(check, 'zh', env)).title, '中信兄弟 擊敗 味全龍');
     await assert.rejects(runCheck(check, 'zh', {}), /tsdb 429/);
   } finally {
     globalThis.fetch = real;

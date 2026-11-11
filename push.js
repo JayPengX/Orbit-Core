@@ -50,7 +50,7 @@
 import { weatherCheck } from './weather.js';
 import { tdxGet, tdxRequest } from './transit.js';
 import { bodyText } from './http.js';
-import { LEAGUES, parseStatus, overByRule } from './kit/sports-espn.mjs';
+import { LEAGUES, parseStatus, overByRule, finalWords } from './kit/sports-espn.mjs';
 import { cpblDay } from './asia-baseball.js';
 
 const enc = new TextEncoder();
@@ -414,10 +414,11 @@ export async function runCheck(check, lang, env) {
       const result = /postpon|delay|suspend/i.test(type.name || '') ? T('延賽', 'Postponed') : /cancel/i.test(type.name || '') ? T('比賽取消', 'Canceled') : T('比賽結束', 'Final');
       return { body: result, result };
     }
-    const [as, hs] = [Number(a?.score), Number(h?.score)];
-    const won = a?.winner ? na : h?.winner ? nh : as > hs ? na : hs > as ? nh : null;
-    const result = won ? T(`${won} 贏了`, `${won} win`) : as === hs ? T('平手', 'Draw') : T('比賽結束', 'Final');
-    return { title: `${na} ${a?.score ?? ''} : ${h?.score ?? ''} ${nh}`, body: result, result };
+    // Who won in the title, the score in the body (kit finalWords, the app's own notice's words).
+    const shoot = [a?.shootoutScore, h?.shootoutScore].every(x => Number.isFinite(Number(x)) && x !== null && x !== undefined) ? { away: a.shootoutScore, home: h.shootoutScore } : null;
+    const words = finalWords({ away: { name: na, score: a?.score }, home: { name: nh, score: h?.score }, winner: a?.winner ? 'away' : h?.winner ? 'home' : null, shootout: shoot }, lang);
+    if (!words) return { body: T('比賽結束', 'Final'), result: T('比賽結束', 'Final') };
+    return { title: words.title, body: words.result, result: words.result };
   }
   if (check.tsdb) {
     const T = (zh, en) => (lang === 'en' ? en : zh);
@@ -429,9 +430,8 @@ export async function runCheck(check, lang, env) {
     // (A side held scoreless is left empty.)
     const [as, hs] = [Number(e.intAwayScore) || 0, Number(e.intHomeScore) || 0];
     const [na, nh] = check.names || [e.strAwayTeam, e.strHomeTeam];
-    const won = as > hs ? na : hs > as ? nh : null;
-    const result = won ? T(`${won} 贏了`, `${won} win`) : T('平手', 'Draw');
-    return { title: `${na} ${as} : ${hs} ${nh}`, body: result, result };
+    const words = finalWords({ away: { name: na, score: as }, home: { name: nh, score: hs } }, lang);
+    return { title: words.title, body: words.result, result: words.result };
   }
   if (check.yahoo) {
     const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(check.yahoo)}?range=1d&interval=5m`, { headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' }, signal: AbortSignal.timeout(UPSTREAM_MS) });
