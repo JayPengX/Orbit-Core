@@ -15,3 +15,4 @@ into `out/<job>.jsonl`. Locally: `node jobs/<job>.mjs size` guesses the cost wit
 | 8-articles | Sonnet 5.5 | Those laws' first 3,500 articles explained ahead of time with /law-ask's explainer |
 | 2a-run | each feature's own Claude model | Every AI feature's examples answered as live |
 | 2b-review | Opus 5.5 | Each feature reviewed on those answers: findings, exact prompt edits, new examples |
+| 1-gold | Sonnet 5.5 | Job 5's 3,706 questions checked against their articles' text: Law's test set |
