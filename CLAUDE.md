@@ -211,7 +211,7 @@ w;dur=`, noted by the 除錯紀錄 when slow.
 | `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |
 | `/flight` | `flight.js`, `kit/flight.mjs` | Class's 專注飛行: real planes landing in about N minutes; pool: R2 `flight/` (§5.5) |
 | `/gift` | `gift.js` | 公開領取 at `/key/` (`site/key/`), set in admin; one a device (D1 `gift_claim`), `op: 'go'` a `#qh=` into an app; unreplaced back after `hold` hours |
-| `/showcase/pass` | `showcase.js` | The showcase's short pass: its demos' reads, its 問 Orbit (`showcase-ask`); capped per address a day |
+| `/showcase/pass` | `showcase.js` | The showcase's pass: demos' reads, 問 Orbit (`showcase-ask`); capped per address a day |
 | `/data/…` | `data.js` | R2, public reads (§5.5); `/data/build` (POST, Bearer `DATA_PUSH_SECRET`, `build.yml`) runs a builder now |
 | `/sources` | `sources.js` | Phones' beacons of their outside reads (the proxy's: `fetch` wrapped) |
 | `/config` | `worker.js`, `kit/devconfig.mjs` | The live speeds (`DEV`), a minute in Cloudflare's cache |
