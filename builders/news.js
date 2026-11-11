@@ -1044,7 +1044,6 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
   };
   const chansDue = feedsDue(chans, now);
   const feedsNow = feedsDue(feeds, now);
-  const asked = chansDue.length + feedsNow.length;
   await Promise.all([
     ...chansDue.map(readChannel),
     ...feedsNow.map(async ([o, url, kind]) => {
@@ -1097,10 +1096,12 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
     await store.put(NEWS_PATH, { built: now, tw: out.tw, intl: out.intl });
     await store.put(NEWS_PAST, { built: now, ...out.past });
   }
-  // (A few feeds or channels missing is a normal build: YouTube's feeds 404 a channel at a
-  // time for hours. Only half or more of what was asked failing is the build's failure,
-  // what the beat and the panel's 外部來源 call broken.)
-  const missed = failed.length && failed.length * 2 < asked ? failed.slice(0, 12) : null;
+  // (A few feeds missing is a normal build. Only half or more of the stories' feeds asked
+  // failing is the build's failure, what the beat and the panel's 外部來源 call broken.)
+  // (Channels' clips apart: YouTube's feeds can all 404 for a day (11-11, every channel from
+  // everywhere) while the stories build fine; the clips kept 48 hours carry them.)
+  const storyFails = failed.filter(f => !/ clips: /.test(f)).length;
+  const missed = failed.length && storyFails * 2 < feedsNow.length ? failed.slice(0, 12) : null;
   return { items: items.length, fresh, clips: clips.length, pages: want.length, kept: out.recs.length, tw: out.tw.length, intl: out.intl.length, past: out.past.tw.length + out.past.intl.length, ...(missed ? { missed } : { failed }) };
 }
 
