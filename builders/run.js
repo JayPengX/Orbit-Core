@@ -9,7 +9,8 @@
 //   (the bus packs: GitHub's weekly build from TDX's GTFS since 2026-11,
 //   tools/gtfs-buses.mjs, started from here: :22 at 19 UTC daily, kickBuses,
 //   when none ran in a week; buses.js runBuses only by hand, POST /data/build?job=buses)
-//   :04 :24 :34 :54  the family's AI made once (ai.js: news lines, game recaps, word cards)
+//   :04 :24 :34 :54  the family's AI made once (ai.js: news lines, game recaps, word cards);
+//                then the listed companies' 重大訊息 (filings.js)
 //   :00 :10 :18 :30 :40 :50  Orbit News' stories (every outlet's feed, news.js),
 //                and its site published when News's main moved (newsSite)
 //   :22 daily    15 UTC CPBL's tables and its month whole (23:00 in Taiwan);
@@ -33,6 +34,7 @@ import { runBuses, kickBuses, BUSES_HOUR } from './buses.js';
 import { runKept, KEPT_HOUR } from './kept.js';
 import { runF1Kept } from './f1kept.js';
 import { runNews, newsSite } from './news.js';
+import { runFilings } from './filings.js';
 import { runNewsLaws } from './news-laws.js';
 import { runAi } from './ai.js';
 
@@ -64,6 +66,7 @@ export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[ne
   if (job === 'buses') await step('buses', () => runBuses({ store, env, now, until: now + 6 * 60_000 }));
   // The family's AI made once (builders/ai.js): news lines, game recaps, word cards; `ai-news`… one step by hand.
   if (job === 'ai' || only === 'ai' || only?.startsWith?.('ai-')) await step('ai', () => runAi({ store, env, proxy, now, cap: aiCap, only: only?.startsWith?.('ai-') ? only.slice(3) : null }));
+  if (job === 'ai' || only === 'filings') await step('filings', () => runFilings({ store, now }));
   if (job === 'news' || only === 'news') {
     await step('news', () => runNews({ store, now }));
     await step('newsSite', () => newsSite({ store, env, now }));
