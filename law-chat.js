@@ -624,9 +624,10 @@ export async function lawCompare(env, ctx, headers, gemini, calls, qs = COMPARE_
 // started (first: the answer's first words). try: 'model=lite,plan=minimal,answer=minimal'.
 export const TIMED_QS = ['房東不還押金怎麼辦', '酒駕被抓會怎樣', '公司沒給加班費可以告嗎'];
 export async function lawChatTimes(env, ctx, headers, gemini, tryOut = '') {
-  const tune = Object.fromEntries(String(tryOut).split(',').map(x => x.split('=')).filter(([k, v]) => ['model', 'plan', 'answer'].includes(k) && v));
+  const tune = Object.fromEntries(String(tryOut).split(',').map(x => x.split('=')).filter(([k, v]) => ['model', 'plan', 'answer', 'q'].includes(k) && v));
   const out = [];
-  for (const q of TIMED_QS) {
+  // (q=…: one question of one's own, its rules and councils' parts listed.)
+  for (const q of tune.q ? [tune.q.slice(0, 200)] : TIMED_QS) {
     const ms = {};
     const drafts = [];
     const chat = readChat({ q });
@@ -642,7 +643,7 @@ export async function lawChatTimes(env, ctx, headers, gemini, tryOut = '') {
     };
     const res = await answerChat(chat, 'ops', env, ctx, headers, counted, s => s.stage === 'draft' && drafts.push(s.verdict), LAW_LIMITS.perDay, ms, tune);
     const j = await res.json().catch(() => ({}));
-    out.push({ q, status: res.status, ms, tokens, drafts: drafts.length, arts: j.sources?.length ?? null, points: j.points?.length ?? null, cases: j.cases?.length ?? 0, verdict: j.verdict || j.error || '', answer: (j.answer || '').slice(0, 80) });
+    out.push({ q, status: res.status, ms, tokens, drafts: drafts.length, arts: j.sources?.length ?? null, points: j.points?.length ?? null, cases: j.cases?.length ?? 0, verdict: j.verdict || j.error || '', answer: (j.answer || '').slice(0, tune.q ? 400 : 80), ...(tune.q ? { rules: (j.rules || []).map(r => r.n), local: j.local || null, points: (j.points || []).map(p => `${p.text} [${p.cites.join(',')}]`) } : {}) });
   }
   return { at: new Date().toISOString(), tune, out };
 }
