@@ -48,7 +48,7 @@ orbit-workers-proxy (worker.js, near each caller): every route in §4
  ├─ upstreams: ESPN, MLB, Jolpica, F1, OpenF1, Polymarket, Yahoo, TDX,
  │   Google, CWA, MOENV, 立法院, 司法院, NCDR, TAIFEX…
  ├─ gemini-relay (Gemini, Claude, GPT from Taiwan: gcp:asia-east1), GEMINI_RELAY
- ├─ orbit-law (Orbit Law's site), service LAW_SITE: its data read by the proxy
+ ├─ orbit-law (Orbit Law's site), service LAW_SITE: its data read by the proxy (packed)
  └─ quota-guard, service GUARD: reads the bill every 5 minutes (a DO alarm),
      paces (Free plan: a day's amounts, no stop)
 orbit-site (site.js): the domain's hosts as custom domains
@@ -131,10 +131,10 @@ modules for modulepreload. `node kit/apps.mjs` refreshes every app's snippets;
 | `stock-account.mjs`, `stock-access.mjs`, `stock-credit.mjs`, `stock-markets.mjs`, `stock-quotes.mjs`, `stock-bonds.mjs`, `stock-savings.mjs`, `stock-ipo.mjs`, `stock-holidays.mjs`, `stock-hk-lots.mjs`, `stock-jp-lists.mjs`, `stock-codec.mjs` | Securities' ledger, broker rules, markets, prices, bonds, savings, IPOs, holidays, lot sizes, saved-copy codec; shared with the Worker |
 | `pay.mjs`, `gov.mjs` | The weekly pay and relief (rules only; the Worker alone writes them); what the government took and gave one account |
 | `flight.mjs`, `ebus.mjs`, `ebus-read.mjs` | A real plane in the air on a sphere (`/flight`, Class's 專注飛行); bus sites' ETAs, notices as TDX's (臺中, 桃園, 臺南: phones, then proxy; 高雄: phones) |
-| `domain.mjs`, `devconfig.mjs`, `mirror.mjs` | The family's domain (one place); `DEV` for the Workers; the nightly mirror's addresses |
+| `domain.mjs`, `devconfig.mjs`, `mirror.mjs`, `data-pack.mjs` | The family's domain (one place); `DEV` for the Workers; the nightly mirror's addresses; small data files in packs (`packReader`: the 20,000-file cap) |
 | `sw.js`, `sw-images.js` | The one service worker every app imports (page and own pictures kept first, refreshed behind; `?v=` files from the cache, checked against their hash); other sites' pictures in one cache all apps share |
 | `apps.mjs`, `link.mjs`, `preload.mjs`, `stamp.mjs`, `stamp-app.mjs`, `hash.mjs`, `frame-guard.mjs`, `no-net.mjs` | Build tools, never served: the apps' snippets; `.kit` links; modulepreload; the content-hashed builds; `frameFaults` (only colours on the tab bar); tests offline |
-| `img/` | The kit's own pictures (the Premier League's mark, light and dark) |
+| `img/` | The kit's own pictures |
 
 ### 3.3 Component patterns: what to use for what
 
@@ -467,7 +467,6 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
 | `node tools/live-scroll.mjs [app…] [--webkit]` | Nothing jumps: refreshes, loading, scrolling, folding |
 | `node tools/test-apps.mjs [app…]` | Every app's tests against this kit |
 
-`npm test` covers the Workers, kit and this map.
 
 ## 12. If you change…
 

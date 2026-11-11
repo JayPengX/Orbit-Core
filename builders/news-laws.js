@@ -6,7 +6,9 @@
 // news/laws.json: { built, stories: { id: [{ n, p, k, bill, open, passed }] },
 // bills: { k: [[id, title, at]] } } (the second for Law's bill page).
 
-import { DATA, lawFetch } from '../law.js';
+import { dataReader } from '../law.js';
+let hourly = null;
+const readHour = path => (hourly ||= dataReader(3600))(path);
 import { NEWS_PATH } from './news.js';
 
 export const LAWS_PATH = 'news/laws.json';
@@ -74,9 +76,9 @@ export function lawsPage(stories = [], items = [], now = Date.now()) {
 export async function runNewsLaws({ store, now = Date.now() }) {
   const page = await store.json(NEWS_PATH);
   if (!page?.tw) return { skipped: 'no stories' };
-  const res = await lawFetch(`${DATA}bills/items.json`, { cf: { cacheTtlByStatus: { '200-299': 3600, '500-599': 0 }, cacheEverything: true }, signal: AbortSignal.timeout(10_000) });
-  if (!res.ok) throw new Error(`law items ${res.status}`);
-  const out = lawsPage(page.tw, (await res.json())?.items || [], now);
+  const items = await readHour('bills/items.json');
+  if (!items) throw new Error('law items 404');
+  const out = lawsPage(page.tw, items.items || [], now);
   // (Written only when a story's laws changed: the time alone isn't a change.)
   const was = await store.json(LAWS_PATH).catch(() => null);
   if (was && JSON.stringify(was.stories) === JSON.stringify(out.stories)) return { same: Object.keys(out.stories).length };
