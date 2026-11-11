@@ -87,7 +87,7 @@ export const STORE = {
     app: 'weather', brand: 'weather', show: 'weather', prefix: 'weather', account: 'pins',
     shots: [
       { zh: '今天天氣一眼看完', en: 'Today, in one look', wait: 9000 },
-      { zh: '用問的：明天會下雨嗎？', en: 'Just ask: will it rain tomorrow? (in Chinese)', dark: true, hash: 'ask=明天竹北會下雨嗎', wait: 9000 },
+      { zh: '用問的：明天會下雨嗎？', en: 'Just ask: will it rain tomorrow?', dark: true, hash: { zh: 'ask=明天竹北會下雨嗎', en: 'ask=Will it rain in Zhubei tomorrow?' }, wait: 9000 },
       { zh: '未來十天降雨', en: 'Rain, ten days ahead', page: 'rain', wait: 9000 },
       { zh: '一天的每小時', en: 'Every hour of the day', dark: true, page: 'day', wait: 9000 },
       { zh: '附近空氣品質', en: 'The air around you', page: 'air', wait: 9000 },
