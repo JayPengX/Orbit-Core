@@ -24,6 +24,103 @@
 //   update didn't finish, with reload (mends again) or open anyway. Nothing
 //   right is dropped or downloaded again. The app says it started with
 //   window.__fxStarted and hides #loading itself (the kit does).
+
+// ---- 測試工具 (the tester's tools, kit testtools.mjs) ----
+// Set on this device only, after the unlock (Orbit Pass › tap 除錯紀錄 seven
+// times): a clock moved (every Date in the page runs from the time picked),
+// a place (the page's geolocation answers there) and the network (off, slow,
+// or every read failing). Put in place here, before any of the app's own
+// code runs, so every app is tested as it is, with nothing of its own changed.
+// window.ORBIT_TEST says what's on; a pill on the page says it too.
+(function () {
+  var t = null;
+  try {
+    t = JSON.parse(localStorage.getItem('orbit.tester') || 'null');
+  } catch (e) {}
+  if (!t || !t.on) return;
+  window.ORBIT_TEST = t;
+  var on = [];
+  var off = Number(t.clock && t.clock.off) || 0;
+  if (off && window.Reflect) {
+    var D = Date;
+    var F = function () {
+      var a = Array.prototype.slice.call(arguments);
+      if (!new.target) return new D(D.now() + off).toString();
+      return Reflect.construct(D, a.length ? a : [D.now() + off], new.target);
+    };
+    F.prototype = D.prototype;
+    F.now = function () {
+      return D.now() + off;
+    };
+    F.parse = D.parse;
+    F.UTC = D.UTC;
+    F.real = function () {
+      return D.now();
+    };
+    window.Date = F;
+    on.push('clock');
+  }
+  var p = t.place;
+  if (p && isFinite(p.lat) && isFinite(p.lng) && navigator.geolocation) {
+    var pos = function () {
+      return { coords: { latitude: +p.lat, longitude: +p.lng, accuracy: +p.acc || 20, altitude: null, altitudeAccuracy: null, heading: null, speed: null }, timestamp: Date.now() };
+    };
+    var geo = navigator.geolocation;
+    var ids = 0;
+    try {
+      geo.getCurrentPosition = function (ok) {
+        setTimeout(function () {
+          ok(pos());
+        }, 50);
+      };
+      geo.watchPosition = function (ok) {
+        setTimeout(function () {
+          ok(pos());
+        }, 50);
+        return ++ids;
+      };
+      geo.clearWatch = function () {};
+    } catch (e) {}
+    var perms = navigator.permissions;
+    if (perms && perms.query) {
+      var query = perms.query.bind(perms);
+      try {
+        perms.query = function (d) {
+          return d && d.name === 'geolocation' ? Promise.resolve({ state: 'granted', name: 'geolocation', onchange: null, addEventListener: function () {}, removeEventListener: function () {} }) : query(d);
+        };
+      } catch (e) {}
+    }
+    on.push('place');
+  }
+  var net = t.net;
+  if ((net === 'off' || net === 'slow' || net === 'fail') && window.fetch) {
+    var realFetch = window.fetch.bind(window);
+    // (The page's own files and the kit's are never in the way: only reads of data.)
+    var own = function (u) {
+      return /\/(Orbit-Core\/kit|kit)\/|version\.json/.test(u) && !/\/api\//.test(u);
+    };
+    window.fetch = function (input, init) {
+      var u = String((input && input.url) || input || '');
+      if (own(u)) return realFetch(input, init);
+      if (net === 'off') return Promise.reject(new TypeError('Failed to fetch (測試工具：離線)'));
+      if (net === 'fail') return Promise.resolve(new Response(JSON.stringify({ error: 'tester', message: '測試工具：讀取失敗' }), { status: 503, headers: { 'content-type': 'application/json' } }));
+      return new Promise(function (ok) {
+        setTimeout(ok, 3000);
+      }).then(function () {
+        return realFetch(input, init);
+      });
+    };
+    if (net === 'off') {
+      try {
+        Object.defineProperty(navigator, 'onLine', { configurable: true, get: function () { return false; } });
+      } catch (e) {}
+    }
+    on.push('net');
+  }
+  t.active = on;
+  if (on.length) document.documentElement.classList.add('q-testing');
+})();
+
 (function () {
   // A phone or a tablet (an iPad says Macintosh, with touch), set before the
   // first paint (orbit.mjs reads html.q-touch).
