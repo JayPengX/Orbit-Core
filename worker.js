@@ -65,7 +65,7 @@ import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
 import { docStore, storeReady } from './doc-store.js';
 import { handleMoneyRead } from './money-read.js';
 import { handleCal } from './cal.js';
-import { logCall, callsSince, reliability, lastFailed } from './gemini-use.js';
+import { logCall, callsSince, reliability, spendOf, lastFailed } from './gemini-use.js';
 import { handleAi, handleAiBuild, aiTry } from './ai.js';
 import { handleClassNews, classNewsTry, classNewsPeek, classNewsRead } from './class-news.js';
 import { FEATURES } from './ai-features.js';
@@ -1482,7 +1482,9 @@ async function route(request, env, ctx, headers, origin) {
     // Every Gemini call of the last ?days= (30 at most) by day, feature, model and status.
     if (check === 'gemini-use') {
       const days = Math.min(30, Math.max(1, Number(new URL(request.url).searchParams.get('days')) || 7));
-      return json(reliability(await callsSince(env, Date.now() - days * 86_400_000)), 200, headers);
+      const calls = await callsSince(env, Date.now() - days * 86_400_000);
+      // (&tokens=1: each feature's calls and tokens by model over those days: what cost cuts are measured by.)
+      return json(new URL(request.url).searchParams.get('tokens') ? spendOf(calls) : reliability(calls), 200, headers);
     }
     // CPU by route from the Workers Logs (guard.js cpuByRoute): what passes the
     // Free plan's 10 ms a request. ?group= a logs key, ?keys=1 the keys, ?script=, ?hours=, ?where=.
