@@ -373,7 +373,7 @@ writing a file only when it changed (`builders/store.js`):
 | `kept.js` | wipes kept copies (`mirror/`) before a league's first askable day | daily 17:00 |
 | `news.js`, `news-words.js`, `news-laws.js` | `news/index.json` (3 days), `past.json` (weeks): stories by weight, topic, side; `laws.json`: laws named | every 10 min |
 | `tools/flight-pool.mjs` (`flight.yml`) | `flight/` | 10 min |
-| `ai.js`, `recaps.js`, `f1story.js`; `filings.js` | AI made once: `news/lines.json`, `sides.json`, `words/cards/<a…z>.json`, `sports/recaps/<day>.json`, `sports/f1/stories/`; 重大訊息 as rows: `stock/filings/` | :04 :24 :34 :54 |
+| `ai.js`, `recaps.js`, `previews.js`, `f1story.js`; `filings.js` | AI made once: `news/lines.json`, `sides.json`, `words/cards/`, `sports/` (`recaps/`, `previews/`, `f1/stories/`); 重大訊息 as rows: `stock/filings/` | :04 :24 :34 :54 |
 
 A season is kept until the next one's first game.
 

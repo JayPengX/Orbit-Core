@@ -143,7 +143,7 @@ export const DEV = {
   // The AI door's features (ai.js, ai-features.js), one count an app's (taps and builds together).
   aiMoneyMore: { def: 600, min: 0, max: 5000, unit: '次', group: 'ai', ai: ['money-say', 'money-ask', 'money-month'], zh: '記帳 AI（Money）', en: 'Money AI', note: '用說的記帳、問我的帳、每月回顧；0 = 暫停' },
   aiWords: { def: 1500, min: 0, max: 10000, unit: '次', group: 'ai', ai: ['words-check', 'words-cards', 'words-photo', 'words-chat'], zh: '單字 AI（Words）', en: 'Words AI', note: '檢查句子、例句與記憶法、拍照、用新字聊天；0 = 暫停' },
-  aiSports: { def: 600, min: 0, max: 5000, unit: '次', group: 'ai', ai: ['sports-recap', 'f1-story', 'sports-ask'], zh: '比賽 AI（Sports）', en: 'Sports AI', note: '賽後三句話、F1 賽後故事、問比賽；0 = 暫停' },
+  aiSports: { def: 600, min: 0, max: 5000, unit: '次', group: 'ai', ai: ['sports-recap', 'sports-preview', 'f1-story', 'sports-ask'], zh: '比賽 AI（Sports）', en: 'Sports AI', note: '賽前看點、賽後三句話、F1 賽後故事、問比賽；0 = 暫停' },
   aiTransit: { def: 400, min: 0, max: 5000, unit: '次', group: 'ai', ai: ['transit-notice', 'transit-say'], zh: '交通 AI（Transit）', en: 'Transit AI', note: '通告讀成路線、用說的查路線；0 = 暫停' },
   aiNews: { def: 600, min: 0, max: 5000, unit: '次', group: 'ai', ai: ['news-lines', 'news-sides'], zh: '新聞 AI（News）', en: 'News AI', note: '一句話、雙語標題、各方怎麼說（每次一批）；0 = 暫停' },
   aiWeather: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['weather-ask'], zh: '天氣 AI（Weather）', en: 'Weather AI', note: '問天氣（程式讀不懂時）；0 = 暫停' },

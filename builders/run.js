@@ -9,7 +9,7 @@
 //   (the bus packs: GitHub's weekly build from TDX's GTFS since 2026-11,
 //   tools/gtfs-buses.mjs, started from here: :22 at 19 UTC daily, kickBuses,
 //   when none ran in a week; buses.js runBuses only by hand, POST /data/build?job=buses)
-//   :04 :24 :34 :54  the family's AI made once (ai.js: news lines, game recaps, word cards);
+//   :04 :24 :34 :54  the family's AI made once (ai.js: news lines, game recaps and previews, word cards);
 //                then the listed companies' 重大訊息 (filings.js)
 //   :00 :10 :18 :30 :40 :50  Orbit News' stories (every outlet's feed, news.js),
 //                and its site published when News's main moved (newsSite)

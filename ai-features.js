@@ -620,6 +620,53 @@ export const FEATURES = {
     }
   },
 
+  // Orbit Sports: 賽前看點 (Jay 11-11: "most games have none, and what there
+  // is only says the table"): up to two points worth knowing before a game,
+  // made once by builders/previews.js from code's digest of ESPN's summary,
+  // only what the game's page doesn't show at a glance; every number one of the digest's.
+  'sports-preview': {
+    models: ['haiku', 'luna'],
+    effort: { luna: 'low' },
+    maxIn: 3200,
+    parts: ({ facts }) =>
+      text(
+        [
+          'You write 看點 for a game that has not started yet: the one or two things a fan in Taiwan would want to know before it. The page already shows both records, both places in the table, each side’s last five results as W/L, the win chance, each side’s season leaders with their averages and the past meetings’ results: never say any of those again (no 「排名第3」, no 「近5場3勝2敗」, no 「場均25.9分」, no 「勝率」).',
+          'Worth telling, best first: a team’s best-known player out (and until when); what a win would do in the table (「贏球就升上第2」, 「輸球恐跌入降級區」); who did something big last time out (from the preview: 「上一場攻下43分」); a side on the second night in a row, or with a cup or European game a few days before while the other rested; a run longer than five games; a home or road record that is perfect or winless; a play-off series. Skip a fact a fan would shrug at (a bench player out, a day’s rest more or less, last season’s totals). An injured player matters only if he is one of the team’s leaders or a widely known name; when unsure, leave him out.',
+          'points: 1 or 2 points, the strongest first, never two about the same fact. Each: k, the kind (out = a player out; table = what the result does in the table; star = a player’s recent big game; rest = schedule or tiredness; run = a streak or a home/road record; series = a play-off series); zh, ONE short sentence in Traditional Chinese as a Taiwan sports desk writes (台灣體育報導用語、全形標點，句末不加句號), ≤ 26 字 not counting tokens, no English words, no spaces around tokens or numbers; en, the same in English, ≤ 16 words, no full stop.',
+          'Teams and players are tokens: write {t:<id>} for a team and {p:<id>} for a player exactly as the facts give them (the app draws them with their logo or face), never their names in words. A point about one team starts with its token.',
+          'Use only these facts. Every number you write must be one of theirs (dates as 「12/21」 or 「12月21日」 from a due-back date). Nothing the facts do not say: no 「關鍵戰」, 「復仇」, 「宿敵」 or a reason a player is out that is not given.',
+          'If nothing here is worth telling beyond what the page shows, return points [].',
+          'Facts:',
+          facts
+        ].join('\n')
+      ),
+    schema: obj({ points: arr(obj({ k: S, zh: S, en: S })) }),
+    clean: (raw, { facts }) => {
+      const KINDS = new Set(['out', 'table', 'star', 'rest', 'run', 'series']);
+      const bare = t => t.replace(/\{[pt]:[^}]+\}/g, '');
+      const names = [...facts.matchAll(/\{p:[^}]+\} = ([^(;\n]+)/g)].map(m => m[1].trim().split(/\s+/).pop()).filter(n => n.length >= 3);
+      const teamWords = [...facts.matchAll(/\{t:[^}]+\} = \w+ \(([^)]+)\)/g)].flatMap(m => m[1].split(/\s+/)).filter(n => n.length >= 4);
+      const points = [];
+      for (const p of list(raw?.points, 3)) {
+        const zh = str(p?.zh, 120).replace(/[。.]$/, ''), en = str(p?.en, 200).replace(/\.$/, '');
+        if (!zh || !en) continue;
+        const toks = `${zh} ${en}`.match(/\{[pt]:[^}]+\}/g) || [];
+        if (toks.some(t => !facts.includes(t))) continue;
+        if (/[A-Za-z]{3,}/.test(bare(zh))) continue;
+        if (names.some(n => bare(en).includes(n)) || teamWords.some(n => bare(en).includes(n))) continue;
+        if (bare(zh).replace(/\s/g, '').length > 34 || en.split(/\s+/).filter(Boolean).length > 20) continue;
+        // (What the card shows, said again: its place, its last five, its averages, the win chance.)
+        if (/排名第\s*\d+|近\s*[五5]\s*場|場均|勝率/.test(bare(zh))) continue;
+        if (!numbersFrom(bare(zh) + ' ' + bare(en), facts)) continue;
+        points.push({ k: KINDS.has(p?.k) ? p.k : 'star', zh, en });
+        if (points.length >= 2) break;
+      }
+      // (Points given, none usable: the next model tries; none given: nothing to tell.)
+      return points.length || !list(raw?.points, 3).length ? { points } : null;
+    }
+  },
+
   // Orbit Sports' F1 賽後故事: how a race or sprint was won, told once from
   // code's digest of F1's own timing (builders/f1story.js): the result with
   // grids, stops and tyres, who led which laps, climbs, retirements, safety
