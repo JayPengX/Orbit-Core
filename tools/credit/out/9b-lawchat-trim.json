@@ -1,0 +1,3744 @@
+{
+ "usage": [
+  {
+   "q": "房東不還押金怎麼辦",
+   "set": "claude-sonnet-5-5:medium",
+   "in": 9330,
+   "out": 663,
+   "usd": 0.02529,
+   "promptChars": 11000
+  },
+  {
+   "q": "房東不還押金怎麼辦",
+   "set": "claude-sonnet-5-5:medium:trim",
+   "in": 7659,
+   "out": 571,
+   "usd": 0.021028,
+   "promptChars": 9613
+  },
+  {
+   "q": "酒駕被抓會怎樣",
+   "set": "claude-sonnet-5-5:medium",
+   "in": 14979,
+   "out": 972,
+   "usd": 0.039678,
+   "promptChars": 15458
+  },
+  {
+   "q": "酒駕被抓會怎樣",
+   "set": "claude-sonnet-5-5:medium:trim",
+   "in": 13987,
+   "out": 883,
+   "usd": 0.036804,
+   "promptChars": 14647
+  },
+  {
+   "q": "公司沒給加班費可以告嗎",
+   "set": "claude-sonnet-5-5:medium",
+   "in": 17915,
+   "out": 722,
+   "usd": 0.04305,
+   "promptChars": 19686
+  },
+  {
+   "q": "公司沒給加班費可以告嗎",
+   "set": "claude-sonnet-5-5:medium:trim",
+   "in": 10635,
+   "out": 749,
+   "usd": 0.02876,
+   "promptChars": 12885
+  },
+  {
+   "q": "高中生打工一小時最低多少錢",
+   "set": "claude-sonnet-5-5:medium",
+   "in": 6214,
+   "out": 600,
+   "usd": 0.018428,
+   "promptChars": 8816
+  },
+  {
+   "q": "高中生打工一小時最低多少錢",
+   "set": "claude-sonnet-5-5:medium:trim",
+   "in": 6029,
+   "out": 563,
+   "usd": 0.017688,
+   "promptChars": 8590
+  },
+  {
+   "q": "網購收到的東西跟照片不一樣可以退嗎",
+   "set": "claude-sonnet-5-5:medium",
+   "in": 9086,
+   "out": 785,
+   "usd": 0.026022,
+   "promptChars": 10936
+  },
+  {
+   "q": "網購收到的東西跟照片不一樣可以退嗎",
+   "set": "claude-sonnet-5-5:medium:trim",
+   "in": 9138,
+   "out": 713,
+   "usd": 0.025406,
+   "promptChars": 10785
+  },
+  {
+   "q": "被機車撞到對方不賠怎麼辦",
+   "set": "claude-sonnet-5-5:medium",
+   "in": 10712,
+   "out": 739,
+   "usd": 0.028814,
+   "promptChars": 12044
+  },
+  {
+   "q": "被機車撞到對方不賠怎麼辦",
+   "set": "claude-sonnet-5-5:medium:trim",
+   "in": 9053,
+   "out": 696,
+   "usd": 0.025066,
+   "promptChars": 10551
+  },
+  {
+   "q": "在學校被同學霸凌可以怎麼處理",
+   "set": "claude-sonnet-5-5:medium",
+   "in": 13836,
+   "out": 755,
+   "usd": 0.035222,
+   "promptChars": 14910
+  },
+  {
+   "q": "在學校被同學霸凌可以怎麼處理",
+   "set": "claude-sonnet-5-5:medium:trim",
+   "in": 12401,
+   "out": 778,
+   "usd": 0.032582,
+   "promptChars": 13638
+  },
+  {
+   "q": "未成年可以自己辦手機門號嗎",
+   "set": "claude-sonnet-5-5:medium",
+   "in": 8923,
+   "out": 687,
+   "usd": 0.024716,
+   "promptChars": 10785
+  },
+  {
+   "q": "未成年可以自己辦手機門號嗎",
+   "set": "claude-sonnet-5-5:medium:trim",
+   "in": 8203,
+   "out": 632,
+   "usd": 0.022726,
+   "promptChars": 10052
+  },
+  {
+   "q": "鄰居半夜一直吵可以檢舉嗎",
+   "set": "claude-sonnet-5-5:medium",
+   "in": 12019,
+   "out": 693,
+   "usd": 0.030968,
+   "promptChars": 13568
+  },
+  {
+   "q": "鄰居半夜一直吵可以檢舉嗎",
+   "set": "claude-sonnet-5-5:medium:trim",
+   "in": 13192,
+   "out": 719,
+   "usd": 0.033574,
+   "promptChars": 15316
+  },
+  {
+   "q": "在網路上罵人會被告嗎",
+   "set": "claude-sonnet-5-5:medium",
+   "in": 9084,
+   "out": 891,
+   "usd": 0.027078,
+   "promptChars": 10416
+  },
+  {
+   "q": "在網路上罵人會被告嗎",
+   "set": "claude-sonnet-5-5:medium:trim",
+   "in": 8617,
+   "out": 746,
+   "usd": 0.024694,
+   "promptChars": 9995
+  },
+  {
+   "q": "房東可以隨時進來我房間嗎",
+   "set": "claude-sonnet-5-5:medium",
+   "in": 7696,
+   "out": 663,
+   "usd": 0.022022,
+   "promptChars": 9440
+  },
+  {
+   "q": "房東可以隨時進來我房間嗎",
+   "set": "claude-sonnet-5-5:medium:trim",
+   "in": 7393,
+   "out": 657,
+   "usd": 0.021356,
+   "promptChars": 9284
+  },
+  {
+   "q": "打工被扣薪水合法嗎",
+   "set": "claude-sonnet-5-5:medium",
+   "in": 12919,
+   "out": 689,
+   "usd": 0.032728,
+   "promptChars": 14348
+  },
+  {
+   "q": "打工被扣薪水合法嗎",
+   "set": "claude-sonnet-5-5:medium:trim",
+   "in": 9478,
+   "out": 620,
+   "usd": 0.025156,
+   "promptChars": 11124
+  },
+  {
+   "q": "在路上被狗咬到可以求償嗎",
+   "set": "claude-sonnet-5-5:medium",
+   "in": 7364,
+   "out": 672,
+   "usd": 0.021448,
+   "promptChars": 9219
+  },
+  {
+   "q": "在路上被狗咬到可以求償嗎",
+   "set": "claude-sonnet-5-5:medium:trim",
+   "in": 8987,
+   "out": 620,
+   "usd": 0.024174,
+   "promptChars": 10558
+  },
+  {
+   "q": "機車停紅線會罰多少",
+   "set": "claude-sonnet-5-5:medium",
+   "in": 17558,
+   "out": 659,
+   "usd": 0.041706,
+   "promptChars": 17937
+  },
+  {
+   "q": "機車停紅線會罰多少",
+   "set": "claude-sonnet-5-5:medium:trim",
+   "in": 10404,
+   "out": 627,
+   "usd": 0.027078,
+   "promptChars": 11456
+  },
+  {
+   "q": "手機被偷了警察不受理怎麼辦",
+   "set": "claude-sonnet-5-5:medium",
+   "in": 13251,
+   "out": 662,
+   "usd": 0.033122,
+   "promptChars": 14095
+  },
+  {
+   "q": "手機被偷了警察不受理怎麼辦",
+   "set": "claude-sonnet-5-5:medium:trim",
+   "in": 11088,
+   "out": 633,
+   "usd": 0.028506,
+   "promptChars": 12275
+  }
+ ],
+ "out": [
+  {
+   "q": "房東不還押金怎麼辦",
+   "status": 200,
+   "results": {
+    "current": {
+     "ms": 6472,
+     "covered": true,
+     "verdict": "押金應返還，可依不當得利請求",
+     "facts": [
+      {
+       "k": "主要請求權",
+       "v": "不當得利返還"
+      },
+      {
+       "k": "可扣抵項目",
+       "v": "欠租、毀損賠償"
+      }
+     ],
+     "timeline": [],
+     "answer": "租約終止、你已返還房屋後，房東若無正當理由（如欠租或房屋毀損）扣留押金，屬無法律上原因受利益，你可請求返還。房東僅能扣抵欠租或你應負責的損害；是否有此類扣抵，會影響可拿回金額。",
+     "points": [
+      {
+       "text": "租約終止後，你須先返還租賃物。",
+       "cites": [
+        "B0000001:455"
+       ]
+      },
+      {
+       "text": "房東無正當原因扣留押金，屬不當得利，應返還。",
+       "cites": [
+        "B0000001:179"
+       ]
+      },
+      {
+       "text": "房東可扣欠付租金，但房屋欠租須達二個月租額才能終止。",
+       "cites": [
+        "B0000001:439",
+        "B0000001:440"
+       ]
+      },
+      {
+       "text": "若你保管不善致房屋毀損，房東可主張賠償並扣抵。",
+       "cites": [
+        "B0000001:432",
+        "B0000001:216"
+       ]
+      },
+      {
+       "text": "若房東故意不還，造成損害，亦可能構成侵權責任。",
+       "cites": [
+        "B0000001:184"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "可請求房東返還押金（扣除合理欠租或損害後之餘額）。",
+       "cites": [
+        "B0000001:179"
+       ]
+      },
+      {
+       "text": "房東違約不還，可請求賠償所受損害及所失利益；若契約有違約金約定，依約請求。",
+       "cites": [
+        "B0000001:216",
+        "B0000001:250"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "先以存證信函限期請房東返還押金",
+      "保留租約、押金收據與匯款紀錄",
+      "交屋時拍照並請房東簽收點交單",
+      "逾期不還，向法院起訴請求返還"
+     ],
+     "followups": [
+      "房東可以扣哪些費用",
+      "押金請求有時效嗎",
+      "房屋有損壞要賠多少"
+     ],
+     "sources": [
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "439"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "440"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "216"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "455"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "179"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "184"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "250"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "432"
+      }
+     ],
+     "cited": []
+    },
+    "low": {
+     "ms": 6421,
+     "covered": true,
+     "verdict": "押金應於租約結束後返還，可請求返還",
+     "facts": [],
+     "timeline": [],
+     "answer": "押金沒有專條可引，但租約終止後房東再留著押金，已無法律上原因，依民法第179條可請求返還；若房東主張扣抵欠租或損壞，則視實際金額而定。假設您已搬離並交還房屋，也沒有欠租或毀損。",
+     "points": [
+      {
+       "text": "租約期滿或終止，租賃關係即消滅。",
+       "cites": [
+        "B0000001:450"
+       ]
+      },
+      {
+       "text": "租賃關係消滅後，房東繼續持有押金無法律上原因。",
+       "cites": [
+        "B0000001:179"
+       ]
+      },
+      {
+       "text": "房東得扣抵者，以欠租或承租人違約造成的損害為限。",
+       "cites": [
+        "B0000001:439",
+        "B0000001:438",
+        "B0000001:216"
+       ]
+      },
+      {
+       "text": "類似案例中，租約終止後房東留下租金與押金，承租人依第179條請求返還。",
+       "cites": [
+        "TPSV,113,台上,406,20240522,1"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "可依不當得利請求房東返還押金及其利益。",
+       "cites": [
+        "B0000001:179"
+       ]
+      },
+      {
+       "text": "房東可主張欠租或損害，在實際損失範圍內扣抵。",
+       "cites": [
+        "B0000001:216",
+        "B0000001:439"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "寄存證信函，限期十日內返還押金",
+      "保存租約、匯款紀錄與押金收據",
+      "保留交屋照片與點交紀錄",
+      "房東仍不還，向法院起訴請求返還"
+     ],
+     "followups": [
+      "房東可以扣哪些費用",
+      "沒寫押金收據怎麼辦",
+      "請求權多久會消滅"
+     ],
+     "sources": [
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "450"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "439"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "216"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "179"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "438"
+      }
+     ],
+     "cited": [
+      "TPSV,113,台上,406,20240522,1"
+     ]
+    }
+   },
+   "judge": {
+    "better": "low",
+    "current": 5,
+    "low": 7,
+    "issues": "B is the weaker answer. Its point citing §440 (termination requires two months' rent in arrears) has nothing to do with getting a deposit back and confuses the reader. Its §184 tort point is legally dubious: a landlord simply keeping the deposit is ordinarily a contract or unjust-enrichment matter, not a tort. The §250 penalty-clause consequence is speculative padding unrelated to the user's facts. Overall B is longer and less focused for a phone reader. A has minor flaws: the 'assume you have moved out' sentence reads awkwardly inside the answer, and saying 'no specific provision' overlooks the 租賃住宅市場發展及管理條例 deposit rules, although those were not among the articles the app found. A's core analysis (§450 → §179, deductions limited under §§439/438/216, a supporting Supreme Court case) is accurate and concise."
+   }
+  },
+  {
+   "q": "酒駕被抓會怎樣",
+   "status": 200,
+   "results": {
+    "current": {
+     "ms": 8511,
+     "covered": true,
+     "verdict": "罰款、吊扣駕照、可能刑責，視酒精濃度",
+     "facts": [
+      {
+       "k": "汽車罰鍰",
+       "v": "3.6萬至15萬元"
+      },
+      {
+       "k": "吊扣駕照",
+       "v": "1至2年"
+      },
+      {
+       "k": "拒測罰鍰",
+       "v": "18萬元＋吊銷"
+      },
+      {
+       "k": "刑責",
+       "v": "最重3年有期徒刑"
+      }
+     ],
+     "timeline": [],
+     "answer": "酒測超標，汽車駕駛人罰3萬6千至15萬元、當場移置保管車輛、吊扣駕照1至2年；吐氣酒精達每公升0.25毫克還可能涉公共危險罪，最重3年有期徒刑。若拒測，罰18萬元並吊銷駕照。",
+     "points": [
+      {
+       "text": "酒精濃度超標，處罰鍰、移置保管車輛並吊扣駕照1至2年。",
+       "cites": [
+        "K0040012:35"
+       ]
+      },
+      {
+       "text": "吐氣達0.25mg/L或血液0.05%以上，涉公共危險罪。",
+       "cites": [
+        "C0000001:185-3"
+       ]
+      },
+      {
+       "text": "拒絕酒測者罰18萬元、吊銷駕照，並吊扣車牌2年。",
+       "cites": [
+        "K0040012:35",
+        "D0080029:19-2"
+       ]
+      },
+      {
+       "text": "10年內再犯，罰鍰與處分加重，第三次起吊銷駕照。",
+       "cites": [
+        "K0040012:35"
+       ]
+      },
+      {
+       "text": "被吊銷後須完成防制教育15小時才可重考；拒測吊銷者3年內不得考領。",
+       "cites": [
+        "K0040075:2",
+        "K0040075:3",
+        "K0040012:67",
+        "s699"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "汽車駕駛人罰3萬6千元以上15萬元以下，機車1萬8千元以上12萬元以下，並移置保管車輛、吊扣駕照1至2年。",
+       "cites": [
+        "K0040012:35"
+       ]
+      },
+      {
+       "text": "附載未滿12歲兒童或肇事致人受傷，吊扣駕照2至4年。",
+       "cites": [
+        "K0040012:35"
+       ]
+      },
+      {
+       "text": "公共危險罪：3年以下有期徒刑，得併科30萬元以下罰金；致人於死處3年以上10年以下。",
+       "cites": [
+        "C0000001:185-3"
+       ]
+      },
+      {
+       "text": "酒駕致人傷亡，刑責得加重至二分之一。",
+       "cites": [
+        "K0040012:86"
+       ]
+      },
+      {
+       "text": "同車成年乘客可罰6千至1萬5千元（70歲以上等除外）。",
+       "cites": [
+        "K0040012:35"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "保留酒測結果紙，並確認是否簽名",
+      "盡快向公路監理機關詢問防制教育課程",
+      "涉刑案時留存筆錄，準備應訊"
+     ],
+     "followups": [
+      "拒絕酒測會怎樣",
+      "酒駕吊銷後多久能重考",
+      "酒駕坐同車會被罰嗎"
+     ],
+     "sources": [
+      {
+       "p": "K0040012",
+       "n": "道路交通管理處罰條例",
+       "key": "35"
+      },
+      {
+       "p": "K0040012",
+       "n": "道路交通管理處罰條例",
+       "key": "67"
+      },
+      {
+       "p": "K0040012",
+       "n": "道路交通管理處罰條例",
+       "key": "86"
+      },
+      {
+       "p": "C0000001",
+       "n": "中華民國刑法",
+       "key": "185-3"
+      },
+      {
+       "p": "D0080029",
+       "n": "違反道路交通管理事件統一裁罰基準及處理細則",
+       "key": "19-2"
+      },
+      {
+       "p": "K0040075",
+       "n": "酒駕毒駕防制教育及酒癮毒品戒癮治療實施管理辦法",
+       "key": "2"
+      },
+      {
+       "p": "K0040075",
+       "n": "酒駕毒駕防制教育及酒癮毒品戒癮治療實施管理辦法",
+       "key": "3"
+      }
+     ],
+     "cited": [
+      "s699"
+     ]
+    },
+    "low": {
+     "ms": 7528,
+     "covered": true,
+     "verdict": "酒駕要罰款、吊扣或吊銷駕照，還可能被判刑",
+     "facts": [
+      {
+       "k": "汽車罰鍰",
+       "v": "3.6萬～15萬元"
+      },
+      {
+       "k": "機車罰鍰",
+       "v": "1.8萬～12萬元"
+      },
+      {
+       "k": "刑責",
+       "v": "3年以下有期徒刑"
+      },
+      {
+       "k": "拒測罰鍰",
+       "v": "18萬元＋吊銷"
+      }
+     ],
+     "timeline": [],
+     "answer": "酒測超標（吐氣每公升0.25毫克以上），汽車駕駛人罰3萬6千元至15萬元，當場移置保管車輛並吊扣駕照1至2年，同時涉刑法公共危險罪。拒測罰18萬元並吊銷駕照；若肇事傷亡、累犯則更重。",
+     "points": [
+      {
+       "text": "酒精濃度超標，汽車罰3萬6千至15萬元。",
+       "cites": [
+        "K0040012:35"
+       ]
+      },
+      {
+       "text": "當場移置保管車輛，並吊扣駕照1至2年。",
+       "cites": [
+        "K0040012:35"
+       ]
+      },
+      {
+       "text": "吐氣達0.25毫克，刑法可判3年以下並科30萬以下罰金。",
+       "cites": [
+        "C0000001:185-3"
+       ]
+      },
+      {
+       "text": "拒絕酒測罰18萬元、吊銷駕照；吊銷後3年內不得考照。",
+       "cites": [
+        "K0040012:35",
+        "K0040012:67",
+        "s699"
+       ]
+      },
+      {
+       "text": "吊銷後須完成15小時酒駕防制教育才能重考。",
+       "cites": [
+        "K0040075:2",
+        "K0040075:3"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "10年內再犯：按最高額罰款，第三次起每次加罰9萬元並吊銷駕照。",
+       "cites": [
+        "K0040012:35"
+       ]
+      },
+      {
+       "text": "肇事致人重傷或死亡：吊銷駕照且不得再考領；刑責為重傷1至7年、致死3至10年。",
+       "cites": [
+        "K0040012:35",
+        "C0000001:185-3"
+       ]
+      },
+      {
+       "text": "同車成年乘客可罰6千至1萬5千元；車輛牌照吊扣2年。",
+       "cites": [
+        "K0040012:35"
+       ]
+      },
+      {
+       "text": "二次以上違規者，重考前須接受12個月、至少12次酒癮治療。",
+       "cites": [
+        "K0040075:2"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "保存酒測紀錄單與筆錄",
+      "完成15小時酒駕防制教育並由監理機關列管",
+      "累犯者重考前須取得酒癮治療完成證明書"
+     ],
+     "followups": [
+      "拒絕酒測會怎樣",
+      "酒駕肇事刑責多重",
+      "吊銷後何時能重考"
+     ],
+     "sources": [
+      {
+       "p": "K0040012",
+       "n": "道路交通管理處罰條例",
+       "key": "35"
+      },
+      {
+       "p": "K0040012",
+       "n": "道路交通管理處罰條例",
+       "key": "67"
+      },
+      {
+       "p": "C0000001",
+       "n": "中華民國刑法",
+       "key": "185-3"
+      },
+      {
+       "p": "K0040075",
+       "n": "酒駕毒駕防制教育及酒癮毒品戒癮治療實施管理辦法",
+       "key": "2"
+      },
+      {
+       "p": "K0040075",
+       "n": "酒駕毒駕防制教育及酒癮毒品戒癮治療實施管理辦法",
+       "key": "3"
+      }
+     ],
+     "cited": [
+      "s699"
+     ]
+    }
+   },
+   "judge": {
+    "better": "low",
+    "current": 7.5,
+    "low": 8,
+    "issues": "The two answers are close. Points against B: (1) Its consequences section largely repeats the fines, vehicle impoundment and licence suspension already stated in the answer and points, which wastes phone space. (2) It omits the penalty for drunk driving that causes serious injury (1 to 7 years) and the rule that a licence revoked after causing serious injury or death can never be reissued. (3) Its repeat-offender point is vague: it says only that penalties increase, without the 90,000-yuan surcharge from the third offence. (4) Its facts list only the car fine; the scooter fine appears only further down. A has one wording flaw of its own: it says the criminal fine is imposed together with the prison term (並科 30萬以下), when the law makes the fine optional (得併科)."
+   }
+  },
+  {
+   "q": "公司沒給加班費可以告嗎",
+   "status": 200,
+   "results": {
+    "current": {
+     "ms": 7622,
+     "covered": true,
+     "verdict": "可以，加班費可請求並可被罰",
+     "facts": [
+      {
+       "k": "罰鍰",
+       "v": "2萬至100萬元"
+      },
+      {
+       "k": "請求時效",
+       "v": "5年"
+      },
+      {
+       "k": "平日加班",
+       "v": "前2小時加1/3以上"
+      },
+      {
+       "k": "休息日",
+       "v": "另加1又1/3以上"
+      }
+     ],
+     "timeline": [],
+     "answer": "雇主讓您延長工時或休息日出勤，依法必須加給工資；沒給付，您可向法院請求補發，雇主也可被處罰鍰。請求權五年不行使即消滅，要及早主張。若約定「責任制」且經核備，結果可能不同。",
+     "points": [
+      {
+       "text": "延長工時須依第24條加給工資，不能不給。",
+       "cites": [
+        "N0030001:24"
+       ]
+      },
+      {
+       "text": "休息日、國定假日出勤，工資另有加給或加倍。",
+       "cites": [
+        "N0030001:24",
+        "N0030001:39"
+       ]
+      },
+      {
+       "text": "違反加班費規定，雇主可處2萬至100萬元罰鍰。",
+       "cites": [
+        "N0030001:79"
+       ]
+      },
+      {
+       "text": "加班費屬定期給付，請求權五年不行使即消滅。",
+       "cites": [
+        "B0000001:126"
+       ]
+      },
+      {
+       "text": "法院曾判雇主須補付休息日、國定假日加班費，屬可比案例。",
+       "cites": [
+        "TPSV,113,台上,2149,20250424,1"
+       ]
+      },
+      {
+       "text": "特殊工作另約未核備，仍須依法計付加班費。",
+       "cites": [
+        "s726"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "雇主可被處新臺幣二萬元以上一百萬元以下罰鍰，情節重可加重至最高額二分之一。",
+       "cites": [
+        "N0030001:79"
+       ]
+      },
+      {
+       "text": "您可向法院請求補付加班費及延長工時工資。",
+       "cites": [
+        "N0030001:24",
+        "N0030001:39"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "整理打卡、排班、薪資單等出勤證據",
+      "計算加班時數與應補工資金額",
+      "以存證信函向公司催告補發",
+      "五年內向法院起訴請求給付"
+     ],
+     "followups": [
+      "加班費怎麼計算",
+      "公司說月薪含加班費",
+      "可以直接離職嗎"
+     ],
+     "sources": [
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "24"
+      },
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "39"
+      },
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "79"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "126"
+      }
+     ],
+     "cited": [
+      "s726",
+      "TPSV,113,台上,2149,20250424,1"
+     ]
+    },
+    "low": {
+     "ms": 6534,
+     "covered": true,
+     "verdict": "可以，可請求加班費並可能罰款",
+     "facts": [
+      {
+       "k": "平日前2小時",
+       "v": "加給1/3以上"
+      },
+      {
+       "k": "再延長2小時內",
+       "v": "加給2/3以上"
+      },
+      {
+       "k": "雇主罰鍰",
+       "v": "2萬至100萬元"
+      },
+      {
+       "k": "請求權時效",
+       "v": "5年"
+      }
+     ],
+     "timeline": [],
+     "answer": "可以。雇主讓你延長工時或休息日出勤，依勞基法第24條必須加給工資；沒給就是短付，你可向法院請求補發。假設你確有加班事實，且非經核備的責任制工作者；能否勝訴取決於加班證據。",
+     "points": [
+      {
+       "text": "延長工時，雇主須依標準加給工資。",
+       "cites": [
+        "N0030001:24"
+       ]
+      },
+      {
+       "text": "休息日出勤，2小時內加給1又1/3以上。",
+       "cites": [
+        "N0030001:24"
+       ]
+      },
+      {
+       "text": "經同意於國定假日出勤，工資加倍發給。",
+       "cites": [
+        "N0030001:39"
+       ]
+      },
+      {
+       "text": "違反第24條，雇主可罰2萬至100萬元。",
+       "cites": [
+        "N0030001:79"
+       ]
+      },
+      {
+       "text": "類似案件中，法院依第24、39條判雇主補付加班費，此為可比案例，非你的案件。",
+       "cites": [
+        "TPSV,113,台上,2149,20250424,1",
+        "s726"
+       ]
+      },
+      {
+       "text": "加班費屬定期給付，請求權5年不行使而消滅。",
+       "cites": [
+        "B0000001:126"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "雇主可被處新臺幣2萬元以上100萬元以下罰鍰，情節重可加重至最高額二分之一。",
+       "cites": [
+        "N0030001:79"
+       ]
+      },
+      {
+       "text": "可請求補足加班費及法定遲延利息（比照類似案件請求內容）。",
+       "cites": [
+        "TPSV,113,台上,2149,20250424,1"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "整理打卡、排班表、通訊紀錄作證據",
+      "計算每月加班時數與短付金額",
+      "先以書面向公司請求補發加班費",
+      "5年內提起請求給付加班費訴訟"
+     ],
+     "followups": [
+      "沒有打卡紀錄怎麼證明",
+      "責任制可以不給加班費嗎",
+      "加班費怎麼計算"
+     ],
+     "sources": [
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "24"
+      },
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "39"
+      },
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "79"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "126"
+      }
+     ],
+     "cited": [
+      "s726",
+      "TPSV,113,台上,2149,20250424,1"
+     ]
+    }
+   },
+   "judge": {
+    "better": "same",
+    "current": 7,
+    "low": 7,
+    "issues": "The two answers are close in quality, and a reader would hardly notice a difference. Shared gaps: neither names the cheaper first steps of a complaint to the local labour authority or labour-dispute mediation (調解) before court (agency is null in both). Neither mentions that by law the employer must keep attendance records. A gives the precise rate tiers (first 2 hours +1/3, next 2 hours +2/3, rest day) and stresses that the outcome depends on evidence. It mentions statutory late-payment interest but cites that only to a case, and it attaches the oddly paired cite s726 to the case point. B lacks the +2/3 tier for hours 3–4. Its rest-day wording 「另加1又1/3以上」 is vague. Its second consequence redundantly lists 加班費及延長工時工資. B does state the 責任制/核備 nuance more clearly and usefully."
+   }
+  },
+  {
+   "q": "高中生打工一小時最低多少錢",
+   "status": 200,
+   "results": {
+    "current": {
+     "ms": 6102,
+     "covered": true,
+     "verdict": "高中生打工也適用最低工資",
+     "facts": [
+      {
+       "k": "現行時薪",
+       "v": "196元"
+      },
+      {
+       "k": "116/1/1起",
+       "v": "205元（待核定）"
+      },
+      {
+       "k": "月薪",
+       "v": "30,900元（116年）"
+      },
+      {
+       "k": "未滿18歲",
+       "v": "不得做危險工作"
+      }
+     ],
+     "timeline": [],
+     "answer": "最低工資不分年齡，高中生受僱打工，時薪不得低於最低工資。目前依公告，116年1月1日起每小時最低工資由196元調為205元（尚待行政院核定）。假設你已滿15歲且有僱傭關係；若時薪低於標準，仍以最低工資計算。",
+     "points": [
+      {
+       "text": "勞資議定工資不得低於基本工資。",
+       "cites": [
+        "N0030001:21"
+       ]
+      },
+      {
+       "text": "議定工資低於最低工資者，以最低工資為準。",
+       "cites": [
+        "N0030028:5"
+       ]
+      },
+      {
+       "text": "最低工資分月薪與時薪兩種。",
+       "cites": [
+        "N0030028:4"
+       ]
+      },
+      {
+       "text": "16歲以上未滿18歲者，不得從事危險或有害工作。",
+       "cites": [
+        "N0030001:44"
+       ]
+      },
+      {
+       "text": "未滿15歲須符合例外許可，且工時受限。",
+       "cites": [
+        "N0030001:45",
+        "N0030025:4"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "約定時薪低於最低工資時，雇主仍須按最低工資給付。",
+       "cites": [
+        "N0030028:5"
+       ]
+      }
+     ],
+     "agency": "勞動部",
+     "next": [
+      "保留薪資單與出勤紀錄",
+      "時薪不足時請雇主補足差額"
+     ],
+     "followups": [
+      "高中生每天可打工幾小時",
+      "未滿十五歲能打工嗎",
+      "雇主少付薪水怎麼辦"
+     ],
+     "sources": [
+      {
+       "p": "N0030028",
+       "n": "最低工資法（112.12.27制定）",
+       "key": "2"
+      },
+      {
+       "p": "N0030028",
+       "n": "最低工資法（112.12.27制定）",
+       "key": "4"
+      },
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "21"
+      },
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "44"
+      },
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "45"
+      },
+      {
+       "p": "N0030028",
+       "n": "最低工資法（112.12.27制定）",
+       "key": "5"
+      },
+      {
+       "p": "N0030025",
+       "n": "勞動基準法第四十五條無礙身心健康認定基準及審查辦法",
+       "key": "4"
+      }
+     ],
+     "cited": []
+    },
+    "low": {
+     "ms": 5581,
+     "covered": true,
+     "verdict": "現行每小時最低工資 196 元；116年起 205 元",
+     "facts": [
+      {
+       "k": "現行時薪",
+       "v": "196 元"
+      },
+      {
+       "k": "116年1月1日起",
+       "v": "205 元（待核定）"
+      },
+      {
+       "k": "月薪",
+       "v": "29,500→30,900元"
+      },
+      {
+       "k": "年齡限制",
+       "v": "15歲以上為童工"
+      }
+     ],
+     "timeline": [],
+     "answer": "高中生若與雇主有僱傭關係且適用勞基法，時薪不得低於基本工資。勞動部公告：每小時由196元調整至205元，自116年1月1日起，尚待行政院核定。高中生多已滿15歲，可受僱，但不得從事危險或有害工作。",
+     "points": [
+      {
+       "text": "工資由勞雇雙方議定，但不得低於基本工資。",
+       "cites": [
+        "N0030001:21"
+       ]
+      },
+      {
+       "text": "最低工資法適用於適用勞基法的勞工。",
+       "cites": [
+        "N0030028:3"
+       ]
+      },
+      {
+       "text": "15歲以上未滿16歲受僱者為童工，16至18歲同受保護。",
+       "cites": [
+        "N0030001:44"
+       ]
+      },
+      {
+       "text": "童工及未滿18歲者不得從事危險性或有害性工作。",
+       "cites": [
+        "N0030001:44"
+       ]
+      },
+      {
+       "text": "若屬技術生，災害補償薪資標準也不得低於基本工資。",
+       "cites": [
+        "N0030001:69"
+       ]
+      }
+     ],
+     "consequences": [],
+     "agency": null,
+     "next": [
+      "確認時薪不低於196元，並留存薪資單",
+      "保存簽到簿或出勤紀錄作為工時證明"
+     ],
+     "followups": [
+      "未滿十六歲可打工嗎",
+      "高中生工時有限制嗎",
+      "老闆給的時薪太低怎麼辦"
+     ],
+     "sources": [
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "21"
+      },
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "44"
+      },
+      {
+       "p": "N0030028",
+       "n": "最低工資法（112.12.27制定）",
+       "key": "3"
+      },
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "69"
+      }
+     ],
+     "cited": []
+    }
+   },
+   "judge": {
+    "better": "current",
+    "current": 8,
+    "low": 7,
+    "issues": "A is the weaker answer, though both use the same figures (196 now, 205 from 116 pending approval). A's problems: (1) It never says what happens when the agreed wage is below the minimum. It omits 最低工資法 §5, so the user doesn't learn that the employer must still pay the minimum or that the shortfall can be claimed. (2) It includes an irrelevant point on 技術生 occupational-injury compensation (勞基法 §69), which takes space on a phone screen without helping a student who works part-time. (3) It leaves out the under-15 situation and names no agency to contact. (4) Its next steps only say to check the wage and keep records; they don't tell the user to ask the employer to make up the difference. B's minor drawback: its verdict doesn't state the hourly figure directly, though the facts section supplies it."
+   }
+  },
+  {
+   "q": "網購收到的東西跟照片不一樣可以退嗎",
+   "status": 200,
+   "results": {
+    "current": {
+     "ms": 7388,
+     "covered": true,
+     "verdict": "可退：7日內無理由退貨，或主張瑕疵",
+     "facts": [
+      {
+       "k": "退貨期限",
+       "v": "收貨後7日內"
+      },
+      {
+       "k": "退貨方式",
+       "v": "退回商品或書面通知"
+      },
+      {
+       "k": "退款期限",
+       "v": "收到後15日內"
+      },
+      {
+       "k": "運費理由",
+       "v": "無須說明理由及費用"
+      }
+     ],
+     "timeline": [],
+     "answer": "網購屬通訊交易，收貨後7日內可退貨且免說明理由、免負擔費用。若商品與照片明顯不符，另可依瑕疵擔保解除契約或減價。但若屬客製化等已事先告知的例外商品，無理由退貨會被排除。",
+     "points": [
+      {
+       "text": "網購是通訊交易，收貨後7日內可解除契約，無須理由與費用。",
+       "cites": [
+        "J0170001:19"
+       ]
+      },
+      {
+       "text": "客製化、已拆封影音或軟體等，經商家事先告知者，不適用7日解除權。",
+       "cites": [
+        "J0170012:2"
+       ]
+      },
+      {
+       "text": "商家未告知解約資訊者，7日自提供之次日起算，但最長4個月。",
+       "cites": [
+        "J0170001:19"
+       ]
+      },
+      {
+       "text": "東西與照片不符，屬欠缺保證品質或有瑕疵，可解除契約或減價。",
+       "cites": [
+        "B0000001:354",
+        "B0000001:359"
+       ]
+      },
+      {
+       "text": "種類物有瑕疵，可要求另換無瑕疵商品；缺保證品質亦可請求損害賠償。",
+       "cites": [
+        "B0000001:364",
+        "B0000001:360"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "商家應於取回或收到退貨次日起15日內退還已付款項。",
+       "cites": [
+        "J0170001:19-2"
+       ]
+      },
+      {
+       "text": "寄出商品或發出書面通知時，契約即視為解除。",
+       "cites": [
+        "J0170001:19"
+       ]
+      },
+      {
+       "text": "瑕疵情形可解除契約、減少價金，或請求換貨。",
+       "cites": [
+        "B0000001:359",
+        "B0000001:364"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "收貨後7日內以書面通知商家解除契約",
+      "保留商品頁照片、收到商品照片與訂單",
+      "寄回商品並留存寄件收據",
+      "商家15日內未退款，可再書面催告"
+     ],
+     "followups": [
+      "商品已拆封還能退嗎",
+      "商家拒絕退款怎麼辦",
+      "退貨運費誰負擔"
+     ],
+     "sources": [
+      {
+       "p": "J0170001",
+       "n": "消費者保護法",
+       "key": "19"
+      },
+      {
+       "p": "J0170001",
+       "n": "消費者保護法",
+       "key": "19-2"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "354"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "359"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "360"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "364"
+      },
+      {
+       "p": "J0170012",
+       "n": "通訊交易解除權合理例外情事適用準則",
+       "key": "2"
+      }
+     ],
+     "cited": []
+    },
+    "low": {
+     "ms": 6459,
+     "covered": true,
+     "verdict": "可退：7日鑑賞期，另可主張瑕疵解約",
+     "facts": [
+      {
+       "k": "退貨期限",
+       "v": "收貨後7日內"
+      },
+      {
+       "k": "理由與費用",
+       "v": "免說明、免負擔"
+      },
+      {
+       "k": "未告知退貨資訊",
+       "v": "最長4個月"
+      },
+      {
+       "k": "另可主張",
+       "v": "解約或減價"
+      }
+     ],
+     "timeline": [],
+     "answer": "網購屬通訊交易，收貨後7日內可無理由退貨，不必說明理由、不付費用。若商品與照片不符屬瑕疵或不實廣告，另可依民法請求解除契約或減價。但客製化商品、已拆封影音等若賣家事先告知，則不適用7日退貨。",
+     "points": [
+      {
+       "text": "網購為通訊交易，收貨後7日內可退貨解約。",
+       "cites": [
+        "J0170001:19"
+       ]
+      },
+      {
+       "text": "退回商品或書面通知即可，無須說明理由或付費。",
+       "cites": [
+        "J0170001:19"
+       ]
+      },
+      {
+       "text": "賣家未提供解約資訊，7日自提供次日起算，最長4個月。",
+       "cites": [
+        "J0170001:19"
+       ]
+      },
+      {
+       "text": "客製化、已拆封影音等例外，須賣家事先告知才排除退貨。",
+       "cites": [
+        "J0170012:2"
+       ]
+      },
+      {
+       "text": "與照片不符若屬瑕疵，可解除契約或減少價金。",
+       "cites": [
+        "B0000001:354",
+        "B0000001:359"
+       ]
+      },
+      {
+       "text": "照片虛偽或引人錯誤，賣家違反公平交易法。",
+       "cites": [
+        "J0150002:21"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "7日內退貨解約，賣家須退款，消費者不負擔費用。",
+       "cites": [
+        "J0170001:19"
+       ]
+      },
+      {
+       "text": "依瑕疵擔保，可解除契約或請求減少價金。",
+       "cites": [
+        "B0000001:359"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "保留商品頁照片、訂單與開箱照片",
+      "7日內以退回商品或書面通知賣家解約",
+      "書面通知留存寄送證明"
+     ],
+     "followups": [
+      "賣家不退款怎麼辦",
+      "退貨運費誰出",
+      "哪些商品不能退"
+     ],
+     "sources": [
+      {
+       "p": "J0170001",
+       "n": "消費者保護法",
+       "key": "19"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "354"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "359"
+      },
+      {
+       "p": "J0150002",
+       "n": "公平交易法",
+       "key": "21"
+      },
+      {
+       "p": "J0170012",
+       "n": "通訊交易解除權合理例外情事適用準則",
+       "key": "2"
+      }
+     ],
+     "cited": []
+    }
+   },
+   "judge": {
+    "better": "current",
+    "current": 8.5,
+    "low": 7,
+    "issues": "A is legally correct on the 7-day no-reason return under 消保法§19, its exceptions and the 民法 defect remedies, but it is less useful than B: (1) It never says when the seller must refund. B gives the 15-day deadline under §19-2 and a next step if the refund is late. (2) It omits the remedies most practical for a mismatched product: replacement for 種類物 (§364) and damages where a promised quality is missing (§360). (3) It spends a point on 公平交易法§21, which gives the consumer no direct return or refund remedy, so it is filler for this question. (4) Its next steps do not cover what to do if the seller refuses or delays a refund."
+   }
+  },
+  {
+   "q": "被機車撞到對方不賠怎麼辦",
+   "status": 200,
+   "results": {
+    "current": {
+     "ms": 7667,
+     "covered": true,
+     "verdict": "可依侵權行為向肇事者請求賠償",
+     "facts": [
+      {
+       "k": "強制險請求時效",
+       "v": "知悉起 2 年"
+      },
+      {
+       "k": "事故最長期限",
+       "v": "事故後 10 年"
+      }
+     ],
+     "timeline": [],
+     "answer": "若對方騎車撞傷你且有過失，依民法第184條、第193條、第195條，可請求醫藥費、減少勞動能力損失及慰撫金。對方不賠時，可先向強制險請求給付，或起訴請求；時效是關鍵。我假設對方有過失、你無過失；若你也有過失，賠償可能被減少。",
+     "points": [
+      {
+       "text": "對方因過失撞傷你，須負損害賠償責任。",
+       "cites": [
+        "B0000001:184"
+       ]
+      },
+      {
+       "text": "身體受傷可請求勞動能力減損與增加的生活需要。",
+       "cites": [
+        "B0000001:193"
+       ]
+      },
+      {
+       "text": "身體健康受侵害，非財產上損害也可請求慰撫金。",
+       "cites": [
+        "B0000001:195"
+       ]
+      },
+      {
+       "text": "類似案件中，法院依第184、193、195條判被撞傷者勝訴；此為可比案件，非你的案件。",
+       "cites": [
+        "TPSV,114,台簡上,36,20250910,1"
+       ]
+      },
+      {
+       "text": "強制險請求權自知有損害及保險人起 2 年不行使即消滅。",
+       "cites": [
+        "G0390060:14"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "可請求醫療費、減少勞動能力損失、慰撫金等損害賠償。",
+       "cites": [
+        "B0000001:184",
+        "B0000001:193",
+        "B0000001:195"
+       ]
+      },
+      {
+       "text": "肇事致人受傷而逃逸，駕駛執照吊銷，另可處罰鍰。",
+       "cites": [
+        "K0040012:62"
+       ]
+      }
+     ],
+     "agency": "金融監督管理委員會",
+     "next": [
+      "保留診斷書、醫療收據及事故照片",
+      "取得警方事故資料，確認對方肇事責任",
+      "2 年內向強制險保險人請求給付",
+      "對方拒賠，向法院起訴請求賠償"
+     ],
+     "followups": [
+      "對方逃逸怎麼辦",
+      "我也有過失還能求償嗎",
+      "慰撫金通常多少"
+     ],
+     "sources": [
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "184"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "193"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "195"
+      },
+      {
+       "p": "G0390060",
+       "n": "強制汽車責任保險法",
+       "key": "3"
+      },
+      {
+       "p": "K0040012",
+       "n": "道路交通管理處罰條例",
+       "key": "62"
+      },
+      {
+       "p": "G0390060",
+       "n": "強制汽車責任保險法",
+       "key": "14"
+      }
+     ],
+     "cited": [
+      "TPSV,114,台簡上,36,20250910,1"
+     ]
+    },
+    "low": {
+     "ms": 6337,
+     "covered": true,
+     "verdict": "對方須賠；可依侵權行為求償",
+     "facts": [
+      {
+       "k": "請求依據",
+       "v": "民法184、191-2"
+      },
+      {
+       "k": "精神慰撫金",
+       "v": "可請求"
+      }
+     ],
+     "timeline": [],
+     "answer": "機車駕駛人在使用中撞傷你，原則上要賠償，除非能證明已盡相當注意。假設你受傷且對方有過失；若你也有過失，法院可減輕賠償。對方不賠，可以起訴請求。",
+     "points": [
+      {
+       "text": "機車使用中致人受損，駕駛人須賠，除非已盡注意。",
+       "cites": [
+        "B0000001:191-2"
+       ]
+      },
+      {
+       "text": "對方有故意或過失侵害你的權利，也要負賠償責任。",
+       "cites": [
+        "B0000001:184"
+       ]
+      },
+      {
+       "text": "受傷可求償勞動力減損與增加的生活需要。",
+       "cites": [
+        "B0000001:193"
+       ]
+      },
+      {
+       "text": "身體受傷，非財產上損害也可請求慰撫金。",
+       "cites": [
+        "B0000001:195"
+       ]
+      },
+      {
+       "text": "類似案件中，法院判令駕駛人依上述條文賠償182萬餘元（可比案件，非你的案件）。",
+       "cites": [
+        "TPSV,114,台簡上,36,20250910,1"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "可請求醫療費、薪資損失、慰撫金等損害賠償。",
+       "cites": [
+        "B0000001:193",
+        "B0000001:195"
+       ]
+      },
+      {
+       "text": "你若也有過失，法院得減輕或免除賠償金額。",
+       "cites": [
+        "B0000001:217"
+       ]
+      },
+      {
+       "text": "對方肇事逃逸，致人受傷者吊銷駕照；重傷或死亡者並不得再考領。",
+       "cites": [
+        "K0040012:62"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "保留診斷書、醫療收據與薪資證明",
+      "保存事故現場照片、監視器與對方資料",
+      "向對方書面請求賠償並定期限",
+      "不賠則向法院起訴請求損害賠償"
+     ],
+     "followups": [
+      "對方逃逸怎麼辦",
+      "我也有過失會少賠嗎",
+      "可以請求多少慰撫金"
+     ],
+     "sources": [
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "184"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "191-2"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "193"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "195"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "217"
+      },
+      {
+       "p": "K0040012",
+       "n": "道路交通管理處罰條例",
+       "key": "62"
+      }
+     ],
+     "cited": [
+      "TPSV,114,台簡上,36,20250910,1"
+     ]
+    }
+   },
+   "judge": {
+    "better": "current",
+    "current": 8,
+    "low": 6.5,
+    "issues": "B leaves out compulsory motor insurance (強制險) entirely. When the other rider refuses to pay, this is the most practical route: the victim can claim directly from the insurer without needing the rider's cooperation. A covers this, with the correct 2-year limitation and 10-year outer limit (強制汽車責任保險法 §14). B has other weaknesses: its verdict 「對方須賠」 is stated more absolutely than its own assumptions about fault support. It cites a specific award (182萬餘元) from the comparable case, which adds little and may lead the reader to anchor on that figure. Its agency field is null, so it names no body to contact. B does have strengths: it cites 民法191-2, under which the rider is presumed at fault, and §217 on the victim's own fault. A omits 191-2, and its hit-and-run consequence (道交條例62) is only marginally relevant. Neither answer mentions mediation (鄉鎮市調解委員會) or an accident fault assessment (車禍鑑定)."
+   }
+  },
+  {
+   "q": "在學校被同學霸凌可以怎麼處理",
+   "status": 200,
+   "results": {
+    "current": {
+     "ms": 7287,
+     "covered": true,
+     "verdict": "可向學校申請霸凌調查，並可求償",
+     "facts": [
+      {
+       "k": "處理類型",
+       "v": "生對生霸凌"
+      },
+      {
+       "k": "侵權請求時效",
+       "v": "知悉起2年"
+      }
+     ],
+     "timeline": [],
+     "answer": "同學間霸凌屬「生對生霸凌」，學校須依準則審查、調和、調查及處理。若受有身心或財產損害，可依民法向加害人請求賠償；加害人未成年時，監護人可能連帶負責。性質若屬性霸凌，則改依性別平等教育法處理。",
+     "points": [
+      {
+       "text": "持續貶抑、排擠、欺負他人致受損害，屬霸凌。",
+       "cites": [
+        "MOE:GL000683"
+       ]
+      },
+      {
+       "text": "各級學校生對生霸凌，應依準則審查、調和、調查及處理。",
+       "cites": [
+        "MOE:GL000683"
+       ]
+      },
+      {
+       "text": "學校應鼓勵學生及家長檢舉，並可用修復式正義促進和解。",
+       "cites": [
+        "H0020081:8"
+       ]
+      },
+      {
+       "text": "國家應保障學生不受霸凌造成身心侵害。",
+       "cites": [
+        "H0020045:8"
+       ]
+      },
+      {
+       "text": "侵害身體、健康、名譽等，可請求賠償及慰撫金。",
+       "cites": [
+        "B0000001:184",
+        "B0000001:195"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "加害人須賠償損害，名譽受損並可請求回復名譽之適當處分。",
+       "cites": [
+        "B0000001:184",
+        "B0000001:195"
+       ]
+      },
+      {
+       "text": "加害人無識別能力或未成年時，法定代理人可能連帶或單獨賠償，但監督無疏懈者不負責。",
+       "cites": [
+        "B0000001:187"
+       ]
+      },
+      {
+       "text": "侵權賠償請求權自知有損害及賠償義務人起2年不行使而消滅，逾侵權行為10年亦同。",
+       "cites": [
+        "B0000001:197"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "向導師或學校書面檢舉霸凌事件",
+      "保存訊息截圖、診斷書、受傷照片",
+      "請學校啟動調和或調查程序",
+      "記下知悉加害人日期，2年內求償"
+     ],
+     "followups": [
+      "可以請求多少慰撫金？",
+      "老師霸凌學生怎麼辦？",
+      "學校不處理怎麼辦？"
+     ],
+     "sources": [
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "184"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "187"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "195"
+      },
+      {
+       "p": "H0020045",
+       "n": "教育基本法",
+       "key": "8"
+      },
+      {
+       "p": "H0020081",
+       "n": "校園霸凌防制準則",
+       "key": "8"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "197"
+      }
+     ],
+     "cited": [
+      "MOE:GL000683"
+     ]
+    },
+    "low": {
+     "ms": 7168,
+     "covered": true,
+     "verdict": "可循校內霸凌程序處理，並可求償、告傷害",
+     "facts": [
+      {
+       "k": "霸凌類型",
+       "v": "生對生霸凌"
+      },
+      {
+       "k": "傷害罪最重",
+       "v": "5年有期徒刑"
+      }
+     ],
+     "timeline": [],
+     "answer": "同學霸凌屬「生對生霸凌」，學校須依準則審查、調和、調查及處理。若造成傷害或損害，另可依民法請求賠償，嚴重者可提傷害告訴。是否構成霸凌，取決於是否持續、故意且造成損害或影響學習。",
+     "points": [
+      {
+       "text": "持續故意貶抑、排擠、欺負、騷擾，造成損害或影響學習，即屬霸凌。",
+       "cites": [
+        "MOE:GL000683"
+       ]
+      },
+      {
+       "text": "各級學校生對生霸凌，須依準則審查、調和、調查及處理。",
+       "cites": [
+        "MOE:GL000683"
+       ]
+      },
+      {
+       "text": "調和須雙方及法定代理人均同意，不同意仍可走調查。",
+       "cites": [
+        "MOE:GL000683"
+       ]
+      },
+      {
+       "text": "霸凌行為不法侵害身體、健康、名譽，可請求損害賠償及慰撫金。",
+       "cites": [
+        "B0000001:184",
+        "B0000001:195"
+       ]
+      },
+      {
+       "text": "加害同學未成年，有識別能力者與法定代理人連帶負責。",
+       "cites": [
+        "B0000001:187"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "傷害身體或健康：5年以下有期徒刑、拘役或50萬元以下罰金；致重傷3年以上10年以下。",
+       "cites": [
+        "C0000001:277"
+       ]
+      },
+      {
+       "text": "可請求醫療等損害賠償，及精神慰撫金；名譽受損可請求回復名譽之適當處分。",
+       "cites": [
+        "B0000001:184",
+        "B0000001:195"
+       ]
+      },
+      {
+       "text": "加害人為未成年人，法定代理人監督無疏懈者可免責。",
+       "cites": [
+        "B0000001:187"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "向導師或學校提出書面霸凌申請",
+      "保存訊息、截圖、驗傷單及就醫收據",
+      "要求學校啟動調查或雙方同意之調和",
+      "受傷嚴重時向警察機關提出傷害告訴"
+     ],
+     "followups": [
+      "調和一定要參加嗎",
+      "父母要賠償嗎",
+      "學校不處理怎麼辦"
+     ],
+     "sources": [
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "184"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "187"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "195"
+      },
+      {
+       "p": "C0000001",
+       "n": "中華民國刑法",
+       "key": "277"
+      }
+     ],
+     "cited": [
+      "MOE:GL000683"
+     ]
+    }
+   },
+   "judge": {
+    "better": "low",
+    "current": 7,
+    "low": 8,
+    "issues": "B leaves out the criminal route entirely. For a bullying victim who has been physically hurt, filing a 傷害 complaint (刑法277) is a key option, and B never mentions it. B also includes a filler point (國家應保障學生不受霸凌) that gives the reader nothing to act on. It calls the liable party 監護人 when the term should be 法定代理人. Its 'next' step 'record the date and claim within 2 years' is useful, but it is not enough to make up for the missing criminal option. Shortcomings of A, for balance: it does not mention the 2-year 侵權 limitation period. It also does not mention that 傷害罪 is 告訴乃論, so the complaint must be filed within 6 months. Neither answer flags that 性霸凌 falls under 性平法, which only B covers."
+   }
+  },
+  {
+   "q": "未成年可以自己辦手機門號嗎",
+   "status": 200,
+   "results": {
+    "current": {
+     "ms": 6412,
+     "covered": true,
+     "verdict": "原則上不行，須法定代理人同意",
+     "facts": [
+      {
+       "k": "未滿7歲",
+       "v": "無行為能力"
+      },
+      {
+       "k": "7歲以上未成年",
+       "v": "限制行為能力"
+      },
+      {
+       "k": "催告期限",
+       "v": "一個月以上"
+      },
+      {
+       "k": "未承認前",
+       "v": "電信業者可撤回"
+      }
+     ],
+     "timeline": [],
+     "answer": "辦手機門號是訂立契約。未滿七歲無行為能力，意思表示無效；七歲以上為限制行為能力人，未得法定代理人允許所訂契約，須經其承認才生效。假設申辦的是一般門號且非日常必需，則須父母同意。",
+     "points": [
+      {
+       "text": "未滿七歲無行為能力，其意思表示無效。",
+       "cites": [
+        "B0000001:13",
+        "B0000001:75"
+       ]
+      },
+      {
+       "text": "七歲以上為限制行為能力人，訂約應得法定代理人允許。",
+       "cites": [
+        "B0000001:13",
+        "B0000001:77"
+       ]
+      },
+      {
+       "text": "未得允許訂立的契約，須經法定代理人承認才生效。",
+       "cites": [
+        "B0000001:79"
+       ]
+      },
+      {
+       "text": "純獲利益或依年齡身分日常生活所必需者例外，但辦門號通常不易認定屬此類。",
+       "cites": [
+        "B0000001:77"
+       ]
+      },
+      {
+       "text": "業者可定一個月以上期限催告確答，逾期不答視為拒絕承認。",
+       "cites": [
+        "B0000001:80"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "未經承認前，業者不知情時可撤回契約；若訂約時已知未獲允許則不得撤回。",
+       "cites": [
+        "B0000001:82"
+       ]
+      },
+      {
+       "text": "成年後本人承認該契約，與法定代理人承認效力相同。",
+       "cites": [
+        "B0000001:81"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "請父母（法定代理人）一併到場或出具同意書",
+      "由父母名義申辦，或同意後再由未成年人使用"
+     ],
+     "followups": [
+      "父母同意後契約就有效嗎",
+      "成年後可以承認舊合約嗎",
+      "未成年人已簽約可以反悔嗎"
+     ],
+     "sources": [
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "13"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "75"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "77"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "79"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "80"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "81"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "82"
+      }
+     ],
+     "cited": []
+    },
+    "low": {
+     "ms": 6498,
+     "covered": true,
+     "verdict": "未成年人多半不能獨自辦，需法定代理人同意",
+     "facts": [
+      {
+       "k": "未滿7歲",
+       "v": "無行為能力"
+      },
+      {
+       "k": "7歲以上未成年",
+       "v": "限制行為能力"
+      },
+      {
+       "k": "未經同意契約",
+       "v": "待承認才生效"
+      },
+      {
+       "k": "單獨行為",
+       "v": "無效"
+      }
+     ],
+     "timeline": [],
+     "answer": "未滿7歲無行為能力，意思表示無效；7歲以上為限制行為能力人，辦門號屬訂約，須法定代理人允許或事後承認。電信門號契約通常有持續付費義務，不屬純獲利益，也難說是日常生活必需，故以需家長同意為宜。",
+     "points": [
+      {
+       "text": "未滿七歲無行為能力，其意思表示無效。",
+       "cites": [
+        "B0000001:13",
+        "B0000001:75"
+       ]
+      },
+      {
+       "text": "七歲以上為限制行為能力人，為意思表示原則須法定代理人允許。",
+       "cites": [
+        "B0000001:13",
+        "B0000001:77"
+       ]
+      },
+      {
+       "text": "辦門號要付費負擔義務，非純獲法律上利益。",
+       "cites": [
+        "B0000001:77",
+        "MOF:GL004817"
+       ]
+      },
+      {
+       "text": "未經允許所訂契約，須法定代理人承認才生效。",
+       "cites": [
+        "B0000001:79"
+       ]
+      },
+      {
+       "text": "成年後自己承認該契約，與法定代理人承認效力相同。",
+       "cites": [
+        "B0000001:81"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "未經允許訂立的門號契約，在法定代理人承認前不生效力。",
+       "cites": [
+        "B0000001:79"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "請父母或法定代理人到場同意並一同簽約",
+      "已自行申辦者，請父母出具承認再向電信業者確認"
+     ],
+     "followups": [
+      "父母不同意契約會怎樣",
+      "已簽的門號能反悔嗎",
+      "成年後可承認舊契約嗎"
+     ],
+     "sources": [
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "13"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "75"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "77"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "79"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "81"
+      }
+     ],
+     "cited": [
+      "MOF:GL004817"
+     ]
+    }
+   },
+   "judge": {
+    "better": "current",
+    "current": 8,
+    "low": 7,
+    "issues": "Both answers state Civil Code arts. 13, 75, 77, 79 and 81 correctly. Problems with A: (1) A cites MOF:GL004817, a Ministry of Finance guideline that is out of place for whether a telecom contract is a pure legal benefit. (2) A lists the 單獨行為無效 rule (art. 78) as a key fact, but it has nothing to do with signing a phone contract, and no point or cite supports it. (3) A leaves out the operator's side, which B covers: the right to demand a ratification answer within at least one month, with silence counting as refusal (art. 80), and the right to withdraw before ratification unless it knew consent was missing (art. 82). (4) A states the art. 77 exceptions (pure benefit, daily necessity) less clearly than B, which states them and explains why a phone plan usually doesn't qualify. (5) A's next steps lack B's practical alternative of opening the number in the parent's name. A does usefully address a contract already signed (get the parents to ratify), but overall B is more complete and more useful."
+   }
+  },
+  {
+   "q": "鄰居半夜一直吵可以檢舉嗎",
+   "status": 200,
+   "results": {
+    "current": {
+     "ms": 6989,
+     "covered": true,
+     "verdict": "可以，先勸阻，不聽可報警",
+     "facts": [
+      {
+       "k": "罰鍰上限",
+       "v": "新臺幣1萬元"
+      },
+      {
+       "k": "要件",
+       "v": "不聽禁止"
+      },
+      {
+       "k": "處理機關",
+       "v": "警察機關"
+      },
+      {
+       "k": "民事",
+       "v": "可請求禁止侵入"
+      }
+     ],
+     "timeline": [],
+     "answer": "鄰居半夜吵鬧，若是喧嘩、謾罵或製造噪音妨害公眾安寧，經勸阻仍不聽，可報警依社維法處最高1萬元罰鍰。若是持續、可量測的營業或設施噪音，則適用噪音管制標準。假設對方是一般住戶的偶發吵鬧。",
+     "points": [
+      {
+       "text": "深夜喧嘩、製造噪音妨害安寧，不聽禁止者可罰。",
+       "cites": [
+        "D0080067:72"
+       ]
+      },
+      {
+       "text": "不具持續性、不易量測的聲音，由警察機關處理。",
+       "cites": [
+        "O0030001:6"
+       ]
+      },
+      {
+       "text": "住戶噪音多屬不持續聲音，適用社維法而非量測標準。",
+       "cites": [
+        "D0080070:11"
+       ]
+      },
+      {
+       "text": "若喧囂侵入且非輕微，可依民法請求禁止。",
+       "cites": [
+        "B0000001:793"
+       ]
+      },
+      {
+       "text": "若造成損害（如失眠就醫），可請求賠償。",
+       "cites": [
+        "B0000001:184"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "處新臺幣一萬元以下罰鍰（須經禁止仍不聽）",
+       "cites": [
+        "D0080067:72"
+       ]
+      },
+      {
+       "text": "民事上可請求禁止侵入，並就損害求償",
+       "cites": [
+        "B0000001:793",
+        "B0000001:184"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "噪音發生時立即報警請員警到場勸阻",
+      "錄下時間與聲音，留存多次紀錄",
+      "先向鄰居或管理委員會溝通勸阻"
+     ],
+     "followups": [
+      "警察來了對方還吵怎麼辦",
+      "可以向鄰居求償嗎",
+      "樓上腳步聲算噪音嗎"
+     ],
+     "sources": [
+      {
+       "p": "O0030001",
+       "n": "噪音管制法",
+       "key": "6"
+      },
+      {
+       "p": "D0080067",
+       "n": "社會秩序維護法",
+       "key": "72"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "793"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "184"
+      },
+      {
+       "p": "D0080070",
+       "n": "違反社會秩序維護法案件處理辦法",
+       "key": "11"
+      }
+     ],
+     "cited": []
+    },
+    "low": {
+     "ms": 5971,
+     "covered": true,
+     "verdict": "視噪音來源而定，部分可檢舉",
+     "facts": [
+      {
+       "k": "車輛噪音檢舉期限",
+       "v": "30 日內"
+      },
+      {
+       "k": "檢舉方式",
+       "v": "書面、電話、網路等"
+      },
+      {
+       "k": "夜間時段",
+       "v": "晚10時至翌晨7時"
+      },
+      {
+       "k": "留名要求",
+       "v": "須留真實姓名"
+      }
+     ],
+     "timeline": [],
+     "answer": "鄰居半夜吵若是機動車輛噪音，可依法向主管機關檢舉；若是營業場所、擴音設施或工程噪音，超標也受管制。單純鄰居說話、聚會，所給法規未規定檢舉管道，只能依民法請求禁止侵入。",
+     "points": [
+      {
+       "text": "使用中機動車輛噪音妨害安寧，人民得檢舉。",
+       "cites": [
+        "O0030001:13"
+       ]
+      },
+      {
+       "text": "檢舉須於30日內，附車號、時間、地點並留真實資料。",
+       "cites": [
+        "MOENV:FL050230"
+       ]
+      },
+      {
+       "text": "娛樂、營業場所、擴音設施發出聲音不得超標。",
+       "cites": [
+        "O0030001:9"
+       ]
+      },
+      {
+       "text": "營業場所指有營業行為之商業、餐飲等場所，住家吵鬧不在其內。",
+       "cites": [
+        "O0030006:2"
+       ]
+      },
+      {
+       "text": "一般鄰居喧囂侵入，土地所有人得禁止，但輕微或依習慣相當者除外。",
+       "cites": [
+        "B0000001:793"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "車輛經查屬實，會被通知至指定地點接受檢驗。",
+       "cites": [
+        "O0030001:13",
+        "MOENV:FL050230"
+       ]
+      },
+      {
+       "text": "鄰居喧囂侵入達一定程度，所有人得請求禁止。",
+       "cites": [
+        "B0000001:793"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "記錄噪音時間並錄音錄影存證",
+      "車輛噪音30日內向縣市主管機關檢舉",
+      "檢舉時寫明車號、車種、地點與時間"
+     ],
+     "followups": [
+      "鄰居住家噪音怎麼處理",
+      "檢舉人身分會保密嗎",
+      "營業場所夜間噪音標準"
+     ],
+     "sources": [
+      {
+       "p": "O0030001",
+       "n": "噪音管制法",
+       "key": "9"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "793"
+      },
+      {
+       "p": "O0030001",
+       "n": "噪音管制法",
+       "key": "13"
+      },
+      {
+       "p": "O0030006",
+       "n": "噪音管制標準",
+       "key": "2"
+      }
+     ],
+     "cited": [
+      "MOENV:FL050230"
+     ]
+    }
+   },
+   "judge": {
+    "better": "current",
+    "current": 7,
+    "low": 3,
+    "issues": "A misses the core scenario. Ordinary neighbour noise at night can be reported to the police under 社會秩序維護法第72條 (製造噪音或深夜喧譁) and 噪音管制法第6條. A wrongly says the provided rules give no reporting channel for this and leaves the user with only a civil claim under 民法793. Most of A is about vehicle-noise reporting (the 30-day deadline, plate number, 留真實姓名), which is irrelevant to a noisy neighbour. Its next steps are therefore largely useless. B has its own flaws. Its figure of 1萬元 may not match the current 第72條 amount, which I recall as 六千元以下. It also ties 「不聽禁止」 to deep-night noise, although that requirement attaches to a different item of the article. Even so, B gives the correct practical path: police, evidence, 管委會, and civil claims under 793 and 184."
+   }
+  },
+  {
+   "q": "在網路上罵人會被告嗎",
+   "status": 200,
+   "results": {
+    "current": {
+     "ms": 7194,
+     "covered": true,
+     "verdict": "會，可能被告公然侮辱或誹謗",
+     "facts": [
+      {
+       "k": "公然侮辱",
+       "v": "拘役或9千元以下罰金"
+      },
+      {
+       "k": "文字誹謗",
+       "v": "最重2年有期徒刑"
+      },
+      {
+       "k": "誹謗罰金",
+       "v": "最高3萬元"
+      },
+      {
+       "k": "免責",
+       "v": "真實、善意評論"
+      }
+     ],
+     "timeline": [],
+     "answer": "在網路上公開罵人，可能構成公然侮辱（拘役或九千元以下罰金）；若指摘具體足以毀損名譽之事，可能成誹謗，散布文字最重二年。是否成罪，要看是否公開、是否只是抽象謾罵或有具體事實、是否屬善意評論。",
+     "points": [
+      {
+       "text": "公開辱罵他人，可能構成公然侮辱罪。",
+       "cites": [
+        "C0000001:309"
+       ]
+      },
+      {
+       "text": "張貼文字指摘足損名譽之事，可能成加重誹謗。",
+       "cites": [
+        "C0000001:310"
+       ]
+      },
+      {
+       "text": "能證明為真實，原則不罰；但涉私德且無公益者除外。",
+       "cites": [
+        "C0000001:310"
+       ]
+      },
+      {
+       "text": "善意自辯或對可受公評之事適當評論，不罰。",
+       "cites": [
+        "C0000001:311"
+       ]
+      },
+      {
+       "text": "憲法法庭曾審查臉書留言案，認侮辱罪須考量言論自由，屬可比案件。",
+       "cites": [
+        "j113-4"
+       ]
+      },
+      {
+       "text": "網路貼文被判誹謗確定的案例也存在，屬可比案件。",
+       "cites": [
+        "TPSM,113,台上,1713,20241001,1"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "公然侮辱：拘役或九千元以下罰金；以強暴為之，一年以下有期徒刑、拘役或一萬五千元以下罰金。",
+       "cites": [
+        "C0000001:309"
+       ]
+      },
+      {
+       "text": "誹謗：一年以下有期徒刑、拘役或一萬五千元以下罰金；散布文字圖畫，二年以下有期徒刑、拘役或三萬元以下罰金。",
+       "cites": [
+        "C0000001:310"
+       ]
+      },
+      {
+       "text": "辱罵已死之人亦可罰：侮辱拘役或九千元以下罰金，誹謗一年以下有期徒刑、拘役或三萬元以下罰金。",
+       "cites": [
+        "C0000001:312"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "保存貼文、留言截圖與網址、時間",
+      "留言前確認所述事實有證據可證明真實",
+      "被告時保留自辯或善意評論的佐證資料"
+     ],
+     "followups": [
+      "怎樣算公然侮辱？",
+      "說真話也會被告嗎？",
+      "罵公務員有何不同？"
+     ],
+     "sources": [
+      {
+       "p": "C0000001",
+       "n": "中華民國刑法",
+       "key": "309"
+      },
+      {
+       "p": "C0000001",
+       "n": "中華民國刑法",
+       "key": "310"
+      },
+      {
+       "p": "C0000001",
+       "n": "中華民國刑法",
+       "key": "311"
+      },
+      {
+       "p": "C0000001",
+       "n": "中華民國刑法",
+       "key": "312"
+      }
+     ],
+     "cited": [
+      "j113-4",
+      "TPSM,113,台上,1713,20241001,1"
+     ]
+    },
+    "low": {
+     "ms": 6328,
+     "covered": true,
+     "verdict": "可能被告：公然侮辱或誹謗",
+     "facts": [
+      {
+       "k": "公然侮辱",
+       "v": "拘役或9千元以下罰金"
+      },
+      {
+       "k": "散布文字誹謗",
+       "v": "最重2年有期徒刑"
+      },
+      {
+       "k": "提告",
+       "v": "告訴乃論"
+      },
+      {
+       "k": "誹謗罰金",
+       "v": "最高3萬元"
+      }
+     ],
+     "timeline": [],
+     "answer": "在網路上公開罵人，可能構成公然侮辱罪（拘役或九千元以下罰金）；若指摘具體足以毀損名譽之事，可能成立誹謗罪。這些罪須被害人提告才會處理，是否違法要看言論內容與是否公開。",
+     "points": [
+      {
+       "text": "公開場合辱罵他人，可能成立公然侮辱罪。",
+       "cites": [
+        "C0000001:309"
+       ]
+      },
+      {
+       "text": "在網路貼文指摘傳述損害名譽之事，可能成立誹謗罪。",
+       "cites": [
+        "C0000001:310"
+       ]
+      },
+      {
+       "text": "以文字散布誹謗，刑責較重，最高2年有期徒刑。",
+       "cites": [
+        "C0000001:310"
+       ]
+      },
+      {
+       "text": "事涉公共利益且經合理查證，即使不能證明為真，仍可不罰。",
+       "cites": [
+        "j112-8",
+        "C0000001:310"
+       ]
+      },
+      {
+       "text": "善意自辯或對可受公評之事適當評論，不罰；被害人須提告。",
+       "cites": [
+        "C0000001:311",
+        "C0000001:314",
+        "C0010001:232"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "公然侮辱：拘役或九千元以下罰金；以強暴為之，一年以下有期徒刑、拘役或一萬五千元以下罰金。",
+       "cites": [
+        "C0000001:309"
+       ]
+      },
+      {
+       "text": "散布文字誹謗：二年以下有期徒刑、拘役或三萬元以下罰金。",
+       "cites": [
+        "C0000001:310"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "保留貼文、留言截圖與網址作為證據",
+      "避免再刪改或擴散爭議言論，必要時澄清",
+      "被告訴時，整理查證資料與善意理由"
+     ],
+     "followups": [
+      "什麼算公然侮辱？",
+      "罵人要多久內被告？",
+      "怎樣才算合理查證？"
+     ],
+     "sources": [
+      {
+       "p": "C0000001",
+       "n": "中華民國刑法",
+       "key": "309"
+      },
+      {
+       "p": "C0000001",
+       "n": "中華民國刑法",
+       "key": "310"
+      },
+      {
+       "p": "C0000001",
+       "n": "中華民國刑法",
+       "key": "311"
+      },
+      {
+       "p": "C0000001",
+       "n": "中華民國刑法",
+       "key": "314"
+      },
+      {
+       "p": "C0010001",
+       "n": "刑事訴訟法",
+       "key": "232"
+      }
+     ],
+     "cited": [
+      "j112-8"
+     ]
+    }
+   },
+   "judge": {
+    "better": "low",
+    "current": 6,
+    "low": 7,
+    "issues": "B never says that these offences are prosecuted only on the victim's complaint (告訴乃論, 刑法第314條). That is central to a question about whether one 'will be sued'. B's flat '會' verdict also overstates the risk. It adds marginal material: insulting the dead (§312) is irrelevant here, and the two 'comparable case' points give no takeaway, making it longer for a phone. B does usefully explain abstract abuse versus specific factual accusations. A is not flawless: its advice to 'avoid editing or deleting the posts' is odd for someone worried about being sued. Neither answer mentions civil damages liability (民法184、195)."
+   }
+  },
+  {
+   "q": "房東可以隨時進來我房間嗎",
+   "status": 200,
+   "results": {
+    "current": {
+     "ms": 6747,
+     "covered": true,
+     "verdict": "不能隨時進入，須有正當理由",
+     "facts": [
+      {
+       "k": "可能罪責",
+       "v": "侵入住宅罪"
+      },
+      {
+       "k": "最重刑度",
+       "v": "1年有期徒刑"
+      },
+      {
+       "k": "罰金上限",
+       "v": "9千元"
+      },
+      {
+       "k": "例外",
+       "v": "必要保存行為"
+      }
+     ],
+     "timeline": [],
+     "answer": "房東把房間租給你後，你對房間享有使用收益權，房東無故進入可能構成侵入住宅。僅在為保存租賃物而必要（如修繕）時，你才不得拒絕。假設你是房客且租約未特別約定；若契約有約定看屋或檢查條款，結果可能不同。",
+     "points": [
+      {
+       "text": "租賃是房東將房屋交你使用收益。",
+       "cites": [
+        "B0000001:421"
+       ]
+      },
+      {
+       "text": "房東須維持房屋合於約定使用的狀態，不能任意干擾。",
+       "cites": [
+        "B0000001:423"
+       ]
+      },
+      {
+       "text": "房東為保存租賃物所為必要行為，你不得拒絕。",
+       "cites": [
+        "B0000001:429"
+       ]
+      },
+      {
+       "text": "無故侵入他人住宅或建築物，或經要求退去仍留滯，構成侵入住宅罪。",
+       "cites": [
+        "C0000001:306"
+       ]
+      },
+      {
+       "text": "法院曾就侵入住宅罪依第306條論罪，屬可比案件，非你的案件。",
+       "cites": [
+        "TPSM,113,台上,1486,20240501,1"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "房東無故進入或經要求退去仍不走：一年以下有期徒刑、拘役或九千元以下罰金。",
+       "cites": [
+        "C0000001:306"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "以書面或訊息要求房東事先通知再進入",
+      "保存房東擅自進入的錄影、訊息等證據",
+      "房東不退去時報警並要求退去"
+     ],
+     "followups": [
+      "房東可以換鎖嗎",
+      "房東要修繕我可拒絕嗎",
+      "房東可以直接把房子賣掉嗎"
+     ],
+     "sources": [
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "423"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "429"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "421"
+      },
+      {
+       "p": "C0000001",
+       "n": "中華民國刑法",
+       "key": "306"
+      }
+     ],
+     "cited": [
+      "TPSM,113,台上,1486,20240501,1"
+     ]
+    },
+    "low": {
+     "ms": 14544,
+     "covered": true,
+     "verdict": "不可以，房東無故進入可能犯侵入住宅罪",
+     "facts": [
+      {
+       "k": "最重刑度",
+       "v": "1年以下有期徒刑"
+      },
+      {
+       "k": "罰金上限",
+       "v": "9千元"
+      }
+     ],
+     "timeline": [],
+     "answer": "租屋期間房間交由你使用收益，房東不能隨時進入。若房東無正當理由進入，或你要求離開後仍留著，可能構成侵入住宅罪，最重處一年以下有期徒刑、拘役或九千元以下罰金。假設租約沒有特別約定，且房東不是出於緊急情形。",
+     "points": [
+      {
+       "text": "租賃是房東把房屋交你使用收益，你取得使用權。",
+       "cites": [
+        "B0000001:421"
+       ]
+      },
+      {
+       "text": "房東須維持房屋合於約定使用的狀態，不是可任意進出。",
+       "cites": [
+        "B0000001:423"
+       ]
+      },
+      {
+       "text": "無故侵入他人住宅或建築物，可構成侵入住宅罪。",
+       "cites": [
+        "C0000001:306"
+       ]
+      },
+      {
+       "text": "經你要求退去仍留滯，同樣可罰。",
+       "cites": [
+        "C0000001:306"
+       ]
+      },
+      {
+       "text": "實務上有人因涉侵入住宅罪遭逮捕、聲請提審，可見此罪會被追訴；此為類似案件，非你的案件。",
+       "cites": [
+        "TPSM,114,台抗,1251,20250723,1"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "房東無故侵入或受退去要求仍留滯：一年以下有期徒刑、拘役或九千元以下罰金。",
+       "cites": [
+        "C0000001:306"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "明確書面或訊息要求房東事前通知並徵得同意",
+      "保留房東擅自進入的錄影、照片、對話紀錄",
+      "房東拒絕離開時當場要求退去並報警"
+     ],
+     "followups": [
+      "房東擅自換鎖怎麼辦",
+      "房東可以進來看房嗎",
+      "房東不修繕怎麼辦"
+     ],
+     "sources": [
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "421"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "423"
+      },
+      {
+       "p": "C0000001",
+       "n": "中華民國刑法",
+       "key": "306"
+      }
+     ],
+     "cited": [
+      "TPSM,114,台抗,1251,20250723,1"
+     ]
+    }
+   },
+   "judge": {
+    "better": "current",
+    "current": 8,
+    "low": 6.5,
+    "issues": "A leaves out 民法第429條第2項: the tenant cannot refuse the landlord's acts needed to preserve the property, such as repairs. That is the main lawful reason a landlord may enter, so A's flat 「不可以」 overstates the tenant's position. A gestures only vaguely at 「緊急情形」 without legal support. A's case point is about an arrest and 提審 application, which says little about this question and could confuse the reader. Neither answer notes that 侵入住宅罪 is 告訴乃論 (the tenant must file a complaint), which would help with the 報警 step. B has small flaws: its facts list shows the penalty as 「1年有期徒刑」 instead of 「1年以下」, and 「僅在…才」 slightly overstates the exception as the only one."
+   }
+  },
+  {
+   "q": "打工被扣薪水合法嗎",
+   "status": 200,
+   "results": {
+    "current": {
+     "ms": 6728,
+     "covered": true,
+     "verdict": "無故扣薪不合法，可罰2萬至100萬",
+     "facts": [
+      {
+       "k": "原則",
+       "v": "工資應全額給付"
+      },
+      {
+       "k": "禁止",
+       "v": "預扣當違約金"
+      },
+      {
+       "k": "罰鍰",
+       "v": "2萬至100萬元"
+      },
+      {
+       "k": "終止契約",
+       "v": "知悉後30日內"
+      }
+     ],
+     "timeline": [],
+     "answer": "雇主須全額直接給付工資，也不能預扣工資當違約金或賠償費用。除非法令另有規定（如代扣稅款、勞健保）或你同意，否則被扣薪就是違法。實際是否合法，要看扣的原因與有無約定。",
+     "points": [
+      {
+       "text": "工資應全額直接給付勞工，法令另有規定或雙方另有約定才可例外。",
+       "cites": [
+        "N0030001:22"
+       ]
+      },
+      {
+       "text": "雇主不得預扣工資作為違約金或賠償費用。",
+       "cites": [
+        "N0030001:26"
+       ]
+      },
+      {
+       "text": "雇主須每月至少發薪兩次，並提供各項目計算明細，可據以核對被扣項目。",
+       "cites": [
+        "N0030001:23"
+       ]
+      },
+      {
+       "text": "違反全額給付或發薪規定，處2萬至100萬元罰鍰。",
+       "cites": [
+        "N0030001:79"
+       ]
+      },
+      {
+       "text": "雇主不依約給付報酬，勞工可不經預告終止契約。",
+       "cites": [
+        "N0030001:14"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "違反第22至25條：罰鍰新臺幣2萬元以上100萬元以下，可加重至最高額二分之一",
+       "cites": [
+        "N0030001:79"
+       ]
+      },
+      {
+       "text": "雇主不給付工資，勞工得不經預告終止契約，須於知悉後30日內為之",
+       "cites": [
+        "N0030001:14"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "保留薪資單、轉帳紀錄與對話截圖",
+      "要求雇主提供工資各項目計算明細",
+      "書面請雇主限期補發被扣工資"
+     ],
+     "followups": [
+      "可以馬上離職嗎",
+      "被罰款扣薪合法嗎",
+      "加班費怎麼算"
+     ],
+     "sources": [
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "22"
+      },
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "23"
+      },
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "26"
+      },
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "14"
+      },
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "79"
+      }
+     ],
+     "cited": []
+    },
+    "low": {
+     "ms": 5926,
+     "covered": true,
+     "verdict": "原則不合法：不能擅自扣薪",
+     "facts": [
+      {
+       "k": "罰鍰",
+       "v": "2萬至100萬元"
+      },
+      {
+       "k": "發薪頻率",
+       "v": "每月至少2次"
+      }
+     ],
+     "timeline": [],
+     "answer": "打工也是受僱勞工，工資應全額直接給付，雇主不得預扣工資當違約金或賠償費用。除非法令另有規定（如稅款）或雙方另有約定，否則擅自扣薪可能違法；若只是依法扣繳所得稅則屬合法。",
+     "points": [
+      {
+       "text": "打工以勞務換報酬，屬僱傭關係。",
+       "cites": [
+        "B0000001:482"
+       ]
+      },
+      {
+       "text": "工資應全額直接給付勞工，例外限於法令或雙方約定。",
+       "cites": [
+        "N0030001:22"
+       ]
+      },
+      {
+       "text": "雇主不得預扣工資作違約金或賠償費用。",
+       "cites": [
+        "N0030001:26"
+       ]
+      },
+      {
+       "text": "雇主須提供工資項目計算明細，可核對扣了什麼。",
+       "cites": [
+        "N0030001:23"
+       ]
+      },
+      {
+       "text": "類似案件中，勞工主張被不當扣款，法院曾審理並發回更審；此為可比案件，非您的案件。",
+       "cites": [
+        "TPSV,113,台上,343,20240516,1"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "違反全額給付或不得預扣規定，處新臺幣2萬元以上100萬元以下罰鍰，可視情節加重至最高額一半。",
+       "cites": [
+        "N0030001:79"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "保留薪資單、轉帳紀錄與聊天訊息",
+      "要求雇主提供工資各項目計算明細",
+      "書面請雇主限期補發被扣工資"
+     ],
+     "followups": [
+      "扣薪是所得稅可以嗎",
+      "遲發薪水怎麼辦",
+      "被要求賠償損失要付嗎"
+     ],
+     "sources": [
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "22"
+      },
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "26"
+      },
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "23"
+      },
+      {
+       "p": "N0030001",
+       "n": "勞動基準法",
+       "key": "79"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "482"
+      }
+     ],
+     "cited": [
+      "TPSV,113,台上,343,20240516,1"
+     ]
+    }
+   },
+   "judge": {
+    "better": "low",
+    "current": 5,
+    "low": 7,
+    "issues": "B misstates the law on resignation. It says a worker who quits without notice because wages are unpaid must do so within 30 days of learning of it. Under 勞基法第14條第2項, that 30-day limit applies only to 第1款 and 第6款, not 第5款 (unpaid wages). A worker could wrongly believe their right to quit has lapsed. B also states as an unqualified rule that wages must be paid at least twice a month (第23條). It omits the exceptions for a special agreement or monthly prepayment, which is how most part-time pay actually works. It repeats the 第79條 fine in both points and consequences, and its answer is internally inconsistent: it first says any deduction 'is illegal', then says 'it depends'. A makes the same pay-frequency simplification in its facts and adds a vague, low-value case citation. Even so, it contains no substantive error that could harm the user."
+   }
+  },
+  {
+   "q": "在路上被狗咬到可以求償嗎",
+   "status": 200,
+   "results": {
+    "current": {
+     "ms": 6067,
+     "covered": true,
+     "verdict": "可以，向狗的占有人求償",
+     "facts": [
+      {
+       "k": "求償對象",
+       "v": "狗的占有人"
+      },
+      {
+       "k": "免責條件",
+       "v": "已相當注意管束"
+      },
+      {
+       "k": "可求項目",
+       "v": "醫藥費、慰撫金"
+      },
+      {
+       "k": "法律依據",
+       "v": "民法第190條"
+      }
+     ],
+     "timeline": [],
+     "answer": "被狗咬傷，可依民法第190條向狗的占有人（通常是飼主）請求賠償。除非飼主證明已盡相當注意管束，或縱已注意仍會發生損害。若飼主放任狗在路上亂跑，多半要負責。",
+     "points": [
+      {
+       "text": "動物傷人，由占有人負賠償責任。",
+       "cites": [
+        "B0000001:190"
+       ]
+      },
+      {
+       "text": "飼主證明已相當注意管束，才可免責。",
+       "cites": [
+        "B0000001:190"
+       ]
+      },
+      {
+       "text": "飼主疏於看管，也可能構成過失侵權。",
+       "cites": [
+        "B0000001:184"
+       ]
+      },
+      {
+       "text": "身體受傷致減少工作能力或增加生活需要，可求賠償。",
+       "cites": [
+        "B0000001:193"
+       ]
+      },
+      {
+       "text": "身體、健康受侵害，也可請求精神慰撫金。",
+       "cites": [
+        "B0000001:195"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "可請求醫療費、減少勞動能力及增加生活需要的損害賠償。",
+       "cites": [
+        "B0000001:193"
+       ]
+      },
+      {
+       "text": "可請求相當金額的精神慰撫金。",
+       "cites": [
+        "B0000001:195"
+       ]
+      },
+      {
+       "text": "若狗是被他人挑動而咬人，飼主賠償後可向挑動者求償。",
+       "cites": [
+        "B0000001:190"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "保留傷口照片、驗傷單與就醫收據",
+      "記下飼主資料並留存現場目擊者聯絡方式",
+      "書面向飼主請求賠償並留存紀錄"
+     ],
+     "followups": [
+      "飼主不賠怎麼辦",
+      "可以請求多少慰撫金",
+      "流浪狗咬人找誰賠"
+     ],
+     "sources": [
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "190"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "184"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "193"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "195"
+      }
+     ],
+     "cited": []
+    },
+    "low": {
+     "ms": 6244,
+     "covered": true,
+     "verdict": "可以，向狗的占有人求償",
+     "facts": [
+      {
+       "k": "求償對象",
+       "v": "狗的占有人"
+      },
+      {
+       "k": "免責條件",
+       "v": "已盡相當管束"
+      }
+     ],
+     "timeline": [],
+     "answer": "被狗咬傷，可依民法第190條請求狗的占有人（通常是飼主）賠償。除非飼主證明已盡相當注意管束，或縱使盡力管束仍會發生，才可免責。若狗被他人挑動，飼主可再向挑動者求償。",
+     "points": [
+      {
+       "text": "動物傷人，由占有人負賠償責任。",
+       "cites": [
+        "B0000001:190"
+       ]
+      },
+      {
+       "text": "飼主證明已盡相當注意管束，即可免責。",
+       "cites": [
+        "B0000001:190"
+       ]
+      },
+      {
+       "text": "飼主有疏失（如未繫繩）亦可主張一般侵權責任。",
+       "cites": [
+        "B0000001:184"
+       ]
+      },
+      {
+       "text": "可請求醫藥費、減少的工作能力與增加的生活需要。",
+       "cites": [
+        "B0000001:193",
+        "B0000001:216"
+       ]
+      },
+      {
+       "text": "身體受害可再請求精神慰撫金。",
+       "cites": [
+        "B0000001:195"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "賠償所受損害及所失利益，如醫療費、無法工作的損失。",
+       "cites": [
+        "B0000001:216",
+        "B0000001:193"
+       ]
+      },
+      {
+       "text": "傷害身體健康，得請求相當金額的慰撫金。",
+       "cites": [
+        "B0000001:195"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "保留診斷證明書與醫療收據",
+      "拍下傷口照片及現場、狗的照片",
+      "記下飼主姓名、聯絡方式及目擊者",
+      "書面通知飼主請求賠償並留存紀錄"
+     ],
+     "followups": [
+      "飼主說已繫繩還要賠嗎",
+      "流浪狗咬人找誰賠",
+      "精神慰撫金可請求多少"
+     ],
+     "sources": [
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "190"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "184"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "193"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "195"
+      },
+      {
+       "p": "B0000001",
+       "n": "民法",
+       "key": "216"
+      }
+     ],
+     "cited": []
+    }
+   },
+   "judge": {
+    "better": "current",
+    "current": 8,
+    "low": 7.5,
+    "issues": "The two answers are very close and both are legally correct. B is slightly weaker for three reasons. (1) Its short answer spends its last sentence on the owner's right to recover from someone who provoked the dog. That right belongs to the owner and is of little use to the person who was bitten. A instead applies the law to the situation asked about: an owner who lets a dog run loose on the street will usually be liable. (2) B's facts section omits what the victim can claim. A lists medical costs and compensation for emotional distress (慰撫金). (3) B's addition of Civil Code art. 216 (所失利益, lost earnings) and its fuller evidence steps, such as photographing the dog and getting a diagnosis certificate, are useful. They do not make up for its less focused answer."
+   }
+  },
+  {
+   "q": "機車停紅線會罰多少",
+   "status": 200,
+   "results": {
+    "current": {
+     "ms": 6302,
+     "covered": true,
+     "verdict": "紅線停車罰 600 至 1,200 元",
+     "facts": [
+      {
+       "k": "停車罰鍰",
+       "v": "600–1,200 元"
+      },
+      {
+       "k": "臨時停車",
+       "v": "300–600 元"
+      }
+     ],
+     "timeline": [],
+     "answer": "紅線是禁止臨時停車線，在紅線處停車（含機車）依第56條處 600 元以上 1,200 元以下罰鍰。若只是臨時停車（如短暫上下人），則適用第55條，罰 300 至 600 元。本條文寫「汽車駕駛人」，一般實務機車亦視為汽車適用；若為黃線則屬禁止臨時停車，標線不同。",
+     "points": [
+      {
+       "text": "紅線屬禁止停車線，為禁制標線之一。",
+       "cites": [
+        "K0040014:164"
+       ]
+      },
+      {
+       "text": "駕駛人須遵守標誌、標線的禁制規定。",
+       "cites": [
+        "K0040012:4"
+       ]
+      },
+      {
+       "text": "在設有禁止停車標誌、標線處停車，罰 600 至 1,200 元。",
+       "cites": [
+        "K0040012:56"
+       ]
+      },
+      {
+       "text": "若僅臨時停車於禁止臨時停車標線處，罰 300 至 600 元。",
+       "cites": [
+        "K0040012:55"
+       ]
+      },
+      {
+       "text": "警察可責令移置；駕駛人不移置或不在車內，可代為移置。",
+       "cites": [
+        "K0040012:56"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "違規停車：新臺幣 600 元以上 1,200 元以下罰鍰",
+       "cites": [
+        "K0040012:56"
+       ]
+      },
+      {
+       "text": "臨時停車違規：新臺幣 300 元以上 600 元以下罰鍰",
+       "cites": [
+        "K0040012:55"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "保留罰單，於收單後 15 日內繳納或陳述意見",
+      "立即將機車移離紅線，避免被連續舉發"
+     ],
+     "followups": [
+      "黃線停車罰多少",
+      "被拖吊怎麼辦",
+      "不服罰單怎麼申訴"
+     ],
+     "sources": [
+      {
+       "p": "K0040012",
+       "n": "道路交通管理處罰條例",
+       "key": "56"
+      },
+      {
+       "p": "K0040012",
+       "n": "道路交通管理處罰條例",
+       "key": "4"
+      },
+      {
+       "p": "K0040012",
+       "n": "道路交通管理處罰條例",
+       "key": "55"
+      },
+      {
+       "p": "K0040014",
+       "n": "道路交通標誌標線號誌設置規則",
+       "key": "164"
+      }
+     ],
+     "cited": []
+    },
+    "low": {
+     "ms": 5765,
+     "covered": true,
+     "verdict": "機車停紅線：罰600至1,200元",
+     "facts": [
+      {
+       "k": "臨時停車",
+       "v": "300~600元"
+      },
+      {
+       "k": "停車",
+       "v": "600~1,200元"
+      }
+     ],
+     "timeline": [],
+     "answer": "紅線通常是禁止臨時停車的標線，機車停在紅線處，依第55條或第56條處罰。假設該處設有禁止臨時停車標線，且為臨時停車，罰300元至600元；若是停車（非臨時），罰600元至1,200元。此處不含免罰或其他例外情形。",
+     "points": [
+      {
+       "text": "設有禁止臨時停車標線處所停車，屬第56條第1項違規。",
+       "cites": [
+        "K0040012:56"
+       ]
+      },
+      {
+       "text": "若只是臨時停車，在禁止臨時停車標線處，依第55條處罰。",
+       "cites": [
+        "K0040012:55"
+       ]
+      },
+      {
+       "text": "違規停車經舉發後不改正，可被連續舉發多次處罰。",
+       "cites": [
+        "s604"
+       ]
+      },
+      {
+       "text": "警察或交通助理人員可逕行舉發違規停車，並責令移車。",
+       "cites": [
+        "K0040012:7",
+        "K0040012:56"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "停車（第56條）：罰鍰新臺幣600元以上1,200元以下",
+       "cites": [
+        "K0040012:56"
+       ]
+      },
+      {
+       "text": "臨時停車（第55條）：罰鍰新臺幣300元以上600元以下",
+       "cites": [
+        "K0040012:55"
+       ]
+      },
+      {
+       "text": "不移置或不在車旁，執法人員得代為移置",
+       "cites": [
+        "K0040012:56"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "接獲通知單後15日內繳納罰鍰結案",
+      "不服舉發，15日內向處罰機關陳述意見",
+      "收到通知後立即移車，避免被連續舉發"
+     ],
+     "followups": [
+      "停黃線罰多少",
+      "被連續舉發合法嗎",
+      "身障車位違停罰多少"
+     ],
+     "sources": [
+      {
+       "p": "K0040012",
+       "n": "道路交通管理處罰條例",
+       "key": "56"
+      },
+      {
+       "p": "K0040012",
+       "n": "道路交通管理處罰條例",
+       "key": "7"
+      },
+      {
+       "p": "K0040012",
+       "n": "道路交通管理處罰條例",
+       "key": "55"
+      }
+     ],
+     "cited": [
+      "s604"
+     ]
+    }
+   },
+   "judge": {
+    "better": "low",
+    "current": 5,
+    "low": 8,
+    "issues": "A gets the yellow line wrong: it says a yellow line means no temporary stopping, but a yellow line only prohibits parking, while a red line prohibits temporary stopping. A also contradicts itself, calling the red line 禁止臨時停車線 in its answer but 禁止停車線 in its points. Its 600–1,200 parking fine and 300–600 temporary-stopping fine are correct. B presents the same correct figures consistently, though its wording '假設該處設有禁止臨時停車標線' is slightly awkward."
+   }
+  },
+  {
+   "q": "手機被偷了警察不受理怎麼辦",
+   "status": 200,
+   "results": {
+    "current": {
+     "ms": 6182,
+     "covered": true,
+     "verdict": "可直接向檢察官提告，不必靠警察受理",
+     "facts": [
+      {
+       "k": "罪名",
+       "v": "竊盜罪"
+      },
+      {
+       "k": "最重刑度",
+       "v": "5 年有期徒刑"
+      },
+      {
+       "k": "罰金",
+       "v": "50 萬元以下"
+      },
+      {
+       "k": "告訴對象",
+       "v": "檢察官或警察"
+      }
+     ],
+     "timeline": [],
+     "answer": "手機被偷屬竊盜罪，最重處五年以下有期徒刑、拘役或五十萬元以下罰金。被害人可自行告訴，警察不受理時，可改以書狀或言詞向檢察官提出，檢察官知有犯罪嫌疑即應開始偵查。",
+     "points": [
+      {
+       "text": "偷手機是竊取他人動產，成立竊盜罪。",
+       "cites": [
+        "C0000001:320"
+       ]
+      },
+      {
+       "text": "你是被害人，有權提出告訴。",
+       "cites": [
+        "C0010001:232"
+       ]
+      },
+      {
+       "text": "告訴可用書狀或言詞，向檢察官或司法警察官為之。",
+       "cites": [
+        "C0010001:242"
+       ]
+      },
+      {
+       "text": "警察不受理，可直接向檢察官告訴，言詞告訴會作筆錄。",
+       "cites": [
+        "C0010001:242"
+       ]
+      },
+      {
+       "text": "檢察官因告訴知有犯罪嫌疑，應即開始偵查。",
+       "cites": [
+        "C0010001:228"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "竊盜罪：五年以下有期徒刑、拘役或五十萬元以下罰金；未遂也罰。",
+       "cites": [
+        "C0000001:320"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "備妥報案資料、購買證明、手機序號與IMEI",
+      "整理被偷時間地點，及監視器、定位證據",
+      "寫告訴狀，向地方檢察署檢察官提出告訴",
+      "要求警方或檢察官製作筆錄，並留存收執"
+     ],
+     "followups": [
+      "告訴狀怎麼寫",
+      "檢察官不起訴怎麼辦",
+      "告訴有期限嗎"
+     ],
+     "sources": [
+      {
+       "p": "C0010001",
+       "n": "刑事訴訟法",
+       "key": "232"
+      },
+      {
+       "p": "C0000001",
+       "n": "中華民國刑法",
+       "key": "320"
+      },
+      {
+       "p": "C0010001",
+       "n": "刑事訴訟法",
+       "key": "228"
+      },
+      {
+       "p": "C0010001",
+       "n": "刑事訴訟法",
+       "key": "242"
+      }
+     ],
+     "cited": []
+    },
+    "low": {
+     "ms": 6354,
+     "covered": true,
+     "verdict": "可改向檢察官告訴，竊盜最重5年",
+     "facts": [
+      {
+       "k": "罪名",
+       "v": "竊盜罪"
+      },
+      {
+       "k": "最重刑度",
+       "v": "5年有期徒刑"
+      },
+      {
+       "k": "可罰金",
+       "v": "50萬元以下"
+      },
+      {
+       "k": "未遂",
+       "v": "處罰"
+      }
+     ],
+     "timeline": [],
+     "answer": "手機被偷屬竊盜罪，任何人知有犯罪嫌疑都可告發，不必只靠警察受理。警察若不受理，可改以書面向檢察官提出告訴或告發；需有被竊事實及證據才易成立。",
+     "points": [
+      {
+       "text": "竊取他人手機，意圖不法所有，構成竊盜罪。",
+       "cites": [
+        "C0000001:320"
+       ]
+      },
+      {
+       "text": "任何人知有犯罪嫌疑，都可以告發。",
+       "cites": [
+        "C0010001:240"
+       ]
+      },
+      {
+       "text": "司法警察官調查後，應將結果移送檢察官。",
+       "cites": [
+        "C0010001:229"
+       ]
+      },
+      {
+       "text": "公務員因職務知有犯罪嫌疑，應為告發。",
+       "cites": [
+        "C0010001:241"
+       ]
+      },
+      {
+       "text": "鐵路警察分局也掌理告訴、告發及刑案移送，可就轄區報案。",
+       "cites": [
+        "D0010036:14"
+       ]
+      }
+     ],
+     "consequences": [
+      {
+       "text": "竊盜罪：5年以下有期徒刑、拘役或50萬元以下罰金，未遂也罰。",
+       "cites": [
+        "C0000001:320"
+       ]
+      }
+     ],
+     "agency": null,
+     "next": [
+      "改向地方檢察署遞狀提出竊盜告訴",
+      "保留購買憑證、IMEI及定位截圖",
+      "記下報案時間與承辦員警姓名",
+      "請求保密身分時可依證人保護法聲請"
+     ],
+     "followups": [
+      "如何寫竊盜告訴狀",
+      "手機找回後要撤告嗎",
+      "檢舉人身分可保密嗎"
+     ],
+     "sources": [
+      {
+       "p": "C0010001",
+       "n": "刑事訴訟法",
+       "key": "241"
+      },
+      {
+       "p": "C0010001",
+       "n": "刑事訴訟法",
+       "key": "240"
+      },
+      {
+       "p": "C0010001",
+       "n": "刑事訴訟法",
+       "key": "229"
+      },
+      {
+       "p": "C0000001",
+       "n": "中華民國刑法",
+       "key": "320"
+      },
+      {
+       "p": "D0010036",
+       "n": "內政部警政署鐵路警察局辦事細則",
+       "key": "14"
+      }
+     ],
+     "cited": []
+    }
+   },
+   "judge": {
+    "better": "current",
+    "current": 8,
+    "low": 5,
+    "issues": "A frames the user mainly as an informant (告發, §240) rather than the victim, who has the right to file a complaint (告訴, §232). It also never cites §242. As a result it says only a written filing is possible and omits the option of an oral complaint recorded by the prosecutor. A fills its points with irrelevant provisions: §241 (public officials' duty to report), §229 (police transferring cases to prosecutors), and a railway police division regulation that has nothing to do with this user. Its next steps add an uncited and inapplicable suggestion to request identity protection under the Witness Protection Act (證人保護法). A also never mentions that once the prosecutor learns of the suspected crime, an investigation must start (§228). B correctly cites the victim's right to complain (§232), the written or oral complaint to the prosecutor (§242), and the prosecutor's duty to investigate (§228), with concrete, practical next steps. B's minor weakness is that it repeats §242 across two points."
+   }
+  }
+ ]
+}
