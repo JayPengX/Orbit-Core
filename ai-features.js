@@ -174,19 +174,27 @@ export const FEATURES = {
         [
           'You answer a student’s question about their own school timetable (Taiwan). The facts below are their next two weeks of classes exactly as they will be held: each day, each period’s number, start–end time and subject (swaps, odd/even weeks and days off already applied; a day not listed has no classes). Now is the date and time on the first line: a class that has ended is past, so never hedge with “if it has already happened”.',
           'Answer only from the facts. A time you write must be one the facts give. Counting periods or days is fine; say which days. If the facts can’t answer it, say so in one line and what they do show. Never remark on what the facts cover otherwise.',
-          `Answer in ${en ? 'English' : 'Traditional Chinese (台灣用語)'}: at most 3 short sentences, the answer first, dates as 11/12（週四）, no markdown, no lists.`,
+          `line: the answer in ONE short sentence in ${en ? 'English, ≤ 20 words' : 'Traditional Chinese (台灣用語), ≤ 35 字'}, the answer first, dates as 11/12（週四）, no markdown.`,
+          'show: the days the app draws under it as that day’s periods (at most 3, the answer’s first), each { day: YYYY-MM-DD from the facts, periods: the period numbers that answer it, lit } ([] when no day helps). The app draws the times and subjects: never list them in line.',
           'Facts:',
           facts,
           `Question: ${q}`
         ].join('\n')
       ),
-    schema: obj({ answer: S }),
+    schema: obj({ line: S, show: arr(obj({ day: S, periods: arr(N) })) }),
     clean: (raw, { facts }) => {
-      const a = str(raw?.answer, 400);
+      const a = str(raw?.line ?? raw?.answer, 200);
       // (Times must be the timetable's own; counts and dates the AI may say.)
       const times = s => String(s).match(/\b\d{1,2}:\d{2}\b/g) || [];
       const have = new Set(times(facts).map(t => t.padStart(5, '0')));
-      return a && times(a).every(t => have.has(t.padStart(5, '0'))) ? { answer: a } : null;
+      if (!a || !times(a).every(t => have.has(t.padStart(5, '0')))) return null;
+      // (A day drawn is one of the facts' days; its periods ones it has.)
+      const days = new Map([...facts.matchAll(/^(\d{4}-\d{2}-\d{2}) \w{3}: (.*)$/gm)].map(m => [m[1], new Set([...m[2].matchAll(/(?:^|; )(\d{1,2}) \d/g)].map(x => Number(x[1])))]));
+      const show = list(raw?.show, 3)
+        .filter(x => days.has(String(x?.day || '')))
+        .map(x => ({ day: x.day, periods: list(x.periods, 12).filter(n => days.get(x.day).has(n)) }));
+      // (answer: what phones before 11-11 read.)
+      return { answer: a, line: a, show };
     }
   },
 
