@@ -65,6 +65,14 @@ export const EXAMPLES = {
     { name: 'english', input: { question: 'Where did most of my money go this month?', facts: MONEY_FACTS, lang: 'en' } },
   ],
 
+  'transit-say': [
+    { name: 'arrive by tomorrow', input: { text: '明天早上八點前到台大醫院', now: '2026-11-11 10:00 週三', places: ['家', '學校'] } },
+    { name: 'from a saved place', input: { text: '下午三點半從學校去台北車站', now: '2026-11-11 10:00 週三', places: ['家', '學校'] } },
+    { name: 'home tonight', input: { text: '晚上七點回家', now: '2026-11-11 10:00 週三', places: ['家', '學校'] } },
+    { name: 'a weekday', input: { text: '週六十點出發去淡水老街', now: '2026-11-11 10:00 週三', places: [] } },
+    { name: 'no place', input: { text: '明天早上八點', now: '2026-11-11 10:00 週三', places: [] } },
+  ],
+
   'sports-ask': [
     { name: 'my places', input: { question: '我的球隊排第幾？', facts: SPORTS_FACTS } },
     { name: 'next game', input: { question: '湖人下一場什麼時候？', facts: SPORTS_FACTS } },

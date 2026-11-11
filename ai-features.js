@@ -655,6 +655,57 @@ export const FEATURES = {
   // that show it. Asked on a stock's page, kept for everyone (`shared`:
   // the same filing, the same words, one call).
   // (A filing's figures may be said rounded or in 萬/億 (its 仟元 too), its dates without the zero: 116/03/18 → 3/18.)
+  // Orbit Transit: 用說的查路線. A trip said with a time in it ("明天八點前到
+  // 台大醫院"); the phone reads the plain ones itself (lib/said.mjs). The AI
+  // only names the two places as written and the day and time; each place
+  // must be the person's own words or one of their saved places' names,
+  // and the phone finds them (their places, else the search with the words).
+  'transit-say': {
+    app: 'transit',
+    tap: true,
+    models: ['luna', 'haiku'],
+    effort: { luna: 'low' },
+    maxIn: 1200,
+    perPass: 40,
+    perMinute: 10,
+    input(raw) {
+      const t = str(raw?.text, 120);
+      const now = str(raw?.now, 30);
+      if (!t || !/^\d{4}-\d\d-\d\d \d\d:\d\d/.test(now)) return null;
+      return { t, now, places: list(raw?.places, 12).map(x => str(x, 30)).filter(Boolean) };
+    },
+    parts: ({ t, now, places }) =>
+      text(
+        [
+          'A person in Taiwan says a trip they want to plan on public transport. Read it into the two places and the time.',
+          'to: where they want to go, copied exactly as they wrote it (a place, an address, a station; drop words like 到, 去, 前往). from: where they start, copied the same way, "" when they don’t say (they start where they are; 這裡, 現在位置 are "" too).',
+          places.length ? `Their saved places: ${places.join('、')}. When they mean one of these (回家 → 家), write its name exactly.` : '',
+          'by: "arrive" when they must be there by a time (前到, 之前到, 趕上), "depart" when they leave at a time, "now" when no time is said. day: 0 today, 1 tomorrow, 2 the day after, or the days until a weekday they name; time: 24-hour "HH:MM" (早上八點 08:00, 下午三點半 15:30, 晚上 7 點 19:00), "" with by "now".',
+          `Now: ${now} (Taiwan).`,
+          `They said: ${t}`
+        ]
+          .filter(Boolean)
+          .join('\n')
+      ),
+    schema: obj({ from: S, to: S, by: S, day: N, time: S }),
+    clean(raw, { t, places }) {
+      const norm = x => String(x || '').replace(/台/g, '臺').replace(/\s+/g, '').toLowerCase();
+      const said = norm(t);
+      const mine = new Set(places.map(norm));
+      // (A place is their words or one of their places: never one the AI made up.)
+      const ok = x => Boolean(x) && (said.includes(norm(x)) || mine.has(norm(x)));
+      const to = str(raw?.to, 40).replace(/^(到|去|前往)/, '');
+      if (!ok(to)) return null;
+      const from0 = str(raw?.from, 40).replace(/^從/, '');
+      const from = /^(這裡|這邊|現在位置|目前位置|我的位置)$/.test(from0) || !ok(from0) ? '' : from0;
+      const m = /^(\d{1,2}):(\d{2})$/.exec(str(raw?.time, 5));
+      const time = m && +m[1] < 24 && +m[2] < 60 ? `${m[1].padStart(2, '0')}:${m[2]}` : '';
+      const by = ['arrive', 'depart'].includes(raw?.by) && time ? raw.by : 'now';
+      const day = Number.isInteger(raw?.day) && raw.day >= 0 && raw.day <= 7 ? raw.day : 0;
+      return { from, to, by, day: by === 'now' ? 0 : day, time: by === 'now' ? '' : time };
+    }
+  },
+
   // Orbit Sports: 問比賽, a question about the teams and leagues followed.
   // The phone lays out what it read as tables (lib/ask.mjs: my teams'
   // places, next and last games, each followed league's table, today's);
