@@ -189,6 +189,9 @@ phone on its side, a tablet, a computer), light and dark
    icon tiny beside its text, like pieces the same size?
 9. Does any label, name or number wrap at 320? Is anything left of an older
    look (RULEBOOK §3 "No old look left")?
+10. Can any line of explanation go? Read every string aloud in Chinese and
+    in English: is it what a person in Taiwan (or an English speaker) would
+    say, and is the same thing named the same way everywhere?
 
 ## 10. Every screen, either way up
 
