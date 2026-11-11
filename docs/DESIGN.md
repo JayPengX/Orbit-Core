@@ -183,6 +183,12 @@ phone on its side, a tablet, a computer), light and dark
 5. Same gap for the same relationship everywhere?
 6. On a wide screen: is the space used (columns, a grid), or is it one
    phone's column with empty sides or one row stretched across?
+7. Is any area emptier than the spacing rule allows (a tall card holding
+   little, a blank half row, a band of nothing)? Shrink it.
+8. Is every piece in proportion: no bar or button fatter than its words, no
+   icon tiny beside its text, like pieces the same size?
+9. Does any label, name or number wrap at 320? Is anything left of an older
+   look (RULEBOOK §3 "No old look left")?
 
 ## 10. Every screen, either way up
 
