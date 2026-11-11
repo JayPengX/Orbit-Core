@@ -1,0 +1,3862 @@
+{
+ "money-ask": [
+  {
+   "example": "how it was paid",
+   "runs": [
+    {
+     "v": [
+      "haiku",
+      null
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": null,
+       "out": {
+        "answer": "這個月付最多的是台新 Richart，共 8000 元，只付了 1 次房租；現金則用了 11 次。",
+        "line": "這個月付最多的是台新 Richart，共 8000 元，只付了 1 次房租；現金則用了 11 次。",
+        "show": [
+         "pay0"
+        ],
+        "mark": [
+         "台新 Richart",
+         "國泰CUBE •8812",
+         "現金"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1890,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 431,
+        "output_tokens_details": {
+         "thinking_tokens": 345
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0004045,
+       "ms": 3116,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": null,
+       "out": {
+        "answer": "台新 Richart 付最多，8000 元，只有一筆房租；國泰CUBE •8812 付 4523 元，6 次。",
+        "line": "台新 Richart 付最多，8000 元，只有一筆房租；國泰CUBE •8812 付 4523 元，6 次。",
+        "show": [
+         "pay0"
+        ],
+        "mark": [
+         "台新 Richart",
+         "國泰CUBE •8812"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1890,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 890,
+        "output_tokens_details": {
+         "thinking_tokens": 799
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.000634,
+       "ms": 4499,
+       "stop": "end_turn"
+      }
+     ]
+    },
+    {
+     "v": [
+      "haiku",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "answer": "這個月最大的付款來源是台新 Richart 的 8000，就是11/8 的房租，只有 1 次。",
+        "line": "這個月最大的付款來源是台新 Richart 的 8000，就是11/8 的房租，只有 1 次。",
+        "show": [
+         "pay0"
+        ],
+        "mark": [
+         "台新 Richart",
+         "國泰CUBE •8812"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1890,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 444,
+        "output_tokens_details": {
+         "thinking_tokens": 363
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.000411,
+       "ms": 2568,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "answer": "這個月付最多的是台新 Richart 的 8000，只有11/8房租那一筆；國泰CUBE •8812 刷了 6 次，共 4523。",
+        "line": "這個月付最多的是台新 Richart 的 8000，只有11/8房租那一筆；國泰CUBE •8812 刷了 6 次，共 4523。",
+        "show": [
+         "pay0"
+        ],
+        "mark": [
+         "台新 Richart",
+         "國泰CUBE •8812"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1890,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 548,
+        "output_tokens_details": {
+         "thinking_tokens": 451
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.000463,
+       "ms": 3321,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "candidate",
+      "current": 6,
+      "candidate": 8,
+      "issues": "A adds two extra details after the main number (the single rent payment, and cash used 11 times), but the prompt allows at most one. The cash count is also already plain in the pay0 table, which moves toward walking down the rows. A marks 國泰CUBE •8812 even though its line never mentions it. B also marks CUBE without mentioning it, but otherwise keeps to one extra detail (the single 11/8 rent entry behind the 8000).",
+      "usd": 0.021024
+     }
+    }
+   ]
+  },
+  {
+   "example": "card or cash",
+   "runs": [
+    {
+     "v": [
+      "haiku",
+      null
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": null,
+       "out": {
+        "answer": "國泰CUBE •8812 刷了 4523 元（6 次），另有國泰CUBE Apple Pay 260 元也是信用卡，一併標出。",
+        "line": "國泰CUBE •8812 刷了 4523 元（6 次），另有國泰CUBE Apple Pay 260 元也是信用卡，一併標出。",
+        "show": [
+         "pay0"
+        ],
+        "mark": [
+         "國泰CUBE •8812",
+         "國泰CUBE Apple Pay"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1886,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 868,
+        "output_tokens_details": {
+         "thinking_tokens": 765
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0006226000000000001,
+       "ms": 4765,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": null,
+       "out": {
+        "answer": "信用卡沒有直接加總；國泰CUBE •8812 最多，4523 元（6 次），另有國泰CUBE Apple Pay 未加總。",
+        "line": "信用卡沒有直接加總；國泰CUBE •8812 最多，4523 元（6 次），另有國泰CUBE Apple Pay 未加總。",
+        "show": [
+         "pay0"
+        ],
+        "mark": [
+         "國泰CUBE •8812",
+         "國泰CUBE Apple Pay"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1886,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 1018,
+        "output_tokens_details": {
+         "thinking_tokens": 915
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0006976,
+       "ms": 5154,
+       "stop": "end_turn"
+      }
+     ]
+    },
+    {
+     "v": [
+      "haiku",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "answer": "信用卡以國泰CUBE •8812 最多，4523 元、刷了 6 次；國泰CUBE Apple Pay 另有 260 元，未加總。",
+        "line": "信用卡以國泰CUBE •8812 最多，4523 元、刷了 6 次；國泰CUBE Apple Pay 另有 260 元，未加總。",
+        "show": [
+         "pay0"
+        ],
+        "mark": [
+         "國泰CUBE •8812",
+         "國泰CUBE Apple Pay"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1886,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 701,
+        "output_tokens_details": {
+         "thinking_tokens": 596
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0005391,
+       "ms": 3657,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "answer": "信用卡裡最大的是國泰CUBE •8812，這個月刷了4523元（6次）；另有國泰CUBE Apple Pay，不另加總。",
+        "line": "信用卡裡最大的是國泰CUBE •8812，這個月刷了4523元（6次）；另有國泰CUBE Apple Pay，不另加總。",
+        "show": [
+         "pay0"
+        ],
+        "mark": [
+         "國泰CUBE •8812",
+         "國泰CUBE Apple Pay"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1886,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 728,
+        "output_tokens_details": {
+         "thinking_tokens": 624
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0005526,
+       "ms": 3657,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "same",
+      "current": 8,
+      "candidate": 8,
+      "issues": "",
+      "usd": 0.023392
+     }
+    }
+   ]
+  },
+  {
+   "example": "food this month",
+   "runs": [
+    {
+     "v": [
+      "haiku",
+      null
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": null,
+       "out": {
+        "answer": "這個月餐飲花了1814元，上個月同期沒有這類支出，算是新增的。",
+        "line": "這個月餐飲花了1814元，上個月同期沒有這類支出，算是新增的。",
+        "show": [
+         "cat0"
+        ],
+        "mark": [
+         "餐飲"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1886,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 353,
+        "output_tokens_details": {
+         "thinking_tokens": 293
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.00036510000000000004,
+       "ms": 2819,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": null,
+       "out": {
+        "answer": "這個月餐飲共花了 1814 元；比上個月同期（0 元）是新增的支出。",
+        "line": "這個月餐飲共花了 1814 元；比上個月同期（0 元）是新增的支出。",
+        "show": [
+         "cat0",
+         "vs"
+        ],
+        "mark": [
+         "餐飲"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1886,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 566,
+        "output_tokens_details": {
+         "thinking_tokens": 501
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0004716,
+       "ms": 3561,
+       "stop": "end_turn"
+      }
+     ]
+    },
+    {
+     "v": [
+      "haiku",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "answer": "11月到今天餐飲花了1814元，比上個月同期是新增的，上個月同期沒有這類支出。",
+        "line": "11月到今天餐飲花了1814元，比上個月同期是新增的，上個月同期沒有這類支出。",
+        "show": [
+         "cat0",
+         "vs"
+        ],
+        "mark": [
+         "餐飲"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1886,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 404,
+        "output_tokens_details": {
+         "thinking_tokens": 334
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0003906,
+       "ms": 2932,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "answer": "這個月餐飲花了1814元，比上個月同期多出來，上個月同期是0，等於新增的花費。",
+        "line": "這個月餐飲花了1814元，比上個月同期多出來，上個月同期是0，等於新增的花費。",
+        "show": [
+         "cat0"
+        ],
+        "mark": [
+         "餐飲"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1886,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 444,
+        "output_tokens_details": {
+         "thinking_tokens": 377
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0004106,
+       "ms": 3260,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "same",
+      "current": 8,
+      "candidate": 8,
+      "issues": "",
+      "usd": 0.021876
+     }
+    }
+   ]
+  },
+  {
+   "example": "up on last month",
+   "runs": [
+    {
+     "v": [
+      "haiku",
+      null
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": null,
+       "out": {
+        "answer": "比上月同期多花最多的是購物，NT$3233，上月同期沒有這項支出（是新增的）。",
+        "line": "比上月同期多花最多的是購物，NT$3233，上月同期沒有這項支出（是新增的）。",
+        "show": [
+         "vs",
+         "cat0"
+        ],
+        "mark": [
+         "購物",
+         "數位",
+         "餐飲"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1885,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 557,
+        "output_tokens_details": {
+         "thinking_tokens": 482
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.000467,
+       "ms": 3181,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": null,
+       "out": {
+        "answer": "比上個月同期，購物多花最多，3233 元；上個月同期這些分類都是 0，全部是新增。",
+        "line": "比上個月同期，購物多花最多，3233 元；上個月同期這些分類都是 0，全部是新增。",
+        "show": [
+         "vs",
+         "cat0"
+        ],
+        "mark": [
+         "購物"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1885,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 582,
+        "output_tokens_details": {
+         "thinking_tokens": 514
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0004795,
+       "ms": 3568,
+       "stop": "end_turn"
+      }
+     ]
+    },
+    {
+     "v": [
+      "haiku",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "answer": "比上個月同期多花最多的是購物，3233 元，上個月同期是 0，所以是新增的。",
+        "line": "比上個月同期多花最多的是購物，3233 元，上個月同期是 0，所以是新增的。",
+        "show": [
+         "vs",
+         "cat0"
+        ],
+        "mark": [
+         "購物"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1885,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 576,
+        "output_tokens_details": {
+         "thinking_tokens": 511
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0004765,
+       "ms": 3692,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "answer": "比上個月同期，購物多花最多，3233元，上月同期是0；數位1940、餐飲1814也是新增。",
+        "line": "比上個月同期，購物多花最多，3233元，上月同期是0；數位1940、餐飲1814也是新增。",
+        "show": [
+         "vs"
+        ],
+        "mark": [
+         "購物",
+         "數位",
+         "餐飲"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1885,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 422,
+        "output_tokens_details": {
+         "thinking_tokens": 348
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0003995,
+       "ms": 2524,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "candidate",
+      "current": 6,
+      "candidate": 7,
+      "issues": "A marks 數位 and 餐飲 even though its line only talks about 購物; mark should list only the rows the line is about. Both answers frame the 購物 row as 多花最多 even though every vs row is 'was 0', which the prompt says to call new rather than more. Both do add that it is 新增.",
+      "usd": 0.021124
+     }
+    }
+   ]
+  },
+  {
+   "example": "budget",
+   "runs": [
+    {
+     "v": [
+      "haiku",
+      null
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": null,
+       "out": {
+        "answer": "這個月預算還剩 4121 元，其中最大的一筆支出是 11/8 房租 8000 元。",
+        "line": "這個月預算還剩 4121 元，其中最大的一筆支出是 11/8 房租 8000 元。",
+        "show": [
+         "budget"
+        ],
+        "mark": [
+         "還剩"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1883,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 384,
+        "output_tokens_details": {
+         "thinking_tokens": 320
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.00038030000000000003,
+       "ms": 2092,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": null,
+       "out": {
+        "answer": "這個月預算還剩 4121 元；已花的錢裡，最大一筆是 11/8 的房租 8000 元。",
+        "line": "這個月預算還剩 4121 元；已花的錢裡，最大一筆是 11/8 的房租 8000 元。",
+        "show": [
+         "budget"
+        ],
+        "mark": [
+         "還剩"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1883,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 465,
+        "output_tokens_details": {
+         "thinking_tokens": 397
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.00042080000000000004,
+       "ms": 2697,
+       "stop": "end_turn"
+      }
+     ]
+    },
+    {
+     "v": [
+      "haiku",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "answer": "這個月預算還剩 4121 元，其中最大一筆支出是 11/8 的房租 8000 元。",
+        "line": "這個月預算還剩 4121 元，其中最大一筆支出是 11/8 的房租 8000 元。",
+        "show": [
+         "budget"
+        ],
+        "mark": [
+         "還剩",
+         "已花"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1883,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 436,
+        "output_tokens_details": {
+         "thinking_tokens": 369
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0004063,
+       "ms": 2591,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "answer": "預算還剩 4121 元，預算 20000 元，已花 15879 元。",
+        "line": "預算還剩 4121 元，預算 20000 元，已花 15879 元。",
+        "show": [
+         "budget"
+        ],
+        "mark": []
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1883,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 49,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.00021280000000000002,
+       "ms": 886,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "same",
+      "current": 7,
+      "candidate": 7,
+      "issues": "",
+      "usd": 0.014688
+     }
+    }
+   ]
+  },
+  {
+   "example": "not in the facts",
+   "runs": [
+    {
+     "v": [
+      "haiku",
+      null
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": null,
+       "out": {
+        "answer": "沒有去年的資料，帳本2026年7月才開始；記錄中花最多的是10月，32103元。",
+        "line": "沒有去年的資料，帳本2026年7月才開始；記錄中花最多的是10月，32103元。",
+        "show": [
+         "months"
+        ],
+        "mark": [
+         "10月"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1888,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 772,
+        "output_tokens_details": {
+         "thinking_tokens": 711
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0005748,
+       "ms": 4092,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": null,
+       "out": {
+        "answer": "帳本只有9月到11月的資料，查不到去年；這幾個月中10月花最多，共32103元。",
+        "line": "帳本只有9月到11月的資料，查不到去年；這幾個月中10月花最多，共32103元。",
+        "show": [
+         "months"
+        ],
+        "mark": [
+         "10月"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1888,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 497,
+        "output_tokens_details": {
+         "thinking_tokens": 436
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0004373,
+       "ms": 2817,
+       "stop": "end_turn"
+      }
+     ]
+    },
+    {
+     "v": [
+      "haiku",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "answer": "資料只有9月、10月和11月到今天，看不到去年；10月花最多，共32103元。",
+        "line": "資料只有9月、10月和11月到今天，看不到去年；10月花最多，共32103元。",
+        "show": [
+         "months"
+        ],
+        "mark": [
+         "10月"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1888,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 57,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.00021730000000000002,
+       "ms": 943,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "answer": "資料只有9月、10月和11月到今天，看不到去年；最高的是10月，32103元。",
+        "line": "資料只有9月、10月和11月到今天，看不到去年；最高的是10月，32103元。",
+        "show": [
+         "months"
+        ],
+        "mark": [
+         "10月"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1888,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 57,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.00021730000000000002,
+       "ms": 876,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "candidate",
+      "current": 6,
+      "candidate": 9,
+      "issues": "A says 記錄中花最多的是10月, which presents October as the most of the whole book. The book starts in July, but the months table only covers Sep–Nov, and the prompt forbids calling a row the most of the whole book. B limits the claim to the months shown.",
+      "usd": 0.021052
+     }
+    }
+   ]
+  },
+  {
+   "example": "english",
+   "runs": [
+    {
+     "v": [
+      "haiku",
+      null
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": null,
+       "out": {
+        "answer": "Living costs took the most this month at NT$8000, all of it one rent payment on 11/8.",
+        "line": "Living costs took the most this month at NT$8000, all of it one rent payment on 11/8.",
+        "show": [
+         "cat0"
+        ],
+        "mark": [
+         "居住"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1872,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 578,
+        "output_tokens_details": {
+         "thinking_tokens": 522
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.00047620000000000003,
+       "ms": 3948,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": null,
+       "out": {
+        "answer": "Living took the most, NT$8000, all from one rent payment on 11/8.",
+        "line": "Living took the most, NT$8000, all from one rent payment on 11/8.",
+        "show": [
+         "cat0"
+        ],
+        "mark": [
+         "居住"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1872,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 433,
+        "output_tokens_details": {
+         "thinking_tokens": 382
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.00040370000000000005,
+       "ms": 3180,
+       "stop": "end_turn"
+      }
+     ]
+    },
+    {
+     "v": [
+      "haiku",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "answer": "Most of your money went to housing, NT$8000 of NT$15879 so far this month, paid by one Richart transfer on 11/8.",
+        "line": "Most of your money went to housing, NT$8000 of NT$15879 so far this month, paid by one Richart transfer on 11/8.",
+        "show": [
+         "cat0",
+         "pay0"
+        ],
+        "mark": [
+         "居住",
+         "台新 Richart"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1872,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 86,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0002302,
+       "ms": 1737,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "answer": "Living (居住) took the most: NT$8000, all from one rent entry on 11/8.",
+        "line": "Living (居住) took the most: NT$8000, all from one rent entry on 11/8.",
+        "show": [
+         "cat0",
+         "sub0.living"
+        ],
+        "mark": [
+         "居住"
+        ]
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1872,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 465,
+        "output_tokens_details": {
+         "thinking_tokens": 400
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.00041970000000000006,
+       "ms": 2817,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "current",
+      "current": 9,
+      "candidate": 5,
+      "issues": "B repeats the month total (NT$15879), which the prompt forbids because the tables already show it. It also adds more than the one allowed extra detail: the share of the total plus the payment method. Calling the Richart payment a 'transfer' is an inference the facts don't state. Adding pay0 to show is unnecessary for a where-did-it-go question.",
+      "usd": 0.01616
+     }
+    }
+   ]
+  }
+ ],
+ "orbit-ask": [
+  {
+   "example": "tomorrow",
+   "runs": [
+    {
+     "v": [
+      "sonnet",
+      null
+     ],
+     "reps": [
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": null,
+       "out": {
+        "line": "體育課13:10雨60%，可能改室內；14時起70%要帶傘。湖人戰勇士10:30在數學課。",
+        "ids": [
+         "f4",
+         "f3",
+         "f6",
+         "f1"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1027,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 529,
+        "output_tokens_details": {
+         "thinking_tokens": 455
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.007344,
+       "ms": 4831,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": null,
+       "out": {
+        "line": "明天13:10體育課雨機率60%，可能改室內；14時起雨70%，記得帶傘。湖人比賽10:30剛好在數學課。",
+        "ids": [
+         "f4",
+         "f3",
+         "f6",
+         "f1"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1027,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 447,
+        "output_tokens_details": {
+         "thinking_tokens": 364
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.006524,
+       "ms": 4024,
+       "stop": "end_turn"
+      }
+     ]
+    },
+    {
+     "v": [
+      "sonnet",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": "low",
+       "out": {
+        "line": "明天13:10體育課有雨60%，可能改室內；14時起降雨70%，記得帶傘。湖人比賽10:30剛好在上數學課。",
+        "ids": [
+         "f4",
+         "f3",
+         "f6",
+         "f1"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1027,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 84,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.002894,
+       "ms": 1604,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": "low",
+       "out": {
+        "line": "明天13:10體育課雨60%，可能改室內；14時起降雨70%，記得帶傘。湖人比賽10:30，正在上數學課。",
+        "ids": [
+         "f4",
+         "f3",
+         "f6",
+         "f1"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1027,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 82,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.002874,
+       "ms": 1455,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "same",
+      "current": 8,
+      "candidate": 8,
+      "issues": "",
+      "usd": 0.014756
+     }
+    },
+    {
+     "v": [
+      "haiku",
+      "medium"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "medium",
+       "out": {
+        "line": "明天要帶雨傘，14時起降雨機率70%；13:10的體育課在戶外，雨60%，可能改到室內上。",
+        "ids": [
+         "f3",
+         "f4",
+         "f1"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1027,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 592,
+        "output_tokens_details": {
+         "thinking_tokens": 519
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0003987,
+       "ms": 3622,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "medium",
+       "out": {
+        "line": "明天13:10體育課雨機率60%，可能改室內；14時起降雨70%，要帶傘。10:30湖人對勇士開打，正值第3節數學。",
+        "ids": [
+         "f4",
+         "f3",
+         "f6"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1027,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 495,
+        "output_tokens_details": {
+         "thinking_tokens": 411
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0003502,
+       "ms": 3014,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "current",
+      "current": 9,
+      "candidate": 6,
+      "issues": "A leaves out the Lakers vs Warriors game at 10:30, which falls during 3rd-period math. The prompt names a game during class as something to lead with, so A misses a key point for '明天要注意什麼'. A's ids also omit f6.",
+      "usd": 0.014712
+     }
+    },
+    {
+     "v": [
+      "haiku",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "line": "明天14時起降雨機率70%，要帶雨傘。13:10體育課雨機率60%，可能改室內。另外湖人vs勇士10:30開打，正好在第3節數學。",
+        "ids": [
+         "f3",
+         "f4",
+         "f6",
+         "f1"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1027,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 502,
+        "output_tokens_details": {
+         "thinking_tokens": 407
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0003537,
+       "ms": 3219,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "line": "明天要帶傘，14時起降雨70%；13:10體育課雨60%，可能改室內。10:30湖人vs勇士開賽，正在第3節數學。",
+        "ids": [
+         "f3",
+         "f4",
+         "f6",
+         "f1"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1027,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 707,
+        "output_tokens_details": {
+         "thinking_tokens": 620
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0004562,
+       "ms": 3742,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "current",
+      "current": 9,
+      "candidate": 5,
+      "issues": "A runs to about 65 characters, over the 60-字 limit. It also uses three sentences where the prompt allows one or two. It leads with the general umbrella note instead of the rain during 體育課, which the prompt says should come first.",
+      "usd": 0.01512
+     }
+    }
+   ]
+  },
+  {
+   "example": "today",
+   "runs": [
+    {
+     "v": [
+      "sonnet",
+      null
+     ],
+     "reps": [
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": null,
+       "out": {
+        "line": "今天還有 18 個單字該複習。其他今天的行程，我這邊沒有紀錄。",
+        "ids": [
+         "f5"
+        ],
+        "app": "vocab"
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1027,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 59,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.002644,
+       "ms": 1257,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": null,
+       "out": {
+        "line": "今天還有 18 個單字該複習，其他今天的行程我這裡沒有紀錄。",
+        "ids": [
+         "f5"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1027,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 54,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.002594,
+       "ms": 1179,
+       "stop": "end_turn"
+      }
+     ]
+    },
+    {
+     "v": [
+      "sonnet",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": "low",
+       "out": {
+        "line": "今天還有 18 個單字該複習。其他今天的行程，資料裡沒有記錄。",
+        "ids": [
+         "f5"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1027,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 54,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.002594,
+       "ms": 1268,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": "low",
+       "out": {
+        "line": "今天還有 18 個單字該複習。其他今天的事，資料裡沒有記錄。",
+        "ids": [
+         "f5"
+        ],
+        "app": "vocab"
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1027,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 57,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.002624,
+       "ms": 1505,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "candidate",
+      "current": 6,
+      "candidate": 8,
+      "issues": "B sets app to \"vocab\", but 今天還有什麼事 is a general question across apps, not one for the vocab app to answer itself, so app should be \"\". The line and ids are otherwise equivalent to A.",
+      "usd": 0.010876
+     }
+    },
+    {
+     "v": [
+      "haiku",
+      "medium"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "medium",
+       "out": {
+        "line": "今天還有 18 個單字該複習。其他紀錄都是明天（11/12 週四）的課、天氣和比賽，今天沒有其他行程。",
+        "ids": [
+         "f5"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1027,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 474,
+        "output_tokens_details": {
+         "thinking_tokens": 400
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.00033969999999999996,
+       "ms": 2742,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "medium",
+       "out": {
+        "line": "今天還有 18 個單字要複習。你的課表、天氣和比賽都排在明天（11/12 週四）。",
+        "ids": [
+         "f5",
+         "f1",
+         "f6"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1027,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 572,
+        "output_tokens_details": {
+         "thinking_tokens": 505
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0003887,
+       "ms": 3185,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "candidate",
+      "current": 6,
+      "candidate": 8,
+      "issues": "B sets app to \"vocab\", but 今天還有什麼事 is a general question about the day, not one for a single app to answer, so app should be \"\". B's line is also less useful: it doesn't mention that the other records are tomorrow's classes, weather and game, which would help the person. A is slightly overconfident in stating 今天沒有其他行程.",
+      "usd": 0.015996
+     }
+    },
+    {
+     "v": [
+      "haiku",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "line": "今天還有 18 個單字該複習。其他的課、天氣和比賽都排在明天（11/12 週四）。",
+        "ids": [
+         "f5",
+         "f1"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1027,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 496,
+        "output_tokens_details": {
+         "thinking_tokens": 432
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0003507,
+       "ms": 3107,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "line": "今天還有 18 個單字該複習。我手上的資料裡，今天就只有這項待辦。",
+        "ids": [
+         "f5"
+        ],
+        "app": "vocab"
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1027,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 478,
+        "output_tokens_details": {
+         "thinking_tokens": 419
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0003417,
+       "ms": 3131,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "candidate",
+      "current": 6,
+      "candidate": 8,
+      "issues": "B sets app to \"vocab\", but 今天還有什麼事 is a general question rather than one for a single app, so app should be \"\". B's line \"我這邊沒有紀錄\" is less useful than pointing out that the classes, rain and game are tomorrow.",
+      "usd": 0.011996
+     }
+    }
+   ]
+  },
+  {
+   "example": "for an app",
+   "runs": [
+    {
+     "v": [
+      "sonnet",
+      null
+     ],
+     "reps": [
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": null,
+       "out": {
+        "line": "我沒有你要去台北車站的路線資料，這題交給交通 app 幫你查比較準。",
+        "ids": [
+         "f8"
+        ],
+        "app": "transit"
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1028,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 58,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.002636,
+       "ms": 1526,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": null,
+       "out": {
+        "line": "我手上沒有去台北車站的路線資料，這題請直接問交通 app 幫你規劃。",
+        "ids": [],
+        "app": "transit"
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1028,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 56,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.002616,
+       "ms": 1342,
+       "stop": "end_turn"
+      }
+     ]
+    },
+    {
+     "v": [
+      "sonnet",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": "low",
+       "out": {
+        "line": "這裡沒有前往台北車站的路線資訊，建議直接到交通App查詢。",
+        "ids": [
+         "f8"
+        ],
+        "app": "transit"
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1028,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 55,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.002606,
+       "ms": 1385,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": "low",
+       "out": {
+        "line": "這裡沒有你去台北車站的路線資料，建議直接用交通 app 查詢。",
+        "ids": [],
+        "app": "transit"
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1028,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 53,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.002586,
+       "ms": 1266,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "same",
+      "current": 7,
+      "candidate": 7,
+      "issues": "Both answers correctly say the facts have no route to 台北車站 and route the question to transit. Both make the same mistake: they list f8 (the commute to school) in ids even though it does not answer the question, and the prompt says to leave ids empty in that case.",
+      "usd": 0.0092
+     }
+    },
+    {
+     "v": [
+      "haiku",
+      "medium"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "medium",
+       "out": {
+        "line": "這裡沒有台北車站的路線資訊，建議直接到交通 App 查詢。",
+        "ids": [],
+        "app": "transit"
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1028,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 239,
+        "output_tokens_details": {
+         "thinking_tokens": 187
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0002223,
+       "ms": 2054,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "medium",
+       "out": {
+        "line": "我手上的資料沒有去台北車站的路線，請直接用交通 app 查詢。",
+        "ids": [],
+        "app": "transit"
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1028,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 335,
+        "output_tokens_details": {
+         "thinking_tokens": 283
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0002703,
+       "ms": 2212,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "candidate",
+      "current": 6,
+      "candidate": 9,
+      "issues": "A ignores the rule to leave ids empty when the facts don't answer the question. It cites f8, the home-to-竹東高中 school commute, which has nothing to do with getting to 台北車站.",
+      "usd": 0.009428
+     }
+    },
+    {
+     "v": [
+      "haiku",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "line": "我手機上的資料沒有到台北車站的路線，可以直接到交通查詢。",
+        "ids": [],
+        "app": "transit"
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1028,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 246,
+        "output_tokens_details": {
+         "thinking_tokens": 195
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0002258,
+       "ms": 1751,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "line": "我這裡只有你從家到竹東高中的上學路線，沒有到台北車站的資料，請改到交通App查詢。",
+        "ids": [],
+        "app": "transit"
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1028,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 388,
+        "output_tokens_details": {
+         "thinking_tokens": 324
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0002968,
+       "ms": 2517,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "candidate",
+      "current": 6,
+      "candidate": 8,
+      "issues": "A: the facts don't answer the question, so the prompt requires empty ids. A still lists f8 (the 上學 commute to 竹東高中), which has nothing to do with getting to 台北車站. That gives the person an irrelevant row to tap.",
+      "usd": 0.010884
+     }
+    }
+   ]
+  },
+  {
+   "example": "not there",
+   "runs": [
+    {
+     "v": [
+      "sonnet",
+      null
+     ],
+     "reps": [
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": null,
+       "out": {
+        "line": "目前資料裡沒有你下週的考試範圍或考試科目，無法回答這個問題。",
+        "ids": [],
+        "app": "orbit"
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1028,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 55,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.002606,
+       "ms": 1933,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": null,
+       "out": {
+        "line": "目前資料裡沒有你下週的考試範圍或考試科目，我沒辦法回答這題。",
+        "ids": [],
+        "app": "orbit"
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1028,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 57,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.002626,
+       "ms": 1783,
+       "stop": "end_turn"
+      }
+     ]
+    },
+    {
+     "v": [
+      "sonnet",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": "low",
+       "out": {
+        "line": "目前資料裡沒有你下週考試的範圍或科目，無法回答這個問題。",
+        "ids": [],
+        "app": "orbit"
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1028,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 53,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.002586,
+       "ms": 1677,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": "low",
+       "out": {
+        "line": "目前的資料裡沒有下週考試的科目或範圍，無法回答你。",
+        "ids": [],
+        "app": "orbit"
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1028,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 50,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.002556,
+       "ms": 1664,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "same",
+      "current": 8,
+      "candidate": 8,
+      "issues": "",
+      "usd": 0.00624
+     }
+    },
+    {
+     "v": [
+      "haiku",
+      "medium"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "medium",
+       "out": {
+        "line": "我手上的資料沒有下週考試的科目或範圍，只有明天的課表。請到 Orbit 的課表或學校公告確認。",
+        "ids": [],
+        "app": "orbit"
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1028,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 348,
+        "output_tokens_details": {
+         "thinking_tokens": 278
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0002768,
+       "ms": 2352,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "medium",
+       "out": {
+        "line": "你的資料裡沒有下週考試的科目和範圍，我沒辦法回答。",
+        "ids": [],
+        "app": "orbit"
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1028,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 376,
+        "output_tokens_details": {
+         "thinking_tokens": 324
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0002908,
+       "ms": 2245,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "current",
+      "current": 8,
+      "candidate": 7,
+      "issues": "A adds advice the facts don't support (go check the Orbit timetable or school announcements). The prompt forbids unsupported advice and asks for a plain short line when the facts can't answer. A also doesn't address the person as 你. Both answers set app to \"orbit\"; arguably it should be empty, since no fact covers exams.",
+      "usd": 0.014448
+     }
+    },
+    {
+     "v": [
+      "haiku",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "line": "你下週的考試內容，手機上的資料裡沒有寫到，只有明天的課表和天氣。要查考試範圍，建議看課程表或問老師。",
+        "ids": [],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1028,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 73,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0001393,
+       "ms": 1140,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "line": "你下週的考試內容，這些資料裡沒有寫到，課表只有明天（11/12）的上課安排。你可以先到課表或學校公告確認。",
+        "ids": [
+         "f1"
+        ],
+        "app": "orbit"
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1028,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 79,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.00014230000000000002,
+       "ms": 1127,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "current",
+      "current": 8,
+      "candidate": 6,
+      "issues": "A adds advice the facts don't support (「建議看課程表或問老師」), which the prompt explicitly forbids. It is also wordier than the plain short line required when the facts don't answer the question. B's app value 'orbit' is a debatable choice for a question the facts can't answer, but it is a minor issue.",
+      "usd": 0.01474
+     }
+    }
+   ]
+  },
+  {
+   "example": "english",
+   "runs": [
+    {
+     "v": [
+      "sonnet",
+      null
+     ],
+     "reps": [
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": null,
+       "out": {
+        "line": "Tomorrow's 體育 at 13:10 has 60% rain and may move indoors; bring an umbrella (70% rain from 14:00). The Lakers–Warriors game at 10:30 falls during math.",
+        "ids": [
+         "f4",
+         "f3",
+         "f6",
+         "f5"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1022,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 100,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.003044,
+       "ms": 1440,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": null,
+       "out": {
+        "line": "Tomorrow's 體育 at 13:10 may move indoors (rain 60%). Bring an umbrella, since rain is 70% from 14:00. A Lakers vs Warriors game is at 10:30, during 數學.",
+        "ids": [
+         "f4",
+         "f3",
+         "f6",
+         "f1",
+         "f5"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1022,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 108,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.003124,
+       "ms": 1545,
+       "stop": "end_turn"
+      }
+     ]
+    },
+    {
+     "v": [
+      "sonnet",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": "low",
+       "out": {
+        "line": "Tomorrow's 體育 at 13:10 has a 60% chance of rain and may move indoors. Bring an umbrella; rain is 70% from 14:00. Lakers vs Warriors is 10:30, during 數學.",
+        "ids": [
+         "f4",
+         "f3",
+         "f6",
+         "f1",
+         "f5"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1022,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 109,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.003134,
+       "ms": 1595,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": "low",
+       "out": {
+        "line": "Tomorrow's 13:10 outdoor PE has 60% rain and may move indoors. Bring an umbrella; rain is 70% from 14:00. Lakers vs Warriors at 10:30 is during math.",
+        "ids": [
+         "f4",
+         "f3",
+         "f6",
+         "f1",
+         "f5"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1022,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 105,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.003094,
+       "ms": 1504,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "current",
+      "current": 8,
+      "candidate": 6,
+      "issues": "B's line has three sentences, which breaks the 'one or two short sentences' rule. B also lists f5 (words due today, not tomorrow) as a supporting id; A does the same, so this is a shared weakness.",
+      "usd": 0.01778
+     }
+    },
+    {
+     "v": [
+      "haiku",
+      "medium"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "medium",
+       "out": {
+        "line": "Tomorrow at 13:10 PE class may get rain (60%) and may move indoors, and you'll need an umbrella from 14:00 (70%). The Lakers vs Warriors game starts at 10:30, during your 3rd-period math.",
+        "ids": [
+         "f4",
+         "f3",
+         "f6",
+         "f1"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1022,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 598,
+        "output_tokens_details": {
+         "thinking_tokens": 488
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0004012,
+       "ms": 3029,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "medium",
+       "out": {
+        "line": "Bring an umbrella: rain from 14:00 (70%), and your 13:10 PE class may be moved indoors (60% rain). Also, Lakers vs Warriors starts 10:30 during your 10:10 math class.",
+        "ids": [
+         "f3",
+         "f4",
+         "f6",
+         "f1"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1022,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 609,
+        "output_tokens_details": {
+         "thinking_tokens": 505
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.00040669999999999997,
+       "ms": 3145,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "candidate",
+      "current": 8,
+      "candidate": 8.5,
+      "issues": "A's ids include f5 (18 words due today), which isn't about tomorrow and is weakly relevant. It leaves out f1 (tomorrow's timetable), which would be a more useful row to tap. Otherwise A is accurate and within the length limits.",
+      "usd": 0.020364
+     }
+    },
+    {
+     "v": [
+      "haiku",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "line": "Bring an umbrella: rain from 14:00 (70%), and your 13:10 PE class may move indoors (60% rain). Also, Lakers vs Warriors starts 10:30 during your math class.",
+        "ids": [
+         "f3",
+         "f4",
+         "f6",
+         "f1"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1022,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 583,
+        "output_tokens_details": {
+         "thinking_tokens": 486
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0003937,
+       "ms": 3238,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "line": "Tomorrow: PE at 13:10 is outdoors with 60% rain, so it may move indoors. Bring an umbrella; rain is 70% from 14:00.",
+        "ids": [
+         "f4",
+         "f3",
+         "f1"
+        ],
+        "app": ""
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1022,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 474,
+        "output_tokens_details": {
+         "thinking_tokens": 391
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0003392,
+       "ms": 2537,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "candidate",
+      "current": 7,
+      "candidate": 8,
+      "issues": "B's ids include f5 (18 vocab words due today), which is not about tomorrow and is not mentioned in the line, while it omits f1 (tomorrow's timetable). B also puts the Chinese term 體育 in an English line.",
+      "usd": 0.017892
+     }
+    }
+   ]
+  }
+ ],
+ "news-sides": [
+  {
+   "example": "taiwan two",
+   "runs": [
+    {
+     "v": [
+      "sonnet",
+      null
+     ],
+     "reps": [
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": null,
+       "out": {
+        "1v8c6to": {
+         "sides": {
+          "g": {
+           "zh": "以「攻防」描述，並引律師稱「1原因」沈伯洋該道歉",
+           "en": "Calls it a \"clash\" and cites a lawyer saying there is \"1 reason\" Shen should apologise."
+          },
+          "c": {
+           "zh": "用「怒了」形容蔣萬安，並稱沈伯洋是「用猜的」",
+           "en": "Describes Chiang as \"angry\" and says Shen's figures were \"guessed\"."
+          },
+          "b": {
+           "zh": "以蔣萬安與張善政掃街、人潮「擠爆」開頭",
+           "en": "Opens with Chiang and Chang Shan-cheng canvassing, with crowds \"packed\"."
+          }
+         },
+         "diff": null
+        },
+        "181cz57": {
+         "sides": {
+          "b": {
+           "zh": "以「強硬反擊」形容赫塞斯的回應",
+           "en": "Describes Hegseth's response as a \"hardline counterattack\"."
+          },
+          "c": {
+           "zh": "引赫格塞斯稱「再來一次仍會開戰」",
+           "en": "Quotes Hegseth saying he would \"still go to war again\"."
+          },
+          "g": {
+           "zh": "以「八大罪」列舉彈劾指控",
+           "en": "Lists the impeachment charges as \"eight major offences\"."
+          }
+         },
+         "diff": null
+        }
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 2075,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 2379,
+        "output_tokens_details": {
+         "thinking_tokens": 1729
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.02794,
+       "ms": 22853,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": null,
+       "out": {
+        "1v8c6to": {
+         "sides": {
+          "g": {
+           "zh": "引律師說沈伯洋該道歉的「1原因」",
+           "en": "Cites a lawyer's \"1 reason\" Shen should apologise."
+          },
+          "c": {
+           "zh": "提及蔣萬安曾為兒虐案與市府不足處致歉",
+           "en": "Notes Chiang himself apologised over the child abuse case and city government shortcomings."
+          },
+          "b": {
+           "zh": "以蔣萬安與張善政掃街、夜市人潮擠爆開頭",
+           "en": "Opens with Chiang and Chang Shan-cheng canvassing, with night market crowds packed."
+          }
+         },
+         "diff": null
+        },
+        "181cz57": {
+         "sides": {
+          "b": {
+           "zh": "用「強硬」形容赫格塞斯的反擊",
+           "en": "Describes Hegseth's response as \"hardline\" counterattack."
+          },
+          "c": {
+           "zh": "引赫格塞斯稱「再來一次仍會開戰」，堅持伊朗戰爭正確",
+           "en": "Quotes Hegseth saying he would go to war again, insisting the Iran war was right."
+          },
+          "g": {
+           "zh": "點出彈劾指控「八大罪」與違憲戰爭",
+           "en": "Leads with the impeachment charge of \"eight major offences\" and an unconstitutional war."
+          }
+         },
+         "diff": {
+          "zh": "只有偏綠標題指出提案彈劾的是美國共和黨人。",
+          "en": "Only green-leaning headlines say the impeachment was proposed by Republicans."
+         }
+        }
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 2075,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 2190,
+        "output_tokens_details": {
+         "thinking_tokens": 1563
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.02605,
+       "ms": 20343,
+       "stop": "end_turn"
+      }
+     ]
+    },
+    {
+     "v": [
+      "sonnet",
+      "medium"
+     ],
+     "reps": [
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": "medium",
+       "out": {
+        "1v8c6to": {
+         "sides": {
+          "c": {
+           "zh": "強調沈伯洋的兒虐數字是「用猜的」，並呈現沈回嗆市長該道歉的對攻。",
+           "en": "Stresses Shen's child-abuse figures were \"guessed\", and shows Shen's counter that the mayor should apologise."
+          },
+          "b": {
+           "zh": "以蔣萬安與張善政掃街人潮開場，並用「永不認錯」描述沈伯洋。",
+           "en": "Opens with Chiang and Chang Shan-cheng's crowded night-market walk, and says Shen \"never admits error\"."
+          }
+         },
+         "diff": {
+          "zh": "只有偏綠標題提到蔣萬安接受廖玉蕙道歉，其他兩方未提。",
+          "en": "Only green-leaning headlines mention Chiang accepting Liao Yu-hui's apology; the other sides omit it."
+         }
+        },
+        "181cz57": {
+         "sides": {
+          "b": {
+           "zh": "用「強硬反擊」形容赫格塞斯的回應，沒寫彈劾理由。",
+           "en": "Describes Hegseth's response as a \"hardline\" counterattack, without giving the impeachment grounds."
+          },
+          "c": {
+           "zh": "側重赫格塞斯「鬧劇必敗」的回嗆，並寫「再來一次仍會開戰」。",
+           "en": "Focuses on Hegseth's \"farce\" retort, adding he would go to war again and calling the Iran war right."
+          },
+          "g": {
+           "zh": "點出彈劾指控「違憲戰爭」與「八大罪」，著重指控內容。",
+           "en": "Highlights the charges of an unconstitutional war and \"eight major offences\", focusing on the accusations."
+          }
+         },
+         "diff": {
+          "zh": "只有中間標題提到彈劾源於未經國會授權對伊朗動武。",
+          "en": "Only centre headlines say the impeachment stems from attacking Iran without congressional authorisation."
+         }
+        }
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 2075,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 788,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.01203,
+       "ms": 7551,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": "medium",
+       "out": {
+        "1v8c6to": {
+         "sides": {
+          "g": {
+           "zh": "引律師說法，稱有「1原因」沈伯洋應道歉，並提蔣萬安接受廖玉蕙道歉",
+           "en": "Cites a lawyer saying there is \"1 reason\" Shen should apologise, and notes Chiang accepted Liao Yu-hui's apology."
+          },
+          "c": {
+           "zh": "強調沈伯洋說兒虐數字「用猜的」，並呈現沈反擊「該道歉的是」蔣萬安",
+           "en": "Stresses the child-abuse figures were \"guessed\", and gives Shen's counter that Chiang is the one who should apologise."
+          },
+          "b": {
+           "zh": "以「永不認錯」形容沈伯洋，並連結蔣萬安與張善政掃街人潮",
+           "en": "Describes Shen as \"never admitting error\", and pairs Chiang with a street campaign with Chang Shan-cheng drawing crowds."
+          }
+         },
+         "diff": {
+          "zh": "只有中間標題提到蔣萬安也為兒虐案與市府不足之處致歉。",
+          "en": "Only the centre headlines mention Chiang himself apologising over the abuse case and city government shortcomings."
+         }
+        },
+        "181cz57": {
+         "sides": {
+          "b": {
+           "zh": "用「強硬反擊」形容赫塞斯的回應",
+           "en": "Describes Hegseth's response as a \"hardline\" counterattack."
+          },
+          "c": {
+           "zh": "帶出赫格塞斯稱「再來一次仍會開戰」，並指控未經國會授權",
+           "en": "Quotes Hegseth saying he would \"go to war again\" and cites the lack of congressional authorisation."
+          },
+          "g": {
+           "zh": "強調彈劾指控違憲戰爭、涉「八大罪」",
+           "en": "Highlights the charge of an unconstitutional war involving \"eight major offences\"."
+          }
+         },
+         "diff": {
+          "zh": "只有偏綠標題指出提案者是共和黨人；偏藍標題未提。",
+          "en": "Only the green-leaning headlines say Republicans filed the motion; the blue-leaning headline does not."
+         }
+        }
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 2075,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 732,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.01147,
+       "ms": 7273,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "current",
+      "current": 7,
+      "candidate": 5,
+      "issues": "A has no green-side line for story 1061cz57's companion story 1v8c6to, so that side gets no framing point. A's centre zh line for 1v8c6to is about 31 字, over the 30-字 hard limit. Several of A's 'distinctive' points are shared with other sides, which the prompt forbids: 「永不認錯」 also appears in the centre headlines, and 「鬧劇」 and Shen's counter also appear in the green and blue headlines. A's en centre line for 181cz57 adds 'calling the Iran war right', which its zh line does not say, so zh and en differ. A does supply valid diffs (廖玉蕙 for 1v8c6to, the Iran/congressional authorisation point for 181cz57), which B lacks.",
+      "usd": 0.030508
+     }
+    },
+    {
+     "v": [
+      "sonnet",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": "low",
+       "out": {
+        "1v8c6to": {
+         "sides": {
+          "g": {
+           "zh": "引律師說法，稱沈伯洋該道歉有「1原因」，並提到蔣萬安接受廖玉蕙道歉",
+           "en": "Cites a lawyer saying there is \"1 reason\" Shen should apologise, and notes the mayor accepted Liao Yu-hui's apology."
+          },
+          "c": {
+           "zh": "強調沈伯洋數字「用猜的」，並呈現沈回擊「該道歉的是蔣萬安」",
+           "en": "Stresses Shen's figures were \"guessed\" and presents Shen's counter that the mayor is the one who should apologise."
+          },
+          "b": {
+           "zh": "以蔣萬安「永不認錯」質問為主軸，並帶入與張善政掃街的人潮",
+           "en": "Centres on the mayor's \"never admits wrong\" challenge, and adds the crowds from his street campaign with Chang San-cheng."
+          }
+         },
+         "diff": {
+          "zh": "只有偏中間標題提到蔣萬安曾就兒虐案與市府不足處致歉。",
+          "en": "Only the centre headlines mention that Chiang Wan-an himself apologised over the child abuse case and city government shortcomings."
+         }
+        },
+        "181cz57": {
+         "sides": {
+          "b": {
+           "zh": "只用「強硬反擊」形容赫塞斯回應彈劾提案",
+           "en": "Describes Hegseth's response to the impeachment motion only as a \"hardline\" counterattack."
+          },
+          "c": {
+           "zh": "除「鬧劇必敗」外，強調彈劾來自自家人，並稱再來一次仍會開戰",
+           "en": "Besides \"farce\", stresses impeachment came from his own side and that he would go to war again."
+          },
+          "g": {
+           "zh": "列出「八大罪」與違憲戰爭指控，點名提案者是共和黨人",
+           "en": "Lists the \"eight major charges\" and unconstitutional-war accusation, naming Republicans as the sponsors."
+          }
+         },
+         "diff": {
+          "zh": "只有偏中間標題提到彈劾理由是未經國會授權對伊朗動武。",
+          "en": "Only the centre headlines say the impeachment cites attacking Iran without congressional authorisation."
+         }
+        }
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 2075,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 762,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.01177,
+       "ms": 7237,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": "low",
+       "out": {
+        "1v8c6to": {
+         "sides": {
+          "g": {
+           "zh": "引律師說法，稱沈伯洋「1原因」應道歉，並提蔣萬安接受廖玉蕙道歉",
+           "en": "Cites a lawyer saying there is \"1 reason\" Shen should apologise, and notes Chiang accepted Liao Yu-hui's apology."
+          },
+          "c": {
+           "zh": "強調沈伯洋兒虐數字「用猜的」，並呈現沈反嗆「該道歉的是蔣萬安」",
+           "en": "Stresses Shen's child-abuse figures were \"guessed\", and presents Shen's counter that Chiang is the one who should apologise."
+          },
+          "b": {
+           "zh": "結合張善政掃街人潮「擠爆」的場景，並稱沈「還反嗆」",
+           "en": "Pairs the story with Chang San-cheng's street campaign crowds \"packed\", and says Shen \"snapped back\"."
+          }
+         },
+         "diff": {
+          "zh": "只有偏中間標題提到蔣萬安也為兒虐案與市府不足之處致歉。",
+          "en": "Only the centre headlines mention Chiang himself apologising over the child-abuse case and city government shortcomings."
+         }
+        },
+        "181cz57": {
+         "sides": {
+          "b": {
+           "zh": "只用「強硬反擊」形容赫塞斯回應彈劾",
+           "en": "Describes Hegseth's response to impeachment only as a \"hardline\" counterattack."
+          },
+          "c": {
+           "zh": "強調自家人彈劾，並引赫格塞斯稱伊朗戰爭正確、再來一次仍開戰",
+           "en": "Stresses impeachment by his own side, quoting Hegseth that the Iran war was right and he would do it again."
+          },
+          "g": {
+           "zh": "以「違憲戰爭」「八大罪」點出彈劾指控內容",
+           "en": "Spells out the charges: an unconstitutional war and \"eight major offences\"."
+          }
+         },
+         "diff": {
+          "zh": "只有偏中間標題提到彈劾理由是未經國會授權對伊朗動武。",
+          "en": "Only the centre headlines say the impeachment cites use of force against Iran without congressional authorisation."
+         }
+        }
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 2075,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 748,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.01163,
+       "ms": 7415,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "current",
+      "current": 7,
+      "candidate": 5,
+      "issues": "B's lines are lists rather than one framing point each, and several cite elements other sides share. Story 1 c says 用猜的, which b also uses. Story 1 b says 永不認錯, which c also uses. Story 2 c says 自家人, and Story 2 g says 共和黨人, but every side reports the impeachment came from his own party. B's story-1 g zh line is about 33 字, over the 30-字 hard limit, so it would be thrown away. B's diffs are valid (Chiang's own apology; the Iran war without congressional authorisation), which A misses. A has a minor romanization error (Chang Shan-cheng instead of Chang San-cheng), and its 用猜的 on the c side is also shared with b.",
+      "usd": 0.038624
+     }
+    },
+    {
+     "v": [
+      "haiku",
+      "medium"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "medium",
+       "out": {
+        "1v8c6to": {
+         "sides": {
+          "g": {
+           "zh": "偏綠以蔣萬安索討道歉開場，並引律師喊「1原因」作為焦點。",
+           "en": "Green headlines lead with Chiang demanding an apology, quoting a lawyer's \"1原因\"."
+          },
+          "c": {
+           "zh": "偏中間以沈伯洋「用猜的」反駁開場，並引其反嗆市長。",
+           "en": "Centre headlines lead with Shen's \"guessed\" claim and quote his counter-attack on the mayor."
+          },
+          "b": {
+           "zh": "偏藍以張善政掃街的競選畫面開場，引蔣萬安「永不認錯」質問。",
+           "en": "Blue headlines open with Chang's street-campaign scene, then quote Chiang's \"never admit fault\" challenge."
+          }
+         },
+         "diff": null
+        },
+        "181cz57": {
+         "sides": {
+          "b": {
+           "zh": "偏藍以赫格塞斯「強硬反擊」為重點，開場即是遭提案彈劾。",
+           "en": "Blue headline centres on Hegseth's \"hardline\" counterattack against the impeachment bid."
+          },
+          "c": {
+           "zh": "偏中間以赫格塞斯「鬧劇」斥責開場，強調伊朗戰爭是正確之舉。",
+           "en": "Centre headlines quote Hegseth's \"farce\" rebuttal and stress that the Iran war was right."
+          },
+          "g": {
+           "zh": "偏綠以同黨議員提彈劾為開場，並列出「八大罪」違憲指控。",
+           "en": "Green headlines lead with same-party lawmakers' impeachment and list \"eight major crimes\" charges."
+          }
+         },
+         "diff": null
+        }
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 2075,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 7514,
+        "output_tokens_details": {
+         "thinking_tokens": 6754
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0039645,
+       "ms": 32740,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "medium",
+       "out": {},
+       "error": null,
+       "usage": {
+        "input_tokens": 2075,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 7591,
+        "output_tokens_details": {
+         "thinking_tokens": 7475
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.004003,
+       "ms": 34422,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "current",
+      "current": 8,
+      "candidate": 4,
+      "issues": "B's side lines rely on points other sides also have. Its centre line on story 1 cites Shen's counter-attack, which blue headlines also carry. Its blue line cites 「永不認錯」, which centre headlines also use. On story 2, its centre line cites 「鬧劇」, which green also uses, and its green line opens with same-party impeachment, which centre also reports. Each line is a list of two points rather than one framing choice. The English green line quotes the Chinese \"1原因\" untranslated, against the rule. The zh lines carry redundant labels (偏綠/偏中間), and 「偏中間」 is a wrong label for 中間. B also misses the truly distinctive choices: centre's 「怒了」 and 「再來一次仍會開戰」. Minor point on A: its 「用猜的」 on story 1 also appears in blue headlines.",
+      "usd": 0.028232
+     }
+    },
+    {
+     "v": [
+      "haiku",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "1v8c6to": {
+         "sides": {
+          "g": {
+           "zh": "偏綠以律師說法帶出1原因，強調要求沈伯洋道歉",
+           "en": "Green quotes a lawyer's \"reason\" one and stresses Shen Bo-yang must apologize."
+          },
+          "c": {
+           "zh": "中間以台北市長選戰框架開場，並引沈伯洋說該道歉的是現任市長",
+           "en": "Centre frames it as the Taipei mayoral race and quotes Shen saying the incumbent should apologize."
+          },
+          "b": {
+           "zh": "偏藍以張善政掃街夜市人潮開場，凸顯選戰場景與造勢",
+           "en": "Blue leads with Chang Shan-cheng's night-market walk and crowds, setting a campaign scene."
+          }
+         },
+         "diff": null
+        },
+        "181cz57": {
+         "sides": {
+          "b": {
+           "zh": "偏藍以遭彈劾與赫格塞斯反擊開場，未引其原話",
+           "en": "Blue leads with the impeachment and Hegseth's counterattack, quoting no direct words."
+          },
+          "c": {
+           "zh": "中間引赫格塞斯原話，稱彈劾為鬧劇，並堅稱再來一次仍會開戰",
+           "en": "Centre quotes Hegseth directly, calling the impeachment a \"farce\" and saying he would fight again."
+          },
+          "g": {
+           "zh": "偏綠以違憲與八大罪等彈劾理由開場，重點放在指控內容",
+           "en": "Green leads with \"unconstitutional\" war charges and the impeachment's \"eight counts\"."
+          }
+         },
+         "diff": null
+        }
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 2075,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 5160,
+        "output_tokens_details": {
+         "thinking_tokens": 4437
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0027875,
+       "ms": 23789,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "1v8c6to": {
+         "sides": {
+          "g": {
+           "zh": "偏綠標題引述律師以「1原因」回應道歉要求",
+           "en": "Green-leaning headlines quote a lawyer's \"1原因\" reply to the apology demand."
+          },
+          "c": {
+           "zh": "中間標題先寫蔣萬安為市府不足處致歉，再帶出沈伯洋不認錯。",
+           "en": "Centre headlines lead with the mayor apologizing for city shortcomings, then Shen's refusal."
+          },
+          "b": {
+           "zh": "偏藍標題先寫合體張善政掃街夜市人潮，再帶出蔣萬安喊話。",
+           "en": "Blue-leaning headlines lead with Chang Shan-cheng's street walk and night-market crowds."
+          }
+         },
+         "diff": null
+        },
+        "181cz57": {
+         "sides": {
+          "b": {
+           "zh": "偏藍標題以「強硬反擊」描寫赫格塞斯回應彈劾案。",
+           "en": "Blue-leaning headline frames Hegseth's response to impeachment as a \"hardline\" counterattack."
+          },
+          "c": {
+           "zh": "中間標題多強調赫格塞斯堅稱伊朗戰爭正確，甚至「再來一次仍會開戰」。",
+           "en": "Centre headlines stress Hegseth insisting the Iran war was right and would be fought again."
+          },
+          "g": {
+           "zh": "偏綠標題以「八大罪」列出違憲戰爭的指控。",
+           "en": "Green-leaning headlines list the \"eight great crimes\" accusation of unconstitutional war."
+          }
+         },
+         "diff": null
+        }
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 2075,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 3728,
+        "output_tokens_details": {
+         "thinking_tokens": 3003
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0020715,
+       "ms": 18197,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "current",
+      "current": 7,
+      "candidate": 5,
+      "issues": "B does not quote the headlines' telling words in 「」, even though the prompt asks for this. Several of B's lines are multi-point summaries that include content other sides share. In story 1, its centre line uses Shen's reply 'the one who should apologise is the mayor', which blue's headlines also carry. In story 2, its centre line includes 鬧劇, which green's headline also uses. Its green line leads with 違憲 war charges, which overlaps with centre's 未經國會授權 charge. B also writes 赫格塞斯 for the blue side, which uses 赫塞斯. Its green line in story 1 ('stresses Shen must apologize') is generic rather than a distinct framing choice.",
+      "usd": 0.032664
+     }
+    }
+   ]
+  },
+  {
+   "example": "world",
+   "runs": [
+    {
+     "v": [
+      "sonnet",
+      null
+     ],
+     "reps": [
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": null,
+       "out": {
+        "1iag6xn": {
+         "sides": {
+          "c": {
+           "zh": "側重彈劾的人道與程序面：「300」多名平民戰爭死者，並附說明文章。",
+           "en": "Focus on the humanitarian and procedural angles: \"Over 300\" civilian war dead, plus an explainer on how impeachment works."
+          },
+          "l": {
+           "zh": "追問赫格塞斯「為何」面臨彈劾，並翻出軍中睪固酮計畫舊事。",
+           "en": "Ask \"why\" Hegseth faces impeachment and revive the military testosterone plan, with Vance saying it \"isn't about Iran.\""
+          }
+         },
+         "diff": {
+          "zh": "只有偏右標題提到民主黨預告1月還會有更多行動；其他兩邊沒有。",
+          "en": "Only right-leaning headlines mention Democrats signalling more action in January; the other two sides do not."
+         }
+        }
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1696,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 443,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.007822,
+       "ms": 4083,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": null,
+       "out": {},
+       "error": null,
+       "usage": {
+        "input_tokens": 1696,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 478,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.008172,
+       "ms": 3850,
+       "stop": "end_turn"
+      }
+     ]
+    },
+    {
+     "v": [
+      "sonnet",
+      "medium"
+     ],
+     "reps": [
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": "medium",
+       "out": {},
+       "error": null,
+       "usage": {
+        "input_tokens": 1696,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 464,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.008032,
+       "ms": 4231,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": "medium",
+       "out": {
+        "1iag6xn": {
+         "sides": {
+          "c": {
+           "zh": "以逾300名平民戰爭死者「發聲」切入，並附彈劾程序說明。",
+           "en": "Leads with Massie giving over 300 civilian war dead \"a voice\", plus an explainer on how impeachment works."
+          },
+          "l": {
+           "zh": "聚焦彈劾原因，並提及萬斯說「與伊朗無關」及赫格塞斯的睪固酮計畫。",
+           "en": "Focuses on why he faces impeachment, citing Vance saying it \"isn't about Iran\" and the military testosterone plan."
+          }
+         },
+         "diff": null
+        }
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1696,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 425,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.007642,
+       "ms": 3898,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "current",
+      "current": 5,
+      "candidate": 1,
+      "issues": "A is empty and gives no output for the story. B is usable but flawed. (1) It has no line for the r side, although r headlines carry distinct framing. (2) The c line lists several points (the 300 dead plus an explainer) instead of one. It quotes a number rather than a telling word, and adds its own 'humanitarian' framing. Its en version is 19 words (limit 18), and its zh version looks to be about 33 字 (limit 30). (3) The l line also lists several points and runs about 19 words in en. Its en and zh differ: only en adds Vance's \"isn't about Iran\", and Vance also appears in the r headlines, so he does not set l apart. (4) The diff is acceptable.",
+      "usd": 0.024376
+     }
+    },
+    {
+     "v": [
+      "sonnet",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": "low",
+       "out": {
+        "1iag6xn": {
+         "sides": {
+          "r": {
+           "zh": "強調民主黨集結支持，並引述萬斯與赫格塞斯斥彈劾為「荒謬」「鬧劇」。",
+           "en": "Stresses Democrats rallying behind it, quoting Vance and Hegseth dismissing the push as \"absurd,\" a \"farce.\""
+          },
+          "c": {
+           "zh": "以300多名平民戰爭死者為切入點，並提供彈劾程序說明。",
+           "en": "Leads with over 300 civilian war dead and offers an explainer on how impeachment would work."
+          },
+          "l": {
+           "zh": "追問赫格塞斯為何面臨彈劾，並提起軍中睪固酮計畫。",
+           "en": "Asks why Hegseth faces impeachment and recalls the military testosterone plan."
+          }
+         },
+         "diff": {
+          "zh": "只有偏右標題提到民主黨預告1月還會有更多行動；其他兩邊沒有。",
+          "en": "Only right-leaning headlines mention Democrats signalling more action in January; the other two sides do not."
+         }
+        }
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1696,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 375,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.007142,
+       "ms": 3172,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "effort": "low",
+       "out": {
+        "1iag6xn": {
+         "sides": {
+          "c": {
+           "zh": "從平民戰爭死者與「低睪固酮」說法切入，並附彈劾程序說明。",
+           "en": "Leads with civilian war dead and Hegseth's \"Low-T\" tirade, plus an explainer on how impeachment works."
+          },
+          "l": {
+           "zh": "聚焦「為何」遭彈劾，並提醒軍中睪固酮計畫，引萬斯稱「與伊朗無關」。",
+           "en": "Asks \"why\" he faces impeachment, recalls the military testosterone plan, and quotes Vance saying it \"isn't about Iran.\""
+          }
+         },
+         "diff": null
+        }
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1696,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 435,
+        "output_tokens_details": {
+         "thinking_tokens": 0
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.007742,
+       "ms": 3645,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "candidate",
+      "current": 4,
+      "candidate": 6,
+      "issues": "B has no line for the r side, so one of the three sides is uncovered. B's c zh line is about 33 字, over the 30-字 hard limit. That line also adds its own framing label 「人道」, which no headline uses. B's l en line adds Vance's \"isn't about Iran\" quote, which the zh line lacks, so zh and en do not say the same thing. B's c and l lines each combine two points instead of one. A also has flaws: its r zh line runs about 33 字, its r line stacks several points, and \"farce\" also appears in a c headline, so it is not distinctive to r.",
+      "usd": 0.029848
+     }
+    },
+    {
+     "v": [
+      "haiku",
+      "medium"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "medium",
+       "out": {
+        "1iag6xn": {
+         "sides": {
+          "r": {
+           "zh": "偏右標題引述赫格塞斯以「政治奇觀」「鬧劇」反駁彈劾",
+           "en": "Right-leaning headlines quote Hegseth's own words, \"political spectacle\" and \"farce,\" against Massie."
+          },
+          "c": {
+           "zh": "中間標題強調Massie為逾300名平民戰死者發聲",
+           "en": "Centre headlines lead with Massie giving over 300 civilian war dead a voice."
+          },
+          "l": {
+           "zh": "偏左標題以萬斯「不是關於伊朗」的說法切入",
+           "en": "Left-leaning headlines open with Vance saying the vote \"isn't about Iran.\""
+          }
+         },
+         "diff": {
+          "zh": "只有偏右標題提到還會有更多彈劾動作，其他兩方未提。",
+          "en": "Only right-leaning headlines say more impeachment moves are coming; the other two omit it."
+         }
+        }
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1696,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 3944,
+        "output_tokens_details": {
+         "thinking_tokens": 3610
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0021416,
+       "ms": 18042,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "medium",
+       "out": {
+        "1iag6xn": {
+         "sides": {
+          "r": {
+           "zh": "偏右標題以民主黨「集結」支持彈劾為開頭",
+           "en": "Right-leaning headlines lead with Democrats rallying behind the impeachment push."
+          },
+          "c": {
+           "zh": "中間標題以300位平民戰死者為開頭，讓其發聲",
+           "en": "Centre headlines lead with over 300 civilian war dead getting a voice."
+          },
+          "l": {
+           "zh": "偏左標題用「睪固酮」一詞描述赫格塞斯的軍事計畫",
+           "en": "Left-leaning headlines describe Hegseth's military plan with the word testosterone."
+          }
+         },
+         "diff": null
+        }
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1696,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 3601,
+        "output_tokens_details": {
+         "thinking_tokens": 3294
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0019701,
+       "ms": 16691,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "candidate",
+      "current": 4,
+      "candidate": 8,
+      "issues": "B has no line for the right-leaning side. Its side lines are lists rather than one framing point: c joins the humanitarian angle with an explainer, and l joins \"why\" with the testosterone plan. B's l lines also disagree: the en version adds Vance's \"isn't about Iran\", which the zh version omits. B's c zh line is about 33 字, over the 30-字 hard limit. Its \"300\" is quoted as if it were a telling word, and \"humanitarian\" is the answer's own framing, not a word from the headlines. A has a minor flaw: \"farce\" in its r line also appears in a centre headline, but \"political spectacle\" is unique to the right-leaning side.",
+      "usd": 0.029484
+     }
+    },
+    {
+     "v": [
+      "haiku",
+      "low"
+     ],
+     "reps": [
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "1iag6xn": {
+         "sides": {
+          "r": {
+           "zh": "右派標題用「farce」等詞反擊彈劾案。",
+           "en": "Right-leaning headlines use the word \"farce\" to dismiss the impeachment effort."
+          },
+          "c": {
+           "zh": "中間派標題以解釋彈劾程序切入，而非直接引述雙方言論。",
+           "en": "Centre headlines lead with an explainer on how impeachment works."
+          },
+          "l": {
+           "zh": "左派標題以「testosterone」帶出個人議題。",
+           "en": "Left-leaning headlines use testosterone to bring up Hegseth's personal image."
+          }
+         },
+         "diff": {
+          "zh": "只有偏藍標題提到民主黨將在1月有更多彈劾行動。",
+          "en": "Only the right-leaning headlines say Democrats signal more impeachment moves in January."
+         }
+        }
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1696,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 3352,
+        "output_tokens_details": {
+         "thinking_tokens": 3056
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0018456,
+       "ms": 16299,
+       "stop": "end_turn"
+      },
+      {
+       "model": "claude-haiku-5-5",
+       "effort": "low",
+       "out": {
+        "1iag6xn": {
+         "sides": {
+          "r": {
+           "zh": "偏藍標題引用赫格塞斯語，稱彈劾為「政治奇觀」「鬧劇」。",
+           "en": "Right-leaning headlines quote Hegseth calling the bid a political spectacle and farce."
+          },
+          "c": {
+           "zh": "中間標題以300名平民戰歿者為主角，並用「解說」說明程序。",
+           "en": "Centre headlines lead with 300 civilian war dead and an explainer on impeachment process."
+          },
+          "l": {
+           "zh": "偏左標題把赫格塞斯與「睪固酮」軍事計畫並列，成為焦點。",
+           "en": "Left-leaning headlines bring in a military testosterone plan alongside Hegseth."
+          }
+         },
+         "diff": {
+          "zh": "只有偏藍標題提到民主黨人集結支持彈劾，並預示之後還會有更多動作。",
+          "en": "Only right-leaning headlines say Democrats rally behind the impeachment push and signal more to come."
+         }
+        }
+       },
+       "error": null,
+       "usage": {
+        "input_tokens": 1696,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+         "ephemeral_5m_input_tokens": 0,
+         "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 3707,
+        "output_tokens_details": {
+         "thinking_tokens": 3353
+        },
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard"
+       },
+       "usd": 0.0020231,
+       "ms": 16678,
+       "stop": "end_turn"
+      }
+     ],
+     "judge": {
+      "better": "candidate",
+      "current": 3,
+      "candidate": 4,
+      "issues": "B has no line for the r side, even though the story gives one. B's c line packs two points (the 300 civilian dead and the explainer), adds an evaluative 人道 framing, and its en line is over 18 words. B's l en line is also over 18 words and adds a Vance quote that the zh line lacks. Vance also appears in r headlines, so that quote does not set l apart. A has its own problems: \"farce\" also appears in a c headline, so it does not mark r out. A leaves 「farce」 and 「testosterone」 untranslated in zh, and c's \"Low-T\" headline weakens the testosterone point for l. A's c zh line claims c does not quote either side, but c quotes 'It's a farce'. A's diff wrongly calls the right-leaning side 偏藍 in an international story.",
+      "usd": 0.032232
+     }
+    }
+   ]
+  }
+ ]
+}
