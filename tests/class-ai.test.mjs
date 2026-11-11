@@ -116,6 +116,21 @@ test('a feed, ischool’s list and a page’s dated links read alike', async () 
   assert.deepEqual(page, [{ title: '115學年度第2次期中考考程表', url: 'https://www.g.hc.edu.tw/news/1', date: '2026-11-10', unit: '' }]);
 });
 
+test('iSchool’s newer page: each list’s id and name from its block; teachers’ and honours’ left out', () => {
+  const w = (h, name) => `<div id='site_news' class='WID_0_2_${h.repeat(40)} widget-x'>\n<div id="main" class="main-x" data-show-col-time="1"><div id="div_topbanner" class="topbanner-x"><h2 id="widget-title-text1"><span>${name}</span></h2></div>`;
+  const l = pageLeads(w('a', '綜合公告') + w('b', '學生事務') + w('c', '教師活動') + w('d', '榮譽榜') + w('e', '升學訊息'), 'https://mars.s.tp.edu.tw/ischool/publish_page/0/');
+  assert.deepEqual(l.ischool.map(x => x.title), ['學生事務', '綜合公告', '升學訊息']);
+});
+
+test('a page whose links hold their own date (cards in blocks): each one, its unit apart', () => {
+  const html = `<a href="/zh/page/1"><div class="d">2026-11-05</div><div>教育局教育網路中心機房基礎設施汰換作業</div><div>圖資處</div></a>
+  <a href="/zh/page/2"><div>2026-10-30</div><div>南華大學校「116學年度學士班特殊選才招生簡章」，歡迎踴躍</div></a><a href="/zh/page-list">更多內容</a>`;
+  assert.deepEqual(pageItems(html, 'https://www.s.edu.tw/zh', '2026-11-11').map(x => [x.date, x.title, x.unit]), [
+    ['2026-11-05', '教育局教育網路中心機房基礎設施汰換作業', '圖資處'],
+    ['2026-10-30', '南華大學校「116學年度學士班特殊選才招生簡章」，歡迎踴躍', '']
+  ]);
+});
+
 test('where a page leads: ischool’s widgets (students’ first), its feed, a refresh', () => {
   const html = `<meta http-equiv=refresh content="0;url=home">
   <a href="site_news/main2.php?uid=WID_0_2_${'a'.repeat(40)}&maximize=1" title="全部教職員專區">全部</a>

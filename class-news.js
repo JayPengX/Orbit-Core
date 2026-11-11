@@ -144,6 +144,24 @@ export function pageItems(html, base, today) {
       if (url) out.push({ title, url, date, unit: '' });
     }
   }
+  // A link that holds its own date (cards drawn in blocks: <a><div>2026-11-05</div><div>title</div><div>圖資處</div></a>).
+  const have = new Set(out.map(x => x.url));
+  for (const [, attrs, inner] of cleanPage(html).matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
+    const words = textOf(inner);
+    const m = /^(\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{2,3}[-/.]\d{1,2}[-/.]\d{1,2})\s+(.+)$/.exec(words);
+    if (!m) continue;
+    const date = dateIn(m[1], today);
+    const href = /href\s*=\s*["']?([^"'\s>]+)/i.exec(attrs)?.[1] || '';
+    const url = date && href && !/^(javascript|mailto|tel|#)/i.test(href) ? absolute(href, base) : '';
+    if (!url || have.has(url)) continue;
+    // (Its unit at the end, 教務處, 圖資處, 資料處理科: kept apart.)
+    const u = /\s([\u4e00-\u9fff]{2,5}(?:處|室|科|組|部|中心))$/.exec(m[2]);
+    const title = (u ? m[2].slice(0, u.index) : m[2]).trim();
+    const n = [...title].length;
+    if (n < 6 || n > 140) continue;
+    have.add(url);
+    out.push({ title, url, date, unit: u ? u[1] : '' });
+  }
   return out;
 }
 
@@ -161,7 +179,9 @@ export function pageLeads(html, base) {
   };
   const rank = t => (/教職|教師|研習|招標|採購|校外|行事曆|榮譽/.test(t) ? 9 : /學生/.test(t) ? 0 : /最新|全部|公告|news/i.test(t) ? 1 : 5);
   const widgets = [...page.matchAll(/site_news\/main2\.php\?uid=(WID_[0-9]+_2_[0-9a-f]{40})[^>]*?title=["']([^"']*)/gi)].map(m => ({ uid: m[1], title: unEnt(m[2]) }));
-  const ischool = [...new Map(widgets.map(w => [w.uid, w])).values()].filter(w => rank(w.title) < 9).sort((a, b) => rank(a.title) - rank(b.title)).slice(0, 2);
+  // (iSchool's newer pages: each list a <div id='site_news' class='WID_…'>, its name in its <h2>.)
+  for (const m of page.matchAll(/id=["']site_news["']\s+class=["'](WID_[0-9]+_2_[0-9a-f]{40})[\s\S]{0,1500}?widget-title-text\d*["']?>\s*(?:<span>)?([^<]{1,20})/gi)) widgets.push({ uid: m[1], title: unEnt(m[2]).trim() });
+  const ischool = [...new Map(widgets.map(w => [w.uid, w])).values()].filter(w => rank(w.title) < 9).sort((a, b) => rank(a.title) - rank(b.title)).slice(0, 4);
   const feeds = [];
   for (const m of page.matchAll(/<link\b[^>]*type=["']application\/(?:rss|atom)\+xml["'][^>]*>/gi)) {
     const href = /href=["']([^"']+)/i.exec(m[0])?.[1];
