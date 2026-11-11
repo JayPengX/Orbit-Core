@@ -13,3 +13,5 @@ into `out/<job>.jsonl`. Locally: `node jobs/<job>.mjs size` guesses the cost wit
 | 4-agency | Haiku 5.5 | Every agency rule: one plain line and the words people search it by |
 | 5-phrases | Opus 5.5 | 116 everyday laws: what people type → the law's own words and articles (checked in the text) |
 | 8-articles | Sonnet 5.5 | Those laws' first 3,500 articles explained ahead of time with /law-ask's explainer |
+| 2a-run | each feature's own Claude model | Every AI feature's examples answered as live |
+| 2b-review | Opus 5.5 | Each feature reviewed on those answers: findings, exact prompt edits, new examples |
