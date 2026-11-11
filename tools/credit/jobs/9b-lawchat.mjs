@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, ledger } from '../lib.mjs';
-import { lawCompare, COMPARE_QS } from '../../../law-chat.js';
+import { lawCompare, COMPARE_QS, CHAT_LIMITS } from '../../../law-chat.js';
 import { requestOf, geminiShapeOf } from '../../../ai-other.js';
 import { PRICES, jsonOf } from '../../../ai.js';
 
@@ -45,12 +45,23 @@ const setting = (model, effort) => async (parts, schema) => {
   usage.push({ q, set: `${model}:${effort}`, in: j.usage.input_tokens, out: j.usage.output_tokens, usd: usd(model, j.usage), promptChars: parts[0].text.length });
   return asResponse(model, j);
 };
-const SETS = { current: setting('claude-sonnet-5-5', 'medium'), low: setting('claude-sonnet-5-5', 'low') };
+// (cmd trim: the same Sonnet at medium, the law text sent cut to TRIM's limits: 'low' below is the trimmed one.)
+const TRIM = process.argv[2] === 'trim' ? { maxArts: 7, maxHits: 4, maxChars: 8000 } : null;
+const FULL = { maxArts: CHAT_LIMITS.maxArts, maxHits: CHAT_LIMITS.maxHits, maxChars: CHAT_LIMITS.maxChars };
+const SETS = TRIM ? { current: setting('claude-sonnet-5-5', 'medium') } : { current: setting('claude-sonnet-5-5', 'medium'), low: setting('claude-sonnet-5-5', 'low') };
 const QS = [...COMPARE_QS, '房東可以隨時進來我房間嗎', '打工被扣薪水合法嗎', '在路上被狗咬到可以求償嗎', '機車停紅線會罰多少', '手機被偷了警察不受理怎麼辦'];
 const out = [];
 for (const question of QS) {
   q = question;
   const r = await lawCompare({ GEMINI_API_KEY: 'unused' }, { waitUntil: () => {} }, {}, gemini, SETS, [question]);
+  if (TRIM) {
+    Object.assign(CHAT_LIMITS, TRIM);
+    const usage0 = usage.length;
+    const t = await lawCompare({ GEMINI_API_KEY: 'unused' }, { waitUntil: () => {} }, {}, gemini, { current: setting('claude-sonnet-5-5', 'medium') }, [question]);
+    for (const u of usage.slice(usage0)) u.set += ':trim';
+    Object.assign(CHAT_LIMITS, FULL);
+    r.out[0].results = { current: r.out[0].results?.current, low: t.out[0].results?.current };
+  }
   out.push(r.out[0]);
   console.log(question, JSON.stringify(usage.filter(u => u.q === question)), `spent $${spent.toFixed(3)}`);
 }
@@ -74,7 +85,7 @@ for (const row of out) {
   console.log(row.q, JSON.stringify(row.judge));
 }
 fs.mkdirSync(path.join(ROOT, 'out'), { recursive: true });
-fs.writeFileSync(path.join(ROOT, 'out', '9b-lawchat.json'), JSON.stringify({ usage, out }, null, 1));
+fs.writeFileSync(path.join(ROOT, 'out', TRIM ? '9b-lawchat-trim.json' : '9b-lawchat.json'), JSON.stringify({ usage, out }, null, 1));
 const l = ledger();
 const job = (l.jobs['9b-lawchat'] ||= {});
 job.cost = +((job.cost || 0) + spent).toFixed(3);
