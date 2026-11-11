@@ -69,7 +69,7 @@ orbit-site (site.js): the domain's hosts as custom domains
 | Orbit Law | `law` | `/law/` | Orbit-Law | `orbit-law` |
 | Orbit Securities | `stock` | `/securities/` | Orbit-Securities | `stock-study-accounts` |
 
-Order: this table's (`APP_ORDER`). Orbit-Showcase: Jay's homepage, `/showcase/`. This repo's site has the family page
+Order: `APP_ORDER`. Orbit-Showcase: Jay's homepage, `/showcase/`. This repo's site has the family page
 (`/pass/`) and the admin page (`site/admin/`). A new app: a `slug` in
 `kit/brand.mjs` and a collection in `eco.js` `ECO_APPS`.
 
@@ -114,7 +114,7 @@ modules for modulepreload. `node kit/apps.mjs` refreshes every app's snippets;
 | `hold-place.mjs` | A redraw never moves the page, a sheet or a panel; a tap holds the control under the finger; not a drawing (`loose`); a sized sheet keeps its height (`--q-sheet-floor`); `scrollBusy()` holds `everyDev` under a finger; `freshScreen()`: a new screen at the top; `letGo()`: a drag carries its grip away |
 | `steady-pics.mjs` | A picture drawn again is eager and decoded at once |
 | `sources.mjs`, `source-watch.mjs` | Outside sources (`SOURCES`, `sourceOf`, `stateOf`: admin 外部來源); a phone's own outside reads, beaconed to `/sources` |
-| `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, first); the cover held for it |
+| `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, first) |
 | `loader.html` | The snippets every app's page carries (`kit:head`, `kit:boot`) |
 | `brand.mjs` | Families, names, colours, marks, repos, slugs, `APP_ORDER`, `DEV` (speeds, §9) |
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); each app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
@@ -131,10 +131,9 @@ modules for modulepreload. `node kit/apps.mjs` refreshes every app's snippets;
 | `stock-account.mjs`, `stock-access.mjs`, `stock-credit.mjs`, `stock-markets.mjs`, `stock-quotes.mjs`, `stock-bonds.mjs`, `stock-savings.mjs`, `stock-ipo.mjs`, `stock-holidays.mjs`, `stock-hk-lots.mjs`, `stock-jp-lists.mjs`, `stock-codec.mjs` | Securities' ledger, broker rules, markets, prices, bonds, savings, IPOs, holidays, lot sizes, saved-copy codec; shared with the Worker |
 | `pay.mjs`, `gov.mjs` | The weekly pay and relief (rules only; the Worker alone writes them); what the government took and gave one account |
 | `flight.mjs`, `ebus.mjs`, `ebus-read.mjs` | A real plane in the air on a sphere (`/flight`, Class's 專注飛行); bus sites' ETAs, notices as TDX's (臺中, 桃園, 臺南: phones, then proxy; 高雄: phones) |
-| `domain.mjs`, `devconfig.mjs`, `mirror.mjs`, `data-pack.mjs` | The family's domain (one place); `DEV` for the Workers; the nightly mirror's addresses; small data files in packs (`packReader`: the 20,000-file cap) |
+| `domain.mjs`, `devconfig.mjs`, `mirror.mjs`, `data-pack.mjs`, `img/` | The family's domain (one place); `DEV` for the Workers; the nightly mirror's addresses; small data files in packs (`packReader`: the 20,000-file cap); the kit's pictures |
 | `sw.js`, `sw-images.js` | The one service worker every app imports (page and own pictures kept first, refreshed behind; `?v=` files from the cache, checked against their hash); other sites' pictures in one cache all apps share |
 | `apps.mjs`, `link.mjs`, `preload.mjs`, `stamp.mjs`, `stamp-app.mjs`, `hash.mjs`, `frame-guard.mjs`, `no-net.mjs` | Build tools, never served: the apps' snippets; `.kit` links; modulepreload; the content-hashed builds; `frameFaults` (only colours on the tab bar); tests offline |
-| `img/` | The kit's own pictures |
 
 ### 3.3 Component patterns: what to use for what
 
@@ -194,7 +193,7 @@ w;dur=`, noted by the 除錯紀錄 when slow.
 
 | Route | File | What |
 | --- | --- | --- |
-| `/eco` | `eco.js`, `eco-admin.js`, `money.js`, `passkey.js`, `webauthn.js`, `orbit-token.js` | The Pass (§6); `op: 'admin'` is the owner's panel |
+| `/eco` | `eco.js`, `eco-admin.js`, `money.js`, `passkey.js`, `webauthn.js`, `orbit-token.js`, `rec-weekly.js` | The Pass (§6); `op: 'admin'` is the owner's panel; `bug`: 除錯紀錄 sent (`private/bugs/`, weekly) |
 | `/stock` | `stock-fill.js`, `stock-check.js` | Securities' fills at the proxy's own quote; the account replayed on each save |
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
 | `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `weather-radar.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations) scored hourly (`/weather/skill`); `radar`: 2 hours' rain (radar); in a typhoon, `dayOff`: each county's 停班停課 or a fitted chance |
@@ -213,7 +212,7 @@ w;dur=`, noted by the 除錯紀錄 when slow.
 | `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |
 | `/flight` | `flight.js`, `kit/flight.mjs` | Class's 專注飛行: real planes landing in about N minutes |
 | `/gift` | `gift.js` | 公開領取 at `/key/` (`site/key/`), set in admin; one a device (D1 `gift_claim`), `op: 'go'` a `#qh=` into an app; unreplaced back after `hold` hours |
-| `/showcase/pass` | `showcase.js` | The showcase's short pass for its live demos: reads only, capped per address and day |
+| `/showcase/pass` | `showcase.js` | The showcase's short pass for its demos: reads only, capped per address a day |
 | `/data/…` | `data.js` | R2, public reads (§5.5); `/data/build` (POST, Bearer `DATA_PUSH_SECRET`, `build.yml`) runs a builder now |
 | `/sources` | `sources.js` | Phones' beacons of their outside reads (the proxy's: `fetch` wrapped) |
 | `/config` | `worker.js`, `kit/devconfig.mjs` | The live speeds (`DEV`), a minute in Cloudflare's cache |
@@ -239,7 +238,7 @@ w;dur=`, noted by the 除錯紀錄 when slow.
 
 - **Crons:** even minutes (notices, builders, weather scoring and radar,
   capacity, the meter's copy), F1's laps on both, run by Runner alarms.
-  Never new Cron Triggers: ones made since 10-2026 never ran.
+  Never new Cron Triggers (since 10-2026 they never ran).
 - **The proxy is the only one adding money:** `eco.js appEntries` takes only
   spending from apps, dated by the Worker; Securities' cash and cost are the
   Worker's (`stock-check.js`).
@@ -345,8 +344,7 @@ A new Cloudflare product goes into `guard.js` `PLAN` with it.
   write or delete replaces goes to D1's `history` (whole 2 days, daily 30),
   the whole store to R2 each night (`store-backup.js`), and D1's Time Travel
   covers 30 days; the admin page's 備份與復原 puts any of them back.
-- **Saved copies carry a version in their key** (`fx.day.v4`); bump it
-  when the meaning changes (TRUTH §4).
+- **Saved copies carry a version in their key** (`fx.day.v4`), bumped when the meaning changes.
 
 ### 5.4 On the device
 

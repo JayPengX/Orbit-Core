@@ -883,6 +883,39 @@ export const FEATURES = {
     }
   },
 
+  // 除錯紀錄週報 (rec-weekly.js, Mondays): the week's bug-report groups code
+  // made (by app and what went wrong, counted) and the proxy's 5xx by route,
+  // each named in plain words with what it likely means; the owner reads it
+  // in the admin panel. Haiku: writing from given facts.
+  'rec-weekly': {
+    models: ['haiku', 'luna'],
+    effort: { luna: 'low' },
+    maxIn: 12000,
+    parts: ({ groups, routes }) =>
+      text(
+        [
+          'You help the owner of a family of small phone web apps read this week\'s bug reports. Each group below was made by code: the app (match = Sports, transit, weather, orbit = Class, money, news, vocab = Words, beats, law, stock = Securities), the kind (error = a JavaScript error, slow = a slow read, proxy-fail = a read through the server that failed), a sample message, where in the code if known, how many times (n), from how many reports, and the devices.',
+          'For each group: title, at most 16 字, Traditional Chinese (台灣用語), naming what broke in plain words (e.g. 地圖載入失敗, 比賽頁讀取太慢); why, at most 50 字, what it likely means for a person using the app and, if the sample makes it clear, the likely cause, with full-width punctuation. Never invent a file, a fix or a number not given. level: "fix" when a person likely saw something broken, "watch" when it may matter, "ok" when it is noise (an old phone\'s browser, a network blip, a read that a retry fixes).',
+          'summary: one line, at most 40 字, the week in short: what matters most, or that it was quiet. Mention a route in routes only if its count is large (over 50).',
+          'Return one item per group with its id.',
+          JSON.stringify({ groups, routes })
+        ].join('\n')
+      ),
+    schema: obj({ summary: S, groups: arr(obj({ id: S, title: S, why: S, level: S })) }),
+    clean(raw, { groups }) {
+      const ids = new Set(groups.map(g => g.id));
+      const out = [];
+      for (const g of list(raw?.groups, 30)) {
+        const id = String(g?.id || '');
+        const title = str(g?.title, 24);
+        if (!ids.has(id) || !title) continue;
+        out.push({ id, title, why: str(g?.why, 80), level: ['fix', 'watch', 'ok'].includes(g?.level) ? g.level : 'watch' });
+      }
+      if (groups.length && !out.length) return null;
+      return { summary: str(raw?.summary, 60), groups: out };
+    }
+  },
+
   // Orbit News' 各方怎麼說 (built once a story, builders/ai.js newsSides): how
   // each side's outlets framed it, from their own headlines only, never
   // which side is right. Sonnet: telling an angle from a fact is judgment.
