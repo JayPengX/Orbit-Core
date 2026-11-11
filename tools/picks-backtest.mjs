@@ -310,8 +310,9 @@ async function law() {
   const F = await mod('Orbit-Core/kit/feedback.mjs');
   const { topicOf } = await mod('Orbit-Law/public/lib/topics.mjs');
   const FY = existsSync(resolve(ROOT, 'Orbit-Law/public/lib/foryou.mjs')) ? await mod('Orbit-Law/public/lib/foryou.mjs') : null;
+  const read = (await mod('Orbit-Core/kit/data-pack.mjs')).siteReader('https://orbit.jaypengx.com/law/data/');
   const get = async (path, file) => {
-    if (!existsSync(file)) writeFileSync(file, await (await fetch(`https://orbit.jaypengx.com/law/data/${path}`)).text());
+    if (!existsSync(file)) writeFileSync(file, JSON.stringify(await read(path)));
     return JSON.parse(readFileSync(file, 'utf8'));
   };
   mkdirSync(DATA, { recursive: true });

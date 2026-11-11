@@ -102,6 +102,18 @@ export function packReader(getJson, { ttl = Infinity, keep = 64, now = () => Dat
   };
 }
 
+// The reader for a site's data/ over the web: `base` its address ('./data/', 'https://…/law/data/').
+export const siteReader = (base, opts) =>
+  packReader(
+    (path, o) =>
+      fetch(base + path, o?.fresh ? { cache: 'no-store' } : undefined).then(r => {
+        if (r.status === 404) return null;
+        if (!r.ok) throw new Error(`${path}: ${r.status}`);
+        return r.json();
+      }),
+    opts
+  );
+
 // The build's half (Node only; `fs` passed in so a phone never loads it):
 // packs every root under `dir` with at least `min` files. → { roots, before, after }.
 export async function packData(dir, { fs, hashOf, min = 50, packBytes = PACK_BYTES, looseBytes = LOOSE_BYTES } = {}) {
