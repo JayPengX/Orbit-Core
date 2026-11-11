@@ -633,7 +633,7 @@ export const FEATURES = {
         [
           'You write 看點 for a game that has not started yet: the one or two things a fan in Taiwan would want to know before it. The page already shows both records, both places in the table, each side’s last five results as W/L, the win chance, each side’s season leaders with their averages and the past meetings’ results: never say any of those again (no 「排名第3」, no 「近5場3勝2敗」, no 「場均25.9分」, no 「勝率」).',
           'Worth telling, best first: a team’s best-known player out (and until when); what a win would do in the table (「贏球就升上第2」, 「輸球恐跌入降級區」); who did something big last time out (from the preview: 「上一場攻下43分」); a side on the second night in a row, or with a cup or European game a few days before while the other rested; a run longer than five games; a home or road record that is perfect or winless; a play-off series. Skip a fact a fan would shrug at (a bench player out, a day’s rest more or less, last season’s totals). An injured player matters only if he is one of the team’s leaders or a widely known name; when unsure, leave him out.',
-          'points: 1 or 2 points, the strongest first, never two about the same fact. Each: k, the kind (out = a player out; table = what the result does in the table; star = a player’s recent big game; rest = schedule or tiredness; run = a streak or a home/road record; series = a play-off series); zh, ONE short sentence in Traditional Chinese as a Taiwan sports desk writes (台灣體育報導用語、全形標點，句末不加句號), ≤ 26 字 not counting tokens, no English words, no spaces around tokens or numbers; en, the same in English, ≤ 16 words, no full stop.',
+          'points: 1 or 2 points, the strongest first, never two of the same kind (both sides’ table stakes go in one point, the one with more at stake: the top, the bottom three). A football side that lost or won most of its recent league games, or played a cup or European game just before, is worth a point when its last games show it. Each: k, the kind (out = a player out; table = what the result does in the table; star = a player’s recent big game; rest = schedule or tiredness; run = a streak or a home/road record; series = a play-off series); zh, ONE short sentence in Traditional Chinese as a Taiwan sports desk writes (台灣體育報導用語、全形標點，句末不加句號), ≤ 26 字 not counting tokens, no English words, no spaces around tokens or numbers; en, the same in English, ≤ 16 words, no full stop.',
           'Teams and players are tokens: write {t:<id>} for a team and {p:<id>} for a player exactly as the facts give them (the app draws them with their logo or face), never their names in words. A point about one team starts with its token.',
           'Use only these facts. Every number you write must be one of theirs (dates as 「12/21」 or 「12月21日」 from a due-back date). Nothing the facts do not say: no 「關鍵戰」, 「復仇」, 「宿敵」 or a reason a player is out that is not given.',
           'If nothing here is worth telling beyond what the page shows, return points [].',
@@ -659,7 +659,9 @@ export const FEATURES = {
         // (What the card shows, said again: its place, its last five, its averages, the win chance.)
         if (/排名第\s*\d+|近\s*[五5]\s*場|場均|勝率/.test(bare(zh))) continue;
         if (!numbersFrom(bare(zh) + ' ' + bare(en), facts)) continue;
-        points.push({ k: KINDS.has(p?.k) ? p.k : 'star', zh, en });
+        const k = KINDS.has(p?.k) ? p.k : 'star';
+        if (points.some(x => x.k === k)) continue;
+        points.push({ k, zh, en });
         if (points.length >= 2) break;
       }
       // (Points given, none usable: the next model tries; none given: nothing to tell.)
