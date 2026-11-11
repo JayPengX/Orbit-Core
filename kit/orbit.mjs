@@ -4727,7 +4727,9 @@ function swapLogos(root, dark) {
 // (A colour's relative luminance, and the dark logo tile's: --q-grouped-3, #2c2c2e.)
 const rel = (...c) => c.map(v => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
 const TILE_L = rel(44 / 255, 44 / 255, 46 / 255);
-const LOGO_HOST = /^https:\/\/(a\.espncdn\.com|r2\.thesportsdb\.com|www\.thesportsdb\.com|cdn\.nba\.com)\//;
+// (Not cdn.nba.com: it answers no CORS, so every read failed (the panel's 外部來源 counted
+// them as 聯盟官網 broken, 11-11), and its marks come in a dark-screen version of their own.)
+const LOGO_HOST = /^https:\/\/(a\.espncdn\.com|r2\.thesportsdb\.com|www\.thesportsdb\.com)\//;
 const tones = new Map();
 const toneOf = async url => {
   if (tones.has(url)) return tones.get(url);

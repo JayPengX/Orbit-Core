@@ -158,6 +158,11 @@ test('a build reads every feed, keeps what it read, never writes an empty page o
   assert.equal(r3.failed.length, 3);
   assert.equal(files.get(NEWS_PATH), before);
   assert.ok(files.get(NEWS_PAST));
+  // One feed of three failing: a normal build, the miss noted (YouTube's feeds 404 a channel at a time).
+  const one = async url => (url === 'https://setn/1' ? new Response('', { status: 404 }) : new Response(bodies[url], { status: 200 }));
+  const r4 = await runNews({ store, now: NOW + 1_800_000, fetchImpl: one, feeds, channels: {} });
+  assert.equal(r4.failed, undefined);
+  assert.deepEqual(r4.missed, ['setn: 404']);
 });
 
 test('only stories two outlets or more carry are listed, the widest and newest first', () => {

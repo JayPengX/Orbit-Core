@@ -3,7 +3,8 @@
 # builder without waiting for its minute or its hour. Or a check of the
 # proxy (POST /ops): gemini-check, one tiny Gemini call through the Taiwan
 # relay; system, the report the admin panel's 系統 shows; capacity, its 容量;
-# sources, its 外部來源 (the proxy's and the phones' counts).
+# sources, its 外部來源 (the proxy's and the phones' counts); sources-state,
+# the panel's own verdict (what's red or amber, and why).
 name: Run a builder or a check
 on:
   workflow_dispatch:
@@ -11,7 +12,7 @@ on:
       job:
         description: The job
         type: choice
-        options: [watch, watch-full, cutouts, buses, play, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, news, gemini-check, gemini-use, law-chat-time, ai-models, ai-compare, ai-try, ai, ai-news, ai-sports, ai-f1, ai-sides, ai-words, system, capacity, cpu, sources, purge-money-mail]
+        options: [watch, watch-full, cutouts, buses, play, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, news, gemini-check, gemini-use, law-chat-time, ai-models, ai-compare, ai-try, ai, ai-news, ai-sports, ai-f1, ai-sides, ai-words, system, capacity, cpu, sources, sources-state, purge-money-mail]
         default: watch
       try:
         description: "law-chat-time: settings to try, e.g. answer=minimal,plan=minimal,model=lite; gemini-check: a model name; ai-compare: models=a,b&from=0&n=3; cpu: query, e.g. hours=24&group=…&keys=1&script=…; sources: ids, e.g. tnn-bus,txg-bus"
@@ -35,6 +36,7 @@ jobs:
             capacity) url="$base/ops?check=capacity" ;;
             cpu) url="$base/ops?check=cpu&$TRY" ;;
             sources) url="$base/ops?check=sources&src=$TRY" ;;
+            sources-state) url="$base/ops?check=sources-state" ;;
             purge-money-mail) url="$base/ops?check=purge-money-mail" ;;
             watch-full) url="$base/data/build?job=watch&full=1" ;;
             watch|cutouts|buses) url="$base/data/build?job=$JOB" ;;

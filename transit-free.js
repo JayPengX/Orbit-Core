@@ -102,12 +102,19 @@ export function indexYouBike(list) {
 let yb = null; // { at, idx }
 let ybGoing = null;
 let ybFailed = 0; // (refused: not asked again for 10 minutes, never the 6 MB at each ask)
+// (A 403: YouBike's guard (Imperva) turning Cloudflare's addresses away, as
+// it has every time since 11-10, while phones read it fine: not asked again
+// for 12 hours, so the panel's 外部來源 isn't kept red by a door that's shut.)
+const YB_REFUSED = 12 * HOUR;
+let ybRefused = 0;
 async function youBike(fetchFn, now) {
   if (yb && now - yb.at < YB_FRESH) return yb;
+  if (now - ybRefused < YB_REFUSED) return null;
   if (now - ybFailed < YB_KEEP) return yb && now - yb.at < YB_KEEP ? yb : null;
   if (!ybGoing) {
     ybGoing = (async () => {
       const res = await fetchFn(YB_URL, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout?.(8000) });
+      if (res.status === 403) ybRefused = now;
       if (!res.ok) throw new Error(`youbike ${res.status}`);
       const idx = indexYouBike(await res.json());
       if (!idx.all.length) throw new Error('youbike empty');
@@ -127,6 +134,7 @@ export function resetYouBike() {
   yb = null;
   ybGoing = null;
   ybFailed = 0;
+  ybRefused = 0;
 }
 
 const BIKE_CITY = /^basic\/v2\/Bike\/(Station|Availability)\/City\/([A-Za-z]+)$/;

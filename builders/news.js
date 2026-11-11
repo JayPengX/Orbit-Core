@@ -1042,9 +1042,12 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
       failed.push(`${o} clips: ${String(e?.message || e).slice(0, 40)}`);
     }
   };
+  const chansDue = feedsDue(chans, now);
+  const feedsNow = feedsDue(feeds, now);
+  const asked = chansDue.length + feedsNow.length;
   await Promise.all([
-    ...feedsDue(chans, now).map(readChannel),
-    ...feedsDue(feeds, now).map(async ([o, url, kind]) => {
+    ...chansDue.map(readChannel),
+    ...feedsNow.map(async ([o, url, kind]) => {
       try {
         const r = await readFeed(url, kind, kept.etag?.[url], { fetchImpl });
         if (r.same) return void (etag[url] = kept.etag[url]);
@@ -1094,7 +1097,11 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
     await store.put(NEWS_PATH, { built: now, tw: out.tw, intl: out.intl });
     await store.put(NEWS_PAST, { built: now, ...out.past });
   }
-  return { items: items.length, fresh, clips: clips.length, pages: want.length, kept: out.recs.length, tw: out.tw.length, intl: out.intl.length, past: out.past.tw.length + out.past.intl.length, failed };
+  // (A few feeds or channels missing is a normal build: YouTube's feeds 404 a channel at a
+  // time for hours. Only half or more of what was asked failing is the build's failure,
+  // what the beat and the panel's 外部來源 call broken.)
+  const missed = failed.length && failed.length * 2 < asked ? failed.slice(0, 12) : null;
+  return { items: items.length, fresh, clips: clips.length, pages: want.length, kept: out.recs.length, tw: out.tw.length, intl: out.intl.length, past: out.past.tw.length + out.past.intl.length, ...(missed ? { missed } : { failed }) };
 }
 
 // Outlets whose pages carry the story's own YouTube clip.

@@ -700,7 +700,7 @@ import { DEV, DEV_GROUPS, cleanDev, BRANDS, appIcon, familyMark, pathOf } from '
 import { icons, tileHtml, heroCardHtml, escHtml } from '../kit/ui.mjs';
 import { API, DOMAIN } from '../kit/domain.mjs';
 import { passkeyName } from '../kit/passkey.mjs';
-import { SOURCES, SOURCE_BY_ID, GROUPS as SOURCE_GROUPS, stateOf, lateOf } from '../kit/sources.mjs';
+import { SOURCES, SOURCE_BY_ID, GROUPS as SOURCE_GROUPS, freshAt, sourceState } from '../kit/sources.mjs';
 const ECO_URL = `${API}/eco`;
 const KEY = 'orbit.admin';
 const $ = id => document.getElementById(id);
@@ -1935,23 +1935,11 @@ function quotaOf(u, key) {
 }
 // The age of what's built from a source: { at, every, late, what } or null.
 function freshOf(s, d) {
-  const f = s.fresh;
+  const f = freshAt(s, d);
   if (!f) return null;
-  if (f.job) {
-    const b = d.jobs?.[f.job];
-    return { at: b?.okAt || 0, every: f.every, late: lateOf(b?.okAt, f.every, d.at), what: b && !b.ok ? `上次建置失敗：${noteText(b.note)}` : b?.note ? noteText(b.note) : '', job: true };
-  }
-  if (f.r2) {
-    const at = d.files?.[f.r2] || 0;
-    return { at, every: f.every, late: lateOf(at, f.every, d.at), what: `R2 ${f.r2}` };
-  }
-  if (f.law) {
-    // (Orbit Law's status file comes with its first nightly build after 2026-11-10: till then, nothing to say.)
-    if (!d.law) return null;
-    const p = d.law[f.law] || { built: 0, n: 0 };
-    return { at: p.built, every: f.every, late: lateOf(p.built, f.every, d.at), what: `Orbit Law 每晚建置的${LAW_PART[f.law] || f.law}${p.n ? `（${nf(p.n)} 筆）` : ''}` };
-  }
-  return null;
+  if (f.job) return { ...f, what: f.failed ? `上次建置失敗：${noteText(f.note)}` : f.note ? noteText(f.note) : '' };
+  if (f.file) return { ...f, what: `R2 ${f.file}` };
+  return { ...f, what: `Orbit Law 每晚建置的${LAW_PART[f.part] || f.part}${f.n ? `（${nf(f.n)} 筆）` : ''}` };
 }
 function sourceRows(d, u) {
   const rows = d.rows && !d.rows.error ? d.rows : {};
@@ -1963,10 +1951,9 @@ function sourceRows(d, u) {
   const out = [...known, ...strangers].map(({ s, r }) => {
     const fresh = freshOf(s, d);
     const quota = s.quota ? quotaOf(u, s.quota) : null;
-    let state = stateOf(r, fresh, d.at, s.steady);
+    let state = sourceState(s, r, fresh, d.at);
     if (quota && quota.share >= 1) state = 'bad';
     else if (quota && quota.share >= 0.8 && state !== 'bad') state = 'warn';
-    if (fresh?.job && d.jobs?.[s.fresh.job] && !d.jobs[s.fresh.job].ok && state === 'ok') state = 'warn';
     return { s, r, fresh, quota, state };
   });
   return { at: d.at, rows: out, error: d.rows?.error || '' };
