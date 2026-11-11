@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed } from '../builders/news.js';
+import { ALTS, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -425,4 +425,23 @@ test('Taiwan’s outlets on a world story: joined by the names and words they sh
   assert.ok(!out.tw.find(s => /韓國瑜/.test(s.title))?.world);
   // (The world's own headlines stay the world's: Taiwan's are apart.)
   assert.ok(pope.items.every(it => OUTLETS[it[0]].region === 'intl'));
+});
+
+test('a story carries other outlets’ pictures to fall back on: each another outlet’s, a clip’s last (Jay 11-11: one that wouldn’t load left an empty space)', () => {
+  const t = 'US, Russia and Ukraine start talks in Abu Dhabi';
+  const items = [
+    { ...item('japantimes', t, NOW - H, { img: 'https://jt.example/a.jpg' }), near: 0.9 },
+    item('japantimes', `${t} again`, NOW - 2 * H, { img: 'https://jt.example/b.jpg' }),
+    item('nypost', t, NOW - 3 * H, { img: 'https://ny.example/c.jpg' }),
+    item('bbc', t, NOW - 4 * H, { img: 'https://bbc.example/d.jpg' }),
+    item('fox', t, NOW - 5 * H)
+  ];
+  const vids = [{ o: 'cnn', y: 'AAAAAAAAAAA', t, at: NOW - H }];
+  const s = storyOf(items, 'intl', NOW, { vids });
+  assert.equal(s.img, 'https://jt.example/a.jpg');
+  assert.equal(s.imgBy, 'japantimes');
+  // (Not Japan Times' other: an outlet that refuses one refuses them all.)
+  assert.deepEqual(s.alts.map(a => a[1]), ['nypost', 'bbc', 'cnn'].slice(0, ALTS));
+  assert.equal(s.alts.at(-1)[0], 'https://i.ytimg.com/vi/AAAAAAAAAAA/hqdefault.jpg');
+  assert.equal(storyOf([item('fox', t, NOW - H), item('nyt', t, NOW - 2 * H)], 'intl', NOW).alts, undefined);
 });
