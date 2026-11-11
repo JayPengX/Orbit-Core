@@ -138,7 +138,7 @@ const school = (pages, seen = []) => async (u, init = {}) => {
   return new Response(p.body ?? p, { headers: { 'Content-Type': p.type || 'text/html; charset=utf-8' } });
 };
 
-test('a school read by code, worded once, kept an hour; a title worded before never sent again', async () => {
+test('a school read by code at once, worded behind, kept an hour; a title worded before never sent again', async () => {
   const pages = { 'https://www.s.hcc.edu.tw/': '<html><a class="rssIcon" href="/rssfeeds?a=1" title="RSS">RSS</a></html>', 'https://www.s.hcc.edu.tw/rssfeeds?a=1': { body: RSS, type: 'application/xml' } };
   const read = await readSchool('https://www.s.hcc.edu.tw/', school(pages), '2026-11-11');
   assert.equal(read.how, 'feed');
@@ -158,22 +158,38 @@ test('a school read by code, worded once, kept an hour; a title worded before ne
     }
   };
   const now = Date.parse('2026-11-11T02:00:00Z');
-  const first = await schoolNews(env, {}, 'https://www.s.hcc.edu.tw/', { cap: 10, fetchFn: school(pages), now });
-  assert.equal(first.items.length, 2);
-  assert.equal(first.items[0].line, '寒假營隊開放報名');
-  assert.deepEqual(first.items[0].who, ['all']);
+  // A Worker's ctx: what runs behind the answer, settled when the test says.
+  const pending = [];
+  const ctx = { waitUntil: p => pending.push(p) };
+  const settle = async () => {
+    while (pending.length) await Promise.all(pending.splice(0));
+  };
+  const first = await schoolNews(env, ctx, 'https://www.s.hcc.edu.tw/', { cap: 10, fetchFn: school(pages), now });
+  assert.equal(first.items.length, 2, 'the titles at once');
+  assert.equal(first.wording, true, 'the AI words them behind');
+  assert.equal(first.items[0].line, undefined);
+  await settle();
   assert.equal(asked.length, 1);
-  const again = await schoolNews(env, {}, 'https://www.s.hcc.edu.tw/', { cap: 10, fetchFn: school(pages), now: now + 600_000 });
+  const worded = await schoolNews(env, ctx, 'https://www.s.hcc.edu.tw/', { cap: 10, fetchFn: school(pages), now: now + 15_000 });
+  assert.equal(worded.items[0].line, '寒假營隊開放報名');
+  assert.deepEqual(worded.items[0].who, ['all']);
+  assert.ok(!worded.wording);
+  const again = await schoolNews(env, ctx, 'https://www.s.hcc.edu.tw/', { cap: 10, fetchFn: school(pages), now: now + 600_000 });
   assert.equal(again.at, first.at, 'within the hour: the kept copy, nothing read');
   pages['https://www.s.hcc.edu.tw/rssfeeds?a=1'].body = RSS.replace('<item>', '<item><title>新的公告標題</title><link>https://www.s.hcc.edu.tw/content?a=9</link><pubDate>2026-11-11 08:00:00</pubDate></item><item>');
-  const later = await schoolNews(env, {}, 'https://www.s.hcc.edu.tw/', { cap: 10, fetchFn: school(pages), now: now + 2 * 3_600_000 });
-  assert.equal(later.items.length, 3);
+  const old = await schoolNews(env, ctx, 'https://www.s.hcc.edu.tw/', { cap: 10, fetchFn: school(pages), now: now + 2 * 3_600_000 });
+  assert.equal(old.items.length, 2, 'past the hour: the older copy answers at once…');
+  assert.equal(old.stale, true);
+  await settle();
+  const later = await schoolNews(env, ctx, 'https://www.s.hcc.edu.tw/', { cap: 10, fetchFn: school(pages), now: now + 2 * 3_600_000 + 20_000 });
+  assert.equal(later.items.length, 3, '…and the school is read again behind it');
   assert.equal(asked.length, 2);
   assert.equal(asked[1].length, 1, 'only the new title asked');
   assert.ok(later.items.every(x => x.line), 'the old ones keep their words');
-  const capped = await schoolNews({ ...env, DATA: { get: async () => null, put: async () => {} } }, {}, 'https://www.s.hcc.edu.tw/', { cap: 0, fetchFn: school(pages), now });
+  const capped = await schoolNews({ ...env, DATA: { get: async () => null, put: async () => {} } }, ctx, 'https://www.s.hcc.edu.tw/', { cap: 0, fetchFn: school(pages), now });
   assert.equal(capped.items.length, 3, 'capped: the titles alone');
   assert.equal(capped.items[0].line, undefined);
+  await settle();
   assert.deepEqual(mergeWorded([{ id: 'x', title: 't' }], [{ id: 'x', line: 'l', who: [], act: '', by: '' }]), [{ id: 'x', title: 't', line: 'l', who: [], act: '', by: '' }]);
 });
 
