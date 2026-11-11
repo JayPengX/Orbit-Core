@@ -3,5 +3,13 @@
   "requests": 1744,
   "inputTokens": 4795356,
   "usd": 15.8
- }
+ },
+ "batches": [
+  "msgbatch_01DvAU8yMMjZTb3HAVonthys"
+ ],
+ "submitted": "2026-11-11T06:08:09.461Z",
+ "cost": 12.27,
+ "ok": 1744,
+ "bad": 0,
+ "collected": "2026-11-11T06:13:11.382Z"
 }
