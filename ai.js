@@ -33,7 +33,7 @@ import { buildKeyOk } from './law-hosts.js';
 export const MODELS = { sonnet: 'claude-sonnet-5-5', sol: 'gpt-6.1-sol', haiku: 'claude-haiku-5-5', luna: 'gpt-6-luna', flash: 'gemini-3.6-flash', lite: 'gemini-3.5-flash-lite' };
 // US$ per 1M tokens (11-10; Flash doubles 2027-01-01): what aiBill counts spend by.
 export const PRICES = {
-  'claude-sonnet-5-5': { in: 2, cached: 0.2, out: 10 },
+  'claude-sonnet-5-5': { in: 2, cached: 0.1, out: 10 },
   'claude-haiku-5-5': { in: 0.1, cached: 0.01, out: 0.5 },
   'gpt-6-luna': { in: 0.1, cached: 0.025, out: 0.5 },
   'gpt-6.1-sol': { in: 2, cached: 0.5, out: 10 },

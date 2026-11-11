@@ -27,7 +27,7 @@ const CUR = name => {
   return [m, effortFor(f, m)];
 };
 const CANDIDATES = {
-  'news-sides': [['sonnet', 'medium'], ['sonnet', 'low'], ['haiku', 'medium'], ['haiku', 'low']],
+  'news-sides': [['sonnet', 'medium'], ['sonnet', 'low'], ['haiku', 'medium']],
   'orbit-ask': [['sonnet', 'low'], ['haiku', 'medium'], ['haiku', 'low']],
   'law-contract': [['sonnet', 'low']],
   'law-contract-read': [['haiku', 'low'], ['haiku', 'medium']],
@@ -113,6 +113,13 @@ async function judge(name, input, a, b) {
   return { better: un(v.better), current: flip ? v.scoreB : v.scoreA, candidate: flip ? v.scoreA : v.scoreB, issues: v.issues, usd: usd(JUDGE, j.usage) };
 }
 
+// (News 各方怎麼說 on today's real stories too, batched as the builder does: two examples are too few to tell.)
+if (process.env.LIVE_NEWS || process.argv[2] === 'news') {
+  const { sideFacts, sidesWanted } = await import('../../../builders/ai.js');
+  const idx = await (await fetch('https://orbit.jaypengx.com/api/data/news/index.json')).json();
+  const front = ['tw', 'intl'].flatMap(r => (idx[r] || []).filter(s => sidesWanted(s, r)).slice(0, r === 'tw' ? 12 : 8).map(s => sideFacts(s, r)));
+  for (let i = 0; i < front.length; i += 4) EXAMPLES['news-sides'].push({ name: `live ${i / 4 + 1}`, input: { stories: front.slice(i, i + 4) } });
+}
 const only = (process.env.BATCHES || process.argv[3] || '').split(',').filter(Boolean);
 const names = Object.keys(EXAMPLES).filter(n => FEATURES[n] && (only.length ? only.includes(n) : true));
 const REPS = Number(process.env.REPS || 2);
