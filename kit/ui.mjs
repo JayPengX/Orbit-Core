@@ -240,7 +240,11 @@ function dayReveal(s) {
 // sideways, a field or the strip): step(+1 | -1) goes a day either way and
 // says whether it did; the page follows the finger and the new day slides
 // in (.q-day-swipe; the strip, a sheet's head and a .q-day-still stay put).
-export function daySwipe(panel, step) {
+// `can(dir)`: is there anything that way now (false: the page never follows
+// the finger, a drag that leads nowhere; Jay 2026-11-11, Law's 議會: "it can
+// swipe left and right but it does nothing"); `page: false`: only a finger on
+// the panel itself (a part of a page, not the whole page's days).
+export function daySwipe(panel, step, { can = null, page = true } = {}) {
   if (!panel) return;
   panel.classList.add('q-day-swipe');
   let start = null;
@@ -277,7 +281,7 @@ export function daySwipe(panel, step) {
   const move = ev => {
     const dx = ev.touches[0].clientX - start.x;
     const dy = ev.touches[0].clientY - start.y;
-    if (start.lock == null && Math.hypot(dx, dy) > 10) start.lock = Math.abs(dx) > Math.abs(dy) * 1.3 && !(start.box && canScroll(start.box, dx)) ? 'x' : 'y';
+    if (start.lock == null && Math.hypot(dx, dy) > 10) start.lock = Math.abs(dx) > Math.abs(dy) * 1.3 && !(start.box && canScroll(start.box, dx)) && (!can || can(dx < 0 ? 1 : -1)) ? 'x' : 'y';
     if (start.lock !== 'x') return;
     ev.preventDefault();
     // (A slide still running lets go of the page: the finger has it now.)
@@ -309,6 +313,7 @@ export function daySwipe(panel, step) {
   // finger on what holds the panel (the page, its main) while the panel
   // shows; never in a sheet (its backdrop is the sheet's), never on a bar or
   // anything else beside the panel. Let go once the panel is gone.
+  if (!page) return;
   let seen = false;
   const onPage = ev => {
     if (!panel.isConnected) return seen && off();
