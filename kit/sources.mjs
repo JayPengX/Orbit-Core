@@ -25,6 +25,10 @@
 //                                (Orbit-Law's data/status.json)
 //   quota     a usage the panel shows beside it ('google-maps',
 //             'google-weather', 'tdx', 'gemini')
+//   backup    sides that are only a backup, judged only when the main
+//             ones have no calls (YouBike's guard turns Cloudflare's
+//             addresses away: the phones read it, the proxy's tries are
+//             shown but never make the row red)
 //   steady    true: something reads it all day (a cron), so a day without a
 //             good call is a problem; otherwise a quiet day is just nobody
 //             asking
@@ -62,7 +66,7 @@ export const SOURCES = [
   { id: 'metro', zh: '捷運（臺北、桃園、臺中、高雄）', group: 'transit', apps: ['transit'], feeds: '捷運列車到站、營運狀態', hosts: ['tcgmetro.blob.core.windows.net', 'web.metro.taipei', 'ssl.metro.taipei', 'www.tymetro.com.tw', 'www.tmrt.com.tw', 'easygo.krtc.com.tw', 'www.krtc.com.tw'], where: ['worker'] },
   { id: 'tra-site', zh: '臺鐵網站', group: 'transit', apps: ['transit'], feeds: '路線運行狀態、一班車的誤點、票價', hosts: ['www.railway.gov.tw'], where: ['worker'] },
   { id: 'thsr-site', zh: '高鐵網站', group: 'transit', apps: ['transit'], feeds: '票價、列車運行狀況', hosts: ['www.thsrc.com.tw'], where: ['worker'] },
-  { id: 'youbike', zh: 'YouBike', group: 'transit', apps: ['transit'], feeds: '站點的車與空位', hosts: ['apis.youbike.com.tw'], where: ['phone', 'worker'] },
+  { id: 'youbike', zh: 'YouBike', group: 'transit', apps: ['transit'], feeds: '站點的車與空位', hosts: ['apis.youbike.com.tw'], where: ['phone', 'worker'], backup: ['worker', 'cron'] },
   { id: 'bus-build', zh: '公車與鐵路時刻（每週）', group: 'transit', apps: ['transit'], feeds: '路線、站牌、時刻表、高鐵 4 週、捷運', hosts: [], where: ['github'], fresh: { r2: 'where.json', every: 8 * DAY } },
   { id: 'osm', zh: 'OpenStreetMap', group: 'transit', apps: ['transit'], feeds: '地點搜尋的備援、走路路線', hosts: ['nominatim.openstreetmap.org', 'routing.openstreetmap.de'], where: ['worker', 'phone'] },
 
@@ -172,6 +176,46 @@ export function stateOf(row, fresh, now = Date.now(), steady = false) {
   if (recent[1] >= 2 && r.lastFail > r.lastOk) return 'warn';
   if (!calls && !fresh) return 'idle';
   return 'ok';
+}
+// The row a source is judged by: with `backup` sides, only its main sides'
+// counts while they have any (no hours by side: the last 3 hours' rule
+// reads their last answer and failure instead).
+export function judgedRow(s, row) {
+  if (!row || !s?.backup?.length || !row.sides) return row;
+  const main = Object.entries(row.sides).filter(([side]) => !s.backup.includes(side)).map(([, v]) => v);
+  const ok = main.reduce((n, v) => n + (v.ok || 0), 0);
+  const fail = main.reduce((n, v) => n + (v.fail || 0), 0);
+  if (!ok && !fail) return row;
+  const lastOk = Math.max(0, ...main.map(v => v.lastOk || 0));
+  const lastFail = Math.max(0, ...main.map(v => v.lastFail || 0));
+  return { ...row, ok, fail, lastOk, lastFail, hours: lastFail > lastOk ? row.hours : [] };
+}
+// The age of what's built from a source (the admin op `sources`' jobs,
+// files, law): { at, every, late, job?, failed?, note?, part?, n? } or null.
+export function freshAt(s, d) {
+  const f = s?.fresh;
+  if (!f) return null;
+  if (f.job) {
+    const b = d?.jobs?.[f.job];
+    return { at: b?.okAt || 0, every: f.every, late: lateOf(b?.okAt, f.every, d?.at), job: true, failed: !!b && !b.ok, note: b?.note || '' };
+  }
+  if (f.r2) {
+    const at = d?.files?.[f.r2] || 0;
+    return { at, every: f.every, late: lateOf(at, f.every, d?.at), file: f.r2 };
+  }
+  if (f.law) {
+    // (Orbit Law's status file comes with its first nightly build after 2026-11-10: till then, nothing to say.)
+    if (!d?.law) return null;
+    const p = d.law[f.law] || { built: 0, n: 0 };
+    return { at: p.built, every: f.every, late: lateOf(p.built, f.every, d.at), part: f.law, n: p.n || 0 };
+  }
+  return null;
+}
+// A source's state as the panel shows it, before its quota: its judged
+// counts, its data's age, a build that last failed (one 'warn' at most).
+export function sourceState(s, row, fresh, now = Date.now()) {
+  const state = stateOf(judgedRow(s, row), fresh, now, s?.steady);
+  return fresh?.failed && state === 'ok' ? 'warn' : state;
 }
 // How late a source's data is: 0 on time, 1 late (past its time), 2 very late (past twice).
 export const lateOf = (at, every, now = Date.now()) => (!at ? 2 : now - at > 2 * every ? 2 : now - at > every ? 1 : 0);

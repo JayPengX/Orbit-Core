@@ -31,6 +31,7 @@
 
 // (First: the outside calls counted, sources.js, before anything keeps a fetch of its own.)
 import { watchRelay, flushSources, asSourceCall, pruneSources, takeBeacon, readSources } from './sources.js';
+import { SOURCES, freshAt, sourceState } from './kit/sources.mjs';
 import { handleLawAsk, useLawSite, addOne, twDay } from './law.js';
 import { handleLawChat, lawChatTimes, lawCompare, COMPARE_QS } from './law-chat.js';
 import { otherAnswer, streamOther, makerOf, modelsOf } from './ai-other.js';
@@ -1476,6 +1477,24 @@ async function route(request, env, ctx, headers, origin) {
     if (check === 'capacity') return json(await ADMIN_TOOLS.capacity({ env, deps: ECO_DEPS }), 200, headers);
     // Each outside source's last 7 days as the proxy and the phones counted
     // them (sources.js, the panel's 外部來源): ?src=a,b only those.
+    // The panel's own verdict on every source (kit/sources.mjs sourceState,
+    // the same data as its 外部來源, before quotas): what's red or amber and why.
+    if (check === 'sources-state') {
+      const d = await ADMIN_TOOLS.sources({ env, deps: ECO_DEPS });
+      const rows = d.rows && !d.rows.error ? d.rows : {};
+      const out = { at: d.at, bad: [], warn: [], ok: 0, idle: 0, error: d.rows?.error || '', why: {} };
+      for (const s of SOURCES) {
+        const r = rows[s.id];
+        const fresh = freshAt(s, d);
+        const state = sourceState(s, r, fresh, d.at);
+        if (state === 'ok' || state === 'idle') out[state]++;
+        else {
+          out[state].push(s.id);
+          out.why[s.id] = { ok: r?.ok || 0, fail: r?.fail || 0, lastOk: r?.lastOk || 0, lastFail: r?.lastFail || 0, err: r?.err || '', sides: r?.sides || {}, fresh };
+        }
+      }
+      return json(out, 200, headers);
+    }
     if (check === 'sources') {
       const want = (new URL(request.url).searchParams.get('src') || '').split(',').filter(Boolean).slice(0, 20);
       const all = await readSources(env);
@@ -1488,7 +1507,7 @@ async function route(request, env, ctx, headers, origin) {
       for (const d of docs) await DOCS.delete(env, 'orbit-money-mail', d.id);
       return json({ deleted: docs.length }, 200, headers);
     }
-    return json({ error: { message: 'check=gemini|system|capacity|sources|purge-money-mail' } }, 400, headers);
+    return json({ error: { message: 'check=gemini|system|capacity|sources|sources-state|purge-money-mail' } }, 400, headers);
   }
   // A builder's job now (builders/run.js), by hand: Bearer DATA_PUSH_SECRET
   // (Orbit-Core's build.yml). ?job=watch|cutouts|buses, or

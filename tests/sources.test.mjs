@@ -133,3 +133,34 @@ test('every outside host the Workers name has its source row (a new source: a ro
     for (const [, h] of readFileSync(new URL(f, root), 'utf8').matchAll(/https:\/\/([a-z0-9.-]+\.[a-z]{2,})/gi)) if (sourceOf(h).startsWith('host:')) missing.add(`${h} (${f})`);
   assert.deepEqual([...missing], []);
 });
+
+test('a backup side never makes the row red while the main side answers (YouBike: phones read it, its guard refuses the proxy)', async () => {
+  const { judgedRow, sourceState, SOURCE_BY_ID } = await import('../kit/sources.mjs');
+  const now = 1_800_000_000_000;
+  const yb = SOURCE_BY_ID.youbike;
+  const row = {
+    ok: 21, fail: 5, lastOk: now - 0.6 * HOUR, lastFail: now - 0.4 * HOUR, err: 'apis.youbike.com.tw 403',
+    hours: [[Math.floor(now / HOUR) - 1, 10, 5]],
+    sides: { phone: { ok: 21, fail: 0, lastOk: now - 0.6 * HOUR, lastFail: 0 }, worker: { ok: 0, fail: 1, lastOk: 0, lastFail: now - 0.4 * HOUR }, cron: { ok: 0, fail: 4, lastOk: 0, lastFail: now - 0.5 * HOUR } }
+  };
+  assert.equal(stateOf(row, null, now), 'bad', 'judged whole, it was red');
+  assert.equal(judgedRow(yb, row).fail, 0);
+  assert.equal(sourceState(yb, row, null, now), 'ok');
+  // The phones failing too: red as before.
+  const down = { ...row, sides: { ...row.sides, phone: { ok: 0, fail: 6, lastOk: now - 5 * HOUR, lastFail: now - 0.2 * HOUR } } };
+  assert.equal(sourceState(yb, down, null, now), 'bad');
+  // Only the backup asked: judged on it.
+  const only = { ...row, sides: { worker: row.sides.worker, cron: row.sides.cron } };
+  assert.equal(sourceState(yb, only, null, now), stateOf(only, null, now));
+});
+
+test("a build's age and its last failure: amber when the data's on time but the build failed", async () => {
+  const { freshAt, sourceState, SOURCE_BY_ID } = await import('../kit/sources.mjs');
+  const now = 1_800_000_000_000;
+  const news = SOURCE_BY_ID.news;
+  const d = { at: now, jobs: { 'build:news': { okAt: now - 10 * 60_000, ok: false, note: 'x' } } };
+  const f = freshAt(news, d);
+  assert.equal(f.late, 0);
+  assert.equal(sourceState(news, { ok: 5, fail: 0, lastOk: now, lastFail: 0, hours: [] }, f, now), 'warn');
+  assert.equal(freshAt(news, { at: now, jobs: { 'build:news': { okAt: now - 4 * HOUR, ok: false } } }).late, 2);
+});
