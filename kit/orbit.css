@@ -1995,6 +1995,11 @@ dialog.q-sheet.q-full {
   border-radius: 50%;
   vertical-align: 0;
 }
+/* (A team's logo keeps its own shape; a face stays round.) */
+.q-ai-ref > .logo:not(.round) {
+  border-radius: 0;
+  object-fit: contain;
+}
 /* 問 Orbit on the Pass tab (ask-orbit.mjs): the ask bar, then (words no rule knows) the apps as taps. */
 .q-ask-orbit {
   display: grid;
