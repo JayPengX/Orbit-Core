@@ -159,7 +159,7 @@ export function pageLeads(html, base) {
       return false;
     }
   };
-  const rank = t => (/教職|招標|採購|校外|行事曆|榮譽/.test(t) ? 9 : /學生/.test(t) ? 0 : /最新|全部|公告|news/i.test(t) ? 1 : 5);
+  const rank = t => (/教職|教師|研習|招標|採購|校外|行事曆|榮譽/.test(t) ? 9 : /學生/.test(t) ? 0 : /最新|全部|公告|news/i.test(t) ? 1 : 5);
   const widgets = [...page.matchAll(/site_news\/main2\.php\?uid=(WID_[0-9]+_2_[0-9a-f]{40})[^>]*?title=["']([^"']*)/gi)].map(m => ({ uid: m[1], title: unEnt(m[2]) }));
   const ischool = [...new Map(widgets.map(w => [w.uid, w])).values()].filter(w => rank(w.title) < 9).sort((a, b) => rank(a.title) - rank(b.title)).slice(0, 2);
   const feeds = [];
@@ -179,7 +179,10 @@ export function pageLeads(html, base) {
   }
   const refresh = /<meta[^>]+http-equiv=["']?refresh["']?[^>]*content=["']?\s*\d+\s*;\s*url=([^"'>\s]+)/i.exec(page)?.[1];
   // (A site with a feed for each of its boards, 行政消息, 活動消息…: each one, its name.)
-  const boards = ours.length > 1 ? ours.slice(0, 8).map(f => ({ url: f.url, name: /[-－:：]\s*([^-－:：]{2,10})\s*$/.exec(f.title)?.[1] || '' })) : [];
+  // (Teachers' boards read too, only to take their posts out of the 全部 feed.)
+  const nameOf = f => /[-－:：]\s*([^-－:：]{2,10})\s*$/.exec(f.title)?.[1] || '';
+  const skip = [...new Map(feeds.filter(f => f.url && same(f.url) && rank(f.title) === 9).map(f => [f.url, f])).values()].slice(0, 3);
+  const boards = ours.length > 1 ? [...ours.slice(0, 8).map(f => ({ url: f.url, name: nameOf(f) })), ...skip.map(f => ({ url: f.url, name: nameOf(f), skip: true }))] : [];
   return { ischool, feed, boards, more: [...new Set(more)].slice(0, 2), refresh: refresh ? absolute(refresh, base) : '' };
 }
 
@@ -273,7 +276,12 @@ export async function readSchool(site, fetchFn, today) {
   if (leads.boards.length) {
     const got = await Promise.all(leads.boards.map(b => getPage(b.url, fetchFn).then(r => (r && isFeed(r.text, r.type) ? feedItems(r.text, r.url, today).map(it => (it.unit || !b.name || /^(all|全部.*)$/i.test(b.name) ? it : { ...it, kind: b.name })) : []))));
     // (The boards' own first, so a post in both keeps its board's name.)
-    const named = got.flat().sort((a, b) => (b.kind ? 1 : 0) - (a.kind ? 1 : 0));
+    const out = new Set(got.flatMap((list, i) => (leads.boards[i].skip ? list.map(it => it.title.replace(/\s+/g, '')) : [])));
+    const named = got
+      .filter((_, i) => !leads.boards[i].skip)
+      .flat()
+      .filter(it => !out.has(it.title.replace(/\s+/g, '')))
+      .sort((a, b) => (b.kind ? 1 : 0) - (a.kind ? 1 : 0));
     await take(named, 'feed');
   }
   if (best.items.length < 8 && leads.feed) {
