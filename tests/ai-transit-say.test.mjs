@@ -12,7 +12,7 @@ test('transit-say: the place as said, the time read', () => {
   assert.deepEqual(f.clean({ from: '家', to: '學校', by: 'depart', day: 0, time: '' }, input('從家去學校')), { from: '家', to: '學校', by: 'now', day: 0, time: '' });
 });
 
-test('transit-say: a place the AI made up is refused; none said is an answer', () => {
+test('transit-say: a place the AI made up is refused; none said is an answer, the time kept', () => {
   assert.equal(f.clean({ from: '', to: '台北101', by: 'now', day: 0, time: '' }, input('明天八點前到台大醫院')), null);
-  assert.deepEqual(f.clean({ from: '', to: '', by: 'arrive', day: 1, time: '08:00' }, input('明天早上八點')), { from: '', to: '', by: 'now', day: 0, time: '' });
+  assert.deepEqual(f.clean({ from: '', to: '', by: 'arrive', day: 1, time: '08:00' }, input('明天早上八點')), { from: '', to: '', by: 'arrive', day: 1, time: '08:00' });
 });

@@ -1,5 +1,5 @@
 // 問比賽 (ai-features.js 'sports-ask'): the line's numbers the facts', tables by id, marks a row's label;
-// and F1's 勝負關鍵 says 杆位 only of the car that started first.
+// and F1's 勝負關鍵 says 竿位 (Taiwan's word) only of the car that started first.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { FEATURES } from '../ai-features.js';
@@ -15,10 +15,10 @@ test('sports-ask: tables by id, marks by label, a number not theirs refused', ()
   assert.equal(f.clean({ line: '湖人排第 2 名。', show: ['mine'], mark: [] }, input), null);
 });
 
-test('f1-story: 杆位 only for the car that started first', () => {
+test('f1-story: 竿位 only for the car that started first', () => {
   const f = FEATURES['f1-story'];
   const race = 'Grand Prix race: X, 57 laps.\n1 George Russell #63 (Mercedes), from 1, 1 stop\n2 Oscar Piastri #81 (McLaren), from 5, 1 stop';
   const out = f.clean({ points: [{ lap: 0, no: '81', zh: '杆位第5起跑，起跑後即退賽', en: 'Started 5th, out at once' }, { lap: 0, no: '63', zh: '杆位起跑一路領先', en: 'Led from the start' }] }, { facts: race, laps: 57 });
   assert.equal(out.points[0].zh, '第5起跑，起跑後即退賽');
-  assert.equal(out.points[1].zh, '杆位起跑一路領先');
+  assert.equal(out.points[1].zh, '竿位起跑一路領先');
 });

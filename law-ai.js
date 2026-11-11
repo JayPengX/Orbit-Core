@@ -271,16 +271,16 @@ export const LAW_FEATURES = {
       const t = String(raw?.text ?? '').slice(0, 40_000);
       const pdf = fileOf(raw?.pdf, /^application\/pdf$/, 9_000_000);
       if (t.replace(/\s/g, '').length < 200 && !pdf) return null;
-      return { town: str(raw?.town, 30), session: str(raw?.session, 40), text: pdf ? '' : t, pdf };
+      return { town: str(raw?.town, 30), session: str(raw?.session, 40), text: pdf ? '' : t, pdf, cut: !pdf && String(raw?.text ?? '').length > 40_000 };
     },
-    parts: ({ town, session, text: t, pdf }) => [
+    parts: ({ town, session, text: t, pdf, cut }) => [
       {
         text: [
-          `These are the minutes (議事錄) of ${town || 'a township council (代表會) in Taiwan'}${session ? `, ${session}` : ''}${pdf ? ' (a scanned PDF)' : ', as text: the speeches between proposals are cut'}.`,
+          `These are the minutes (議事錄) of ${town || 'a township council (代表會) in Taiwan'}${session ? `, ${session}` : ''}${pdf ? ' (a scanned PDF)' : ', as text: the speeches between proposals are cut'}${cut ? '; the text also stops before the end of the minutes, so a proposal whose result is past the end is 未議決' : ''}.`,
           'List every proposal (提案, 議案, 臨時動議) the council decided or discussed, in order:',
-          'no: its number as written (鎮長提案第1號, 代表提案第3號, 臨時動議第1號, 甲字第2號), "" when none; kind: its 類別 (民政, 建設…) or ""; by: who proposed it as written (鄉長蔣煙燈 → 蔣煙燈; several joined by 、), "" when not said; what: its 案由 in the minutes’ own words, shortened to ≤ 60 字 (keep the place, the amount and what is asked; drop 敬請貴會…, 提請審議);',
-          'result: one of 通過, 修正通過, 保留, 不通過, 撤回, 退回, 擇日再議, 未議決 (照案通過, 照原案通過, 照審查意見通過 are 通過); note: how it was amended or why held, ≤ 30 字, else ""; vote: the count if a vote was taken (贊成 7 票、反對 2 票), else ""; d: the day decided, YYYY-MM-DD (民國 115 年 = 2026), "" when not clear.',
-          'Only what the minutes say. Never guess a result: when the minutes don’t say, 未議決. Speeches, reports (工作報告) and questions (質詢) are not proposals.'
+          'no: its number as written (鎮長提案第1號, 代表提案第3號, 臨時動議第1號, 甲字第2號), "" when none; kind: its 類別 (民政, 建設…) or ""; by: who proposed it as written (鄉長蔣煙燈 → 蔣煙燈; several joined by 、), "" when not said; what: its 案由 in the minutes’ own words, at most 60 字 (count them; keep in this order the project or place, what is asked, the total amount; drop the 補助/自籌 split first when it won’t fit; drop 敬請貴會…, 提請審議); copy every figure exactly as written: when a figure is cut off in the text (「合計新台幣467」 and the line ends), leave it out; never complete, round or add up figures (never 「467萬餘元」);',
+          'result: one of 通過, 修正通過, 保留, 不通過, 撤回, 退回, 擇日再議, 未議決 (照案通過, 照原案通過 are 通過; 照審查意見通過 is 通過 only when the 審查意見 keeps the case as proposed, else 修正通過 with the change, e.g. 刪減50萬元, in note; 保留 = held for later in this session, 擇日再議 = moved to another day, 退回 = sent back to the 公所); note: how it was amended or why held, ≤ 30 字, else ""; vote: the count if a vote was taken (贊成 7 票、反對 2 票), else ""; d: the day it was decided, YYYY-MM-DD (西元 = 民國 + 1911, so 民國 114 年 = 2025), only when the proposal sits under a dated 次會 heading or a date is written next to it; never take it from the agenda (日程) list; when the meeting spans several days and this proposal’s day isn’t shown, "".',
+          'Only what the minutes say. Never guess a result: when the minutes don’t say, 未議決. Speeches, reports (工作報告) and questions (質詢) are not proposals; when there is no proposal, items is []. by and no: keep the characters exactly as written (黄 stays 黄).'
         ].join('\n')
       },
       pdf ? { inlineData: { mimeType: 'application/pdf', data: pdf.data } } : { text: t }
@@ -306,16 +306,16 @@ export const LAW_FEATURES = {
     parts: ({ items }) =>
       text(
         [
-          'For each item below, a bill in Taiwan’s 立法院 (kind bill: its stated purpose) or a law just amended (kind law: its changed articles), write ONE line saying what it changes for people, in plain words a high-school student understands.',
-          `line: ${ZH}, ≤ 32 字, starting with what changes (不是「本法案旨在」), no law name (the card shows it), no stage (the card shows it), no opinion. Every number you write must be in that item.`,
-          'A law’s arts show each change as 【new words】（原：the words they replaced）, 【刪去：words taken out】, or a whole article that is new; say what the change does, not that words moved.',
-          'Return one item per id.',
+          'For each item below, a bill in Taiwan’s 立法院 (kind bill: its stated purpose) or a law just amended (kind law: its changed articles), write ONE line saying what it changes for people, in plain words a high-school student understands.\nA bill’s about is its proposers’ stated purpose, sometimes several joined by ；. Text after 現行 describes today’s rule, not the change. A bill’s arts such as 第22條（8 案） only say which articles the proposals touch and how many proposals there are, not what they say. For a bill, name the concrete rule it would change (who must do what, what becomes allowed or required). Never present a 現行 rule as the change, and never add effects it does not state (no 更明確, 更完整, 保障健康).',
+          `line: ${ZH}, ≤ 32 字, starting with what changes (不是「本法案旨在」), no law name (the card shows it), no stage (the card shows it), no opinion. Every number you write must be in that item, written as the item writes it; never take a number or date from the id.`,
+          'A law’s arts are snippets of changed articles; … marks text left out. Each change shows as 【new words】（原：the words they replaced）, 【new words】 alone (words added), 【刪去：words taken out】, or a whole article that is new. Say what the change does for people, not that words moved. Taking out a limiting word widens who or what is covered: 認可之【刪去：民營】機構 means any approved institution may now do it, not only private ones (never write 不含民營). If a change depends on text hidden behind … (for example which 項 or 款 now apply), leave it out rather than guess.',
+          'Return one item per id. If an item does not say concretely what changes (only a goal, or only article numbers and proposal counts), return line "" for it; never fill it with a guess or a restated goal.',
           JSON.stringify(items)
         ].join('\n')
       ),
     schema: obj({ items: arr(obj({ id: S, line: S })) }),
     clean(raw, { items }) {
-      const given = new Map(items.map(x => [x.id, JSON.stringify(x)]));
+      const given = new Map(items.map(x => [x.id, JSON.stringify([x.name, x.about, x.arts])]));
       const out = {};
       for (const it of list(raw?.items, 60)) {
         const src = given.get(String(it?.id || ''));
