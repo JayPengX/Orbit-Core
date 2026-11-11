@@ -626,7 +626,7 @@ export const FEATURES = {
   // only what the game's page doesn't show at a glance; every number one of the digest's.
   'sports-preview': {
     models: ['haiku', 'luna'],
-    effort: { haiku: 'low', luna: 'low' },
+    effort: { luna: 'low' },
     maxIn: 3200,
     parts: ({ facts }) =>
       text(
