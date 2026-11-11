@@ -695,6 +695,8 @@ export const FEATURES = {
       // (A place is their words or one of their places: never one the AI made up.)
       const ok = x => Boolean(x) && (said.includes(norm(x)) || mine.has(norm(x)));
       const to = str(raw?.to, 40).replace(/^(到|去|前往)/, '');
+      // (No place said, said so: an answer, the phone asks again; never a second model.)
+      if (!to && raw && typeof raw === 'object' && 'to' in raw) return { from: '', to: '', by: 'now', day: 0, time: '' };
       if (!ok(to)) return null;
       const from0 = str(raw?.from, 40).replace(/^從/, '');
       const from = /^(這裡|這邊|現在位置|目前位置|我的位置)$/.test(from0) || !ok(from0) ? '' : from0;
