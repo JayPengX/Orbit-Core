@@ -28,8 +28,8 @@
 // ---- 測試工具 (the tester's tools, kit testtools.mjs) ----
 // Set on this device only, after the unlock (Orbit Pass › tap 除錯紀錄 seven
 // times): a clock moved (every Date in the page runs from the time picked),
-// a place (the page's geolocation answers there) and the network (off, slow,
-// or every read failing). Put in place here, before any of the app's own
+// a place (the page's geolocation answers there) and the network (off, slow:
+// 8 s a read, past the kit's slow mark; or every read answered 503). Put in place here, before any of the app's own
 // code runs, so every app is tested as it is, with nothing of its own changed.
 // window.ORBIT_TEST says what's on; a pill on the page says it too.
 (function () {
@@ -105,7 +105,7 @@
       if (net === 'off') return Promise.reject(new TypeError('Failed to fetch (測試工具：離線)'));
       if (net === 'fail') return Promise.resolve(new Response(JSON.stringify({ error: 'tester', message: '測試工具：讀取失敗' }), { status: 503, headers: { 'content-type': 'application/json' } }));
       return new Promise(function (ok) {
-        setTimeout(ok, 3000);
+        setTimeout(ok, 8000);
       }).then(function () {
         return realFetch(input, init);
       });
@@ -118,7 +118,6 @@
     on.push('net');
   }
   t.active = on;
-  if (on.length) document.documentElement.classList.add('q-testing');
 })();
 
 (function () {
@@ -192,7 +191,7 @@
   var hold = function () {
     // (The service worker gave the server's newest page, the kit's newest
     // files noted for it (kit sw.js pageFirst): nothing to wait for.)
-    if (holding || navigator.onLine === false || Date.now() - (window.__orbitFresh || 0) < 30000) return;
+    if (holding || navigator.onLine === false || (Date.real ? Date.real() : Date.now()) - (window.__orbitFresh || 0) < 30000) return;
     holding = true;
     document.head.appendChild(held);
     box.classList.add('q-boot-hold');

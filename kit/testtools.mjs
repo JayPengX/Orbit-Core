@@ -7,7 +7,7 @@
 //
 // - 時間: every Date in the page runs from the time picked (an offset, so
 //   time still moves). Notices aren't sent to the Worker meanwhile
-//   (orbit.mjs schedulePush), and the device's kept reads are dropped at
+//   (orbit.mjs schedulePush), no milestone day is counted (msTick), and the device's kept reads are dropped at
 //   each change (a copy read "now" would look fresh at another time).
 // - 位置: the page's geolocation answers at the place picked.
 // - 網路: off, slow (3 s each), or every read failing (503).
@@ -83,7 +83,7 @@ export function summary(t = state()) {
   if (t.place) out.push(en() ? t.place.en || t.place.name : t.place.name);
   if (t.net === 'off') out.push(T('離線', 'Offline'));
   if (t.net === 'slow') out.push(T('網路慢', 'Slow'));
-  if (t.net === 'fail') out.push(T('讀取失敗', 'Reads fail'));
+  if (t.net === 'fail') out.push(T('伺服器錯誤', 'Server errors'));
   const flags = Object.entries(t.flags || {}).filter(([, v]) => v);
   if (flags.length) out.push(T(`${flags.length} 個開關`, `${flags.length} switch${flags.length > 1 ? 'es' : ''}`));
   return out;
@@ -169,12 +169,12 @@ function netPart() {
   const t = state();
   return [
     head(T('網路', 'Network')),
-    sub(T('讀取資料的網路（App 本身的檔案照常載入）：看離線、讀很慢、讀取失敗時的畫面。', 'The network for data (the app’s own files still load): see offline, slow and failed reads.')),
+    sub(T('讀取資料的網路（App 本身的檔案照常載入）：很慢＝每次讀 8 秒；伺服器錯＝每次都回 503；離線＝完全連不上。', 'The network for data (the app’s own files still load): slow = 8 s a read; errors = every read answers 503; offline = nothing gets through.')),
     segmented(
       [
         { id: '', label: T('正常', 'Normal') },
         { id: 'slow', label: T('很慢', 'Slow') },
-        { id: 'fail', label: T('失敗', 'Fail') },
+        { id: 'fail', label: T('伺服器錯', 'Errors') },
         { id: 'off', label: T('離線', 'Offline') }
       ],
       { value: t.net || '', onChange: v => save({ ...state(), net: v || undefined }), label: T('網路', 'Network') }

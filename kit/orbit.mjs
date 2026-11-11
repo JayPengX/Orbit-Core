@@ -310,7 +310,8 @@ function msWrite(s, id, value) {
 // the tier stays).
 function msTick(s) {
   const w = s.wallet;
-  if (!w || !s.pass) return;
+  // (測試工具's clock moved: no made-up days counted on the real Pass.)
+  if (!w || !s.pass || globalThis.ORBIT_TEST?.active?.includes('clock')) return;
   const day = twDay(Date.now());
   const own = MILESTONES.find(m => m.days && m.id === s.app);
   if (own) {
