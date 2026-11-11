@@ -1709,10 +1709,13 @@ dialog.q-sheet.q-full {
   --q-ai-2: currentColor;
 }
 .q-ai-bar {
+  box-sizing: border-box;
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  padding: 6px 6px 6px 14px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 5px 5px 5px 11px;
   border-radius: 22px;
   background: var(--q-fill-3);
   transition: box-shadow 0.2s;
@@ -1720,24 +1723,43 @@ dialog.q-sheet.q-full {
 .q-ai-bar:focus-within {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--q-accent) 45%, transparent);
 }
+/* (The mark sits on the last line, as the send button does: a bar that
+   grows keeps both at its foot.) */
 .q-ai-bar > .q-ai-mark {
-  align-self: center;
+  width: 22px;
+  height: 34px;
+}
+.q-ai-bar > .q-ai-mark svg {
+  height: 22px;
 }
 .q-ai-bar textarea {
-  flex: 1 1 auto;
+  box-sizing: border-box;
+  flex: 1 1 0;
+  width: 0;
   min-width: 0;
+  height: 34px;
   min-height: 34px;
   max-height: 132px;
-  padding: 7px 0;
+  margin: 0;
+  padding: 6px 0;
   border: 0;
   background: none;
   color: var(--q-label);
-  font: 400 var(--q-t-body, 17px) / 1.3 var(--q-font);
+  font: var(--q-t-body);
   resize: none;
   outline: none;
 }
+/* Empty, one line: a long hint ends in … rather than growing the bar. */
+.q-ai-bar textarea:placeholder-shown {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .q-ai-bar textarea::placeholder {
   color: var(--q-label-3, var(--q-muted));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .q-ai-send {
   flex: none;
@@ -1745,19 +1767,22 @@ dialog.q-sheet.q-full {
   place-items: center;
   width: 34px;
   height: 34px;
+  padding: 0;
   border: 0;
   border-radius: 50%;
   background: var(--q-accent);
   color: #fff;
   cursor: pointer;
-  transition: opacity 0.2s, transform var(--q-dur-snappy) var(--q-spring-snappy);
+  transition: background-color 0.2s, color 0.2s, transform var(--q-dur-snappy) var(--q-spring-snappy);
 }
 .q-ai-send svg {
   width: 18px;
   height: 18px;
 }
+/* Nothing to send: a quiet grey disc, never the accent washed out. */
 .q-ai-send:disabled {
-  opacity: 0.35;
+  background: var(--q-fill-2);
+  color: var(--q-label-3, var(--q-muted));
   cursor: default;
 }
 .q-ai-send:not(:disabled):active {
@@ -2433,8 +2458,12 @@ input[type='checkbox'][switch] {
   -webkit-appearance: none;
   appearance: none;
 }
+.q-search input {
+  text-overflow: ellipsis;
+}
 .q-search input::placeholder {
   color: var(--q-label-2);
+  text-overflow: ellipsis;
 }
 .q-search input::-webkit-search-cancel-button {
   display: none;

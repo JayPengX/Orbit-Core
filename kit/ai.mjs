@@ -78,8 +78,9 @@ export function aiBar({ placeholder = '', onSend = () => {}, value = '', label =
   input.value = value;
   const send = h('button', { type: 'button', class: 'q-ai-send', 'aria-label': W('送出', 'Send'), html: icons.send });
   const fit = () => {
-    input.style.height = 'auto';
-    input.style.height = `${Math.min(input.scrollHeight, 132)}px`;
+    // (Empty: the CSS's one line, so a long hint never grows the bar.)
+    input.style.height = '';
+    if (input.value) input.style.height = `${Math.min(input.scrollHeight, 132)}px`;
     send.disabled = !input.value.trim();
   };
   const go = () => {
@@ -96,6 +97,7 @@ export function aiBar({ placeholder = '', onSend = () => {}, value = '', label =
   });
   send.addEventListener('click', go);
   const box = h('div', { class: 'q-ai-bar' }, [mark(), input, send]);
+  send.disabled = !input.value.trim();
   requestAnimationFrame(fit);
   return Object.assign(box, {
     input,

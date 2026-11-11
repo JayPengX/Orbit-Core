@@ -73,7 +73,7 @@ export function askOrbitCard({ go, apps = {} } = {}) {
   const pick = h('div', { class: 'q-ask-orbit-pick', hidden: true });
   const send = (app, text) => go(app, `ask=${encodeURIComponent(text)}`);
   const bar = aiBar({
-    placeholder: W('問 Orbit：明天要帶傘嗎、去台北車站…', 'Ask Orbit: rain tomorrow? to Taipei Main Station…'),
+    placeholder: W('問 Orbit：要帶傘嗎？', 'Ask Orbit: umbrella?'),
     label: W('問 Orbit', 'Ask Orbit'),
     max: 200,
     onSend(text) {
