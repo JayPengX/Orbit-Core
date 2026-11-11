@@ -1928,6 +1928,29 @@ dialog.q-sheet.q-full {
   height: 100% !important;
   border-radius: inherit;
 }
+.q-aia-wait .q-aia-sk {
+  display: block;
+  height: 14px;
+  border-radius: 7px;
+}
+.q-aia-wait .q-aia-line {
+  display: grid;
+  flex: 1;
+  gap: 8px;
+  padding-top: 3px;
+}
+.q-aia-doing {
+  color: var(--q-label-2);
+}
+.q-aia-wait .q-ai-mark {
+  animation: q-ai-breathe 1.4s ease-in-out infinite;
+}
+.q-aia-wait .q-aia-sk.short {
+  width: 55%;
+}
+.q-aia-wait .q-aia-end .q-aia-sk {
+  width: 64px;
+}
 .q-ai-think {
   display: flex;
   align-items: center;
@@ -1946,7 +1969,8 @@ dialog.q-sheet.q-full {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .q-ai-think .q-ai-mark {
+  .q-ai-think .q-ai-mark,
+  .q-aia-wait .q-ai-mark {
     animation: none;
   }
 }
