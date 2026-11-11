@@ -161,7 +161,7 @@ Rules:
 // No question: the article explained, the way a good teacher would: what it
 // means in a line, what it says piece by piece, why it's there, examples,
 // the hard words, how it stands today, and what to read next.
-const EXPLAIN_SCHEMA = {
+export const EXPLAIN_SCHEMA = {
   type: 'object',
   properties: {
     gist: { type: 'string' },

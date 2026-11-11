@@ -127,6 +127,7 @@ export function guess(requests, outGuess) {
 //   go       guess (×1.25 for safety) → budget check → submit → wait → collect
 //   collect  wait for and collect a job already submitted
 export async function run(job, build, outGuess) {
+  if (!String(process.argv[1] || '').includes(job)) return; // (imported by another job, not run)
   const cmd = process.argv[2] || 'size';
   if (cmd === 'collect') return collect(job);
   const requests = await build();
