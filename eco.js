@@ -53,6 +53,7 @@
 //   POST   /eco { op: 'admin', token, action }        the store's clean-up
 //   POST   /eco { op: 'passkey-…' }                    passkeys (passkey.js)
 
+import { cleanReport, REC_PREFIX } from './rec-weekly.js';
 import { retire } from './money.js';
 import { storeReady } from './doc-store.js';
 import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './orbit-token.js';
@@ -377,6 +378,7 @@ const OPS = {
   'share-redeem': shareRedeem,
   relief: ecoRelief,
   past: ecoPast,
+  bug: ecoBug,
   admin: ctx => handleAdmin(ctx),
   'passkey-begin': passkeyBegin,
   'passkey-login': passkeyLogin,
@@ -853,6 +855,23 @@ async function ecoSignOutAll(ctx) {
   await updateWallet(env, deps, c.d, w => (gen(w) !== c.g ? w : { ...w, sec: { ...(w.sec || {}), gen: gen(w) + 1 }, live: null }));
   const res = await signIn({ ...ctx, app: c.a }, c.d);
   return res || deps.errorJson('ECO_SIGNED_OUT', 401, headers, request);
+}
+
+// 傳給 Orbit (the Pass sheet's 除錯紀錄): this phone's report of what went
+// wrong, sent on its person's tap, kept in R2's private/bugs/ for the
+// owner's weekly report (rec-weekly.js); 3 an hour a session.
+async function ecoBug(ctx) {
+  const { env, headers, deps, request, body } = ctx;
+  const c = await liveSession(ctx);
+  if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
+  if (sessionLimited(`bug:${c.s}`, 3, 3_600_000, deps.now())) return deps.errorJson('RATE_LIMITED', 429, headers, request);
+  if (!env.DATA) return deps.errorJson('MISSING_STORE', 500, headers, request);
+  const now = deps.now();
+  const report = cleanReport(body.report, now);
+  if (!report) return deps.errorJson('INVALID_JSON', 400, headers, request);
+  const day = new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
+  await env.DATA.put(`${REC_PREFIX}${day}/${String(c.d).slice(0, 8)}-${now}.json`, JSON.stringify(report), { httpMetadata: { contentType: 'application/json' } });
+  return deps.json({ ok: true }, 200, headers);
 }
 
 // A new pass for the same account (the old one leaked, say): everything

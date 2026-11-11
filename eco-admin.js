@@ -14,6 +14,7 @@
 // The token is checked against the Worker's secret ECO_ADMIN_TOKEN (by its
 // SHA-256; the token itself is never in the repo). Without the secret, no one gets in.
 
+import { REC_WEEKLY, REC_PREFIX } from './rec-weekly.js';
 import { doorReport, doorSet } from './door.js';
 import { systemReport, alertAccount, tell, OPS_DOC, beats } from './ops.js';
 import { passAccount, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet } from './eco.js';
@@ -915,7 +916,7 @@ export const ADMIN_TOOLS = {
   // A builder now, whatever the pace (builders/run.js).
   async build({ env, deps, body }) {
     const job = String(body.job || '');
-    if (!['watch', 'watch-full', 'cutouts', 'buses', 'asia', 'cpbl', 'sports', 'photos', 'winprob'].includes(job)) return { error: 'ECO_UNKNOWN_OP', status: 400 };
+    if (!['watch', 'watch-full', 'cutouts', 'buses', 'asia', 'cpbl', 'sports', 'photos', 'winprob', 'ai-weekly'].includes(job)) return { error: 'ECO_UNKNOWN_OP', status: 400 };
     return deps.build(env, job);
   },
   // 外部來源: each outside source's last 7 days as the proxy and phones
@@ -1052,6 +1053,20 @@ Object.assign(ADMIN_TOOLS, {
     if (!GH_REPOS.includes(repo) || !(workflow > 0 || run > 0)) return { error: 'ECO_UNKNOWN_OP', status: 400 };
     if (!env.GH_ACTIONS_TOKEN) return { ok: false, why: 'unset' };
     return run > 0 ? ghPost(env, `${repo}/actions/runs/${run}/rerun-failed-jobs`) : ghPost(env, `${repo}/actions/workflows/${workflow}/dispatches`, { ref: 'main' });
+  },
+  // 除錯紀錄週報 (rec-weekly.js): the last report made, and how many phones sent theirs since.
+  async bugs({ env, deps }) {
+    if (!env.DATA) return { off: true };
+    const now = deps.now();
+    const week = await env.DATA.get(REC_WEEKLY).then(o => (o ? o.json() : null)).catch(() => null);
+    const days = Array.from({ length: 7 }, (_, i) => twDate(now - i * DAY));
+    const since = week?.built || 0;
+    let fresh = 0;
+    for (const day of days) {
+      const r = await env.DATA.list({ prefix: `${REC_PREFIX}${day}/`, limit: 1000 }).catch(() => ({ objects: [] }));
+      fresh += r.objects.filter(o => +new Date(o.uploaded) > since).length;
+    }
+    return { at: now, week, fresh };
   },
   // { routes: { '/transit': { today, yesterday } }, workers: guard's 24 hours }
   async errors({ env, deps }) {

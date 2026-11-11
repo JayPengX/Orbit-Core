@@ -5686,10 +5686,13 @@ export function watchFit(selector, { roots = null } = {}) {
 // on (Orbit Pass → 除錯紀錄; it stays on until switched off), every one is
 // kept on this device, with the app's errors and the screens opened, up to
 // about 2 MB, oldest gone first. Nothing leaves the device unless copied or
-// shared, and never the pass, a token or a key (left out by name).
+// shared, or sent by 傳給 Orbit (only what went wrong), and never the pass,
+// a token or a key (left out by name).
 const REC_KEY = 'orbit.rec';
 const REC_ON = 'orbit.recOn';
 const REC_MAX = 2_000_000;
+// What 傳給 Orbit sends: what went wrong, never which screens were opened.
+const REC_SEND = new Set(['error', 'slow', 'proxy-fail', 'net', 'update', 'reboot']);
 const recLast = new Map();
 const secret = /^(pass|passcode|token|secret|auth|authorization|password|apikey|api_key)$/i;
 const recClean = x => JSON.parse(JSON.stringify(x ?? null, (k, v) => (secret.test(k) ? undefined : v)));
@@ -5817,6 +5820,27 @@ function recRows(s, note) {
       })
     ]),
     node('div', { class: 'q-rec-acts' }, [
+      // (傳給 Orbit: only what went wrong, on this tap, for the owner's weekly report; rec-weekly.js.)
+      s.op
+        ? node('button', {
+            class: 'q-chip',
+            type: 'button',
+            text: T('傳給 Orbit', 'Send to Orbit'),
+            onclick: async () => {
+              const d = JSON.parse(recDump(s.app));
+              d.log = (d.log || []).filter(e => REC_SEND.has(e.kind)).slice(-300);
+              d.last = Object.fromEntries(Object.entries(d.last || {}).filter(([k]) => REC_SEND.has(k)));
+              if (!d.log.length && !Object.keys(d.last).length) return void (note.textContent = T('沒有錯誤可以傳', 'No errors to send'));
+              note.textContent = T('傳送中…', 'Sending…');
+              try {
+                await s.op('bug', { report: d });
+                note.textContent = T('已傳給 Orbit，謝謝', 'Sent to Orbit, thanks');
+              } catch {
+                note.textContent = T('沒傳出去，等一下再試', 'Not sent; try again soon');
+              }
+            }
+          })
+        : null,
       btn(T('複製紀錄', 'Copy'), () => send('copy')),
       btn(T('分享檔案', 'Share file'), () => send('share')),
       btn(T('清除', 'Clear'), async () => {

@@ -20,6 +20,8 @@
 import { aiOnce } from '../ai.js';
 import { runRecaps } from './recaps.js';
 import { runF1Stories } from './f1story.js';
+import { runRecWeekly } from '../rec-weekly.js';
+import { usage as meterUsage } from '../transit.js';
 import { sideOf } from '../kit/news-outlets.mjs';
 
 const NEWS_LINES = 'news/lines.json';
@@ -182,5 +184,7 @@ export async function runAi({ store, env, proxy, now = Date.now(), cap = async (
   await step('sports', 'sports-recap', c => runRecaps({ store, env, ctx, proxy, cap: c, now, until }));
   await step('f1', 'f1-story', c => runF1Stories({ store, env, ctx, proxy, cap: c, now, until }));
   await step('words', 'words-cards', c => wordsCards({ store, env, ctx, cap: c, until }));
+  // (除錯紀錄週報: Mondays from 06:00 Taiwan, once a week; `ai-weekly` by hand makes it now.)
+  await step('weekly', 'rec-weekly', c => runRecWeekly({ store, env, ctx, cap: c, now, aiOnce, usage: () => meterUsage(env, now), force: only === 'weekly' }));
   return out;
 }
