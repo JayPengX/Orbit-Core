@@ -1765,6 +1765,169 @@ dialog.q-sheet.q-full {
   opacity: 0.35;
   pointer-events: none;
 }
+/* An AI answer, drawn (kit/ai.mjs aiAnswer / aiAnswerHtml): the line under
+   Orbit AI's mark, a picture beside it; then rows, each its picture in
+   front (a face, a logo, a tile, an emoji), its figure at the end, a bar
+   under it; the rows the line rests on lit. */
+.q-aia {
+  display: grid;
+  gap: 12px;
+}
+.q-aia-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.q-aia-head > .q-ai-mark {
+  margin-top: 3px;
+  color: var(--q-ai, var(--q-accent));
+}
+.q-aia-line {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--q-label);
+  font: 600 var(--q-t-body, 17px) / 1.35 var(--q-font);
+}
+.q-aia-sec {
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border-radius: var(--q-r-cell, 12px);
+  background: var(--nv-card, var(--q-fill-4));
+}
+.q-aia-sec h4 {
+  margin: 4px 8px 4px;
+  color: var(--q-label-2);
+  font: 600 var(--q-t-footnote, 13px) / 1.3 var(--q-font);
+}
+.q-aia-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 5px;
+  padding: 7px 8px;
+  border-radius: 10px;
+}
+.q-aia-row.bare {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.q-aia-row.on {
+  background: color-mix(in srgb, var(--q-accent) 12%, transparent);
+}
+.q-aia-text {
+  display: grid;
+  min-width: 0;
+}
+.q-aia-label {
+  overflow: hidden;
+  color: var(--q-label);
+  font: 400 var(--q-t-subhead, 15px) / 1.3 var(--q-font);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.q-aia-text small,
+.q-aia-end small {
+  color: var(--q-label-3, var(--q-muted));
+  font: 400 var(--q-t-caption, 12px) / 1.3 var(--q-font);
+}
+.q-aia-end {
+  display: grid;
+  justify-items: end;
+  text-align: right;
+}
+.q-aia-end b {
+  color: var(--q-label);
+  font: 600 var(--q-t-subhead, 15px) / 1.3 var(--q-font);
+  font-variant-numeric: tabular-nums;
+}
+.q-aia-end b.up {
+  color: var(--q-up);
+}
+.q-aia-end b.down {
+  color: var(--q-down);
+}
+.q-aia-row.on .q-aia-end b {
+  color: var(--q-accent);
+}
+.q-aia-bar {
+  position: relative;
+  grid-column: 2 / -1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--q-fill-3);
+  overflow: hidden;
+}
+.q-aia-row.bare .q-aia-bar {
+  grid-column: 1 / -1;
+}
+.q-aia-bar > i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 3px;
+}
+.q-aia-bar > .was {
+  background: var(--q-fill-1);
+}
+.q-aia-bar > .now {
+  background: var(--q-label-3, var(--q-muted));
+  opacity: 0.8;
+}
+.q-aia-row.on .q-aia-bar > .now {
+  background: var(--q-accent);
+  opacity: 1;
+}
+.q-aia-pic {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  border-radius: 9px;
+}
+.q-aia-pic.big {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+.q-aia-pic.round {
+  border-radius: 50%;
+  background: var(--q-fill-3);
+}
+.q-aia-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.q-aia-pic.cover img,
+.q-aia-pic.round img {
+  object-fit: cover;
+}
+.q-aia-pic.gone img {
+  display: none;
+}
+.q-aia-pic.tile {
+  background: var(--t);
+  color: #fff;
+}
+.q-aia-pic.tile svg {
+  width: 60%;
+  height: 60%;
+}
+.q-aia-pic.emoji {
+  background: var(--q-fill-3);
+  font-size: 18px;
+}
+.q-aia-pic.big.emoji {
+  font-size: 26px;
+}
+.q-aia-pic.node > * {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: inherit;
+}
 .q-ai-think {
   display: flex;
   align-items: center;

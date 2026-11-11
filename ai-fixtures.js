@@ -59,6 +59,12 @@ export const EXAMPLES = {
     { name: 'english', input: { question: 'Where did most of my money go this month?', facts: MONEY_FACTS, lang: 'en' } },
   ],
 
+  'sec-lesson': [
+    { name: 'sold below the best close', input: { facts: 'Stock: 台積電\n[pl] Result: 5000 TWD (+5%)\n[buy] Average cost a share: 1000\n[sell] Sold at: 1050\n[held] Held: 10 days\n[high] Best close while held: 1100 on 10/05 (+10% on cost)\n[low] Worst close while held: 980 on 10/03 (-2% on cost)\n[market] The market over the same days: +5%\n[costs] Fees and tax on the sale: 465 TWD' } },
+    { name: 'a loss in a rising market', input: { facts: 'Stock: 長榮\n[pl] Result: -12400 TWD (-8.3%)\n[buy] Average cost a share: 186.5\n[sell] Sold at: 171\n[held] Held: 41 days\n[high] Best close while held: 192 on 09/22 (+2.9% on cost)\n[low] Worst close while held: 168.5 on 10/28 (-9.7% on cost)\n[market] The market over the same days: +3.1%\n[costs] Fees and tax on the sale: 790 TWD' } },
+    { name: 'a quick day trade, costs ate it', input: { facts: 'Stock: 鴻海\n[pl] Result: 120 TWD (+0.1%)\n[buy] Average cost a share: 210\n[sell] Sold at: 211\n[held] Held: 0 days\n[costs] Fees and tax on the sale: 380 TWD' } },
+    { name: 'english', input: { lang: 'en', facts: 'Stock: Apple\n[pl] Result: 84.2 USD (+4.6%)\n[buy] Average cost a share: 182.4\n[sell] Sold at: 190.8\n[held] Held: 63 days\n[high] Best close while held: 199.1 on 10/14 (+9.2% on cost)\n[low] Worst close while held: 176 on 09/05 (-3.5% on cost)\n[market] The market over the same days: +6.8%\n[costs] Fees and tax on the sale: 1.2 USD' } }
+  ],
   // (Real filings of 11-10, as builders/filings.js parsed them.)
   'sec-filing': [
     {"name": "quarter loss", "input": {"title": "公告本公司董事會通過115年第2季合併財務報告", "name": "國慶科技", "rows": [["財務報告或年度自結財務資訊報導期間起訖日期", "115/01/01-115/09/30"], ["今年累計營業收入(仟元)", "1,227,508"], ["今年累計營業毛利(毛損)(仟元)", "−48,339"], ["今年累計營業利益(損失)(仟元)", "−185,240"], ["今年累計稅前淨利(淨損)(仟元)", "−193,085"], ["今年累計本期淨利(淨損)(仟元)", "−191,479"], ["今年累計歸屬於母公司業主淨利(損)(仟元)", "−191,479"], ["今年累計基本每股盈餘(損失)(元)", "−1.04"], ["期末總資產(仟元)", "2,848,896"], ["期末總負債(仟元)", "1,307,981"], ["期末歸屬於母公司業主之權益(仟元)", "1,540,915"]]}},
