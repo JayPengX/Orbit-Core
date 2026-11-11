@@ -144,12 +144,12 @@ export function previewFacts(summary, e) {
   const ap = apPreview(summary.article).map(p => tokenize(p, who));
   if (ap.length) worth.push('Preview (AP):', ...ap);
 
-  // Who's out: ESPN's list, Out first, with when each is due back.
+  // Who's out: ESPN's list, with when each is due back (a day already gone or the game's own: no date; Jay 11-11 saw 'back 11/11' for an 11/12 game).
   for (const side of summary?.injuries || []) {
     const out = (side.injuries || [])
       .filter(i => i.athlete?.id && /out|doubtful/i.test(i.status || ''))
       .slice(0, 5)
-      .map(i => `{p:${i.athlete.id}} ${i.status}${i.details?.type ? ` (${cut(i.details.type, 20)})` : ''}${i.details?.returnDate ? `, due back ${i.details.returnDate}` : ''}`);
+      .map(i => `{p:${i.athlete.id}} ${i.status}${i.details?.type ? ` (${cut(i.details.type, 20)})` : ''}${i.details?.returnDate && Date.parse(i.details.returnDate) > Date.parse(e.start) + 86_400_000 ? `, due back ${i.details.returnDate}` : ''}`);
     if (out.length) worth.push(`Out for ${tok(side.team?.id)}: ${out.join('; ')}`);
   }
   // A star's season (leaders: season averages before the game), for the AI to judge who matters.
