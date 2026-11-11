@@ -16,7 +16,7 @@ import { countOf, addOne } from './law.js';
 import { sessionLimited } from './orbit-token.js';
 import { aiOnce } from './ai.js';
 
-export const NEWS = { freshMs: 3_600_000, edgeS: 600, days: 45, keep: 40, perPass: 30, perMinute: 6, timeoutMs: 15_000, maxBytes: 3 * 1024 * 1024, hops: 4, aiBatch: 30 };
+export const NEWS = { freshMs: 3_600_000, edgeS: 600, days: 45, keep: 60, perPass: 30, perMinute: 6, timeoutMs: 15_000, maxBytes: 3 * 1024 * 1024, hops: 4, aiBatch: 30 };
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 
 // A school's site: a host under edu.tw, no credentials or port; null otherwise.
@@ -312,7 +312,7 @@ const edge = () => (typeof caches !== 'undefined' && caches.default) || null;
 // titles now (code-read), the AI's lines written behind (`wording`), the
 // phone asking again a few seconds on. One wording at a time a school.
 const NEWS_V = 3; // the class-news prompt's version: a new one words every school again
-const unworded = x => (x?.items || []).slice(0, NEWS.aiBatch).some(it => it.line == null);
+const unworded = x => (x?.items || []).some(it => it.line == null);
 export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now = Date.now(), build = true } = {}) {
   const key = keyOf(site);
   let kept = null;
@@ -326,12 +326,18 @@ export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now
   const today = twDay(now);
   // The AI's lines for the titles not yet worded, then kept.
   const word = async base => {
-    const fresh = base.items.slice(0, NEWS.aiBatch).filter(it => it.line == null);
-    if (!fresh.length) return base;
-    const r = await aiOnce(env, ctx, 'class-news', { school: new URL(site).hostname, today, items: fresh }, cap);
-    // (Failing, each is marked tried, '' its line: the title shows, asked again with the next read.)
-    const worded = r?.out || Object.fromEntries(fresh.map(it => [it.id, { line: '', who: null, act: '', by: '' }]));
-    const out = { ...base, wordingAt: 0, items: mergeWorded(base.items, [], worded) };
+    // (In batches of 30, newest first, each kept as it's done: the phone shows them as they come.)
+    let out = base;
+    for (let i = 0; i < Math.ceil(NEWS.keep / NEWS.aiBatch); i++) {
+      const fresh = out.items.filter(it => it.line == null).slice(0, NEWS.aiBatch);
+      if (!fresh.length) break;
+      const r = await aiOnce(env, ctx, 'class-news', { school: new URL(site).hostname, today, items: fresh }, cap);
+      // (Failing, each is marked tried, '' its line: the title shows, asked again with the next read.)
+      const worded = r?.out || Object.fromEntries(fresh.map(it => [it.id, { line: '', who: null, act: '', by: '' }]));
+      out = { ...out, items: mergeWorded(out.items, [], worded) };
+      await put({ ...out, wordingAt: out.items.some(it => it.line == null) ? out.wordingAt || now : 0 });
+    }
+    out = { ...out, wordingAt: 0 };
     await put(out);
     return out;
   };
@@ -350,7 +356,12 @@ export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now
   const rebuild = async () => {
     const read = await readSchool(site, fetchFn, today);
     if (!read || !read.items.length) return kept ? { ...kept, stale: true } : { site, at: now, items: [], how: read ? read.how : 'none', unread: !read };
-    return { site, at: now, v: NEWS_V, how: read.how, items: mergeWorded(read.items, kept?.items) };
+    // (What the school's list no longer shows but did, within 45 days, stays: a fuller list.)
+    const seen = new Set(read.items.flatMap(it => [it.id, it.title.replace(/\s+/g, '')]));
+    const from = new Date(Date.parse(`${today}T00:00:00Z`) - NEWS.days * 86_400_000).toISOString().slice(0, 10);
+    const older = (kept?.items || []).filter(it => !seen.has(it.id) && !seen.has(String(it.title || '').replace(/\s+/g, '')) && it.date >= from);
+    const items = [...read.items, ...older].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)).slice(0, NEWS.keep);
+    return { site, at: now, v: NEWS_V, how: read.how, items: mergeWorded(items, kept?.items) };
   };
   // An older copy answers now; the school is read again behind it.
   if (kept?.items?.length) {
@@ -414,12 +425,16 @@ export async function classNewsTry(env, raw, cap) {
 // The ops check (ai-try, feature=class-news&peek=<a school's page>): that
 // page as the relay reads it, to see how a school lays out its lists: its
 // links (text, address) and a slice of its text (from, n).
-export async function classNewsPeek(env, raw, { from = 0, n = 4000, method = 'GET', body = '' } = {}) {
+export async function classNewsPeek(env, raw, { from = 0, n = 4000, method = 'GET', body = '', grep = '' } = {}) {
   const url = schoolSite(raw);
   if (!url) return { error: 'site' };
   const via = env.GEMINI_RELAY ? (u, init) => env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, init) : fetch;
   const got = await getPage(url, via, method === 'POST' ? { method, headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body } : {});
   if (!got) return { url, error: 'unread' };
   const links = [...got.text.matchAll(/<a\b[^>]*href=["']([^"'#][^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)].map(m => [textOf(m[2]).slice(0, 40), m[1].slice(0, 160)]).filter(([t]) => t).slice(0, 300);
+  if (grep) {
+    const re = new RegExp(grep, 'gi');
+    return { url: got.url, length: got.text.length, hits: [...got.text.matchAll(re)].slice(0, 40).map(m => got.text.slice(Math.max(0, m.index - 200), m.index + 300)) };
+  }
   return { url: got.url, type: got.type, length: got.text.length, feeds: [...got.text.matchAll(/<link\b[^>]*(?:rss|atom)[^>]*>/gi)].map(m => m[0]).slice(0, 10), links, text: got.text.slice(+from || 0, (+from || 0) + Math.min(+n || 4000, 20000)) };
 }

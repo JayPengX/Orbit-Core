@@ -1452,7 +1452,7 @@ async function route(request, env, ctx, headers, origin) {
     if (check === 'ai-try') {
       const q = new URL(request.url).searchParams;
       // class-news on a school's live site (&site=): read and worded as a phone asks, kept as it would be.
-      if (q.get('feature') === 'class-news' && q.get('peek')) return json(await classNewsPeek(env, q.get('peek'), { from: q.get('from'), n: q.get('n'), method: q.get('method') || 'GET', body: q.get('body') || '' }), 200, headers);
+      if (q.get('feature') === 'class-news' && q.get('peek')) return json(await classNewsPeek(env, q.get('peek'), { from: q.get('from'), n: q.get('n'), method: q.get('method') || 'GET', body: q.get('body') || '', grep: q.get('grep') || '' }), 200, headers);
       if (q.get('feature') === 'class-news' && q.get('site')) return json(await classNewsTry(env, q.get('site'), await aiCap(env, ctx, 'class-news')), 200, headers);
       return json(await aiTry(env, ctx, q.get('feature') || '', { models: (q.get('models') || '').split(',').filter(Boolean), from: Number(q.get('from')) || 0, n: Number(q.get('n')) || 3, gemini: lawGemini('ai-try') }), 200, headers);
     }
