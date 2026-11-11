@@ -89,7 +89,7 @@ export const ECO_APPS = {
   orbit: { collection: 'orbit-class', maxPayload: 200_000 },
   weather: { collection: 'orbit-weather', maxPayload: 50_000 },
   transit: { collection: 'orbit-transit', maxPayload: 200_000 },
-  beats: { collection: 'orbit-beats', maxPayload: 50_000 },
+  beats: { collection: 'orbit-beats', maxPayload: 200_000 },
   law: { collection: 'orbit-law', maxPayload: 100_000 },
   money: { collection: 'orbit-money', maxPayload: 1_000_000 },
   news: { collection: 'orbit-news', maxPayload: 50_000 }

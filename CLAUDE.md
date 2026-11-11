@@ -121,7 +121,7 @@ modules for modulepreload. `node kit/apps.mjs` refreshes every app's snippets;
 | `passkey.mjs` | Passkeys in the browser: made, used, named (`passkeyHere()` false where a browser can't) |
 | `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); `TOPICS`; `sideOf`, `partiesIn`, `topicsOf`, `namesRe` |
 | `ai.mjs`, `family.mjs`, `today.mjs`, `ask-orbit.mjs` | AI (mark `icons.ai`, `--q-ai`; `.q-ai-ref` a name chip): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer`, `aiAnswerWait` (answers drawn); the phone's family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天; 問 Orbit (`routeAsk`, an app's `#ask=` by `takeAsk`) |
-| `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law |
+| `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law, Beats |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs`: qrcode-generator 2.0.4 (MIT), vendored |
 | `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays` |
 | `feedback.mjs` | Every app's picks, one engine: `shown`, `picked`, `passed`, `did` → weights per key (30-day half-life); `scorer`, `lifter`, `chance`, `whyOf` (常看), `hitRate`; on the Pass: `fb:<app>` |
