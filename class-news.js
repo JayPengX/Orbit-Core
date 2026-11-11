@@ -323,7 +323,7 @@ const edge = () => (typeof caches !== 'undefined' && caches.default) || null;
 // phone asking again a few seconds on. One wording at a time a school.
 const NEWS_V = 3; // the class-news prompt's version: a new one words every school again
 const unworded = x => (x?.items || []).some(it => it.line == null);
-export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now = Date.now(), build = true } = {}) {
+export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now = Date.now(), build = true, force = false } = {}) {
   const key = keyOf(site);
   let kept = null;
   try {
@@ -357,7 +357,7 @@ export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now
     later(put(marked).then(() => word(marked)));
     return { ...marked, wording: true };
   };
-  if (kept && now - kept.at < NEWS.freshMs) {
+  if (kept && !force && now - kept.at < NEWS.freshMs) {
     if (!unworded(kept)) return kept;
     if (wording(kept) || !build) return { ...kept, wording: wording(kept) };
     return startWording(kept);
@@ -416,14 +416,14 @@ export async function handleClassNews(request, env, ctx, headers, session, { cap
 
 // The ops check (ai-try, feature=class-news&site=): a school read and worded
 // now, as a phone's first ask then its ask again; what each answered and when.
-export async function classNewsTry(env, raw, cap) {
+export async function classNewsTry(env, raw, cap, { force = false } = {}) {
   const site = schoolSite(raw);
   if (!site) return { error: 'site' };
   const via = env.GEMINI_RELAY ? (u, init) => env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, init) : fetch;
   const pending = [];
   const ctx = { waitUntil: p => pending.push(p) };
   const t0 = Date.now();
-  const first = await schoolNews(env, ctx, site, { cap, fetchFn: via });
+  const first = await schoolNews(env, ctx, site, { cap, fetchFn: via, force });
   const firstMs = Date.now() - t0;
   while (pending.length) await Promise.all(pending.splice(0));
   const doneMs = Date.now() - t0;
