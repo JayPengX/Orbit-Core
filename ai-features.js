@@ -883,6 +883,101 @@ export const FEATURES = {
     }
   },
 
+  // Orbit 助理 (kit ask-orbit.mjs, on the Pass sheet's 問 Orbit): a question
+  // about the person's day ("今天要注意什麼", "明天要準備什麼") or one no rule
+  // knows. Code gathers the facts the person's apps told the family notebook
+  // on this phone (kit today.mjs `dayFacts`: classes, the weather's lines,
+  // words due, games, trips, days off), each with an id; the model only picks
+  // the ones that answer, says it in a line, and names an app when the
+  // question is really for one. Sonnet: telling what matters is judgment.
+  'orbit-ask': {
+    app: '*',
+    tap: true,
+    models: ['sonnet', 'sol'],
+    effort: { sol: 'low' },
+    perPass: 30,
+    perMinute: 6,
+    maxIn: 6000,
+    input(raw) {
+      const q = str(raw?.q, 200);
+      const now = str(raw?.now, 40);
+      if (!q || !now) return null;
+      const facts = list(raw?.facts, 40)
+        .map(f => ({ id: str(f?.id, 12), app: str(f?.app, 12), text: str(f?.text, 160) }))
+        .filter(f => f.id && f.text);
+      const apps = list(raw?.apps, 12).map(a => str(a, 12)).filter(Boolean);
+      return { q, now, facts, apps, en: raw?.lang === 'en' };
+    },
+    parts: ({ q, now, facts, apps, en }) =>
+      text(
+        [
+          'You are Orbit, the assistant of a family of phone apps a student in Taiwan uses (orbit = Class: timetable and school; weather; transit; match = Sports; vocab = Words; money; stock = Securities; news; law; beats = music).',
+          `Now: ${now} (Asia/Taipei).`,
+          'Below are facts the person\'s own apps keep on this phone, each with an id. Answer the question from them only.',
+          `line: the answer in one or two short sentences, at most 60 字, ${en ? 'in English (at most 35 words)' : '繁體中文（台灣用語，全形標點）'}, speaking to the person (你). Lead with what matters most for the question (rain on a day with 體育課, a game during class, words due). Every number and time you write must be in the facts. Never invent a class, a game, a plan or advice the facts don\'t support. If the facts don\'t answer it, say so plainly in a short line and leave ids empty.`,
+          'ids: the ids of the facts that answer it, most important first, at most 5 (the app shows them as rows the person can tap).',
+          `app: when the question is really for one app to answer itself (a trip to plan, a score, a law, a price, money spent), that app\'s id from: ${apps.join(', ')}; else "".`,
+          `Question: ${q}`,
+          'Facts:',
+          facts.length ? facts.map(f => `${f.id} [${f.app}] ${f.text}`).join('\n') : '(none: the apps have told nothing on this phone yet)'
+        ].join('\n')
+      ),
+    schema: obj({ line: S, ids: arr(S), app: S }),
+    clean(raw, { q, facts, apps, en }) {
+      const line = str(raw?.line, en ? 260 : 90);
+      if (!line) return null;
+      const given = new Set(facts.map(f => f.id));
+      const ids = [...new Set(list(raw?.ids, 8).map(x => String(x || '')).filter(x => given.has(x)))].slice(0, 5);
+      // (A number the facts or the question don't hold: the line is not shown.)
+      if (!numbersFrom(line, `${q} ${facts.map(f => f.text).join(' ')}`)) return { line: '', ids, app: apps.includes(raw?.app) ? raw.app : '' };
+      return { line, ids, app: apps.includes(raw?.app) ? raw.app : '' };
+    }
+  },
+
+  // Showcase 問 Orbit (Orbit-Showcase views/ask.mjs): a reader's question
+  // about how Orbit was made ("怎麼做到不花錢", "AI 做了什麼"). The page's
+  // code picks the structure tree's cards that share its words (problem →
+  // idea → result, each with an id); the model answers from those only, in
+  // plain words, and names the cards to open. The showcase's own pass
+  // (showcase.js), a Pass per address. Haiku: writing from given text.
+  'showcase-ask': {
+    app: 'showcase',
+    tap: true,
+    models: ['haiku', 'luna'],
+    effort: { luna: 'low' },
+    perPass: 20,
+    perMinute: 6,
+    maxIn: 8000,
+    input(raw) {
+      const q = str(raw?.q, 200);
+      if (!q) return null;
+      const cards = list(raw?.cards, 8)
+        .map(c => ({ id: str(c?.id, 40), title: str(c?.title, 60), text: str(c?.text, 900) }))
+        .filter(c => c.id && c.text);
+      return { q, cards, en: raw?.lang === 'en' };
+    },
+    parts: ({ q, cards, en }) =>
+      text(
+        [
+          'You answer a visitor\'s question on the showcase page of Orbit: ten everyday phone web apps a Taiwanese high-school student (Jay) built with Claude (he sets the direction, the standards and the judgment calls; Claude does the typing). Readers are teachers and professors who know no tech.',
+          'Answer only from the cards below (each: a problem, the idea, the result). Plain everyday words, no technical names. If the cards don\'t answer it, say so in a short line and leave ids empty; never invent a number, a feature or a date.',
+          `line: ${en ? 'at most 45 words, English' : 'at most 80 字, 繁體中文（台灣用語，全形標點）'}. Every number must be in the cards.`,
+          'ids: the cards that answer it, most useful first, at most 3 (the page shows them as links).',
+          `Question: ${q}`,
+          'Cards:',
+          cards.map(c => `${c.id} | ${c.title} | ${c.text}`).join('\n')
+        ].join('\n')
+      ),
+    schema: obj({ line: S, ids: arr(S) }),
+    clean(raw, { q, cards, en }) {
+      const line = str(raw?.line, en ? 320 : 120);
+      const given = new Set(cards.map(c => c.id));
+      const ids = [...new Set(list(raw?.ids, 6).map(x => String(x || '')).filter(x => given.has(x)))].slice(0, 3);
+      if (!line || !numbersFrom(line, `${q} ${cards.map(c => `${c.title} ${c.text}`).join(' ')}`)) return ids.length ? { line: '', ids } : null;
+      return { line, ids };
+    }
+  },
+
   // 除錯紀錄週報 (rec-weekly.js, Mondays): the week's bug-report groups code
   // made (by app and what went wrong, counted) and the proxy's 5xx by route,
   // each named in plain words with what it likely means; the owner reads it

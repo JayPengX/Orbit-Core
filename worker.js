@@ -1397,7 +1397,9 @@ async function route(request, env, ctx, headers, origin) {
     try {
       feature = String((await request.clone().json())?.feature || '');
     } catch {}
-    return handleAi(request, env, ctx, headers, await sessionOf(request, env), { cap: FEATURES[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai') });
+    // (The showcase's 問 Orbit: its own pass, never a Pass session's door.)
+    const session = FEATURES[feature]?.app === 'showcase' ? await showcaseOf(request, env, { ip, origin }) : await sessionOf(request, env);
+    return handleAi(request, env, ctx, headers, session, { cap: FEATURES[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai') });
   }
   // Orbit Class's 學校公告摘要 (class-news.js): a school's list read by code, worded once an hour by the AI, kept in R2.
   if (path === '/class-news') return handleClassNews(request, env, ctx, headers, await sessionOf(request, env), { cap: await aiCap(env, ctx, 'class-news') });

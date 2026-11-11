@@ -54,6 +54,25 @@ const JOB = [{"n":"一","text":"乙方擔任甲方門市兼職人員，工作時
 // A real 議事錄 as Law's build cuts it (lib/minutes.mjs digest): 伸港's results sit in the chair's speeches.
 const MINUTES_SHENGANG = "時間：中華民國114年1月13日起至1月15止\n1月15日（星期三）：第三次會：討論提案、臨時動議、閉幕典禮。\n家好！這一次召開第21屆第11次臨時會，要審議公所提案，請代\n1月13日（星期一）：第一次會：報到、預備會議。\n1月14日（星期二）：第二次會：開幕典禮、討論提案。\n1月15日（星期三）：第三次會：討論提案、臨時動議、閉幕典禮。\n公所第1號提案。\n伸港鄉公所第1號提案\n提案人：鄉長黄永欽\n類別：社政\n案由：為本所辦理「伸港鄉海尾社區活動中心廁所及關懷據點簡\n易廚房新建工程」，彰化縣政府補助新台幣（下同）450萬\n元，及本所自籌配合款620萬1,186元，合計1,070萬\n1,186元，請同意先行墊付。\n理由：\n辦法：審議通過後先行墊付，俟辦理114年追加減預算或115年\n萬1,186元，請大會同意先行墊付，以上報告，敬請代表支持通過。\n代表同仁對公所第1號提案是否有意見？如無意見本案照原案\n通過。請陳秘書宣讀公所第2號提案。\n伸港鄉公所第2號提案\n提案人：鄉長黄永欽\n類別：環保\n案由：有關彰化縣環境保護局核定「114年公共設施改善-補助鄉\n鎮市購置垃圾車及資源回收車」案，補助本所垃圾車及資\n源回收車各1輛，彰化縣政府補助257萬2,350元(55%)，\n本所需自籌配合款210萬4,650元(45%)，合計新台幣467\n理由：\n辦法：審議通過後，先行墊付，俟辦理114年追加減預算或115年\n付支應，以上報告，請多多支持通過，謝謝。\n各位代表同仁對公所第2號提案是否有意見？如無意見本案照\n原案通過。請陳秘書宣讀公所第3號提案。\n伸港鄉公所第3號提案\n提案人：鄉長黄永欽\n類別：社政\n案由：為本所辦理「彰化縣伸港鄉老人文康中心屋頂防水修繕及\n牆面粉刷工程」，衛生福利部補助新台幣（下同）225萬元\n整，及本所自籌配合款25萬元整，合計250萬元整，請同\n意先行墊付。\n理由：\n辦法：審議通過後先行墊付，俟辦理114年追加減預算或115年\n萬元，請大會同意先行墊付，以上報告，敬請代表支持通過，謝謝。\n各位代表同仁對公所第3號提案是否有意見？如無意見本案照\n原案通過。\n各位代表是否要發言或臨時動議要提？若無，本次臨時會議到";
 
+// Orbit 助理's facts as today.mjs dayFacts says them (a sample student's phone).
+const ORBIT_APPS = ['weather', 'transit', 'match', 'orbit', 'money', 'vocab', 'stock', 'news', 'law', 'beats'];
+const ORBIT_FACTS = [
+  { id: 'f1', app: 'orbit', text: '明天（11/12 週四） 上課 08:10–16:00: 1 國文 08:10, 2 英文 09:10, 3 數學 10:10, 4 化學 11:10, 5 體育 13:10（戶外）, 6 歷史 14:10, 7 物理 15:10' },
+  { id: 'f2', app: 'orbit', text: '學校: 竹東高中' },
+  { id: 'f3', app: 'weather', text: '明天（11/12 週四） 天氣: 雨傘：要帶，14時起 70%' },
+  { id: 'f4', app: 'weather', text: '明天（11/12 週四） 天氣: 體育課：13:10 體育，雨 60%，可能改室內' },
+  { id: 'f5', app: 'vocab', text: '今天有 18 個單字該複習' },
+  { id: 'f6', app: 'match', text: '追蹤的比賽: 湖人 vs 勇士, 明天（11/12 週四） 10:30，正在上第3節數學' },
+  { id: 'f7', app: 'orbit', text: '11/15（週六） 放假: 國父誕辰紀念日（補假）' },
+  { id: 'f8', app: 'transit', text: '常用行程: 上學 從 家 到 竹東高中' }
+];
+// The showcase's cards as lib/ask.mjs gives them (two of the tree's, shortened).
+const SHOW_CARDS = [
+  { id: 'cheap', title: '不超過額度、不花錢', text: '每天用得到，但不能每個月付錢。 服務都要錢，用多了會被收費。 能放成靜態檔案的就放，能在手機上算的就在手機上算，伺服器只做非做不可的事；一個守門員每 5 分鐘看一次帳單。 主機費 0 元，只有網址每年付一次。' },
+  { id: 'team', title: '怎麼做出來的', text: 'Jay 不寫程式：他決定要做什麼、定標準、做取捨，每天在 iPhone 上試；Claude 寫程式、測試、推上去。' },
+  { id: 'kit', title: '共用零件', text: '像樂高：十個 App 用同一盒積木。 改一次，十個 App 同時變好。' }
+];
+
 export const EXAMPLES = {
   'money-ask': [
     { name: 'how it was paid', input: { question: '這個月的錢都怎麼付出去的', facts: MONEY_FACTS } },
@@ -186,6 +205,18 @@ export const EXAMPLES = {
     { name: 'place', input: { text: '海邊夕陽' } },
     { name: 'sound', input: { text: '有點像周杰倫那種中國風但要帶節奏' } },
     { name: 'nonsense', input: { text: '明天幾點開會' } }
+  ],
+  'orbit-ask': [
+    { name: 'tomorrow', input: { q: '明天要注意什麼', now: '2026-11-11 21:00 Wed', facts: ORBIT_FACTS, apps: ORBIT_APPS } },
+    { name: 'today', input: { q: '今天還有什麼事', now: '2026-11-11 21:00 Wed', facts: ORBIT_FACTS, apps: ORBIT_APPS } },
+    { name: 'for an app', input: { q: '怎麼去台北車站', now: '2026-11-11 21:00 Wed', facts: ORBIT_FACTS, apps: ORBIT_APPS } },
+    { name: 'not there', input: { q: '我下週考試考什麼', now: '2026-11-11 21:00 Wed', facts: ORBIT_FACTS, apps: ORBIT_APPS } },
+    { name: 'english', input: { q: 'What should I watch out for tomorrow?', now: '2026-11-11 21:00 Wed', facts: ORBIT_FACTS, apps: ORBIT_APPS, lang: 'en' } }
+  ],
+  'showcase-ask': [
+    { name: 'free', input: { q: '怎麼做到不花錢？', cards: SHOW_CARDS } },
+    { name: 'who codes', input: { q: 'Jay 自己寫程式嗎？', cards: SHOW_CARDS } },
+    { name: 'not there', input: { q: '這個 App 要多少錢？', cards: SHOW_CARDS } }
   ],
   'weather-ask': [
     { name: 'mountain', input: { question: '週六合歡山會下雪嗎', place: '合歡山' } },

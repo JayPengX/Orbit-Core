@@ -7,7 +7,8 @@
 // showcase's address, and only from the address it was given to (its IP's
 // block or an IPv4 /24, placeOf). It opens reads only, and only these: Transit and
 // Weather (worker.js) and the data proxy's reads for Sports (sports.js). The
-// Pass, wallets, orders, AI, notices and every write still want a real Pass.
+// Pass, wallets, orders, notices, every write and every AI but the showcase's
+// own 問 Orbit (ai-features.js 'showcase-ask', worker.js /ai) still want a real Pass.
 //
 // The limits: a few passes an hour per address, SHOW_DAY_CAP passes a day for
 // everyone (a KV count by Taiwan's day), each pass's asks a minute (the

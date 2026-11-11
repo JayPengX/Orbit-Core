@@ -42,3 +42,21 @@ test('the evening shows tomorrow’s first class; old facts are left out', () =>
   const later = Date.parse('2026-11-12T02:30:00Z');
   assert.deepEqual(todayRows({ now: later }).filter(r => r.app !== 'orbit'), []);
 });
+
+test('Orbit 助理’s facts: the days’ classes, the weather, games (one in class time says so), days off, trips; each an id', async () => {
+  const { dayFacts } = await import('../kit/today.mjs');
+  const at = Date.parse('2026-11-10T02:30:00Z'); // Tue 10:30
+  F.tell('class', 'days', { '2026-11-10': [{ n: 3, name: '數學', from: '10:10', to: '11:00' }, { n: 4, name: '體育', from: '11:10', to: '12:00', out: true }] }, at);
+  F.tell('sports', 'games', [{ id: 'nba:1', at: Date.parse('2026-11-10T03:20:00Z'), mins: 150, title: '湖人 vs 勇士', hash: '#event=nba:1' }], at);
+  F.tell('transit', 'trips', [{ name: '回家', from: null, to: { lat: 24.8, lon: 121, name: '家' } }], at);
+  const facts = dayFacts({ now: at, holiday: d => (d === '2026-11-12' ? { zh: '國父誕辰', en: 'Sun Yat-sen’s birthday' } : null), plan: p => `#plan?to=${p.lat},${p.lon}` });
+  const ids = new Set(facts.map(f => f.id));
+  assert.equal(ids.size, facts.length);
+  const cls = facts.find(f => f.app === 'orbit' && /節課/.test(f.label));
+  assert.match(cls.text, /今天（11\/10 週二） 上課 10:10–12:00: 3 數學 10:10, 4 體育 11:10（戶外）/);
+  const game = facts.find(f => f.app === 'match');
+  assert.match(game.text, /正在上第4節體育/);
+  assert.equal(game.hash, 'event=nba:1');
+  assert.ok(facts.some(f => /國父誕辰/.test(f.text) && /11\/12/.test(f.text)));
+  assert.equal(facts.find(f => f.app === 'transit').hash, 'plan?to=24.8,121');
+});
