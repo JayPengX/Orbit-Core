@@ -521,6 +521,11 @@ test('one sentence and the morning brief, from the numbers', async () => {
   assert.equal(rainPhrase([{ t: t(8), pop: 10 }, { t: t(10), pop: 35 }], t(8)), '10 點前後 35% 會下雨');
   assert.equal(rainPhrase([{ t: t(8), pop: 10 }], t(8)), '未來 12 小時不太會下雨');
   assert.equal(rainPhrase([{ t: t(8), pop: 80 }], t(8) + 600_000), '正在或即將下雨（80%）');
+  // An English subscriber's brief is in English (no Chinese in it but the place's name).
+  const en = briefText(resp, morning, 'en');
+  assert.match(en.title, /^\{title\} \d+° \/ \d+°$/);
+  assert.ok(en.body && !/[\u4e00-\u9fff]/.test(en.body), en.body);
+  assert.equal(rainPhrase([{ t: t(8), pop: 10 }, { t: t(15), pop: 70 }], t(8), 12, undefined, 'en'), 'Rain likely from 15:00 (70%)');
 });
 
 test('the rain alert answers only when the next 2 hours turn wet', async () => {
@@ -537,6 +542,8 @@ test('the rain alert answers only when the next 2 hours turn wet', async () => {
   const alert = await weatherCheck(e, { lat: 25.034, lon: 121.565, kind: 'rain' }, { fetchFn: upstream(), now: at });
   assert.equal(alert.title, '{title} · 13:00');
   assert.match(alert.body, /^降雨機率 75%/);
+  const alertEn = await weatherCheck(e, { lat: 25.034, lon: 121.565, kind: 'rain' }, { fetchFn: upstream(), now: at, lang: 'en' });
+  assert.match(alertEn.body, /^75% chance of rain/);
   // A fresh radar frame with nothing coming for two hours: the wet hour within the hour waits (Jay 2026-11-10).
   const still = btoa(String.fromCharCode(...new Uint8Array(2 * 14 * 18)));
   const DATA = { get: async (k, o) => ({ customMetadata: { at: String(at - 10 * 60_000), motion: still }, arrayBuffer: async () => new ArrayBuffer(o.range.length) }) };

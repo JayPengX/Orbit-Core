@@ -61,7 +61,6 @@ export function heard(app, key, { maxAge = Infinity, now = Date.now() } = {}) {
   const f = read()[`${app}.${key}`];
   return f && now - f.at <= maxAge ? f.v : null;
 }
-export const heardAt = (app, key) => read()[`${app}.${key}`]?.at ?? null;
 
 const okPlace = p => p && Number.isFinite(+p.lat) && Number.isFinite(+p.lon);
 // A trip in Orbit Transit (its #plan, Transit's lib/links.mjs): from where
@@ -109,4 +108,3 @@ export function breakAfter(t = Date.now()) {
   const { day } = twParts(t);
   return Date.parse(`${day}T${p.to.padStart(5, '0')}:00+08:00`);
 }
-export const momentOf = (day, hm) => Date.parse(`${day}T${String(hm).padStart(5, '0')}:00+08:00`);

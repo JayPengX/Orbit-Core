@@ -399,7 +399,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
 - **`quota-guard`** (`guard.js`, every 5 minutes) reads the use against
   `PLAN`, paces on real use only (`paceFor`: past 60/75/85% at a rate
   reaching the stop; 85% `newcomers: false`; `pace.js`), a forecast only
-  warns (`forecastOf`), mails at 50/75/90% (`ops.js`); 90%: the proxy off. Google: Maps stops at 90% of each SKU's free
+  warns (`forecastOf`), a push notice to the owner at 50/75/90% (`ops.js` `tellOwner`); 90%: the proxy off. Google: Maps stops at 90% of each SKU's free
   month, Weather under 8,500 a month (`googleDayCap`).
 - **TDX** (`transit.js`): `tdxPlan` (free from 12-01: 3 points a month);
   `tdxGuard`: people's share a day, kept longer as it's spent, copies only

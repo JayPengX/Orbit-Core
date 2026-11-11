@@ -3251,7 +3251,9 @@ export const NOTICE_KINDS = {
   ],
   transit: [
     ['bus', '到站提醒', 'Bus alert', '你設定的公車快到站時，手機鎖著也會通知。', 'When a bus you set an alert for is nearly at your stop, even with the phone locked.'],
-    ['nav', '導航提醒', 'Navigation', '導航中：該出發、要搭的公車快到了、火車快開、快到下車站，手機鎖著也會通知。', 'While navigating: time to leave, your bus nearly here, your train about to leave, your stop coming up, even with the phone locked.']
+    ['nav', '導航提醒', 'Navigation', '導航中：該出發、要搭的公車快到了、火車快開、快到下車站，手機鎖著也會通知。', 'While navigating: time to leave, your bus nearly here, your train about to leave, your stop coming up, even with the phone locked.'],
+    ['trip', '行程出發提醒', 'Time to leave', '存好的固定行程，出發前 10 分鐘。', 'Ten minutes before it’s time to leave for a saved trip.'],
+    ['bike', 'YouBike 免費時間', 'YouBike free time', '騎了 25 分鐘，5 分鐘內還車再借，下一段仍免費。', 'After 25 minutes on a YouBike: return and re-rent within 5 minutes to keep riding free.']
   ]
 };
 

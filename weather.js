@@ -1080,14 +1080,19 @@ const hourIn = (ms, tz) => Number(clockIn(ms, tz).slice(0, 2));
 
 // The next hours' rain, said once: when it starts and how likely, or that
 // it stays dry.
-export function rainPhrase(hours, now, span = 12, tz) {
+export function rainPhrase(hours, now, span = 12, tz, lang = 'zh') {
   const next = (hours || []).filter(h => h.t + HOUR > now && h.t < now + span * HOUR && h.pop != null);
   if (!next.length) return null;
   const first = next.find(h => h.pop >= 50);
   const top = next.reduce((a, h) => (h.pop > a.pop ? h : a), next[0]);
-  if (first) return first.t <= now ? `正在或即將下雨（${first.pop}%）` : `${hourIn(first.t, tz)} 點起可能下雨（${Math.max(first.pop, top.pop)}%）`;
-  if (top.pop >= 30) return `${hourIn(top.t, tz)} 點前後 ${top.pop}% 會下雨`;
-  return `未來 ${span} 小時不太會下雨`;
+  const en = lang === 'en';
+  if (first) {
+    if (first.t <= now) return en ? `Rain now or soon (${first.pop}%)` : `正在或即將下雨（${first.pop}%）`;
+    const pop = Math.max(first.pop, top.pop);
+    return en ? `Rain likely from ${hourIn(first.t, tz)}:00 (${pop}%)` : `${hourIn(first.t, tz)} 點起可能下雨（${pop}%）`;
+  }
+  if (top.pop >= 30) return en ? `${top.pop}% chance of rain around ${hourIn(top.t, tz)}:00` : `${hourIn(top.t, tz)} 點前後 ${top.pop}% 會下雨`;
+  return en ? `Little chance of rain in the next ${span} hours` : `未來 ${span} 小時不太會下雨`;
 }
 
 export function headline(resp, now) {
@@ -1107,19 +1112,25 @@ export function headline(resp, now) {
 // The morning brief (push.js, check { weather }): today, in one line.
 // The title the day's high and low (the app's own name for the place before
 // them, "{title}": 家 今天天氣 31° / 25°), the line under it the rest.
-export function briefText(resp, now) {
+// English words for the brief (a subscriber whose app is in English: push.js
+// record.lang); the zh words are the advice's and the air reading's own.
+const UV_EN = { 低: 'low', 中: 'moderate', 高: 'high', 過量: 'very high', 危險: 'extreme' };
+const AQI_EN = { 良好: 'good', 普通: 'moderate', 對敏感族群不健康: 'unhealthy for sensitive groups', 對所有族群不健康: 'unhealthy', 非常不健康: 'very unhealthy', 危害: 'hazardous' };
+const WEAR_EN = { coat: 'wear a coat', jacket: 'bring a light jacket', sleeves: 'long or short sleeves', light: 'light short sleeves' };
+export function briefText(resp, now, lang = 'zh') {
   const tz = resp.tz;
+  const en = lang === 'en';
   const parts = [];
-  const rain = rainPhrase(resp.hours, now, 14, tz);
+  const rain = rainPhrase(resp.hours, now, 14, tz, lang);
   if (rain) parts.push(rain);
   const d = resp.days?.find(x => x.date === twDay(now)) || resp.days?.[0];
   const temps = d?.hi != null ? `${Math.round(d.hi)}°${d.lo != null ? ` / ${Math.round(d.lo)}°` : ''}` : '';
   const sun = resp.advice?.find(a => a.kind === 'sun' && a.level !== 'none');
-  if (sun) parts.push(`UV ${hourIn(sun.why.from, tz)}–${hourIn(sun.why.to, tz)} 點${sun.level}`);
-  if (resp.air?.level) parts.push(`空氣${resp.air.level}`);
+  if (sun) parts.push(en ? `UV ${UV_EN[sun.level] || sun.level} ${hourIn(sun.why.from, tz)}:00–${hourIn(sun.why.to, tz)}:00` : `UV ${hourIn(sun.why.from, tz)}–${hourIn(sun.why.to, tz)} 點${sun.level}`);
+  if (resp.air?.level) parts.push(en ? (AQI_EN[resp.air.level] ? `air ${AQI_EN[resp.air.level]}` : resp.air.aqi != null ? `AQI ${resp.air.aqi}` : '') : `空氣${resp.air.level}`);
   const wear = resp.advice?.find(a => a.kind === 'wear');
-  if (wear) parts.push(wear.text.replace(/^穿著：/, ''));
-  return { title: `{title}${temps ? ` ${temps}` : ''}`, body: parts.join('，'), place: resp.place?.town || '' };
+  if (wear) parts.push(en ? `${WEAR_EN[wear.level] || ''}${wear.why?.layers ? `${WEAR_EN[wear.level] ? ', ' : ''}layers for morning and evening` : ''}` : wear.text.replace(/^穿著：/, ''));
+  return { title: `{title}${temps ? ` ${temps}` : ''}`, body: parts.filter(Boolean).join(en ? '; ' : '，'), place: resp.place?.town || '' };
 }
 
 // A notice's check (push.js): { weather: { lat, lon, kind: 'brief' | 'rain' } }.
@@ -1132,29 +1143,33 @@ export function briefText(resp, now) {
 // 2026-11-10: an alert said rain while the page said 晴).
 export const RAIN_ALERT = 60;
 export const RADAR_ALERT_MMH = 1;
-export function radarNotice(rain, now, tz) {
+export function radarNotice(rain, now, tz, lang = 'zh') {
   if (!rain || rain.kind !== 'start' || rain.peak < RADAR_ALERT_MMH || rain.from - now > HOUR) return null;
   const word = rainWord(rain.peak);
   const mins = Math.max(5, Math.round((rain.from - now) / (5 * MIN)) * 5);
   const lasts = rain.to ? `約 ${clockIn(rain.to, tz)} 停（下 ${Math.max(5, Math.round((rain.to - rain.from) / (5 * MIN)) * 5)} 分鐘左右）` : `至少下到 ${clockIn(rain.until, tz)}`;
+  if (lang === 'en') {
+    const lastsEn = rain.to ? `stopping about ${clockIn(rain.to, tz)} (about ${Math.max(5, Math.round((rain.to - rain.from) / (5 * MIN)) * 5)} min)` : `until at least ${clockIn(rain.until, tz)}`;
+    return { title: `{title} · ${word.en} from ${clockIn(rain.from, tz)}`, body: `Starts in about ${mins} min, ${lastsEn}; ${word.tipEn}. Rain clouds tracked by radar, within about 1.5 km` };
+  }
   return { title: `{title} · ${clockIn(rain.from, tz)} 起${word.zh}`, body: `約 ${mins} 分鐘後開始，${lasts}，${word.tipZh}。雷達追蹤雨雲，約 1.5 公里內` };
 }
-export async function weatherCheck(env, w, { fetchFn = fetch, now = Date.now() } = {}) {
+export async function weatherCheck(env, w, { fetchFn = fetch, now = Date.now(), lang = 'zh' } = {}) {
   const jobs = [];
   const resp = await cellForecast(env, { waitUntil: p => jobs.push(p) }, w.lat, w.lon, { fetchFn, now, freshMs: HOUR });
   if (w.kind === 'brief') {
     await Promise.all(jobs);
-    return briefText(resp, now);
+    return briefText(resp, now, lang);
   }
   const rain = rainNow(await radarAt(env, w.lat, w.lon, now).catch(() => null), now);
   await Promise.all(jobs);
   const place = resp.place?.town || '';
-  const said = radarNotice(rain, now, resp.tz);
+  const said = radarNotice(rain, now, resp.tz, lang);
   if (said) return { ...said, place };
   const seen = rain?.kind === 'dry' ? Math.min(rain.until, now + HOUR) : rain ? Infinity : now;
   const wet = (resp.hours || []).find(h => h.t + HOUR > now && h.t < now + 2 * HOUR && h.pop >= RAIN_ALERT && h.t >= seen);
   if (!wet) return null;
-  return { title: `{title} · ${clockIn(Math.max(wet.t, now), resp.tz)}`, body: `降雨機率 ${wet.pop}%，出門記得帶傘`, place };
+  return { title: `{title} · ${clockIn(Math.max(wet.t, now), resp.tz)}`, body: lang === 'en' ? `${wet.pop}% chance of rain, take an umbrella` : `降雨機率 ${wet.pop}%，出門記得帶傘`, place };
 }
 
 // ---- Advice (plan section D; thresholds in one table) ---------------------------

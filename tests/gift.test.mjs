@@ -149,6 +149,10 @@ test('times: soon before it opens, over after it closes; a network at most `rate
   assert.equal((await t.device('8.8.8.8')()).data.state, 'over');
   assert.equal((await t.device('8.8.8.8', 'https://evil.example')()).status, 403);
   assert.equal((await t.admin('gift-set', { opens: now + 10, closes: now })).error?.code, 'GIFT_TIMES');
+  // An empty field leaves its setting as it was (never 0).
+  const kept = (await t.admin('gift-set', { total: '', rate: '', hold: '' })).gift;
+  assert.equal(kept.total, 100);
+  assert.equal(kept.rate, 2);
 });
 
 test('a new round counts afresh and lets each device claim once more', async () => {

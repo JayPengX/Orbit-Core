@@ -902,36 +902,6 @@ export const FEATURES = {
     }
   },
 
-  'transit-notice': {
-    models: ['luna', 'haiku'],
-    effort: { luna: 'low' },
-    parts: ({ title, body, today }) =>
-      text(
-        [
-          'Read this Taiwanese public-transport notice and say what it changes.',
-          `Today is ${today}.`,
-          'routes: names of the routes or lines the change applies to, copied exactly as written (e.g. 307, 紅2, 板南線). Never a phrase like 所有路線, 全部路線 or 全線. If it applies to every route, routes is [] and scope is "全部"; otherwise scope is "指定".',
-          'stops: stops or stations riders lose or that change (skipped, moved, closed), copied exactly as written including brackets (e.g. 臺北車站(忠孝)站). instead: stops the notice tells riders to use instead, copied exactly. Never put a stop in both lists.',
-          'from / to: when the change starts and ends. Convert 民國 years by adding 1911 (115年 → 2026). For a date with no year (11/10) or 今日/明日, use Today. Write YYYY-MM-DD HH:MM (24-hour) only if a clock time is stated (22時 → 22:00, 下午4時 → 16:00); otherwise YYYY-MM-DD only, never an invented 00:00. Use "" when not said or 另行公告.',
-          'kind: exactly one of 停駛 改道 施工 停靠調整 班次調整 票價 其他, describing what riders experience, not the cause. Road works that reroute a bus are 改道. Use 施工 only when the works themselves are the change (e.g. an exit or elevator closed).',
-          'short: one line ≤ 30 字, 台灣用語 and 全形標點, saying what the rider must do differently: which way the bus goes now, where to board instead, which direction is affected. Do not repeat route names, dates or times, or list the skipped stops; those are shown separately. Name a stop only where to go instead, exactly as written. No 敬請見諒, 請注意 or 另行公告.',
-          `Title: ${title}`,
-          `Text: ${body}`
-        ].join('\n')
-      ),
-    schema: obj({ routes: arr(S), scope: S, stops: arr(S), instead: arr(S), from: S, to: S, kind: S, short: S }),
-    clean: (raw, { title, body }) => {
-      const all = `${title}\n${body}`;
-      const routes = list(raw?.routes, 40).map(r => str(r, 20)).filter(r => r && all.includes(r) && !/所有|全部|全線/.test(r));
-      const instead = list(raw?.instead, 10).map(r => str(r, 30)).filter(r => r && all.includes(r));
-      const stops = list(raw?.stops, 40).map(r => str(r, 30)).filter(r => r && all.includes(r) && !instead.includes(r));
-      const when = v => (/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(v || '') ? v : '');
-      const kinds = ['停駛', '改道', '施工', '停靠調整', '班次調整', '票價', '其他'];
-      const kind = kinds.includes(raw?.kind) ? raw.kind : '其他';
-      return { routes, scope: raw?.scope === '全部' ? '全部' : '指定', stops, instead, from: when(raw?.from), to: when(raw?.to), kind, short: str(raw?.short, 40) };
-    }
-  },
-
   // Orbit 助理 (kit ask-orbit.mjs, on the Pass sheet's 問 Orbit): a question
   // about the person's day ("今天要注意什麼", "明天要準備什麼") or one no rule
   // knows. Code gathers the facts the person's apps told the family notebook

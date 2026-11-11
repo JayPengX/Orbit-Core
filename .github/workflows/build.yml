@@ -12,7 +12,7 @@ on:
       job:
         description: The job
         type: choice
-        options: [watch, watch-full, cutouts, buses, play, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, news, gemini-check, gemini-use, law-chat-time, ai-models, ai-compare, ai-try, as-phone, ai, ai-news, ai-sports, ai-preview, ai-f1, ai-sides, ai-words, system, capacity, cpu, sources, sources-state, purge-money-mail]
+        options: [watch, watch-full, cutouts, buses, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, news, gemini-check, gemini-use, law-chat-time, ai-models, ai-compare, ai-try, as-phone, ai, ai-news, ai-sports, ai-preview, ai-f1, ai-sides, ai-words, system, capacity, cpu, sources, sources-state, purge-money-mail]
         default: watch
       try:
         description: "law-chat-time: settings to try, e.g. answer=minimal,plan=minimal,model=lite; gemini-check: a model name; ai-compare: models=a,b&from=0&n=3; cpu: query, e.g. hours=24&group=…&keys=1&script=…; as-phone: path=/ai&app=money&body=<base64 JSON>; sources: ids, e.g. tnn-bus,txg-bus"

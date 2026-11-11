@@ -14,12 +14,10 @@ on:
       - 'wrangler.gemini.toml'
       - 'wrangler.site.toml'
       - '.github/workflows/deploy.yml'
-  # On 20 October (the old sports-proxy deleted) and 6 December (the
-  # Firebase key off: sign-ins it signed ran out on 2026-12-05), even if
-  # nothing was pushed.
+  # On 6 December (the Firebase key off: sign-ins it signed ran out on
+  # 2026-12-05), even if nothing was pushed.
   schedule:
     - cron: '17 3 6 12 *'
-    - cron: '17 3 20 10 *'
   workflow_dispatch:
 
 # One deploy at a time; pushes made while one runs wait as one (the latest),

@@ -258,8 +258,9 @@ export async function handleGift(request, env, headers, { ip = '', origin = '', 
 
 // ---- The admin panel's (eco-admin.js ADMIN_TOOLS) -------------------------------------
 
+// (An empty field is no number: it leaves the setting as it was, never 0.)
 const num = (v, lo, hi, dflt) => {
-  const n = Math.floor(Number(v));
+  const n = v === '' || v == null ? NaN : Math.floor(Number(v));
   return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : dflt;
 };
 

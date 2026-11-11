@@ -137,12 +137,10 @@ export const PACES = [
   { at: 0.85, slow: 8, reads: 0.25, newcomers: false }
 ];
 export const ALERTS = [0.5, 0.75, 0.9];
-// (sports-proxy, the old forwarder, is deleted from 2026-10-20: a 404 for it is
-// nothing to stop or start. Stopped with the proxy until then: it reaches the
-// proxy through a service binding, not its address.) orbit-site mirrors the
-// apps onto the family's own domain (site.js; none until kit/domain.mjs has
-// one, a 404 here like the forwarder's).
-export const WORKERS = ['orbit-workers-proxy', 'orbit-site', 'sports-proxy'];
+// orbit-site mirrors the apps onto the family's own domain (site.js; none
+// until kit/domain.mjs has one: a 404 here is nothing to stop or start).
+// (The old sports-proxy forwarder was deleted 2026-10-20: no longer watched.)
+export const WORKERS = ['orbit-workers-proxy', 'orbit-site'];
 export const STATE_KEY = 'guard:state';
 // Unreadable this long while armed: stopped too (a bill can't be watched blind).
 export const BLIND_MS = 6 * 3_600_000;
@@ -493,7 +491,7 @@ export async function guardRun(env, { fetcher = fetch, now = Date.now(), kv = en
         await startWorker(env, fetcher, name, prev.stopped.saved);
         acts.push(`${name} on`);
       } catch (e) {
-        // A Worker that's gone (the old sports-proxy, deleted) has nothing to start.
+        // A Worker that isn't there (orbit-site without a domain) has nothing to start.
         if (e.status !== 404) acts.push(`${name} on failed: ${e.message}`);
       }
     if (!acts.some(a => a.includes('failed'))) state.stopped = null;
