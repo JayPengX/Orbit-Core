@@ -91,3 +91,20 @@ test('a city\'s rules only for the reader\'s city, or one the question names', (
   assert.deepEqual(citiesIn('台南違停被拖吊怎麼領車', local), ['臺南市']);
   assert.deepEqual(citiesIn('違停被拖吊怎麼領車', local), []);
 });
+
+// Jay 11-11: 「起徵點是多少？」 was answered 「由財政部定，金額未載明」. The figure is 財政部's
+// own 令 (小規模營業人營業稅起徵點, resting on 營業稅法 第26條), kept by Law's build: it comes first,
+// over the 函釋 that only mention 起徵點, and with or without the article found.
+test('a rule that sets what an article leaves to a ministry comes first: 起徵點', () => {
+  const u = id => `https://law-out.mof.gov.tw/LawContent.aspx?id=${id}`;
+  const rows = [
+    ['MOF:FL006090', '小規模營業人營業稅起徵點', '財政部', '2024-12-12', u('FL006090'), ['G0340080:26'], ['G0340080']],
+    ['MOF:GL010768', '透過網路銷售貨物或勞務月銷售額達起徵點者應即辦理稅籍登記', '財政部', '2020-01-31', u('GL010768'), [], []],
+    ['MOF:GL009256', '調減攤販查定銷售額案件是否已達起徵點之認定標準', '財政部', '2009-10-01', u('GL009256'), [], []],
+    ['MOF:GL1', '統一發票給獎辦法作業要點', '財政部', '2020-01-01', u('GL1'), ['G0340080:58'], ['G0340080']],
+    ...Array.from({ length: 400 }, (_, i) => [`MOE:GL${i}`, `某校學生${i}輔導作業要點`, '教育部', '2020-01-01', u('x'), [], []])
+  ];
+  assert.equal(matchRules(rows, '起徵點是多少？', ['G0340080:26', 'G0340080:13', 'J0080004:5'])[0].id, 'MOF:FL006090');
+  assert.equal(matchRules(rows, '起徵點是多少？', [])[0].id, 'MOF:FL006090');
+  assert.ok(!matchRules(rows, '起徵點是多少？', ['G0340080:26']).some(r => r.id === 'MOF:GL1'), 'a rule on another article of the same law stays out');
+});
