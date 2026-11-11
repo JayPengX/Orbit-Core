@@ -292,7 +292,7 @@ export async function readSchool(site, fetchFn, today) {
 // The new items worded by the AI (class-news), the ones worded before kept as they were.
 const WORDS = ['line', 'who', 'act', 'by'];
 export function mergeWorded(items, before = [], worded = {}) {
-  const old = new Map(before.filter(x => x.line != null).map(x => [x.id, x]));
+  const old = new Map(before.filter(x => x.line != null && x.who != null).map(x => [x.id, x]));
   return items.map(it => {
     const w = worded[it.id] || old.get(it.id);
     return w ? { ...it, ...Object.fromEntries(WORDS.map(k => [k, w[k]])) } : it;
@@ -307,28 +307,61 @@ const keyOf = site => {
 const twDay = (now = Date.now()) => new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
 const edge = () => (typeof caches !== 'undefined' && caches.default) || null;
 
-// The school's list, fresh within the hour, built now when it isn't.
+// The school's list, fast: a copy within the hour answers at once; an older
+// one answers at once too and is read again behind; none: the school's own
+// titles now (code-read), the AI's lines written behind (`wording`), the
+// phone asking again a few seconds on. One wording at a time a school.
+const unworded = x => (x?.items || []).slice(0, NEWS.aiBatch).some(it => it.line == null);
 export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now = Date.now(), build = true } = {}) {
   const key = keyOf(site);
   let kept = null;
   try {
     kept = (await (await env.DATA?.get(key))?.json?.()) || null;
   } catch {}
-  if (kept && now - kept.at < NEWS.freshMs) return kept;
-  if (!build) return kept;
+  const later = p => (ctx?.waitUntil ? ctx.waitUntil(p.catch(() => {})) : p.catch(() => {}));
+  const put = v => env.DATA?.put(key, JSON.stringify(v), { httpMetadata: { contentType: 'application/json' } }) || Promise.resolve();
   const today = twDay(now);
-  const read = await readSchool(site, fetchFn, today);
-  if (!read || !read.items.length) return kept ? { ...kept, stale: true } : { site, at: now, items: [], how: read ? read.how : 'none', unread: !read };
-  const fresh = read.items.filter(it => !(kept?.items || []).some(x => x.id === it.id && x.line != null));
-  let worded = {};
-  if (fresh.length) {
-    const r = await aiOnce(env, ctx, 'class-news', { school: new URL(site).hostname, today, items: fresh.slice(0, NEWS.aiBatch) }, cap);
-    if (r?.out) worded = r.out;
+  // The AI's lines for the titles not yet worded, then kept.
+  const word = async base => {
+    const fresh = base.items.slice(0, NEWS.aiBatch).filter(it => it.line == null);
+    if (!fresh.length) return base;
+    const r = await aiOnce(env, ctx, 'class-news', { school: new URL(site).hostname, today, items: fresh }, cap);
+    // (Failing, each is marked tried, '' its line: the title shows, asked again with the next read.)
+    const worded = r?.out || Object.fromEntries(fresh.map(it => [it.id, { line: '', who: null, act: '', by: '' }]));
+    const out = { ...base, wordingAt: 0, items: mergeWorded(base.items, [], worded) };
+    await put(out);
+    return out;
+  };
+  const wording = x => !!x.wordingAt && now - x.wordingAt < 90_000;
+  const startWording = base => {
+    const marked = { ...base, wordingAt: now };
+    later(put(marked).then(() => word(marked)));
+    return { ...marked, wording: true };
+  };
+  if (kept && now - kept.at < NEWS.freshMs) {
+    if (!unworded(kept)) return kept;
+    if (wording(kept) || !build) return { ...kept, wording: wording(kept) };
+    return startWording(kept);
   }
-  const out = { site, at: now, how: read.how, items: mergeWorded(read.items, kept?.items, worded) };
-  const put = env.DATA?.put(key, JSON.stringify(out), { httpMetadata: { contentType: 'application/json' } });
-  if (put) ctx?.waitUntil ? ctx.waitUntil(put.catch(() => {})) : await put.catch(() => {});
-  return out;
+  if (!build) return kept;
+  const rebuild = async () => {
+    const read = await readSchool(site, fetchFn, today);
+    if (!read || !read.items.length) return kept ? { ...kept, stale: true } : { site, at: now, items: [], how: read ? read.how : 'none', unread: !read };
+    return { site, at: now, how: read.how, items: mergeWorded(read.items, kept?.items) };
+  };
+  // An older copy answers now; the school is read again behind it.
+  if (kept?.items?.length) {
+    later(
+      rebuild().then(out => {
+        if (out.stale || out.unread) return;
+        return unworded(out) ? put({ ...out, wordingAt: now }).then(() => word(out)) : put(out);
+      })
+    );
+    return { ...kept, stale: true, wording: false };
+  }
+  const out = await rebuild();
+  if (!out.items.length) return out;
+  return unworded(out) ? startWording(out) : (later(put(out)), out);
 }
 
 // GET /class-news?site=… (a session of Orbit Class's).
@@ -351,7 +384,8 @@ export async function handleClassNews(request, env, ctx, headers, session, { cap
   const out = await schoolNews(env, ctx, site, { cap, fetchFn: via, build: may });
   if (!out) return json({ error: 'cap' }, 429, headers);
   if (may && out.at > Date.now() - 60_000) await addOne(env, who, day);
-  const body = { site: out.site, at: out.at, how: out.how, stale: !!out.stale, unread: !!out.unread, items: (out.items || []).map(({ desc, ...it }) => it) };
-  if (body.items.length) ctx?.waitUntil?.(edge()?.put(ck, new Response(JSON.stringify(body), { headers: { 'Cache-Control': `max-age=${NEWS.edgeS}` } })).catch(() => {}));
+  const body = { site: out.site, at: out.at, how: out.how, stale: !!out.stale, unread: !!out.unread, wording: !!out.wording, items: (out.items || []).map(({ desc, ...it }) => it) };
+  // (Kept at the edge only when it's whole: while the AI words it, the phone asks again.)
+  if (body.items.length && !body.wording && !unworded(body)) ctx?.waitUntil?.(edge()?.put(ck, new Response(JSON.stringify(body), { headers: { 'Cache-Control': `max-age=${NEWS.edgeS}` } })).catch(() => {}));
   return json(body, 200, headers);
 }

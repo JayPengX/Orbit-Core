@@ -300,7 +300,7 @@ export const FEATURES = {
         [
           `These are the newest announcements on a Taiwanese school’s website (${school}). Today is ${today}. For each, from its title, unit and the start of its text:`,
           'who: which of the school’s students it concerns, a list: "all" every student; "1", "2", "3" a grade (高一 / 一年級 / 1xx班 = "1"; 高三, 畢業班, 升學 = "3"); "jh" its 國中部 or a 國中 grade (國一–國三, 七–九年級); "some" only some (a team, a club, those who signed up, applicants for a scholarship or a contest). [] when it isn’t for students at all: teachers (研習, 甄選, 公開觀課, 會議), staff, bids (招標, 採購), parents only, results lists for the public.',
-          'line: one plain sentence for a student, ≤ 30 字: what happens or what they get, and when. Not the title again: drop 【轉知】, 公告, unit names and the school’s name; say it simply, no filler (請同學留意, 歡迎參加). Every date and number must be one the title or text gives.',
+          'line: a short headline for a student, ≤ 24 字: the thing first, then when (學測報名 11/20 截止; 第二次期中考考程表; 寒假志工服務營隊，4 天; 流感疫苗補接種). Not a sentence: no 。 at the end, never starting with a verb (下載, 參加, 可申請). Not the title again: drop 【轉知】, 公告, unit names and the school’s name; no filler (請同學留意, 歡迎參加). Every date and number must be one the title or text gives.',
           'act: what they must do, ≤ 10 字 (報名, 繳回條, 上傳學習歷程, 帶…), "" when nothing.',
           'by: the deadline, or the day it happens, as YYYY-MM-DD when the title or text gives one (115年 = 2026; a month and day alone is the coming one), else "".',
           'Return one item per announcement with its id.',
@@ -315,7 +315,7 @@ export const FEATURES = {
         const it = given.get(String(x?.id || ''));
         if (!it) continue;
         const src = `${it.title} ${it.desc || ''} ${it.date}`;
-        const line = str(x.line, 60);
+        const line = str(x.line, 60).replace(/[。．.！!]+$/, '');
         const by = DAY.test(x.by) ? x.by : '';
         // (A date written 11/20 or 115年11月20日 is its own numbers; the deadline's month and day must be in the source.)
         const byOk = by && (by === it.date || [String(+by.slice(5, 7)), String(+by.slice(8, 10))].every(n => nums(src).includes(n)));
