@@ -192,7 +192,7 @@ w;dur=`, noted by the 除錯紀錄 when slow.
 
 | Route | File | What |
 | --- | --- | --- |
-| `/eco` | `eco.js`, `eco-admin.js`, `money.js`, `passkey.js`, `webauthn.js`, `orbit-token.js`, `rec-weekly.js` | The Pass (§6); `op: 'admin'` is the owner's panel; `bug`: 除錯紀錄 sent (`private/bugs/`, weekly) |
+| `/eco` | `eco.js`, `eco-admin.js`, `money.js`, `passkey.js`, `webauthn.js`, `orbit-token.js`, `rec-weekly.js` | The Pass (§6); `op: 'admin'`: the owner's panel; `bug`: 除錯紀錄 sent (`private/bugs/`, weekly) |
 | `/stock` | `stock-fill.js`, `stock-check.js` | Securities' fills at the proxy's own quote; the account replayed on each save |
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
 | `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `weather-radar.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations), scored (`/weather/skill`); `radar`: 2 hours' rain (radar); in a typhoon, `dayOff`: each county's 停班停課 or a fitted chance |
@@ -211,7 +211,7 @@ w;dur=`, noted by the 除錯紀錄 when slow.
 | `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |
 | `/flight` | `flight.js`, `kit/flight.mjs` | Class's 專注飛行: real planes landing in about N minutes; pool: R2 `flight/` (§5.5) |
 | `/gift` | `gift.js` | 公開領取 at `/key/` (`site/key/`), set in admin; one a device (D1 `gift_claim`), `op: 'go'` a `#qh=` into an app; unreplaced back after `hold` hours |
-| `/showcase/pass` | `showcase.js` | The showcase's short pass for its demos: reads only, capped per address a day |
+| `/showcase/pass` | `showcase.js` | The showcase's short pass: its demos' reads, its 問 Orbit (`showcase-ask`); capped per address a day |
 | `/data/…` | `data.js` | R2, public reads (§5.5); `/data/build` (POST, Bearer `DATA_PUSH_SECRET`, `build.yml`) runs a builder now |
 | `/sources` | `sources.js` | Phones' beacons of their outside reads (the proxy's: `fetch` wrapped) |
 | `/config` | `worker.js`, `kit/devconfig.mjs` | The live speeds (`DEV`), a minute in Cloudflare's cache |

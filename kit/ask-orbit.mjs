@@ -3,10 +3,19 @@
 // "去台北車站" Transit, "湖人排第幾" Sports…), and the app opens with the
 // question in its own ask (`#ask=<words>`, read there by `takeAsk`). Words no
 // rule knows: the apps as a row of taps, the question carried to the one picked.
-// No AI is called here and nothing is sent anywhere but the app's own page.
+//
+// Orbit 助理 (the AI plan): a question about the person's own day
+// ("今天要注意什麼", "明天要準備什麼") or one no rule knows is answered here:
+// code gathers what the apps told the family notebook on this phone
+// (today.mjs `dayFacts`), and one AI call (`orbit-ask`) picks the facts that
+// answer and says it in a line, drawn as an AI answer whose rows open their
+// apps. Only those facts and the question are sent; failing, the taps.
 import { h } from './ui.mjs';
-import { aiBar } from './ai.mjs';
-import { W } from './lang.mjs';
+import { aiBar, aiCall, aiAnswer, aiAnswerWait } from './ai.mjs';
+import { W, en } from './lang.mjs';
+import { dayFacts } from './today.mjs';
+import { twHoliday } from './holidays.mjs';
+import { planHash } from './family.mjs';
 
 // Each app's words, in the order they're tried (the first that matches wins).
 // A trip said ("去 X", "從 X 到 Y") is Transit's before the rest but the weather's words.
@@ -23,10 +32,15 @@ const RULES = [
   ['beats', /音樂|節奏|節拍|鼓|beats|music/i]
 ];
 
-// The app for some words: its kit id, or null when no rule knows them.
+// The person's own day: Orbit 助理's, before any app's words.
+const DAY_WORDS = /(今天|明天|後天|這週|這禮拜|週末|今晚|早上|下午)?.{0,6}(要注意|注意什麼|要準備|準備什麼|要帶什麼|有什麼事|有什麼行程|要幹嘛|要做什麼|怎麼安排|幫我安排|行程|忙不忙|有空)|我的一天|my day|what'?s on|plan my/i;
+
+// The app for some words: its kit id, 'assist' (Orbit 助理: the person's
+// day), or null when no rule knows them.
 export function routeAsk(text) {
   const t = String(text || '').trim();
   if (!t) return null;
+  if (DAY_WORDS.test(t)) return 'assist';
   for (const [app, re] of RULES) if (re.test(t)) return app;
   return null;
 }
@@ -64,19 +78,61 @@ export function askOrbitCard({ go, apps = {} } = {}) {
     max: 200,
     onSend(text) {
       const app = routeAsk(text);
-      if (app) return send(app, text);
-      // (No rule knows them: which app, a tap each.)
-      pick.replaceChildren(
-        h('p', { class: 'q-ask-orbit-q', text: W('要問哪個 App？', 'Which app should answer?') }),
-        h(
-          'div',
-          { class: 'q-ask-orbit-apps' },
-          ASK_APPS.filter(a => apps[a]).map(a => h('button', { type: 'button', class: 'q-ask-orbit-app q-press', onclick: () => send(a, text) }, [apps[a].icon, h('span', { text: apps[a].name })]))
-        )
-      );
-      pick.hidden = false;
+      if (app && app !== 'assist') return send(app, text);
+      return assist(text, app === 'assist');
     }
   });
-  bar.input.addEventListener('input', () => (pick.hidden = true));
+  // (Which app, a tap each: what no rule knows, when the AI can't answer.)
+  const taps = text =>
+    h('div', { class: 'q-ask-orbit-taps' }, [
+      h('p', { class: 'q-ask-orbit-q', text: W('要問哪個 App？', 'Which app should answer?') }),
+      h(
+        'div',
+        { class: 'q-ask-orbit-apps' },
+        ASK_APPS.filter(a => apps[a]).map(a => h('button', { type: 'button', class: 'q-ask-orbit-app q-press', onclick: () => send(a, text) }, [apps[a].icon, h('span', { text: apps[a].name })]))
+      )
+    ]);
+  let asked = 0;
+  async function assist(text, day) {
+    const n = ++asked;
+    let facts = [];
+    try {
+      facts = dayFacts({ en, holiday: twHoliday, plan: planHash });
+    } catch {}
+    // (Nothing told on this phone and not about the day: straight to the taps.)
+    if (!facts.length && !day) return show(taps(text));
+    show(aiAnswerWait({ rows: Math.min(3, Math.max(1, facts.length)), text: W('看看你的 App…', 'Looking at your apps…') }));
+    const now = Date.now();
+    const at = new Date(now + 8 * 3_600_000);
+    const r = await aiCall('orbit-ask', {
+      q: text,
+      now: `${at.toISOString().slice(0, 16).replace('T', ' ')} ${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][at.getUTCDay()]}`,
+      facts: facts.map(({ id, app, text: t }) => ({ id, app, text: t })),
+      apps: ASK_APPS.filter(a => apps[a]),
+      lang: en ? 'en' : 'zh'
+    });
+    if (n !== asked) return;
+    const out = r?.out;
+    if (r?.error || !out) return show(taps(text), r?.error === 'cap' ? W('今天的 Orbit 助理問完了，選一個 App 問：', 'Orbit used up today’s answers. Pick an app:') : '');
+    const byId = new Map(facts.map(f => [f.id, f]));
+    const rows = (out.ids || [])
+      .map(id => byId.get(id))
+      .filter(Boolean)
+      .map(f => ({ lead: apps[f.app]?.icon?.cloneNode?.(true) || null, label: f.label, sub: f.sub, onTap: () => go(f.app, f.hash || '') }));
+    // (The question really an app's: a row to ask it there.)
+    if (out.app && apps[out.app]) rows.push({ lead: apps[out.app].icon.cloneNode(true), label: W(`到 ${apps[out.app].name} 問`, `Ask ${apps[out.app].name}`), sub: text, onTap: () => send(out.app, text) });
+    const line = out.line || (rows.length ? W('這些是你的 App 記下的：', 'From your apps:') : '');
+    if (!line && !rows.length) return show(taps(text));
+    const answer = aiAnswer({ line, sections: [{ rows }] });
+    show(rows.length || out.app ? answer : h('div', {}, [answer, taps(text)]));
+  }
+  function show(node, note = '') {
+    pick.replaceChildren(...(note ? [h('p', { class: 'q-ask-orbit-q', text: note })] : []), node);
+    pick.hidden = false;
+  }
+  bar.input.addEventListener('input', () => {
+    asked++;
+    pick.hidden = true;
+  });
   return h('div', { class: 'q-ask-orbit' }, [bar, pick]);
 }

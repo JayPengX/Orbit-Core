@@ -17,3 +17,10 @@ test('ask-orbit: the question taken out of the address', () => {
   assert.equal(to, '/transit/#qh=x');
   assert.equal(takeAsk({ hash: '#go' }), '');
 });
+
+test('ask-orbit: a question about the day is Orbit 助理’s, before any app’s words', () => {
+  for (const q of ['今天要注意什麼', '明天要準備什麼', '我明天有什麼行程', '這週末有空嗎', '今天要帶什麼']) assert.equal(routeAsk(q), 'assist', q);
+  // (An app's own question stays the app's.)
+  assert.equal(routeAsk('今天有什麼新聞'), 'news');
+  assert.equal(routeAsk('明天要帶傘嗎'), 'weather');
+});
