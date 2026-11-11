@@ -220,6 +220,7 @@ export async function aiFlow(host, { feature, input, lists = {}, titles = {}, th
 //   aiAnswerHtml(same) → string, for apps that draw with template strings
 // row: { lead, label, sub, value, valueSub, bar: { now, was, max }, on, tone: 'up' | 'down' }
 // lead / pic: a Node (aiAnswer only), { src, round, fit }, { glyph (svg), color }, or text (an emoji).
+// A row may open something: href (+ external), attrs ({ 'data-x': … } or a string), onTap (aiAnswer only).
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 function leadHtml(lead, big = false) {
   if (!lead) return '';
@@ -230,9 +231,14 @@ function leadHtml(lead, big = false) {
   return '';
 }
 const pct = (v, max) => `${Math.max(0, Math.min(100, (Math.max(0, v) / max) * 100))}%`;
+// (A row that opens something: `href` an <a>; `attrs` (data-*, as a string of
+// attributes) or `onTap` (aiAnswer only) a <button>, with a chevron.)
+const dataAttrs = a => (typeof a === 'string' ? a : Object.entries(a || {}).map(([k, v]) => `${esc(k)}="${esc(v)}"`).join(' '));
 function rowHtml(r, lead) {
   const max = r.bar ? Math.max(1e-9, r.bar.max ?? Math.max(r.bar.now || 0, r.bar.was || 0)) : 0;
-  return `<div class="q-aia-row${r.on ? ' on' : ''}${lead ? '' : ' bare'}">${lead}<span class="q-aia-text"><span class="q-aia-label">${esc(r.label)}</span>${r.sub ? `<small>${esc(r.sub)}</small>` : ''}</span>${r.value != null && r.value !== '' ? `<span class="q-aia-end"><b class="num${r.tone ? ` ${r.tone}` : ''}">${esc(r.value)}</b>${r.valueSub ? `<small class="num">${esc(r.valueSub)}</small>` : ''}</span>` : ''}${r.bar ? `<i class="q-aia-bar" aria-hidden="true">${r.bar.was != null ? `<i class="was" style="width:${pct(r.bar.was, max)}"></i>` : ''}<i class="now" style="width:${pct(r.bar.now, max)}"></i></i>` : ''}</div>`;
+  const [tag, extra] = r.href ? ['a', ` href="${esc(r.href)}"${r.external ? ' target="_blank" rel="noopener"' : ''}`] : r.attrs || r.onTap ? ['button', ` type="button" ${dataAttrs(r.attrs)}`] : ['div', ''];
+  const go = tag === 'div' ? '' : ' go q-press';
+  return `<${tag} class="q-aia-row${r.on ? ' on' : ''}${lead ? '' : ' bare'}${go}"${extra}>${lead}<span class="q-aia-text"><span class="q-aia-label">${esc(r.label)}</span>${r.sub ? `<small>${esc(r.sub)}</small>` : ''}</span>${r.value != null && r.value !== '' ? `<span class="q-aia-end"><b class="num${r.tone ? ` ${r.tone}` : ''}">${esc(r.value)}</b>${r.valueSub ? `<small class="num">${esc(r.valueSub)}</small>` : ''}</span>` : ''}${r.bar ? `<i class="q-aia-bar" aria-hidden="true">${r.bar.was != null ? `<i class="was" style="width:${pct(r.bar.was, max)}"></i>` : ''}<i class="now" style="width:${pct(r.bar.now, max)}"></i></i>` : ''}${tag === 'div' ? '' : `<span class="q-aia-chev" aria-hidden="true">${icons.chevron || '›'}</span>`}</${tag}>`;
 }
 const lineHtml = (line, pic) => (line ? `<div class="q-aia-head">${`<span class="q-ai-mark" aria-hidden="true">${icons.ai || icons.spark}</span>`}<p class="q-aia-line">${esc(line)}</p>${pic}</div>` : '');
 export function aiAnswerHtml({ line = '', pic = null, sections = [], note = '' } = {}) {
@@ -257,6 +263,7 @@ export function aiAnswer(spec = {}) {
   let i = 0;
   for (const s of spec.sections || []) for (const r of (s.rows || []).filter(Boolean)) {
     const row = rows[i++];
+    if (row && typeof r.onTap === 'function') row.addEventListener('click', r.onTap);
     if (row && r.lead instanceof Node) {
       const wrap = h('span', { class: 'q-aia-pic node' }, [r.lead]);
       row.prepend(wrap);

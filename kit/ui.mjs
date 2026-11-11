@@ -697,9 +697,9 @@ export function cell({ icon = null, tint = '', title = '', sub = '', value = '',
   return c;
 }
 // A grouped list: rows (cells), with a header and footer line.
-export function list(rows, { head = '', foot = '', big = false } = {}) {
+export function list(rows, { head = '', foot = '', big = false, ai = false } = {}) {
   const frag = h('section', { class: 'q-list-group' });
-  if (head) frag.append(h('h3', { class: `q-list-head${big ? ' big' : ''}`, text: head }));
+  if (head) frag.append(ai ? h('h3', { class: `q-list-head q-h-ai${big ? ' big' : ''}` }, [aiMark(), h('span', { text: head })]) : h('h3', { class: `q-list-head${big ? ' big' : ''}`, text: head }));
   frag.append(h('div', { class: 'q-list' }, rows));
   if (foot) frag.append(h('p', { class: 'q-list-foot', text: foot }));
   return frag;
@@ -1299,15 +1299,21 @@ export function statsHtml(items) {
     })
     .join('')}</div>`;
 }
-// sectionHtml(title, bodyHtml, { more, moreHref, moreTap, cls })
-export function sectionHtml(title, bodyHtml, { more = '', moreHref = '', moreTap = null, cls = '' } = {}) {
+// The Orbit AI mark: on every smart thing, made by AI or by code (Jay 11-11).
+// aiMark() → Node, aiMarkHtml() → string; a head takes it with { ai: true }.
+export const aiMarkHtml = (cls = '') => `<span class="${clsOf('q-ai-mark', cls)}" aria-hidden="true">${icons.ai}</span>`;
+export const aiMark = (cls = '') => h('span', { class: clsOf('q-ai-mark', cls), 'aria-hidden': 'true', html: icons.ai });
+const titleHtml = (title, ai) => (ai ? `<h2 class="q-h-ai">${aiMarkHtml()}<span>${E(title)}</span></h2>` : `<h2>${E(title)}</h2>`);
+const titleNode = (title, ai) => (ai ? h('h2', { class: 'q-h-ai' }, [aiMark(), h('span', { text: title })]) : h('h2', { text: title }));
+// sectionHtml(title, bodyHtml, { more, moreHref, moreTap, cls, ai })
+export function sectionHtml(title, bodyHtml, { more = '', moreHref = '', moreTap = null, cls = '', ai = false } = {}) {
   const link = !more ? '' : moreHref ? `<a href="${E(moreHref)}">${E(more)}</a>` : `<button type="button"${dataOf({ more: moreTap })}>${E(more)}</button>`;
-  return `<section class="${clsOf('q-section', cls)}"><div class="q-section-head"><h2>${E(title)}</h2>${link}</div>${joinHtml(bodyHtml)}</section>`;
+  return `<section class="${clsOf('q-section', cls)}"><div class="q-section-head">${titleHtml(title, ai)}${link}</div>${joinHtml(bodyHtml)}</section>`;
 }
-export function sectionHeadHtml(title, { more = '', moreTap = null, moreHref = '', count = null, data = null } = {}) {
+export function sectionHeadHtml(title, { more = '', moreTap = null, moreHref = '', count = null, data = null, ai = false } = {}) {
   const chev = `<span style="display:contents">${icons.chevron}</span>`;
   const link = !more ? '' : moreHref ? `<a class="q-sh-more" href="${E(moreHref)}"${dataOf(data)}>${E(more)}${chev}</a>` : `<button class="q-sh-more" type="button"${dataOf({ more: moreTap, ...data })}>${E(more)}${chev}</button>`;
-  return `<div class="q-section-head q-shd"><h2>${E(title)}</h2>${count != null && count !== '' ? `<span class="q-sh-count num">${E(count)}</span>` : ''}${link}</div>`;
+  return `<div class="q-section-head q-shd">${titleHtml(title, ai)}${count != null && count !== '' ? `<span class="q-sh-count num">${E(count)}</span>` : ''}${link}</div>`;
 }
 // A logo tile with no picture (none known, or every URL broken) shows a
 // picture of its kind on its tint, never a letter: a shield for a team (the
@@ -1566,10 +1572,10 @@ export function stats(items) {
 // A section: a title, an optional link on its right, and its body.
 // shd: the 20px head of sectionHead() (with its count and chevron link);
 // action: a node put at the head's end; sub: a line under the head.
-export function section(title, body, { more = '', moreHref = '', onMore = null, cls = '', sub = '', action = null, shd = false, count = null } = {}) {
+export function section(title, body, { more = '', moreHref = '', onMore = null, cls = '', sub = '', action = null, shd = false, count = null, ai = false } = {}) {
   const head = shd
-    ? sectionHead(title, { more, moreHref, onMore, count })
-    : h('div', { class: 'q-section-head' }, [h('h2', { text: title }), more ? h(moreHref ? 'a' : 'button', { ...(moreHref ? { href: moreHref } : { type: 'button', onclick: onMore }), text: more }) : null]);
+    ? sectionHead(title, { more, moreHref, onMore, count, ai })
+    : h('div', { class: 'q-section-head' }, [titleNode(title, ai), more ? h(moreHref ? 'a' : 'button', { ...(moreHref ? { href: moreHref } : { type: 'button', onclick: onMore }), text: more }) : null]);
   if (action) head.append(action);
   return h('section', { class: cls ? `q-section ${cls}` : 'q-section' }, [head, sub ? h('p', { class: 'section-sub', text: sub }) : null, ...[].concat(body)]);
 }
@@ -1579,10 +1585,10 @@ export function section(title, body, { more = '', moreHref = '', onMore = null, 
 // A section's head: its title, a count beside it, a link to the rest on the
 // right. sectionHead('為你推薦', { count: 4, more: '全部', onMore | data: { tab: 'all' } }); the same
 // .q-section-head as section()'s, drawn 20px with a 44px tap target (.q-shd).
-export function sectionHead(title, { more = '', onMore = null, moreHref = '', count = null, data = null } = {}) {
+export function sectionHead(title, { more = '', onMore = null, moreHref = '', count = null, data = null, ai = false } = {}) {
   const chev = h('span', { html: icons.chevron, style: { display: 'contents' } });
   return h('div', { class: 'q-section-head q-shd' }, [
-    h('h2', { text: title }),
+    titleNode(title, ai),
     count != null && count !== '' ? h('span', { class: 'q-sh-count num', text: String(count) }) : null,
     more ? h(moreHref ? 'a' : 'button', { class: 'q-sh-more', ...(moreHref ? { href: moreHref } : { type: 'button', onclick: onMore }), ...dataProps(data) }, [more, chev]) : null
   ]);
