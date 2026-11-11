@@ -144,7 +144,7 @@ export function previewFacts(summary, e) {
   const ap = apPreview(summary.article).map(p => tokenize(p, who));
   if (ap.length) worth.push('Preview (AP):', ...ap);
 
-  // Who's out: ESPN's list, with when each is due back (a day already gone or the game's own: no date; Jay 11-11 saw 'back 11/11' for an 11/12 game).
+  // Who's out: ESPN's list, with when each is due back (a day already gone or the game's own: no date, it reads as stale).
   for (const side of summary?.injuries || []) {
     const out = (side.injuries || [])
       .filter(i => i.athlete?.id && /out|doubtful/i.test(i.status || ''))
