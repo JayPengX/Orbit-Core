@@ -2871,8 +2871,9 @@ export function passAccount(s, { extra = null, close = () => {}, looks = () => {
     node('h3', { class: 'q-sheet-h', text: T('通知', 'Notifications') }),
     ...notifyRows(s, note),
     ...(inHomeApp() ? [node('h3', { class: 'q-sheet-h', text: T('連結', 'Links') }), linkRows(s)] : []),
-    node('h3', { class: 'q-sheet-h', text: T('除錯紀錄', 'Debug log') }),
+    testerHead(s, T('除錯紀錄', 'Debug log'), close),
     recRows(s, note),
+    ...(testerOn() ? [node('div', { class: 'q-rows' }, [act(T('測試工具', 'Tester tools'), () => (close(), openTester(s)))])] : []),
     node('h3', { class: 'q-sheet-h', text: T('帳戶安全', 'Security') }),
     node('div', { class: 'q-rows' }, [
       act(T('登出其他所有裝置', 'Sign out every other device'), async () => {
@@ -3158,6 +3159,8 @@ export function classHold(app, at, until = 0) {
 }
 export async function schedulePush(s, items) {
   if (!s?.app) return;
+  // (The 測試工具's clock moved: a notice at a made-up time never goes to the Worker.)
+  if (globalThis.ORBIT_TEST?.active?.includes('clock')) return void rec('push-held', { app: s.app, items: items.length });
   const storeKey = `orbit.push.list.${s.app}`;
   // Turned off: the Worker's list emptied too (once).
   if (!notifyOn()) {
@@ -3180,6 +3183,16 @@ export async function schedulePush(s, items) {
     keepPushed(s.app, before);
     writeStore(storeKey, text);
   }
+}
+// 測試工具: a notice from the Worker a minute from now (the real minute,
+// whatever the tester's clock says), the app's own list sent with it unchanged.
+export async function pushTest(s, { title = 'Orbit 測試通知', body = '', hash = '' } = {}) {
+  if (!(await enablePush(s, true))) return false;
+  const now = globalThis.Date.real?.() ?? Date.now();
+  const kept = readJson(`orbit.push.list.${s.app}`, []);
+  const base = `${globalThis.location?.origin || SITE}${APPS[s.app]?.path || '/'}`;
+  const test = { at: now + 60_000, title, body: body || new Date().toLocaleString(), tag: `${s.app}:tester`, url: `${base}${hash ? `#${hash}` : ''}` };
+  return Boolean(await pushPost(s, 'schedule', { items: [...(Array.isArray(kept) ? kept : []), test].sort((a, b) => a.at - b.at).slice(0, 60) }));
 }
 // What the Worker had on the list and whose time has come was sent as a
 // phone notice: remembered (two days) when the list is replaced, so the app
@@ -5675,6 +5688,41 @@ export function watchFit(selector, { roots = null } = {}) {
     resized.disconnect();
     document.fonts?.removeEventListener?.('loadingdone', fonts);
   };
+}
+
+// ---- 測試工具: the tester's tools (testtools.mjs), for the owner or a developer -----------------
+//
+// Hidden until unlocked on this device: seven taps on the Orbit Pass's
+// 除錯紀錄 heading within a few seconds, then a yes. Then a 測試工具 row under
+// it: a moved clock, a place, the network off or slow, test notices, the
+// app's own switches (globalThis.ORBIT_TEST_TOOLS). boot.js puts the clock,
+// the place and the network in place before the app starts; a pill on the
+// page says what's on. Loaded only when used.
+const TESTER_KEY = 'orbit.tester';
+export const testerOn = () => Boolean(readJson(TESTER_KEY, null)?.on);
+const testerKit = () => import('./testtools.mjs');
+export const openTester = s => testerKit().then(m => m.openTester(s || dataSession));
+function testerHead(s, text, close) {
+  let taps = [];
+  return node('h3', {
+    class: 'q-sheet-h',
+    text,
+    onclick: async () => {
+      const now = performance.now();
+      taps = [...taps.filter(t => now - t < 4000), now];
+      if (taps.length < 7) return;
+      taps = [];
+      const m = await testerKit();
+      if (await m.unlock(s)) {
+        close();
+        m.openTester(s);
+      }
+    }
+  });
+}
+if (typeof window !== 'undefined' && globalThis.ORBIT_TEST?.on) {
+  const pill = () => testerKit().then(m => m.pill(() => openTester())).catch(() => {});
+  document.body ? setTimeout(pill, 600) : document.addEventListener('DOMContentLoaded', () => setTimeout(pill, 600));
 }
 
 // ---- 除錯紀錄: what an app did, for its maker to replay ---------------------------------------

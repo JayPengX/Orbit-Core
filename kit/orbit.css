@@ -7039,3 +7039,90 @@ html[data-look='native'] :is(.q-reorder-lift, .q-reorder-land) {
   background: var(--q-bg);
   will-change: transform;
 }
+
+/* ---- 測試工具 (testtools.mjs): the tester's pill and sheet, only once unlocked ---- */
+.q-test-pill {
+  position: fixed;
+  z-index: 2147482000;
+  left: var(--q-mid, 50%);
+  top: calc(var(--q-top, env(safe-area-inset-top)) + 4px);
+  transform: translateX(-50%);
+  max-width: calc(var(--q-vw, 100vw) - 32px);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--q-orange) 88%, black);
+  color: white;
+  font: 600 12px/1 var(--q-font);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+.q-test-pill-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.q-tester .q-test-now {
+  margin: 0 0 var(--q-s-3);
+  padding: 10px 14px;
+  border-radius: var(--q-r-cell);
+  background: color-mix(in srgb, var(--q-orange) 18%, transparent);
+  color: var(--q-label);
+  font: 600 var(--q-t-subhead, 15px) / 1.35 var(--q-font);
+}
+.q-tester .q-test-when {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: var(--q-s-2) 0;
+}
+.q-tester .q-test-when .q-field {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.q-tester .q-test-when .q-btn {
+  flex: none;
+}
+.q-tester .q-test-list {
+  display: grid;
+  gap: 1px;
+  border-radius: var(--q-r-cell);
+  overflow: hidden;
+  background: var(--q-separator, var(--q-fill-3));
+}
+.q-tester .q-test-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 14px;
+  background: var(--nv-card, var(--q-grouped-2, var(--q-fill-4)));
+}
+.q-tester .q-test-choice {
+  display: grid;
+  gap: 8px;
+}
+.q-tester .q-test-row-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.q-tester .q-test-row-text small {
+  color: var(--q-label-2);
+  font-size: var(--q-t-footnote, 13px);
+}
+.q-tester .q-test-val {
+  color: var(--q-label-2);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.q-tester .q-test-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: var(--q-s-5) 0 var(--q-s-3);
+}
