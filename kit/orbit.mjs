@@ -2414,7 +2414,7 @@ function signInGate(s) {
         form,
         ...(keys ? [keys.row] : []),
         node('p', { class: 'q-gate-note', text: en ? 'No Orbit Pass yet? Ask the person who shared Orbit with you for one.' : '還沒有 Orbit Pass？請向分享 Orbit 給你的人索取。' }),
-        node('p', { class: 'q-gate-note', text: en ? 'Signed in on another device? Its Account sheet gives a device code for this one.' : '已在其他裝置登入？在那裡的「帳戶」取得裝置代碼，就能在這裡登入。' })
+        node('p', { class: 'q-gate-note', text: en ? 'Signed in on another device? There, Orbit Pass › Devices gives a code for this one.' : '已在其他裝置登入？在那裡的 Orbit Pass › 裝置取得裝置代碼，就能在這裡登入。' })
       ])
     ]);
     document.documentElement.classList.add('q-signing-in');

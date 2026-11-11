@@ -916,7 +916,7 @@ export const ADMIN_TOOLS = {
   // A builder now, whatever the pace (builders/run.js).
   async build({ env, deps, body }) {
     const job = String(body.job || '');
-    if (!['watch', 'watch-full', 'cutouts', 'buses', 'asia', 'cpbl', 'sports', 'photos', 'winprob', 'ai-weekly'].includes(job)) return { error: 'ECO_UNKNOWN_OP', status: 400 };
+    if (!['watch', 'watch-full', 'cutouts', 'buses', 'asia', 'cpbl', 'sports', 'photos', 'winprob', 'ai-weekly', 'news'].includes(job)) return { error: 'ECO_UNKNOWN_OP', status: 400 };
     return deps.build(env, job);
   },
   // 外部來源: each outside source's last 7 days as the proxy and phones
