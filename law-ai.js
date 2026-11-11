@@ -308,6 +308,7 @@ export const LAW_FEATURES = {
         [
           'For each item below, a bill in Taiwan’s 立法院 (kind bill: its stated purpose) or a law just amended (kind law: its changed articles), write ONE line saying what it changes for people, in plain words a high-school student understands.',
           `line: ${ZH}, ≤ 32 字, starting with what changes (不是「本法案旨在」), no law name (the card shows it), no stage (the card shows it), no opinion. Every number you write must be in that item.`,
+          'A law’s arts show each change as 【new words】（原：the words they replaced）, 【刪去：words taken out】, or a whole article that is new; say what the change does, not that words moved.',
           'Return one item per id.',
           JSON.stringify(items)
         ].join('\n')
