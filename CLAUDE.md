@@ -82,7 +82,7 @@ map, a chart); `sw.js` is the app's settings and then `kit/sw.js`. Its
 deploy workflow tests against main's kit, stamps every file with its hash
 (`scripts/stamp-version.mjs` → `kit/stamp-app.mjs`) and publishes with
 `Orbit-Core/deploy/cf-site.mjs`. `npm test`'s `pretest` links `.kit` to
-`../Orbit-Core/kit`. Orbit Class is the one Vite app (`src/`, `npm run build`).
+`../Orbit-Core/kit`. Orbit Class: the one Vite app (`src/`).
 
 ## 3. The kit (`kit/`)
 
@@ -120,7 +120,7 @@ modules for modulepreload. `node kit/apps.mjs` refreshes every app's snippets;
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); each app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
 | `passkey.mjs` | Passkeys in the browser: made, used, named (`passkeyHere()` false where a browser can't) |
 | `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); `TOPICS`; `sideOf`, `partiesIn`, `topicsOf`, `namesRe` |
-| `ai.mjs`, `family.mjs`, `today.mjs` | AI (mark `icons.ai`, `--q-ai`): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer` (answers drawn), `aiAnswerWait` (their shape meanwhile); the phone's family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天 |
+| `ai.mjs`, `family.mjs`, `today.mjs` | AI (mark `icons.ai`, `--q-ai`): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer`, `aiAnswerWait` (answers drawn); the phone's family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天 |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs`: qrcode-generator 2.0.4 (MIT), vendored |
 | `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays` |
