@@ -35,6 +35,7 @@ import { DEV } from './kit/brand.mjs';
 import { rulingId, rulingJob } from './law-ruling.js';
 import { townAsk, townJob } from './law-town.js';
 import { SITE } from './kit/domain.mjs';
+import { packReader, isPack, isPackList } from './kit/data-pack.mjs';
 
 // Orbit Law's data as its site publishes it (orbit.<domain>/law/data/), read
 // through the service binding LAW_SITE (the orbit-law Worker's files: a
@@ -247,14 +248,21 @@ export const aiBucket = key => {
 };
 export const madeFor = (j, field, version) => (j && j.raw && String(j[field] ?? '') === String(version ?? '') ? j.raw : null);
 
-// A file of Orbit Law's data, kept a day at the edge (a 404 a minute, a
-// server error not at all); null when it isn't there.
-export async function readData(path) {
-  const res = await lawFetch(`${DATA}${path}`, { cf: { cacheTtlByStatus: { '200-299': 86_400, 404: 60, '500-599': 0 }, cacheEverything: true }, signal: AbortSignal.timeout(8000) });
+// A file of Orbit Law's data, kept at the edge `ttl` seconds (a 404 a
+// minute, a server error not at all; `fresh`: past the edge); null when it
+// isn't there. Most files are in packs (kit/data-pack.mjs, Law's
+// scripts/pack-data.mjs): the list a minute, a pack for good (its address
+// is its content), read through packReader as if each file were its own.
+export async function fetchData(path, ttl = 86_400, fresh = false) {
+  const t = isPackList(path) ? 60 : isPack(path) ? 30 * 86_400 : ttl;
+  const res = await lawFetch(`${DATA}${path}`, { ...(fresh ? {} : { cf: { cacheTtlByStatus: { '200-299': t, 404: 60, '500-599': 0 }, cacheEverything: true } }), signal: AbortSignal.timeout(8000) });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`${path} ${res.status}`);
   return res.json();
 }
+export const dataReader = ttl => packReader((path, o) => fetchData(path, ttl, o?.fresh), { ttl: 60_000, keep: 24 });
+// A day at the edge (laws, rulings, rules: they change once a day).
+export const readData = dataReader(86_400);
 
 // The law as Orbit Law publishes it ({ p, n, m, a: [[kind, key, text]] });
 // null when there's no such law.
