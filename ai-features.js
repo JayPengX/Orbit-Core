@@ -142,7 +142,9 @@ export const FEATURES = {
       if (!a || !numbersFrom(a, facts)) return null;
       const ids = new Set([...facts.matchAll(/^\[([a-z0-9.]+)\]/gm)].map(m => m[1]));
       const show = [...new Set(list(raw?.show, 4).map(x => str(x, 40)).filter(x => ids.has(x)))].slice(0, 2);
-      const mark = list(raw?.mark, 6).map(x => str(x, 40)).filter(x => x && facts.includes(x)).slice(0, 3);
+      // (A mark is a row's label as the app draws it: its figures, if written, taken off.)
+      const labels = new Set([...facts.matchAll(/^\[[a-z0-9.]+\][^:]*: (.*)$/gm)].flatMap(m => m[1].split('; ').map(r => r.replace(/ -?[\d,.]+( \(.*)?$/, ''))));
+      const mark = [...new Set(list(raw?.mark, 6).map(x => str(x, 40)).map(x => (labels.has(x) ? x : x.replace(/ -?[\d,.]+$/, ''))).filter(x => labels.has(x)))].slice(0, 3);
       // (answer: what phones before 11-11 read.)
       return { answer: a, line: a, show, mark };
     }
@@ -605,7 +607,7 @@ export const FEATURES = {
       text(
         [
           'You pick the moments that decided this Formula 1 race, for fans in Taiwan who already see the finishing order and a lap-by-lap list. Tell what the order can’t: the turning point (when the winner took the lead for good, and what came with it: a stop, a tyre change, a safety car), then who climbed or fell back most and why the facts show. Never recite the grid, every stint or every lap range.',
-          'points: 2 to 4 moments, in lap order. Each: lap (the lap it happened, a number from the facts; 0 for the start) and no (the car number of the driver it is about, from #N in the facts; "" for the track, a safety car or red flag). zh: one line in Traditional Chinese, as Taiwan’s F1 coverage writes, ≤ 30 字, without the driver’s own name (his face shows it; another driver by surname in English). Tyres: soft 軟胎, medium 中性胎, hard 硬胎, inter 半雨胎, wet 全雨胎; 杆位起跑, 進站, 換胎, 安全車, 紅旗, 領跑, 退賽. en: the same, ≤ 16 words.',
+          'points: 2 to 4 moments, in lap order. Each: lap (the lap it happened, a number from the facts; 0 for the start) and no (the car number of the driver it is about, from #N in the facts; "" for the track, a safety car or red flag). zh: one line in Traditional Chinese, as Taiwan’s F1 coverage writes, ≤ 30 字. The row shows the lap and the driver’s face, so zh starts with what happened and never names him in any language nor repeats the lap (進站換硬胎，從第 9 追到第 2). Another driver: by surname in English, never #N. Tyres: soft 軟胎, medium 中性胎, hard 硬胎, inter 半雨胎, wet 全雨胎; 杆位起跑, 進站, 換胎, 安全車, 紅旗, 領跑, 退賽. en: the same, ≤ 16 words, also without his name or the lap (Pitted for hards and climbed from 9th to 2nd).',
           'Use only these facts. Every number you write must be one of theirs. Never give a reason the facts don’t show: no crash, penalty, rain or mistake they don’t name.',
           'Facts:',
           facts
@@ -615,8 +617,17 @@ export const FEATURES = {
     clean: (raw, { facts, laps = 0 }) => {
       const cars = new Set([...facts.matchAll(/#(\d{1,2})\b/g)].map(m => m[1]));
       const most = laps || Math.max(0, ...[...facts.matchAll(/(\d{1,3}) laps/g)].map(m => Number(m[1])));
+      // (#N written out by surname; the row's own driver and lap, said again, taken off.)
+      const surname = Object.fromEntries([...facts.matchAll(/([A-Z][\w'’.-]+(?: [A-Z][\w'’.-]+)*) #(\d{1,2})\b/g)].map(m => [m[2], m[1].split(' ').at(-1)]));
+      const named = s => s.replace(/#(\d{1,2})\b/g, (m, n) => surname[n] || m);
+      const trim = (s, p) => {
+        if (!p.no) return s;
+        const t = s.replace(/^(?![^第從在於]*[胎站車旗跑賽圈位後前])[\u4e00-\u9fff·]{2,6}?(?=第\s?\d|從第|在第|於第)/, '').replace(new RegExp(`^${surname[p.no] || '#'}\\b,?\\s*`), '').replace(/^第\s?\d+\s?圈[，,]?\s*/, '').replace(/^on lap \d+,?\s*/i, '');
+        return t.length >= 4 ? t[0].toUpperCase() + t.slice(1) : s;
+      };
       const points = list(raw?.points, 5)
         .map(p => ({ lap: Number.isInteger(p?.lap) && p.lap >= 0 && p.lap <= most ? p.lap : null, no: cars.has(String(p?.no || '').replace('#', '')) ? String(p.no).replace('#', '') : '', zh: str(p?.zh, 50), en: str(p?.en, 140) }))
+        .map(p => ({ ...p, zh: trim(named(p.zh), p), en: trim(named(p.en), p) }))
         .filter(p => p.zh && p.en && numbersFrom(`${p.zh} ${p.en}`, facts))
         .slice(0, 4);
       return points.length >= 2 ? { points } : null;
