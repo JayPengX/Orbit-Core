@@ -40,7 +40,7 @@
 // The caps are this Worker's own count (KV, flushed in batches so KV's
 // million writes a month aren't spent on counting): the hard stop is
 // Google Cloud's per-day quotas, which the owner sets on each API (the
-// CLAUDE.md, §4).
+// MAP.md, §4).
 
 import { SHOWCASE_ORIGINS } from './showcase.js';
 import { cleanDev } from './kit/devconfig.mjs';
@@ -1798,7 +1798,7 @@ async function routes(env, q, { fetchFn, ctx, now, cache, by: who }) {
     // The app ranks them (by what's practical, not only the soonest there): it gets them all.
     .slice(0, 16);
   const out = { from, to, at, by, plans, sources: { ...sources, ms: took } };
-  // Only a whole answer is kept: a planner that failed (busy, an error) leaves it out, never shared for 5 minutes (TRUTH §7).
+  // Only a whole answer is kept: a planner that failed (busy, an error) leaves it out, never shared for 5 minutes.
   const failed = Object.values(sources).some(v => v === 'busy' || v === 'error' || String(v).startsWith('http'));
   if (cache && plans.length && !failed) {
     const put = cache.put(cacheKey, new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300' } })).catch(() => {});

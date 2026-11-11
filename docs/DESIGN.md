@@ -16,7 +16,7 @@ loud things mean something.
 
 ## 1. One focal point per screen
 
-- Every tab answers one question (TRUTH §6). The answer is the focal point:
+- Every tab answers one question (RULEBOOK §2). The answer is the focal point:
   the biggest type on the screen, with the most space around it. Money's
   月曆: what I spent this month. Weather: how warm it is now. Sports: the
   game on now.
@@ -61,7 +61,7 @@ loud things mean something.
 - **Neutral by default.** Text is black (white in dark) and grey; surfaces
   are the grouped background and white cells.
 - **The app's colour is a pointer, not paint.** It marks: the chosen tab,
-  the primary action, a link, the selected item, and *one* highlight that
+  the primary action, the selected item, what is live, and *one* highlight that
   tells the person something (Money's big days). If a screen uses the
   accent on more than about four things, take it off the ones that only
   decorate.

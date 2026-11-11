@@ -97,7 +97,7 @@ A read from an app goes down these layers until one answers: memory, the phone's
 
 The kit is **served, not copied**: apps load it from this repo's site through an import map (`#kit/…`), every file addressed by its content hash, so a kit change is one push here and a phone downloads only what changed.
 
-Every route, data layer, sync path, component pattern, secret and deploy: **[CLAUDE.md](CLAUDE.md)**, the family's map that every session reads first.
+Every route, data layer, sync path, component pattern, secret and deploy: **[MAP.md](MAP.md)**, the family's map ([CLAUDE.md](CLAUDE.md) is where every session starts).
 
 ## Project structure
 
@@ -124,7 +124,7 @@ brand/               icons, share cards and manifests for every app
 locales/             shared text
 tools/               preview.mjs and the other tools (tools/README.md)
 tests/               node --test
-docs/                TRUTH.md (how to work), RULEBOOK.md (every rule), DESIGN.md (how screens look)
+docs/                RULEBOOK.md (how to work, every rule), DESIGN.md (how screens look)
 wrangler*.toml       one per Worker
 ```
 
