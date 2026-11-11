@@ -424,7 +424,8 @@ const server = (h2 && !serve ? (fn => createSecureServer(h2Cert(), fn)) : create
     res.end(serve && file.endsWith('.html') ? String(data).replace('<head>', `<head><script>${inits.join(';')};${pointFetch}</script>`) : data);
   } catch {
     // Orbit Law's data, never in git (60 MB built at deploy): what's not built here is read from the live site.
-    if (path.startsWith('/Orbit-Law/data/')) {
+    // (A local build not packed reads its own files: the live site's list of packs would point past them.)
+    if (path.startsWith('/Orbit-Law/data/') && !(path.endsWith('/_packs.json') && existsSync(join(served.dir, 'data/index.json')))) {
       const body = await curlText(`https://orbit.jaypengx.com${path.replace(/^\/Orbit-Law\//, '/law/')}`);
       if (body && !/^\s*</.test(body)) return res.writeHead(200, { 'Content-Type': TYPES[extname(path)] || 'application/json', 'Cache-Control': 'no-store' }).end(body);
     }

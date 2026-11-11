@@ -12,17 +12,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { aiBucket } from '../../law.js';
+import { siteReader } from '../../kit/data-pack.mjs';
 
 const OUT = path.resolve(process.argv[2] || '../Orbit-Law', 'ai');
 const HERE = path.join(path.dirname(new URL(import.meta.url).pathname), 'out');
-const DATA = 'https://orbit.jaypengx.com/law/data/';
+const read = siteReader('https://orbit.jaypengx.com/law/data/');
 const rd = f => (fs.existsSync(path.join(HERE, f)) ? fs.readFileSync(path.join(HERE, f), 'utf8').trim().split('\n').map(l => JSON.parse(l)) : []);
 const ok = r => r.stop === 'end_turn' && r.text;
 const write = (f, j) => (fs.mkdirSync(path.dirname(f), { recursive: true }), fs.writeFileSync(f, JSON.stringify(j)));
 const textFile = id => String(id).replace(/[^A-Za-z0-9_-]/g, '_');
 
 // Rulings: each with the date of the text it was explained from.
-const cons = new Map((await (await fetch(DATA + 'cons/index.json')).json()).items.map(r => [r[0], r[1]]));
+const cons = new Map((await read('cons/index.json')).items.map(r => [r[0], r[1]]));
 let n = 0;
 const packs = {};
 const put = (file, key, val) => ((packs[file] ||= {})[key] = val);
@@ -40,7 +41,7 @@ n = 0;
 for (const r of [...rd('8-articles.jsonl'), ...rd('8b-articles.jsonl')].filter(ok)) {
   const [, p, key] = r.id.match(/^([A-Z]\d{7})_(.+)$/) || [];
   if (!p) continue;
-  if (!laws.has(p)) laws.set(p, await (await fetch(`${DATA}law/${p}.json`)).json());
+  if (!laws.has(p)) laws.set(p, await read(`law/${p}.json`));
   const law = laws.get(p);
   // (A key like 15-1 came back as 15-1; one the id had to change is found by its shape.)
   const art = law.a.find(a => a[0] === 'A' && textFile(a[1]) === key);
@@ -55,7 +56,7 @@ for (const [f, j] of Object.entries(packs)) write(path.join(OUT, f), j);
 console.log('packed files', Object.keys(packs).length);
 
 // Agency rules: a line and the words people search them by (filler openings off).
-const { rules } = await (await fetch(DATA + 'agency/all.json')).json();
+const { rules } = await read('agency/all.json');
 const byFile = new Map(rules.map(r => [textFile(r[0]).slice(0, 64), r[0]]));
 const agency = {};
 for (const r of rd('4-agency.jsonl').filter(ok)) {
