@@ -69,7 +69,7 @@ orbit-site (site.js): the domain's hosts as custom domains
 | Orbit Law | `law` | `/law/` | Orbit-Law | `orbit-law` |
 | Orbit Securities | `stock` | `/securities/` | Orbit-Securities | `stock-study-accounts` |
 
-The family's order: this table's (`APP_ORDER`). Orbit-Showcase is Jay's homepage and `/showcase/`. This repo's site has the family page
+The family's order: this table's (`APP_ORDER`). Orbit-Showcase: Jay's homepage, `/showcase/`. This repo's site has the family page
 (`/pass/`) and the admin page (`site/admin/`). A new app: a `slug` in
 `kit/brand.mjs` and a collection in `eco.js` `ECO_APPS`.
 
@@ -120,7 +120,7 @@ modules for modulepreload. `node kit/apps.mjs` refreshes every app's snippets;
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); each app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
 | `passkey.mjs` | Passkeys in the browser: made, used, named (`passkeyHere()` false where a browser can't) |
 | `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); `TOPICS`; `sideOf`, `partiesIn`, `topicsOf`, `namesRe` |
-| `ai.mjs`, `family.mjs`, `today.mjs` | AI (mark `icons.ai`, `--q-ai`): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`; the phone's family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天 |
+| `ai.mjs`, `family.mjs`, `today.mjs` | AI (mark `icons.ai`, `--q-ai`): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer` (answers drawn); the phone's family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天 |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs`: qrcode-generator 2.0.4 (MIT), vendored |
 | `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays` |
@@ -330,7 +330,7 @@ A new Cloudflare product goes into `guard.js` `PLAN` with it.
   `q.write({ payload, wallet })` (only while live), `q.claim()`, events
   (`wallet`, `active`, `claim`, `signedout`), and a heartbeat every 2 minutes.
   One app live in one place: another device's (Worker) or tab's (`orbit-live`)
-  copy is `quiet()` (no Worker reads but `/eco`, no `everyDev`, 在這裡繼續).
+  copy is `quiet()` (only `/eco`, no `everyDev`, 在這裡繼續).
 - **The wallet** (`eco-wallets`) is merged by the Worker (`mergeWallet`):
   `entries` (fixed ids: sent twice counts once), `snap` (each app's
   figures, newest wins), `settings` (newest wins per key), `apps`, `inbox`,
@@ -465,7 +465,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
 | `node tools/preview.mjs <app>` | The app with real data (`--live`, `--width`, `--timing`, `--webkit`…; `ORBIT_DATA=<dir>`: local /data/ files); prints `wraps:`, `cut:` |
 | `node tools/gate.mjs [app…]` | The quality gate (`gate-page.js`) on every tab: lift, stalls, dead taps, wraps, cuts, white, mixed language… |
 | `node tools/speed.mjs <app…>` | Before vs after (3G, CPU ×4, replayed) |
-| `node tools/live-scroll.mjs [app…] [--webkit]` | Nothing jumps: live refreshes, loading, scrolling, folding |
+| `node tools/live-scroll.mjs [app…] [--webkit]` | Nothing jumps: refreshes, loading, scrolling, folding |
 | `node tools/test-apps.mjs [app…]` | Every app's tests against this kit |
 
 `npm test` covers the Workers, kit and this map.

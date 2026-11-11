@@ -688,6 +688,41 @@ export const FEATURES = {
     }
   },
 
+  // Orbit Securities: 這筆交易學到什麼. A sale that closed a holding, its rows
+  // worked out by the phone from the account (lib/lesson.mjs: cost, sale,
+  // days held, best and worst close while held, the market alongside, the
+  // costs); the AI says in one line what it teaches and lights the rows it
+  // rests on. A study app: never advice on what to buy or sell next.
+  'sec-lesson': {
+    app: 'stock',
+    tap: true,
+    models: ['haiku', 'luna'],
+    maxIn: 1200,
+    perPass: 30,
+    perMinute: 6,
+    input(raw) {
+      const facts = str(raw?.facts, 1000);
+      return /\[pl\]/.test(facts) ? { facts, lang: raw?.lang === 'en' ? 'en' : 'zh' } : null;
+    },
+    parts: ({ facts, lang }) =>
+      text(
+        [
+          'A student practising investing with play money just closed this trade. The app shows every figure below as rows.',
+          `line: ONE sentence in ${lang === 'en' ? 'English, ≤ 24 words' : 'Traditional Chinese (台灣用語), ≤ 45 字'} on what this trade teaches, from its figures: compare what they did with what the rows show (sold near the best or worst close, the market's move alongside, how long it was held, what the costs took). Kind and honest; one point, the clearest. Never advise what to buy or sell next, never predict a price.`,
+          'mark: the ids (pl, buy, sell, held, high, low, market, costs) of the one or two rows your line rests on.',
+          'Facts:',
+          facts
+        ].join('\n')
+      ),
+    schema: obj({ line: S, mark: arr(S) }),
+    clean: (raw, { facts }) => {
+      const line = str(raw?.line, 160);
+      if (!line || !filingNumbers(line, facts)) return null;
+      const ids = new Set([...facts.matchAll(/^\[([a-z]+)\]/gm)].map(m => m[1]));
+      return { line, mark: [...new Set(list(raw?.mark, 4).map(x => str(x, 10)).filter(x => ids.has(x)))].slice(0, 2) };
+    }
+  },
+
   'transit-notice': {
     models: ['luna', 'haiku'],
     effort: { luna: 'low' },

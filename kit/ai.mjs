@@ -207,3 +207,62 @@ export async function aiFlow(host, { feature, input, lists = {}, titles = {}, th
     answers.push(await answer);
   }
 }
+
+// ---- An AI answer, drawn (Jay 11-11: never a paragraph; "icon, images… native and beautiful") ----
+// One look for every app's answer: the AI's one line under Orbit AI's mark
+// (a picture beside it when the answer is about one thing: a face, a logo,
+// the weather's art), then the app's own rows, each with its picture in
+// front: a face (round), a logo, a tile (a glyph on its colour) or an emoji;
+// a figure at the end, a bar under it (now, and before), the rows the line
+// rests on lit. Code builds every row; the AI only wrote the line and said
+// which rows to light.
+//   aiAnswer({ line, pic, sections: [{ title, rows }], note, lang }) → Node
+//   aiAnswerHtml(same) → string, for apps that draw with template strings
+// row: { lead, label, sub, value, valueSub, bar: { now, was, max }, on, tone: 'up' | 'down' }
+// lead / pic: a Node (aiAnswer only), { src, round, fit }, { glyph (svg), color }, or text (an emoji).
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+function leadHtml(lead, big = false) {
+  if (!lead) return '';
+  const cls = `q-aia-pic${big ? ' big' : ''}`;
+  if (typeof lead === 'string') return `<span class="${cls} emoji" aria-hidden="true">${esc(lead)}</span>`;
+  if (lead.src) return `<span class="${cls}${lead.round ? ' round' : ''}${lead.fit === 'cover' ? ' cover' : ''}"><img src="${esc(lead.src)}" alt="${esc(lead.alt || '')}" loading="lazy" decoding="async" onerror="this.parentNode.classList.add('gone')"></span>`;
+  if (lead.glyph) return `<span class="${cls} tile" style="--t:${esc(lead.color || 'var(--q-accent)')}" aria-hidden="true">${lead.glyph}</span>`;
+  return '';
+}
+const pct = (v, max) => `${Math.max(0, Math.min(100, (Math.max(0, v) / max) * 100))}%`;
+function rowHtml(r, lead) {
+  const max = r.bar ? Math.max(1e-9, r.bar.max ?? Math.max(r.bar.now || 0, r.bar.was || 0)) : 0;
+  return `<div class="q-aia-row${r.on ? ' on' : ''}${lead ? '' : ' bare'}">${lead}<span class="q-aia-text"><span class="q-aia-label">${esc(r.label)}</span>${r.sub ? `<small>${esc(r.sub)}</small>` : ''}</span>${r.value != null && r.value !== '' ? `<span class="q-aia-end"><b class="num${r.tone ? ` ${r.tone}` : ''}">${esc(r.value)}</b>${r.valueSub ? `<small class="num">${esc(r.valueSub)}</small>` : ''}</span>` : ''}${r.bar ? `<i class="q-aia-bar" aria-hidden="true">${r.bar.was != null ? `<i class="was" style="width:${pct(r.bar.was, max)}"></i>` : ''}<i class="now" style="width:${pct(r.bar.now, max)}"></i></i>` : ''}</div>`;
+}
+const lineHtml = (line, pic) => (line ? `<div class="q-aia-head">${`<span class="q-ai-mark" aria-hidden="true">${icons.ai || icons.spark}</span>`}<p class="q-aia-line">${esc(line)}</p>${pic}</div>` : '');
+export function aiAnswerHtml({ line = '', pic = null, sections = [], note = '' } = {}) {
+  const secs = sections
+    .filter(s => s?.rows?.length)
+    .map(s => `<div class="q-aia-sec">${s.title ? `<h4>${esc(s.title)}</h4>` : ''}${s.rows.map(r => rowHtml(r, leadHtml(r.lead))).join('')}</div>`)
+    .join('');
+  return `<div class="q-aia">${lineHtml(line, leadHtml(pic, true))}${secs}${note ? `<p class="q-ai-note"><span class="q-ai-mark" aria-hidden="true">${icons.ai || icons.spark}</span><span>${esc(note)}</span></p>` : ''}</div>`;
+}
+// (Node leads, an app's own pictures, put in where their place holds.)
+export function aiAnswer(spec = {}) {
+  const swap = x => (x?.lead instanceof Node ? { ...x, lead: null } : x);
+  const html = aiAnswerHtml({
+    ...spec,
+    pic: spec.pic instanceof Node ? null : spec.pic,
+    sections: (spec.sections || []).map(s => ({ ...s, rows: (s.rows || []).filter(Boolean).map(swap) }))
+  });
+  const box = h('div', { html });
+  const el = box.firstElementChild;
+  // (Each Node lead into its row, in order; a big picture beside the line.)
+  const rows = [...el.querySelectorAll('.q-aia-row')];
+  let i = 0;
+  for (const s of spec.sections || []) for (const r of (s.rows || []).filter(Boolean)) {
+    const row = rows[i++];
+    if (row && r.lead instanceof Node) {
+      const wrap = h('span', { class: 'q-aia-pic node' }, [r.lead]);
+      row.prepend(wrap);
+      row.classList.remove('bare');
+    }
+  }
+  if (spec.pic instanceof Node) el.querySelector('.q-aia-head')?.append(h('span', { class: 'q-aia-pic big node' }, [spec.pic]));
+  return el;
+}
