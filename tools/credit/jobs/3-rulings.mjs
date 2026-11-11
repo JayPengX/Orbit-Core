@@ -20,7 +20,7 @@ async function build() {
       const r = { id, title: [j.label, j.n].filter(Boolean).join(' '), court: '憲法法庭', v: String(j.d || ''), paras };
       const { rows, cut } = numbered(r.paras);
       for (const lang of LANGS)
-        reqs.push({ custom_id: `${id}.${lang}`, params: { model: 'claude-sonnet-5-5', max_tokens: 4000, output_config: { effort: 'low', format: { type: 'json_schema', schema: { ...RULING_SCHEMA, additionalProperties: false, properties: { ...RULING_SCHEMA.properties, points: { type: 'array', items: { ...RULING_SCHEMA.properties.points.items, additionalProperties: false } } } } } }, messages: [{ role: 'user', content: rulingPrompt(r, rows, cut, '', lang) }] } });
+        reqs.push({ custom_id: `${id}_${lang}`, params: { model: 'claude-sonnet-5-5', max_tokens: 4000, output_config: { effort: 'low', format: { type: 'json_schema', schema: { ...RULING_SCHEMA, additionalProperties: false, properties: { ...RULING_SCHEMA.properties, points: { type: 'array', items: { ...RULING_SCHEMA.properties.points.items, additionalProperties: false } } } } } }, messages: [{ role: 'user', content: rulingPrompt(r, rows, cut, '', lang) }] } });
     }
   }
   return reqs;

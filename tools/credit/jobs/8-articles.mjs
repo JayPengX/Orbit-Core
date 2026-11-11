@@ -24,7 +24,7 @@ async function build() {
     for (const a of law.a || []) {
       if (a[0] !== 'A' || typeof a[2] !== 'string' || !a[2].trim() || /^（?(刪除|删除)）?。?$/.test(a[2].trim())) continue;
       if (reqs.length >= MAX) return reqs;
-      reqs.push({ custom_id: `${p}.${a[1]}`.replace(/[^A-Za-z0-9_.-]/g, '_'), params: { model: 'claude-sonnet-5-5', max_tokens: 6000, output_config: { effort: 'low', format: { type: 'json_schema', schema: strict(EXPLAIN_SCHEMA) } }, messages: [{ role: 'user', content: explainPrompt(law, [a], 'zh') }] } });
+      reqs.push({ custom_id: `${p}_${a[1]}`.replace(/[^A-Za-z0-9_-]/g, '_'), params: { model: 'claude-sonnet-5-5', max_tokens: 6000, output_config: { effort: 'low', format: { type: 'json_schema', schema: strict(EXPLAIN_SCHEMA) } }, messages: [{ role: 'user', content: explainPrompt(law, [a], 'zh') }] } });
     }
   }
   return reqs;
