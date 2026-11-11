@@ -218,7 +218,7 @@ w;dur=`, noted by the 除錯紀錄 when slow.
 | `/config` | `worker.js`, `kit/devconfig.mjs` | The live speeds (`DEV`), a minute in Cloudflare's cache |
 | `/guard` | `worker.js` | The guard as it last read the bill (no key) |
 | `/store/check` | `worker.js`, `doc-store.js` | Each collection's count, localhost only |
-| `/ops` | `ops.js`, `worker.js`, `ai-other.js` | Checks (Bearer `DATA_PUSH_SECRET`): `?check=` `gemini*`, `law-chat`, `ai-*`, `as-phone` (a phone's AI ask, for `tools/shots/ai/`), `system`, `capacity`, `cpu`, `sources`, `sources-state` |
+| `/ops` | `ops.js`, `worker.js`, `ai-other.js` | Checks (Bearer `DATA_PUSH_SECRET`): `?check=` `gemini*`, `law-chat`, `ai-*`, `as-phone`, `system`, `capacity`, `cpu`, `sources`, `sources-state` |
 
 - **The gate:** every route needs a Pass session (`qt=`), counted per
   session and app in memory (600 a minute on the data proxy). Public routes
