@@ -168,7 +168,8 @@ export function pageLeads(html, base) {
     if (href) feeds.push({ url: absolute(href, base), title: unEnt(/title=["']([^"']*)/i.exec(m[0])?.[1] || '') });
   }
   for (const m of page.matchAll(/<a\b([^>]*href=["']([^"']*(?:rssfeeds|\/rss|rss\.php|feed)[^"']*)["'][^>]*)>/gi)) feeds.push({ url: absolute(m[2], base), title: unEnt(/title=["']([^"']*)/i.exec(m[1])?.[1] || '') });
-  const feed = feeds.filter(f => f.url && same(f.url)).sort((a, b) => rank(a.title) - rank(b.title))[0]?.url || '';
+  const ours = [...new Map(feeds.filter(f => f.url && same(f.url) && rank(f.title) < 9).map(f => [f.url, f])).values()].sort((a, b) => rank(a.title) - rank(b.title));
+  const feed = ours[0]?.url || feeds.find(f => f.url && same(f.url))?.url || '';
   const more = [];
   for (const [, attrs, inner] of cleanPage(page).matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
     const words = `${textOf(inner)} ${unEnt(/title=["']([^"']*)/i.exec(attrs)?.[1] || '')}`;
@@ -177,7 +178,9 @@ export function pageLeads(html, base) {
     if (url && same(url) && url !== base && !/site_news\//.test(url)) more.push(url);
   }
   const refresh = /<meta[^>]+http-equiv=["']?refresh["']?[^>]*content=["']?\s*\d+\s*;\s*url=([^"'>\s]+)/i.exec(page)?.[1];
-  return { ischool, feed, more: [...new Set(more)].slice(0, 2), refresh: refresh ? absolute(refresh, base) : '' };
+  // (A site with a feed for each of its boards, 行政消息, 活動消息…: each one, its name.)
+  const boards = ours.length > 1 ? ours.slice(0, 8).map(f => ({ url: f.url, name: /[-－:：]\s*([^-－:：]{2,10})\s*$/.exec(f.title)?.[1] || '' })) : [];
+  return { ischool, feed, boards, more: [...new Set(more)].slice(0, 2), refresh: refresh ? absolute(refresh, base) : '' };
 }
 
 // The items kept: dated within the last NEWS.days (and up to a year ahead),
@@ -265,6 +268,13 @@ export async function readSchool(site, fetchFn, today) {
       } catch {}
     }
     await take(all, 'ischool');
+  }
+  // Every board's feed (older posts than the one list keeps), each item named by its board.
+  if (leads.boards.length) {
+    const got = await Promise.all(leads.boards.map(b => getPage(b.url, fetchFn).then(r => (r && isFeed(r.text, r.type) ? feedItems(r.text, r.url, today).map(it => (it.unit || !b.name || /^(all|全部.*)$/i.test(b.name) ? it : { ...it, kind: b.name })) : []))));
+    // (The boards' own first, so a post in both keeps its board's name.)
+    const named = got.flat().sort((a, b) => (b.kind ? 1 : 0) - (a.kind ? 1 : 0));
+    await take(named, 'feed');
   }
   if (best.items.length < 8 && leads.feed) {
     const got = await getPage(leads.feed, fetchFn);

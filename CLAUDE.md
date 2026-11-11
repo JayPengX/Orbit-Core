@@ -208,7 +208,7 @@ w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
 | `/law-chat` | `law-chat.js`, `ai-other.js` | 問法律: a plan (Flash-Lite), up to 14 articles from Law's lists and index, answered from those only by Sonnet (failing: Gemini), cites checked; grounded by `law-ground.js`, `law-more.js`, `law-local.js` (councils); 16 turns back; 30 a day a Pass |
 | `/law-page` | `law-page.js`, `law-hosts.js` | A gov.tw / edu.tw page read in Law, cleaned; edge cache only; Taiwan-only via the relay (build key: any gov.tw; `file=1`: raw); 500 a day a Pass |
 | `/law-live` | `law-live.js` | 立法院's IVOD streams now, 60 s at the edge (last good read 30 min); ours only |
-| `/class-news` | `class-news.js` | Class's 學校公告: a school's list read via the relay, new titles worded once; R2, an hour |
+| `/class-news` | `class-news.js` | Class's 學校公告: a school's list (every board's feed) read via the relay, new titles worded once, what it showed kept 45 days; R2, an hour; ops `ai-try` `peek=` a school's page |
 | `/money-read` | `money-read.js` | Money's 拍照記帳: a picture → `{ buys, left }`, read by Gemini, checked; on a tap; 30 a day a Pass, 300 in all |
 | `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |
 | `/flight` | `flight.js`, `kit/flight.mjs` | Class's 專注飛行: real planes landing in about N minutes |
