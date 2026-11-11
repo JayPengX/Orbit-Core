@@ -1448,6 +1448,25 @@ async function route(request, env, ctx, headers, origin) {
       const qs = COMPARE_QS.slice(from, from + Math.min(10, Math.max(1, Number(q.get('n')) || 3)));
       return json(await lawCompare(env, ctx, headers, lawGemini('compare'), calls, qs), 200, headers);
     }
+    // A phone's own AI ask, run as one (?path=/ai|/law-ask|/law-chat|/class-news, ?body= its JSON,
+    // base64; ?app=): the very answer a phone gets, for the store screenshots' saved answers
+    // (Orbit-Core tools/shots/ai/). Counted as a pass's call ('ops-shots'), on the day's caps.
+    if (check === 'as-phone') {
+      const q = new URL(request.url).searchParams;
+      const p = q.get('path') || '';
+      if (!['/ai', '/law-ask', '/law-chat', '/class-news'].includes(p)) return json({ error: 'path' }, 400, headers);
+      let body = '';
+      try {
+        body = new TextDecoder().decode(Uint8Array.from(atob(q.get('body') || ''), c => c.charCodeAt(0)));
+        JSON.parse(body);
+      } catch {
+        return json({ error: 'body' }, 400, headers);
+      }
+      const site = 'https://orbit.jaypengx.com';
+      const qt = await signToken(await tokenSecret(env), { k: 'ses', d: 'ops-shots', a: q.get('app') || 'law', s: 'ops-shots', e: Date.now() + 300_000 });
+      const res = await route(new Request(`${new URL(request.url).origin}${p}?qt=${encodeURIComponent(qt)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: site }, body }), env, ctx, corsHeaders(site), site);
+      return new Response(await res.text(), { status: res.status, headers: { ...headers, 'Content-Type': res.headers.get('Content-Type') || 'application/json' } });
+    }
     // An AI feature's prompt tried on its examples (ai-fixtures.js), or ?models= each in turn
     // (ai.js MODELS' names): what each answered, asked back, how long it took. Nothing kept.
     if (check === 'ai-try') {
