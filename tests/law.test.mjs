@@ -22,6 +22,7 @@ const laws = [];
 const gemini = [];
 let reply = { answer: '輔助宣告由法院為之。', points: [{ text: '可聲請輔助宣告', cites: ['第15條之1'] }, { text: '外部條文', cites: ['16'] }, { text: '沒有出處', cites: [] }], covered: true };
 let geminiStatus = 200;
+const MADE = {};
 globalThis.fetch = async (url, init) => {
   const u = String(url);
   if (u.includes('generativelanguage')) {
@@ -37,6 +38,11 @@ globalThis.fetch = async (url, init) => {
     if (id === '202110000010000') return new Response(JSON.stringify({ error: false, data: BILL }));
     if (id === '202110000020000') return new Response(JSON.stringify({ error: false, data: { 議案名稱: '預算案', 對照表: [] } }));
     return new Response(JSON.stringify({ error: true, message: 'not found' }), { status: 404 });
+  }
+  // Answers made ahead (Orbit Law's data/ai/, the API credit's jobs).
+  if (u.startsWith('https://orbit.jaypengx.com/law/data/ai/')) {
+    const k = u.slice('https://orbit.jaypengx.com/law/data/ai/'.length);
+    return MADE[k] ? new Response(JSON.stringify(MADE[k])) : new Response('', { status: 404 });
   }
   if (u === 'https://orbit.jaypengx.com/law/data/diff/B0000001.json') return diffStatus === 200 ? new Response(JSON.stringify(DIFF)) : new Response('', { status: diffStatus });
   if (u === 'https://orbit.jaypengx.com/law/data/index.json') return new Response(JSON.stringify({ laws: [['B0000001', '民法', '法律', '', '20250101', 0, 'Civil Code', 4]] }));
@@ -353,4 +359,29 @@ test('no question: the article explained (gist, why, examples, terms, today), on
   } finally {
     reply = saved;
   }
+});
+
+test('an article explained ahead for this version is answered without Gemini, checked, free; another version asks Gemini', async () => {
+  const raw = { gist: '輔助宣告保護判斷力較弱的人。', points: [{ text: '可聲請輔助宣告', cites: ['15-1'] }, { text: '外部', cites: ['99'] }], why: '保護', examples: [], terms: [], now: '', related: [], covered: true };
+  MADE['explain/B0000001-0.json'] = { '15-1': { m: '20250101', raw } };
+  const before = gemini.length;
+  const r = await ask({ p: 'B0000001', arts: ['15-1'], lang: 'zh' });
+  assert.equal(r.status, 200);
+  const j = await r.json();
+  assert.equal(j.gist, raw.gist);
+  assert.equal(j.cached, true);
+  assert.deepEqual(j.points.map(x => x.cites), [['15-1']]);
+  assert.equal(gemini.length, before);
+  // (Made from an older text: not used.)
+  MADE['explain/B0000001-0.json'] = { '15-1': { m: '20200101', raw } };
+  reply = { ...raw, gist: '新的解釋' };
+  const r2 = await ask({ p: 'B0000001', arts: ['15-1'], lang: 'zh' });
+  assert.equal((await r2.json()).gist, '新的解釋');
+  assert.equal(gemini.length, before + 1);
+  delete MADE['explain/B0000001-0.json'];
+});
+
+test("answers made ahead are packed: an article's by a hundred numbers, a ruling's by fifty", async () => {
+  const { aiBucket } = await import('../law.js');
+  assert.deepEqual(['1', '15-1', '99', '100', '1225', 's748', 's1', 'j115-7', 'j115-51'].map(aiBucket), ['0', '0', '0', '1', '12', 's14', 's0', 'j115-0', 'j115-1']);
 });

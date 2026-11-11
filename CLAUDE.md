@@ -204,7 +204,7 @@ w;dur=`, noted by the 除錯紀錄 when slow.
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
 | `/ai` | `ai.js`, `ai-features.js`, `law-ai.js`, `ai-util.js`, `ai-fixtures.js` | Every app's AI by name: fixed prompt, models in turn, lean input (`maxIn`), caps, asks back (`clarify`, `pick`); builders' `aiOnce`; ops `ai-try` (`site/ai-try/`) |
 | `/ai/build` | `ai.js` | A repo's build runs its `build:` features (Law's key) on the day's cap |
-| `/law-ask` | `law.js`, `law-ruling.js`, `law-town.js`, `law-ground.js` | Law's questions on 1–8 articles, every point cited and checked, kept in KV; modes `bill`, `diff`, `ruling`, `town`; 40 Gemini calls a day a Pass, 300 in all with `/law-chat`'s (D1 `law_day`) |
+| `/law-ask` | `law.js`, `law-ruling.js`, `law-town.js`, `law-ground.js` | Law's questions on 1–8 articles, every point cited and checked, kept in KV (or Law's `data/ai/`); modes `bill`, `diff`, `ruling`, `town`; 40 Gemini calls a day a Pass, 300 in all with `/law-chat`'s (D1 `law_day`) |
 | `/law-chat` | `law-chat.js`, `ai-other.js` | 問法律: a plan (Flash-Lite), up to 14 articles (and delegated ones) from Law's index, answered from those by Sonnet (failing: Sol), cites checked; grounded by `law-ground.js`, `law-more.js`, `law-local.js` (councils); 16 turns back; 30 a day a Pass |
 | `/law-page` | `law-page.js`, `law-hosts.js` | A gov.tw / edu.tw page read in Law, cleaned; edge cache only; Taiwan-only via the relay (build key: any gov.tw; `file=1`: raw); 500 a day a Pass |
 | `/law-live` | `law-live.js` | 立法院's IVOD streams now, 60 s at the edge (last good read 30 min); ours only |
