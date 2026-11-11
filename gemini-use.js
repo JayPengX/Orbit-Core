@@ -96,6 +96,23 @@ export function reliability(calls) {
   return days;
 }
 
+// Each feature's answered calls and tokens by model (build.yml gemini-use, try tokens=1&days=):
+// { 'feature model': { n, in, cached, out, ms } }, ms the average.
+export function spendOf(calls) {
+  const out = {};
+  for (const c of calls) {
+    if (c.status !== 200) continue;
+    const r = (out[`${c.feature} ${c.model}`] ||= { n: 0, in: 0, cached: 0, out: 0, ms: 0 });
+    r.n++;
+    r.in += c.tin;
+    r.cached += c.cached;
+    r.out += c.tout;
+    r.ms += c.ms || 0;
+  }
+  for (const r of Object.values(out)) r.ms = Math.round(r.ms / r.n);
+  return out;
+}
+
 // What the admin panel shows, from the calls:
 // - ai: each feature's calls on each of the last 7 Taiwan days (refusals not counted: nothing was answered);
 // - google: each model on Google's day so far (calls, the busiest minute, refusals) and when that day ends;
