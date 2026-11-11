@@ -1,0 +1,26 @@
+# Orbit Class's 專注飛行: every routed airliner in the air, built here (the
+# plane sources turn Cloudflare away) every ten minutes and written to R2
+# flight/pool.json, which the proxy's /flight?pool=1 answers with
+# (tools/flight-pool.mjs). Runs may overlap: each writes a whole pool, so no
+# concurrency group (a cancel mails Jay).
+name: Flight pool
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      # main's tip, never the commit that started the run.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build and push the pool
+        run: node tools/flight-pool.mjs
+        env:
+          DATA_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET }}

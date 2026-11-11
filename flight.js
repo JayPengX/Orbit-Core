@@ -9,10 +9,17 @@
 // busy airports; ADS-B has no route, so a callsign's origin and destination
 // come from adsbdb.com (free) and are checked against where the plane is and
 // where it's heading (kit/flight.mjs onRoute). The time left is the distance
-// to go at its ground speed plus the approach (etaMin). Nothing is stored:
-// each area's planes are kept a minute and each callsign's route a day in
-// Cloudflare's cache, so however many phones ask, the sources are asked
-// about once a minute an area.
+// to go at its ground speed plus the approach (etaMin).
+//
+// The pool is built off Cloudflare (2026-11-11): adsb.lol allows an address
+// 500 asks a day and Cloudflare's addresses are shared, so from Workers it
+// answers 429; adsb.fi refuses Workers (403); and neither lets a phone read it
+// (no CORS). So GitHub Actions builds it every ten minutes
+// (tools/flight-pool.mjs, flight.yml) into R2 `flight/pool.json`; the proxy
+// answers with that copy, builds one itself only when it is old, and when that
+// fails too answers the old copy (its planes still in the air: the phone flies
+// each on from its fix). A plane followed (?hex=) is the proxy's ask: when it
+// fails the phone flies it on from its last fix.
 import { json } from './http.js';
 import { distKm, etaMin, onRoute, choose } from './kit/flight.mjs';
 
@@ -34,12 +41,26 @@ const AIRLINE = /^[A-Z]{3}\d{1,4}[A-Z]{0,2}$/;
 
 const edge = () => (typeof caches !== 'undefined' && caches.default) || null;
 
+// A source that turned us away (429, 403) is left alone two minutes: every
+// phone following a plane asks every 15 s, and asking again only digs deeper.
+const shut = new Map();
+const SHUT_MS = 120_000;
+const hostOf = url => {
+  try {
+    return new URL(url).host;
+  } catch {
+    return '';
+  }
+};
+
 // A JSON read through Cloudflare's cache (`ttl` seconds), a failure as null.
 async function cachedJson(key, url, ttl, fetchFn, ms, opts = {}) {
   const c = edge();
   const req = new Request(key);
   const hit = c && (await c.match(req).catch(() => null));
   if (hit) return hit.json().catch(() => null);
+  const host = hostOf(url);
+  if (Date.now() < (shut.get(host) || 0)) return null;
   let res;
   try {
     res = await fetchFn(url, { ...opts, headers: { 'User-Agent': UA, Accept: 'application/json', ...(opts.headers || {}) }, signal: AbortSignal.timeout(ms) });
@@ -51,6 +72,7 @@ async function cachedJson(key, url, ttl, fetchFn, ms, opts = {}) {
     if (c) await c.put(req, new Response('null', { headers: { 'Cache-Control': `max-age=${ttl}` } })).catch(() => {});
     return null;
   }
+  if (res.status === 429 || res.status === 403) shut.set(host, Date.now() + SHUT_MS);
   if (!res.ok) return null;
   const text = await res.text();
   let data;
@@ -100,7 +122,7 @@ export function routeOf(data) {
   if (!from || !to) return null;
   return { no: r.callsign_iata || '', airline: { name: r.airline?.name || '', iata: r.airline?.iata || '', icao: r.airline?.icao || '' }, from, to };
 }
-const routeFor = (cs, fetchFn) => cachedJson(`https://flight.orbit/route/${cs}`, `https://api.adsbdb.com/v0/callsign/${cs}`, ROUTE_TTL, fetchFn, LIMITS.routeMs).then(routeOf);
+export const routeFor = (cs, fetchFn) => cachedJson(`https://flight.orbit/route/${cs}`, `https://api.adsbdb.com/v0/callsign/${cs}`, ROUTE_TTL, fetchFn, LIMITS.routeMs).then(routeOf);
 
 // The planes worth looking up: airliners in the air, flying, seen just now,
 // once each.
@@ -132,16 +154,18 @@ export function flightOf(c, route, now) {
 // fixes a few minutes old: the phone flies each plane on from its fix, and
 // asks for a new one as soon as it follows one.) The phone
 // picks from it itself (kit/flight.mjs choose), whatever the minutes.
-export async function buildPool({ fetchFn = fetch, now = Date.now() } = {}) {
+// (Off Cloudflare, tools/flight-pool.mjs passes its own route lookup, kept in
+// R2, and a longer budget.)
+export async function buildPool({ fetchFn = fetch, now = Date.now(), routes = cs => routeFor(cs, fetchFn), budgetMs = LIMITS.budgetMs } = {}) {
   const t0 = Date.now();
   const lists = await Promise.all(Object.keys(AREAS).map(k => areaPlanes(k, fetchFn)));
   if (lists.every(x => !x)) return null;
   const order = candidates(lists, now).slice(0, LIMITS.lookups);
   const found = [];
-  for (let i = 0; i < order.length && Date.now() - t0 < LIMITS.budgetMs - LIMITS.routeMs; i += LIMITS.batch) {
+  for (let i = 0; i < order.length && Date.now() - t0 < budgetMs - LIMITS.routeMs; i += LIMITS.batch) {
     const part = order.slice(i, i + LIMITS.batch);
-    const routes = await Promise.all(part.map(c => routeFor(c.cs, fetchFn)));
-    part.forEach((c, j) => found.push(flightOf(c, routes[j], now)));
+    const got = await Promise.all(part.map(c => routes(c.cs)));
+    part.forEach((c, j) => found.push(flightOf(c, got[j], now)));
   }
   return found.filter(f => f && f.eta - now <= (LIMITS.maxMin + 30) * 60_000 && f.eta > now).map(slim);
 }
@@ -151,12 +175,51 @@ const slim = f => ({ hex: f.hex, cs: f.cs, no: f.no, airline: f.airline, from: p
 
 const POOL_FRESH_MS = 180_000;
 const POOL_KEEP_S = 1800;
+// The copy GitHub Actions builds (flight-pool.mjs): taken as it is while it
+// is this young; older, a build here is tried first.
+export const KEPT_FRESH_MS = 20 * 60_000;
+// Older still, it answers only when nothing newer can be had, and only for
+// as long as enough of its planes are still up.
+const KEPT_MAX_MS = 4 * 3_600_000;
+const BUILD_REST_MS = 5 * 60_000;
 let poolMem = null;
 let building = null;
-// The pool kept: fresh (three minutes) as it is; older (up to half an hour),
-// answered at once while a new one is built behind (`ctx.waitUntil`), so only
-// a city's very first ask waits on a build.
-export async function poolNow({ fetchFn = fetch, now = Date.now(), ctx = null } = {}) {
+let failedAt = 0;
+let keptMem = null;
+
+// R2's copy ({ at, flights }), read at most once a minute an isolate.
+async function keptPool(data, now) {
+  if (!data) return null;
+  if (keptMem?.data === data && Math.abs(now - keptMem.read) < 60_000) return keptMem.pool;
+  const pool = await data
+    .get('flight/pool.json')
+    .then(o => o?.json())
+    .catch(() => null);
+  keptMem = { data, read: now, pool: pool && Number.isFinite(pool.at) && Array.isArray(pool.flights) ? pool : null };
+  return keptMem.pool;
+}
+// A kept pool's planes still flying (a minute to go at least).
+export const stillUp = (flights, now) => flights.filter(f => f && f.eta > now + 60_000);
+
+// The pool: R2's copy while young; else one built here (kept three minutes
+// fresh, up to half an hour answered at once while a new one is built
+// behind, `ctx.waitUntil`); else R2's copy of any age up to four hours.
+export async function poolNow({ fetchFn = fetch, now = Date.now(), ctx = null, data = null } = {}) {
+  const kept = await keptPool(data, now);
+  if (kept && now - kept.at <= KEPT_FRESH_MS) {
+    const up = stillUp(kept.flights, now);
+    if (up.length) return up;
+  }
+  const built = await builtPool({ fetchFn, now, ctx }).catch(() => null);
+  if (built?.length) return built;
+  if (kept && now - kept.at <= KEPT_MAX_MS) {
+    const up = stillUp(kept.flights, now);
+    if (up.length) return up;
+  }
+  return built || null;
+}
+
+async function builtPool({ fetchFn, now, ctx }) {
   // (Sources faked, as the tests do: built each time.)
   if (fetchFn !== globalThis.fetch) return buildPool({ fetchFn, now });
   const c = edge();
@@ -164,23 +227,27 @@ export async function poolNow({ fetchFn = fetch, now = Date.now(), ctx = null } 
   const build = () =>
     (building ||= buildPool({ fetchFn, now })
       .then(async pool => {
-        if (!pool) return null;
+        if (!pool) {
+          failedAt = Date.now();
+          return null;
+        }
         poolMem = { at: now, pool };
         if (c) await c.put(key, new Response(JSON.stringify(poolMem), { headers: { 'Cache-Control': `max-age=${POOL_KEEP_S}` } })).catch(() => {});
         return pool;
       })
       .finally(() => (building = null)));
   if (!poolMem && c) poolMem = await c.match(key).then(r => r?.json()).catch(() => null);
-  if (!poolMem || now - poolMem.at > POOL_KEEP_S * 1000) return build();
-  if (now - poolMem.at > POOL_FRESH_MS) {
+  const resting = Date.now() - failedAt < BUILD_REST_MS;
+  if (!poolMem || now - poolMem.at > POOL_KEEP_S * 1000) return resting ? null : build();
+  if (now - poolMem.at > POOL_FRESH_MS && !resting) {
     const next = build().catch(() => null);
     ctx?.waitUntil?.(next);
   }
   return poolMem.pool;
 }
 
-export async function pickFlights(minutes, { fetchFn = fetch, now = Date.now(), ctx = null } = {}) {
-  const pool = await poolNow({ fetchFn, now, ctx });
+export async function pickFlights(minutes, { fetchFn = fetch, now = Date.now(), ctx = null, data = null } = {}) {
+  const pool = await poolNow({ fetchFn, now, ctx, data });
   return pool ? choose(pool, minutes, now) : null;
 }
 
@@ -213,7 +280,7 @@ export async function probeSources(fetchFn = fetch) {
   return { lol, fi, adsbdb };
 }
 
-export async function handleFlight(request, headers, { session, limited, fetchFn = fetch, colo = '', ctx = null }) {
+export async function handleFlight(request, headers, { session, limited, fetchFn = fetch, colo = '', ctx = null, data = null }) {
   if (new URL(request.url).searchParams.get('probe') === '1') {
     const c = edge();
     const key = new Request(`https://flight.orbit/probe/${colo}`);
@@ -234,11 +301,11 @@ export async function handleFlight(request, headers, { session, limited, fetchFn
   }
   // ?pool=1: the whole pool, for the phone to pick from.
   if (q.get('pool') === '1') {
-    const pool = await poolNow({ fetchFn, ctx });
+    const pool = await poolNow({ fetchFn, ctx, data });
     return pool ? json({ flights: pool, at: Date.now() }, 200, headers) : json({ error: { code: 'UPSTREAM' } }, 502, headers);
   }
   const minutes = Math.round(Number(q.get('min')));
   if (!(minutes >= LIMITS.minMin && minutes <= LIMITS.maxMin)) return json({ error: { code: 'BAD_MINUTES' } }, 400, headers);
-  const flights = await pickFlights(minutes, { fetchFn, ctx });
+  const flights = await pickFlights(minutes, { fetchFn, ctx, data });
   return flights ? json({ flights, at: Date.now() }, 200, headers) : json({ error: { code: 'UPSTREAM' } }, 502, headers);
 }

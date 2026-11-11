@@ -90,8 +90,7 @@ deploy workflow tests against main's kit, stamps every file with its hash
 
 Served from this repo's site, never copied. Each app's page carries
 `kit/loader.html`'s snippets; `kit/preload.mjs` lists the first screen's
-modules for modulepreload. `node kit/apps.mjs` refreshes every app's snippets;
-`node kit/link.mjs` links `<app>/.kit` for tests.
+modules for modulepreload.
 
 - **Addresses by content.** The kit's deploy (`kit/stamp.mjs`) and every
   app's (`kit/stamp-app.mjs`) minify each file and address it by its hash
@@ -196,7 +195,7 @@ w;dur=`, noted by the 除錯紀錄 when slow.
 | `/eco` | `eco.js`, `eco-admin.js`, `money.js`, `passkey.js`, `webauthn.js`, `orbit-token.js`, `rec-weekly.js` | The Pass (§6); `op: 'admin'` is the owner's panel; `bug`: 除錯紀錄 sent (`private/bugs/`, weekly) |
 | `/stock` | `stock-fill.js`, `stock-check.js` | Securities' fills at the proxy's own quote; the account replayed on each save |
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
-| `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `weather-radar.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations) scored hourly (`/weather/skill`); `radar`: 2 hours' rain (radar); in a typhoon, `dayOff`: each county's 停班停課 or a fitted chance |
+| `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `weather-radar.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations), scored (`/weather/skill`); `radar`: 2 hours' rain (radar); in a typhoon, `dayOff`: each county's 停班停課 or a fitted chance |
 | `/transit/…` | `transit.js`, `transit-free.js` | TDX (allowlist `TDX_RULES`; `tdxTrim`; YouBike, buses (but 金門, 馬祖; 高雄's: phones), 台鐵's day, fares, notices, boards, metros live: own sites; 高鐵's day, metros: `rail/`; slow lists: `tdx/`; `tdxf:*`), bus places (`gps`), map config, search, place, route (TDX's if `TDX_MAAS`), walk, book (高鐵), `gtfs` (bus build), `status` |
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `f1-people.js`, `fund-nav.js`, `taifex.js` | The data proxy (§4.1): sports, quotes, F1, Asian baseball, SITCA's fund NAVs, TAIFEX |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
@@ -210,7 +209,7 @@ w;dur=`, noted by the 除錯紀錄 when slow.
 | `/class-news` | `class-news.js` | Class's 學校公告: a school's boards read via the relay, kept 45 days, new titles worded once; R2 |
 | `/money-read` | `money-read.js` | Money's 拍照記帳: a picture → `{ buys, left }`, read by Gemini, checked; on a tap; 30 a day a Pass, 300 in all |
 | `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |
-| `/flight` | `flight.js`, `kit/flight.mjs` | Class's 專注飛行: real planes landing in about N minutes |
+| `/flight` | `flight.js`, `kit/flight.mjs` | Class's 專注飛行: real planes landing in about N minutes; pool: R2 `flight/` (§5.5) |
 | `/gift` | `gift.js` | 公開領取 at `/key/` (`site/key/`), set in admin; one a device (D1 `gift_claim`), `op: 'go'` a `#qh=` into an app; unreplaced back after `hold` hours |
 | `/showcase/pass` | `showcase.js` | The showcase's short pass for its demos: reads only, capped per address a day |
 | `/data/…` | `data.js` | R2, public reads (§5.5); `/data/build` (POST, Bearer `DATA_PUSH_SECRET`, `build.yml`) runs a builder now |
@@ -313,7 +312,7 @@ A read (`kit proxyJson`) goes down these until one answers:
 | Store | Binding | What's in it |
 | --- | --- | --- |
 | D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data, the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced (§5.3); `gemini_call`: every Gemini call (`gemini-use.js`); `law_day`: the AI caps' counts a day; `gift`, `gift_claim`: the giveaway (`gift.js`); `beats`: each job's last run and failures (`ops.js`); `meter`: Google's and TDX's counts a month (`transit.js`); `push_kv`: notices' devices and lists (`push.js`); `sources`: outside calls by hour (`sources.js`) |
-| R2 `orbit-data` | `DATA` | Public: the builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `station/`, `rail/`, `tdx/`, `where.json`), the proxy's kept reads (`mirror/`), the radar's (`weather/`), schools' news (`class-news/`). Never served: `private/` (nightly backups `private/store/`, Firestore's last copy) |
+| R2 `orbit-data` | `DATA` | Public: the builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `station/`, `rail/`, `tdx/`, `where.json`), the proxy's kept reads (`mirror/`), the radar's (`weather/`), schools' news (`class-news/`), `flight/`. Never served: `private/` (nightly backups `private/store/`, Firestore's last copy) |
 | KV | `RATE_LIMIT_KV` | Counters (sign-ins, per-address limits); the guard's state, pace and alerts (`guard:*`); Google Weather's cells and calls a day (`weather:g:*`, `weather:google:<day>`); TDX's last reads (`tdx:warm:*`); the meter's copy (`transit:use:<month>`); Law's kept plans and answers (`law:*`); the showcase's passes a day (`showcase:passes:*`); the door's state (`door:state`); `ops:data-folders` |
 | Durable Objects | `F1_LOG`, `DOOR`, `RUNNER`, `CLOCK` | `F1Log`: F1's laps; `Door`: seats and the line; `Runner` (`runner.js`): heavy routes, crons by alarm, relays past 40 outside calls; `GuardClock`: the guard's alarm |
 | Edge cache | (Cache API) | The data proxy's answers by tier (§4.1), `/sports-today`, TDX's reads and routes (`transit.js`), the weather blend's cells (`weather.js`), `/law-live`, `/law-page`, `/config` |
@@ -373,6 +372,7 @@ writing a file only when it changed (`builders/store.js`):
 | `f1kept.js` | each finished F1 session's 數據 and laps, kept early (via the proxy) | :06, :26, :46 |
 | `kept.js` | wipes kept copies (`mirror/`) before a league's first askable day | daily 17:00 |
 | `news.js`, `news-words.js`, `news-laws.js` | `news/index.json` (3 days), `past.json` (weeks): stories by weight, topic, side; `laws.json`: laws named | every 10 min |
+| `tools/flight-pool.mjs` (`flight.yml`) | `flight/` | 10 min |
 | `ai.js`, `recaps.js`, `f1story.js`; `filings.js` | AI made once: `news/lines.json`, `sides.json`, `words/cards/<a…z>.json`, `sports/recaps/<day>.json`, `sports/f1/stories/`; 重大訊息 as rows: `stock/filings/` | :04 :24 :34 :54 |
 
 A season is kept until the next one's first game.
