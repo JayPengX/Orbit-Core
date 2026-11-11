@@ -66,6 +66,8 @@ export async function submit(job, requests) {
   if (!est) throw new Error('plan first');
   const committed = l.spent + Object.values(l.reserved).reduce((a, b) => a + b, 0);
   if (committed + est.usd * 1.2 > BUDGET_USD) throw new Error(`over budget: ${committed.toFixed(2)} committed + ${est.usd} (×1.2) > ${BUDGET_USD}`);
+  const bad = requests.find(r => !/^[a-zA-Z0-9_-]{1,64}$/.test(r.custom_id));
+  if (bad) throw new Error(`bad custom_id: ${bad.custom_id}`);
   const ids = [];
   for (let i = 0; i < requests.length; i += 5000) {
     const b = await client().messages.batches.create({ requests: requests.slice(i, i + 5000) });
