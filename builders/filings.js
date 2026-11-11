@@ -39,7 +39,7 @@ const EMPTY = /^(不適用|無|NA|N\/A|none|－|-|—|無。|不適用。)$/i;
 const label = k =>
   k
     .replace(/\s+/g, '')
-    .replace(/[（(]請[^）)]*[）)]/g, '')
+    .replace(/[（(][請如][^）)]*[）)]/g, '')
     .replace(/\(X{2,}.*$/, '')
     .replace(/^1月1日累計至本期止/, '今年累計')
     .replace(/[:：]$/, '');
