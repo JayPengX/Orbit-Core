@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Look before you write (CLAUDE.md): what the kit already has for a word.
+// Look before you write (CLAUDE.md, RULEBOOK §1): what the kit already has for a word.
 //
 //   node tools/kit-find.mjs sheet foot       exports and CSS whose name or comment has every word
 //   node tools/kit-find.mjs --css focus      only orbit.css (classes and --q- tokens)
