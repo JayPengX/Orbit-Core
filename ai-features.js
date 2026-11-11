@@ -628,6 +628,9 @@ export const FEATURES = {
       // (#N written out by surname; the row's own driver and lap, said again, taken off.)
       const surname = Object.fromEntries([...facts.matchAll(/([A-Z][\w'’.-]+(?: [A-Z][\w'’.-]+)*) #(\d{1,2})\b/g)].map(m => [m[2], m[1].split(' ').at(-1)]));
       const named = s => s.replace(/#(\d{1,2})\b/g, (m, n) => surname[n] || m);
+      // (杆位 only for the car that started first: "杆位第5起跑" read as pole, 11-11.)
+      const grid = Object.fromEntries([...facts.matchAll(/#(\d{1,2}) \([^)]*\), from (\d+)/g)].map(m => [m[1], Number(m[2])]));
+      const pole = (s, p) => (grid[p.no] === 1 || !/杆位/.test(s) ? s : s.replace(/杆位(?=第\s?\d)/g, '').replace(/杆位起跑/g, grid[p.no] ? `第${grid[p.no]}起跑` : '起跑'));
       const trim = (s, p) => {
         if (!p.no) return s;
         const t = s.replace(/^(?![^第從在於]*[胎站車旗跑賽圈位後前])[\u4e00-\u9fff·]{2,6}?(?=第\s?\d|從第|在第|於第)/, '').replace(new RegExp(`^${surname[p.no] || '#'}\\b,?\\s*`), '').replace(/^第\s?\d+\s?圈[，,]?\s*/, '').replace(/^on lap \d+,?\s*/i, '');
@@ -635,7 +638,7 @@ export const FEATURES = {
       };
       const points = list(raw?.points, 5)
         .map(p => ({ lap: Number.isInteger(p?.lap) && p.lap >= 0 && p.lap <= most ? p.lap : null, no: cars.has(String(p?.no || '').replace('#', '')) ? String(p.no).replace('#', '') : '', zh: str(p?.zh, 50), en: str(p?.en, 140) }))
-        .map(p => ({ ...p, zh: trim(named(p.zh), p), en: trim(named(p.en), p) }))
+        .map(p => ({ ...p, zh: trim(pole(named(p.zh), p), p), en: trim(named(p.en), p) }))
         .filter(p => p.zh && p.en && numbersFrom(`${p.zh} ${p.en}`, facts))
         .slice(0, 4);
       return points.length >= 2 ? { points } : null;
@@ -652,6 +655,51 @@ export const FEATURES = {
   // that show it. Asked on a stock's page, kept for everyone (`shared`:
   // the same filing, the same words, one call).
   // (A filing's figures may be said rounded or in 萬/億 (its 仟元 too), its dates without the zero: 116/03/18 → 3/18.)
+  // Orbit Sports: 問比賽, a question about the teams and leagues followed.
+  // The phone lays out what it read as tables (lib/ask.mjs: my teams'
+  // places, next and last games, each followed league's table, today's);
+  // the AI only picks the tables that answer and writes one line, every
+  // number one of theirs, and names the rows to light.
+  'sports-ask': {
+    app: 'match',
+    tap: true,
+    models: ['haiku', 'luna'],
+    effort: { luna: 'low' },
+    maxIn: 6000,
+    perPass: 40,
+    perMinute: 10,
+    input(raw) {
+      const q = str(raw?.question, 200);
+      const facts = String(raw?.facts || '').slice(0, 5000);
+      if (!q || facts.length < 20) return null;
+      return { q, facts, en: raw?.lang === 'en' };
+    },
+    parts: ({ q, facts, en }) =>
+      text(
+        [
+          'You answer a question about the sports a person follows. The facts below are what their app already read: each line starting [id] is a table the app draws as rows, with each team’s logo, under your answer.',
+          'Tables: mine (their teams’ places), next (their teams’ next games, Taiwan time), last (their teams’ last results), table.<league> (a league’s table, top first), today (today’s games in their leagues).',
+          'show: the ids of the one or two tables that answer it, the best first ([] when none does). line: ONE short sentence that answers it, the thing asked first (zh at most 40 字, en at most 22 words); never list what the tables will show. mark: up to 3 row labels in those tables to light up, written exactly as in the facts (the part before the first comma).',
+          'Every number in line must appear in the facts exactly (places, dates, times, scores; no new sums or odds). If the facts can’t answer it (a team or league they don’t follow, a stat not given), line says so and what they do show, show [].',
+          `Write line in ${en ? 'English' : 'Traditional Chinese (台灣用語), team names as the facts write them'}, plain words, no markdown. Never about betting.`,
+          'Facts:',
+          facts,
+          `Question: ${q}`
+        ].join('\n')
+      ),
+    schema: obj({ line: S, show: arr(S), mark: arr(S) }),
+    clean: (raw, { facts }) => {
+      const a = str(raw?.line ?? raw?.answer, 200);
+      if (!a || !numbersFrom(a, facts)) return null;
+      const ids = new Set([...facts.matchAll(/^\[([a-z0-9.]+)\]/gm)].map(m => m[1]));
+      const show = [...new Set(list(raw?.show, 4).map(x => str(x, 40)).filter(x => ids.has(x)))].slice(0, 2);
+      // (A row's label: the part of a row before its first comma.)
+      const labels = new Set([...facts.matchAll(/^\[[a-z0-9.]+\][^:]*: (.*)$/gm)].flatMap(m => m[1].split('; ').map(r => r.split(', ')[0])));
+      const mark = [...new Set(list(raw?.mark, 6).map(x => str(x, 60).split(', ')[0]).filter(x => labels.has(x)))].slice(0, 3);
+      return { line: a, show, mark };
+    }
+  },
+
   'sec-filing': {
     app: 'stock',
     tap: true,

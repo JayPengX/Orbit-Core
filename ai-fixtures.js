@@ -22,6 +22,12 @@ const MONEY_PAYS = [
 ];
 const money = (name, text, answers) => ({ name, input: { text, today: '2026-11-10', cats: MONEY_CATS, pays: MONEY_PAYS }, ...(answers ? { answers } : {}) });
 
+const SPORTS_FACTS = `Today: 11/11 (Taiwan).
+[mine] 我的球隊排名: 湖人, NBA · 西區, 第 3 名; 勇士, NBA · 西區, 第 8 名
+[next] 我的球隊下一場: 勇士 vs 金塊, 11/11（三）19:00; 湖人 @ 太陽, 11/12（四）19:30
+[last] 我的球隊上一場: 勇士 vs 塞爾提克, 11/10, 99–118 負; 湖人 vs 太陽, 11/9, 112–104 勝; 道奇 vs 洋基, 11/1, 5–4 勝
+[table.nba] NBA 西區: 雷霆, 12-1, 第 1 名; 火箭, 11-2, 第 2 名; 湖人, 11-2, 第 3 名; 金塊, 10-3, 第 4 名; 灰狼, 9-4, 第 5 名; 快艇, 8-5, 第 6 名; 獨行俠, 8-5, 第 7 名; 勇士, 7-6, 第 8 名
+[today] 今天我的聯賽: 公鹿 @ 尼克, 已結束, 110–121; 金塊 @ 勇士, 19:00`;
 const MONEY_FACTS = `Today: 2026-11-10. Amounts are NT$.
 Book starts: 2026-07-08
 Income this month: 1860
@@ -57,6 +63,16 @@ export const EXAMPLES = {
     { name: 'budget', input: { question: '預算還剩多少？', facts: MONEY_FACTS } },
     { name: 'not in the facts', input: { question: '我去年花最多的是哪個月？', facts: MONEY_FACTS } },
     { name: 'english', input: { question: 'Where did most of my money go this month?', facts: MONEY_FACTS, lang: 'en' } },
+  ],
+
+  'sports-ask': [
+    { name: 'my places', input: { question: '我的球隊排第幾？', facts: SPORTS_FACTS } },
+    { name: 'next game', input: { question: '湖人下一場什麼時候？', facts: SPORTS_FACTS } },
+    { name: 'last results', input: { question: '最近打得怎麼樣？', facts: SPORTS_FACTS } },
+    { name: 'today', input: { question: '今天有什麼比賽？', facts: SPORTS_FACTS } },
+    { name: 'the table', input: { question: '西區誰第一？', facts: SPORTS_FACTS } },
+    { name: 'not followed', input: { question: '熱火排第幾？', facts: SPORTS_FACTS } },
+    { name: 'english', input: { question: 'When do my teams play next?', facts: SPORTS_FACTS, lang: 'en' } },
   ],
 
   'sec-lesson': [
