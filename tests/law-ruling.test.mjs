@@ -10,6 +10,7 @@ const PAGE = `<html><div class="htmlcontent"><div>最高法院刑事判決</div>
 const JID = 'TPSM,115,台上,4682,20261001,1';
 const gemini = [];
 const pages = [];
+const MADE = {};
 let reply = { answer: '法院認為事前審查違憲。', held: '規定違憲，失效。', points: [{ text: '事前審查限制言論最嚴', cites: ['¶4'] }, { text: '沒有的段', cites: ['99'] }, { text: '沒有出處', cites: [] }], who: ['移民業者'], covered: true };
 globalThis.fetch = async (url, init) => {
   const u = String(url);
@@ -19,6 +20,11 @@ globalThis.fetch = async (url, init) => {
   }
   if (u === 'https://orbit.jaypengx.com/law/data/cons/j115-7.json') return new Response(JSON.stringify(CONS));
   if (u.startsWith('https://orbit.jaypengx.com/law/data/cons/')) return new Response('', { status: 404 });
+  // (Explained ahead: Orbit Law's data/ai/ruling/, the API credit's job.)
+  if (u.startsWith('https://orbit.jaypengx.com/law/data/ai/')) {
+    const k = u.slice('https://orbit.jaypengx.com/law/data/ai/'.length);
+    return MADE[k] ? new Response(JSON.stringify(MADE[k])) : new Response('', { status: 404 });
+  }
   throw new Error(`unexpected fetch ${u}`);
 };
 // (gemini-relay carries Gemini's calls too: only the judgment page is answered here.)
@@ -103,4 +109,20 @@ test('a long ruling keeps 主文 whole and the reasons up to the limit; no point
   assert.deepEqual(rows.map(r => r.key), ['1', '2', '3']);
   assert.equal(cut, 3);
   assert.equal(checkRuling({ answer: 'a', points: [{ text: 'b', cites: ['9'] }], covered: true }, rows).covered, false);
+});
+
+test('a 釋字 or 憲判字 explained ahead from this text is answered without Gemini; a question, or another text, still asks', async () => {
+  MADE['ruling/j115-0-zh.json'] = { 'j115-7': { v: '2026-10-08', raw: { answer: '事先審查廣告違憲。', held: '規定失效。', points: [{ text: '事前審查最嚴', cites: ['5'] }, { text: '沒有的段', cites: ['77'] }], who: ['移民業者'], covered: true } } };
+  const before = gemini.length;
+  const j = await (await ask({ mode: 'ruling', id: 'j115-7' })).json();
+  assert.equal(j.answer, '事先審查廣告違憲。');
+  assert.deepEqual(j.points, [{ text: '事前審查最嚴', cites: ['5'] }]);
+  assert.deepEqual(j.quotes, { 5: ['理由', '事前審查是對言論最嚴格的限制。【3】'] });
+  assert.equal(gemini.length, before);
+  await ask({ mode: 'ruling', id: 'j115-7', q: '罰多少？' });
+  assert.equal(gemini.length, before + 1);
+  MADE['ruling/j115-0-zh.json']['j115-7'].v = '2026-01-01';
+  await ask({ mode: 'ruling', id: 'j115-7' });
+  assert.equal(gemini.length, before + 2);
+  delete MADE['ruling/j115-0-zh.json'];
 });

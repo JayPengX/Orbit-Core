@@ -9,7 +9,7 @@
 // answer, so the app shows the ruling's own words under each point.
 // (law.js does the rest: the Pass, the counts, the cache.)
 import { sha256Hex } from './http.js';
-import { readData, cited } from './law.js';
+import { readData, cited, madeFor, aiBucket } from './law.js';
 import { CONS_ID, JID } from './law-more.js';
 import { viaTaiwan } from './law-hosts.js';
 
@@ -172,6 +172,8 @@ export async function rulingJob(ask, { env, fail, askKey }) {
     info: { ruling: { id: r.id, title: r.title } },
     prompt: rulingPrompt(r, rows, cut, ask.q, ask.lang),
     schema: RULING_SCHEMA,
+    // (A 釋字 or 憲判字 with no question, explained ahead from this text: same paragraphs, same numbers.)
+    ready: async () => (!ask.q && CONS_ID.test(r.id) ? madeFor((await readData(`ai/ruling/${aiBucket(r.id)}-${ask.lang === 'en' ? 'en' : 'zh'}.json`))?.[r.id], 'v', r.v) : null),
     check: raw => checkRuling(raw, rows)
   };
 }

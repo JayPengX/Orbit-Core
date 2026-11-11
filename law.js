@@ -237,6 +237,16 @@ export async function checkExplain(raw, law, keys) {
   return { answer: gist, gist, points, why: str(raw?.why), examples, terms, now: str(raw?.now), related, covered: covered && Boolean(gist) };
 }
 
+// Answers made ahead live in Orbit Law's data/ai/, packed: an article's by
+// its law and a hundred numbers (15-1 → 0), a ruling's by fifty (s748 → s14,
+// j115-7 → j115-0). Each only for the version it was made from ({ m | v, raw }).
+export const aiBucket = key => {
+  const k = String(key);
+  const m = k.match(/^(s|j\d+-)(\d+)$/);
+  return m ? `${m[1]}${Math.floor(m[2] / 50)}` : String(Math.floor(parseInt(k, 10) / 100) || 0);
+};
+export const madeFor = (j, field, version) => (j && j.raw && String(j[field] ?? '') === String(version ?? '') ? j.raw : null);
+
 // A file of Orbit Law's data, kept a day at the edge (a 404 a minute, a
 // server error not at all); null when it isn't there.
 export async function readData(path) {
@@ -531,6 +541,8 @@ const JOBS = {
         info: { law: { p: law.p, n: law.n, m: law.m } },
         prompt: explainPrompt(law, articles, ask.lang),
         schema: EXPLAIN_SCHEMA,
+        // (One article in Chinese, explained ahead for this version of the law.)
+        ready: async () => (keys.length === 1 && ask.lang === 'zh' ? madeFor((await readData(`ai/explain/${law.p}-${aiBucket(keys[0])}.json`))?.[keys[0]], 'm', law.m) : null),
         // (Flash, not Flash-Lite: a real explanation needs it, and each article's is kept 180 days.)
         model: 'gemini-3.6-flash',
         check: raw => checkExplain(raw, law, keys)
@@ -602,6 +614,16 @@ export async function handleLawAsk(request, env, ctx, headers, session, gemini, 
   const left = n => Math.max(0, cap - n);
   const hit = await kept(env, job.key);
   if (hit) return json({ ...hit, ...job.info, cached: true, left: left(await countOf(env, who, day)) }, 200, headers);
+  // Made ahead (Orbit Law's data/ai/: the API credit's jobs, tools/credit/):
+  // checked as if the model had just answered, kept, and free to the reader.
+  const made = job.ready ? await job.ready().catch(() => null) : null;
+  if (made) {
+    const out = await Promise.resolve(made).then(job.check).catch(() => null);
+    if (out?.covered) {
+      keep(env, ctx, job.key, out, job.ttl);
+      return json({ ...out, ...job.info, cached: true, left: left(await countOf(env, who, day)) }, 200, headers);
+    }
+  }
 
   if (!env.GEMINI_API_KEY) return fail('setup', 503, headers);
   const used = await spend(env, who, cap, day, dayCap);
