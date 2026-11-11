@@ -16,9 +16,12 @@
 //            各方怎麼說: how each side's outlets framed the day's top stories.
 //   sports   sports/recaps/<YYYY-MM-DD>.json  { built, games: { espnId: { line } } }
 //            賽後三句話's "why" line for each finished game (builders/recaps.js).
+//   preview  sports/previews/<YYYY-MM-DD>.json  { v, built, games: { '<league>:<id>': { points, who } } }
+//            賽前看點: up to two points before each game of today and tomorrow (builders/previews.js).
 // Lean input (Jay 11-10): code picks and trims the facts before any call.
 import { aiOnce } from '../ai.js';
 import { runRecaps } from './recaps.js';
+import { runPreviews } from './previews.js';
 import { runF1Stories } from './f1story.js';
 import { runRecWeekly } from '../rec-weekly.js';
 import { usage as meterUsage } from '../transit.js';
@@ -182,6 +185,7 @@ export async function runAi({ store, env, proxy, now = Date.now(), cap = async (
   await step('news', 'news-lines', c => newsLines({ store, env, ctx, cap: c, until }));
   await step('sides', 'news-sides', c => newsSides({ store, env, ctx, cap: c, until, now }));
   await step('sports', 'sports-recap', c => runRecaps({ store, env, ctx, proxy, cap: c, now, until }));
+  await step('preview', 'sports-preview', c => runPreviews({ store, env, ctx, proxy, cap: c, now, until }));
   await step('f1', 'f1-story', c => runF1Stories({ store, env, ctx, proxy, cap: c, now, until }));
   await step('words', 'words-cards', c => wordsCards({ store, env, ctx, cap: c, until }));
   // (除錯紀錄週報: Mondays from 06:00 Taiwan, once a week; `ai-weekly` by hand makes it now.)
