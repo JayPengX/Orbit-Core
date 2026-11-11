@@ -33,7 +33,8 @@
 // → news/index.json: { built, tw: [story], intl: [story] } (heard of in
 //   the last 3 days); news/past.json the same for older ones, by
 //   importance, each outlet's newest headline only. A story:
-//   { id, title, sum, img, at, first, n (outlets), m (headlines), days:
+//   { id, title, sum, img, alts: [[picture, outlet]] (others, should img
+//     not load), at, first, n (outlets), m (headlines), days:
 //     [['MM-DD', headlines]], sides: { g, c, b } (or l, c, r), blind: 'g' |
 //     'b' | 'l' | 'r' | '' (the side that carries none of a story the other
 //     side carries widely; only a topic sides take: TOPICS' spectrum),
@@ -506,6 +507,8 @@ export function sameOf(pages, items) {
     pagePic: (o, u) => (n.get(`p ${o} ${u}`) || 0) < 2
   };
 }
+// (Pictures a story carries past its own: other outlets', should its own not load.)
+export const ALTS = 3;
 const SMALL_PIC = /[?&]width=(?:[1-3]\d\d)\b|\/(?:ace\/standard|news)\/240\//;
 const ytPicture = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 // A feed's small picture swapped for the outlet's own larger size of it.
@@ -713,6 +716,15 @@ export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, i
   clips.sort((a, b) => Boolean(b[1]) - Boolean(a[1]));
   // (A thumbnail's size, The Guardian's 140 kept from before, only when no other.)
   const withImg = pics.find(p => p && !SMALL_PIC.test(p[0])) || pics.find(Boolean) || (clips[0]?.[4] && [clips[0][4], clips[0][0]]);
+  // Others to show should a phone fail to load it (an outlet that refuses
+  // another site its pictures, Jay 11-11): each another outlet's, a clip's last.
+  const alts = [];
+  const tried = new Set([withImg?.[1]]);
+  for (const p of [...pics.filter(p => p && !SMALL_PIC.test(p[0])), ...pics, ...clips.map(c => c[4] && [c[4], c[0]])]) {
+    if (alts.length >= ALTS || !p || tried.has(p[1])) continue;
+    tried.add(p[1]);
+    alts.push(p);
+  }
   const sides = region === 'tw' ? { g: 0, c: 0, b: 0 } : { l: 0, c: 0, r: 0 };
   for (const o of byOutlet.keys()) {
     const s = sideOf(o, region);
@@ -757,6 +769,7 @@ export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, i
     sumBy: withSum?.o || '',
     img: withImg?.[0] || '',
     imgBy: withImg?.[1] || '',
+    ...(alts.length ? { alts } : {}),
     at,
     first,
     n,
