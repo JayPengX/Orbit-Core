@@ -819,19 +819,23 @@ export const ADMIN_TOOLS = {
     const first = Object.fromEntries(Object.entries(FEATURES).map(([k, f]) => [k, MODELS[f.models[0]] || f.models[0]]));
     const dev = await readDev(env, deps).catch(() => cleanDev());
     const caps = Object.fromEntries(Object.entries(DEV).filter(([, d]) => d.ai).map(([k]) => [k, dev[k]]));
-    return { at: now, money: moneyLeft(saved, calls, now), month, health: healthOf(week, first, now), features: Object.fromEntries(Object.entries(FEATURES).map(([k, f]) => [k, { app: f.app || null, tap: !!f.tap, models: f.models.map(m => MODELS[m] || m) }])), caps };
+    return { at: now, rate: saved.rate || 32, money: moneyLeft(saved, calls, now), month, health: healthOf(week, first, now), features: Object.fromEntries(Object.entries(FEATURES).map(([k, f]) => [k, { app: f.app || null, tap: !!f.tap, models: f.models.map(m => MODELS[m] || m) }])), caps };
   },
   // A provider's balance as read off its own page (US$): from now, its calls' cost is taken off it.
+  // Or `rate` alone: how many NT$ a US$ is, for the panel's NT$ (the makers bill in US$).
   async 'ai-set'({ env, deps, body }) {
     const prov = String(body.provider || '');
     const usd = Number(body.usd);
-    if (!PROVIDERS.includes(prov) || !Number.isFinite(usd) || usd < 0 || usd > 1e6) return { error: 'ADMIN_BAD_AMOUNT' };
+    const rate = Number(body.rate);
+    const rateOnly = body.rate != null && !body.provider;
+    if (rateOnly ? !(rate >= 10 && rate <= 100) : !PROVIDERS.includes(prov) || !Number.isFinite(usd) || usd < 0 || usd > 1e6) return { error: 'ADMIN_BAD_AMOUNT' };
     const doc = await deps.fsGet(env, CONFIG_COLLECTION, 'ai-money').catch(() => ({ exists: false }));
     let saved = {};
     try {
       if (doc.exists) saved = JSON.parse(doc.payload);
     } catch {}
-    saved[prov] = { usd, at: deps.now() };
+    if (rateOnly) saved.rate = rate;
+    else saved[prov] = { usd, at: deps.now() };
     await deps.fsWrite(env, CONFIG_COLLECTION, 'ai-money', JSON.stringify(saved));
     return saved;
   },
