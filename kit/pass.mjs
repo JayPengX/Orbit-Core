@@ -238,7 +238,7 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
     };
     return list(
       rows.map(r => cell({ icon: el('img', { src: svgUrl(appIcon(r.app)), alt: '', width: 29, height: 29 }), title: r.title, sub: r.sub, chevron: true, onClick: goTo(r) })),
-      { head: t('today') }
+      { head: t('today'), ai: true }
     );
   }
   // (The Pass tab only redraws its card: a device code or a note on it stays.)
