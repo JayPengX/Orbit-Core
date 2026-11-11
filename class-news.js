@@ -448,3 +448,20 @@ export async function classNewsPeek(env, raw, { from = 0, n = 4000, method = 'GE
   }
   return { url: got.url, type: got.type, length: got.text.length, feeds: [...got.text.matchAll(/<link\b[^>]*(?:rss|atom)[^>]*>/gi)].map(m => m[0]).slice(0, 10), links, text: got.text.slice(+from || 0, (+from || 0) + Math.min(+n || 4000, 20000)) };
 }
+
+// The ops check (ai-try, feature=class-news&read=<site>,<site>…): each school
+// read by code alone, nothing worded or kept: how, how many, from when.
+export async function classNewsRead(env, raws) {
+  const via = env.GEMINI_RELAY ? (u, init) => env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, init) : fetch;
+  const today = twDay();
+  return Promise.all(
+    String(raws || '').split(',').slice(0, 12).map(async raw => {
+      const site = schoolSite(raw.trim());
+      if (!site) return { site: raw, error: 'site' };
+      const t0 = Date.now();
+      const r = await readSchool(site, via, today).catch(e => ({ error: String(e?.message || e) }));
+      const items = r?.items || [];
+      return { site, how: r?.how || null, unread: !r, n: items.length, ms: Date.now() - t0, from: items.at(-1)?.date, kinds: [...new Set(items.map(x => x.kind || x.unit).filter(Boolean))].slice(0, 8), first: items.slice(0, 4).map(x => `${x.date} ${x.title.slice(0, 30)}`) };
+    })
+  );
+}
