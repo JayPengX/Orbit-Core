@@ -1702,6 +1702,7 @@ dialog.q-sheet.q-full {
 /* On a filled control the mark takes the control's own colour. */
 .q-ai-mono,
 .q-btn.primary,
+.q-tab-action,
 .q-cell-icon {
   --q-ai: currentColor;
   --q-ai-2: currentColor;
