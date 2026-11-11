@@ -169,7 +169,10 @@ export function stateOf(row, fresh, now = Date.now(), steady = false) {
   const calls = r.ok + r.fail;
   if (fresh?.late === 2) return 'bad';
   // (Failing for half an hour with nothing working since: broken, whatever worked before.)
-  if (recent[1] >= 3 && r.lastFail > r.lastOk && now - r.lastOk > 30 * MIN) return 'bad';
+  // (A 429 is a source pacing us, often for every Cloudflare address at once: while it still
+  // answered in the last 3 hours, 不穩, not broken; the proxy and the builders wait and keep copies.)
+  const paced = /\b429\b/.test(r.err || '') && now - r.lastOk < 3 * HOUR;
+  if (recent[1] >= 3 && r.lastFail > r.lastOk && now - r.lastOk > 30 * MIN && !paced) return 'bad';
   if (steady && calls && !r.ok) return 'bad';
   if (fresh?.late) return 'warn';
   if (calls && r.fail / calls > 0.1) return 'warn';

@@ -164,3 +164,12 @@ test("a build's age and its last failure: amber when the data's on time but the 
   assert.equal(sourceState(news, { ok: 5, fail: 0, lastOk: now, lastFail: 0, hours: [] }, f, now), 'warn');
   assert.equal(freshAt(news, { at: now, jobs: { 'build:news': { okAt: now - 4 * HOUR, ok: false } } }).late, 2);
 });
+
+test('a source pacing us (429) that answered within 3 hours is 不穩, not broken', () => {
+  const now = 1_800_000_000_000;
+  const h = Math.floor(now / HOUR);
+  const row = { ok: 600, fail: 616, lastOk: now - 45 * 60_000, lastFail: now - 60_000, err: 'www.thesportsdb.com 429 /api', hours: [[h, 10, 20]] };
+  assert.equal(stateOf(row, null, now), 'warn');
+  assert.equal(stateOf({ ...row, lastOk: now - 4 * HOUR }, null, now), 'bad');
+  assert.equal(stateOf({ ...row, err: 'www.thesportsdb.com 500 /api' }, null, now), 'bad');
+});
