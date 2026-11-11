@@ -213,6 +213,10 @@ export async function handleAi(request, env, ctx, headers, session, { cap = 0, g
   if ((await paceOf(env)).pace >= 2) return json({ error: 'paused' }, 503, headers);
   const input = f.input(body?.input);
   if (!input) return json({ error: 'input' }, 400, headers);
+  // (A `shared` feature's answer is kept for everyone a week, by what it was asked: the same filing, one call.)
+  const keptKey = f.shared && env.RATE_LIMIT_KV ? `ai:kept:${name}:${(await sha256Hex(JSON.stringify(input))).slice(0, 32)}` : '';
+  const kept = keptKey ? await env.RATE_LIMIT_KV.get(keptKey, 'json').catch(() => null) : null;
+  if (kept?.out) return json({ out: kept.out, ask: null, left: f.perPass, model: kept.model || null, kept: true }, 200, headers);
   // Spent before the call: the Pass's count first (a capped one adds nothing to the day's).
   const day = twDay();
   const who = `ai:${name}:${(await sha256Hex(`ai|${day}|${pass}`)).slice(0, 24)}`;
@@ -222,6 +226,11 @@ export async function handleAi(request, env, ctx, headers, session, { cap = 0, g
   const left = Math.max(0, f.perPass - used);
   try {
     const { out, ask, model } = await runFeature(env, ctx, name, input, { gemini, answers: f.clarify ? answersOf(body?.input?.answers) : [] });
+    if (keptKey && out && !ask) {
+      const put = env.RATE_LIMIT_KV.put(keptKey, JSON.stringify({ out, model: providerOf(model) }), { expirationTtl: 8 * 86_400 }).catch(() => {});
+      if (ctx?.waitUntil) ctx.waitUntil(put);
+      else await put;
+    }
     return json({ out, ask: ask || null, left, model: providerOf(model) }, 200, headers);
   } catch {
     return json({ error: 'upstream', left }, 502, headers);

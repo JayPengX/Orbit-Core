@@ -54,6 +54,14 @@ export function cleanBook(raw, { today, subjects = [] }) {
 }
 
 // A scope's numbers with its ranges' insides (L4-L6 names L5 too; Ch3–Ch5, Ch4).
+export function filingNumbers(out, given) {
+  const have = nums(given).map(Number);
+  const near = (n, g) => g !== 0 && Math.abs(n - g) / Math.abs(g) < 0.06;
+  return nums(out)
+    .map(Number)
+    .every(n => (Number.isInteger(n) && n <= 31) || have.some(g => [1, 1e-3, 1e-4, 1e-5, 1e-7, 1e-8, 10, 0.1].some(k => near(n, g * k)) || near(n, g)));
+}
+
 export const spanOf = scope =>
   String(scope || '').replace(/(\d+)\s*[-~～–—至到]\s*[A-Za-z]{0,4}\s*(\d+)(?![-.]\d)/g, (m, a, b) => {
     const x = +a, y = +b;
@@ -638,6 +646,48 @@ export const FEATURES = {
   // Orbit Transit: an operator's free-text notice (its own site's, not
   // TDX's, which names its routes) read into which lines, stops and days.
   // Every route and stop must be words of the notice's own.
+  // Orbit Securities: 重大訊息白話. A listed company's filing as code parsed
+  // it (builders/filings.js: the title and its rows); the AI says in one
+  // line what it means for someone holding the stock and picks the rows
+  // that show it. Asked on a stock's page, kept for everyone (`shared`:
+  // the same filing, the same words, one call).
+  // (A filing's figures may be said rounded or in 萬/億 (its 仟元 too), its dates without the zero: 116/03/18 → 3/18.)
+  'sec-filing': {
+    app: 'stock',
+    tap: true,
+    shared: true,
+    models: ['haiku', 'luna'],
+    maxIn: 2400,
+    perPass: 40,
+    perMinute: 8,
+    input(raw) {
+      const title = str(raw?.title, 160);
+      const name = str(raw?.name, 30);
+      const rows = list(raw?.rows, 12)
+        .filter(r => Array.isArray(r))
+        .map(([k, v]) => [str(k, 40), str(v, 160)])
+        .filter(([, v]) => v);
+      return title ? { title, name, rows, lang: raw?.lang === 'en' ? 'en' : 'zh' } : null;
+    },
+    parts: ({ title, name, rows, lang }) =>
+      text(
+        [
+          `A Taiwan-listed company's 重大訊息 (a filing to the exchange), its rows numbered. Readers are students learning to invest who hold ${name || 'the stock'}.`,
+          `line: ONE sentence in ${lang === 'en' ? 'English, ≤ 22 words' : 'Traditional Chinese (台灣用語), ≤ 40 字'}: what happened in plain words and what it means for a holder (money in or out of the company, a dividend's amount and dates, profit or loss, a deal's size). No advice to buy or sell, no guesses beyond the rows, no jargon a student wouldn't know.`,
+          'show: the numbers of up to 4 rows that matter most to a holder, the most important first ([] when the title says it all). The app draws those rows under your line: never repeat their figures one by one.',
+          `Title: ${title}`,
+          ...rows.map(([k, v], i) => `${i + 1}. ${k ? `${k}: ` : ''}${v}`)
+        ].join('\n')
+      ),
+    schema: obj({ line: S, show: arr(N) }),
+    clean: (raw, { title, rows }) => {
+      const line = str(raw?.line, 160);
+      if (!line || !filingNumbers(line, `${title}\n${rows.map(r => r.join(' ')).join('\n')}`)) return null;
+      const show = [...new Set(list(raw?.show, 6).filter(n => Number.isInteger(n) && n >= 1 && n <= rows.length))].slice(0, 4).map(n => n - 1);
+      return { line, show };
+    }
+  },
+
   'transit-notice': {
     models: ['luna', 'haiku'],
     effort: { luna: 'low' },

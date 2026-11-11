@@ -99,6 +99,7 @@ export const SOURCES = [
   // ---- 證券與錢 ----
   { id: 'yahoo', zh: 'Yahoo 財經', group: 'money', apps: ['stock'], feeds: '報價、走勢、股利、成交', hosts: ['query1.finance.yahoo.com', 'query2.finance.yahoo.com', 'fc.yahoo.com'], where: ['worker'] },
   { id: 'twse', zh: '證交所', group: 'money', apps: ['stock'], feeds: '新股申購、權證報價', hosts: ['www.twse.com.tw', 'mis.twse.com.tw'], where: ['worker'] },
+  { id: 'filings', zh: '證交所、櫃買中心重大訊息', group: 'money', apps: ['stock'], feeds: '重大訊息白話', hosts: ['openapi.twse.com.tw', 'www.tpex.org.tw'], where: ['cron'], fresh: { job: 'build:ai', every: HOUR } },
   { id: 'taifex', zh: '期交所', group: 'money', apps: ['stock'], feeds: '期貨、選擇權', hosts: ['openapi.taifex.com.tw', 'www.taifex.com.tw'], where: ['worker'] },
   { id: 'funds', zh: '投信投顧公會、鉅亨', group: 'money', apps: ['stock'], feeds: '境內基金淨值', hosts: ['www.sitca.org.tw', 'fund.api.cnyes.com'], where: ['worker'] },
   { id: 'gcis', zh: '經濟部商工登記', group: 'money', apps: ['money'], feeds: '統編的公司名（拍照記帳）', hosts: ['data.gcis.nat.gov.tw'], where: ['worker'] },
