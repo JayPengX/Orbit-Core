@@ -311,7 +311,7 @@ const edge = () => (typeof caches !== 'undefined' && caches.default) || null;
 // one answers at once too and is read again behind; none: the school's own
 // titles now (code-read), the AI's lines written behind (`wording`), the
 // phone asking again a few seconds on. One wording at a time a school.
-const NEWS_V = 2; // the class-news prompt's version: a new one words every school again
+const NEWS_V = 3; // the class-news prompt's version: a new one words every school again
 const unworded = x => (x?.items || []).slice(0, NEWS.aiBatch).some(it => it.line == null);
 export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now = Date.now(), build = true } = {}) {
   const key = keyOf(site);
