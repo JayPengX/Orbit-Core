@@ -32,7 +32,7 @@ import { viaTaiwan } from './law-hosts.js';
 import { matchBills, readGround } from './law-ground.js';
 import { LAW_LIMITS, PCODE, ART, fail, twDay, citeKey, cited, label, readData, readList, readLaw, askKey, opening, passOf, passKey, spend, countOf, kept, keep, modelJson } from './law.js';
 
-export const CHAT_LIMITS = { maxQ: 500, maxTurns: 16, maxTurn: 1500, maxPins: 2, maxArts: 10, maxHits: 6, lyHits: 2, maxChars: 12_000, maxLaws: 6, maxBuckets: 16, maxCities: 3, maxBody: 64_000 };
+export const CHAT_LIMITS = { maxQ: 500, maxTurns: 16, maxTurn: 1500, maxPins: 2, maxArts: 10, maxHits: 6, lyHits: 2, maxChars: 12_000, maxLaws: 6, maxDeleg: 2, maxBuckets: 16, maxCities: 3, maxBody: 64_000 };
 const CHAT_TTL_S = 30 * 86_400;
 const BILL_WORDS = /修法|修正|草案|立法院|立委|三讀|二讀|一讀|法案|進度|提案|bill/i;
 // The answer's model (Jay 2026-11-10, after a blind side by side of five on ten
@@ -240,6 +240,22 @@ export async function textHits(terms, named, maxBuckets = CHAT_LIMITS.maxBuckets
 // question once pulled 14), and the competent-authority article (所稱主管機關)
 // of the first of their laws that has one; at most 10 articles from 6 laws
 // and 12,000 characters.
+// An article that leaves a matter to a regulation or a ministry.
+export const LEAVES = /定之|另定|訂定之|訂之/;
+// The regulations resting on those articles (deleg: p → { to: { key: [[order p, name]] } }), each once, two at most.
+export function delegatedRegs(articles, deleg, max = CHAT_LIMITS.maxDeleg) {
+  const out = [];
+  for (const a of articles)
+    for (const r of deleg.get(a.p)?.to?.[a.key] || []) if (Array.isArray(r) && PCODE.test(r[0]) && !out.includes(r[0])) out.push(r[0]);
+  return out.slice(0, max);
+}
+// A regulation's articles that speak to the question (most words shared, then the earlier), two at most;
+// none sharing any, its first article that isn't only its basis.
+export function delegArts(arts, want, max = 2) {
+  const scored = arts.map((x, i) => [[...bigrams(x[2])].filter(b => want.has(b)).length, i, x]).filter(([n]) => n > 0);
+  if (!scored.length) return arts.filter(x => !/^本\S{1,6}依\S+(?:訂定|規定)/.test(x[2])).slice(0, 1);
+  return scored.sort((a, b) => b[0] - a[0] || a[1] - b[1]).slice(0, max).sort((a, b) => a[1] - b[1]).map(([, , x]) => x);
+}
 export async function find(chat, plan, ly = false) {
   const laws = await readList('index.json');
   const row = resolver(laws);
@@ -264,10 +280,11 @@ export async function find(chat, plan, ly = false) {
   const out = [];
   const seen = new Set();
   let chars = 0;
-  const add = (p, art) => {
-    if (!art || out.length >= CHAT_LIMITS.maxArts) return;
+  // (room: a regulation an article leaves its matter to gets two places past the limit.)
+  const add = (p, art, room = 0) => {
+    if (!art || out.length >= CHAT_LIMITS.maxArts + room) return;
     const key = String(art[1]);
-    if (seen.has(`${p}:${key}`) || chars + art[2].length > CHAT_LIMITS.maxChars) return;
+    if (seen.has(`${p}:${key}`) || chars + art[2].length > CHAT_LIMITS.maxChars + room * 1500) return;
     seen.add(`${p}:${key}`);
     chars += art[2].length;
     const l = texts.get(p);
@@ -276,6 +293,22 @@ export async function find(chat, plan, ly = false) {
   for (const a of all) {
     if (!arts.has(a.p)) continue;
     add(a.p, a.ord != null ? arts.get(a.p)[a.ord] : arts.get(a.p).find(x => String(x[1]) === a.key));
+  }
+  // A matter an article leaves to a regulation (「…辦法，由主管機關定之」, 「…之起徵點，由財政部定之」):
+  // that regulation's articles closest to the question, so the answer has what it sets, not
+  // 「由財政部定之」 (Jay 11-11). Law's data/deleg/<p>.json says which regulation rests on which
+  // article; a ministry's own 令 (not in the national database) comes as a rule (law-more.js).
+  if (!ly) {
+    const leave = out.filter(a => LEAVES.test(a.text)).slice(0, 4);
+    const delegs = new Map(await Promise.all([...new Set(leave.map(a => a.p))].map(async p => [p, await readData(`deleg/${p}.json`).catch(() => null)])));
+    const want = bigrams(`${chat.q} ${plan.terms.join(' ')}`);
+    for (const r of delegatedRegs(leave, delegs).filter(r => !texts.has(r))) {
+      const l = await readLaw(r).catch(() => null);
+      if (!l) continue;
+      texts.set(r, l);
+      arts.set(r, l.a.filter(x => Array.isArray(x) && x[0] === 'A' && typeof x[2] === 'string'));
+      for (const art of delegArts(arts.get(r), want)) add(r, art, 2);
+    }
   }
   const authority = ly ? null : [...new Set(out.map(a => a.p))].map(p => [p, arts.get(p).find(x => /所稱主管機關/.test(x[2]))]).find(([, art]) => art);
   if (authority) add(...authority);
@@ -321,10 +354,11 @@ ${chat.q}
 >>>
 
 Rules:
+- When an article leaves a matter to a ministry or a regulation (由主管機關定之, 由財政部定之) and a regulation or rule above sets it (an amount, a threshold, a list), answer with what it sets and cite that regulation or rule, not only the article that hands it over.
 - Every legal rule you rely on must come from the material above. Don't cite or rely on any law, rule or case not given, and never invent a case number, an article or a figure. You may reason from the given rules to the reader's facts, as a lawyer would.
 - The reader skims on a phone: be brief and concrete. Never mention a database, "the material", "the data given" or what you were or weren't given; speak of the law itself.
 - verdict: the answer in one short line a reader gets at a glance (at most 22 Chinese characters or 12 English words), e.g. 「房東不能扣光押金」「有罪風險高：最重 7 年」「116 年度總預算：排入院會」.
-- facts: up to 4 key facts as label and value, each value at most 14 characters (a date, a stage, an amount, a penalty range, a deadline), e.g. { k: "最重刑度", v: "7 年有期徒刑" }, { k: "時效", v: "2 年" }; leave it empty when none.
+- facts: 2 or 4 key facts (an even number, so they sit in pairs; 1 when only one matters) as label and value, each value at most 14 characters (a date, a stage, an amount, a penalty range, a deadline), e.g. { k: "最重刑度", v: "7 年有期徒刑" }, { k: "時效", v: "2 年" }; leave it empty when none.
 - timeline: for a question about progress (a bill, a budget, a case's steps), up to 5 steps in order as { d: date as given, t: what happened, at most 16 characters }; otherwise empty. Only the current cycle (the newest year or term given) unless the reader asks about an older one.
 - answer: then 1 to 3 plain sentences (at most 120 Chinese characters) that explain the verdict. When the reader describes their own situation, make the call: apply the rules to their facts and say who is likely in the right, what they can claim or must pay, the likely penalty or outcome (ranges exactly as the articles state them), and what it turns on. Say which assumption you made and which missing fact would change the answer. Don't just restate the articles. When the question is about bills, legislators, votes, budgets or meetings, answer it directly from those lines.
 - points: up to 5, the legal reasoning step by step, each one short sentence (at most 40 Chinese characters); its cites lists the cite of every article, rule or case it rests on, exactly as given in quotes (e.g. "B0000001:184", a case's id, a rule's id). Never a point without a cite, never a cite not listed above.

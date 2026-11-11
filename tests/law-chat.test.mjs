@@ -579,3 +579,21 @@ test('a follow-up carries the conversation: up to 16 turns, and the prompt says 
   assert.ok(answerCall.prompt.includes('follow up on the conversation'));
   assert.ok(!(await import('../law-chat.js')).answerPrompt({ q: 'x', history: [], pin: [], lang: 'zh' }, [], () => '').includes('follow up on the conversation'));
 });
+
+// Jay 11-11: an article that leaves its matter to a regulation (「…由主管機關定之」) brings
+// that regulation's articles closest to the question, so the answer has what it sets.
+test('問法律 follows an article to the regulation it leaves its matter to', async () => {
+  const { LEAVES, delegatedRegs, delegArts, bigrams } = await import('../law-chat.js');
+  assert.ok(LEAVES.test('小規模營業人之營業稅起徵點，由財政部定之。'));
+  assert.ok(!LEAVES.test('營業人應依本法申報銷售額。'));
+  const deleg = new Map([['G0340080', { to: { 32: [['G0340082', '統一發票使用辦法'], ['G0340084', '營業人使用收銀機辦法']], 26: [] } }]]);
+  assert.deepEqual(delegatedRegs([{ p: 'G0340080', key: '32' }, { p: 'G0340080', key: '26' }], deleg), ['G0340082', 'G0340084']);
+  assert.deepEqual(delegatedRegs([{ p: 'G0340080', key: '32' }], deleg, 1), ['G0340082'], 'two at most (here one)');
+  const arts = [
+    ['A', '1', '本辦法依加值型及非加值型營業稅法第三十二條規定訂定之。'],
+    ['A', '4', '營業人每月銷售額未達新臺幣二十萬元者，得免用統一發票。'],
+    ['A', '9', '統一發票應按時序開立。']
+  ];
+  assert.deepEqual(delegArts(arts, bigrams('每月銷售額多少可以免用統一發票')).map(x => x[1]), ['4', '9']);
+  assert.deepEqual(delegArts(arts, bigrams('火星')).map(x => x[1]), ['4'], 'nothing shared: its first article past the basis');
+});
