@@ -1,0 +1,15 @@
+{
+ "est": {
+  "requests": 75,
+  "inputTokens": 32813,
+  "usd": 0.03
+ },
+ "batches": [
+  "msgbatch_015KDRvDUESy4LSC9TTH2RU2"
+ ],
+ "submitted": "2026-11-11T06:10:02.206Z",
+ "cost": 0.04,
+ "ok": 75,
+ "bad": 0,
+ "collected": "2026-11-11T06:14:03.871Z"
+}
