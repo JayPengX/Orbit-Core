@@ -4323,6 +4323,56 @@ function keepStrips() {
 }
 keepStrips();
 
+// A field takes the keys where it shows (Jay 2026-11-11: "I often need to
+// click on a typing field then close it then open it again to have a
+// perfect focus"). iOS places its caret, and slides the screen to show the
+// field, from where the field is the moment it's focused, and doesn't follow
+// it as it moves after (a movement is drawn, not laid out). A sheet slides up
+// for 0.42 s, and its field was focused on the way (the apps focus it a frame
+// or 50 ms after opening): still low on the screen or under it, so iOS slid
+// the screen for a field it took to be under the keys, the caret stayed where
+// the field had been, and only a second try was right. So a field about to
+// take the keys, by a tap or by the code, first lands what carries it: any
+// movement still running on it or a box around it (a sheet's slide, a
+// card's pop, a sheet's detent) ends at once. (Fading is no movement: left.)
+// The other half is the apps': iOS raises the keys only for a focus made in
+// the tap itself, so a sheet opened to be typed in focuses its field at once,
+// never a frame or a timer later (that left a field marked as typed in with
+// no keys, and a tap on it often brought none either).
+const MOVES = /^(transform|translate|scale|rotate|top|bottom|left|right|inset|margin|height|max-height|width)/;
+export const typingField = el =>
+  Boolean(el && el.nodeType === 1 && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable) && !/^(checkbox|radio|range|button|submit|reset|color|file|hidden|image)$/.test(el.type) && !el.readOnly && !el.disabled);
+// (What moves: a keyframe or a transition that changes where the box is; never one without end.)
+export const moving = a => {
+  if (a?.playState !== 'running' || a.effect?.getComputedTiming?.().endTime === Infinity) return false;
+  if (a.transitionProperty) return MOVES.test(a.transitionProperty.replace(/^-webkit-/, ''));
+  const frames = a.effect?.getKeyframes?.() || [];
+  return frames.some(f => Object.keys(f).some(k => MOVES.test(k.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`))));
+};
+export function landField(el) {
+  for (let p = el; p && p.nodeType === 1; p = p.parentElement) {
+    for (const a of p.getAnimations?.() || []) {
+      if (!moving(a)) continue;
+      try {
+        a.finish();
+      } catch {}
+    }
+  }
+}
+function landBeforeTyping() {
+  if (typeof document === 'undefined' || typeof HTMLElement === 'undefined' || globalThis.__orbitLand) return;
+  globalThis.__orbitLand = true;
+  const focus = HTMLElement.prototype.focus;
+  HTMLElement.prototype.focus = function (...a) {
+    if (typingField(this)) landField(this);
+    return focus.apply(this, a);
+  };
+  // (A finger on a field in a sheet still sliding: landed before the tap focuses it.)
+  document.addEventListener('pointerdown', e => typingField(e.target) && landField(e.target), true);
+  document.addEventListener('focusin', e => typingField(e.target) && landField(e.target), true);
+}
+landBeforeTyping();
+
 // The on-screen keyboard, in every app, nothing to call. iOS lays the
 // keyboard over the page without shrinking it, then slides the whole screen
 // up to show the field: a sheet's foot and its fields went under the keys,
@@ -4460,7 +4510,33 @@ function watchKeyboard() {
       if (after.top >= 0 && after.bottom <= globalThis.innerHeight - kb) unslide();
     }
   };
-  const soon = () => (frame ||= requestAnimationFrame(apply));
+  // Once the keys have settled (nothing moved for a moment): what they
+  // cover read again, and the field checked against what's seen. The first
+  // reading can come while the keys are still rising (held a little short,
+  // a sheet's button left under them), and iOS's own slide can land the
+  // field elsewhere than the lift left it: put right, twice at most per
+  // field, and nothing at all when it's already in view (most times).
+  let settleTimer = 0;
+  const settle = () => {
+    const el = document.activeElement;
+    if (!held || held.el !== el || !typing() || held.settles >= 2) return;
+    held.settles = (held.settles || 0) + 1;
+    const keys = Math.max(0, Math.round(globalThis.innerHeight - vv.height));
+    if (Math.abs(keys - held.keys) > 8 || Math.abs(Math.round(vv.height) - held.vvh) > 8) {
+      held.keys = keys;
+      held.vvh = Math.round(vv.height);
+      root.style.setProperty('--q-kb', `${keys}px`);
+      root.style.setProperty('--q-vvh', `${held.vvh}px`);
+    }
+    if (root.querySelector('.q-kb-docked')?.contains(el)) return;
+    const r = el.getBoundingClientRect?.();
+    if (r && r.height && (r.bottom > vv.offsetTop + vv.height - 4 || r.top < vv.offsetTop)) lift(el, held.keys);
+  };
+  const soon = () => {
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(settle, 220);
+    return (frame ||= requestAnimationFrame(apply));
+  };
   vv.addEventListener('resize', soon);
   vv.addEventListener('scroll', soon);
   globalThis.addEventListener?.('resize', soon);
