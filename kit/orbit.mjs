@@ -2987,7 +2987,7 @@ function passkeyRows(s, note) {
             node('button', {
               class: 'q-row-btn',
               type: 'button',
-              text: keys.length ? T('再加一個通行密鑰', 'Add another passkey') : T('加入通行密鑰（Face ID／Touch ID）', 'Add a passkey (Face ID, Touch ID)'),
+              text: keys.length ? T('再加一個通行密鑰', 'Add another passkey') : T('加入通行密鑰', 'Add a passkey'),
               disabled: keys.length >= 10,
               onclick: async event => {
                 const b = event.currentTarget;
