@@ -1,0 +1,50 @@
+# The Max plan's API credit spent on one-off jobs whose results are kept
+# (tools/credit/: Jay 2026-11-11 chose "run all 7 as ranked"). By hand:
+# a job's `go` builds its requests, guesses the cost, refuses past US$100 in
+# all (tools/credit/ledger.json), submits one Message Batch (half price),
+# waits, and commits what came back to tools/credit/out/ with the ledger.
+# The key is the repo secret ANTHROPIC_CREDIT_KEY (its own Console
+# workspace, a US$100 spend limit; deleted when done).
+name: Spend the API credit
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: The job file in tools/credit/jobs (without .mjs)
+        required: true
+      cmd:
+        description: size, dump, go or collect
+        default: go
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run the job
+        working-directory: tools/credit
+        env:
+          ANTHROPIC_CREDIT_KEY: ${{ secrets.ANTHROPIC_CREDIT_KEY }}
+          JOB: ${{ inputs.job }}
+          CMD: ${{ inputs.cmd }}
+        run: |
+          case "$JOB" in *[!A-Za-z0-9-]*) echo "bad job"; exit 1 ;; esac
+          npm i --no-save --no-audit --no-fund --prefix . @anthropic-ai/sdk >/dev/null
+          node "jobs/$JOB.mjs" "$CMD"
+      - name: Keep what came back
+        if: always()
+        run: |
+          git config user.name "orbit-credit"
+          git config user.email "actions@users.noreply.github.com"
+          git add tools/credit/out tools/credit/ledger.json 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "Credit: ${{ inputs.job }} ${{ inputs.cmd }}"
+          for i in 1 2 3 4; do git pull --rebase origin main && git push origin HEAD:main && exit 0; sleep $((i*5)); done
+          exit 1

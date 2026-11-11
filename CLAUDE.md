@@ -377,7 +377,7 @@ writing a file only when it changed (`builders/store.js`):
 | `news.js`, `news-words.js`, `news-laws.js` | `news/index.json` (3 days), `past.json` (weeks): stories by weight, topic, side; `laws.json`: laws named | every 10 min |
 | `ai.js`, `recaps.js`, `f1story.js`; `filings.js` | AI made once: `news/lines.json`, `sides.json`, `words/cards/<a…z>.json`, `sports/recaps/<day>.json`, `sports/f1/stories/`; 重大訊息 as rows: `stock/filings/` | :04 :24 :34 :54 |
 
-A season is kept until the next one's first game. `private/` is never served.
+A season is kept until the next one's first game.
 
 ## 6. The Orbit Pass (`/eco`)
 
@@ -437,8 +437,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   - `news-site.yml`: News's site (this repo's token), started by `newsSite`;
   - every app repo's deploy workflow: its own site, to Cloudflare.
 - By hand: `build.yml` (a builder now, a check), `tail.yml` (logs),
-  `audit.yml` (secret names, the store counted), `zone-speed.yml` (the zone's
-  speed settings).
+  `audit.yml` (secret names, store counts), `zone-speed.yml` (zone speed), `credit.yml` (`tools/credit/`).
 - Never a cancelling `concurrency:` (a cancel mails Jay): copy the `queue`
   job; builds check out main's tip.
 - **Only what must stay secret is a secret** (the rest: code, tomls).
