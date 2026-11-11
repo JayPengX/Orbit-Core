@@ -15,6 +15,9 @@ on:
       cmd:
         description: size, dump, go or collect
         default: go
+      batches:
+        description: "collect: batch ids, comma-separated, when the ledger lacks them"
+        default: ''
 permissions:
   contents: write
 jobs:
@@ -34,6 +37,7 @@ jobs:
           ANTHROPIC_CREDIT_KEY: ${{ secrets.ANTHROPIC_CREDIT_KEY }}
           JOB: ${{ inputs.job }}
           CMD: ${{ inputs.cmd }}
+          BATCHES: ${{ inputs.batches }}
         run: |
           case "$JOB" in *[!A-Za-z0-9-]*) echo "bad job"; exit 1 ;; esac
           npm i --no-save --no-audit --no-fund --prefix . @anthropic-ai/sdk >/dev/null

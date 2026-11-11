@@ -67,16 +67,23 @@ export async function submit(job, requests) {
 export async function collect(job, { wait = true } = {}) {
   const c = client();
   const l = ledger();
-  const ids = l.jobs[job]?.batches || [];
-  const out = fs.createWriteStream(path.join(ROOT, 'out', `${job}.jsonl`));
-  let usd = 0, ok = 0, bad = 0;
-  for (const id of ids) {
+  // (BATCHES=id,id: a job whose ids never reached the ledger.)
+  const ids = process.env.BATCHES ? process.env.BATCHES.split(',') : l.jobs[job]?.batches || [];
+  if (!ids.length) throw new Error(`${job}: no batches`);
+  l.jobs[job] = { ...(l.jobs[job] || {}), batches: ids };
+  saveLedger(l);
+  for (const id of ids)
     for (;;) {
       const b = await c.messages.batches.retrieve(id);
       if (b.processing_status === 'ended') break;
-      if (!wait) return console.log(id, b.processing_status, b.request_counts);
+      console.log(id, b.processing_status, JSON.stringify(b.request_counts));
+      if (!wait) return;
       await new Promise(r => setTimeout(r, 60_000));
     }
+  fs.mkdirSync(path.join(ROOT, 'out'), { recursive: true });
+  const out = fs.createWriteStream(path.join(ROOT, 'out', `${job}.jsonl`));
+  let usd = 0, ok = 0, bad = 0;
+  for (const id of ids) {
     for await (const r of await c.messages.batches.results(id)) {
       if (r.result.type === 'succeeded') {
         const m = r.result.message;
@@ -87,7 +94,7 @@ export async function collect(job, { wait = true } = {}) {
       } else { bad++; out.write(JSON.stringify({ id: r.custom_id, error: r.result.type }) + '\n'); }
     }
   }
-  out.end();
+  await new Promise(r => out.end(r));
   delete l.reserved[job];
   l.spent += usd;
   l.jobs[job] = { ...l.jobs[job], cost: +usd.toFixed(2), ok, bad, collected: new Date().toISOString() };
