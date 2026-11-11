@@ -61,9 +61,14 @@ async function shoot(n, lang) {
   const tmp = join(dir, `.tmp-${n}-${lang}`); rmSync(tmp, { recursive: true, force: true });
   const account = s.account ?? set.account;
   const payload = account ? ['--payload', account.startsWith('/') ? account : accountFile(account)] : [];
-  const hash = s.hash || page.hash;
+  const hash = (h => (h && typeof h === 'object' ? h[lang] : h))(s.hash || page.hash);
+  // A real AI answer, asked once as a phone (build.yml as-phone) and kept: tools/shots/ai/<name>.<lang>.ndjson|json.
+  const ai = (s.ai || []).flatMap(([text, name]) => {
+    const f = ['ndjson', 'json'].map(x => join(HERE, 'shots', 'ai', `${name}.${lang}.${x}`)).find(existsSync);
+    return f ? ['--fixture', `${text}=${f}`] : [];
+  });
   const args = [join(HERE, 'preview.mjs'), set.app, ...(hash ? [hash] : []), '--live', '--lang', lang, '--width', '375', '--height', '812', '--wait', String(s.wait ?? 6000), '--out', tmp,
-    ...(s.dark ? ['--dark'] : []), ...payload, ...(set.args || []), ...(page.args || []), ...(s.args || [])];
+    ...(s.dark ? ['--dark'] : []), ...payload, ...ai, ...(set.args || []), ...(page.args || []), ...((a => (Array.isArray(a) ? a : a?.[lang]))(s.args) || [])];
   const r = await run(process.execPath, args, { cwd: join(HERE, '..') });
   const png = existsSync(tmp) && readdirSync(tmp).find(f => f.endsWith('.png'));
   const file = join(dir, `${n}.${lang}.png`);
