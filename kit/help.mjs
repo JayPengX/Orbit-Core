@@ -19,7 +19,7 @@ export const HELP = {
   pass: {
     zh: [
       ['what', 'Orbit Pass 是什麼', [
-        '你在每個 Orbit App 的帳號：Sports、Transit、Weather、Class、Money、Words、Beats、Law、Securities。每個 App 都用它登入，資料存在它裡面，換裝置也一樣。',
+        '你在每個 Orbit App 的帳號：Sports、Transit、Weather、Class、Money、News、Words、Beats、Law、Securities。每個 App 都用它登入，資料存在它裡面，換裝置也一樣。',
         '通行碼是 10 個字的代碼，由分享 Orbit 給你的人發給你。知道它就能用這個帳號，所以別給別人；它只顯示一次，請記在安全的地方。',
         '每個 App 右上角的頭像就是 Orbit Pass 的入口。'
       ]],
@@ -60,7 +60,7 @@ export const HELP = {
     ],
     en: [
       ['what', 'What the Orbit Pass is', [
-        'Your account in every Orbit app: Sports, Transit, Weather, Class, Money, Words, Beats, Law and Securities. Each signs in with it and keeps its data on it, the same on any device.',
+        'Your account in every Orbit app: Sports, Transit, Weather, Class, Money, News, Words, Beats, Law and Securities. Each signs in with it and keeps its data on it, the same on any device.',
         'The pass is a 10-character code from whoever shared Orbit with you. Anyone who knows it can use the account, so keep it to yourself; it’s shown once, so write it down somewhere safe.',
         'The avatar at the top right of every app opens the Orbit Pass.'
       ]],
@@ -620,13 +620,13 @@ export function helpFor(app, lang = 'zh') {
 export const TOURS = {
   pass: {
     zh: [
-      ['first', '第一次登入', ['別人給你的通行碼，第一次登入時先換成你自己的：設定通行密鑰（建議，另附一組備用通行碼），或換一組新的通行碼。換好才打開 App。']],
+      ['first', '第一次登入', ['別人給你的通行碼，第一次登入時要先換成你自己的一組新通行碼（換好才打開 App）；接著可以加入通行密鑰（建議，用 Face ID 登入），也可以以後再說。']],
       ['pass', 'Pass', ['你的卡片（頭像、里程碑、帳號），點它換外觀；下面是這個 App 的設定、新增裝置、通知、除錯紀錄和帳戶安全。']],
       ['looks', '外觀', ['里程碑，和免費的頭像、頭像框。最上面是最接近的下一枚。']],
       ['apps', 'App', ['每個 Orbit App，上次什麼時候用，一點就打開。']]
     ],
     en: [
-      ['first', 'First sign-in', ['A pass someone gave you is made yours at its first sign-in: add a passkey (recommended, with a new backup pass), or get a new pass. Then the app opens.']],
+      ['first', 'First sign-in', ['A pass someone gave you is replaced with a new one of your own at its first sign-in (then the app opens); after that you can add a passkey (recommended: sign in with Face ID), or leave it for later.']],
       ['pass', 'Pass', ['Your card (avatar, milestones, account); tap it for your look. Below: this app’s settings, adding a device, notifications, the debug log and security.']],
       ['looks', 'Looks', ['Milestones, and the free avatars and frames. On top, the nearest next medal.']],
       ['apps', 'Apps', ['Every Orbit app, when you last used it, a tap to open it.']]
