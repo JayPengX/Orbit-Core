@@ -57,6 +57,7 @@
 //   - writes <out>/<app>-<hash>[-en][-<click>].png and prints the page's console errors.
 //
 // Needs Playwright (global in the container: /opt/node22/lib/node_modules).
+import { siteReader } from '../kit/data-pack.mjs';
 import { layoutFaults } from './layout-faults.mjs';
 import { createServer } from 'node:http';
 import { createSecureServer } from 'node:http2';
@@ -423,11 +424,16 @@ const server = (h2 && !serve ? (fn => createSecureServer(h2Cert(), fn)) : create
     // Served: the made-up sign-in and the fetch pointed here, before anything else runs.
     res.end(serve && file.endsWith('.html') ? String(data).replace('<head>', `<head><script>${inits.join(';')};${pointFetch}</script>`) : data);
   } catch {
-    // Orbit Law's data, never in git (60 MB built at deploy): what's not built here is read from the live site.
-    // (A local build not packed reads its own files: the live site's list of packs would point past them.)
-    if (path.startsWith('/Orbit-Law/data/') && !(path.endsWith('/_packs.json') && existsSync(join(served.dir, 'data/index.json')))) {
-      const body = await curlText(`https://orbit.jaypengx.com${path.replace(/^\/Orbit-Law\//, '/law/')}`);
-      if (body && !/^\s*</.test(body)) return res.writeHead(200, { 'Content-Type': TYPES[extname(path)] || 'application/json', 'Cache-Control': 'no-store' }).end(body);
+    // Orbit Law's data, never in git (60 MB built at deploy): what's not built here is read from the live site,
+    // file by file as the page asks. The live site packs its files (kit/data-pack.mjs): each one is found in its
+    // pack here, and the page is told nothing is packed (the live list would point it past the files built here).
+    if (path === '/Orbit-Law/data/_packs.json') return res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end('{}');
+    if (path.startsWith('/Orbit-Law/data/')) {
+      const rel = decodeURIComponent(path.slice('/Orbit-Law/data/'.length));
+      const j = rel.endsWith('.json') ? await lawLive()(rel).catch(() => null) : null;
+      if (j != null) return res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end(JSON.stringify(j));
+      const body = rel.endsWith('.json') ? '' : await curlText(`https://orbit.jaypengx.com${path.replace(/^\/Orbit-Law\//, '/law/')}`);
+      if (body && !/^\s*</.test(body)) return res.writeHead(200, { 'Content-Type': TYPES[extname(path)] || 'application/octet-stream', 'Cache-Control': 'no-store' }).end(body);
     }
     res.writeHead(404);
     res.end('not found');
@@ -689,7 +695,10 @@ const weatherEnv = { GOOGLE_WEATHER_KEY: 'preview', CWA_KEY: 'preview', MOENV_KE
 // --radar <mm an hour>: a shower that hard on the radar, here in ~20 minutes for ~30
 // (--radar-in, --radar-for: minutes), put on each /weather answer (radarFake).
 const weatherFetch = weatherFixtures();
-const curlText = url => new Promise(resolve => execFile('curl', ['-s', '-m', '20', url], (err, stdout) => resolve(err ? '' : stdout)));
+const curlText = url => new Promise(resolve => execFile('curl', ['-s', '-m', '20', url], { maxBuffer: 64 << 20 }, (err, stdout) => resolve(err ? '' : stdout)));
+// Orbit Law's live data/ read as files (its packs opened here; kit/data-pack.mjs), made at first use.
+let lawLiveRead = null;
+const lawLive = () => (lawLiveRead ||= siteReader('https://orbit.jaypengx.com/law/data/', { keep: 200 }));
 await context.route(live ? /^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/push/ : /^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(weather|push)/, async route => {
   const req = route.request();
   const u = new URL(req.url());
