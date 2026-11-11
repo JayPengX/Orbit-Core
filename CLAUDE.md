@@ -69,7 +69,7 @@ orbit-site (site.js): the domain's hosts as custom domains
 | Orbit Law | `law` | `/law/` | Orbit-Law | `orbit-law` |
 | Orbit Securities | `stock` | `/securities/` | Orbit-Securities | `stock-study-accounts` |
 
-The family's order: this table's (`APP_ORDER`). Orbit-Showcase: Jay's homepage, `/showcase/`. This repo's site has the family page
+Order: this table's (`APP_ORDER`). Orbit-Showcase: Jay's homepage, `/showcase/`. This repo's site has the family page
 (`/pass/`) and the admin page (`site/admin/`). A new app: a `slug` in
 `kit/brand.mjs` and a collection in `eco.js` `ECO_APPS`.
 
@@ -101,7 +101,7 @@ modules for modulepreload. `node kit/apps.mjs` refreshes every app's snippets;
   (the new version, started once); else boot.js reloads behind the cover.
   An open page swaps only after 5 minutes away (`AWAY_MS`).
 - **A phone may run an older kit:** a new export is read with a fallback
-  (`kitUI.newThing?.(…)`, a namespace import), never imported by name.
+  (`kitUI.newThing?.(…)`), never imported by name.
 - **Kit CSS loads after the app's**: an override needs higher specificity.
 
 ### 3.2 Modules
@@ -111,7 +111,7 @@ modules for modulepreload. `node kit/apps.mjs` refreshes every app's snippets;
 | `orbit.mjs` | The core: the session, data reads and device storage (§5), the economy's tables, looks and milestones, notices, the frame (`tabBar`, `topActions`, `accountButton`, `ask`/`tell`), screens, fitting, live beats and break countdowns, recommendations (`rank`, `affinity`), the 除錯紀錄 (`rec`); on import it stops pinch zoom, lifts sheets over the keyboard (`watchKeyboard`), holds the lift for pictures, presses only when pressed; `switchGlide` |
 | `orbit.css` | The design system: iOS 27's tokens (colour, type, space, radius, Liquid Glass, springs) and every `q-` component; the apps' accents (`tools/accent-css.mjs`); at its end Orbit's own look (`data-look="native"`, DESIGN §11) |
 | `ui.mjs` | The builders (§3.3) and their HTML-string twins (`…Html`) for apps that draw with template strings; loads `hold-place.mjs` |
-| `hold-place.mjs` | A redraw never moves the page, a sheet or a panel; a tap holds the control under the finger; never a drawing (`loose`); a sized sheet keeps its height (`--q-sheet-floor`); `scrollBusy()` holds `everyDev` under a finger; `freshScreen()`: a new screen at the top; `letGo()`: a drag carries its grip away |
+| `hold-place.mjs` | A redraw never moves the page, a sheet or a panel; a tap holds the control under the finger; not a drawing (`loose`); a sized sheet keeps its height (`--q-sheet-floor`); `scrollBusy()` holds `everyDev` under a finger; `freshScreen()`: a new screen at the top; `letGo()`: a drag carries its grip away |
 | `steady-pics.mjs` | A picture drawn again is eager and decoded at once |
 | `sources.mjs`, `source-watch.mjs` | Outside sources (`SOURCES`, `sourceOf`, `stateOf`: admin 外部來源); a phone's own outside reads, beaconed to `/sources` |
 | `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, first); the cover held for it |
@@ -120,7 +120,7 @@ modules for modulepreload. `node kit/apps.mjs` refreshes every app's snippets;
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); each app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
 | `passkey.mjs` | Passkeys in the browser: made, used, named (`passkeyHere()` false where a browser can't) |
 | `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); `TOPICS`; `sideOf`, `partiesIn`, `topicsOf`, `namesRe` |
-| `ai.mjs`, `family.mjs`, `today.mjs` | AI (mark `icons.ai`, `--q-ai`): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer`, `aiAnswerWait` (answers drawn); the phone's family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天 |
+| `ai.mjs`, `family.mjs`, `today.mjs`, `ask-orbit.mjs` | AI (mark `icons.ai`, `--q-ai`; `.q-ai-ref` a name chip): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer`, `aiAnswerWait` (answers drawn); the phone's family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天; 問 Orbit (`routeAsk`, an app's `#ask=` by `takeAsk`) |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs`: qrcode-generator 2.0.4 (MIT), vendored |
 | `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays` |
@@ -133,7 +133,7 @@ modules for modulepreload. `node kit/apps.mjs` refreshes every app's snippets;
 | `flight.mjs`, `ebus.mjs`, `ebus-read.mjs` | A real plane in the air on a sphere (`/flight`, Class's 專注飛行); bus sites' ETAs, notices as TDX's (臺中, 桃園, 臺南: phones, then proxy; 高雄: phones) |
 | `domain.mjs`, `devconfig.mjs`, `mirror.mjs` | The family's domain (one place); `DEV` for the Workers; the nightly mirror's addresses |
 | `sw.js`, `sw-images.js` | The one service worker every app imports (page and own pictures kept first, refreshed behind; `?v=` files from the cache, checked against their hash); other sites' pictures in one cache all apps share |
-| `apps.mjs`, `link.mjs`, `preload.mjs`, `stamp.mjs`, `stamp-app.mjs`, `hash.mjs`, `frame-guard.mjs`, `no-net.mjs` | Build tools, never served: the apps' snippets; `.kit` links; first-screen modulepreload; the kit's and each app's content-hashed build; `frameFaults` (apps' tests: only colours on the tab bar); tests offline |
+| `apps.mjs`, `link.mjs`, `preload.mjs`, `stamp.mjs`, `stamp-app.mjs`, `hash.mjs`, `frame-guard.mjs`, `no-net.mjs` | Build tools, never served: the apps' snippets; `.kit` links; modulepreload; the content-hashed builds; `frameFaults` (only colours on the tab bar); tests offline |
 | `img/` | The kit's own pictures (the Premier League's mark, light and dark) |
 
 ### 3.3 Component patterns: what to use for what
@@ -190,7 +190,7 @@ the `q-` components; they don't restyle them.
 `worker.js` routes (`route()`, heavy ones in the Runner); each route's work in its own file;
 `http.js` is what every route answers with (who may call, CORS, JSON;
 `lineAnswer`: lines gzipped, each flushed). Every answer carries `Server-Timing:
-w;dur=` (the Worker's time), noted by the 除錯紀錄 when slow.
+w;dur=`, noted by the 除錯紀錄 when slow.
 
 | Route | File | What |
 | --- | --- | --- |

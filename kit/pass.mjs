@@ -13,6 +13,7 @@ let helpLoad = null;
 export const loadHelp = () => (helpLoad ||= import('./help.mjs').then(m => (helpMod = m)).catch(e => ((helpLoad = null), Promise.reject(e))));
 import { sheet, section, list, cell } from './ui.mjs';
 import { todayRows } from './today.mjs';
+import { askOrbitCard } from './ask-orbit.mjs';
 import { homeOf } from './brand.mjs';
 
 export const STRINGS = {
@@ -217,11 +218,21 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
     account = null;
     if (state.tab === 'pass') {
       account = passAccount(s, { extra: state.extra, close, looks: () => show('looks') });
-      return put(body, ...[todayCard(), ...account.nodes].filter(Boolean));
+      return put(body, ...[askCard(), todayCard(), ...account.nodes].filter(Boolean));
     }
     if (state.tab === 'looks') return put(body, looksSection(ctx));
     if (state.tab === 'apps') return renderApps(body, ctx);
     renderHelp(body, ctx, state.help);
+  }
+  // 問 Orbit (ask-orbit.mjs): a question opens the app that answers it, with the question in its ask.
+  function askCard() {
+    const goTo = (app, hash) => {
+      if (app !== s.app) return void s.go?.(app, hash);
+      close();
+      location.hash = hash;
+    };
+    const apps = Object.fromEntries(Object.entries(APPS).map(([id, a]) => [id, { name: a.short || a.name, icon: el('img', { src: svgUrl(appIcon(id)), alt: '', width: 29, height: 29 }) }]));
+    return askOrbitCard({ go: goTo, apps });
   }
   // 今天 (today.mjs): what each app told the phone's family notebook for
   // today, a row an app, each opening its app there (this one: closes the sheet).
