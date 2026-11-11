@@ -67,6 +67,7 @@ import { readFile, stat, mkdir, mkdtemp, rm, cp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 import { ASIA_HOST, asiaBaseballResponse } from '../asia-baseball.js';
 import { F1_LIVE_HOST, f1LiveResponse, memoryLog, sampleLive } from '../f1-live.js';
@@ -190,6 +191,10 @@ const openedApps = Object.fromEntries(opt('apps', '').split(',').filter(Boolean)
 const shotSel = opt('shot', null);
 const evals = [];
 for (let c; (c = opt('eval', null)); ) evals.push(c);
+// --script file.mjs: its default export is run after the clicks and evals,
+// given { page, context, base, out, errors, hash }: a scenario that taps
+// through the app and prints what it found (the checklist's checks).
+const scriptFile = opt('script', '');
 const latency = Number(opt('latency', 0));
 // --version-latency ms: version.json (the app's and the kit's) answered that much later: a phone whose
 // app opens from its saved files before the update check answers.
@@ -1472,6 +1477,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
   }
   if (freezes) console.log(`freezes ${key}${hash ? `#${hash}` : ''}: ${JSON.stringify(await page.evaluate(() => globalThis.__freezes || []))}`);
   for (const js of evals) console.log('eval:', JSON.stringify(await page.evaluate(js).catch(e => `error ${e.message}`)));
+  if (scriptFile) await (await import(pathToFileURL(resolve(scriptFile)).href)).default({ page, context, base, out, errors, hash }).catch(e => console.log(`script: ${e.stack || e}`));
   // The language and what was clicked in the name: runs that differ only in those don't overwrite each other.
   const slug = c => c.replace(/^js:/, '').replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_+|_+$/g, '').slice(0, 32);
   const file = join(out, `${key}-${hash || 'start'}${reopen ? (first ? '-1' : '-2') : ''}${lang !== 'zh' ? `-${lang}` : ''}${clicks.length ? `-${clicks.map(slug).join('+').slice(0, 160)}` : ''}${dark ? '-dark' : ''}${engine === 'webkit' ? '-webkit' : ''}.png`);
