@@ -311,6 +311,7 @@ const edge = () => (typeof caches !== 'undefined' && caches.default) || null;
 // one answers at once too and is read again behind; none: the school's own
 // titles now (code-read), the AI's lines written behind (`wording`), the
 // phone asking again a few seconds on. One wording at a time a school.
+const NEWS_V = 2; // the class-news prompt's version: a new one words every school again
 const unworded = x => (x?.items || []).slice(0, NEWS.aiBatch).some(it => it.line == null);
 export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now = Date.now(), build = true } = {}) {
   const key = keyOf(site);
@@ -318,6 +319,8 @@ export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now
   try {
     kept = (await (await env.DATA?.get(key))?.json?.()) || null;
   } catch {}
+  // (A copy worded by an older prompt: its words dropped, so it's worded again.)
+  if (kept && kept.v !== NEWS_V) kept = { ...kept, v: NEWS_V, at: kept.at, items: (kept.items || []).map(({ line, who, act, by, ...it }) => it) };
   const later = p => (ctx?.waitUntil ? ctx.waitUntil(p.catch(() => {})) : p.catch(() => {}));
   const put = v => env.DATA?.put(key, JSON.stringify(v), { httpMetadata: { contentType: 'application/json' } }) || Promise.resolve();
   const today = twDay(now);
@@ -347,7 +350,7 @@ export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now
   const rebuild = async () => {
     const read = await readSchool(site, fetchFn, today);
     if (!read || !read.items.length) return kept ? { ...kept, stale: true } : { site, at: now, items: [], how: read ? read.how : 'none', unread: !read };
-    return { site, at: now, how: read.how, items: mergeWorded(read.items, kept?.items) };
+    return { site, at: now, v: NEWS_V, how: read.how, items: mergeWorded(read.items, kept?.items) };
   };
   // An older copy answers now; the school is read again behind it.
   if (kept?.items?.length) {
