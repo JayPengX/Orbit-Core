@@ -60,7 +60,8 @@ export function raceFacts(s, title = '') {
   return lines.join('\n').slice(0, 2400);
 }
 
-// The finished races of the past week without a story, told once each.
+// The season's finished races without a story, newest first, told once each
+// (Jay 11-11: every past race has its 勝負關鍵, not only the latest).
 const overAt = c => Date.parse(c.date) + 3 * 3_600_000;
 export async function runF1Stories({ store, env, ctx, proxy, cap, now = Date.now(), until = now + 3 * 60_000 }) {
   const year = new Date(now).getUTCFullYear();
@@ -70,7 +71,8 @@ export async function runF1Stories({ store, env, ctx, proxy, cap, now = Date.now
   const doc = was?.v === 2 ? was : { races: {}, tried: {} };
   const todo = events
     .flatMap(e => (e.competitions || []).map(c => ({ c, name: e.name })))
-    .filter(({ c }) => RACE.has(c.type?.abbreviation) && c.status?.type?.name === 'STATUS_FINAL' && overAt(c) < now && now - Date.parse(c.date) < 7 * 86_400_000 && !(c.date in doc.races));
+    .filter(({ c }) => RACE.has(c.type?.abbreviation) && c.status?.type?.name === 'STATUS_FINAL' && overAt(c) < now && !(c.date in doc.races))
+    .sort((a, b) => Date.parse(b.c.date) - Date.parse(a.c.date));
   let made = 0;
   for (const { c, name } of todo) {
     if (Date.now() >= until) break;

@@ -266,3 +266,13 @@ export function aiAnswer(spec = {}) {
   if (spec.pic instanceof Node) el.querySelector('.q-aia-head')?.append(h('span', { class: 'q-aia-pic big node' }, [spec.pic]));
   return el;
 }
+
+// While an answer is made: its shape, never nothing (Jay 11-11): the mark and
+// a line's shimmer (or what it's doing, `text`), then rows as the answer will
+// draw them (a picture, a label, a figure). aiAnswerWait({ rows, pics, text }) → Node; …Html → string.
+export function aiAnswerWaitHtml({ rows = 3, pics = true, line = true, text = '' } = {}) {
+  const row = i => `<div class="q-aia-row${pics ? '' : ' bare'}">${pics ? '<span class="q-aia-pic q-skel"></span>' : ''}<span class="q-aia-text"><span class="q-skel q-aia-sk" style="width:${[62, 48, 70, 54][i % 4]}%"></span></span><span class="q-aia-end"><span class="q-skel q-aia-sk num"></span></span></div>`;
+  return `<div class="q-aia q-aia-wait" aria-busy="true" role="status" aria-label="${esc(W('想一下…', 'Thinking…'))}">${line || text ? `<div class="q-aia-head"><span class="q-ai-mark" aria-hidden="true">${icons.ai || icons.spark}</span>${text ? `<p class="q-aia-line q-aia-doing">${esc(text)}</p>` : '<span class="q-aia-line"><span class="q-skel q-aia-sk"></span><span class="q-skel q-aia-sk short"></span></span>'}</div>` : ''}${rows ? `<div class="q-aia-sec">${Array.from({ length: rows }, (_, i) => row(i)).join('')}</div>` : ''}</div>`;
+}
+export const aiAnswerWait = (o = {}) => h('div', { html: aiAnswerWaitHtml(o) }).firstElementChild;
+
