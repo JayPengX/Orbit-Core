@@ -16,7 +16,7 @@ import { aiBucket } from '../../law.js';
 const OUT = path.resolve(process.argv[2] || '../Orbit-Law', 'ai');
 const HERE = path.join(path.dirname(new URL(import.meta.url).pathname), 'out');
 const DATA = 'https://orbit.jaypengx.com/law/data/';
-const rd = f => fs.readFileSync(path.join(HERE, f), 'utf8').trim().split('\n').map(l => JSON.parse(l));
+const rd = f => (fs.existsSync(path.join(HERE, f)) ? fs.readFileSync(path.join(HERE, f), 'utf8').trim().split('\n').map(l => JSON.parse(l)) : []);
 const ok = r => r.stop === 'end_turn' && r.text;
 const write = (f, j) => (fs.mkdirSync(path.dirname(f), { recursive: true }), fs.writeFileSync(f, JSON.stringify(j)));
 const textFile = id => String(id).replace(/[^A-Za-z0-9_-]/g, '_');
@@ -37,7 +37,7 @@ console.log('rulings', n);
 // Articles: each with the version of the law it was explained from.
 const laws = new Map();
 n = 0;
-for (const r of rd('8-articles.jsonl').filter(ok)) {
+for (const r of [...rd('8-articles.jsonl'), ...rd('8b-articles.jsonl')].filter(ok)) {
   const [, p, key] = r.id.match(/^([A-Z]\d{7})_(.+)$/) || [];
   if (!p) continue;
   if (!laws.has(p)) laws.set(p, await (await fetch(`${DATA}law/${p}.json`)).json());
