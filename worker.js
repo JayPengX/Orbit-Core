@@ -1523,14 +1523,7 @@ async function route(request, env, ctx, headers, origin) {
       const all = await readSources(env);
       return json(want.length ? Object.fromEntries(want.map(s => [s, all[s] || null])) : all, 200, headers);
     }
-    // Orbit Money's mail-in, removed 2026-10-27 (Jay: too privacy-invading): its
-    // stored boxes and invoices deleted, once (build.yml purge-money-mail).
-    if (check === 'purge-money-mail') {
-      const docs = await DOCS.list(env, 'orbit-money-mail', 300, { idsOnly: true });
-      for (const d of docs) await DOCS.delete(env, 'orbit-money-mail', d.id);
-      return json({ deleted: docs.length }, 200, headers);
-    }
-    return json({ error: { message: 'check=gemini|system|capacity|sources|sources-state|purge-money-mail' } }, 400, headers);
+    return json({ error: { message: 'check=gemini|system|capacity|sources|sources-state' } }, 400, headers);
   }
   // A builder's job now (builders/run.js), by hand: Bearer DATA_PUSH_SECRET
   // (Orbit-Core's build.yml). ?job=watch|cutouts|buses, or
