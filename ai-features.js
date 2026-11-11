@@ -596,20 +596,25 @@ export const FEATURES = {
     parts: ({ facts }) =>
       text(
         [
-          'You write the short story of how this Formula 1 race was won, for fans in Taiwan who already see the finishing order. Tell what the order can’t: lead with the turning point (when the winner took the lead for good, and what came with it: a stop, a tyre change, a safety car), then who climbed or fell back most. Never recite the grid, every stint or every lap range: pick what decided it.',
-          'zh: 2 or 3 sentences in Traditional Chinese, as Taiwan’s F1 coverage writes, ≤ 110 字. Tyres: soft 軟胎, medium 中性胎, hard 硬胎, inter 半雨胎, wet 全雨胎. From grid slot 1 is 杆位起跑; also 進站, 換胎, 安全車, 紅旗, 領跑, 退賽. Drivers by surname as written in English (Norris), teams in English.',
-          'en: the same story in English, ≤ 60 words.',
-          'Use only these facts. Every number you write must be one of theirs. Never give a reason the facts don’t show: no crash, penalty, rain or mistake they don’t name; a tyre change from inter to soft and back says only that the cars changed tyres.',
+          'You pick the moments that decided this Formula 1 race, for fans in Taiwan who already see the finishing order and a lap-by-lap list. Tell what the order can’t: the turning point (when the winner took the lead for good, and what came with it: a stop, a tyre change, a safety car), then who climbed or fell back most and why the facts show. Never recite the grid, every stint or every lap range.',
+          'points: 2 to 4 moments, in lap order. Each: lap (the lap it happened, a number from the facts; 0 for the start) and no (the car number of the driver it is about, from #N in the facts; "" for the track, a safety car or red flag). zh: one line in Traditional Chinese, as Taiwan’s F1 coverage writes, ≤ 30 字, without the driver’s own name (his face shows it; another driver by surname in English). Tyres: soft 軟胎, medium 中性胎, hard 硬胎, inter 半雨胎, wet 全雨胎; 杆位起跑, 進站, 換胎, 安全車, 紅旗, 領跑, 退賽. en: the same, ≤ 16 words.',
+          'Use only these facts. Every number you write must be one of theirs. Never give a reason the facts don’t show: no crash, penalty, rain or mistake they don’t name.',
           'Facts:',
           facts
         ].join('\n')
       ),
-    schema: obj({ zh: S, en: S }),
-    clean: (raw, { facts }) => {
-      const zh = str(raw?.zh, 180), en = str(raw?.en, 420);
-      return zh && en && numbersFrom(zh + ' ' + en, facts) ? { zh, en } : null;
+    schema: obj({ points: arr(obj({ lap: N, no: S, zh: S, en: S })) }),
+    clean: (raw, { facts, laps = 0 }) => {
+      const cars = new Set([...facts.matchAll(/#(\d{1,2})\b/g)].map(m => m[1]));
+      const most = laps || Math.max(0, ...[...facts.matchAll(/(\d{1,3}) laps/g)].map(m => Number(m[1])));
+      const points = list(raw?.points, 5)
+        .map(p => ({ lap: Number.isInteger(p?.lap) && p.lap >= 0 && p.lap <= most ? p.lap : null, no: cars.has(String(p?.no || '').replace('#', '')) ? String(p.no).replace('#', '') : '', zh: str(p?.zh, 50), en: str(p?.en, 140) }))
+        .filter(p => p.zh && p.en && numbersFrom(`${p.zh} ${p.en}`, facts))
+        .slice(0, 4);
+      return points.length >= 2 ? { points } : null;
     }
   },
+
 
   // Orbit Transit: an operator's free-text notice (its own site's, not
   // TDX's, which names its routes) read into which lines, stops and days.
