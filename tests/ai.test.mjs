@@ -115,6 +115,8 @@ test('the AI tab: spend by provider, money left from the balance typed, speed an
   assert.equal(h['money-say'].backup, 1, 'Haiku answered for Luna once');
   assert.equal(h['money-say'].models['claude-haiku-5-5'], 1, 'which model answered, counted');
   assert.equal(h['money-say'].failToday, 1);
+  assert.equal(h['money-say'].backupToday, 1, 'a backup answered today');
+  assert.deepEqual(h['money-say'].why, { '503 gpt-6-luna': 1 }, 'the week’s failures by status and model');
   assert.equal(h['law-chat'].mid, 9000);
 });
 

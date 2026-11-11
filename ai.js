@@ -313,19 +313,28 @@ export function moneyLeft(saved, calls, now = Date.now()) {
 // Each feature's speed and health from its calls (ms logged since 11-10):
 // the middle and the slow end of its answered calls, today's failures, how
 // often a backup model answered (any model past its first), and each
-// model's answers (`models`).
+// model's answers (`models`); the week's failures (`fail`, `why`: by
+// status and model) and today's backups (`backupToday`), so the panel can
+// tell a failure a backup answered from one nobody did.
 export function healthOf(calls, firstModel = {}, now = Date.now()) {
   const out = {};
   const day = twDay(now);
   for (const c of calls) {
-    const f = (out[c.feature] ||= { ms: [], failToday: 0, n: 0, backup: 0, models: {} });
+    const f = (out[c.feature] ||= { ms: [], failToday: 0, fail: 0, why: {}, n: 0, backup: 0, backupToday: 0, models: {} });
     if (c.status === 200) {
       f.n++;
+      if (firstModel[c.feature] && c.model !== firstModel[c.feature] && twDay(c.at) === day) f.backupToday++;
       // (Which model answered, each counted: admin's AI 錢包 shows them.)
       if (c.model) f.models[c.model] = (f.models[c.model] || 0) + 1;
       if (Number.isFinite(c.ms)) f.ms.push(c.ms);
       if (firstModel[c.feature] && c.model !== firstModel[c.feature]) f.backup++;
-    } else if (twDay(c.at) === day) f.failToday++;
+    } else {
+      // (The week's failures by status and model: 504 our time limit, 429 the maker pacing us…)
+      f.fail++;
+      const k = `${c.status} ${c.model}`;
+      f.why[k] = (f.why[k] || 0) + 1;
+      if (twDay(c.at) === day) f.failToday++;
+    }
   }
   for (const f of Object.values(out)) {
     const ms = f.ms.sort((a, b) => a - b);

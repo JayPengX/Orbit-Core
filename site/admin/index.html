@@ -98,6 +98,21 @@
   .tile.bad strong { color: var(--q-red, #e5484d); }
   .tile.warn strong { color: var(--q-warn, #c77700); }
   #aim-tiles .tile em { white-space: normal; }
+  .ai-list { list-style: none; margin: 14px 0 0; padding: 0; }
+  .ai-list li { display: flex; gap: 12px; align-items: baseline; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--q-divider); }
+  .ai-list li > div { min-width: 0; }
+  .ai-list li small { display: block; color: var(--q-muted); font-size: 12px; margin-top: 2px; }
+  .ai-list li small.neg { color: var(--q-bad); }
+  .ai-list li small.warnt { color: var(--q-warn, #c77700); }
+  .ai-list li .v { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+  .ai-list li.grp { padding-top: 18px; border-bottom-width: 2px; flex-wrap: wrap; row-gap: 2px; }
+  .ai-list li.grp strong { white-space: nowrap; }
+  .ai-list li.grp .v { font-weight: 500; font-size: 13px; color: var(--q-muted); }
+  .ai-list li.grp .v.neg { color: var(--q-bad); }
+  .ai-list li.grp .v.warnt { color: var(--q-warn, #c77700); }
+  .ai-list li.feat { padding-left: 12px; }
+  .ai-list li.idle { color: var(--q-muted); font-size: 13px; border-bottom: 0; }
+  .warnt { color: var(--q-warn, #c77700); }
   .door-set { margin-top: 10px; align-items: center; gap: 8px; flex-wrap: nowrap; }
   .door-set label { white-space: nowrap; }
   .door-set input { width: 110px; }
@@ -524,7 +539,7 @@
         <details class="note" id="cap-idle-wrap" hidden><summary id="cap-idle-sum"></summary><ul class="flow stack" id="cap-idle" style="margin-top:8px"></ul></details>
         <details class="note"><summary>說明</summary><p class="muted" id="cap-note" style="margin:8px 0 0"></p><p class="muted" id="cap-bill" style="margin:8px 0 0"></p></details>
       </div>
-      <div class="pane-head" id="bill-guard"><div><h2>Cloudflare 帳單</h2><p class="muted">免費方案（11-13 起）：每天的免費額度。真的用到 60%、75%、85% 而且照這幾天的速度會超過，才慢慢放慢；永遠不收費。</p></div></div>
+      <div class="pane-head" id="bill-guard"><div><h2>Cloudflare</h2><p class="muted">免費方案：每天的免費額度，台灣早上 8 點重算。真的用到 60%、75%、85% 而且照這速度會超過，才慢慢放慢；永遠不收費。</p></div></div>
       <p id="sys-error" class="error"></p>
       <div class="tiles" id="sys-tiles"></div>
       <p class="muted" id="sys-pace" style="margin:10px 0 0"></p>
@@ -534,38 +549,22 @@
         <div class="row"><input id="alert-pass" placeholder="你的 Orbit Pass" autocomplete="off" spellcheck="false" style="flex:1 1 0;min-width:0" /><button id="alert-save" class="small" style="flex:none">設定</button><button id="alert-test" class="small" style="flex:none">測試</button></div>
         <p id="alert-ok" class="ok"></p>
       </div>
-      <div class="pane-head"><div><h2>AI 今天</h2><p class="muted">每個功能全部人一天加起來的次數（台灣的一天）。上限和暫停在設定。</p></div><button class="small" data-go="dev" data-to="set-ai">上限</button></div>
-      <p id="ai-error" class="error"></p>
-      <ul class="checks" id="ai-use"></ul>
-      <div class="pane-head"><div><h2>AI 錢包</h2><p class="muted">三家 AI 各剩多少、照這 7 天的速度還能用幾天。加值後到該家的頁面看餘額，在這裡輸入一次。</p></div><button class="small" id="aim-load">重新整理</button></div>
+      <div class="pane-head" id="ai-use"><div><h2>AI</h2><p class="muted">三家 AI 的預付餘額，和每個 App 的 AI 今天用了多少、這個月花多少。金額都是新台幣。</p></div><div class="row" style="flex:none"><button class="small" data-go="dev" data-to="set-ai">上限</button><button class="small" id="aim-load">重新整理</button></div></div>
       <p id="aim-error" class="error"></p>
       <div class="card">
         <div class="tiles" id="aim-tiles"></div>
-        <div class="row" style="margin-top:14px"><select id="aim-prov" style="flex:none"><option value="anthropic">Anthropic (Claude)</option><option value="openai">OpenAI (GPT)</option><option value="google">Google (Gemini)</option></select><input id="aim-usd" type="number" min="0" step="0.01" placeholder="現在的餘額（US$）" class="grow" /><button id="aim-save" class="primary">儲存</button></div>
+        <details class="note" id="aim-set"><summary>加值了？輸入新的餘額</summary>
+          <div class="row" style="margin-top:10px"><select id="aim-prov" style="flex:none"><option value="anthropic">Claude</option><option value="openai">GPT</option><option value="google">Gemini</option></select><input id="aim-usd" type="number" min="0" step="0.01" placeholder="該家頁面上的餘額（US$）" class="grow" /><button id="aim-save" class="primary">儲存</button></div>
+          <div class="row" style="margin-top:10px"><span class="muted">1 US$ =</span><input id="aim-rate" type="number" min="10" max="100" step="0.1" style="width:90px" /><span class="muted">NT$</span><button id="aim-rate-save" class="small">儲存匯率</button></div>
+        </details>
         <p id="aim-ok" class="ok"></p>
-        <details class="note" open><summary>這個月每個功能花多少</summary>
-          <div class="tablewrap"><table id="aim-feat"><thead><tr><th>功能</th><th class="right">次數</th><th class="right">花費</th><th class="right">每次</th><th class="right">速度</th><th>回答的模型</th></tr></thead><tbody></tbody></table></div>
-          <p class="muted" style="margin:8px 0 0">速度：一半的呼叫在這之內完成 / 九成在這之內。紅色：今天有失敗，或常由備用的 AI 回答。回答的模型：每家的備用都是另一家同一級的（Sonnet ↔ GPT Sol、Haiku ↔ Luna、Flash → Haiku）。</p>
-        </details>
-      </div>
-      <div class="pane-head"><div><h2>Gemini 今天</h2><p class="muted" id="google-note">Google 的每日額度照美國太平洋時間重置。</p></div></div>
-      <ul class="checks" id="google-use"></ul>
-      <div class="pane-head"><div><h2>Google 帳單</h2><p class="muted">Google 沒有預付餘額的 API：每次加值後輸入一次餘額，花費依下面的價格估算。</p></div></div>
-      <p id="bill-error" class="error"></p>
-      <div class="card">
-        <div class="tiles" id="bill-tiles"></div>
-        <div class="tablewrap" style="margin-top:12px"><table id="bill-rows"><thead><tr><th>服務</th><th class="right">本月 / 免費</th><th class="right">估計</th></tr></thead><tbody></tbody></table></div>
-        <div class="row" style="margin-top:14px"><input id="bill-balance" type="number" min="0" step="1" placeholder="現在的餘額（NT$）" class="grow" /><button id="bill-save" class="primary">儲存餘額</button></div>
-        <p id="bill-ok" class="ok"></p>
-        <details style="margin-top:10px"><summary class="muted" style="cursor:pointer">價格與匯率</summary>
-          <div id="bill-prices" class="prices"></div>
-          <div class="row" style="margin-top:10px"><span class="muted">1 USD =</span><input id="bill-rate" type="number" min="1" step="0.1" style="width:90px" /><span class="muted">NT$</span><button id="bill-prices-save" class="small">儲存價格</button></div>
-        </details>
+        <ul class="ai-list" id="aim-feat"></ul>
+        <p class="muted" style="margin:8px 0 0">每個 App：今天用了幾次 / 每天上限（全部人一起，上限在設定）。秒數：一半在這之內答完 / 九成在這之內。主要的模型沒答時，由另一家同一級的備用接手（Sonnet ↔ GPT Sol、Haiku ↔ Luna、Flash → Haiku），這時是黃字；紅字是連備用都沒答到。</p>
       </div>
       <div class="pane-head"><div><h2>TDX</h2></div></div>
       <p id="use-error" class="error"></p>
       <div class="card">
-        <div><strong>點數（每月 200 點）</strong><p class="muted" style="margin:2px 0 0">呼叫：基本 1,500 次 1 點 · 進階 200 次 1 點；資料量另計：基本 150 MB 1 點 · 進階 20 MB 1 點</p></div>
+        <div><strong id="tdx-head">點數</strong><p class="muted" style="margin:2px 0 0">呼叫：基本 1,500 次 1 點 · 進階 200 次 1 點；資料量另計：基本 150 MB 1 點 · 進階 20 MB 1 點</p></div>
         <div class="tiles" id="tdx-tiles" style="margin-top:10px"></div>
         <svg id="tdx-chart" class="chart" viewBox="0 0 360 150" role="img" aria-label="每天的 TDX 點數" style="margin-top:12px"></svg>
         <details class="note"><summary>每天的明細</summary>
@@ -817,7 +816,7 @@ const VIEWS = {
   overview: () => loadOverview(),
   accounts: () => Promise.all([loadWallets(), loadDoor()]),
   health: () => Promise.all([loadSystem(), loadSources(), loadErrors()]),
-  usage: () => Promise.all([loadCapacity(), loadSystem(), loadBilling(), loadUsage(), loadAiMoney()]),
+  usage: () => Promise.all([loadCapacity(), loadSystem(), loadUsage(), loadAiMoney()]),
   dev: () => loadDev(),
   tools: () => Promise.all([loadGift(), loadPushes(), loadBackups()])
 };
@@ -1808,41 +1807,26 @@ $('bc-send').onclick = () =>
       $('bc-error').textContent = e.message;
     }
   });
-const SKU = { autocomplete: '地點搜尋', detailsPro: '地點詳細', textSearch: '搜尋補充' };
 async function loadUsage() {
   $('use-error').textContent = '';
   try {
-    const u = await admin('usage');
-    drawAi(u.ai);
-    drawGoogle(u.google);
+    const u = await usageNow();
+    aiToday = u.ai || [];
+    if (aim) drawAiMoney();
     drawTdx(u.tdx, u.at);
   } catch (e) {
     $('use-error').textContent = e.message;
   }
 }
-// Each AI feature today against its cap (0: paused), the week beside it.
+// Each app's AI today against its cap (0: paused).
 const aiTone = a => (!a.cap ? 'off' : a.days[6] >= a.cap ? 'bad' : a.days[6] >= a.cap * 0.8 ? 'slow' : '');
-function drawAi(ai = []) {
-  $('ai-use').replaceChildren(
-    ...ai.map(a => checkRow(aiTone(a), DEV[a.key]?.zh || a.key, `近 7 天 ${a.days.reduce((x, y) => x + y, 0).toLocaleString()} 次 · 最多一天 ${Math.max(...a.days).toLocaleString()}`, a.cap ? `${a.days[6].toLocaleString()} / ${a.cap.toLocaleString()}` : '已暫停'))
-  );
-}
-// Each Gemini model on Google's day (it starts again at midnight Pacific): calls, the busiest minute, the ones Google turned away (429: over a limit).
 const twTime = ms => new Date(ms + 8 * 3_600_000).toISOString().slice(5, 16).replace('-', '/').replace('T', ' ');
-function drawGoogle(g) {
-  if (!g) return $('google-use').replaceChildren();
-  $('google-note').textContent = `Google 的每日額度照美國太平洋時間重置：下次在台灣時間 ${twTime(g.resets)}。被擋 = Google 回「超過額度」(429)。`;
-  const models = Object.entries(g.models || {});
-  $('google-use').replaceChildren(
-    ...(models.length
-      ? models.map(([m, v]) => checkRow(v.refused ? 'bad' : '', `Gemini ${m.replace(/^gemini-/, '')}`, `最忙的一分鐘 ${v.peakMinute.toLocaleString()} 次${v.refused ? ` · 被擋 ${v.refused.toLocaleString()} 次` : ' · 沒被擋過'}`, `${v.calls.toLocaleString()} 次`))
-      : [el('li', {}, [el('span', { class: 'muted', text: 'Google 的今天還沒有呼叫。' })])])
-  );
-}
 // TDX's points: this month's against the plan, where the month ends at this rate, each day.
 function drawTdx(t, now) {
   if (!t) return;
   const plan = t.plan?.month || 200;
+  // (TDX's paid month (200 points) runs to 12-01; then the free tier, 3 points a month.)
+  $('tdx-head').textContent = plan > 10 ? `點數（這個月 ${plan} 點；12/1 起免費方案每月 3 點）` : `點數（免費方案：每月 ${plan} 點）`;
   const tw = new Date(now + 8 * 3_600_000);
   const day = tw.getUTCDate(), monthDays = new Date(Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth() + 1, 0)).getUTCDate();
   const days = Object.entries(t.days || {}).sort((a, b) => (a[0] < b[0] ? 1 : -1));
@@ -1853,7 +1837,7 @@ function drawTdx(t, now) {
   const pts = n => (n < 10 ? n.toFixed(2) : n.toFixed(1));
   $('tdx-tiles').replaceChildren(
     tile('本月已用', `${pts(t.points)} 點`, `${Math.round((t.points / plan) * 100)}% · 剩 ${pts(Math.max(0, plan - t.points))} 點`),
-    tile('照這速度月底', `${pts(projected)} 點`, projected > plan ? '會超過！調慢 開發 的交通設定' : `${Math.round((projected / plan) * 100)}% 的額度`),
+    tile('照這速度月底', `${pts(projected)} 點`, projected > plan ? '會超過！到 設定 調慢交通' : `${Math.round((projected / plan) * 100)}% 的額度`),
     tile('今天', `${pts(today.points)} 點`, `基本 ${today.basic.toLocaleString()} · 進階 ${today.advanced.toLocaleString()} · ${Math.round((today.kb || 0) / 1024).toLocaleString()} MB`),
     tile('每天平均', `${pts(avg)} 點`, `可用 ${pts(plan / monthDays)} 點 / 天`),
     tile('節流', t.guard?.advanced > 1 ? `進階 ×${t.guard.advanced}` : '沒有', t.guard?.why === 'month' ? '本月點數剩不到 5%：進階最多 5 分鐘一次' : t.guard?.why === 'day' ? `今天用到了月底要的點數，差 ${Math.abs(t.guard.room).toFixed(1)} 點` : t.guard?.room != null ? `月底前還多 ${t.guard.room.toFixed(1)} 點可用` : '')
@@ -2379,12 +2363,13 @@ const restsToday = (b, now) => b.job === 'f1' && ![0, 1, 4, 5, 6].includes(new D
 const isLate = (b, now) => !restsToday(b, now) && now - b.at > (JOBS[b.job]?.[1] || 120) * 60_000;
 const SECRET_GROUPS = [
   ['登入與管理', ['ECO_TOKEN_SECRET', 'ECO_ADMIN_TOKEN', 'DATA_PUSH_SECRET']],
-  ['Google', ['GEMINI_API_KEY', 'GOOGLE_MAPS_KEY', 'GOOGLE_MAPS_BROWSER_KEY', 'GOOGLE_WEATHER_KEY']],
+  ['AI（預付）', ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY']],
+  ['Google 地圖與天氣（免費額度）', ['GOOGLE_MAPS_KEY', 'GOOGLE_MAPS_BROWSER_KEY', 'GOOGLE_WEATHER_KEY']],
   ['台灣的開放資料', ['CWA_KEY', 'MOENV_KEY', 'TDX_CLIENT_ID', 'TDX_CLIENT_SECRET']],
   ['GitHub（部署的重跑）', ['GH_ACTIONS_TOKEN']],
   ['退場中（12/6 自動移除）', ['FIREBASE_PRIVATE_KEY']]
 ];
-const BIND_WORD = { STORE: 'D1 資料庫（Pass、設定）', DATA: 'R2 資料（orbit-data）', RATE_LIMIT_KV: 'KV（通知、帳單狀態、快取）', F1_LOG: 'F1 圈速紀錄（Durable Object）', GEMINI_RELAY: 'Gemini 台灣中繼', GUARD: '帳單保護（quota-guard）' };
+const BIND_WORD = { STORE: 'D1 資料庫（Pass、設定）', DATA: 'R2 資料（orbit-data）', RATE_LIMIT_KV: 'KV（通知、帳單狀態、快取）', F1_LOG: 'F1 圈速紀錄（Durable Object）', GEMINI_RELAY: 'AI 與台灣網頁的中繼（台灣）', GUARD: '帳單保護（quota-guard）' };
 // A job's note (its result, JSON) as words: "watched 0 · sent 2"; an error as it is.
 const noteText = note => {
   try {
@@ -2408,9 +2393,10 @@ async function loadSystem() {
       tile('帳單保護', !g ? '還沒跑過' : g.stopped ? '已停代理' : g.armed ? '運作中' : '沒啟動', g?.at ? `${ago(g.at)} 讀取` : ''),
       tile('節流', `${r.pace.pace} 級`, r.pace.pace ? `從 ${fmt(r.pace.since)}` : '照設定'),
       tile('用得最多', top ? pct(g.share[top]) : '—', top ? BILL_NAME[top] || top : ''),
-      tile('推估到月底', g?.paceTop != null ? pct(g.paceTop) : '—', '最高的一項'),
+      tile(g?.free ? '推估到今天結束' : '推估到月底', g?.paceTop != null ? pct(g.paceTop) : '—', '最高的一項'),
       tile('警示', g ? ['沒有', '過 50%', '過 75%', '過 90%'][g.alert || 0] : '—', r.told?.at ? `上次通知 ${ago(r.told.at)}` : '還沒通知過'),
-      tile('本期', g?.period ? `${fmtDay(g.period.start)} 起` : '—', g?.period ? `到 ${fmtDay(g.period.end)}，每月 13 日續約` : '')
+      // (The free plan's period is a day, 08:00 Taiwan; the paid month ran to 11-13.)
+      g?.free ? tile('方案', '免費', '每天 08:00 重算，永遠不收費') : tile('本期', g?.period ? `${fmtDay(g.period.start)} 起` : '—', g?.period ? `付費方案到 11/13，之後免費` : '')
     );
     // (Only when it says something the 節流 tile doesn't: slowed down, or the bill unread.)
     // (The forecast is a warning only: nobody is slowed by it, the owner 2026-11-05.)
@@ -2520,165 +2506,99 @@ const LINKS = [
 ];
 $('links').replaceChildren(...LINKS.map(([n, href]) => el('a', { href, target: '_blank', rel: 'noopener', text: n })));
 
-// ---- Google 帳單 ----
-// Google's list prices (USD), editable (checked 2026-10-11 against
-// developers.google.com/maps/billing-and-pricing/pricing and
-// ai.google.dev/gemini-api/docs/pricing):
-// - Maps platform, each SKU free to its monthly cap, then per 1,000:
-//   Dynamic Maps 10,000 then $7; Autocomplete Requests 10,000 then $2.83
-//   (free altogether in a session that ends in Place Details, as Transit's
-//   do: counted every request here, on the safe side); Place Details
-//   Essentials 10,000 then $5, Pro 5,000 then $17; Compute Routes Essentials
-//   10,000 then $5; Weather (every call alike) 10,000 then $0.15.
-// - Gemini per million tokens, the paid tier (a project with billing has no
-//   free tier): 3.5 Flash-Lite $0.30 in, $0.03 cached, $2.50 out (thinking
-//   is output); 3.7 Flash isn't on the page: its neighbours 3.6 / 3.8 Flash,
-//   $0.75, $0.075, $3.75 to the end of 2026 (double from 2027-01-01).
-const BILL_DEFAULTS = {
-  rate: 32,
-  prices: {
-    maps: { free: 10000, per: 7 }, autocomplete: { free: 10000, per: 2.83 }, details: { free: 10000, per: 5 }, detailsPro: { free: 5000, per: 17 }, textSearch: { free: 5000, per: 32 }, routes: { free: 10000, per: 5 }, matrix: { free: 10000, per: 5 }, drive: { free: 5000, per: 10 },
-    weather: { free: 10000, per: 0.15 },
-    'gemini-3.5-flash-lite': { in: 0.3, cached: 0.03, out: 2.5 }, 'gemini-3.7-flash': { in: 0.75, cached: 0.075, out: 3.75 }, 'gemini-3.6-flash': { in: 0.75, cached: 0.075, out: 3.75 }
-  }
-};
-// The same names as 容量's (SKU_ZH); the showcase's shares are inside these, never billed apart.
-const BILL_NAMES = { maps: '地圖載入', autocomplete: '地點搜尋', details: '地點位置', detailsPro: '地點名稱', textSearch: '搜尋補充', routes: '路線規劃', matrix: '步行時間', drive: '公車車流', weather: 'Google 天氣' };
-// Each Gemini route, by what the person sees.
-const GEMINI_FEATURES = { gemini: '課表照片匯入（Class）', 'nl-edit': '課表 AI 修改（Class）', 'law-ask': '白話解釋（Law）', 'law-chat': '問法律（Law）', 'money-read': '拍照記帳（Money）', check: '管理面板的檢查' };
-let bill = null;
-const ntd = v => `NT$${(Math.round(v * 10) / 10).toLocaleString()}`;
-function billPrices() {
-  const p = { ...BILL_DEFAULTS.prices, ...(bill?.saved?.prices || {}) };
-  // A model not priced here: as a Flash (the dearer guess).
-  for (const m of [...Object.keys(bill?.gemini || {}), ...Object.values(bill?.features || {}).flatMap(Object.keys)]) p[m] ||= { in: 0.75, cached: 0.075, out: 3.75 };
-  return p;
-}
-function billCosts() {
-  const p = billPrices();
-  const rate = bill.saved?.rate || BILL_DEFAULTS.rate;
-  const rows = [];
-  for (const [k, n] of Object.entries(bill.maps)) if (!k.startsWith('showcase')) rows.push({ k, name: BILL_NAMES[k] || k, used: n.toLocaleString(), free: p[k]?.free, ntd: Math.max(0, n - (p[k]?.free || 0)) * (p[k]?.per || 0) / 1000 * rate });
-  const w = Object.values(bill.weather).reduce((a, b) => a + b, 0);
-  rows.push({ k: 'weather', name: BILL_NAMES.weather, used: w.toLocaleString(), free: p.weather.free, ntd: Math.max(0, w - p.weather.free) * p.weather.per / 1000 * rate });
-  // (Weather's days were kept 2 days until 2026-10-11: October's count is its last days only.)
-  for (const [m, days] of Object.entries(bill.gemini)) {
-    const t = Object.values(days).reduce((a, d) => ({ in: a.in + d.in, cached: a.cached + d.cached, out: a.out + d.out }), { in: 0, cached: 0, out: 0 });
-    const q = p[m];
-    rows.push({ k: m, name: `Gemini ${m.replace(/^gemini-/, '')}`, used: `${Math.round((t.in + t.cached + t.out) / 1000).toLocaleString()}k token`, free: null, ntd: ((t.in * q.in + t.cached * q.cached + t.out * q.out) / 1e6) * rate });
-  }
-  // Where Gemini's share went, by feature (already in the rows above: not added again).
-  for (const [f, models] of Object.entries(bill.features || {})) {
-    const t = Object.entries(models).reduce((a, [m, d]) => ({ n: a.n + d.n, ntd: a.ntd + ((d.in * p[m].in + d.cached * p[m].cached + d.out * p[m].out) / 1e6) * rate }), { n: 0, ntd: 0 });
-    rows.push({ k: `f:${f}`, name: `　↳ ${GEMINI_FEATURES[f] || f}`, used: `${t.n.toLocaleString()} 次`, free: null, ntd: t.ntd, part: true });
-  }
-  return { rows, total: rows.reduce((a, r) => a + (r.part ? 0 : r.ntd), 0), rate };
-}
-function drawBilling() {
-  const { rows, total, rate } = billCosts();
-  const sv = bill.saved;
-  const since = sv ? (sv.month === bill.month ? total - (sv.base || 0) : total) : 0;
-  const left = sv ? sv.balance - since : null;
-  $('bill-tiles').replaceChildren(
-    tile('估計餘額', left == null ? '—' : ntd(left), sv ? `${ntd(sv.balance)} · ${ago(sv.at)}輸入` : '先輸入現在的餘額'),
-    tile('輸入後花了', sv ? ntd(Math.max(0, since)) : '—', sv && sv.month !== bill.month ? '跨月：只算這個月的' : ''),
-    tile('本月估計', ntd(total), `1 USD = NT$${rate}`)
-  );
-  $('bill-rows').tBodies[0].replaceChildren(...rows.map(r => el('tr', {}, [el('td', { text: r.name, class: r.part ? 'muted' : '' }), el('td', { class: 'right' }, [document.createTextNode(r.used), r.free == null ? null : el('span', { class: 'muted', text: ` / ${(r.free / 1000).toLocaleString()}k` })]), el('td', { class: `right ${r.ntd > 0 ? 'neg' : ''}`, text: ntd(r.ntd) })])));
-  const p = billPrices();
-  // Each service a row: its name, then its prices as labelled boxes (a table of six columns ran off a phone).
-  const box = (k, f, label) => el('label', {}, [el('small', { text: label }), el('input', { type: 'number', min: '0', step: 'any', value: p[k]?.[f] ?? '', 'data-k': k, 'data-f': f })]);
-  $('bill-prices').replaceChildren(
-    ...Object.keys(p).map(k => {
-      const gem = 'in' in p[k];
-      return el('div', { class: 'price' }, [el('strong', { text: BILL_NAMES[k] || `Gemini ${k.replace(/^gemini-/, '')}` }), el('div', { class: 'boxes' }, gem ? [box(k, 'in', '輸入 $/1M'), box(k, 'cached', '快取 $/1M'), box(k, 'out', '輸出 $/1M')] : [box(k, 'free', '免費 / 月'), box(k, 'per', '$ / 1,000 次')])]);
-    })
-  );
-  $('bill-rate').value = String(rate);
-}
-async function loadBilling() {
-  $('bill-error').textContent = '';
-  try {
-    bill = await admin('billing');
-    drawBilling();
-  } catch (e) {
-    $('bill-error').textContent = e.message;
-  }
-}
-const readPrices = () => {
-  const p = billPrices();
-  for (const i of $('bill-prices').querySelectorAll('input')) (p[i.dataset.k] = { ...p[i.dataset.k] })[i.dataset.f] = Number(i.value) || 0;
-  return p;
-};
-// A new balance counts from now (the month's estimate now its base); new
-// prices keep what's been spent since as it was (the base moved with them).
-async function saveBilling(balance, keepSince) {
-  const since = keepSince && bill.saved?.month === bill.month ? billCosts().total - (bill.saved.base || 0) : 0;
-  const prices = readPrices();
-  const rate = Number($('bill-rate').value) || BILL_DEFAULTS.rate;
-  bill.saved = { ...(bill.saved || {}), prices, rate };
-  const { total } = billCosts();
-  bill.saved = await admin('billing-set', { billing: { balance, month: bill.month, base: total - since, rate, prices } });
-  drawBilling();
-}
-$('bill-save').onclick = () =>
-  busy($('bill-save'), async () => {
-    $('bill-error').textContent = $('bill-ok').textContent = '';
-    const v = Number($('bill-balance').value);
-    if (!$('bill-balance').value || !(v >= 0)) return ($('bill-error').textContent = '輸入現在的餘額（NT$）。');
-    try {
-      await saveBilling(v, false);
-      $('bill-balance').value = '';
-      $('bill-ok').textContent = `已儲存：從現在起，餘額 ${ntd(v)} 扣掉之後的估計花費。`;
-    } catch (e) {
-      $('bill-error').textContent = e.message;
-    }
-  });
-$('bill-prices-save').onclick = () =>
-  busy($('bill-prices-save'), async () => {
-    $('bill-error').textContent = $('bill-ok').textContent = '';
-    if (!bill.saved) return ($('bill-error').textContent = '先輸入一次餘額，價格會一起存。');
-    try {
-      await saveBilling(bill.saved.balance, true);
-      $('bill-ok').textContent = '價格已儲存。';
-    } catch (e) {
-      $('bill-error').textContent = e.message;
-    }
-  });
-
-// ---- AI 錢包 (eco-admin.js `ai`): each provider's money left, each feature's spend and speed ----
+// ---- AI (eco-admin.js `ai`, `usage`): each maker's money left in NT$, each app's AI today
+// against its cap, each feature's month, speed and state ----
+// (Google Maps and Weather run inside their free months, stopped by the proxy at 90%: their
+// counts are 撐得住多少人's rows, no bill to show. Gemini is a prepaid AI like the others.)
 const AI_PROV = { anthropic: 'Claude', openai: 'GPT', google: 'Gemini' };
-const AI_FEATURES = { 'law-chat': '問法律（Law）', 'law-ask': '白話解釋（Law）', 'money-read': '拍照記帳（Money）', gemini: '課表照片匯入（Class）', 'nl-edit': '課表 AI 修改（Class）', 'money-say': '用說的記帳（Money）', 'money-ask': '問我的帳（Money）', 'money-month': '每月回顧（Money）', 'words-check': '檢查我的句子（Words）', 'words-cards': '例句與記憶法（Words）', 'words-photo': '拍一頁變單字卡（Words）', 'words-chat': '用新字聊天（Words）', 'sports-recap': '賽後三句話（Sports）', 'f1-story': 'F1 賽後故事（Sports）', 'sports-ask': '問比賽（Sports）', 'transit-notice': '通告讀成路線（Transit）', 'transit-say': '用說的查路線（Transit）', 'news-lines': '一句話與標題（News）', 'news-sides': '各方怎麼說（News）', 'weather-ask': '問天氣（Weather）', 'class-book': '拍聯絡簿（Class）', 'class-ask': '問我的課表（Class）', 'class-plan': '考前讀書計畫（Class）', 'class-news': '學校公告（Class）', 'law-contract': '拍合約幫你看（Law）', 'law-minutes': '會議紀錄變表格（Law）', 'law-weekly': '法案週報（Law）', 'sec-filing': '重大訊息白話（Securities）', 'sec-say': '用說的下單（Securities）', 'sec-lesson': '交易學到什麼（Securities）', 'beats-say': '用說的做節奏（Beats）', 'orbit-ask': 'Orbit 助理', 'showcase-ask': '問 Orbit（Showcase）', 'rec-weekly': '除錯週報', check: '管理面板的檢查' };
+const AI_FEATURES = { 'law-chat': '問法律', 'law-ask': '白話解釋', 'money-read': '拍照記帳', gemini: '課表照片匯入', 'nl-edit': '課表 AI 修改', 'money-say': '用說的記帳', 'money-ask': '問我的帳', 'money-month': '每月回顧', 'words-check': '檢查我的句子', 'words-cards': '例句與記憶法', 'words-photo': '拍一頁變單字卡', 'words-chat': '用新字聊天', 'sports-recap': '賽後三句話', 'f1-story': 'F1 賽後故事', 'sports-ask': '問比賽', 'transit-notice': '通告讀成路線', 'transit-say': '用說的查路線', 'news-lines': '一句話與標題', 'news-sides': '各方怎麼說', 'weather-ask': '問天氣', 'class-book': '拍聯絡簿', 'class-ask': '問我的課表', 'class-plan': '考前讀書計畫', 'class-news': '學校公告', 'law-contract-read': '拍合約（讀）', 'law-contract': '拍合約幫你看', 'law-minutes': '會議紀錄變表格', 'law-weekly': '法案週報', 'sec-filing': '重大訊息白話', 'sec-say': '用說的下單', 'sec-lesson': '交易學到什麼', 'beats-say': '用說的做節奏', 'orbit-ask': 'Orbit 助理', 'showcase-ask': '問 Orbit（Showcase）', 'rec-weekly': '除錯週報' };
+// (Calls of ours, never a person's: the panel's own checks, ops ai-try's examples (`x~try`), the model comparisons.)
+const AI_OURS = f => f === 'check' || f === 'compare' || f === 'ai-try' || /~try$/.test(f);
+const MODEL_NAMES = { 'claude-sonnet-5-5': 'Sonnet', 'claude-haiku-5-5': 'Haiku', 'gpt-6.1-sol': 'GPT Sol', 'gpt-6-luna': 'Luna', 'gemini-3.6-flash': 'Flash', 'gemini-3.7-flash': 'Flash', 'gemini-3.5-flash-lite': 'Flash-Lite' };
+const modelName = m => MODEL_NAMES[m] || m;
+const modelsText = m => Object.entries(m || {}).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${modelName(k)} ${n}`).join(' · ') || '—';
+const secs = ms => (ms == null ? '—' : `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)} 秒`);
+// A failure's status in words: 504 our time limit, 429 the maker pacing us…
+const failWord = st => ({ 504: '逾時', 429: '被限流', 529: '太忙', 503: '太忙', 500: '出錯', 502: '出錯', 400: '被拒', 401: '金鑰被拒', 403: '金鑰被拒' })[st] || `錯誤 ${st}`;
+const whyText = why => {
+  const top = Object.entries(why || {}).sort((a, b) => b[1] - a[1])[0];
+  if (!top) return '';
+  const [st, m] = top[0].split(' ');
+  return `${modelName(m)}${failWord(Number(st))}`;
+};
 const usd = v => (v == null ? '—' : `US$${(Math.round(v * 100) / 100).toLocaleString()}`);
-// Which model answered, most first: Sonnet 40 · Sol 2 (a backup's share shows here).
-const MODEL_NAMES = { 'claude-sonnet-5-5': 'Sonnet', 'claude-haiku-5-5': 'Haiku', 'gpt-6.1-sol': 'Sol', 'gpt-6-luna': 'Luna', 'gemini-3.6-flash': 'Flash', 'gemini-3.7-flash': 'Flash', 'gemini-3.5-flash-lite': 'Flash-Lite' };
-const modelsText = m => Object.entries(m || {}).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${MODEL_NAMES[k] || k} ${n}`).join(' · ') || '—';
-const secs = ms => (ms == null ? '—' : `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)} s`);
 let aim = null;
+let aiToday = null;
+const rateNow = () => aim?.rate || 32;
+const nt = v => {
+  const n = v * rateNow();
+  return `NT$${(n < 1 ? Math.round(n * 100) / 100 : n < 10 ? Math.round(n * 10) / 10 : Math.round(n)).toLocaleString()}`;
+};
+// A feature's state today: { tone: '' | 'warn' | 'bad', text }.
+function aiState(h) {
+  if (!h) return { tone: '', text: '' };
+  const missed = Math.max(0, (h.failToday || 0) - (h.backupToday || 0));
+  const why = whyText(h.why);
+  if (missed) return { tone: 'bad', text: `今天 ${missed} 次沒答到${why ? `（${why}）` : ''}` };
+  if (h.backupToday) return { tone: h.n > 4 && h.backupToday / Math.max(1, h.n) > 0.2 ? 'warn' : '', text: `備用接手 ${h.backupToday} 次${why ? `（${why}）` : ''}` };
+  return { tone: '', text: h.n ? '正常' : '' };
+}
 function drawAiMoney() {
-  const rate = bill?.saved?.rate || 32;
   $('aim-tiles').replaceChildren(
     ...Object.entries(aim.money).map(([p, m]) => {
-      const t = tile(AI_PROV[p], m.left == null ? '—' : usd(m.left), m.left == null ? '還沒輸入餘額' : `≈ NT$${Math.round(m.left * rate).toLocaleString()} · ${m.days == null ? '這 7 天沒用' : `還能用 ${m.days.toLocaleString()} 天`} · ${ago(m.typed.at)}輸入 ${usd(m.typed.usd)}`);
+      const t = tile(AI_PROV[p], m.left == null ? '—' : nt(m.left), m.left == null ? '還沒輸入餘額' : `${usd(m.left)} · ${m.days == null ? '這 7 天沒用' : `照這週的速度還能用 ${m.days.toLocaleString()} 天`} · ${ago(m.typed.at)}輸入`);
       if (m.tone) t.classList.add(m.tone === 'bad' ? 'bad' : 'warn');
       return t;
     })
   );
-  const rows = Object.entries(aim.month.features).sort((a, b) => b[1].usd - a[1].usd);
-  $('aim-feat').tBodies[0].replaceChildren(
-    ...(rows.length
-      ? rows.map(([f, v]) => {
-          const h = aim.health[f] || {};
-          const sick = h.failToday > 0 || (h.n > 4 && h.backup / h.n > 0.2);
-          return el('tr', {}, [el('td', { text: AI_FEATURES[f] || f, class: sick ? 'neg' : '' }), el('td', { class: 'right', text: v.n.toLocaleString() }), el('td', { class: 'right', text: `NT$${(Math.round(v.usd * rate * 10) / 10).toLocaleString()}` }), el('td', { class: 'right muted', text: v.n ? `NT$${(Math.round((v.usd * rate * 100) / v.n) / 100).toLocaleString()}` : '—' }), el('td', { class: 'right muted', text: `${secs(h.mid)} / ${secs(h.slow)}${h.failToday ? ` · 失敗 ${h.failToday}` : ''}` }), el('td', { class: 'muted', text: modelsText(h.models) })]);
-        })
-      : [el('tr', {}, [el('td', { colspan: '6', class: 'muted', text: '這個月還沒有 AI 呼叫。' })])])
-  );
+  if (document.activeElement !== $('aim-rate')) $('aim-rate').value = String(rateNow());
+  const month = aim.month.features || {};
+  const health = aim.health || {};
+  const row = (f, v) => {
+    const h = health[f];
+    const st = aiState(h);
+    const facts = [`本月 ${(v?.n || 0).toLocaleString()} 次`, v?.n ? `每次 ${nt(v.usd / v.n)}` : '', h?.mid != null ? `${secs(h.mid)} / ${secs(h.slow)}` : '', h?.models && Object.keys(h.models).length ? modelsText(h.models) : ''].filter(Boolean).join(' · ');
+    return el('li', { class: 'feat' }, [
+      el('div', {}, [el('span', { text: AI_FEATURES[f] || f }), el('small', { text: facts }), st.tone || (st.text && st.text !== '正常') ? el('small', { class: st.tone === 'bad' ? 'neg' : st.tone === 'warn' ? 'warnt' : '', text: st.text }) : null]),
+      el('span', { class: 'v', text: v?.usd ? nt(v.usd) : '—' })
+    ]);
+  };
+  const head = (name, right, tone = '') => el('li', { class: 'grp' }, [el('strong', { text: name }), el('span', { class: `v ${tone}`, text: right })]);
+  const rows = [];
+  const idle = [];
+  const shown = new Set();
+  // Each app's AI (its cap's features, kit DEV `ai*`): a head with today's count against its cap and the month's cost.
+  for (const [key, d] of Object.entries(DEV).filter(([, d]) => d.ai)) {
+    const used = d.ai.filter(f => month[f]?.n || health[f]?.n || health[f]?.failToday);
+    d.ai.forEach(f => shown.add(f));
+    const a = (aiToday || []).find(x => x.key === key);
+    const today = a ? a.days[6] : 0;
+    // (An app whose AI nobody used this month and nobody today: one line at the end, not a block each.)
+    if (!used.length && !today) {
+      idle.push(d.zh.replace(/（.*）$/, ''));
+      continue;
+    }
+    const tone = a ? aiTone(a) : '';
+    const sum = used.reduce((n, f) => n + (month[f]?.usd || 0), 0);
+    const todayText = a ? (a.cap ? `今天 ${today.toLocaleString()} / ${a.cap.toLocaleString()}${tone === 'bad' ? '・用完了' : ''}` : '已暫停') : '';
+    rows.push(head(d.zh.replace(/（(.*)）$/, ' · $1'), [todayText, sum ? `本月 ${nt(sum)}` : ''].filter(Boolean).join('　'), tone === 'bad' ? 'neg' : tone === 'slow' ? 'warnt' : ''));
+    rows.push(...used.map(f => row(f, month[f])));
+  }
+  // Anything no cap names, by its name; ours (tests and comparisons), one line.
+  const ours = Object.keys(month).filter(AI_OURS);
+  const stray = [...new Set([...Object.keys(month), ...Object.keys(health)])].filter(f => !shown.has(f) && !AI_OURS(f));
+  if (stray.length) rows.push(head('其他', ''), ...stray.map(f => row(f, month[f])));
+  if (ours.length) {
+    const n = ours.reduce((x, f) => x + month[f].n, 0), u = ours.reduce((x, f) => x + month[f].usd, 0);
+    rows.push(head('管理用的測試與比較', `本月 ${n.toLocaleString()} 次・${nt(u)}`));
+  }
+  if (idle.length) rows.push(el('li', { class: 'idle', text: `這個月還沒人用：${idle.join('、')}` }));
+  $('aim-feat').replaceChildren(...rows);
 }
 async function loadAiMoney() {
   $('aim-error').textContent = '';
   try {
-    aim = await admin('ai');
+    [aim] = await Promise.all([admin('ai'), usageNow().then(u => (aiToday = u.ai || []), () => null)]);
     drawAiMoney();
   } catch (e) {
     $('aim-error').textContent = e.message;
@@ -2689,11 +2609,24 @@ $('aim-save').onclick = () =>
   busy($('aim-save'), async () => {
     $('aim-error').textContent = $('aim-ok').textContent = '';
     const v = Number($('aim-usd').value);
-    if (!$('aim-usd').value || !(v >= 0)) return ($('aim-error').textContent = '輸入該家現在的餘額（US$）。');
+    if (!$('aim-usd').value || !(v >= 0)) return ($('aim-error').textContent = '輸入該家頁面上現在的餘額（US$）。');
     try {
       await admin('ai-set', { provider: $('aim-prov').value, usd: v });
       $('aim-usd').value = '';
-      $('aim-ok').textContent = `已儲存：${AI_PROV[$('aim-prov').value]} 從現在起由 ${usd(v)} 扣掉之後的花費。`;
+      $('aim-ok').textContent = `已儲存：${AI_PROV[$('aim-prov').value]} 從現在起由 ${usd(v)}（約 ${nt(v)}）扣掉之後的花費。`;
+      await loadAiMoney();
+    } catch (e) {
+      $('aim-error').textContent = e.message;
+    }
+  });
+$('aim-rate-save').onclick = () =>
+  busy($('aim-rate-save'), async () => {
+    $('aim-error').textContent = $('aim-ok').textContent = '';
+    const v = Number($('aim-rate').value);
+    if (!(v >= 10 && v <= 100)) return ($('aim-error').textContent = '匯率是 1 美元換幾元新台幣，例如 32。');
+    try {
+      await admin('ai-set', { rate: v });
+      $('aim-ok').textContent = `匯率已儲存：1 US$ = NT$${v}。`;
       await loadAiMoney();
     } catch (e) {
       $('aim-error').textContent = e.message;
