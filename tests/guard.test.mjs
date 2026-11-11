@@ -32,7 +32,7 @@ test('judge: any count at 90% of the plan is over', () => {
 // A fake Cloudflare: analytics answering `use`, the Workers' addresses and crons.
 function fakeCf(use, { cpuField = true, fail = false, d1Fail = false } = {}) {
   const seen = new Set();
-  const workers = Object.fromEntries(WORKERS.map(w => [w, { on: true, crons: w === 'sports-proxy' ? ['* * * * SUN'] : ['*/2 * * * *', '1-59/2 * * * *'] }]));
+  const workers = Object.fromEntries(WORKERS.map(w => [w, { on: true, crons: w === 'orbit-site' ? ['* * * * SUN'] : ['*/2 * * * *', '1-59/2 * * * *'] }]));
   const calls = [];
   const domains = [];
   const routes = [];
@@ -48,7 +48,7 @@ function fakeCf(use, { cpuField = true, fail = false, d1Fail = false } = {}) {
       const once = kind => (seen.has(kind) ? {} : (seen.add(kind), use));
       if (q.includes('workersInvocationsAdaptive')) {
         const piece = once('w');
-        return acc({ w: [{ sum: { requests: piece.requests || 0, cpuTimeUs: (piece.cpuMs || 0) * 1000 }, quantiles: { cpuTimeP99: 5000 }, dimensions: { scriptName: 'sports-proxy' } }] });
+        return acc({ w: [{ sum: { requests: piece.requests || 0, cpuTimeUs: (piece.cpuMs || 0) * 1000 }, quantiles: { cpuTimeP99: 5000 }, dimensions: { scriptName: 'orbit-workers-proxy' } }] });
       }
       if (q.includes('kvOperationsAdaptiveGroups')) return acc({ x: [{ sum: { requests: once('kv').kvWrite || 0 }, dimensions: { actionType: 'write' } }] });
       if (q.includes('durableObjectsInvocationsAdaptiveGroups')) return acc({ x: [{ sum: { requests: once('do').doRequests || 0 } }] });
@@ -105,7 +105,7 @@ test('under the plan: nothing stopped, the bill kept for the panel', async () =>
   assert.equal(s.stopped, undefined);
   assert.equal(s.use.requests, 2_000_000);
   assert.equal(s.use.cpuMs, 4_000_000);
-  assert.ok(cf.workers['sports-proxy'].on);
+  assert.ok(cf.workers['orbit-site'].on);
   assert.ok(JSON.parse(kv.m.get(STATE_KEY)).armed);
 });
 
@@ -118,23 +118,23 @@ test('at 90% of a count: both proxies off the air, crons kept; back on when the 
     assert.equal(cf.workers[w].on, false);
     assert.deepEqual(cf.workers[w].crons, []);
   }
-  // A deploy turns sports-proxy's address back on: off again the next run.
-  cf.workers['sports-proxy'].on = true;
-  cf.workers['sports-proxy'].crons = ['* * * * SUN'];
+  // A deploy turns orbit-site's address back on: off again the next run.
+  cf.workers['orbit-site'].on = true;
+  cf.workers['orbit-site'].crons = ['* * * * SUN'];
   const cf2 = fakeCf({ requests: 9_200_000 });
-  cf2.workers['sports-proxy'] = cf.workers['sports-proxy'];
+  cf2.workers['orbit-site'] = cf.workers['orbit-site'];
   cf2.workers['orbit-workers-proxy'] = cf.workers['orbit-workers-proxy'];
   await guardRun(env, { fetcher: cf2.fetcher, kv, now: T('2026-10-30T00:05:00Z') });
-  assert.equal(cf.workers['sports-proxy'].on, false);
+  assert.equal(cf.workers['orbit-site'].on, false);
   // The new period: the counts start again, the addresses and crons come back.
   const cf3 = fakeCf({ requests: 1000 });
-  cf3.workers['sports-proxy'] = cf.workers['sports-proxy'];
+  cf3.workers['orbit-site'] = cf.workers['orbit-site'];
   cf3.workers['orbit-workers-proxy'] = cf.workers['orbit-workers-proxy'];
   const back = await guardRun(env, { fetcher: cf3.fetcher, kv, now: T('2026-11-13T00:05:00Z') });
   assert.equal(back.stopped, null);
-  assert.ok(cf.workers['sports-proxy'].on && cf.workers['orbit-workers-proxy'].on);
+  assert.ok(cf.workers['orbit-site'].on && cf.workers['orbit-workers-proxy'].on);
   assert.deepEqual(cf.workers['orbit-workers-proxy'].crons, ['*/2 * * * *', '1-59/2 * * * *']);
-  assert.deepEqual(cf.workers['sports-proxy'].crons, ['* * * * SUN']);
+  assert.deepEqual(cf.workers['orbit-site'].crons, ['* * * * SUN']);
 });
 
 test('still over in the same period: stays stopped', async () => {
@@ -170,7 +170,7 @@ test('the bill unreadable for 6 hours while armed: stopped (never watched blind)
   assert.ok(!s.stopped);
   s = await guardRun(env, { fetcher: cf.fetcher, kv, now: t0 + BLIND_MS + 60_000 });
   assert.deepEqual(s.stopped.why, ['blind']);
-  assert.equal(cf.workers['sports-proxy'].on, false);
+  assert.equal(cf.workers['orbit-site'].on, false);
 });
 
 test('the plan\'s amounts are the $5 plan\'s (developers.cloudflare.com, 2026-10-13)', () => {
@@ -215,15 +215,15 @@ test('the guard\'s clock: a wake starts it once; each alarm runs the guard and s
   assert.equal(JSON.parse(kv.m.get(STATE_KEY)).armed, false, 'the guard ran (unarmed here)');
 });
 
-test('a Worker that is gone (the old sports-proxy, deleted) never keeps the proxy stopped', async () => {
+test('a Worker that is not there (orbit-site without a domain) never keeps the proxy stopped', async () => {
   const cf = fakeCf({ requests: 9_100_000 });
-  delete cf.workers['sports-proxy'];
+  delete cf.workers['orbit-site'];
   const kv = fakeKv();
   const s = await guardRun(env, { fetcher: cf.fetcher, kv, now: T('2026-10-30T00:00:00Z') });
   assert.equal(cf.workers['orbit-workers-proxy'].on, false);
   assert.ok(!s.acts.some(a => a.includes('failed')));
   const cf2 = fakeCf({ requests: 1000 });
-  delete cf2.workers['sports-proxy'];
+  delete cf2.workers['orbit-site'];
   cf2.workers['orbit-workers-proxy'] = cf.workers['orbit-workers-proxy'];
   const back = await guardRun(env, { fetcher: cf2.fetcher, kv, now: T('2026-11-13T00:05:00Z') });
   assert.equal(back.stopped, null);

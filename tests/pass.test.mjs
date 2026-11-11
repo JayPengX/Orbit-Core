@@ -45,3 +45,8 @@ test('the family page (site/index.html) links where the kit does: regenerate it 
   const links = [...page.matchAll(/class="app" href="([^"]+)"/g)].map(m => m[1]).sort();
   assert.deepEqual(links, Object.keys(kit.APPS).map(brand.shortPathOf).sort());
 });
+
+test('/pass and /key pick the language by one rule (kit detectLang: Chinese for a phone in any Chinese, else English)', () => {
+  const rule = page => /navigator\.languages\?\.length\?navigator\.languages:\[navigator\.language\|\|'zh-TW'\];l=n\.some\(x=>\/\^zh\/i\.test\(x\)\)\?'zh':'en'/.test(page);
+  for (const f of ['../site/index.html', '../site/key/index.html']) assert.ok(rule(readFileSync(new URL(f, import.meta.url), 'utf8')), f);
+});

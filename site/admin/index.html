@@ -237,7 +237,6 @@
   .twocol > * { min-width: 0; }
   .twocol:has(> [hidden]) { grid-template-columns: 1fr !important; }
   @media (min-width: 760px) { .twocol { grid-template-columns: 1fr 1fr; align-items: start; } }
-  .prices { display: grid; gap: 8px; margin-top: 10px; }
   .price { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--q-surface-2); }
   .price strong { font-size: 14px; }
   .price .boxes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
@@ -741,7 +740,7 @@ async function admin(action, extra = {}) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const code = data?.error?.code || data?.code || data?.error || `HTTP ${res.status}`;
-    throw new Error(WHY[code] || `出錯了：${code}`);
+    throw Object.assign(new Error(WHY[code] || `出錯了：${code}`), { code });
   }
   return data;
 }
@@ -1740,7 +1739,9 @@ async function giftSet(extra = {}) {
   $('gift-error').textContent = '';
   $('gift-save').disabled = true;
   try {
-    const out = await admin('gift-set', { total: Number($('gift-total').value) || 0, opens: fromLocal($('gift-opens').value), closes: fromLocal($('gift-closes').value), rate: Number($('gift-rate').value) || 20, hold: Number($('gift-hold').value) || 0, ...extra });
+    // (A number left empty is left as it was: never saved as 0.)
+    const count = id => ($(id).value.trim() === '' ? undefined : Number($(id).value));
+    const out = await admin('gift-set', { total: count('gift-total'), opens: fromLocal($('gift-opens').value), closes: fromLocal($('gift-closes').value), rate: count('gift-rate'), hold: count('gift-hold'), ...extra });
     drawGift(out.gift, out.empty);
   } catch (e) {
     $('gift-error').textContent = e.message;
@@ -2334,7 +2335,7 @@ const BILL_NAME = { requests: 'Workers 請求', cpuMs: 'Workers CPU', kvRead: 'K
 const PACE_WORD = ['照設定', '放慢 ×2，可以等的建置暫停', '放慢 ×4，建置全停，每個人讀取減半', '放慢 ×8，讀取剩四分之一，先顧基本功能：新的人先等'];
 // ---- 錯誤 (eco-admin.js errors): each Worker's in 24 hours, the proxy's by route ----
 const STATUS_ZH = { scriptThrewException: '程式出錯', exceededResources: '超過資源上限', exceededCpu: '超過 CPU', exceededMemory: '超過記憶體', internalError: 'Cloudflare 內部錯誤', responseStreamDisconnected: '回應中斷' };
-const WORKER_ZH = { 'orbit-workers-proxy': '代理（api）', 'orbit-site': '網站（jaypengx.com）', 'sports-proxy': 'Sports 代理' };
+const WORKER_ZH = { 'orbit-workers-proxy': '代理（api）', 'orbit-site': '網站（jaypengx.com）' };
 const errRate = w => (w.requests ? w.errors / w.requests : 0);
 const errTone = w => (errRate(w) > 0.05 ? 'bad' : errRate(w) > 0.005 ? 'slow' : '');
 // The worst of it, for the 錯誤 cell: [tone, words].
@@ -2555,7 +2556,7 @@ $('links').replaceChildren(...LINKS.map(([n, href]) => el('a', { href, target: '
 // (Google Maps and Weather run inside their free months, stopped by the proxy at 90%: their
 // counts are 撐得住多少人's rows, no bill to show. Gemini is a prepaid AI like the others.)
 const AI_PROV = { anthropic: 'Claude', openai: 'GPT', google: 'Gemini' };
-const AI_FEATURES = { 'law-chat': '問法律', 'law-ask': '白話解釋', 'money-read': '拍照記帳', gemini: '課表照片匯入', 'nl-edit': '課表 AI 修改', 'money-say': '用說的記帳', 'money-ask': '問我的帳', 'money-month': '每月回顧', 'words-check': '檢查我的句子', 'words-cards': '例句與記憶法', 'words-photo': '拍一頁變單字卡', 'words-chat': '用新字聊天', 'sports-recap': '賽後三句話', 'f1-story': 'F1 賽後故事', 'sports-ask': '問比賽', 'transit-notice': '通告讀成路線', 'transit-say': '用說的查路線', 'news-lines': '一句話與標題', 'news-sides': '各方怎麼說', 'weather-ask': '問天氣', 'class-book': '拍聯絡簿', 'class-ask': '問我的課表', 'class-plan': '考前讀書計畫', 'class-news': '學校公告', 'law-contract-read': '拍合約（讀）', 'law-contract': '拍合約幫你看', 'law-minutes': '會議紀錄變表格', 'law-weekly': '法案週報', 'sec-filing': '重大訊息白話', 'sec-say': '用說的下單', 'sec-lesson': '交易學到什麼', 'beats-say': '用說的做節奏', 'orbit-ask': 'Orbit 助理', 'showcase-ask': '問 Orbit（Showcase）', 'rec-weekly': '除錯週報' };
+const AI_FEATURES = { 'law-chat': '問法律', 'law-ask': '白話解釋', 'money-read': '拍照記帳', gemini: '課表照片匯入', 'nl-edit': '課表 AI 修改', 'money-say': '用說的記帳', 'money-ask': '問我的帳', 'money-month': '每月回顧', 'words-check': '檢查我的句子', 'words-cards': '例句與記憶法', 'words-photo': '拍一頁變單字卡', 'words-chat': '用新字聊天', 'sports-recap': '賽後三句話', 'f1-story': 'F1 賽後故事', 'sports-ask': '問比賽', 'transit-say': '用說的查路線', 'news-lines': '一句話與標題', 'news-sides': '各方怎麼說', 'weather-ask': '問天氣', 'class-book': '拍聯絡簿', 'class-ask': '問我的課表', 'class-plan': '考前讀書計畫', 'class-news': '學校公告', 'law-contract-read': '拍合約（讀）', 'law-contract': '拍合約幫你看', 'law-minutes': '會議紀錄變表格', 'law-weekly': '法案週報', 'sec-filing': '重大訊息白話', 'sec-lesson': '交易學到什麼', 'beats-say': '用說的做節奏', 'orbit-ask': 'Orbit 助理', 'showcase-ask': '問 Orbit（Showcase）', 'rec-weekly': '除錯週報' };
 // (Calls of ours, never a person's: the panel's own checks, ops ai-try's examples (`x~try`), the model comparisons.)
 const AI_OURS = f => f === 'check' || f === 'compare' || f === 'ai-try' || /~try$/.test(f);
 const MODEL_NAMES = { 'claude-sonnet-5-5': 'Sonnet', 'claude-haiku-5-5': 'Haiku', 'gpt-6.1-sol': 'GPT Sol', 'gpt-6-luna': 'Luna', 'gemini-3.6-flash': 'Flash', 'gemini-3.7-flash': 'Flash', 'gemini-3.5-flash-lite': 'Flash-Lite' };
@@ -2677,7 +2678,13 @@ $('aim-rate-save').onclick = () =>
     }
   });
 
-if (token) open();
+// A saved key is checked again as a new one is (it may have been changed
+// since): a key turned away shows the gate, any other failure opens anyway.
+if (token)
+  admin('wallets').then(open, e => {
+    if (e.code !== 'FORBIDDEN') return open();
+    $('gate-error').textContent = e.message;
+  });
 </script>
 </body>
 </html>

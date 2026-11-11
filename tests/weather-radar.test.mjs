@@ -121,5 +121,7 @@ test('the notice: when, how hard and until when, in words; drizzle or more than 
   assert.match(say(now + 15 * MIN, null, 12).body, /至少下到 22:00，晚點再出門/);
   assert.equal(say(now + 15 * MIN, now + 45 * MIN, 0.8), null, 'a drizzle');
   assert.equal(say(now + 70 * MIN, null, 5), null, 'past the hour: asked again later');
+  const en = radarNotice({ kind: 'start', from: now + 20 * MIN, to: now + 50 * MIN, peak: 2, until: now + 110 * MIN }, now, 'Asia/Taipei', 'en');
+  assert.ok(!/[\u4e00-\u9fff]/.test(en.title + en.body), en.title + en.body);
   assert.equal(radarNotice({ kind: 'now', from: now, to: null, peak: 5, until: now }, now), null, 'already raining: no 快下雨了');
 });

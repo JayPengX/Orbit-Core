@@ -352,7 +352,7 @@ export async function handlePush(request, env, headers, session, path) {
 // ---- Checks: news the Worker finds out itself --------------------------------
 
 export async function runCheck(check, lang, env) {
-  if (check.weather) return weatherCheck(env, check.weather);
+  if (check.weather) return weatherCheck(env, check.weather, { lang: lang === 'en' ? 'en' : 'zh' });
   if (check.bus) {
     const got = await tdxGet(env, check.bus.path);
     // (A copy kept while TDX fails says where the bus was minutes ago: never told from, the alert kept for a fresh one.)
