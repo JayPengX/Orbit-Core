@@ -17,7 +17,7 @@ import { aiOnce } from '../ai.js';
 import { NEWS_PATH } from './news.js';
 
 export const MARKETS_PATH = 'news/markets.json';
-const MEMORY = 'private/news/markets.json';
+const MEMORY = 'private/news/markets.v2.json';
 const LINES = 'news/lines.json';
 const GAMMA = 'https://gamma-api.polymarket.com/events';
 // Polymarket's sections whose markets stories can be about (50 each, busiest first).
@@ -179,7 +179,8 @@ const strong = (text, at, share) => at(text.title) || (text.heads.length > 0 && 
 // with one thing more, or two broad names. The AI confirms what passes.
 export function fitOf(text, about) {
   const names = about.names.filter(n => strong(text, t => nameAt(t, n), 1 / 3));
-  if (about.must.some(n => !names.includes(n))) return 0;
+  // (The question's own sharp names in the story's title: a story of 苗栗's debate that names 台中 inside isn't 台中's race.)
+  if (about.must.some(n => !nameAt(text.title, n))) return 0;
   // (A name no table knows, in an English story's words: "Alice Huang" isn't Jensen Huang.)
   if (!text.cjk && about.unknown.some(w => !strong(text, t => enHas(t.en, w.toLowerCase()), 1 / 4))) return 0;
   const asks = about.concepts[0];
@@ -209,23 +210,24 @@ export function candidates(stories, events, lines = {}) {
 }
 
 // ---- What a story shows ----
-// A deadline's label (December 31, March 31, 2027) as M/D (or Y/M/D), null if it isn't one.
-export function deadline(label) {
+// A deadline's label (December 31, March 31, 2027) as M/D (or Y/M/D past this year), null if it isn't one.
+export function deadline(label, now = Date.now()) {
   const m = String(label || '').match(/^(?:by\s+)?([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:,?\s+(\d{4}))?$/i);
   const mo = m ? MONTHS.indexOf(m[1].slice(0, 3).toLowerCase()) + 1 : 0;
   if (!mo || +m[2] < 1 || +m[2] > 31) return null;
-  return m[3] ? `${m[3]}/${mo}/${+m[2]}` : `${mo}/${+m[2]}`;
+  const year = new Date(now + 8 * 3_600_000).getUTCFullYear();
+  return m[3] && +m[3] !== year ? `${m[3]}/${mo}/${+m[2]}` : `${mo}/${+m[2]}`;
 }
 // Party names as Taiwan writes them (an outcome that's a party).
 const PARTIES = { KMT: '國民黨', DPP: '民進黨', TPP: '民眾黨', Republicans: '共和黨', Republican: '共和黨', Democrats: '民主黨', Democratic: '民主黨', Labour: '工黨', Conservatives: '保守黨', Other: '其他', Independent: '無黨籍' };
 const round = (x, n = 3) => Math.round(x * 10 ** n) / 10 ** n;
 
 // The event as a story shows it: one chance; chances by deadline; or the leading outcomes.
-export function shownEvent(ev, words) {
+export function shownEvent(ev, words, now = Date.now()) {
   const ms = ev.markets;
   const base = { e: ev.id, slug: ev.slug, zh: words.zh, en: words.en };
   if (ms.length === 1) return { ...base, kind: 'yes', rows: [{ p: round(ms[0].p), d: round(ms[0].d) }] };
-  const dates = ms.map(m => deadline(m.label));
+  const dates = ms.map(m => deadline(m.label, now));
   if (dates.every(Boolean))
     return {
       ...base,
@@ -300,7 +302,7 @@ export async function runNewsMarkets({ store, env, ctx = null, cap = async () =>
   for (const { s, ev } of found) {
     const k = `${s.id}|${ev.id}`;
     if (!pairs[k]?.ok || !words[ev.id] || (out[s.id]?.length || 0) >= MOST) continue;
-    const shown = shownEvent(ev, words[ev.id]);
+    const shown = shownEvent(ev, words[ev.id], now);
     if (shown) (out[s.id] ||= []).push(shown);
   }
   // (Memory of stories still on the front only; a market's words while it's open.)

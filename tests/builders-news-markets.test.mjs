@@ -45,6 +45,12 @@ test('a name no table knows must be in an English story’s words: Alice Huang i
   assert.equal(fitOf(storyText(s), aboutEvent(evs[1])), 0);
 });
 
+test('a race’s place must be in the story’s title: 苗栗’s debate naming 台中 inside isn’t 台中’s race', () => {
+  const TAICHUNG = trimEvent(event('5', 'Taichung Mayor Election Winner', ['Taiwan', 'Taiwan Elections'], [market('Johnny Chiang', 0.8), market('Ho Hsin-chun', 0.2)]), NOW);
+  const s = tw('f', '苗栗縣長選舉公辦政見會19日首登場', ['苗栗縣長選舉政見會', '台中市長選舉政見會也將登場', '台中市長選戰 江啟臣']);
+  assert.equal(fitOf(storyText(s), aboutEvent(TAICHUNG)), 0);
+});
+
 test('Taipei’s race and New Taipei’s are never each other’s', () => {
   const taipei = tw('d', '台北市長選戰／沈伯洋提市民大道縫合', ['台北市長選戰 蔣萬安回應', '北市選戰 沈伯洋政見']);
   const newTaipei = tw('e', '新北市長選戰 李四川拚勝選', ['新北選戰民調 李四川領先', '蘇巧慧搶年輕票 新北市長選舉']);
@@ -53,10 +59,11 @@ test('Taipei’s race and New Taipei’s are never each other’s', () => {
 
 test('deadlines read as dates; a ladder by deadline, a race by its leaders', () => {
   assert.equal(deadline('December 31'), '12/31');
-  assert.equal(deadline('March 31, 2027'), '2027/3/31');
+  assert.equal(deadline('March 31, 2027', NOW), '2027/3/31');
+  assert.equal(deadline('November 30, 2026', NOW), '11/30', 'this year’s needs no year');
   assert.equal(deadline('Chiang Wan-an'), null);
   const words = { zh: '黃仁勳何時宣布卸任？', en: 'When will Jensen Huang step down?', names: {} };
-  const ladder = shownEvent(evs[0], words);
+  const ladder = shownEvent(evs[0], words, NOW);
   assert.equal(ladder.kind, 'dates');
   assert.deepEqual(ladder.rows.map(r => [r.md, r.p]), [['12/31', 0.12], ['2027/3/31', 0.2]]);
   const race = shownEvent(evs[2], { zh: '台北市長誰會當選？', en: 'Who will win Taipei mayor?', names: { 'Chiang Wan-an': '蔣萬安' } });
@@ -68,7 +75,7 @@ test('the page: only pairs the AI confirmed, at today’s prices; nothing asked 
   const story = tw('a', '傳輝達董事會擬撤換黃仁勳', ['輝達董事會深夜討論黃仁勳去留', '黃仁勳恐丟工作 6票就能撤換']);
   const files = new Map([
     ['news/index.json', { tw: [{ ...story, topics: ['tech'] }], intl: [] }],
-    ['private/news/markets.json', { pairs: { 'a|1': { ok: 1, m: 2, at: NOW } }, words: { 1: { zh: '黃仁勳何時宣布卸任？', en: 'When will Jensen Huang step down?', names: {} } } }]
+    ['private/news/markets.v2.json', { pairs: { 'a|1': { ok: 1, m: 2, at: NOW } }, words: { 1: { zh: '黃仁勳何時宣布卸任？', en: 'When will Jensen Huang step down?', names: {} } } }]
   ]);
   const store = { json: async p => files.get(p) ?? null, put: async (p, d) => (files.set(p, JSON.parse(JSON.stringify(d))), true) };
   const fetchImpl = async url => ({ ok: true, json: async () => (/tag_slug=tech/.test(url) ? [JENSEN, ALICE] : []) });
