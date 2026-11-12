@@ -27,7 +27,7 @@ const claudeEnv = (answer, seen = []) => ({
 test('news: a title in the other language, once a story; no line under it; an old copy with a line made again', async () => {
   const story = (id, m) => ({ id, m, title: `T${id}`, sum: 'x'.repeat(300), items: [['中央社', '標題一'], ['中央社', '標題二'], ['自由時報', '標題三'], ['聯合報', '標題四'], ['ettoday', '標題五']] });
   const f = storyFacts(story('a', 3), 'tw');
-  assert.deepEqual(f, { id: 'a', lang: 'en', heads: ['標題一', '標題三', '標題四'] }, 'an outlet once, three, no summary');
+  assert.deepEqual(f, { id: 'a', lang: 'en', heads: ['Ta', '標題一', '標題三', '標題四'] }, 'its title, then an outlet once, three, no summary');
   assert.equal(storyFacts(story('w', 1), 'intl').lang, 'zh');
   const store = memStore({ 'news/index.json': { tw: [story('a', 3), story('b', 10), story('c', 2)], intl: [] }, 'news/lines.json': { lines: { b: { en: 'Old title', m: 6, t: 'Tb', at: Date.now() - 2 * TITLE_AGAIN }, c: { line: '舊的一句話', zh: '舊', en: 'old', m: 2 }, gone: { en: 'x', m: 1 } } } });
   const seen = [];
