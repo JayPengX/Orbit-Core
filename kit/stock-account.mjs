@@ -989,9 +989,13 @@ export function placeOrder(account, req, { quote, rates, valuation, now = Date.n
         } else return { error: 'creditNeeded' };
       }
       const value = short * quote.price * rates[quote.currency];
-      const owed = valuation.debtTWD + valuation.shortTWD + value;
-      if (!order.credit && !order.dayShort && (valuation.assets + value) / owed < SHORT_INITIAL - EPS) {
-        const room = Math.max(0, (valuation.assets - SHORT_INITIAL * (valuation.debtTWD + valuation.shortTWD)) / (SHORT_INITIAL - 1));
+      // (Outside the credit account: against the rest of the account, as its
+      // maintenance is; an older valuation, the whole account.)
+      const base = valuation.otherAssets ?? valuation.assets;
+      const before = valuation.otherOwed ?? valuation.debtTWD + valuation.shortTWD;
+      const owed = before + value;
+      if (!order.credit && !order.dayShort && (base + value) / owed < SHORT_INITIAL - EPS) {
+        const room = Math.max(0, (base - SHORT_INITIAL * before) / (SHORT_INITIAL - 1));
         return { error: 'shortMargin', max: roundQty(have + room / (quote.price * rates[quote.currency]), quote.kind) };
       }
       order.short = true;
@@ -1585,6 +1589,14 @@ export function valuate(s, quotes, rates) {
   let optShortTWD = 0;
   // The initial margin the risk indicator measures against.
   let futInitTWD = 0;
+  // 整戶擔保維持率, Taiwan's credit account (信用交易): what the broker holds
+  // for 融資 and 融券 over what they owe, the account's cash not counted:
+  //   (融資 shares' value + 融券's deposit and sale money held)
+  //   ÷ (融資金額 + the value of the shares sold by 融券).
+  let creditCover = 0;
+  let creditOwed = 0;
+  let creditLoan = 0;
+  const financedBy = {};
   for (const p of Object.values(s.positions)) {
     const q = quotes?.get?.(p.symbol);
     if (p.kind === 'opt' && p.qty < 0) {
@@ -1645,10 +1657,22 @@ export function valuate(s, quotes, rates) {
     if (p.qty > 0) {
       longTWD += valueTWD;
       collateral += valueTWD * collateralRate(p.kind, p.market, p.symbol);
+      if (p.financed > 0) {
+        // The shares bought with it (融資 shares), not the 現股 beside them.
+        const shares = p.marginQty > 0 ? Math.min(p.qty, p.marginQty) : p.qty;
+        creditCover += price * shares * m * (r ?? 0);
+        creditOwed += p.financed * (r ?? 0);
+        creditLoan += p.financed * (r ?? 0);
+        financedBy[p.currency] = (financedBy[p.currency] || 0) + p.financed;
+      }
     } else {
       shortTWD -= valueTWD;
       feesTWD += fee;
       shortCashTWD += ((p.shortDeposit || 0) + (p.shortHeld || 0) + (p.shortInterest || 0)) * (r ?? 0);
+      if (p.credit) {
+        creditCover += ((p.shortDeposit || 0) + (p.shortHeld || 0)) * (r ?? 0);
+        creditOwed -= valueTWD;
+      }
     }
     out.positions.push({
       ...p,
@@ -1686,7 +1710,19 @@ export function valuate(s, quotes, rates) {
   out.positions.sort((a, b) => Math.abs(b.valueTWD) - Math.abs(a.valueTWD));
   out.cash.sort((a, b) => (a.currency === BASE ? -1 : b.currency === BASE ? 1 : b.twd - a.twd));
   const interestTWD = Object.values(s.loans).reduce((sum, l) => sum + l.interest * (rate(l.currency) ?? 0), 0);
-  const ratio = owed > EPS ? assets / owed : Infinity;
+  // Anything else owed (a loan not tied to a holding, a short outside the
+  // credit account, its borrowing fee) is judged as before, on the rest of
+  // the account (its cash with it); the lower of the two is the account's
+  // ratio. (A 融資 loan's interest is paid when it's repaid, not counted:
+  // what its currency's loan holds past the holdings' 融資金額.)
+  let untied = feesTWD + shortTWD;
+  for (const p of out.positions) if (p.short && p.credit) untied -= Math.abs(p.valueTWD);
+  for (const loan of out.loans) if (!(financedBy[loan.currency] > 0)) untied += loan.twd;
+  const otherAssets = assets - creditCover;
+  const otherOwed = Math.max(0, untied);
+  const creditRatio = creditOwed > EPS ? creditCover / creditOwed : Infinity;
+  const otherRatio = otherOwed > EPS ? otherAssets / otherOwed : Infinity;
+  const ratio = Math.min(creditRatio, otherRatio);
   return {
     ...out,
     cashTWD,
@@ -1728,6 +1764,13 @@ export function valuate(s, quotes, rates) {
     collateral,
     capacity: Math.max(0, collateral - debtTWD - shortTWD * 0.5),
     ratio,
+    creditCover,
+    creditOwed,
+    creditLoan,
+    creditRatio,
+    otherAssets,
+    otherOwed,
+    otherRatio,
     margin: ratio < MARGIN_LIQUIDATE ? 'liquidate' : ratio < MARGIN_CALL ? 'call' : 'ok',
     byKind: groupBy(out.positions.filter(p => !p.short), p => p.kind, cashTWD),
     byCurrency: currencyExposure(s, out.positions, rates)
@@ -1887,12 +1930,28 @@ export function callDeadline(t) {
   }
   return x;
 }
-// NT$ to pay against the loans to bring the ratio back to 166% (補繳金額):
-// paying x takes x off both sides, (assets − x) / (owed − x) = 166%. Only
-// loans can be paid down; a call from shorts beyond that needs buying back.
+// NT$ to pay against the loans to bring the ratio back to 166% (補繳金額).
+// 整戶擔保維持率 counts no cash, so paying x off the 融資 takes x off what's
+// owed alone: cover / (owed − x) = 166%. Anything else owed is judged with
+// the account's cash, so there paying takes x off both sides:
+// (assets − x) / (owed − x) = 166%. Only loans can be paid down; a call
+// from shorts beyond that needs buying back.
 export function callNeed(v) {
   if (!(v.owed > EPS) || v.ratio >= MARGIN_RESTORE) return 0;
-  return Math.max(0, Math.ceil((MARGIN_RESTORE * v.owed - v.assets) / (MARGIN_RESTORE - 1)));
+  if (v.creditRatio == null) return Math.max(0, Math.ceil((MARGIN_RESTORE * v.owed - v.assets) / (MARGIN_RESTORE - 1)));
+  let need = 0;
+  if (v.creditRatio < MARGIN_RESTORE) need += v.creditOwed - v.creditCover / MARGIN_RESTORE;
+  if (v.otherRatio < MARGIN_RESTORE) need += (MARGIN_RESTORE * v.otherOwed - v.otherAssets) / (MARGIN_RESTORE - 1);
+  return Math.max(0, Math.ceil(need - 1e-6));
+}
+// The ratio once `pay` NT$ of cash is paid against the loans (payDown: the
+// 融資 first, then any loan not tied to a holding).
+export function ratioAfter(v, pay) {
+  if (v.creditRatio == null) return v.owed - pay > EPS ? (v.assets - pay) / (v.owed - pay) : Infinity;
+  const toCredit = Math.min(pay, v.creditLoan);
+  const credit = v.creditOwed - toCredit > EPS ? v.creditCover / (v.creditOwed - toCredit) : Infinity;
+  const other = v.otherOwed - (pay - toCredit) > EPS ? (v.otherAssets - pay) / (v.otherOwed - (pay - toCredit)) : Infinity;
+  return Math.min(credit, other);
 }
 // NT$ paid against the loans since a call was issued (補繳): the account's
 // own cash paid in (repay events), not what a sale repaid. Another
