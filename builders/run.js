@@ -13,6 +13,7 @@
 //                then the listed companies' 重大訊息 (filings.js)
 //   :00 :10 :18 :30 :40 :50  Orbit News' stories (every outlet's feed, news.js),
 //                and its site published when News's main moved (newsSite)
+//   :14 :44      預測市場: Polymarket's markets beside the stories they're about (news-markets.js)
 //   :22 daily    15 UTC CPBL's tables and its month whole (23:00 in Taiwan);
 //                16 UTC the season packs (midnight in Taiwan); 18 UTC a few
 //                photo lists in turn (each about weekly); 23 UTC win
@@ -36,6 +37,7 @@ import { runF1Kept } from './f1kept.js';
 import { runNews, newsSite } from './news.js';
 import { runFilings } from './filings.js';
 import { runNewsLaws } from './news-laws.js';
+import { runNewsMarkets } from './news-markets.js';
 import { runAi } from './ai.js';
 
 export const WINPROB_HOUR = 23;
@@ -43,7 +45,7 @@ export const WINPROB_HOUR = 23;
 // `proxy(url, trim)`: a read through the data proxy's route (its trims and edge cache), its JSON or null.
 // One job a run (each run its own 30 s of CPU: the whole hour's work in one
 // went past it, 2026-10-13), each on its own even minute of the hour.
-export const SLOTS = { 0: 'news', 4: 'ai', 6: 'f1kept', 10: 'news', 16: 'watch', 18: 'news', 20: 'cutouts', 22: 'daily', 24: 'ai', 26: 'f1kept', 30: 'news', 34: 'ai', 40: 'news', 46: 'f1kept', 50: 'news', 54: 'ai' };
+export const SLOTS = { 0: 'news', 4: 'ai', 6: 'f1kept', 10: 'news', 14: 'markets', 16: 'watch', 18: 'news', 20: 'cutouts', 22: 'daily', 24: 'ai', 26: 'f1kept', 30: 'news', 34: 'ai', 40: 'news', 44: 'markets', 46: 'f1kept', 50: 'news', 54: 'ai' };
 
 // `proxy(url, trim)`: a read through the data proxy's route (its trims and edge cache), its JSON or null.
 // `pace` (pace.js): at 1 only what phones would miss runs, from 2 nothing
@@ -72,6 +74,7 @@ export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[ne
     await step('newsSite', () => newsSite({ store, env, now }));
     await step('newsLaws', () => runNewsLaws({ store, now }));
   }
+  if (job === 'markets' || only === 'markets') await step('newsMarkets', () => runNewsMarkets({ store, env, cap: aiCap, now }));
   // (f1kept-count: how many are kept, none read.)
   if (job === 'f1kept' || only === 'f1kept' || only === 'f1kept-count') await step('f1kept', () => runF1Kept({ store, proxy, now, ...(only === 'f1kept-count' ? { per: 0 } : {}) }));
   // (By hand, POST /data/build: one of the daily ones now.)

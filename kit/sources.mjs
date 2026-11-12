@@ -88,7 +88,7 @@ export const SOURCES = [
   { id: 'jolpica', zh: 'Jolpica（F1 成績）', group: 'sports', apps: ['match'], feeds: 'F1 成績與積分', hosts: ['api.jolpi.ca'], where: ['worker', 'phone'] },
   { id: 'f1-timing', zh: 'F1 即時計時', group: 'sports', apps: ['match'], feeds: 'F1 即時與賽道圖', hosts: ['livetiming.formula1.com', 'api.multiviewer.app', 'www.formula1.com'], where: ['worker', 'cron'] },
   { id: 'openf1', zh: 'OpenF1', group: 'sports', apps: ['match'], feeds: 'F1 賽段、數據、勝率', hosts: ['api.openf1.org'], where: ['phone', 'worker', 'cron'] },
-  { id: 'polymarket', zh: 'Polymarket', group: 'sports', apps: ['match'], feeds: '預測市場機率', hosts: ['gamma-api.polymarket.com', 'clob.polymarket.com'], where: ['phone', 'worker'] },
+  { id: 'polymarket', zh: 'Polymarket', group: 'sports', apps: ['match', 'news'], feeds: '預測市場機率（比賽、新聞）', hosts: ['gamma-api.polymarket.com', 'clob.polymarket.com'], where: ['phone', 'worker', 'cron'] },
   { id: 'kambi', zh: 'Kambi', group: 'sports', apps: ['match'], feeds: '場中比分', hosts: ['eu-offering-api.kambicdn.com'], where: ['worker'] },
   { id: 'fotmob', zh: 'FotMob', group: 'sports', apps: ['match'], feeds: '足球細節、球員照', hosts: ['www.fotmob.com', 'data.fotmob.com'], where: ['worker', 'cron'] },
   { id: 'tsdb', zh: 'TheSportsDB', group: 'sports', apps: ['match'], feeds: '中職、照片、隊徽', hosts: ['www.thesportsdb.com', 'r2.thesportsdb.com'], where: ['phone', 'relay', 'cron'] },

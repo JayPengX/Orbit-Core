@@ -351,6 +351,7 @@ writing a file only when it changed (`builders/store.js`):
 | `f1kept.js` | each finished F1 session's 數據 and laps, kept early (via the proxy) | :06, :26, :46 |
 | `kept.js` | wipes kept copies (`mirror/`) before a league's first askable day | daily 17:00 |
 | `news.js`, `news-words.js`, `news-laws.js` | `news/index.json` (3 days), `past.json` (weeks): stories by weight, topic, side; `laws.json`: laws named | every 10 min |
+| `news-markets.js` | `news/markets.json`: Polymarket's open markets beside the stories they're about (code finds, AI `news-markets` confirms; no Taiwan vote's in its 10 quiet days) | :14 :44 |
 | `tools/flight-pool.mjs` (`flight.yml`) | `flight/` | 10 min |
 | `ai.js`, `recaps.js`, `previews.js`, `f1story.js`; `filings.js` | AI made once: `news/lines.json`, `sides.json`, `words/cards/`, `sports/` (`recaps/`, `previews/`, `f1/stories/`); 重大訊息 as rows: `stock/filings/` | :04 :24 :34 :54 |
 
