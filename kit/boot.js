@@ -41,17 +41,22 @@
   window.ORBIT_TEST = t;
   var on = [];
   var off = Number(t.clock && t.clock.off) || 0;
-  if (off && window.Reflect) {
+  // (`rate`: the clock running faster from `from` (the real time it started), a trip replayed in less time.)
+  var rate = Number(t.clock && t.clock.rate) || 1;
+  var from = Number(t.clock && t.clock.from) || 0;
+  if ((off || rate !== 1) && window.Reflect) {
     var D = Date;
+    var fake = function () {
+      var n = D.now();
+      return n + off + (rate !== 1 && from ? (rate - 1) * (n - from) : 0);
+    };
     var F = function () {
       var a = Array.prototype.slice.call(arguments);
-      if (!new.target) return new D(D.now() + off).toString();
-      return Reflect.construct(D, a.length ? a : [D.now() + off], new.target);
+      if (!new.target) return new D(fake()).toString();
+      return Reflect.construct(D, a.length ? a : [fake()], new.target);
     };
     F.prototype = D.prototype;
-    F.now = function () {
-      return D.now() + off;
-    };
+    F.now = fake;
     F.parse = D.parse;
     F.UTC = D.UTC;
     F.real = function () {
@@ -60,8 +65,68 @@
     window.Date = F;
     on.push('clock');
   }
+  // (The page told its place is allowed, as it would be.)
+  var granted = function () {
+    var perms = navigator.permissions;
+    if (!perms || !perms.query) return;
+    var query = perms.query.bind(perms);
+    try {
+      perms.query = function (d) {
+        return d && d.name === 'geolocation' ? Promise.resolve({ state: 'granted', name: 'geolocation', onchange: null, addEventListener: function () {}, removeEventListener: function () {} }) : query(d);
+      };
+    } catch (e) {}
+  };
+  // A trip replayed (`feed`: { from, fixes: [[got s, lat, lng, acc, at s]] }, made by an
+  // app's own tool, e.g. Transit's 模擬行程): each fix handed to the page's
+  // watches when the page's clock reaches it, stamped when the device took it
+  // (earlier, for one kept and handed over late), as a phone's GPS does.
+  var feed = t.feed;
+  if (feed && feed.fixes && feed.fixes.length && navigator.geolocation) {
+    var g = navigator.geolocation;
+    var watches = {};
+    var nid = 0;
+    var sent = -1;
+    var asFix = function (x) {
+      return { coords: { latitude: x[1], longitude: x[2], accuracy: x[3], altitude: null, altitudeAccuracy: null, heading: null, speed: null }, timestamp: feed.from + (x[4] != null ? x[4] : x[0]) * 1000 };
+    };
+    var due = function () {
+      var now = Date.now();
+      while (sent + 1 < feed.fixes.length && feed.from + feed.fixes[sent + 1][0] * 1000 <= now) {
+        sent++;
+        for (var id in watches) {
+          try {
+            watches[id](asFix(feed.fixes[sent]));
+          } catch (e) {}
+        }
+      }
+      window.ORBIT_TEST.feedAt = sent + 1;
+    };
+    try {
+      g.watchPosition = function (ok) {
+        var id = ++nid;
+        watches[id] = ok;
+        setTimeout(function () {
+          if (sent >= 0 && watches[id]) ok(asFix(feed.fixes[sent]));
+        }, 50);
+        return id;
+      };
+      g.clearWatch = function (id) {
+        delete watches[id];
+      };
+      g.getCurrentPosition = function (ok, err) {
+        setTimeout(function () {
+          due();
+          if (sent >= 0) ok(asFix(feed.fixes[sent]));
+          else if (err) err({ code: 3, message: 'timeout' });
+        }, 50);
+      };
+    } catch (e) {}
+    setInterval(due, 250);
+    granted();
+    on.push('feed');
+  }
   var p = t.place;
-  if (p && isFinite(p.lat) && isFinite(p.lng) && navigator.geolocation) {
+  if (!feed && p && isFinite(p.lat) && isFinite(p.lng) && navigator.geolocation) {
     var pos = function () {
       return { coords: { latitude: +p.lat, longitude: +p.lng, accuracy: +p.acc || 20, altitude: null, altitudeAccuracy: null, heading: null, speed: null }, timestamp: Date.now() };
     };
@@ -81,15 +146,7 @@
       };
       geo.clearWatch = function () {};
     } catch (e) {}
-    var perms = navigator.permissions;
-    if (perms && perms.query) {
-      var query = perms.query.bind(perms);
-      try {
-        perms.query = function (d) {
-          return d && d.name === 'geolocation' ? Promise.resolve({ state: 'granted', name: 'geolocation', onchange: null, addEventListener: function () {}, removeEventListener: function () {} }) : query(d);
-        };
-      } catch (e) {}
-    }
+    granted();
     on.push('place');
   }
   var net = t.net;
