@@ -17,7 +17,7 @@ import { aiOnce } from '../ai.js';
 import { NEWS_PATH } from './news.js';
 
 export const MARKETS_PATH = 'news/markets.json';
-const MEMORY = 'private/news/markets.v2.json';
+const MEMORY = 'private/news/markets.v3.json';
 const LINES = 'news/lines.json';
 const GAMMA = 'https://gamma-api.polymarket.com/events';
 // Polymarket's sections whose markets stories can be about (50 each, busiest first).
@@ -222,11 +222,24 @@ export function deadline(label, now = Date.now()) {
 const PARTIES = { KMT: '國民黨', DPP: '民進黨', TPP: '民眾黨', Republicans: '共和黨', Republican: '共和黨', Democrats: '民主黨', Democratic: '民主黨', Labour: '工黨', Conservatives: '保守黨', Other: '其他', Independent: '無黨籍' };
 const round = (x, n = 3) => Math.round(x * 10 ** n) / 10 ** n;
 
-// An outcome's name both ways: "X (No Change)" says no change (it was cut at a phone's width), a party as Taiwan writes it.
-export function labelOf(label, names = {}) {
+// An outcome's name both ways: "X (No Change)" says no change (it was cut
+// at a phone's width), else the AI's short labels, a party as Taiwan writes
+// it, or the option as written (a part every option shares left out:
+// "Resigned/removed; Over $4T" beside "…; Under $4T" is Over $4T).
+export function labelOf(label, labels = {}, short = label) {
   if (/\(no change\)$/i.test(label)) return { en: 'No change', zh: '不換人' };
-  const zh = names?.[label] || PARTIES[label];
-  return zh ? { en: label, zh } : { en: label };
+  const l = labels?.[label] || {};
+  const zh = l.zh || PARTIES[label];
+  const en = l.en || short;
+  return zh ? { en, zh } : { en };
+}
+// What tells the options apart: the parts ("; ") all of them share left out.
+export function shortLabels(labels) {
+  const parts = labels.map(l => l.split(/\s*;\s*/));
+  const n = parts[0]?.length || 0;
+  if (n < 2 || parts.some(p => p.length !== n)) return labels;
+  const keep = [...Array(n).keys()].filter(i => parts.some(p => p[i] !== parts[0][i]));
+  return keep.length ? parts.map(p => keep.map(i => p[i]).join('; ')) : labels;
 }
 // The event as a story shows it: one chance; chances by deadline; or the leading outcomes.
 export function shownEvent(ev, words, now = Date.now()) {
@@ -244,14 +257,17 @@ export function shownEvent(ev, words, now = Date.now()) {
         .slice(0, 4)
         .map(({ end, ...r }) => r)
     };
-  const rows = [...ms]
+  const picked = [...ms]
     .filter(m => m.label && m.p >= 0.005)
     .sort((a, b) => b.p - a.p)
-    .slice(0, 4)
-    .map(m => ({ ...labelOf(m.label, words.names), p: round(m.p), d: round(m.d) }));
+    .slice(0, 4);
+  const short = shortLabels(picked.map(m => m.label));
+  let rows = picked.map((m, i) => ({ ...labelOf(m.label, words.labels, short[i]), p: round(m.p), d: round(m.d) }));
+  // (Every row in Chinese or none: never 伊恩·巴克 beside Rene Haas.)
+  if (rows.some(r => !r.zh)) rows = rows.map(({ zh, ...r }) => r);
   return rows.length ? { ...base, kind: 'pick', rows } : null;
 }
-// The outcomes the AI is asked to name in Chinese (a pick's leading four).
+// The outcomes the AI is asked to label (a pick's leading four).
 export const optionsOf = ev => (ev.markets.length > 1 && !ev.markets.every(m => deadline(m.label)) ? [...ev.markets].filter(m => m.label).sort((a, b) => b.p - a.p).slice(0, 4).map(m => m.label) : []);
 
 // A pair as the AI is told it: the story's headlines (an outlet once, five at most) and the market's question.
@@ -264,7 +280,7 @@ export function pairFacts({ s, ev }, line) {
     heads.push(String(title).slice(0, 100));
   }
   if (line?.en && s.region !== 'intl') heads.push(String(line.en).slice(0, 100));
-  return { k: `${s.id}|${ev.id}`, story: heads, market: { q: ev.title, about: ev.about, options: optionsOf(ev).filter(o => !PARTIES[o]) } };
+  return { k: `${s.id}|${ev.id}`, story: heads, market: { q: ev.title, about: ev.about, options: optionsOf(ev) } };
 }
 
 export async function runNewsMarkets({ store, env, ctx = null, cap = async () => 0, now = Date.now(), fetchImpl = fetch, until = now + 4 * 60_000 }) {
@@ -300,7 +316,7 @@ export async function runNewsMarkets({ store, env, ctx = null, cap = async () =>
       if (!a) continue;
       asked++;
       pairs[k] = { ok: a.ok ? 1 : 0, m: x.s.m || 0, at: now };
-      if (a.ok) words[x.ev.id] = { zh: a.zh, en: a.en, names: { ...(words[x.ev.id]?.names || {}), ...a.names } };
+      if (a.ok) words[x.ev.id] = { zh: a.zh, en: a.en, labels: { ...(words[x.ev.id]?.labels || {}), ...a.labels } };
     }
   }
   // The page: each story's confirmed markets, best fit first, at today's prices.
