@@ -890,4 +890,12 @@ test('a whole cell: the hours carry the measured "now", today holds it, the serv
   const today = resp.days.find(d => d.date === twDay(NOW));
   assert.ok(today.hi >= resp.now.temp && today.lo <= resp.now.temp);
   assert.ok(bySource.hours.every(h => 'out' in h));
+  // A day the hours cover whole reads its high and low from them (the day sheet's marks, the 10 days).
+  const whole = resp.days.filter(d => resp.hours.filter(h => twDay(h.t) === d.date && h.temp != null).length >= 22 && d.date !== twDay(NOW));
+  assert.ok(whole.length >= 1);
+  for (const d of whole) {
+    const t = resp.hours.filter(h => twDay(h.t) === d.date).map(h => h.temp);
+    assert.equal(d.hi, Math.max(...t), d.date);
+    assert.equal(d.lo, Math.min(...t), d.date);
+  }
 });
