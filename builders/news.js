@@ -731,6 +731,8 @@ export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lan
 // A story from its headlines: the plainest of its last day's leads (nearest
 // the story's middle, a wire service or public broadcaster a little ahead),
 // so a story that runs for days is led by its latest turn.
+// A video's thumbnail (YouTube's): its words burned in.
+export const THUMB_PIC = /^https?:\/\/(?:i\d?\.ytimg\.com|img\.youtube\.com)\//;
 const STEADY = new Set(['gov', 'public']);
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t.id, t]));
 const twDay = at => new Date(at + 8 * HOUR).toISOString().slice(5, 10);
@@ -783,12 +785,17 @@ export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, i
   const played = clips.map((c, i) => [c, seen[i], i]).sort((a, b) => a[1] - b[1] || a[2] - b[2]).map(x => x[0]);
   clips.splice(0, clips.length, ...played, ...own);
   // (A thumbnail's size, The Guardian's 140 kept from before, only when no other.)
-  const withImg = pics.find(p => p && !SMALL_PIC.test(p[0])) || pics.find(Boolean) || (clips[0]?.[4] && [clips[0][4], clips[0][0]]);
+  // (A photo before a video's thumbnail: a channel's frame carries its words
+  // burned in, 民視's 「6死27傷！」 over 寶林茶室's story, Jay 11-13; a
+  // thumbnail only when no outlet gave a photo.)
+  const photo = p => p && !THUMB_PIC.test(p[0]);
+  const byLook = [...pics.filter(p => photo(p) && !SMALL_PIC.test(p[0])), ...pics.filter(photo), ...pics.filter(p => p && !SMALL_PIC.test(p[0])), ...pics];
+  const withImg = byLook.find(Boolean) || (clips[0]?.[4] && [clips[0][4], clips[0][0]]);
   // Others to show should a phone fail to load it (an outlet that refuses
   // another site its pictures, Jay 11-11): each another outlet's, a clip's last.
   const alts = [];
   const tried = new Set([withImg?.[1]]);
-  for (const p of [...pics.filter(p => p && !SMALL_PIC.test(p[0])), ...pics, ...clips.map(c => c[4] && [c[4], c[0]])]) {
+  for (const p of [...byLook, ...clips.map(c => c[4] && [c[4], c[0]])]) {
     if (alts.length >= ALTS || !p || tried.has(p[1])) continue;
     tried.add(p[1]);
     alts.push(p);

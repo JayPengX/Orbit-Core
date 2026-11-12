@@ -703,3 +703,20 @@ test('a channel\'s clip a little off a big story\'s middle still finds it when o
   assert.ok(s, 'the story');
   assert.deepEqual(s.clips.map(c => c[1]), ['CTI00000001']);
 });
+
+test('a story\'s picture is an outlet\'s photo before a video\'s thumbnail, its words burned in (Jay 11-13: 民視\'s 「6死27傷！」)', () => {
+  const t = '寶林茶室案一審宣判 負責人遭判1年10月';
+  const thumb = 'https://i.ytimg.com/vi/bBaoW8LvY5c/hqdefault.jpg';
+  const items = [
+    { ...item('ftv', t, NOW - H, { img: thumb }), near: 0.95 },
+    item('cts', `${t} 家屬不滿`, NOW - 2 * H, { img: 'https://www.cts.com.tw/a.jpg' }),
+    item('mirror', `${t} 倖存者`, NOW - 3 * H, { img: 'https://mirror.example/b.jpg' })
+  ];
+  const s = storyOf(items, 'tw', NOW);
+  assert.equal(s.img, 'https://www.cts.com.tw/a.jpg');
+  assert.equal(s.imgBy, 'cts');
+  // (The thumbnail last of those to try.)
+  assert.deepEqual(s.alts.map(a => a[1]), ['mirror', 'ftv'].slice(0, ALTS));
+  // (Only a thumbnail to show: it's shown.)
+  assert.equal(storyOf([item('ftv', t, NOW - H, { img: thumb }), item('cts', t, NOW - 2 * H)], 'tw', NOW).img, thumb);
+});
