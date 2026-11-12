@@ -3163,7 +3163,8 @@ dialog.q-moved::backdrop {
   border: 0;
   border-radius: 10px;
   background: none;
-  color: var(--q-accent);
+  /* (Quiet, as the field's own control: an accent word on nothing read as a link, 11-12.) */
+  color: var(--q-label-2);
   font-family: inherit;
   font-size: 14px;
   font-weight: 600;
@@ -3743,6 +3744,10 @@ dialog {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   padding: 2px 14px 12px;
+}
+/* (Four once 傳給 Orbit is there, signed in: two rows of two, not 清除 alone under three, 11-12.) */
+.q-rec-acts:has(> :nth-child(4)) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .q-rec-acts .q-chip {
   justify-content: center;

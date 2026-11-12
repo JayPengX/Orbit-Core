@@ -5939,7 +5939,8 @@ function recRows(s, note) {
   const btn = (label, fn) => node('button', { class: 'q-chip', type: 'button', text: label, onclick: () => fn().catch(() => (note.textContent = T('沒辦法複製', 'Couldn’t copy'))) });
   return node('div', { class: 'q-rows' }, [
     node('div', { class: 'q-notice-row master' }, [
-      node('span', { class: 'q-notice-icon', 'aria-hidden': 'true', text: '🐞' }),
+      // (The kit's tile, as Safari App's row above: the 🐞 emoji was the sheet's only one, 11-12.)
+      tile(icons.history, 'var(--q-red)'),
       node('div', { class: 'q-notice-text' }, [node('strong', { text: T('記錄操作過程', 'Record what the app does') }), sub]),
       toggle(recOn(), T('記錄操作過程', 'Record'), on => {
         setRecOn(on);
