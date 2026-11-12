@@ -221,12 +221,12 @@ export const TOPICS = [
   },
   {
     id: 'def', zh: '國防', en: 'Defense', on: true,
-    zh_: rx('國防|國軍|軍購|軍演|演習|漢光|飛彈|導彈|潛艦|海鯤|戰機|軍機|軍艦|艦艇|航艦|募兵|兵役|義務役|役男|後備|防空|無人機|海巡|軍方|軍人|共諜|間諜|國安|網攻|核武|戰爭|武器|軍售|韌性|全社會防衛'),
+    zh_: rx('國防|國軍|軍購|軍演|演習|漢光|飛彈|導彈|潛艦|海鯤|戰機|軍機|軍艦|艦艇|航艦|募兵|兵役|義務役|役男|後備|防空(?![污汙])|無人機|海巡|軍方|軍人|共諜|間諜|國安(?!基金)|網攻|核武|戰爭|武器|軍售|韌性|全社會防衛'),
     en_: [rxi('military|militar\\w*|Pentagon|Hegseth|troops|soldiers?|army|navy|naval|air force|missiles?|drones?|warships?|nuclear weapons?|nukes?|defen[cs]e|wars?|wartime|airstrikes?|ceasefire|truce|attack\\w*|spy|spies|espionage|intelligence|security|weapons?|arms|terror\\w*|bombs?|bombing|invasion|veterans?')]
   },
   {
     id: 'eco', zh: '經濟', en: 'Economy', on: true,
-    zh_: rx('經濟|GDP|景氣|出口|進口|關稅|貿易|匯率|央行|升息|降息|利率|通膨|物價|油價|電價|水價|薪資|加薪|基本工資|最低工資|勞保|年金|退休金|稅|預算|財政|普發|補助|補貼|振興|紓困|股市|台股|美股|股價|房價|房市|打房|囤房|信用管制|失業|就業|缺工|產業|外資|投資|供應鏈|消費|零售|內需|營收|財報|經濟部|金管會|證交所|銀行|保險|壽險|台幣|美元|漲價|企業|台商|鴻海|侵權|337'),
+    zh_: rx('經濟|GDP|景氣|出口|進口|關稅|貿易|匯率|央行|升息|降息|利率|通膨|物價|油價|電價|水價|薪資|加薪|基本工資|最低工資|勞保|年金|退休金|稅|預算|財政|普發|補助|補貼|振興|紓困|股市|台股|美股|股價|國安基金|護盤|房價|房市|打房|囤房|信用管制|失業|就業|缺工|產業|外資|投資|供應鏈|消費|零售|內需|營收|財報|經濟部|金管會|證交所|銀行|保險|壽險|台幣|美元|漲價|企業|台商|鴻海|侵權|337'),
     en_: [rxi('econom\\w*|tariffs?|trade|trading|inflation|prices?|pricing|Fed|Federal Reserve|interest rates?|rates|jobs|jobless|unemployment|wages?|budget\\w*|tax|taxes|taxpayers?|debt|deficit|stocks?|markets?|Wall Street|recession|GDP|banks?|banking|housing|rent|mortgages?|oil|SNAP|Medicaid|Medicare|Social Security|earnings|profits?|revenue|investors?|investment|billion|trillion|dollar|currency|exports?|imports?|layoffs?|retail|consumers?|spending|costs?|affordab\\w*|insurance|compan(?:y|ies)|business\\w*|industr\\w*|CEO|bonds?|crypto\\w*|bitcoin|auto\\w*|manufactur\\w*')],
     enAt: [rxi('plants?|factor(?:y|ies)')]
   },
@@ -255,7 +255,7 @@ export const TOPICS = [
   // where they'd crowd the front (`weight`), never counted as one-sided.
   {
     id: 'life', zh: '生活', en: 'Life', on: true, spectrum: false,
-    zh_: rx('天氣|氣象|颱風|豪雨|大雨|暴雨|寒流|冷氣團|東北季風|低溫|高溫|熱浪|乾旱|地震|海嘯|停班停課|塞車|車潮|國道|連假|疏運|返鄉|班機|航班|機場|觀光|旅遊|旅客|遊客|火災|火警|大火|起火|爆炸|氣爆|車禍|追撞|相撞|撞死|撞上|翻覆|墜機|墜落|溺水|失蹤|搜救|罹難|停水|垃圾|回收|寵物|流浪狗|流浪貓|動物|外送|菜價|蛋價|房租|超商|百貨|夜市|郵局|垃圾車|天然災害|災情'),
+    zh_: rx('天氣|氣象|颱風|豪雨|大雨|暴雨|寒流|冷氣團|東北季風|低溫|高溫|熱浪|乾旱|地震|海嘯|停班停課|塞車|車潮|國道|連假|疏運|返鄉|班機|航班|機場|觀光|旅遊|旅客|遊客|火災|火警|大火|惡火|起火|爆炸|氣爆|車禍|追撞|相撞|撞死|撞上|翻覆|墜機|墜落|溺水|失蹤|搜救|罹難|停水|垃圾|回收|寵物|流浪狗|流浪貓|動物|外送|菜價|蛋價|房租|超商|百貨|夜市|郵局|垃圾車|天然災害|災情'),
     en_: [rxi('weather|storms?|hurricanes?|typhoons?|tornado\\w*|earthquakes?|tsunami|floods?|flooding|wildfires?|fires?|blaze|heat ?waves?|snow\\w*|blizzard|drought|disasters?|crash\\w*|collision|derail\\w*|accidents?|explosions?|rescue\\w*|travel\\w*|tourism|tourists?|airlines?|flights?|airports?|traffic|holiday\\w*|consumers?|shoppers?|recalls?|pets?|animals?|zoo')]
   },
   {

@@ -215,6 +215,11 @@ test('topics: the sides\' own, and the kinds past them; a game of Pokémon has n
   assert.deepEqual(topicsOf(['日本央行宣布升息'], 'zh'), ['eco', 'world']);
   assert.deepEqual(topicsOf(['外媒指立陶宛要求代表處更名 外交部：無更名計畫'], 'zh'), ['world']);
   assert.ok(topicsOf(['Hurricane aid stalls as FEMA cuts staff'], 'en').includes('soc'));
+  // (11-12: a fire's 防空污 and the stock market's 國安基金 read as 國防.)
+  assert.deepEqual(topicsOf(['新北深夜惡火延燒4廠商 土城、板橋、中和防空污'], 'zh'), ['energy', 'life']);
+  assert.deepEqual(topicsOf(['國安基金進場護盤 法人：還需3條件才能真正止跌'], 'zh'), ['eco']);
+  assert.ok(topicsOf(['國安局揭共諜案'], 'zh').includes('def'));
+  assert.ok(topicsOf(['國軍防空飛彈試射'], 'zh').includes('def'));
   for (const t of TOPICS) assert.ok(t.zh && t.en && t.zh_ instanceof RegExp && t.en_.length, t.id);
   // Not News': a story with no topic isn't listed, however many carry it.
   const game = ['cna', 'ebc', 'tvbs', 'udn'].map((o, i) => item(o, `寶可夢新作預購破百萬套${i}`, NOW - H));
