@@ -132,14 +132,15 @@ export function pickList(items, { title = W('選一個', 'Choose'), current = ''
 }
 
 // A field's value as a button: tapped, the list opens; picked, onChange(id).
-export function picker(items, { value = '', title, empty = W('未選', 'None'), onChange = () => {} } = {}) {
+// `clear`: the list starts with `empty` (id ''), so a pick can be taken back.
+export function picker(items, { value = '', title, empty = W('未選', 'None'), clear = false, onChange = () => {} } = {}) {
   const b = h('button', { type: 'button', class: 'q-picker' });
   const draw = () => {
     const it = items.find(x => x.id === value);
     b.replaceChildren(h('span', { class: it ? '' : 'q-picker-empty', text: it ? it.name : empty }), h('span', { class: 'q-picker-chev', 'aria-hidden': 'true', html: icons.chevron }));
   };
   b.addEventListener('click', async () => {
-    const id = await pickList(items, { title, current: value });
+    const id = await pickList(clear ? [{ id: '', name: empty }, ...items] : items, { title, current: value });
     if (id == null) return;
     value = id;
     draw();
