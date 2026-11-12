@@ -96,7 +96,7 @@ export const HELP = {
         'Security can sign out every other device or change the pass (the old one stops at once, the new one is shown once). Forgot it? Change it on a device that’s still signed in.'
       ]],
       ['money', 'Where the money is', [
-        'The Orbit Pass holds no money. Balance, weekly pay, relief, wealth levels and every entry are in Orbit Securities’ 資金 tab.'
+        'The Orbit Pass holds no money. Balance, weekly pay, relief, wealth levels and every entry are in Orbit Securities’ Money tab.'
       ]]
     ]
   },
@@ -175,11 +175,11 @@ export const HELP = {
       ]],
       ['more', 'Bonds, margin, short selling', [
         'Bonds have a coupon and a maturity, and their price moves against their yield; a purchase pays accrued interest, coupons are paid less the issuer’s withholding, and the face value is repaid at maturity. US Treasuries follow the live yield curve; other countries’ use reference yields.',
-        'Buy on margin by choosing 融資 on the order: the broker lends part of it as it fills, the shares its collateral, and selling repays it first (there’s no borrowing cash on its own). How much is lent is a broker’s: Taiwan 60% listed, 50% OTC (of the trade’s value, the part under NT$1,000 not lent); foreign stocks go through 複委託, cash only: no margin and no short selling; none on crypto, funds or the gold passbook; government bonds 90%, corporate 70%. Interest is added to the loan and paid when it’s repaid or the shares are sold. A holding keeps its own shares (現股) and its margin shares (融資) apart: shares bought on margin are the broker’s collateral, sold only as a margin sale (the money repays the loan first) or turned into your own by repaying in cash; a sale sells your own first. When margin is due, a call isn’t met or there’s no credit account, the broker sells only the margin shares, never your own. Margin shares keep every shareholder right: dividends, meetings and rights issues.',
-        'Margin, 融券 and crypto shorts need a credit account first (Money › Loans); without one, the broker closes any margin or shorts held. To open one: the account 3 months old, 10 trades in the last year, and that year’s turnover at least half the limit; limits of NT$500k, 1M, 2M, 3M or 5M, above 500k with proof of means (net worth 30% of the limit). Taiwan’s 融資 and 融券 each have their own limit. Selling a currency pair borrows nothing and needs no credit account.',
-        'Taiwan margin (融資) and short sales (融券) run six months; within the last month, Extend adds six more. Past due without one, margin shares are sold and shorts bought back. A 融券 short puts up 90% of the sale as a deposit (rounded up to NT$100), and the sale money stays with the broker too, both returned on buying back; it costs a 0.08% fee and no borrow interest, and the deposit and sale money earn 0.2% a year, paid when you buy back. A 融券 position is closed by buying back (or delivering shares you hold), and must be covered before shareholder meetings and ex-dates by the rules. A crypto short: a 3% a year borrow fee, and assets of 150% of what’s owed after opening.',
+        'Buy on margin by choosing Margin on the order: the broker lends part of it as it fills, the shares its collateral, and selling repays it first (there’s no borrowing cash on its own). How much is lent is a broker’s: Taiwan 60% listed, 50% OTC (of the trade’s value, the part under NT$1,000 not lent); foreign stocks go through sub-brokerage (複委託), cash only: no margin and no short selling; none on crypto, funds or the gold passbook; government bonds 90%, corporate 70%. Interest is added to the loan and paid when it’s repaid or the shares are sold. A holding keeps its own shares (Cash, 現股) and its margin shares (Margin, 融資) apart: shares bought on margin are the broker’s collateral, sold only as a margin sale (the money repays the loan first) or turned into your own by repaying in cash; a sale sells your own first. When margin is due, a call isn’t met or there’s no credit account, the broker sells only the margin shares, never your own. Margin shares keep every shareholder right: dividends, meetings and rights issues.',
+        'Margin, short sales and crypto shorts need a credit account first (Money › Loans); without one, the broker closes any margin or shorts held. To open one: the account 3 months old, 10 trades in the last year, and that year’s turnover at least half the limit; limits of NT$500k, 1M, 2M, 3M or 5M, above 500k with proof of means (net worth 30% of the limit). Taiwan margin and short sales each have their own limit. Selling a currency pair borrows nothing and needs no credit account.',
+        'Taiwan margin (融資) and short sales (融券) run six months; within the last month, Extend adds six more. Past due without one, margin shares are sold and shorts bought back. A short sale puts up 90% of the sale as a deposit (rounded up to NT$100), and the sale money stays with the broker too, both returned on buying back; it costs a 0.08% fee and no borrow interest, and the deposit and sale money earn 0.2% a year, paid when you buy back. A short sale is closed by buying back (or delivering shares you hold), and must be covered before shareholder meetings and ex-dates by the rules. A crypto short: a 3% a year borrow fee, and assets of 150% of what’s owed after opening.',
         'Day trading (現股當沖): bought and sold the same day, the sell tax is halved (0.15%, until the end of 2027; only on the shares matched within the day, never odd lots). Either way round needs the account 3 months old with 10 trades in the last year, or a credit account; selling first has a daily day-trade limit (twice net worth, NT$500,000 to NT$50 million) and must be bought back before the close or it’s bought back for you. From 13:25 whole lots go into the closing call auction: limit orders only, matched once at 13:30 at the close. After the close, Taiwan orders placed from 13:40 (odd lots) or 14:00 (whole lots) until 14:30 go to after-hours trading, matched once at 14:30 at the close; unfilled ones are cancelled, and ones sent before their session opens are refused.',
-        'The maintenance ratio (整戶擔保維持率) is the margin shares’ value plus the 融券 deposit and sale money held, over the margin loan plus the shorted shares’ value; cash doesn’t count. Under 130% at the close, it’s a margin call: two business days to bring it back to 166% or pay the amount called in full; still under 130% at the deadline, margin-bought holdings are sold; under 100% they’re sold at once.'
+        'The maintenance ratio (整戶擔保維持率) is the margin shares’ value plus the short-sale deposit and sale money held, over the margin loan plus the shorted shares’ value; cash doesn’t count. Under 130% at the close, it’s a margin call: two business days to bring it back to 166% or pay the amount called in full; still under 130% at the deadline, margin-bought holdings are sold; under 100% they’re sold at once.'
       ]],
       ['save', 'Idle money: cash, deposits, lending', [
         'NT$ in the settlement account earns 0.8% a year, accrued daily and paid on June 21 and December 21.',
@@ -536,7 +536,7 @@ export const HELP = {
         'The map draws the whole trip and shows the step you’re at: close up on a walk, a bike or waiting at the stop, to where you get off once on board; it moves to the next step by itself (started half way too). Every step is listed below; tap one ahead to look at it.',
         'A bus or train step counts down to the second and says how many stops away it is; on board, the stops still to go and when you’ll reach each, with a nudge when yours is next. Tap the countdown to take another departure; miss one and it moves to the next; on a trip to be there by a time, if you won’t make it, it looks for another way in time.',
         'A YouBike station empty or full when you get there: one tap moves you to one nearby. A walk or ride can be handed to Google Maps or Apple Maps. Tap a card’s grip (or swipe it) to fold it for more map.',
-        '⋯ → 編輯行程 adds a stop, takes one off or changes where you’re going; on a bus or train you stay on it and only where you get off changes. Stayed on past your stop, it carries on from the next one; off the ride, it asks whether to plan again from where you are.',
+        '⋯ → Edit trip adds a stop, takes one off or changes where you’re going; on a bus or train you stay on it and only where you get off changes. Stayed on past your stop, it carries on from the next one; off the ride, it asks whether to plan again from where you are.',
         'It never takes the app over: the tabs stay, and it folds to a bar. Swipe the app away and it picks up where it was; it ends by itself when you arrive.'
       ]],
       ['alerts', 'Bus alerts and notices', [
@@ -576,7 +576,7 @@ export const HELP = {
     ],
     en: [
       ['what', 'What Orbit Law is', [
-        'Taiwan’s law on three linked sides: the laws (every article a link), how the courts ruled (the Constitutional Court and the top courts), and what 立法院 is changing. Updated daily from the official sources; what you’ve opened reads offline. Not legal advice: for anything that matters, ask a lawyer or the agency.'
+        'Taiwan’s law on three linked sides: the laws (every article a link), how the courts ruled (the Constitutional Court and the top courts), and what the Legislative Yuan is changing. Updated daily from the official sources; what you’ve opened reads offline. Not legal advice: for anything that matters, ask a lawyer or the agency.'
       ]],
       ['ask', 'Ask the law', [
         'Ask in plain words, say “my landlord won’t return the deposit”. The AI finds the articles, rulings and agency letters that apply and answers from them only: the verdict first, every point cited, a tap on a citation shows the text. Ask on from there.',
@@ -590,7 +590,7 @@ export const HELP = {
         'The Constitutional Court’s every interpretation and judgment, and the Supreme Court’s and Supreme Administrative Court’s rulings, linked from the articles. Each has an AI note: what was decided, why and whom it affects, every point citing its paragraphs.'
       ]],
       ['bills', 'Bills', [
-        'A page a bill: its stage, who proposed it, the comparison table (what changes), the votes and how each party voted. Also the Executive Yuan’s draft notices, legislators by county or party, the agenda and what 立法院 streams now.'
+        'A page a bill: its stage, who proposed it, the comparison table (what changes), the votes and how each party voted. Also the Executive Yuan’s draft notices, legislators by county or party, the agenda and what the Legislative Yuan streams now.'
       ]],
       ['mine', 'Mine', [
         'Starred laws, followed bills and legislators, with a count when something new happens.'
@@ -734,6 +734,20 @@ export const TOURS = {
       ['library', 'Library', ['Kept songs and clips, on this phone; search, sort, rename, share and download.']]
     ]
   },
+  news: {
+    zh: [
+      ['top', '頭條', ['今天的頭條：最重要的幾則左右滑，有照片的、影片、國際和各主題，和只有一邊在報的。每則看得到幾家報、偏綠中間偏藍各幾家，點開是各家的標題並排。']],
+      ['tw', '台灣', ['台灣的每一則，重要的在前，依主題分（左右滑換主題）。國際分頁一樣，位置是偏左、中間、偏右。']],
+      ['side', '單邊', ['三家以上在報、卻只有一邊的媒體在報的新聞，依少報的那一邊分。']],
+      ['outlets', '媒體', ['我的閱讀：近 30 天你點開的新聞，依媒體的位置算成一條；下面是每家媒體的位置，點一家看擁有者和依據。']]
+    ],
+    en: [
+      ['top', 'Top', ['Today’s front page: the lead stories swiped sideways, then pictures, clips, the world’s, each topic’s and the one-sided ones. Each shows how many outlets carry it and how many lean green, centre or blue; open one for every headline side by side.']],
+      ['tw', 'Taiwan', ['Every Taiwan story, most important first, by topic (swipe for the next). World is the same, placed left, centre or right.']],
+      ['side', 'One side', ['Stories three or more outlets carry with only one side carrying them, by the side that left them out.']],
+      ['outlets', 'Outlets', ['Your reading: what you opened in 30 days, counted by where each outlet stands; below, every outlet’s place, a tap for its owner and why.']]
+    ]
+  },
   law: {
     zh: [
       ['home', '首頁', ['一個欄位：打字搜尋法規，或按「問法律」用白話問。下面是試試這樣問（之後是你最近找過的）、繼續閱讀、立法院今天的議程和直播，和生活情境。']],
@@ -744,11 +758,11 @@ export const TOURS = {
       ['ask', '問法律', ['旁邊的圓鈕：用白話問，AI 只用找到的條文回答，每一點都附出處可以點開核對。']]
     ],
     en: [
-      ['home', 'Home', ['One field: type to search the laws, or Ask the law in plain words. Below: questions to try (later, your recent finds), where you were reading, 立法院’s agenda and streams today, and life situations.']],
+      ['home', 'Home', ['One field: type to search the laws, or Ask the law in plain words. Below: questions to try (later, your recent finds), where you were reading, the Legislative Yuan’s agenda and streams today, and life situations.']],
       ['laws', 'Laws', ['Search law names, short names, text or an everyday problem, or browse by life situation and kind.']],
       ['article', 'Reading a law', ['Each law with its text, contents and history; every article it names is a link, and Explain says what one means.']],
       ['rulings', 'Rulings', ['Every Constitutional Court judgment and interpretation, and rulings of the top and lower courts, linked from the articles; an AI note on each says what was decided and why.']],
-      ['bills', 'Bills', ['Bills in 立法院 stage by stage, plus the agenda, draft notices, votes, legislators and the budget.']],
+      ['bills', 'Bills', ['Bills in the Legislative Yuan stage by stage, plus the agenda, draft notices, votes, legislators and the budget.']],
       ['ask', 'Ask the law', ['The round button beside the tabs: ask in plain words; the AI answers only from the articles it found, each point cited for you to check.']]
     ]
   },
@@ -810,6 +824,10 @@ export const SHOTS = {
   'money/entry': '0c5d0d6177e7 2e204f41b1b6 832ebfba8879 ac815a746a6e',
   'money/more': '141b4955625d bff15cb47995 23fcdae6eebb 854531843a9d',
   'money/stats': '6c2817a3ee9f a66a25157eb9 f6a75e86ffa7 961f2786e2c8',
+  'news/outlets': '72054d1ec712 0b04f03a88ea 20a81b5591f7 ce4b1d343fc8',
+  'news/side': 'b14a11b13950 cbea73ee81c8 2ec1fd63a41b 7dba7336875c',
+  'news/top': '1a27a14552e6 d60e22d927ba 0ee606dfcb73 166dc63f94b4',
+  'news/tw': '709ac1705e61 2d84584a0d18 088b2bc95399 c2c04ac1c6a0',
   'orbit/class': '0d5ec6006556 10f6e203ccae 575eb38b4d75 f66fe65b4a5f',
   'orbit/today': 'df9004310e17 ec862e7d897e 133140ac7c6b d59d25228264',
   'orbit/tools': '598835146624 824932e8ad4d 6bcfefbbcfb0 644446c1215c',
