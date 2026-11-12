@@ -610,4 +610,16 @@ test('TAIEX weekly options: each series by its Wednesday or Friday, priced on th
   assert.ok(q.price > 0 && q.price < 600);
   // Its day's move is from the last settlement (the table's day before today), as TAIFEX quotes it.
   assert.equal(q.prev, 300);
+  // The table already today's (after the close): from the model at the last close, the time it had
+  // left then. A call settled under its worth exercised takes its put's volatility (it read
+  // 0.1 → 1,340, +1,339,900%, on 11/11's 3.6% rally).
+  const t2 = at('2026-11-11T13:33:00');
+  const table2 = { date: '2026-11-11', settle: { TX202611: 44_136 }, opt: { '202611F2': { C: { 42_800: 1_280 }, P: { 42_800: 148 } } }, final: {} };
+  const ix = { symbol: '^TWII', price: 44_257, prev: 42_712, marketTime: t2, line: [] };
+  const call = Q.optQuote('TXO202611F2C42800.TF', ix, table2);
+  const put = Q.optQuote('TXO202611F2P42800.TF', ix, table2);
+  assert.ok(call.prev > 300 && call.prev < 1_000 && call.pct < 3, `${call.prev} → ${call.price}`);
+  assert.ok(put.prev > 300 && put.prev < 1_000, String(put.prev));
+  // (Put-call parity: C − P ≈ F − K.)
+  assert.ok(Math.abs(call.price - put.price - (44_136 - 42_800)) < 20, `${call.price} − ${put.price}`);
 });
