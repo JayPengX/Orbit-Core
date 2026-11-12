@@ -85,7 +85,10 @@ export function cleanBuys(raw, today, { cats = [], pays = [] } = {}) {
     const total = Math.round(Number(b?.total));
     if (!(total > 0 && total < 100_000_000)) continue;
     const k = b.k === 'in' ? 'in' : 'out';
-    const day = DAY.test(String(b.day || '')) && !Number.isNaN(Date.parse(b.day)) && b.day <= today ? b.day : '';
+    // (A day that is on the calendar: Date.parse takes 2026-02-30 and 11-31.)
+    const d = String(b.day || '');
+    const t = DAY.test(d) ? Date.parse(`${d}T00:00:00Z`) : NaN;
+    const day = Number.isFinite(t) && new Date(t).toISOString().slice(0, 10) === d && d <= today ? d : '';
     const invoice = String(b.invoice || '').replace(/[-\s]/g, '').toUpperCase();
     const items = (Array.isArray(b.items) ? b.items : [])
       .slice(0, READ_LIMITS.maxItems)

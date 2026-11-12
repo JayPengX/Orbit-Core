@@ -29,6 +29,9 @@ test('only real days, whole totals, an invoice numberâ€™s form, and the personâ€
   assert.equal(out[2].k, 'in');
   assert.equal(out[2].cat, 'salary');
   assert.deepEqual(cleanBuys(null, '2026-10-27'), []);
+  // (Days that aren't on the calendar: none, so today's; 2024's 2/29 is.)
+  const odd = cleanBuys({ buys: ['2026-02-30', '2026-09-31', '2026-02-29', '2024-02-29', '2026-13-01'].map(day => ({ k: 'out', day, total: 1 })) }, '2026-10-27');
+  assert.deepEqual(odd.map(b => b.day), ['', '', '', '2024-02-29', '']);
 });
 
 test('the lists the app sends are kept short and plain', () => {
