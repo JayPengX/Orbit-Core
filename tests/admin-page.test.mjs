@@ -41,3 +41,11 @@ test('admin: 健康’s badge counts the problems listed at the top of 健康, e
   for (const [, k, id] of at.matchAll(/(\w+): '([\w-]+)'/g)) assert.ok(page.includes(`id="${id}"`), `${k} → ${id}`);
   for (const k of [...page.matchAll(/\['(\w+)', '[^']+', '\w+'\]/g)].map(m => m[1]).filter(k => ['guard', 'pace', 'jobs', 'sources', 'deploys', 'secrets', 'errors', 'ai'].includes(k))) assert.match(at, new RegExp(`\\b${k}:`));
 });
+
+test('admin: every check and failure is the family’s q-ask dialog, never the browser’s confirm() or alert(); app names are the brand’s', () => {
+  const code = page.slice(page.indexOf('<script type="module">')).replace(/\/\/.*$/gm, '');
+  assert.doesNotMatch(code, /(?<![\w.$])(confirm|alert|prompt)\(/);
+  assert.match(code, /const sure = \(title, \{ body = '', ok = '繼續', danger = false, only = false \} = \{\}\) =>/);
+  assert.match(code, /el\('dialog', \{ class: `q-ask/);
+  assert.ok(page.includes("stock: 'Orbit Securities'"), 'Securities is Orbit Securities, as on its icon');
+});

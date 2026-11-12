@@ -711,7 +711,7 @@ const KEY = 'orbit.admin';
 const $ = id => document.getElementById(id);
 const store = { get: () => { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } }, set: v => { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch {} } };
 let token = store.get();
-const APPS = { stock: 'Orbit 證券', match: 'Orbit Sports', vocab: 'Orbit Words', orbit: 'Orbit Class', weather: 'Orbit Weather', transit: 'Orbit Transit', beats: 'Orbit Beats', law: 'Orbit Law', money: 'Orbit Money', news: 'Orbit News' };
+const APPS = { stock: 'Orbit Securities', match: 'Orbit Sports', vocab: 'Orbit Words', orbit: 'Orbit Class', weather: 'Orbit Weather', transit: 'Orbit Transit', beats: 'Orbit Beats', law: 'Orbit Law', money: 'Orbit Money', news: 'Orbit News' };
 const appName = a => APPS[a] || a;
 // A record's kind in words (the key itself when it's one not named here).
 const KINDS = { start: '開戶金', pay: '週薪', rank: '財富等級獎勵', rebase: '重算', admin: '手動調整', relief: '急難紓困', od: '透支利息', undo: '撤銷' };
@@ -750,6 +750,35 @@ const el = (tag, props = {}, kids = []) => {
   for (const c of [].concat(kids)) if (c != null) n.append(c);
   return n;
 };
+// The family's own dialog (the kit's q-ask look) for a check or a failure, never the browser's
+// confirm()/alert(): sure(title, { body, ok, danger }) resolves true or false; tell(title) only says.
+// (orbit.mjs's ask() is this, but loading orbit.mjs would set the apps' page up here.)
+const sure = (title, { body = '', ok = '繼續', danger = false, only = false } = {}) =>
+  new Promise(resolve => {
+    const d = el('dialog', { class: `q-ask${danger ? ' danger' : ''}`, 'aria-labelledby': 'admin-ask-title' });
+    let done = false;
+    const finish = v => {
+      if (done) return;
+      done = true;
+      d.classList.add('out');
+      setTimeout(() => (d.close(), d.remove()), 140);
+      resolve(v);
+    };
+    const okBtn = el('button', { class: `q-btn ${danger ? 'danger' : 'primary'}`, type: 'button', text: ok, onclick: () => finish(true) });
+    d.append(
+      ...[
+        el('h2', { id: 'admin-ask-title', class: 'q-ask-title', text: title }),
+        body ? el('p', { class: 'q-ask-body', text: body }) : null,
+        el('div', { class: 'q-ask-actions' }, [only ? null : el('button', { class: 'q-btn', type: 'button', text: '取消', onclick: () => finish(false) }), okBtn])
+      ].filter(Boolean)
+    );
+    d.addEventListener('cancel', e => (e.preventDefault(), finish(only)));
+    d.addEventListener('click', e => e.target === d && finish(only));
+    document.body.append(d);
+    d.showModal();
+    (only || !danger ? okBtn : d.querySelector('.q-btn:not(.danger)')).focus();
+  });
+const tell = title => sure(title, { ok: '好', only: true });
 const fmt = t => (t ? new Date(t).toLocaleString('zh-TW', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '—');
 // This year's without the year (a record's time in a phone-wide table).
 const fmtShort = t => (t && new Date(t).getFullYear() === new Date().getFullYear() ? new Date(t).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : fmt(t));
@@ -1288,7 +1317,7 @@ function drawAccount(a) {
   const grantBtn = el('button', { class: 'primary', text: '入帳' });
   const grant = action('調整金額', '', [[amt], [note, grantBtn]], async () => {
     const v = Number(amt.value);
-    if (!confirm(`${v >= 0 ? '加' : '扣'} ${money(Math.abs(v))} 給帳戶 ${a.ref}？\n原因：${note.value}`)) return '已取消';
+    if (!(await sure(`${v >= 0 ? '加' : '扣'} ${money(Math.abs(v))} 給帳戶 ${a.ref}？`, { body: `原因：${note.value}`, ok: v >= 0 ? '入帳' : '扣款' }))) return '已取消';
     const r = await admin('grant', { wallet: a.ref, amount: v, note: note.value });
     setTimeout(reload, 900);
     return `已入帳，餘額 ${money(r.balance)}`;
@@ -1296,7 +1325,7 @@ function drawAccount(a) {
   grantBtn.onclick = () => grant.run(grantBtn);
   const outBtn = el('button', { text: '登出所有裝置' });
   const signout = action('登出所有裝置', 'Pass 還能用，每台裝置要重新登入。', [outBtn], async () => {
-    if (!confirm(`登出帳戶 ${a.ref} 的所有裝置？`)) return '已取消';
+    if (!(await sure(`登出帳戶 ${a.ref} 的所有裝置？`, { body: 'Pass 還能用，每台裝置要重新登入。', ok: '登出' }))) return '已取消';
     await admin('signout', { wallet: a.ref });
     return '已登出所有裝置';
   });
@@ -1324,7 +1353,7 @@ function drawAccount(a) {
   const resetBtn = el('button', { class: 'danger', text: '重置' });
   const reset = action('重置帳戶', '本人要求時（要他的 Pass）：保留 Pass 和勾選的 App，其他重來。無法復原。', [pass, resetBtn], async () => {
     const keep = keepBoxes.map(l => l.querySelector('input')).filter(i => i.checked).map(i => i.value);
-    if (!confirm(`重置帳戶 ${a.ref}？保留：${keep.length ? keep.map(appName).join('、') : '無'}。無法復原。`)) return '已取消';
+    if (!(await sure(`重置帳戶 ${a.ref}？`, { body: `保留：${keep.length ? keep.map(appName).join('、') : '無'}。無法復原。`, ok: '重置', danger: true }))) return '已取消';
     const r = await admin('reset', { passcode: pass.value, keep });
     setTimeout(reload, 900);
     return `已重置，刪除了 ${r.gone.map(appName).join('、') || '無'}`;
@@ -1334,7 +1363,7 @@ function drawAccount(a) {
   const removeBtn = el('button', { class: 'danger', text: '收回這組 Pass' });
   const remove = !a.lastUsed
     ? action('收回未使用的 Pass', '收回後這組 Pass 就不能登入。', [removeBtn], async () => {
-        if (!confirm(`收回帳戶 ${a.ref}？這組 Pass 會失效。`)) return '已取消';
+        if (!(await sure(`收回帳戶 ${a.ref}？`, { body: '這組 Pass 會失效。', ok: '收回', danger: true }))) return '已取消';
         await admin('remove', { wallet: a.ref });
         setTimeout(() => (dialog.close(), loadWallets()), 700);
         return '已收回';
@@ -1345,7 +1374,7 @@ function drawAccount(a) {
   const clearBtn = el('button', { class: 'danger', text: '清除' });
   const clear = a.apps.length
     ? action('清除某個 App 的資料', '錢包和其他 App 不動，所有裝置登出。無法復原。', [clearApp, clearBtn], async () => {
-        if (!confirm(`清除帳戶 ${a.ref} 在 ${appName(clearApp.value)} 的資料？無法復原。`)) return '已取消';
+        if (!(await sure(`清除帳戶 ${a.ref} 在 ${appName(clearApp.value)} 的資料？`, { body: '無法復原。', ok: '清除', danger: true }))) return '已取消';
         await admin('clear-app', { wallet: a.ref, app: clearApp.value });
         setTimeout(reload, 900);
         return '已清除';
@@ -1362,7 +1391,7 @@ function drawAccount(a) {
   const confirmRef = el('input', { class: 'grow', autocomplete: 'off', placeholder: `輸入 ${a.ref} 確認` });
   const delBtn = el('button', { class: 'danger', text: '刪除' });
   const del = action('刪除帳戶', 'Pass、錢包、所有 App 的資料和通知都刪掉。無法復原，建議先匯出。', [confirmRef, delBtn], async () => {
-    if (!confirm(`永久刪除帳戶 ${a.ref}（餘額 ${money(a.balance)}）？無法復原。`)) return '已取消';
+    if (!(await sure(`永久刪除帳戶 ${a.ref}？`, { body: `餘額 ${money(a.balance)}。無法復原。`, ok: '刪除', danger: true }))) return '已取消';
     const r = await admin('delete', { wallet: a.ref, confirm: confirmRef.value.trim() });
     setTimeout(() => (dialog.close(), loadWallets(), loaded.delete('overview')), 900);
     return `已刪除帳戶 ${r.ref}${r.pushes ? `、${r.pushes} 個通知訂閱` : ''}${r.shares ? `、${r.shares} 個分享碼` : ''}`;
@@ -1402,13 +1431,13 @@ function drawAccount(a) {
 
   // The records: a picture for each kind, filtered by what they are.
   const undo = async (e, btn) => {
-    if (!confirm(`撤銷這筆 ${money(e.amount)}（${kindName(e.kind)}）？會記一筆相反金額的更正。`)) return;
+    if (!(await sure(`撤銷這筆 ${money(e.amount)}（${kindName(e.kind)}）？`, { body: '會記一筆相反金額的更正。', ok: '撤銷' }))) return;
     await busy(btn, async () => {
       try {
         await admin('undo', { wallet: a.ref, entry: e.id });
         reload();
       } catch (err) {
-        alert(err.message);
+        tell(err.message);
       }
     });
   };
@@ -1447,12 +1476,12 @@ function drawAccount(a) {
     btn.innerHTML = ic('trash');
     btn.onclick = () =>
       busy(btn, async () => {
-        if (!confirm(`移除帳戶 ${a.ref} 的「${passkeyName(k, 'zh')}」？\n通行碼和其他通行密鑰照常可用。`)) return;
+        if (!(await sure(`移除帳戶 ${a.ref} 的「${passkeyName(k, 'zh')}」？`, { body: '通行碼和其他通行密鑰照常可用。', ok: '移除', danger: true }))) return;
         try {
           await admin('passkey-remove', { wallet: a.ref, id: k.id });
           reload();
         } catch (e) {
-          alert(e.message);
+          tell(e.message);
         }
       });
     item.append(btn);
@@ -1534,7 +1563,7 @@ function bkRows(rows) {
 const bkButton = (label, run) => {
   const b = el('button', { class: 'small' }, label);
   b.onclick = async () => {
-    if (!confirm(`${label}？他的裝置會全部登出。`)) return;
+    if (!(await sure(`${label}？`, { body: '他的裝置會全部登出。', ok: label }))) return;
     $('bk-error').textContent = $('bk-ok').textContent = '';
     try {
       const r = await run();
@@ -1705,7 +1734,7 @@ $('clean-on').onclick = () => {
 };
 $('clean-days').onchange = () => cleanCall('gift-clean-set', { days: Number($('clean-days').value) || 30 });
 $('clean-run').onclick = async () => {
-  if (!confirm(`現在清掉 ${$('clean-sum').textContent.replace(/\D/g, '')} 個空帳戶？30 天內可以在備份與復原救回。`)) return;
+  if (!(await sure(`現在清掉 ${$('clean-sum').textContent.replace(/\D/g, '')} 個空帳戶？`, { body: '30 天內可以在備份與復原救回。', ok: '清掉' }))) return;
   const out = await cleanCall('gift-clean-run');
   if (out) $('gift-state').textContent = `清掉了 ${out.cleared} 個`;
 };
@@ -1779,7 +1808,7 @@ $('gift-qr').onclick = async () => {
   }
 };
 $('gift-round').onclick = async () => {
-  if (!confirm('開新的一輪？已領的不受影響，每台裝置可以再領一組，數字從 0 算起。')) return;
+  if (!(await sure('開新的一輪？', { body: '已領的不受影響，每台裝置可以再領一組，數字從 0 算起。', ok: '開新的一輪' }))) return;
   try {
     const out = await admin('gift-round');
     drawGift(out.gift, out.empty);
@@ -1807,7 +1836,7 @@ $('bc-send').onclick = () =>
   busy($('bc-send'), async () => {
     $('bc-error').textContent = $('bc-ok').textContent = '';
     const app = $('bc-app').value;
-    if (!confirm(`送「${$('bc-title').value}」給${app === 'all' ? '所有 App' : appName(app)}訂閱通知的每個人？`)) return;
+    if (!(await sure(`送「${$('bc-title').value}」給${app === 'all' ? '所有 App' : appName(app)}訂閱通知的每個人？`, { ok: '送出' }))) return;
     try {
       const r = await admin('broadcast', { app, title: $('bc-title').value, body: $('bc-body').value });
       $('bc-ok').textContent = `送到 ${r.sent} 台裝置${r.failed ? `，${r.failed} 台失敗` : ''}${r.gone ? `，${r.gone} 台已取消訂閱（已移除）` : ''}。`;
@@ -2059,7 +2088,7 @@ $('scan').onclick = () =>
   });
 $('clean').onclick = () =>
   busy($('clean'), async () => {
-    if (!confirm('照掃描的結果整理？刪除的文件無法復原。')) return;
+    if (!(await sure('照掃描的結果整理？', { body: '刪除的文件無法復原。', ok: '整理', danger: true }))) return;
     $('clean-error').textContent = $('clean-ok').textContent = '';
     let deleted = 0, tidied = 0, pushes = 0;
     try {
