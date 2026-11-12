@@ -418,7 +418,10 @@ test("Google's free month: the day's whole cap until 70% of it is used, then wha
 test('the township list for the picker', async () => {
   const res = await handleWeather(new Request('https://w.example/weather/places'), env, {}, '/weather/places');
   const list = await res.json();
-  assert.ok(list.length > 300);
+  // Every one of Taiwan's 368 townships, a station in it or not (臺中市西區 and 臺南市東區 were missing, 2026-11-12).
+  assert.equal(list.length, 368);
+  assert.equal(new Set(list.map(([c, t]) => c + t)).size, 368);
+  for (const [c, t] of [['臺中市', '西區'], ['臺中市', '中區'], ['臺南市', '東區'], ['高雄市', '鳥松區'], ['基隆市', '信義區']]) assert.ok(list.some(x => x[0] === c && x[1] === t), c + t);
   const xinyi = list.find(([c, t]) => c === '臺北市' && t === '信義區');
   assert.ok(xinyi && Math.abs(xinyi[2] - 25.03) < 0.05);
   assert.equal(list[0][0], '宜蘭縣');
