@@ -769,10 +769,24 @@ export async function googleAllowed(env, now, calls = 4, defer = null, spare = f
 
 // Each township's middle (its stations' mean), for the place picker.
 let townsCache = null;
+// The townships no CWA station stands in: each at its district office
+// (checked against NLSC's /weather/where, 2026-11-12). Without them 搜尋地點
+// couldn't find 臺中市西區 or 臺南市東區.
+const NO_STATION = [
+  ['臺中市', '中區', 24.1435, 120.6795],
+  ['臺中市', '東區', 24.1366, 120.6985],
+  ['臺中市', '南區', 24.1206, 120.664],
+  ['臺中市', '西區', 24.1414, 120.6714],
+  ['臺南市', '東區', 22.9805, 120.2248],
+  ['高雄市', '鹽埕區', 22.6248, 120.2853],
+  ['高雄市', '前金區', 22.6276, 120.2943],
+  ['高雄市', '鳥松區', 22.6594, 120.364],
+  ['基隆市', '信義區', 25.1294, 121.7517]
+];
 export function townships() {
   if (townsCache) return townsCache;
   const by = new Map();
-  for (const [, , lat, lon, county, town] of STATIONS) {
+  for (const [, , lat, lon, county, town] of [...STATIONS, ...NO_STATION.map(([county, town, lat, lon]) => ['', '', lat, lon, county, town])]) {
     const k = `${county}|${town}`;
     const t = by.get(k) || { county, town, lat: 0, lon: 0, n: 0 };
     t.lat += lat;
