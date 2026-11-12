@@ -2530,6 +2530,9 @@ function passkeyGate(s, error, signedIn, lock) {
   const ask = async () => {
     try {
       begin = await s.passkeyBegin();
+      // (An answer with no challenge or no end time is no challenge: kept, its next ask was setTimeout(NaN),
+      // at once, and the gate asked again hundreds of times a second.)
+      if (!begin?.challenge || !Number.isFinite(begin.exp)) begin = null;
     } catch {
       begin = null;
     }
