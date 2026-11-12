@@ -615,6 +615,9 @@ test("the pages that refuse Cloudflare are read on GitHub: which, and their clip
   };
   assert.deepEqual(clipsToRead(index, { 'https://pts/1': { y: [] } }), ['https://cts/1', 'https://tvbs/1', 'https://cna/2', 'https://udn/2']);
   assert.deepEqual(clipsToRead(index, {}, { each: 1, most: 3 }), ['https://pts/1', 'https://cts/1', 'https://tvbs/1']);
+  // (A page that wouldn't answer: asked again, 3 times at most.)
+  assert.ok(clipsToRead(index, { 'https://cts/1': { y: [], f: 2 } }).includes('https://cts/1'));
+  assert.ok(!clipsToRead(index, { 'https://cts/1': { y: [], f: 3 } }).includes('https://cts/1'));
   assert.ok(CLIPS_HERE.every(o => CLIPS_AT.includes(o)));
   // Taken in where the build read nothing of its own (its picture kept), never over its own.
   const pages = { 'https://tvbs/1': { i: 'https://tvbs/pic.jpg', y: [] }, 'https://pts/1': { i: '', y: ['OWNCLIP0001'] } };

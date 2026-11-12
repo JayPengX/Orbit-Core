@@ -58,9 +58,9 @@ let clips = 0;
 let own = 0;
 for (const u of want) {
   const p = found[u];
-  // (A page that wouldn't answer is kept as read too, empty: not asked again.)
+  // (A page that wouldn't answer is asked again in a later run, 3 times at most: `f`.)
   const y = (p?.y || []).filter(id => !(shorts[id] < 0));
-  pages[u] = { y, ...(p?.v?.length ? { v: p.v } : {}), at: now };
+  pages[u] = { y, ...(p?.v?.length ? { v: p.v } : {}), at: now, ...(p ? {} : { f: (pages[u]?.f || 0) + 1 }) };
   if (y.length) clips++;
   else if (p?.v?.length) own++;
 }
