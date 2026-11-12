@@ -120,7 +120,7 @@ export const STORE = {
       { zh: '問你的帳，答案畫成圖', en: 'Ask your books, see the answer', hash: { zh: 'ask=這個月吃飯花了多少？', en: 'ask=How much did I spend on food this month?' }, ai: [['feature:money-ask', 'money-ask']], args: click(wait(1500), sheetTop, wait(600)), wait: 9000 }
     ]
   },
-  // Every story from all sides: 81 outlets placed by published research. Every shot another story.
+  // Every story from all sides: 122 outlets placed by published research. Every shot another story.
   news: {
     app: 'news', brand: 'news', show: 'news', prefix: 'news',
     shots: [
@@ -128,7 +128,7 @@ export const STORE = {
       { zh: '同一件事，偏綠、中間、偏藍怎麼下標', en: 'One story, each side’s headline', dark: true, args: click("js:[...document.querySelectorAll('.nw-card')].filter(e=>e.offsetParent)[0]?.click()", wait(3000), toTop("[...document.querySelectorAll('dialog[open] .nw-spec')].pop()", 70), wait(1000)), wait: 9000 },
       { zh: '只有一邊在報的新聞', en: 'The stories only one side carries', hash: 'side', args: click(wait(2000), "js:[...document.querySelectorAll('button,[role=tab],a')].filter(e=>e.offsetParent&&/^(國際|World)$/.test(e.textContent.trim())).sort((a,b)=>a.getBoundingClientRect().top-b.getBoundingClientRect().top)[0]?.click()", wait(2500)), wait: 9000 },
       { zh: '國際大事，台灣媒體怎麼報', en: 'World news, and how Taiwan reports it', dark: true, hash: 'intl', args: click(tap('能源|Energy'), wait(2500)), wait: 9000 },
-      { zh: '81 家媒體，立場都有出處', en: '81 outlets, each place sourced', hash: 'outlets', args: click(toTop("[...document.querySelectorAll('h2,h3,.q-section-head,header')].find(e=>e.offsetParent&&/^(台灣媒體|Taiwan’s outlets)/.test(e.textContent.trim()))", 40), wait(800)), wait: 9000 },
+      { zh: '122 家媒體，立場都有出處', en: '122 outlets, each place sourced', hash: 'outlets', args: click(toTop("[...document.querySelectorAll('h2,h3,.q-section-head,header')].find(e=>e.offsetParent&&/^(台灣媒體|Taiwan’s outlets)/.test(e.textContent.trim()))", 40), wait(800)), wait: 9000 },
       { zh: '14 個主題，照重要程度排', en: '14 topics, ranked by importance', dark: true, hash: 'tw', args: click(tap('生活|Life'), wait(2500)), wait: 9000 }
     ]
   },
