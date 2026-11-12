@@ -224,6 +224,12 @@ test('a school read by code at once, worded behind, kept an hour; a title worded
   assert.deepEqual(fuller.items.map(x => x.title), ['最新一則', '新的公告標題', '【轉知】寒假營隊', '第二次期中考考程表']);
   assert.ok(fuller.items.every(x => x.line), 'each worded, the older ones not asked again');
   assert.equal(asked.length, 3);
+  // The school edits a post's title (same address): that one post, its new title, not two.
+  pages['https://www.s.hcc.edu.tw/rssfeeds?a=1'].body = RSS.replace(/<item>[\s\S]*<\/item>/, '<item><title>最新一則（更正）</title><link>https://www.s.hcc.edu.tw/content?a=10</link><pubDate>2026-11-11 12:00:00</pubDate></item>');
+  await schoolNews(env, ctx, 'https://www.s.hcc.edu.tw/', { cap: 10, fetchFn: school(pages), now: now + 6 * 3_600_000 });
+  await settle();
+  const edited = await schoolNews(env, ctx, 'https://www.s.hcc.edu.tw/', { cap: 10, fetchFn: school(pages), now: now + 6 * 3_600_000 + 20_000 });
+  assert.deepEqual(edited.items.map(x => x.title), ['最新一則（更正）', '新的公告標題', '【轉知】寒假營隊', '第二次期中考考程表']);
   const capped = await schoolNews({ ...env, DATA: { get: async () => null, put: async () => {} } }, ctx, 'https://www.s.hcc.edu.tw/', { cap: 0, fetchFn: school(pages), now });
   assert.equal(capped.items.length, 1, 'capped: the titles alone');
   assert.equal(capped.items[0].line, undefined);
