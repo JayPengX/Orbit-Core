@@ -114,6 +114,7 @@
   .ai-list li.idle { color: var(--q-muted); font-size: 13px; border-bottom: 0; }
   .warnt { color: var(--q-warn, #c77700); }
   .door-set { margin-top: 10px; align-items: center; gap: 8px; flex-wrap: nowrap; }
+  .door-pri-head { margin: 14px 2px 6px; color: var(--q-muted); font-size: 13px; font-weight: 600; }
   .door-set label { white-space: nowrap; }
   .door-set input { width: 110px; }
   .door-set button { margin-left: auto; }
@@ -487,7 +488,7 @@
         <p id="door-error" class="error"></p>
         <div class="tiles" id="door-tiles"></div>
         <div class="row door-set"><label for="door-max">同時最多</label><input id="door-max" type="number" min="0" step="10" inputmode="numeric" placeholder="不限" /><span class="muted">人</span><button id="door-save" class="small primary">套用</button></div>
-        <ul class="flow stack" id="door-pri" style="margin-top:8px"></ul>
+        <div id="door-pri"></div>
         <details class="note"><summary>說明</summary><p class="muted" style="margin:8px 0 0">在用＝15 分鐘內開過 App。到 80% 時，即時資料放慢一倍；額滿時再慢一點，新來的人排隊（App 顯示第幾位，每 20 秒再試），已經在用的人不受影響。帳單保護到「先顧基本」時也不再放新的人進來。優先通行的 Pass 不受限制、不占位置，到帳戶裡設定。0＝不限。</p></details>
       </div>
       <div class="acct-tools">
@@ -2180,11 +2181,10 @@ async function loadDoor() {
       tile('今天最多', `${n0(d.peak?.n)} 人`, d.peak?.at ? fmtShort(d.peak.at) : '—')
     );
     if (document.activeElement !== $('door-max')) $('door-max').value = d.max || '';
-    $('door-pri').replaceChildren(
-      ...(priority.length
-        ? priority.map(p => el('li', {}, [el('span', { class: 'nm' }, [el('button', { class: 'link', text: p.ref, onclick: () => openAccount(p.ref) }), el('small', { text: p.last ? `${ago(p.last)}用過` : '還沒用過' })]), el('span', { class: 'v', text: '優先' })]))
-        : [el('li', {}, [el('span', { class: 'nm' }, ['優先通行', el('small', { text: '還沒有：到帳戶裡設定' })])])])
-    );
+    // (Priority passes as the account list's own rows: an underlined bare reference looked like another page's.)
+    $('door-pri').innerHTML = priority.length
+      ? `<h3 class="door-pri-head">優先通行</h3><div class="q-rowcard">${priority.map(p => acctItem({ ref: p.ref, last: p.last }, { compact: true, value: '', sub: p.last ? `${ago(p.last)}用過` : '還沒用過' })).join('')}</div>`
+      : `<p class="muted door-pri-head">優先通行 · 還沒有：到帳戶裡設定</p>`;
   } catch (e) {
     $('door-error').textContent = e.message;
   }

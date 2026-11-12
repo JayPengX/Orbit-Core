@@ -60,3 +60,9 @@ test('admin: 總覽’s 外部來源 cell names two sources at most (five names 
   assert.ok(page.includes("const few = (list, word) => (list.length > 2 ? `${names(list.slice(0, 1))}等 ${list.length} 個${word}` : `${names(list)} ${word}`);"));
   assert.ok(page.includes("bad.length ? few(bad, '壞了') : warn.length ? few(warn, '不穩')"));
 });
+
+test('admin: 現在在用’s priority passes are the account list’s own rows, under 優先通行 (no underlined bare reference)', () => {
+  assert.match(page, /<div id="door-pri"><\/div>/);
+  assert.match(page, /<h3 class="door-pri-head">優先通行<\/h3><div class="q-rowcard">\$\{priority\.map\(p => acctItem\(/);
+  assert.doesNotMatch(page, /el\('button', \{ class: 'link', text: p\.ref/);
+});
