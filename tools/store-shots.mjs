@@ -13,7 +13,7 @@
 // What each shot is (page, taps, theme, caption) lives in tools/shots/store.mjs.
 // Shots are real: live data, made-up accounts only (tools/shots/accounts).
 // A shot with a fault (text wrapping, cut, sideways scroll) is printed; look
-// at sheet.png before --apply. --out dir (default /tmp/orbit-store), --jobs 3.
+// at sheet.png before --apply. --out dir (default /tmp/orbit-store), --jobs 3, --clock (below).
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync, renameSync, copyFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -31,6 +31,9 @@ const out = opt('out', '/tmp/orbit-store');
 const jobs = Number(opt('jobs', '3'));
 const langs = opt('lang', 'zh,en').split(',');
 const apply = flag('apply');
+// --clock 2026-11-13T08:30: every shot on that Taipei time (Jay 11-12: at night, shoot on the next
+// morning's timetable rather than wait for Taiwan's daytime). Comes first, so it wins over a shot's own.
+const clock = opt('clock', '');
 const [key, ...only] = argv;
 const set = STORE[key];
 if (!set) { console.error(`usage: store-shots.mjs <${Object.keys(STORE).join('|')}> [n…] [--apply]`); process.exit(2); }
@@ -67,7 +70,7 @@ async function shoot(n, lang) {
     const f = ['ndjson', 'json'].map(x => join(HERE, 'shots', 'ai', `${name}.${lang}.${x}`)).find(existsSync);
     return f ? ['--fixture', `${text}=${f}`] : [];
   });
-  const args = [join(HERE, 'preview.mjs'), set.app, ...(hash ? [hash] : []), '--live', '--lang', lang, '--width', '375', '--height', '812', '--wait', String(s.wait ?? 6000), '--out', tmp,
+  const args = [join(HERE, 'preview.mjs'), set.app, ...(hash ? [hash] : []), '--live', '--lang', lang, '--width', '375', '--height', '812', '--wait', String(s.wait ?? 6000), '--out', tmp, ...(clock ? ['--clock', clock] : []),
     ...(s.dark ? ['--dark'] : []), ...payload, ...ai, ...(set.args || []), ...(page.args || []), ...((a => (Array.isArray(a) ? a : a?.[lang]))(s.args) || [])];
   const r = await run(process.execPath, args, { cwd: join(HERE, '..') });
   const png = existsSync(tmp) && readdirSync(tmp).find(f => f.endsWith('.png'));
