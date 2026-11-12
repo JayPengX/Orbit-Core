@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ALTS, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport } from '../builders/news.js';
+import { ALTS, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -130,6 +130,26 @@ test("a story counts outlets by side; one-sided names the side that carries none
   assert.deepEqual(g.topics, ['sport']);
   assert.equal(g.blind, '');
   assert.ok(g.imp < storyOf(blue, 'tw', NOW).imp);
+});
+
+test('快訊: a story many outlets carried in the last 2 hours is live and ranked up; a quiet or old one, or a game, is not', () => {
+  const outs = ['cna', 'ltn', 'udn', 'chinatimes', 'ctinews', 'tvbs', 'setn', 'ettoday', 'pts', 'storm', 'mirror'];
+  const burst = (k, at) => outs.slice(0, k).map((o, i) => ({ ...item(o, `黃仁勳辭輝達執行長 財務長暫代${i}`, at + i), near: 0.5 }));
+  const s = storyOf(burst(LIVE_NEW, NOW - H), 'tw', NOW);
+  assert.equal(s.live, LIVE_NEW);
+  assert.ok(s.score > s.imp * 1.5);
+  // (Fewer outlets, or the same burst 3 hours ago: not live, not lifted.)
+  assert.equal(storyOf(burst(LIVE_NEW - 1, NOW - H), 'tw', NOW).live, undefined);
+  const old = storyOf(burst(LIVE_NEW, NOW - BURST - H), 'tw', NOW);
+  assert.equal(old.live, undefined);
+  assert.ok(old.score < old.imp);
+  // An old story's big new turn: live when LIVE_TURN outlets carry it again.
+  const days = [...burst(LIVE_TURN, NOW - 40 * H), ...burst(LIVE_TURN, NOW - 0.5 * H)];
+  assert.equal(storyOf(days, 'tw', NOW).live, LIVE_TURN);
+  assert.equal(storyOf([...burst(LIVE_NEW, NOW - 40 * H), ...burst(LIVE_NEW, NOW - 0.5 * H)], 'tw', NOW).live, undefined);
+  // A game: never 快訊.
+  const game = outs.map((o, i) => ({ ...item(o, `中華隊經典賽奪冠${i}`, NOW - H + i), near: 0.5 }));
+  assert.equal(storyOf(game, 'tw', NOW).live, undefined);
 });
 
 test('outlets: every one has a place and a reason; only state media stand apart', () => {
