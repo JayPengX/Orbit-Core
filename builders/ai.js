@@ -46,9 +46,11 @@ export const TITLE_AGAIN = 3_600_000;
 // it writes (Jay 11-10: the one line under it only said the headline again).
 export function storyFacts(s, region = s.region) {
   const seen = new Set();
-  const heads = [];
+  // (The story's own title first: the turn it's on, 11-12: the newest three spoke of who comes after him, not that he'd gone.)
+  const heads = s.title ? [String(s.title).slice(0, 90)] : [];
   for (const [outlet, title] of s.items || []) {
-    if (seen.has(outlet) || heads.length >= 3) continue;
+    if (heads.includes(String(title).slice(0, 90))) continue;
+    if (seen.has(outlet) || heads.length >= 4) continue;
     seen.add(outlet);
     heads.push(String(title).slice(0, 90));
   }
