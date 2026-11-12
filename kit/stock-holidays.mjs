@@ -221,8 +221,11 @@ export function upcomingHolidays(market, day, n = 5) {
 
 // Moves a session start (a moment) forward by whole days past weekends and
 // holidays in the market's time zone; `after`: it must also be later than this.
+// (A start weeks old, a quote read long ago or a clock set ahead, first comes to the day
+// before `after`: 30 steps from it ended on 12/12, a Saturday, for 12/25.)
 export function nextTradingStart(market, start, tz, after = -Infinity) {
   let next = start;
+  if (after - next > 86_400_000) next += Math.floor((after - next) / 86_400_000 - 1) * 86_400_000;
   for (let i = 0; i < 30 && (next <= after || !isTradingDay(market, localDay(next, tz))); i++) next += 86_400_000;
   return next;
 }

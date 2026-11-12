@@ -319,6 +319,8 @@ test('the next session start skips weekends and holidays in the market\'s own zo
   const fri = Date.parse('2026-10-09T01:00:00Z');
   assert.equal(iso(nextTradingStart('TW', fri, 'Asia/Taipei')), '2026-10-12T01:00:00.000Z');
   assert.equal(iso(nextTradingStart('US', Date.parse('2026-11-26T14:30:00Z'), 'America/New_York')), '2026-11-27T14:30:00.000Z');
+  // A start weeks before the moment asked about (it once stopped 30 days on, a Saturday).
+  assert.equal(iso(nextTradingStart('TW', Date.parse('2026-11-12T01:00:00Z'), 'Asia/Taipei', Date.parse('2026-12-25T02:00:00Z'))), '2026-12-28T01:00:00.000Z');
   assert.equal(localDay(Date.parse('2026-10-16T23:30:00Z'), 'Asia/Taipei'), '2026-10-17');
   assert.equal(localDayOf(Date.parse('2026-10-16T23:30:00Z'), 'US'), '2026-10-16');
 });
