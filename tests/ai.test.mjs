@@ -176,3 +176,19 @@ test('a story’s points keep only their own words and the material’s numbers'
   assert.equal(clean({ items: [{ id: 'a', points: [ok, { zh: '台北地方法院一審依過失致死罪判處負責人', en: 'Judged.' }] }] }).a, undefined);
   assert.equal(clean({ items: [{ id: 'a', points: [ok, { zh: '负责人将上诉', en: 'The owner will appeal.' }] }] }).a, undefined);
 });
+
+test('news-markets: each option’s short label, Chinese without Latin or a number it lacks, never two alike', () => {
+  const pairs = [{ k: 'a|1', story: ['輝達董事會討論黃仁勳去留'], market: { q: 'Jensen Huang out + Nvidia market cap', about: '', options: ['Resigned/removed; Over $4T', 'Resigned/removed; Under $4T', 'Rene Haas', 'Ian Buck'] } }];
+  const out = FEATURES['news-markets'].clean({ items: [{ k: 'a|1', match: true, zh: '黃仁勳去職時，輝達市值會在4兆美元以上嗎？', en: 'If Jensen Huang leaves, will Nvidia be worth over $4 trillion?', options: [
+    { o: 'Resigned/removed; Over $4T', zh: '4兆美元以上', en: 'Over $4T' },
+    { o: 'Resigned/removed; Under $4T', zh: '5兆美元以下', en: 'Under $4T' },
+    { o: 'Rene Haas', zh: 'Haas', en: 'Rene Haas' },
+    { o: 'Ian Buck', zh: '巴克', en: 'Rene Haas' },
+    { o: 'Nobody', zh: '沒有人', en: 'Nobody' }
+  ] }] }, { pairs });
+  assert.deepEqual(out['a|1'].labels, {
+    'Resigned/removed; Over $4T': { zh: '4兆美元以上', en: 'Over $4T' },
+    'Resigned/removed; Under $4T': { en: 'Under $4T' },
+    'Ian Buck': { zh: '巴克' }
+  });
+});

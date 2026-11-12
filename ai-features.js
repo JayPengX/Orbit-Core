@@ -1156,12 +1156,14 @@ export const FEATURES = {
         [
           'Each item pairs a news story (its outlets’ headlines, Chinese or English) with a question from a prediction market. Decide whether a reader of this story would see the market’s question as the open question this very story raises: the same person, office, race, conflict or decision the story is about, and an outcome the story’s events bear on.',
           'match true only when that is plainly so. Examples: reports Nvidia’s board may replace Jensen Huang ↔ "Jensen Huang announced resignation or removal by…?" true; a Taipei mayoral campaign story ↔ "Taipei Mayor Election Winner" true; US envoys in Moscow for Ukraine peace talks ↔ "Russia x Ukraine ceasefire agreement by…?" true. False: a story about something else in the same country, party or company (a general strike over housing ↔ who wins the next election; a TV debate in 苗栗 ↔ 台中’s mayoral race); a story that only mentions the person or place in passing; a different race, office or person with a similar name; a story about a company’s stock or earnings ↔ a question about its CEO’s private life (but a story about that private life itself, such as an affair, ↔ whether that couple divorces is true); a city council speaker’s bribery case ↔ the county’s magistrate race; anything frivolous (what someone says, wears or posts). When unsure, false.',
-          'When match is true: zh = the market’s question in natural Traditional Chinese as Taiwan writes it (台灣用語; a name as the story’s headlines write it, else Taiwan media’s usual form: 川普, 普丁, 澤倫斯基, 輝達, 黃仁勳; full-width ？), at most 24 characters, a question; en = the same question in plain natural English (not the market’s shorthand: no “by...?”, no “x”), at most 12 words. The answer rows show each deadline, so name no date, and add no number the question doesn’t have. names: only from the market’s options list (names [] when options is []), with en copied exactly as the option is written. Include each option that is a party, a place, or a person Taiwan’s press writes in Chinese characters (Chiang Wan-an = 蔣萬安; Jensen Huang = 黃仁勳), as the story’s headlines write it, else as Taiwan’s press does; a note in brackets becomes full-width Chinese (Jensen Huang (No Change) = 黃仁勳（續任）). Leave out a person Taiwan’s press only transliterates (Rene Haas), and any option whose exact characters you are not sure of. When match is false: zh, en "" and names [].',
+          'When match is true: zh = the market’s question in natural Traditional Chinese as Taiwan writes it (台灣用語; a name as the story’s headlines write it, else Taiwan media’s usual form: 川普, 普丁, 澤倫斯基, 輝達, 黃仁勳; full-width ？), at most 24 characters, a question; en = the same question in plain natural English (not the market’s shorthand: no “by...?”, no “x”), at most 12 words. When the options decide something the title doesn’t ask (options "Resigned/removed; Over $4T" and "Resigned/removed; Under $4T" under "Jensen Huang out + Nvidia market cap"), the question asks what they decide (黃仁勳去職時，輝達市值會在4兆美元以上嗎？), never one option as the question. The answer rows show each deadline, so name no date, and add no number the question doesn’t have.',
+          'options: one item for every option in the market’s options list (none when options is []), o copied exactly as the option is written, with zh and en the short label a reader sees on its row. Every option gets a zh, so a card is all Chinese: a party or place as Taiwan writes it; a person Taiwan’s press writes in Chinese characters as the story’s headlines write them, else as Taiwan’s press does (Chiang Wan-an = 蔣萬安; Jensen Huang = 黃仁勳); any other person by the Chinese name Taiwan’s press (中央社, 經濟日報) uses for them, usually the surname alone (Rene Haas = 哈斯, Colette Kress = 克瑞斯, Ian Buck = 巴克); anything else in plain words (No Meeting by December 31 = 不會會談; Resigned/removed; Over $4T = 4兆美元以上; a note in brackets: Jensen Huang (No Change) = 黃仁勳續任). zh at most 8 characters; en at most 3 words (a person’s full name as written, a phrase cut to what tells the options apart: Over $4T, No meeting). No two options share a label. If you aren’t sure of one option’s Chinese, give zh "" for it.',
+          'When match is false: zh, en "" and options [].',
           'Return one item per pair with its k.',
           JSON.stringify(pairs)
         ].join('\n')
       ),
-    schema: obj({ items: arr(obj({ k: S, match: B, zh: S, en: S, names: arr(obj({ en: S, zh: S })) })) }),
+    schema: obj({ items: arr(obj({ k: S, match: B, zh: S, en: S, options: arr(obj({ o: S, zh: S, en: S })) })) }),
     clean(raw, { pairs }) {
       const given = new Map(pairs.map(p => [p.k, p]));
       const out = {};
@@ -1174,13 +1176,23 @@ export const FEATURES = {
         }
         const zh = str(it.zh, 40), en = str(it.en, 120);
         // (A question past its length, without Chinese, or with a number the market's doesn't have, is no answer.)
-        if (String(it.zh || '').trim().length > 30 || String(it.en || '').trim().length > 100 || !/[一-鿿]/.test(zh) || /[一-鿿]/.test(en) || !en || !nums(`${zh} ${en}`).every(n => nums(p.market.q).includes(n)) || /\d{4}\s*年|\d{1,2}\s*[月日]|\b(19|20)\d\d\b/.test(`${zh} ${en}`)) continue;
-        const names = {};
-        for (const x of list(it.names, 8)) {
-          const k = String(x?.en || '').trim(), z = str(x?.zh, 12);
-          if (p.market.options.includes(k) && /^[一-鿿·・．（）]+$/.test(z)) names[k] = z;
+        if (String(it.zh || '').trim().length > 30 || String(it.en || '').trim().length > 100 || !/[一-鿿]/.test(zh) || /[一-鿿]/.test(en) || !en || !nums(`${zh} ${en}`).every(n => nums(`${p.market.q} ${p.market.options.join(' ')}`).includes(n)) || /\d{4}\s*年|\d{1,2}\s*[月日]|\b(19|20)\d\d\b/.test(`${zh} ${en}`)) continue;
+        // (Each option's row label: Chinese with no Latin letters but $ and a unit, no Simplified, no number the option lacks; English short. A label two options share tells nothing: both go.)
+        const labels = {};
+        for (const x of list(it.options, 12)) {
+          const o = String(x?.o || '').trim();
+          if (!p.market.options.includes(o)) continue;
+          const z = String(x?.zh || '').trim(), e = String(x?.en || '').trim();
+          const okZh = z.length <= 10 && /[一-鿿]/.test(z) && !/[A-Za-z]/.test(z.replace(/\$|AI|APEC/g, '')) && !SIMPLIFIED.test(z) && nums(z).every(n => nums(o).includes(n));
+          const okEn = e.length <= 24 && !/[一-鿿]/.test(e) && e.split(/\s+/).length <= 4 && nums(e).every(n => nums(o).includes(n));
+          if (okZh || okEn) labels[o] = { ...(okZh ? { zh: z } : {}), ...(okEn ? { en: e } : {}) };
         }
-        out[p.k] = { ok: true, zh, en, names };
+        for (const lang of ['zh', 'en']) {
+          const seen = Object.values(labels).map(l => l[lang]).filter(Boolean);
+          for (const l of Object.values(labels)) if (l[lang] && seen.filter(x => x === l[lang]).length > 1) delete l[lang];
+        }
+        for (const [o, l] of Object.entries(labels)) if (!l.zh && !l.en) delete labels[o];
+        out[p.k] = { ok: true, zh, en, labels };
       }
       return out;
     }
