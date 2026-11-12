@@ -81,6 +81,24 @@ test('the same news in other words is one story; other news stays apart', () => 
   assert.ok(groups.includes('pts'), groups.join(' | '));
 });
 
+test("one company's monthly or quarterly report is never another's story (10月, 前三季, 股本, EPS shared by all)", () => {
+  const items = [
+    item('newtalk', '中華電10月營收237.5億元創同期新高 EPS達0.46元', NOW - 5 * H),
+    item('tvbs', '聯發科10月營收550.26億、月減0.67% Q4 ASIC將挹注營收', NOW - 4.9 * H),
+    item('ctinews', '聯發科10月營收550.26億元！AI、ASIC助力Q4挑戰新高', NOW - 4.8 * H),
+    item('technews', '宜特10月營收月增0.3%', NOW - 4.7 * H),
+    item('technews', '志超10月營收月增6.1%', NOW - 4.65 * H),
+    item('udn', '祥碩前三季賺近八股本', NOW - 4.45 * H),
+    item('cna', '和碩10月營收1880億寫單月次高 AI伺服器動能助攻', NOW - 4.6 * H),
+    item('tvbs', '陽明Q3賺逾半個股本 EPS 5.32元創11季新高', NOW - 4.5 * H),
+    item('udn', '奇鋐前三季賺七股本', NOW - 4.4 * H),
+    item('technews', '醫美版圖邁入收割期！霈方國際今年前三季大賺逾一個股本', NOW - 4.3 * H),
+    item('ltn', '陽明第3季賺贏上半年 EPS 5.32元創11季新高', NOW - 4.2 * H)
+  ];
+  const groups = groupStories(items, 'zh').map(g => g.map(x => x.t.slice(0, 2)).sort().join(','));
+  assert.deepEqual(groups.sort(), ['中華', '和碩', '奇鋐', '宜特', '志超', '祥碩', '聯發,聯發', '醫美', '陽明,陽明'].sort(), groups.join(' | '));
+});
+
 test('English: forms of a word meet (impeach, impeachment), summaries help', () => {
   const items = [
     item('bbc', 'US congressman files resolution to impeach Defence Secretary Pete Hegseth', NOW - 5 * H, { d: 'A Republican lawmaker says he will force a vote on removing Hegseth over the Iran war.' }),
