@@ -1209,7 +1209,8 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
   for (const it of [...items, ...recs.flatMap(r => r.items)]) if (kept.pages?.[it.u]) pages[it.u] = kept.pages[it.u];
   let out = deskOf(items, recs, now, { pages, vids: clips });
   const want = pagesToRead(out, pages);
-  const read = await Promise.all(want.map(u => readPage(u, { fetchImpl })));
+  const whyNot = {};
+  const read = await Promise.all(want.map(u => readPage(u, { fetchImpl, why: w => (whyNot[u] = w) })));
   // (Each clip a page names asked once whether it's a Short: those are left
   // out. The answers kept 4 days: { id: when asked, less than 0 a Short }.)
   const shorts = Object.fromEntries(Object.entries(kept.shorts || {}).filter(([, at]) => now - Math.abs(at) <= 2 * KEEP_MS));
@@ -1220,7 +1221,7 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
   want.forEach((u, i) => {
     const p = read[i];
     const o = byUrl.get(u)?.o || new URL(u).hostname;
-    if (!p) unread[o] = (unread[o] || 0) + 1;
+    if (!p) (unread[o] ||= []).push(whyNot[u] || '?');
     pages[u] = p ? { ...p, y: p.y.filter(id => !(shorts[id] < 0)) } : { i: '', y: [] };
   });
   if (want.length) out = deskOf(items, recs, now, { pages, vids: clips });
@@ -1281,12 +1282,14 @@ export function pagesToRead(out, pages, most = PAGE_READS, clipMost = CLIP_READS
   return [...clips, ...pics];
 }
 // One page read for its picture and clip; null when it can't be.
-async function readPage(url, { fetchImpl = fetch } = {}) {
+// (Why not, by the outlet, in the build's report: `why`.)
+async function readPage(url, { fetchImpl = fetch, why = () => {} } = {}) {
   try {
     const res = await fetchImpl(url, { headers: { 'User-Agent': UA, Accept: 'text/html' }, signal: AbortSignal.timeout(10_000) });
-    if (!res?.ok) return null;
+    if (!res?.ok) return void why(String(res?.status || 'no answer'));
     return pageOf(await res.text());
-  } catch {
+  } catch (e) {
+    why(String(e?.name === 'TimeoutError' ? 'timeout' : e?.message || e).slice(0, 30));
     return null;
   }
 }
