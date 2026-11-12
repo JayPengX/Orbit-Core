@@ -98,3 +98,43 @@ test('a separate app suggests Orbit at most 3 times, 14 days apart, never after 
   const kit = readFileSync(new URL('../kit/orbit.mjs', import.meta.url), 'utf8');
   assert.match(kit, /isIOS\(\) && isStandalone\(\) && dev\('suiteAsk'\) === true/);
 });
+
+test("back and forward go through the browser's own memory only when the neighbour is right there", () => {
+  let n = 0;
+  const id = () => `id${++n}`;
+  // Sports opened from Orbit's door, then a jump to Transit (the kit's go).
+  let t = S.landing(null, 'match', '/sports/', { len: 1, id });
+  assert.equal(t.list[0].backOk, undefined);
+  t = { ...S.jump(t, 'transit', '/transit/'), pending: { by: 0, app: 'transit' } };
+  t = S.landing(t, 'transit', '/transit/', { len: 2, id });
+  assert.equal(t.i, 1);
+  assert.equal(t.list[1].backOk, 2);
+  assert.equal(t.pending, undefined);
+  // Back by the browser: Sports again, Transit right ahead.
+  t = { ...S.step(t, -1), pending: { by: -1, app: 'match', at: t.list[0].at } };
+  t = S.landing(t, 'match', '/sports/', { tag: t.list[0].at, len: 2, id });
+  assert.equal(t.i, 0);
+  assert.equal(t.list[0].fwdOk, 2);
+  // Forward by the browser: Transit, Sports right behind.
+  t = { ...S.step(t, 1), pending: { by: 1, app: 'transit', at: t.list[1].at } };
+  t = S.landing(t, 'transit', '/transit/', { tag: t.list[1].at, len: 2, id });
+  assert.equal(t.i, 1);
+  assert.equal(t.list[1].backOk, 2);
+  // A reload keeps its place; a link to Weather is a jump with Transit behind it.
+  t = S.landing(t, 'transit', '/transit/#x', { tag: t.list[1].at, len: 2, id });
+  assert.equal(t.i, 1);
+  t = S.landing(t, 'weather', '/weather/', { len: 3, id });
+  assert.deepEqual([t.i, t.list[2].app, t.list[2].backOk], [2, 'weather', 3]);
+  // A back that opened the address anew (no memory): the same entry, nothing assumed behind it.
+  t = S.step(t, -1);
+  t = S.landing(t, 'transit', '/transit/', { len: 4, id });
+  assert.equal(t.i, 1);
+  assert.equal(t.list[1].backOk, 2);
+});
+
+test('the apps warmed first: back, forward, then the ones used lately here', () => {
+  const now = Date.parse('2026-11-13T00:00:00Z');
+  const t = { list: [{ app: 'match' }, { app: 'transit' }, { app: 'news' }], i: 1 };
+  const saved = { apps: { weather: { t: now - 1000 }, money: { t: now - 20 * 86_400_000 }, law: { t: now - 5000 }, transit: { t: now } } };
+  assert.deepEqual(S.warmOrder(t, saved, 'transit', now), ['match', 'news', 'weather', 'law']);
+});

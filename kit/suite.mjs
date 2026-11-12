@@ -143,7 +143,10 @@ function remember() {
   if (!app) return;
   const url = here();
   const y = scrollNow();
-  writeTrail(record(readTrail(), url, y));
+  // (Only while the trail is still on this app: once a hop is under way, it points at the next one.)
+  const raw = readJson('sessionStorage', TRAIL_KEY);
+  const t = sane(raw);
+  if (t.list[t.i]?.app === app) writeTrail({ ...record(t, url, y), ...(raw?.pending ? { pending: raw.pending } : {}) });
   const s = savedSuite();
   writeJson('localStorage', SUITE_KEY, { ...s, on: 1, apps: { ...(s.apps || {}), [app]: { url, y, t: Date.now(), home: pathOf(app) } } });
 }
@@ -166,14 +169,34 @@ export function go(other, hash = '') {
   remember();
   const to = h ? { url: `${pathOf(other)}#${h}`, y: 0 } : resumeOf(savedSuite(), other);
   if (other === app) return open(to.url);
-  writeTrail(jump(readTrail(), other, to.url));
+  writeTrail({ ...jump(readTrail(), other, to.url), pending: { by: 0, app: other } });
   open(to.url, to.y);
 }
+// Back and forward. Where the app before is the browser's own entry right
+// behind this page (this page opened from it, nothing pushed since), the
+// browser goes back itself: Safari then shows that page as it was left, from
+// memory, at once (its back-forward cache), instead of loading it again.
+// Otherwise (or if nothing happens) the address is opened as a new page.
+let fallback = 0;
+function traverse(by, to) {
+  writeTrail({ ...step(readTrail(), by), pending: { by, app: to.app, at: to.at || null } });
+  clearTimeout(fallback);
+  // (Nothing left this page in time: the browser had no such entry.)
+  fallback = setTimeout(() => {
+    const t = readTrail();
+    writeTrail({ list: t.list, i: t.i });
+    open(to.url || resumeOf(savedSuite(), to.app).url, to.y || 0);
+  }, 900);
+  history.go(by);
+}
+const hlNow = () => globalThis.history?.length || 0;
 export function back() {
   const t = readTrail();
   const to = backOf(t);
   if (!to) return;
   remember();
+  const cur = readTrail().list[t.i];
+  if (cur?.backOk && cur.backOk === hlNow()) return traverse(-1, to);
   writeTrail(step(readTrail(), -1));
   open(to.url || resumeOf(savedSuite(), to.app).url, to.y || 0);
 }
@@ -182,8 +205,31 @@ export function forward() {
   const to = forwardOf(t);
   if (!to) return;
   remember();
+  const cur = readTrail().list[t.i];
+  if (cur?.fwdOk && cur.fwdOk === hlNow()) return traverse(1, to);
   writeTrail(step(readTrail(), 1));
   open(to.url || resumeOf(savedSuite(), to.app).url, to.y || 0);
+}
+// A page of this app has opened (or come back from the browser's memory):
+// which entry of the trail it is, and stamped so a later return finds it.
+export function landing(t, app, url, { tag = null, len = 0, id = () => Math.random().toString(36).slice(2, 10) } = {}) {
+  const pending = t?.pending || null;
+  let s = sane(t);
+  const k = tag ? s.list.findIndex(e => e.at === tag) : -1;
+  let how = 'other';
+  if (pending && s.list[s.i]?.app === app && (!pending.at || !tag || pending.at === tag)) how = pending.by < 0 ? 'back' : pending.by > 0 ? 'forward' : 'jump';
+  else if (k >= 0 && s.list[k].app === app) ((s = { list: s.list, i: k }), (how = 'memory'));
+  else {
+    // (The same app again: a reload, its own page. Another: opened from the page before, by a link or a notice.)
+    how = s.list[s.i]?.app === app ? 'same' : s.i >= 0 ? 'jump' : 'first';
+    s = arrive(s, app, url);
+  }
+  const e = { ...s.list[s.i], url, at: s.list[s.i].at || tag || id() };
+  // (Opened from the app before it: that one is right behind. Come back from the one after: it's right ahead.)
+  if (how === 'jump' || how === 'forward') e.backOk = len;
+  if (how === 'back') e.fwdOk = len;
+  if (how === 'jump') delete e.fwdOk;
+  return { list: s.list.map((x, n) => (n === s.i ? e : x)), i: s.i };
 }
 
 // ---- What's drawn ----
@@ -211,7 +257,7 @@ function el(tag, props = {}, kids = []) {
   n.append(...kids.filter(Boolean));
   return n;
 }
-const img = id => el('img', { src: iconOf(id), alt: '', width: '28', height: '28', draggable: 'false' });
+const img = id => el('img', { src: iconOf(id), alt: '', width: '24', height: '24', draggable: 'false' });
 
 let bar = null;
 function draw() {
@@ -223,7 +269,7 @@ function draw() {
   bar.replaceChildren(
     ...[
       el('button', { class: 'q-suite-btn q-suite-switch', type: 'button', 'aria-label': W(`切換 App（現在：${short(app)}）`, `Switch apps (now ${short(app)})`), onclick: () => switcher() }, [img(app), el('span', { class: 'q-suite-chev', html: svg(DOWN) })]),
-    b ? el('button', { class: 'q-suite-btn q-suite-back', type: 'button', 'aria-label': W(`回到 ${short(b.app)}`, `Back to ${short(b.app)}`), onclick: back }, [el('span', { class: 'q-suite-chev', html: svg(LEFT) }), img(b.app), el('span', { class: 'q-suite-label', text: short(b.app) })]) : null,
+    b ? el('button', { class: 'q-suite-btn q-suite-back', type: 'button', 'aria-label': W(`回到 ${short(b.app)}`, `Back to ${short(b.app)}`), onclick: back }, [el('span', { class: 'q-suite-chev', html: svg(LEFT) }), img(b.app)]) : null,
     f ? el('button', { class: 'q-suite-btn q-suite-fwd', type: 'button', 'aria-label': W(`前往 ${short(f.app)}`, `Forward to ${short(f.app)}`), onclick: forward }, [img(f.app), el('span', { class: 'q-suite-chev', html: svg(RIGHT) })]) : null
     ].filter(Boolean)
   );
@@ -266,6 +312,78 @@ async function switcher() {
   }
 }
 
+function land() {
+  const state = globalThis.history?.state;
+  const tag = state && typeof state === 'object' ? state.orbitAt || null : null;
+  const t = landing(readJson('sessionStorage', TRAIL_KEY), app, here(), { tag, len: hlNow() });
+  writeTrail(t);
+  // (The browser's entry for this page carries its id; an app's own state kept as it is.)
+  const at = t.list[t.i]?.at;
+  if (at && tag !== at && (state == null || (typeof state === 'object' && !Array.isArray(state)))) {
+    try {
+      history.replaceState({ ...(state || {}), orbitAt: at }, '');
+    } catch {}
+  }
+}
+
+// ---- The other apps, ready before they're opened ----
+// Once this app has settled and the phone is idle: each app's own service
+// worker put in place (it keeps its page), and the apps this window is
+// likely to open next (back, forward, the ones used lately here) have their
+// first screen's files fetched into the phone's cache, which every app's
+// worker answers from. So a switch opens from the phone, not the network.
+// Once a session each; never on a saving connection.
+const WARM_KEY = 'orbit.suite.warm';
+export function warmOrder(t, saved, here, now = Date.now()) {
+  const out = [];
+  const add = id => id && id !== here && BRANDS[id] && !out.includes(id) && out.push(id);
+  add(backOf(t)?.app);
+  add(forwardOf(t)?.app);
+  Object.entries(saved?.apps || {})
+    .filter(([, v]) => now - (Number(v?.t) || 0) < 14 * 86_400_000)
+    .sort((a, b) => (Number(b[1]?.t) || 0) - (Number(a[1]?.t) || 0))
+    .forEach(([id]) => add(id));
+  return out.slice(0, 5);
+}
+const pause = ms => new Promise(r => setTimeout(r, ms));
+const idle = () => new Promise(r => (globalThis.requestIdleCallback ? requestIdleCallback(() => r(), { timeout: 3000 }) : setTimeout(r, 500)));
+function warmSoon() {
+  if (globalThis.navigator?.connection?.saveData || !globalThis.navigator?.serviceWorker) return;
+  const go = () => setTimeout(() => warm().catch(() => {}), 2500);
+  const cover = document.getElementById('loading');
+  if (!cover || cover.hidden) return go();
+  const look = new MutationObserver(() => cover.hidden && (look.disconnect(), go()));
+  look.observe(cover, { attributes: true, attributeFilter: ['hidden'] });
+}
+async function warm() {
+  const done = readJson('sessionStorage', WARM_KEY) || {};
+  const sw = navigator.serviceWorker;
+  // Every app's worker (each keeps its own page: a first opening starts from the phone).
+  for (const id of APP_ORDER) {
+    if (id === app || done[`sw:${id}`]) continue;
+    await idle();
+    const path = pathOf(id);
+    if (!(await sw.getRegistration(path).catch(() => null))) await sw.register(`${path}sw.js`).catch(() => {});
+    done[`sw:${id}`] = 1;
+    writeJson('sessionStorage', WARM_KEY, done);
+  }
+  // The likely next ones: their first screen's own files (named by their hash, kept until they change).
+  for (const id of warmOrder(readTrail(), savedSuite(), app)) {
+    if (done[id]) continue;
+    await idle();
+    const path = pathOf(id);
+    const page = await fetch(path, { credentials: 'same-origin' })
+      .then(r => (r.ok ? r.text() : ''))
+      .catch(() => '');
+    for (const m of page.matchAll(/(?:src|href)="(\.\/[^"]+\?v=[0-9a-f]{12})"/g)) {
+      await fetch(new URL(m[1], new URL(path, location.href)).href, { credentials: 'same-origin', priority: 'low' }).catch(() => {});
+    }
+    done[id] = 1;
+    writeJson('sessionStorage', WARM_KEY, done);
+    await pause(300);
+  }
+}
+
 let started = false;
 export function start() {
   if (started || typeof document === 'undefined') return;
@@ -273,7 +391,7 @@ export function start() {
   if (!app) return;
   started = true;
   document.documentElement.classList.add('q-in-suite');
-  writeTrail(arrive(readTrail(), app, here()));
+  land();
   remember();
   const mount = () => {
     draw();
@@ -289,9 +407,12 @@ export function start() {
   // Back from the browser's own memory (a computer's back button): the trail again.
   globalThis.addEventListener('pageshow', e => {
     if (!e.persisted) return;
-    writeTrail(arrive(readTrail(), app, here()));
+    land();
     draw();
   });
+  // (A page left for the browser's memory never opens anything later.)
+  globalThis.addEventListener('pagehide', () => clearTimeout(fallback));
+  warmSoon();
   globalThis.addEventListener('hashchange', () => remember());
 }
 
