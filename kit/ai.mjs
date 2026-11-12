@@ -17,12 +17,13 @@
 //
 // Code first: an app parses what it can itself and calls these only for the rest.
 import { h, sheet, search, cell, icons } from './ui.mjs';
-import { workerJson } from './orbit.mjs';
+import { workerJson, netState } from './orbit.mjs';
 import { W } from './lang.mjs';
 
 export async function aiCall(feature, input, { answers = [], timeout = 40_000 } = {}) {
   const r = await workerJson('/ai', 'v=1', { body: JSON.stringify({ feature, input: { ...input, answers } }), timeout, errors: true });
-  return r || { error: 'offline' };
+  // (No answer: offline only when the phone is; else the AI took too long, 「AI 現在沒有回應」.)
+  return r || { error: globalThis.navigator?.onLine === false || netState?.() === 'offline' ? 'offline' : 'timeout' };
 }
 
 // A picture for the AI (a photo, a screenshot): drawn upright at most `side`
@@ -159,7 +160,14 @@ export function askBox(ask, { lists = {}, titles = {} } = {}) {
   const answer = new Promise(r => (resolve = r));
   const list = ask.field ? lists[ask.field] || [] : null;
   const nameOf = id => list?.find(x => x.id === id)?.name || id;
-  const done = (a, id) => {
+  // (An answer from 其他… or typed: shown as a lit chip once answered, the typing box put away.)
+  const done = (a, id, shown = null) => {
+    if (shown != null) {
+      const lit = id != null && [...chips.querySelectorAll('.q-chip:not(.q-ai-more)')].find((c, i) => ask.options[i] === id);
+      if (lit) lit.classList.add('on');
+      else chips.insertBefore(h('button', { type: 'button', class: 'q-chip on' }, [shown]), chips.querySelector('.q-ai-more'));
+      own.hidden = true;
+    }
     box.classList.add('answered');
     box.querySelectorAll('button, textarea').forEach(b => (b.disabled = true));
     resolve({ q: ask.q, a, ...(id ? { id, field: ask.field } : {}) });
@@ -179,12 +187,12 @@ export function askBox(ask, { lists = {}, titles = {} } = {}) {
           class: 'q-chip q-ai-more',
           onclick: async () => {
             const id = await pickList(list, { title: titles[ask.field] || ask.q });
-            if (id != null) done(said(id), id);
+            if (id != null) done(said(id), id, nameOf(id));
           }
         }, [W('其他…', 'Other…')])
       );
   } else {
-    const bar = aiBar({ placeholder: W('自己打', 'Type your answer'), onSend: t => done(t) });
+    const bar = aiBar({ placeholder: W('自己打', 'Type your answer'), onSend: t => done(t, null, t) });
     own.append(bar);
     chips.append(h('button', { type: 'button', class: 'q-chip q-ai-more', onclick: () => ((own.hidden = false), bar.input.focus()) }, [W('自己打', 'Type it')]));
   }
