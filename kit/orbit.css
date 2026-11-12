@@ -4119,6 +4119,9 @@ div.q-ritem {
   transform: rotate(45deg);
 }
 
+/* The follow button (ui.mjs followButton): graphite until followed, then quiet words in a hairline. */
+.q-follow { display: inline-flex; align-items: center; justify-content: center; flex: none; align-self: center; min-height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--q-fill-3); color: var(--q-label, var(--q-text)); font: inherit; font-size: 13.5px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.q-follow.on { background: transparent; box-shadow: inset 0 0 0 1px var(--q-fill-2); color: var(--q-text-2); }
 .q-tag {
   --t: var(--q-label-2);
   display: inline-flex;

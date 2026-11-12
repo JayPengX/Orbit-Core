@@ -68,6 +68,16 @@ export const spanOf = scope =>
     return y > x && y - x <= 20 ? `${m} ${Array.from({ length: y - x - 1 }, (_, i) => x + i + 1).join(' ')}` : m;
   });
 
+// Simplified Chinese's common characters (never Taiwan's).
+const SIMPLIFIED = /[这们说时会发对经还为业东车长门见现问间关开应实点两亿国联军华负责将诉讯认让议论员总统选举区际头条报导历图书话语气乐听觉进远运过边达迁递务动劳卫监检验证调审决签约贸币价钱银财费额购买卖损伤医疗药灾难护]/;
+// A point that copies the material: any 12 characters running (Chinese) of it found in it.
+const copied = (zh, material) => {
+  const t = String(zh).replace(/[\s，、：「」（）]/g, '');
+  const m = String(material).replace(/[\s，、：「」（）,]/g, '');
+  for (let i = 0; i + 12 <= t.length; i++) if (m.includes(t.slice(i, i + 12))) return true;
+  return false;
+};
+
 export const FEATURES = {
   // Orbit Money: 用說的記帳, the sentences the app's own parser couldn't
   // read ("跟同學吃火鍋花了三百五"). Entries for the person to look over, as 拍照記帳's.
@@ -1086,6 +1096,46 @@ export const FEATURES = {
         // (A diff that only says each side's line again is dropped: sidesRecap.)
         const recap = sidesRecap(dz, Object.values(sides).map(x => x.zh));
         out[src.id] = { sides, diff: whole && dz && de && !recap && numbersFrom(dz + ' ' + de, text) ? { zh: dz, en: de } : null };
+      }
+      return out;
+    }
+  },
+
+  // Orbit News' 重點整理 (built once a story, builders/ai.js newsBriefs; Jay
+  // 11-13: "make it more in app"): what happened, in a few short points of
+  // our own words, from the outlets' own headlines and feed summaries only
+  // (never an article: outlets mark them 禁止轉載), each number theirs.
+  'news-brief': {
+    models: ['haiku', 'luna'],
+    timeoutMs: 60_000,
+    maxIn: 12000,
+    parts: ({ stories }) =>
+      text(
+        [
+          'Each item is one news story: several outlets’ headlines ("heads") and the short summaries their feeds gave ("sums"). For each, write what a reader needs to know in 2 to 4 short points, the most important first: what happened, then the key details (who, numbers, where, when), then what comes next or how those involved responded, if the material says so. Each point one plain sentence of your own words: never copy a sentence or a phrase of more than 8 characters from the material, never quote a headline, no outlet’s name, no opinion of yours, no “according to reports”.',
+          'Only what the material states; if outlets disagree on a fact or a number, leave it out. A claim or accusation keeps who made it (檢方起訴, 涉嫌, X says), never stated as fact. Numbers: copy each exactly as the material writes it (digits stay digits, number words stay words; no unit or currency conversion, no turning "next year" into a year). Names as the material writes them; a foreign name in zh in the form Taiwan’s media use (川普, 普丁, 黃仁勳), else keep the English; in en a Taiwanese person only by the English name they’re known by (賴清德 = Lai Ching-te), else by their role.',
+          'zh: Traditional Chinese as Taiwan writes it (台灣用語; never Simplified), full-width punctuation (，：「」) with half-width digits, each point at most 40 characters, no full stop at the end. en: plain natural English, each point at most 22 words, the same points in the same order as zh. Return one item per story with its id; skip none.',
+          JSON.stringify(stories)
+        ].join('\n')
+      ),
+    schema: obj({ items: arr(obj({ id: S, points: arr(obj({ zh: S, en: S })) })) }),
+    clean(raw, { stories }) {
+      const given = new Map(stories.map(s => [s.id, s]));
+      const out = {};
+      for (const it of list(raw?.items, 40)) {
+        const src = given.get(String(it?.id || ''));
+        if (!src) continue;
+        const material = JSON.stringify(src);
+        const points = [];
+        for (const p of list(it.points, 4)) {
+          const zh0 = String(p?.zh || '').trim(), en0 = String(p?.en || '').trim();
+          // (Past its length it was cut mid-word: a point said too long is left out; so is Simplified Chinese.)
+          if (!zh0 || !en0 || zh0.length > 46 || en0.split(/\s+/).length > 28 || SIMPLIFIED.test(zh0)) continue;
+          const zh = zh0.replace(/[。.]$/, '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+          if (copied(zh, material)) continue;
+          if (numbersFrom(zh + ' ' + en0, material)) points.push({ zh, en: en0 });
+        }
+        if (points.length >= 2) out[src.id] = points;
       }
       return out;
     }

@@ -1517,6 +1517,23 @@ const tag_ = t => (typeof t === 'string' ? h('span', { class: 'q-tag', text: t }
 export function tag(text, tone = '', color = '') {
   return tag_({ text, tone: color ? `${tone} tint` : tone, color });
 }
+// One follow button for the family (Orbit Sports' teams and players, Orbit
+// News' people, topics and outlets): a small graphite pill, `+ 追蹤` until
+// followed, then quiet `✓ 追蹤中` (Jay 2026-11-03: never an orange pill).
+// isOn() says whether it's followed now; toggle() flips it; the tap never
+// reaches a row under it. `label`/`on`: other words for the two states.
+export function followButton(isOn, toggle, { label = kitW('追蹤', 'Follow'), on = kitW('追蹤中', 'Following'), cls = '' } = {}) {
+  const b = h('button', { class: `q-follow${cls ? ` ${cls}` : ''}`, type: 'button' });
+  const paint = () => {
+    const yes = Boolean(isOn());
+    b.textContent = yes ? `✓ ${on}` : `+ ${label}`;
+    b.classList.toggle('on', yes);
+    b.setAttribute('aria-pressed', String(yes));
+  };
+  b.addEventListener('click', e => (e.stopPropagation(), toggle(), paint()));
+  paint();
+  return Object.assign(b, { paint });
+}
 // Cards that scroll sideways to the screen's edge.
 // ---- A page's sections in columns (docs/DESIGN.md §10) ----
 // flowColumns(root): every .q-flow under root (or root itself) has its
