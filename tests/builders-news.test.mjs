@@ -592,6 +592,9 @@ test("the videos in Taiwan's articles (Jay 11-12): each outlet's way of putting 
     const rss = { 'https://cts/rss': ['ebc', titles[0], 'https://cts.example/1'], 'https://pts/rss': ['pts', titles[1], 'https://pts.example/1'], 'https://cna/rss': ['cna', titles[2], 'https://cna.example/1'] }[u];
     return { ok: true, status: 200, headers: new Headers(), text: async () => (rss ? feed(...rss) : page[u] || '<html></html>') };
   };
+  // (The pages are the last build's top stories': the first lays the desk, the next reads them.)
+  await runNews({ store, now: NOW - 600_000, fetchImpl, feeds, channels: {} });
+  assert.equal(asked.length, 0);
   await runNews({ store, now: NOW, fetchImpl, feeds, channels: {} });
   const st = files.get(NEWS_STATE);
   assert.deepEqual(st.pages['https://cts.example/1'].y, ['CTSCLIP0001']);

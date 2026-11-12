@@ -1209,8 +1209,10 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
   for (const it of [...items, ...recs.flatMap(r => r.items)]) if (kept.pages?.[it.u]) pages[it.u] = kept.pages[it.u];
   // (And the clips GitHub found in the pages that refuse us.)
   withClips(pages, await store.json(NEWS_CLIPS).catch(() => null));
-  let out = deskOf(items, recs, now, { pages, vids: clips });
-  const want = pagesToRead(out, pages);
+  // (Which pages: the last build's top stories (its index), so the desk is
+  // laid once a build; twice passed the Runner's 30 s of CPU, 11-12.)
+  const last = await store.json(NEWS_PATH).catch(() => null);
+  const want = pagesToRead({ tw: last?.tw || [], intl: last?.intl || [] }, pages);
   const whyNot = {};
   const read = await Promise.all(want.map(u => readPage(u, { fetchImpl, why: w => (whyNot[u] = w) })));
   // (Each clip a page names asked once whether it's a Short: those are left
@@ -1226,7 +1228,7 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
     if (!p) (unread[o] ||= []).push(whyNot[u] || '?');
     pages[u] = p ? { ...p, y: p.y.filter(id => !(shorts[id] < 0)) } : { i: '', y: [] };
   });
-  if (want.length) out = deskOf(items, recs, now, { pages, vids: clips });
+  const out = deskOf(items, recs, now, { pages, vids: clips });
   const keep = new Set([...items, ...out.recs.flatMap(r => r.items)].map(it => it.u));
   for (const u of Object.keys(pages)) if (!keep.has(u)) delete pages[u];
   await store.put(NEWS_STATE, { items, etag, pages, recs: out.recs, vids: clips, shorts });
