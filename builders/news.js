@@ -801,6 +801,11 @@ const sumOf = vs => {
   return v;
 };
 // What a story keeps of a headline.
+// (A story's headline this far from the rest of it, leaving it out, isn't
+// the story's: measured on 11-12's page, strays sat under 0.05 (English) and
+// 0.075 (Chinese), the story's own above.)
+export const STRAY = { zh: 0.075, en: 0.05 };
+const STRAY_MIN = 6;
 const keepOf = ({ o, t, u, at, d, img, v }) => ({ o, t, u, at, ...(d ? { d } : {}), ...(img ? { img } : {}), ...(v ? { v } : {}) });
 
 // Each channel clip to the kept story its title is nearest: near enough
@@ -905,8 +910,24 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
     const sized = recsHere.map(r => {
       r.items.sort((a, b) => a.at - b.at);
       if (r.items.length > REC_ITEMS) r.items = [...r.items.slice(0, 10), ...r.items.slice(10 - REC_ITEMS)];
-      const vs = r.items.map(vecOf);
-      const c = sumOf(vs);
+      let vs = r.items.map(vecOf);
+      let c = sumOf(vs);
+      // A headline that shares next to nothing with the rest of its story
+      // came in with a group it was chained into (a group joins the story of
+      // any one headline it holds): let go. 11-12: the Hegseth impeachment
+      // story held LSU's coach, China's car sales and oil prices.
+      if (r.items.length >= STRAY_MIN) {
+        const keep = vs.map(v => {
+          const rest = new Map(c);
+          for (const [k, x] of v) rest.set(k, rest.get(k) - x);
+          return cosine(v, norm(v), rest, norm(rest)) >= STRAY[lang];
+        });
+        if (keep.some(k => !k) && keep.filter(Boolean).length >= FEWEST[region]) {
+          r.items = r.items.filter((_, i) => keep[i]);
+          vs = vs.filter((_, i) => keep[i]);
+          c = sumOf(vs);
+        }
+      }
       return { r, vs, c, cn: norm(c), first: r.items[0]?.at || now, last: r.items.at(-1)?.at || now };
     });
     const clipsOf = matchClips(vids.filter(v => OUTLETS[v.o]?.region === region), sized, vecOf, lang);
