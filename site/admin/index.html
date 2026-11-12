@@ -92,6 +92,11 @@
   .flow li.sum .nm, .flow li.sum .v { font-weight: 800; }
   .flow.stack .nm small { display: block; margin: 2px 0 0; white-space: nowrap; overflow: hidden; }
   #cap .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* A phone: tiles two to a row, and a last one alone takes the row (Gemini under Claude and GPT, TDX's 節流) instead of half a row and a hole. */
+  @media (max-width: 639px) {
+    .tiles, .card .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tiles > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+  }
   #door .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   @media (min-width: 900px) { #door .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
   .tile strong.warn { color: var(--q-warn, #c77700); }
@@ -196,6 +201,10 @@
   .pane-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 18px 2px 10px; }
   .pane-head > div { flex: 1 1 0; min-width: 0; }
   .pane-head > button { flex: none; }
+  /* A head with a row of buttons (AI's 上限 · 重新整理): the buttons go under the words when both don't fit, never squeeze them to half the width. */
+  .pane-head:has(> .row) { flex-wrap: wrap; }
+  .pane-head:has(> .row) > div:first-child { flex: 1 1 240px; }
+  .pane-head > .row { flex: none; }
   .pane-head h2 { margin: 0; }
   /* Rows: one column on a phone, two side by side when wide; the check and build buttons a grid. */
   @media (min-width: 700px) { ul.checks { grid-template-columns: repeat(2, minmax(0, 1fr)); } ul.checks > li:last-child:nth-child(odd) { grid-column: 1 / -1; } }
@@ -423,6 +432,8 @@
   .tool-head i svg { width: 22px; height: 22px; }
   .tool-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
   [hidden] { display: none !important; }
+  /* A part a link scrolls to (data-to, 工具's shortcuts, 健康's chips) lands under the sticky top bar, not behind it. */
+  main [id] { scroll-margin-top: calc(env(safe-area-inset-top) + 76px); }
   /* Secondary lines (a label, a sub-line, a note) wrap onto a second line on a narrow screen, never cut with an ellipsis; names and figures stay on one line. */
   .tile small, .tile em, .kpi small, .kpi em, .hcell small, .hit small, .stats-strip small, .q-ritem-text > small { white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
 </style>
@@ -554,7 +565,7 @@
       <div class="card" style="margin-top:12px">
         <strong>帳單警示</strong>
         <p class="muted" id="alert-note" style="margin:6px 0 10px"></p>
-        <div class="row"><input id="alert-pass" placeholder="你的 Orbit Pass" autocomplete="off" spellcheck="false" style="flex:1 1 0;min-width:0" /><button id="alert-save" class="small" style="flex:none">設定</button><button id="alert-test" class="small" style="flex:none">測試</button></div>
+        <div class="row"><input id="alert-pass" placeholder="Orbit Pass" autocomplete="off" spellcheck="false" style="flex:1 1 0;min-width:0" /><button id="alert-save" class="small" style="flex:none">設定</button><button id="alert-test" class="small" style="flex:none">測試</button></div>
         <p id="alert-ok" class="ok"></p>
       </div>
       <div class="pane-head" id="ai-use"><div><h2>AI</h2><p class="muted">三家 AI 的預付餘額，和每個 App 的 AI 今天用了多少、這個月花多少。金額都是新台幣。</p></div><div class="row" style="flex:none"><button class="small" data-go="dev" data-to="set-ai">上限</button><button class="small" id="aim-load">重新整理</button></div></div>
