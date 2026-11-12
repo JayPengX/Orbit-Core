@@ -827,10 +827,13 @@ export function reorder(container, { items = ':scope > [data-q-key]', onChange =
     const r = rows[from];
     const top = rows[0].top;
     const bottom = rows.at(-1).top + rows.at(-1).height;
-    // Within the list's own ends (never dragged out of it).
-    const dy = Math.max(top - r.top, Math.min(bottom - r.top - r.height, g.y - y0 + (s.scrollTop - s0)));
+    // Within the list's own ends (never dragged out of it); its place follows the finger,
+    // so past either end it is first or last (the drawn row, held at the end, sits on that
+    // row's middle and never crossed it).
+    const want = g.y - y0 + (s.scrollTop - s0);
+    const dy = Math.max(top - r.top, Math.min(bottom - r.top - r.height, want));
     row.style.transform = `translate3d(0, ${dy}px, 0)`;
-    const to = reorderSlot(rows, from, r.top + dy + r.height / 2);
+    const to = reorderSlot(rows, from, r.top + want + r.height / 2);
     if (to !== g.to) {
       g.to = to;
       tick();
