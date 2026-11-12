@@ -559,3 +559,15 @@ test('興櫃 trades 09:00–15:00 (by negotiation), past the listed market’s 1
   assert.equal(dayOrderEnd(q('1260.TWO'), at('10:00')), at('15:00'));
   assert.equal(dayOrderEnd(q('2330.TW'), at('10:00')), at('13:30'));
 });
+
+// ---- Valued before any rate is read ------------------------------------------------
+
+test('with no rate read, US$ cash is valued at the last exchange, never NT$0', async () => {
+  const { valuate } = await import('../kit/stock-account.mjs');
+  const acc = newAccount(100_000, 1_000, 'acc');
+  acc.events.push({ id: 'fx1', type: 'fx', t: 2_000, from: 'TWD', to: 'USD', amount: 32_000, received: 1_000 });
+  const v = valuate(replay(acc), new Map(), { TWD: 1 });
+  const usd = v.cash.find(c => c.currency === 'USD');
+  assert.equal(usd.twd, 32_000);
+  assert.deepEqual(v.missingRates, ['USD']);
+});
