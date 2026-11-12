@@ -267,6 +267,12 @@ test('there is one toast: the Pass sheet says its 沒有成功 with the kit\'s g
   assert.doesNotMatch(css, /\.q-pass-toasts|\.q-pass \.toast/);
 });
 
+test('a #help= link closed takes only the guide out of the address: the app\'s own part (its tab) stays', () => {
+  const p = readFileSync(new URL('../kit/pass.mjs', import.meta.url), 'utf8');
+  assert.match(p, /const rest = location\.hash\.slice\(1\)\.split\('&'\)\.filter\(p => p && !p\.startsWith\('help='\)\)\.join\('&'\);/);
+  assert.match(p, /\$\{rest \? `#\$\{rest\}` : ''\}/);
+});
+
 // ---- empty ----
 test('empty(): an accent tile, one line, one button; an emoji and a node action still work', () => {
   const e = ui.empty({ icon: 'ticket', title: '沒有票', body: '去買', action: { label: '去看看', onTap() {} } });
