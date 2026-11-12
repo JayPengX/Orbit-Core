@@ -1047,6 +1047,26 @@ export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFA
     if (d0.hi != null) d0.hi = r1(Math.max(d0.hi, ...temps));
     if (d0.lo != null) d0.lo = r1(Math.min(d0.lo, ...temps));
   }
+  // A day the hours cover whole: its high and low (and feels) are its hours'
+  // (one number one thing: the 10 days and the day sheet's 最高/最低 marks
+  // read the same hours; the daily sources' own were 1–3° off, 11-12).
+  const tz = google?.tz || 'Asia/Taipei';
+  const byDay = new Map();
+  for (const h of hours) {
+    if (h.temp == null) continue;
+    const date = dayIn(h.t, tz);
+    if (!byDay.has(date)) byDay.set(date, []);
+    byDay.get(date).push(h);
+  }
+  for (const d of days) {
+    const hs = byDay.get(d.date);
+    if (d.date === dayIn(now, tz) || !hs || hs.length < 22) continue;
+    const t = hs.map(h => h.temp);
+    d.hi = r1(Math.max(...t));
+    d.lo = r1(Math.min(...t));
+    const fl = hs.map(h => h.feels).filter(v => v != null);
+    if (fl.length >= 22) [d.feelsHi, d.feelsLo] = [r1(Math.max(...fl)), r1(Math.min(...fl))];
+  }
 
   bySource.now = { temp: { google: g?.temp ?? null, station: st?.temp ?? null } };
   const resp = {
