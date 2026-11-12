@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ALTS, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport } from '../builders/news.js';
+import { ALTS, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIP_READS, PAGE_READS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -286,7 +286,7 @@ test("a story's clips and picture come from its outlets' pages; the build reads 
   // Pages to read: a clip outlet's for a story with no clip, the lead's for one with no picture.
   const want = pagesToRead({ tw: [{ items: its.map(x => [x.o, x.t, x.u, x.at]), clips: [], img: '' }], intl: [] }, {});
   assert.ok(want.includes(its[1].u) || want.includes(its[0].u));
-  assert.ok(want.length <= 12);
+  assert.ok(want.length <= PAGE_READS + CLIP_READS);
 });
 
 test('a story is kept for days, grows as coverage comes, and ranks by importance, not newness', () => {
@@ -521,4 +521,85 @@ test("a kept story of several companies' reports keeps its owner's alone (11-12:
   assert.equal(reportOf('卓榮泰不副署老福法'), '');
   assert.deepEqual(reportsOwner(['中信金前10月EPS 3.45元', '中信金前10月賺685.5億', '獲利亮眼！元大金前十月EPS 4.3元 中信金3.45元']), { owner: '中信金', mixed: true });
   assert.equal(otherReport('獲利亮眼！元大金前十月EPS 4.3元 中信金3.45元', '中信金'), false);
+});
+
+test("the videos in Taiwan's articles (Jay 11-12): each outlet's way of putting one in, the article's own only, never a Short", async () => {
+  // TVBS's and 中央社's players in the article (late-loaded too), 華視's beside a list of the channel's links (never those).
+  assert.deepEqual(pageOf('<p>…</p><iframe data-lexical-youtube="D6pygPlBxmE" src="https://www.youtube-nocookie.com/embed/D6pygPlBxmE" frameborder="0"></iframe>').y, ['D6pygPlBxmE']);
+  assert.deepEqual(pageOf("<iframe title='youtube iframe' src='//www.youtube.com/embed/gOPqT0Wkd5s'></iframe>").y, ['gOPqT0Wkd5s']);
+  assert.deepEqual(pageOf('<iframe class="lazy" data-src="https://www.youtube.com/embed/LAZY0000001?rel=0"></iframe>').y, ['LAZY0000001']);
+  assert.deepEqual(pageOf('<a href="https://www.youtube.com/watch?v=LIST0000001">x</a><a href="https://www.youtube.com/shorts/SHRT0000001">y</a>').y, []);
+  // og:video naming a YouTube clip; a VideoObject's own video (三立's mp4, 中天's), played on the outlet's site.
+  assert.deepEqual(pageOf('<meta property="og:video:url" content="https://www.youtube.com/embed/OGVIDEO0001">').y, ['OGVIDEO0001']);
+  const setn = `<script type="application/ld+json">
+    { "@context": "https://schema.org", "@type": "VideoObject", "name": "羅大佑", "thumbnailUrl": ["dest/x.jpg"],
+      "embedUrl": "https://video.setn.com/dest/2026/11/12/250144_1829/mp4/master.mp4" }
+  </script>`;
+  assert.deepEqual(pageOf(setn), { i: '', y: [], v: ['https://video.setn.com/dest/2026/11/12/250144_1829/mp4/master.mp4'] });
+  const graph = `<script type="application/ld+json">{"@graph":[{"@type":"NewsArticle","video":{"@type":"VideoObject","contentUrl":"https://www.youtube.com/watch?v=GRAPH000001"}}]}</script>`;
+  assert.deepEqual(pageOf(graph).y, ['GRAPH000001']);
+  // (A VideoObject that won't parse is read for its fields.)
+  assert.deepEqual(pageOf('<script type="application/ld+json">{"@type":"VideoObject","contentUrl":"https://storage.ctinews.com/a.m3u8",}</script>').v, ['https://storage.ctinews.com/a.m3u8']);
+  // 聯合's own player.
+  assert.deepEqual(pageOf('<div class="video-container"><iframe width="640" src="https://video.udn.com/embed/news/1331985"></iframe></div>').v, ['https://video.udn.com/embed/news/1331985']);
+
+  // The article's own: a clip on two reports of one story is the story's
+  // (中央社's two on one event); on a page of another story it's the box beside them all.
+  const one = [item('cna', '施振榮出席APEC 賴總統交付任務', NOW - H, { near: 0.5 }), item('cna', '施振榮：台灣是AI不可或缺夥伴', NOW - 2 * H, { near: 0.5 }), item('pts', '施振榮代表出席APEC', NOW - H, { near: 0.5 })];
+  const other = item('cna', '颱風明天登陸', NOW - H);
+  const pages = {
+    [one[0].u]: { i: '', y: ['OWNCLIP0001', 'BOXCLIP0001'] },
+    [one[1].u]: { i: '', y: ['OWNCLIP0001', 'BOXCLIP0001'] },
+    [one[2].u]: { i: '', y: [], v: ['https://pts/own.mp4'] },
+    [other.u]: { i: '', y: ['BOXCLIP0001'] }
+  };
+  const same = sameOf(pages, [...one, other]);
+  const mine = new Set(one.map(x => x.u));
+  assert.equal(same.clip('cna', 'OWNCLIP0001', mine), true);
+  assert.equal(same.clip('cna', 'BOXCLIP0001', mine), false);
+  // (Only pages of this one story read: a box can't yet be told from its own.)
+  assert.equal(sameOf(pages, one).clip('cna', 'OWNCLIP0001', mine), false);
+  const ptsOther = item('pts', '別的新聞', NOW);
+  pages[ptsOther.u] = { i: '', y: [] };
+  const s = storyOf(one, 'tw', NOW, { pages, same: sameOf(pages, [...one, other, ptsOther]) });
+  assert.deepEqual(s.clips.map(c => [c[0], c[1]]), [['cna', 'OWNCLIP0001'], ['pts', '']]);
+  assert.equal(s.clips[1][2], one[2].u);
+
+  // Which pages: a story with fewer than 2 clips gets two of its clip outlets' (公視's, 華視's before TVBS's).
+  const story = { items: [['tvbs', 'x', 'https://tvbs/1', NOW], ['cts', 'x', 'https://cts/1', NOW], ['pts', 'x', 'https://pts/1', NOW], ['newtalk', 'x', 'https://newtalk/1', NOW]], clips: [], img: 'https://p.jpg' };
+  assert.deepEqual(pagesToRead({ tw: [story], intl: [] }, {}), ['https://pts/1', 'https://cts/1']);
+  assert.deepEqual(pagesToRead({ tw: [{ ...story, clips: [['pts', 'AAAAAAAAAAA'], ['ebc', 'BBBBBBBBBBB']] }], intl: [] }, {}), []);
+  assert.deepEqual(pagesToRead({ tw: [{ ...story, clips: [['pts', 'AAAAAAAAAAA']] }], intl: [] }, {}), ['https://cts/1']);
+  assert.ok(CLIPS_AT.every(o => OUTLETS[o]?.region === 'tw'), 'Taiwan’s outlets');
+  const many = Array.from({ length: 30 }, (_, i) => ({ ...story, items: story.items.map(([o, t, u, at]) => [o, t, `${u}/${i}`, at]), img: '' }));
+  const want = pagesToRead({ tw: many, intl: [] }, {});
+  assert.equal(want.length, CLIP_READS + PAGE_READS);
+
+  // The build: an article's clip asked once whether it's a Short; a Short left out.
+  const files = new Map();
+  const store = { json: async p => files.get(p) ?? null, put: async (p, d) => (files.set(p, d), true) };
+  const titles = ['立法院三讀通過總預算 朝野協商破局', '總預算三讀通過 朝野協商破局', '朝野協商破局 立法院三讀總預算'];
+  const feed = (o, t, u) => `<rss><channel><item><title>${t}</title><link>${u}</link><pubDate>${new Date(NOW - H).toUTCString()}</pubDate></item></channel></rss>`;
+  const feeds = { cts: [['https://cts/rss', 'rss']], pts: [['https://pts/rss', 'rss']], cna: [['https://cna/rss', 'rss']] };
+  const page = { 'https://cts.example/1': '<iframe src="https://www.youtube.com/embed/CTSCLIP0001"></iframe>', 'https://pts.example/1': '<iframe src="https://www.youtube.com/embed/SHORTCLIP01"></iframe>' };
+  const asked = [];
+  const fetchImpl = async (url, init = {}) => {
+    const u = String(url);
+    if (u.startsWith('https://www.youtube.com/shorts/')) {
+      asked.push([u, init.redirect]);
+      return /SHORTCLIP01/.test(u) ? { ok: true, status: 200, redirected: false, url: u, headers: new Headers() } : { ok: false, status: 303, url: u, headers: new Headers() };
+    }
+    const rss = { 'https://cts/rss': ['cts', titles[0], 'https://cts.example/1'], 'https://pts/rss': ['pts', titles[1], 'https://pts.example/1'], 'https://cna/rss': ['cna', titles[2], 'https://cna.example/1'] }[u];
+    return { ok: true, status: 200, headers: new Headers(), text: async () => (rss ? feed(...rss) : page[u] || '<html></html>') };
+  };
+  await runNews({ store, now: NOW, fetchImpl, feeds, channels: {} });
+  const st = files.get(NEWS_STATE);
+  assert.deepEqual(st.pages['https://cts.example/1'].y, ['CTSCLIP0001']);
+  assert.deepEqual(st.pages['https://pts.example/1'].y, []);
+  assert.deepEqual(st.shorts, { CTSCLIP0001: NOW, SHORTCLIP01: -NOW });
+  assert.ok(asked.every(([, r]) => r === 'manual'));
+  // (Asked once: the next build asks nothing.)
+  asked.length = 0;
+  await runNews({ store, now: NOW + 600_000, fetchImpl, feeds, channels: {} });
+  assert.equal(asked.length, 0);
 });
