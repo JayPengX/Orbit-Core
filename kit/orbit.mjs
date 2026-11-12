@@ -3185,7 +3185,9 @@ export async function schedulePush(s, items) {
     .sort((a, b) => a.at - b.at)
     .slice(0, 60);
   const text = JSON.stringify(list);
-  if (readStore(storeKey) === text && readStore(`orbit.push.sub.${s.app}`)) return;
+  // (The same list, and this phone given to the Worker today: nothing to send. Each new day it's given
+  // again, as enablePush means to: a subscription the browser renewed reaches the Worker, the list kept alive.)
+  if (readStore(storeKey) === text && readStore(`orbit.push.sub.${s.app}`)?.endsWith(`|${new Date().toDateString()}`)) return;
   if (!(await enablePush(s))) return;
   const before = readStore(storeKey);
   if (await pushPost(s, 'schedule', { items: list })) {
