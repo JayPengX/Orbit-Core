@@ -529,7 +529,12 @@ const stem = w => w.slice(0, 6);
 // The words of a company's monthly report (營收, 年增, 創新高…): every
 // company's, so they'd make one story of a day's reports (Jay 11-10: 台積電's
 // sheet held 豆府's, 大東電's, 全家's).
-const ZH_STOP = new Set('營收 月營 收月 收年 收創 月增 年增 增率 月減 年減 創新 新高 同期 期新 累計 億元 單月 歷史 史新 合併 併營 前十 財報 獲利 毛利 每股'.split(' '));
+// (And a quarter's results: 前三季, 股本, EPS, Q3. Jay's 11-10 rule, one
+// company's report never another's story: 11-12's held 中華電's, 聯發科's,
+// 和碩's and 宜特's October by 「10」 alone, and 陽明's, 祥碩's and 霈方's
+// quarters by 前三季 and 股本.)
+const ZH_STOP = new Set('營收 月營 收月 收年 收創 月增 年增 增率 月減 年減 創新 新高 同期 期新 累計 億元 單月 歷史 史新 合併 併營 前十 財報 獲利 毛利 每股 前三 三季 前二 二季 前四 四季 單季 季賺 賺逾 賺近 個股 股本 元創 半個 金前 這大'.split(' '));
+const ZH_LATIN_STOP = /^(eps|q[1-4]|[1-4]q)$/;
 export function piecesOf(title, lang) {
   const s = cleanTitle(title).normalize('NFKC').toLowerCase();
   const out = [];
@@ -538,7 +543,8 @@ export function piecesOf(title, lang) {
       if (run.length === 1) out.push(run);
       for (let i = 0; i + 1 < run.length; i++) if (!ZH_STOP.has(run.slice(i, i + 2))) out.push(run.slice(i, i + 2));
     }
-    for (const w of s.match(/[a-z][a-z0-9.+-]*[a-z0-9]|\d{2,}/g) || []) out.push(w);
+    // (A month's number, 「10月」, says only when: every company's October report has it.)
+    for (const w of s.replace(/\d+\s*月/g, ' ').match(/[a-z][a-z0-9.+-]*[a-z0-9]|\d{2,}/g) || []) if (!ZH_LATIN_STOP.test(w)) out.push(w);
     return out;
   }
   for (const w of s.replace(/['’]s\b/g, '').match(/[a-z0-9][a-z0-9-]*/g) || []) if (w.length > 2 && !EN_STOP.has(w)) out.push(stem(w));
