@@ -3387,10 +3387,10 @@ function notifyRows(s, note) {
   const T = (zh, e) => (en ? e : zh);
   const supported = 'Notification' in globalThis;
   const state = () => {
-    if (!supported) return notifyPrefs().on ? T('已開啟；這個瀏覽器收不到通知', 'On; this browser can’t show them') : T('這個瀏覽器不支援', 'Not supported here');
-    if (Notification.permission === 'denied') return T('這台裝置封鎖了通知：請到系統設定允許', 'Blocked on this device: allow them in system settings');
+    if (!supported) return notifyPrefs().on ? T('已開啟；這個瀏覽器收不到', 'On; this browser can’t show them') : T('這個瀏覽器不支援', 'Not supported here');
+    if (Notification.permission === 'denied') return T('已封鎖，到設定打開', 'Blocked: allow in Settings');
     if (notifyOn()) return T('開啟：每個 App、每台裝置', 'On: every app, every device');
-    if (notifyPrefs().on) return T('已開啟；這台裝置還沒允許，點開關允許', 'On; not allowed on this device yet: tap to allow');
+    if (notifyPrefs().on) return T('還沒允許：點開關', 'Not allowed here yet: tap');
     return T('關閉', 'Off');
   };
   const sub = node('small', { class: 'q-notice-sub', text: state() });

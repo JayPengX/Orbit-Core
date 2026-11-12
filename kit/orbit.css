@@ -3619,7 +3619,8 @@ dialog {
 }
 .q-pass-title { display: flex; align-items: center; gap: 10px; }
 .q-pass-title img { border-radius: 8px; }
-.q-pass-tabs { position: sticky; top: -1px; z-index: 2; margin: 0 calc(-1 * var(--q-margin)) var(--q-s-4); padding: var(--q-s-2) var(--q-margin); background: var(--q-sheet); }
+/* (Stuck at the top, the segments sit clear under the grabber: it lay across their top edge, 11-12; the 6 px more above is taken back by the margin, so unstuck nothing moves.) */
+.q-pass-tabs { position: sticky; top: -1px; z-index: 2; margin: -6px calc(-1 * var(--q-margin)) var(--q-s-4); padding: calc(var(--q-s-2) + 6px) var(--q-margin) var(--q-s-2); background: var(--q-sheet); }
 .q-pass-body { display: grid; gap: 4px; }
 .q-pass .q-section { margin-top: 14px; }
 .q-pass .q-section-head h2 { font-size: 17px; font-weight: 800; margin: 0 0 8px; }
