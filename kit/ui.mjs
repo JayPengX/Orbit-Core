@@ -716,7 +716,9 @@ export function search({ placeholder = kitW('搜尋', 'Search'), value = '', onI
   input.value = value;
   const clear = h('button', { class: 'q-search-clear', type: 'button', 'aria-label': kitW('清除', 'Clear'), text: '✕', onclick: () => ((input.value = ''), input.focus(), onInput('')) });
   input.addEventListener('input', () => onInput(input.value));
-  if (onSubmit) input.addEventListener('keydown', e => e.key === 'Enter' && onSubmit(input.value));
+  // Enter sends: never while 注音/IME is still choosing (that Enter only commits the word), and the
+  // key's default is stopped, so a sheet the search opens isn't shut by the same key landing on its ✕.
+  if (onSubmit) input.addEventListener('keydown', e => e.key === 'Enter' && !e.isComposing && e.keyCode !== 229 && (e.preventDefault(), onSubmit(input.value)));
   const box = h('label', { class: 'q-search' }, [input, clear]);
   return Object.assign(box, { input });
 }
