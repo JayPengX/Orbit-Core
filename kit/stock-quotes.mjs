@@ -330,7 +330,11 @@ export function optQuote(symbol, taiex, table) {
   if (!pricer) return null;
   const t = taiex.marketTime || Date.now();
   const price = pricer.price(taiex.price, t);
-  const prev = Number.isFinite(taiex.prev) ? pricer.price(taiex.prev, t) : price;
+  // Its day's move from the last settlement, as TAIFEX quotes it (the table is the last trading
+  // day's). Priced at yesterday's index with today's hours left, a weekly near expiry was worth
+  // 0.1 and read +1,339,900%. Only once today's own settlement is in, the model's from the index.
+  const today = new Date(t + 8 * 3_600_000).toISOString().slice(0, 10);
+  const prev = table.date < today ? pricer.settle : Number.isFinite(taiex.prev) ? pricer.price(taiex.prev, t) : price;
   // (A weekly by its day: 台指選 10/28週.)
   const due = new Date(optionExpiry(symbol) + 8 * 3_600_000);
   const name = `${OPTION.zh} ${o.week ? `${due.getUTCMonth() + 1}/${due.getUTCDate()}週` : `${o.month}月`} ${o.strike} ${o.right === 'C' ? '買權' : '賣權'}`;
