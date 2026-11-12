@@ -1,0 +1,28 @@
+# Orbit News: the videos in Taiwan's articles, read here (most of Taiwan's
+# outlets refuse Cloudflare's reads of an article) and written to R2
+# news/clips.json (tools/news-clips.mjs). Started by the news build
+# (builders/news.js newsClips) when the last finds are 15 minutes old;
+# GitHub's own timer is a backup only (it runs late or not at all). Runs
+# may overlap: each writes a whole file, so no concurrency group (a cancel
+# mails Jay).
+name: News clips
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      # main's tip, never the commit that started the run.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Read and push the clips
+        run: node tools/news-clips.mjs
+        env:
+          DATA_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET }}

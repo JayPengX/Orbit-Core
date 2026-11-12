@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ALTS, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIP_READS, PAGE_READS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport } from '../builders/news.js';
+import { ALTS, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -565,11 +565,11 @@ test("the videos in Taiwan's articles (Jay 11-12): each outlet's way of putting 
   assert.deepEqual(s.clips.map(c => [c[0], c[1]]), [['cna', 'OWNCLIP0001'], ['pts', '']]);
   assert.equal(s.clips[1][2], one[2].u);
 
-  // Which pages: a story with fewer than 2 clips gets two of its clip outlets' (公視's, 華視's before TVBS's).
+  // Which pages here: a story with fewer than 2 clips gets its clip outlets' that answer Cloudflare (公視's; the rest on GitHub).
   const story = { items: [['tvbs', 'x', 'https://tvbs/1', NOW], ['cts', 'x', 'https://cts/1', NOW], ['pts', 'x', 'https://pts/1', NOW], ['newtalk', 'x', 'https://newtalk/1', NOW]], clips: [], img: 'https://p.jpg' };
-  assert.deepEqual(pagesToRead({ tw: [story], intl: [] }, {}), ['https://pts/1', 'https://cts/1']);
+  assert.deepEqual(pagesToRead({ tw: [story], intl: [] }, {}), ['https://pts/1']);
   assert.deepEqual(pagesToRead({ tw: [{ ...story, clips: [['pts', 'AAAAAAAAAAA'], ['ebc', 'BBBBBBBBBBB']] }], intl: [] }, {}), []);
-  assert.deepEqual(pagesToRead({ tw: [{ ...story, clips: [['pts', 'AAAAAAAAAAA']] }], intl: [] }, {}), ['https://cts/1']);
+  assert.deepEqual(pagesToRead({ tw: [{ ...story, items: [...story.items, ['ebc', 'x', 'https://ebc/1', NOW]], clips: [['pts', 'AAAAAAAAAAA']] }], intl: [] }, {}), ['https://ebc/1']);
   assert.ok(CLIPS_AT.every(o => OUTLETS[o]?.region === 'tw'), 'Taiwan’s outlets');
   const many = Array.from({ length: 30 }, (_, i) => ({ ...story, items: story.items.map(([o, t, u, at]) => [o, t, `${u}/${i}`, at]), img: '' }));
   const want = pagesToRead({ tw: many, intl: [] }, {});
@@ -580,7 +580,7 @@ test("the videos in Taiwan's articles (Jay 11-12): each outlet's way of putting 
   const store = { json: async p => files.get(p) ?? null, put: async (p, d) => (files.set(p, d), true) };
   const titles = ['立法院三讀通過總預算 朝野協商破局', '總預算三讀通過 朝野協商破局', '朝野協商破局 立法院三讀總預算'];
   const feed = (o, t, u) => `<rss><channel><item><title>${t}</title><link>${u}</link><pubDate>${new Date(NOW - H).toUTCString()}</pubDate></item></channel></rss>`;
-  const feeds = { cts: [['https://cts/rss', 'rss']], pts: [['https://pts/rss', 'rss']], cna: [['https://cna/rss', 'rss']] };
+  const feeds = { ebc: [['https://cts/rss', 'rss']], pts: [['https://pts/rss', 'rss']], cna: [['https://cna/rss', 'rss']] };
   const page = { 'https://cts.example/1': '<iframe src="https://www.youtube.com/embed/CTSCLIP0001"></iframe>', 'https://pts.example/1': '<iframe src="https://www.youtube.com/embed/SHORTCLIP01"></iframe>' };
   const asked = [];
   const fetchImpl = async (url, init = {}) => {
@@ -589,7 +589,7 @@ test("the videos in Taiwan's articles (Jay 11-12): each outlet's way of putting 
       asked.push([u, init.redirect]);
       return /SHORTCLIP01/.test(u) ? { ok: true, status: 200, redirected: false, url: u, headers: new Headers() } : { ok: false, status: 303, url: u, headers: new Headers() };
     }
-    const rss = { 'https://cts/rss': ['cts', titles[0], 'https://cts.example/1'], 'https://pts/rss': ['pts', titles[1], 'https://pts.example/1'], 'https://cna/rss': ['cna', titles[2], 'https://cna.example/1'] }[u];
+    const rss = { 'https://cts/rss': ['ebc', titles[0], 'https://cts.example/1'], 'https://pts/rss': ['pts', titles[1], 'https://pts.example/1'], 'https://cna/rss': ['cna', titles[2], 'https://cna.example/1'] }[u];
     return { ok: true, status: 200, headers: new Headers(), text: async () => (rss ? feed(...rss) : page[u] || '<html></html>') };
   };
   await runNews({ store, now: NOW, fetchImpl, feeds, channels: {} });
@@ -602,4 +602,36 @@ test("the videos in Taiwan's articles (Jay 11-12): each outlet's way of putting 
   asked.length = 0;
   await runNews({ store, now: NOW + 600_000, fetchImpl, feeds, channels: {} });
   assert.equal(asked.length, 0);
+});
+
+test("the pages that refuse Cloudflare are read on GitHub: which, and their clips taken in where the build found none", async () => {
+  const s = (clips, items) => ({ clips, items: items.map(([o, u]) => [o, 'x', u, NOW]) });
+  const index = {
+    tw: [
+      s([], [['tvbs', 'https://tvbs/1'], ['cts', 'https://cts/1'], ['newtalk', 'https://newtalk/1'], ['pts', 'https://pts/1']]),
+      s([['pts', 'AAAAAAAAAAA'], ['ebc', 'BBBBBBBBBBB']], [['udn', 'https://udn/1']]),
+      s([['pts', 'AAAAAAAAAAA']], [['udn', 'https://udn/2'], ['cna', 'https://cna/2']])
+    ]
+  };
+  assert.deepEqual(clipsToRead(index, { 'https://pts/1': { y: [] } }), ['https://cts/1', 'https://tvbs/1', 'https://cna/2', 'https://udn/2']);
+  assert.deepEqual(clipsToRead(index, {}, { each: 1, most: 3 }), ['https://pts/1', 'https://cts/1', 'https://tvbs/1']);
+  assert.ok(CLIPS_HERE.every(o => CLIPS_AT.includes(o)));
+  // Taken in where the build read nothing of its own (its picture kept), never over its own.
+  const pages = { 'https://tvbs/1': { i: 'https://tvbs/pic.jpg', y: [] }, 'https://pts/1': { i: '', y: ['OWNCLIP0001'] } };
+  withClips(pages, { pages: { 'https://tvbs/1': { y: ['TVBSCLIP001'], at: NOW }, 'https://pts/1': { y: ['OTHER000001'] }, 'https://udn/2': { y: [], v: ['https://video.udn.com/embed/news/1'] }, 'https://cna/2': { y: [] } } });
+  assert.deepEqual(pages['https://tvbs/1'], { i: 'https://tvbs/pic.jpg', y: ['TVBSCLIP001'] });
+  assert.deepEqual(pages['https://pts/1'].y, ['OWNCLIP0001']);
+  assert.deepEqual(pages['https://udn/2'], { i: '', y: [], v: ['https://video.udn.com/embed/news/1'] });
+  assert.equal(pages['https://cna/2'], undefined);
+  // The build starts GitHub's run when its finds are 15 minutes old, not again within 15.
+  const files = new Map([[NEWS_CLIPS, { at: NOW - 20 * 60_000, pages: {} }]]);
+  const store = { json: async p => files.get(p) ?? null, put: async (p, d) => (files.set(p, d), true) };
+  const calls = [];
+  const fetchImpl = async (url, init) => (calls.push([url, init.method]), { ok: true, status: 204 });
+  assert.deepEqual(await newsClips({ store, env: { GH_ACTIONS_TOKEN: 't' }, now: NOW, fetchImpl }), { started: true });
+  assert.ok(/news-clips\.yml\/dispatches$/.test(calls[0][0]));
+  assert.equal((await newsClips({ store, env: { GH_ACTIONS_TOKEN: 't' }, now: NOW + 5 * 60_000, fetchImpl })).started, undefined);
+  files.set(NEWS_CLIPS, { at: NOW + 6 * 60_000, pages: { a: {} } });
+  assert.deepEqual(await newsClips({ store, env: { GH_ACTIONS_TOKEN: 't' }, now: NOW + 20 * 60_000, fetchImpl }), { found: 1, age: 14 });
+  assert.equal(calls.length, 1);
 });

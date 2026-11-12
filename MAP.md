@@ -353,6 +353,7 @@ writing a file only when it changed (`builders/store.js`):
 | `news.js`, `news-words.js`, `news-laws.js` | `news/index.json` (3 days), `past.json` (weeks): stories by weight, topic, side; `laws.json`: laws named | every 10 min |
 | `news-markets.js` | `news/markets.json`: Polymarket's open markets beside the stories they're about (code finds, AI `news-markets` confirms; no Taiwan vote's in its 10 quiet days) | :14 :44 |
 | `tools/flight-pool.mjs` (`flight.yml`) | `flight/` | 10 min |
+| `tools/news-clips.mjs` (`news-clips.yml`) | `news/clips.json`: the clips in Taiwan's articles (those outlets refuse Cloudflare), taken into the stories by `news.js` | started by `newsClips` (15 min) |
 | `ai.js`, `recaps.js`, `previews.js`, `f1story.js`; `filings.js` | AI made once: `news/lines.json`, `sides.json`, `words/cards/`, `sports/` (`recaps/`, `previews/`, `f1/stories/`); 重大訊息 as rows: `stock/filings/` | :04 :24 :34 :54 |
 
 A season is kept until the next one's first game.
@@ -413,6 +414,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   - `deploy-guard.yml`: the guard, when its files change;
   - `pages.yml`: the kit and `site/`, to Cloudflare (tests first);
   - `news-site.yml`: News's site (this repo's token), started by `newsSite`;
+  - `news-clips.yml`: the clips in Taiwan's articles, started by `newsClips`;
   - every app repo's deploy workflow: its own site, to Cloudflare.
 - By hand: `build.yml` (a builder now, a check), `tail.yml` (logs),
   `audit.yml` (secret names, store counts), `zone-speed.yml` (zone speed), `credit.yml` (`tools/credit/`).
