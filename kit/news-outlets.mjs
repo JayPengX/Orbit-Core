@@ -22,8 +22,10 @@ export const BASIS = {
   },
   // (11-13, Jay: "Taiwan news outlets sit majority in middle, that's probably
   // not so true": TEDS 2019's question on each channel's colour moved TVBS,
-  // 東森 to 偏藍 and 民視, 三立 to 深綠; Chang & Fang 2023, the old source
-  // for six places, only named them, citing no study.)
+  // 東森 to 偏藍 and 民視, 三立 to 深綠; MBFC's Taiwan ratings 關鍵評論網 to
+  // 偏綠; Chang & Fang 2023, the old source for six places, only named
+  // them, citing no study. ETtoday stays 中間: 東森's newest rating, MBFC's
+  // of 2026-10, is nearly centre.)
   teds2019: {
     zh: '申佳健（2023），《行政暨政策學報》76 期，用 TEDS 2019 調查問民眾哪些新聞台屬藍營、哪些屬綠營：民視（綠營提名的 34.1%）、三立（32.2%）與中天（藍營的 27.3%）最多；中視 19.3%、TVBS 19.0%、東森 11.8% 被看成藍營；台視、華視、年代、公視、非凡、客家、原民台藍綠相差不到 5 個百分點。這裡把提名與中天相當（25% 以上）的記為深，藍綠相差 5 點以上的記為偏，其餘為中間。',
     en: 'Shen (2023), Public Administration & Policy 76, from TEDS 2019’s question on which channels are Blue and which Green: FTV (34.1% of Green mentions), SET (32.2%) and CTi (27.3% of Blue) lead; CTV 19.3%, TVBS 19.0% and EBC 11.8% are seen as Blue; TTV, CTS, ERA, PTS, USTV, Hakka TV and TITV differ by under 5 points. Here: named as often as CTi (25% or more) is Deep; 5 points apart or more is Leans; the rest Centre.',
@@ -38,6 +40,11 @@ export const BASIS = {
     zh: '劉嘉薇（2018），《臺灣民眾的媒體選擇與統獨立場》：五次總統大選前一年各報的社論與新聞內容分析，聯合報、中國時報偏統，自由時報偏獨，蘋果日報中立（申佳健 2023 引述）。',
     en: 'Liu (2018), Taiwanese Media Choice and Unification–Independence Stances: content analysis of each paper’s editorials and news in the year before five presidential elections: UDN and China Times lean unification, Liberty Times independence, Apple Daily neutral (as cited by Shen 2023).',
     url: 'https://pa.ntpu.edu.tw/storage/app/media/Journal/7604.pdf'
+  },
+  'mbfc-tw': {
+    zh: 'Media Bias/Fact Check 對台灣媒體的評比（2025–26）：偏向民進黨的（自由時報、三立）評為中間偏左，對民進黨批評多的（TVBS、聯合報）評為中間偏右；這裡把中間偏左記為偏綠、中間偏右記為偏藍。',
+    en: 'Media Bias/Fact Check’s ratings of Taiwan’s outlets (2025–26): those favouring the DPP (Liberty Times, SET) rated Left-Center, those most critical of it (TVBS, UDN) Right-Center; here Left-Center counts as Leans Green, Right-Center as Leans Blue.',
+    url: 'https://mediabiasfactcheck.com/the-news-lens'
   },
   group: {
     zh: '沒有研究評過這家；依同一集團媒體的研究結果（依據較少）。',
@@ -80,22 +87,22 @@ export const BASIS = {
 // [id, 中文名, English name, site, kind, tw, cs, lr, owner zh, owner en, basis, weak]
 const ROWS = [
   // Taiwan, Chinese
-  ['ltn', '自由時報', 'Liberty Times', 'ltn.com.tw', 'private', -2, -2, null, '林榮三家族', 'The Lin Rong-san family', ['xiao2006', 'liu2018', 'kao'], false],
-  ['setn', '三立新聞', 'SET News', 'setn.com', 'private', -2, -2, null, '三立電視（林崑海）', 'Sanlih E-Television (Lin Kun-hai)', ['teds2019', 'teds-tv'], false],
+  ['ltn', '自由時報', 'Liberty Times', 'ltn.com.tw', 'private', -2, -2, null, '林榮三家族', 'The Lin Rong-san family', ['xiao2006', 'liu2018', 'kao', 'mbfc-tw'], false],
+  ['setn', '三立新聞', 'SET News', 'setn.com', 'private', -2, -2, null, '三立電視（林崑海）', 'Sanlih E-Television (Lin Kun-hai)', ['teds2019', 'teds-tv', 'mbfc-tw'], false],
   ['ftv', '民視', 'FTV News', 'ftvnews.com.tw', 'private', -2, -2, null, '民間全民電視（郭倍宏）', 'Formosa Television (Kuo Pei-hung)', ['teds2019', 'teds-tv'], false],
   ['newtalk', '新頭殼', 'Newtalk', 'newtalk.tw', 'private', -1, -1, null, '新頭殼（莊豐嘉）', 'Newtalk (Chuang Feng-chia)', ['stance'], true],
   ['peoples', '民報', 'PeoplesNews', 'peoplenews.tw', 'private', -2, -2, null, '民報文化（陳永興等創辦）', 'Founded by Chen Yung-hsing and others', ['stance'], true],
   ['cna', '中央社', 'CNA', 'cna.com.tw', 'gov', 0, 0, null, '國家通訊社（政府捐助）', 'National news agency (government-funded)', ['cna'], false],
   ['pts', '公視', 'PTS', 'pts.org.tw', 'public', 0, 0, null, '公共電視（公廣集團）', 'Public Television Service', ['teds2019', 'pts'], false],
-  ['ettoday', 'ETtoday', 'ETtoday', 'ettoday.net', 'private', 1, 1, null, '東森集團（王令麟）', 'Eastern group (Wang Ling-lin)', ['group', 'teds2019'], true],
+  ['ettoday', 'ETtoday', 'ETtoday', 'ettoday.net', 'private', 0, 0, null, '東森集團（王令麟）', 'Eastern group (Wang Ling-lin)', ['stance'], true],
   ['ebc', '東森新聞', 'EBC News', 'ebc.net.tw', 'private', 1, 1, null, '東森集團（王令麟）', 'Eastern group (Wang Ling-lin)', ['teds2019', 'teds-tv'], false],
   ['storm', '風傳媒', 'Storm Media', 'storm.mg', 'private', 0, 0, null, '風傳媒', 'Storm Media Group', ['stance'], true],
   ['mirror', '鏡週刊', 'Mirror Media', 'mirrormedia.mg', 'private', 0, 0, null, '鏡傳媒（裴偉創辦）', 'Mirror Media (founded by Pei Wei)', ['stance'], true],
   ['twreporter', '報導者', 'The Reporter', 'twreporter.org', 'nonprofit', 0, 0, null, '財團法人報導者文化基金會', 'The Reporter Foundation (non-profit)', ['stance'], true],
-  ['tnl', '關鍵評論網', 'The News Lens', 'thenewslens.com', 'private', 0, 0, null, '關鍵評論網媒體集團', 'The News Lens Media Group', ['stance'], true],
+  ['tnl', '關鍵評論網', 'The News Lens', 'thenewslens.com', 'private', -1, -1, null, '關鍵評論網媒體集團', 'The News Lens Media Group', ['mbfc-tw'], false],
   ['upmedia', '上報', 'Up Media', 'upmedia.mg', 'private', 0, 0, null, '上報（王健壯創辦）', 'Up Media (founded by Wang Chien-chuang)', ['stance'], true],
-  ['tvbs', 'TVBS', 'TVBS', 'tvbs.com.tw', 'private', 1, 1, null, 'TVBS（王雪紅）', 'TVBS (Cher Wang)', ['teds2019', 'teds-tv'], false],
-  ['udn', '聯合報', 'United Daily News', 'udn.com', 'private', 1, 1, null, '聯合報系（王氏家族）', 'United Daily News Group (the Wang family)', ['xiao2006', 'liu2018', 'kao'], false],
+  ['tvbs', 'TVBS', 'TVBS', 'tvbs.com.tw', 'private', 1, 1, null, 'TVBS（王雪紅）', 'TVBS (Cher Wang)', ['teds2019', 'teds-tv', 'mbfc-tw'], false],
+  ['udn', '聯合報', 'United Daily News', 'udn.com', 'private', 1, 1, null, '聯合報系（王氏家族）', 'United Daily News Group (the Wang family)', ['xiao2006', 'liu2018', 'kao', 'mbfc-tw'], false],
   ['chinatimes', '中時', 'China Times', 'chinatimes.com', 'private', 2, 2, null, '旺旺中時集團（蔡衍明）', 'Want Want China Times (Tsai Eng-meng)', ['kao', 'liu2018', 'xiao2006'], false],
   ['ctinews', '中天', 'CTi News', 'ctinews.com', 'private', 2, 2, null, '旺旺中時集團（蔡衍明）', 'Want Want China Times (Tsai Eng-meng)', ['teds2019', 'teds-tv'], false],
   ['rti', '中央廣播電臺', 'Radio Taiwan International', 'rti.org.tw', 'gov', 0, 0, null, '財團法人中央廣播電臺（政府捐助）', 'Radio Taiwan International (government-funded)', ['rti'], false],
@@ -112,7 +119,7 @@ const ROWS = [
   ['titv', '原視', 'TITV', 'ipcf.org.tw', 'public', 0, 0, null, '原住民族文化事業基金會', 'Indigenous Peoples Cultural Foundation (public)', ['teds2019'], false],
   ['nextapple', '壹蘋新聞網', 'Nextapple', 'nextapple.com', 'private', 0, 0, null, '壹蘋新聞網（潘杰賢）', 'Nextapple (Pan Chieh-hsien)', ['apple'], true],
   ['moneyudn', '經濟日報', 'Economic Daily News', 'money.udn.com', 'private', 1, 1, null, '聯合報系（王氏家族）', 'United Daily News Group (the Wang family)', ['group', 'xiao2006'], true],
-  ['nownews', '今日新聞', 'NOWnews', 'nownews.com', 'private', 0, 0, null, '今日傳媒', 'NOWnews Network', ['stance'], true],
+  ['nownews', '今日新聞', 'NOWnews', 'nownews.com', 'private', -1, -1, null, '今日傳媒', 'NOWnews Network', ['mbfc-tw'], false],
   ['cnews', '匯流新聞網', 'CNEWS', 'cnews.com.tw', 'private', 0, 0, null, '匯流新聞網', 'CNEWS', ['stance'], true],
   ['cnyes', '鉅亨網', 'Anue', 'cnyes.com', 'private', 0, 0, null, '鉅亨網', 'Anue (cnyes)', ['stance'], true],
   ['ydn', '青年日報', 'Youth Daily News', 'ydn.com.tw', 'gov', 0, 0, null, '青年日報社（國防部）', 'Youth Daily News (Ministry of National Defense)', ['ydn'], true],
