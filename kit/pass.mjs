@@ -258,10 +258,11 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
     onClose() {
       account?.stop();
       if (open?.dialog === dialog) open = null;
-      // The address loses the guide it was opened on.
+      // The address loses the guide it was opened on (the rest of it, the app's tab, stays).
       if (/(?:^|[#&])help=/.test(location.hash)) {
+        const rest = location.hash.slice(1).split('&').filter(p => p && !p.startsWith('help=')).join('&');
         try {
-          history.replaceState(history.state, '', `${location.pathname}${location.search}`);
+          history.replaceState(history.state, '', `${location.pathname}${location.search}${rest ? `#${rest}` : ''}`);
         } catch {}
       }
     }
