@@ -1207,6 +1207,8 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
   const recs = kept.recs || [];
   const pages = {};
   for (const it of [...items, ...recs.flatMap(r => r.items)]) if (kept.pages?.[it.u]) pages[it.u] = kept.pages[it.u];
+  // (And the clips GitHub found in the pages that refuse us.)
+  withClips(pages, await store.json(NEWS_CLIPS).catch(() => null));
   let out = deskOf(items, recs, now, { pages, vids: clips });
   const want = pagesToRead(out, pages);
   const whyNot = {};
@@ -1247,9 +1249,13 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
 // 聯合 one in six or eight, TVBS, 三立, ETtoday, 中時 fewer; 自由's pages
 // refuse some readers: last). 民視 is read by its channel, no page.
 export const CLIPS_AT = ['pts', 'cts', 'ctinews', 'ebc', 'cna', 'udn', 'tvbs', 'setn', 'ettoday', 'chinatimes', 'upmedia', 'mirror', 'ltn'];
+// Those whose pages answer Cloudflare (the rest refuse it, 11-12: TVBS,
+// 聯合, 中央社, 三立, 自由…): read here too. Every one of CLIPS_AT is read on
+// GitHub (clipsToRead, tools/news-clips.mjs), its finds in NEWS_CLIPS.
+export const CLIPS_HERE = ['pts', 'ctinews', 'ebc'];
 // Pages a build reads for clips (on top of PAGE_READS for pictures): a top
 // story with fewer than 2 that play here, two of its outlets' pages at most.
-export const CLIP_READS = 12;
+export const CLIP_READS = 6;
 // The pages a build reads, top stories first (two of Taiwan's to one
 // abroad): PAGE_READS for the lead's (else any) where a story has no
 // picture, CLIP_READS for its clip outlets' where it has fewer than 2 clips.
@@ -1268,8 +1274,8 @@ export function pagesToRead(out, pages, most = PAGE_READS, clipMost = CLIP_READS
       const has = new Set((s.clips || []).map(c => c[0]));
       const by = new Set();
       const picks = fresh
-        .filter(([o]) => CLIPS_AT.includes(o) && !has.has(o))
-        .sort((a, b) => CLIPS_AT.indexOf(a[0]) - CLIPS_AT.indexOf(b[0]))
+        .filter(([o]) => CLIPS_HERE.includes(o) && !has.has(o))
+        .sort((a, b) => CLIPS_HERE.indexOf(a[0]) - CLIPS_HERE.indexOf(b[0]))
         .filter(([o]) => !by.has(o) && by.add(o))
         .slice(0, Math.min(2 - playing.length, clipMost - clips.length));
       clips.push(...picks.map(x => x[2]));
@@ -1281,9 +1287,67 @@ export function pagesToRead(out, pages, most = PAGE_READS, clipMost = CLIP_READS
   }
   return [...clips, ...pics];
 }
+// ---- Clips read on GitHub ----------------------------------------------------
+//
+// Most of Taiwan's outlets refuse Cloudflare's reads of their articles, so
+// GitHub Actions reads them (tools/news-clips.mjs, news-clips.yml, started
+// by newsClips when its last finds are 15 minutes old) and writes
+// NEWS_CLIPS: { at, pages: { url: { y, v?, at } }, shorts: { id: ±when } }
+// (pageOf's clips, Shorts left out). A build takes each page's clips where
+// it read none of its own.
+export const NEWS_CLIPS = 'news/clips.json';
+// The pages a GitHub run reads: every clip outlet's report on Taiwan's
+// stories with fewer than 2 clips, top stories first, not read before;
+// `most` a run, `each` an outlet (a site that's asked too fast refuses: 華視).
+export function clipsToRead(index, done = {}, { most = 80, each = 14 } = {}) {
+  const want = [];
+  const per = new Map();
+  for (const s of index?.tw || []) {
+    if ((s.clips || []).filter(c => c[1]).length >= 2) continue;
+    const its = (s.items || []).filter(([o, , u]) => CLIPS_AT.includes(o) && !done[u] && !want.includes(u)).sort((a, b) => CLIPS_AT.indexOf(a[0]) - CLIPS_AT.indexOf(b[0]));
+    for (const [o, , u] of its) {
+      if ((per.get(o) || 0) >= each) continue;
+      per.set(o, (per.get(o) || 0) + 1);
+      want.push(u);
+      if (want.length >= most) return want;
+    }
+  }
+  return want;
+}
+// A GitHub run's finds into the build's pages: each page's clips where the
+// build has none of its own (its picture stays the build's).
+export function withClips(pages, found) {
+  for (const [u, p] of Object.entries(found?.pages || {})) {
+    const mine = pages[u];
+    if (mine && (mine.y?.length || mine.v?.length)) continue;
+    if (!p?.y?.length && !p?.v?.length) continue;
+    pages[u] = { i: mine?.i || '', y: (p.y || []).filter(id => /^[\w-]{11}$/.test(id)), ...(p.v?.length ? { v: p.v } : {}) };
+  }
+  return pages;
+}
+// Starts news-clips.yml when its last finds are 15 minutes old and none
+// was started in the last 15 (GitHub's own timer runs late or not at all).
+export const NEWS_CLIPS_RUN = 'private/news/clips-run.json';
+export async function newsClips({ store, env, now = Date.now(), fetchImpl = fetch }) {
+  if (!env?.GH_ACTIONS_TOKEN) return { off: 'no token' };
+  const found = await store.json(NEWS_CLIPS).catch(() => null);
+  const ran = await store.json(NEWS_CLIPS_RUN).catch(() => null);
+  const age = now - (found?.at || 0);
+  if (age < 15 * 60_000 || now - (ran?.at || 0) < 15 * 60_000) return { found: Object.keys(found?.pages || {}).length, age: Math.round(age / 60_000) };
+  const go = await fetchImpl('https://api.github.com/repos/JayPengX/Orbit-Core/actions/workflows/news-clips.yml/dispatches', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.GH_ACTIONS_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'orbit-news', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ref: 'main' }),
+    signal: AbortSignal.timeout(10_000)
+  });
+  if (!go.ok) return { failed: `start: HTTP ${go.status}` };
+  await store.put(NEWS_CLIPS_RUN, { at: now });
+  return { started: true };
+}
+
 // One page read for its picture and clip; null when it can't be.
 // (Why not, by the outlet, in the build's report: `why`.)
-async function readPage(url, { fetchImpl = fetch, why = () => {} } = {}) {
+export async function readPage(url, { fetchImpl = fetch, why = () => {} } = {}) {
   try {
     const res = await fetchImpl(url, { headers: { 'User-Agent': UA, Accept: 'text/html' }, signal: AbortSignal.timeout(10_000) });
     if (!res?.ok) return void why(String(res?.status || 'no answer'));
@@ -1298,7 +1362,7 @@ async function readPage(url, { fetchImpl = fetch, why = () => {} } = {}) {
 // 11-10): YouTube answers its /shorts/ address for a Short and sends any
 // other clip on to /watch. Unsure (no answer, a relay that followed the
 // redirect and lost where it went): not a Short.
-async function shortOf(id, { fetchImpl = fetch } = {}) {
+export async function shortOf(id, { fetchImpl = fetch } = {}) {
   try {
     const res = await fetchImpl(`https://www.youtube.com/shorts/${id}`, { method: 'HEAD', redirect: 'manual', headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(6_000) });
     return res.status === 200 && !res.redirected && /\/shorts\//.test(res.url || '');

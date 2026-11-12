@@ -34,7 +34,7 @@ import { runPhotos, runCutouts, PHOTOS_HOUR } from './photos.js';
 import { runBuses, kickBuses, BUSES_HOUR } from './buses.js';
 import { runKept, KEPT_HOUR } from './kept.js';
 import { runF1Kept } from './f1kept.js';
-import { runNews, newsSite } from './news.js';
+import { runNews, newsSite, newsClips } from './news.js';
 import { runFilings } from './filings.js';
 import { runNewsLaws } from './news-laws.js';
 import { runNewsMarkets } from './news-markets.js';
@@ -72,6 +72,7 @@ export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[ne
   if (job === 'news' || only === 'news') {
     await step('news', () => runNews({ store, now }));
     await step('newsSite', () => newsSite({ store, env, now }));
+    await step('newsClips', () => newsClips({ store, env, now }));
     await step('newsLaws', () => runNewsLaws({ store, now }));
   }
   if (job === 'markets' || only === 'markets') await step('newsMarkets', () => runNewsMarkets({ store, env, cap: aiCap, now }));
