@@ -132,7 +132,7 @@ export const DEV = {
   // capacity.js: the live refreshes above slowed together when the people
   // expected in 30 days would run past Cloudflare's $5 plan (checked every
   // 6 hours); the numbers above stay the owner's own, the floor.
-  autoScale: { def: false, group: 'scale', zh: '依人數自動調整', en: 'Scale with people', note: '人數預估會超過 Cloudflare $5 方案的額度時，上面的即時更新一起放慢（每 6 小時檢查）；有空間就回到上面的設定' },
+  autoScale: { def: false, group: 'scale', zh: '依人數自動調整', en: 'Scale with people', note: '人數預估會超過 Cloudflare 的額度時，上面的即時更新一起放慢（每 6 小時檢查）；有空間就回到上面的設定' },
   mirror: { def: true, group: 'data', zh: '使用每晚的資料副本', en: 'Use the nightly copies', note: '關掉：所有 App 都直接問代理（除錯用）' },
   // Each paid AI feature's calls a day, everyone together (the proxy's
   // routes named in `ai`; 0 pauses it, the app then says today's AI is used up).

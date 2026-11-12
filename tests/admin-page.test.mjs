@@ -84,3 +84,10 @@ test('admin: 健康’s deploy rows name an app’s usual deploy by the app alon
   const bugs = page.slice(page.indexOf('async function loadBugs()'), page.indexOf("$('bugs-mark').innerHTML"));
   assert.match(bugs, /\$\('bugs-sum'\)\.textContent = '';\n\s*\$\('bugs-error'\)\.textContent = `讀不到：\$\{e\.message\}`;/);
 });
+
+test('admin: on a phone tiles sit two to a row and a lone last one takes the row; a head’s button row drops under its words; links land below the top bar', () => {
+  assert.ok(page.includes('.tiles > :last-child:nth-child(odd) { grid-column: 1 / -1; }'));
+  assert.ok(page.includes('.pane-head:has(> .row) { flex-wrap: wrap; }'));
+  assert.ok(page.includes('main [id] { scroll-margin-top: calc(env(safe-area-inset-top) + 76px); }'));
+  assert.doesNotMatch(page, /placeholder="你的 Orbit Pass"/, 'cut at 320 px');
+});
