@@ -7,7 +7,7 @@
 //   news     news/lines.json   { built, lines: { id: { line, zh, en, m } } }
 //            a story's neutral one line and its titles in both languages,
 //            from its outlets' own headlines (each story once, again when
-//            its coverage has doubled); stories gone from the front, dropped.
+//            its title has turned, an hour on); stories gone from the front, dropped.
 //   words    words/cards/<a…z>.json  { built, cards: { word: { ex: [{ en, zh }], hook, confuse } } }
 //            two examples and a memory hook a word, by its first letter (a
 //            word's sheet reads one small file), the whole list made once, a
@@ -36,6 +36,8 @@ const WORDS_LIST = 'https://orbit.jaypengx.com/words/data/words.json';
 // ---- News: one line and two titles a story ----
 const NEWS_TOP = { tw: 15, intl: 25 };
 const NEWS_BATCH = 12;
+// A title made again once the story's own title has changed, an hour after it was last made at most.
+export const TITLE_AGAIN = 3_600_000;
 // A story as the AI is told it: its outlets' headlines (5 at most, the most
 // outlets' own), each with its summary only on the first, cut short.
 // A story as the AI is told it: its outlets' headlines (an outlet once,
@@ -63,7 +65,10 @@ export async function newsLines({ store, env, ctx, cap, until }) {
     const old = was[s.id];
     // (A title once, in the language its region is asked in; a copy from before titles alone,
     // with its line, made again; so is a world story's English title from before 11-12's fix.)
-    if (old && !old.line && old[storyFacts(s).lang]) keep[s.id] = old;
+    // (Again when the story has turned: its title isn't the one it was made from, an hour on
+    // (11-12: 黃仁勳 resigned, his world story's Chinese title still said the board was weighing it).)
+    const turned = old && old.t !== s.title && !(Date.now() - (old.at || 0) < TITLE_AGAIN);
+    if (old && !old.line && old[storyFacts(s).lang] && !turned) keep[s.id] = old;
     else need.push(s);
   }
   let made = 0, calls = 0;
@@ -74,7 +79,7 @@ export async function newsLines({ store, env, ctx, cap, until }) {
     calls++;
     if (!r) break;
     if (r.error) continue;
-    for (const s of batch) if (r.out[s.id]) (keep[s.id] = { ...r.out[s.id], m: s.m || 0 }), made++;
+    for (const s of batch) if (r.out[s.id]) (keep[s.id] = { ...r.out[s.id], m: s.m || 0, t: s.title, at: Date.now() }), made++;
   }
   // (An old line kept for a story still on the front that this run couldn't reach.)
   for (const s of need) if (!keep[s.id] && was[s.id]) keep[s.id] = was[s.id];

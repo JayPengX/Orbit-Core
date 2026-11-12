@@ -2,7 +2,7 @@
 // is told (lean: code picks the facts), what's kept, what's asked again.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newsLines, storyFacts, wordsCards, cardsPath, sidesWanted, sideFacts, newsSides } from '../builders/ai.js';
+import { newsLines, TITLE_AGAIN, storyFacts, wordsCards, cardsPath, sidesWanted, sideFacts, newsSides } from '../builders/ai.js';
 import { gameFacts, swings } from '../builders/recaps.js';
 
 const memStore = (seed = {}) => {
@@ -25,11 +25,11 @@ const claudeEnv = (answer, seen = []) => ({
 });
 
 test('news: a title in the other language, once a story; no line under it; an old copy with a line made again', async () => {
-  const story = (id, m) => ({ id, m, sum: 'x'.repeat(300), items: [['中央社', '標題一'], ['中央社', '標題二'], ['自由時報', '標題三'], ['聯合報', '標題四'], ['ettoday', '標題五']] });
+  const story = (id, m) => ({ id, m, title: `T${id}`, sum: 'x'.repeat(300), items: [['中央社', '標題一'], ['中央社', '標題二'], ['自由時報', '標題三'], ['聯合報', '標題四'], ['ettoday', '標題五']] });
   const f = storyFacts(story('a', 3), 'tw');
   assert.deepEqual(f, { id: 'a', lang: 'en', heads: ['標題一', '標題三', '標題四'] }, 'an outlet once, three, no summary');
   assert.equal(storyFacts(story('w', 1), 'intl').lang, 'zh');
-  const store = memStore({ 'news/index.json': { tw: [story('a', 3), story('b', 10), story('c', 2)], intl: [] }, 'news/lines.json': { lines: { b: { en: 'Old title', m: 6 }, c: { line: '舊的一句話', zh: '舊', en: 'old', m: 2 }, gone: { en: 'x', m: 1 } } } });
+  const store = memStore({ 'news/index.json': { tw: [story('a', 3), story('b', 10), story('c', 2)], intl: [] }, 'news/lines.json': { lines: { b: { en: 'Old title', m: 6, t: 'Tb', at: Date.now() - 2 * TITLE_AGAIN }, c: { line: '舊的一句話', zh: '舊', en: 'old', m: 2 }, gone: { en: 'x', m: 1 } } } });
   const seen = [];
   const env = claudeEnv(body => ({ items: JSON.parse(body.messages[0].content[0].text.split('\n').at(-1)).map(s => ({ id: s.id, title: `Title ${s.id}` })) }), seen);
   const r = await newsLines({ store, env, cap: 10, until: Date.now() + 60_000 });
@@ -47,7 +47,16 @@ test('news: a title in the other language, once a story; no line under it; an ol
   await newsLines({ store: store2, env: env2, cap: 10, until: Date.now() + 60_000 });
   const asked = JSON.parse(seen2[0].messages[0].content[0].text.split('\n').at(-1));
   assert.deepEqual(asked.map(s => s.lang), ['zh', 'zh']);
-  assert.deepEqual((await store2.json('news/lines.json')).lines.v, { zh: '標題v', m: 4 });
+  const v = (await store2.json('news/lines.json')).lines.v;
+  assert.deepEqual([v.zh, v.m, v.t], ['標題v', 4, 'Tv']);
+  // A story that turned (its title isn't the one its line was made from) is made again, an hour on.
+  const turned = (t, ago) => memStore({ 'news/index.json': { tw: [], intl: [{ ...story('w', 4), title: 'New turn' }] }, 'news/lines.json': { lines: { w: { zh: '舊標題', m: 4, t, at: Date.now() - ago } } } });
+  const store3 = turned('Old turn', 2 * TITLE_AGAIN);
+  await newsLines({ store: store3, env: env2, cap: 10, until: Date.now() + 60_000 });
+  assert.equal((await store3.json('news/lines.json')).lines.w.zh, '標題w');
+  const store4 = turned('Old turn', TITLE_AGAIN / 2);
+  await newsLines({ store: store4, env: env2, cap: 10, until: Date.now() + 60_000 });
+  assert.equal((await store4.json('news/lines.json')).lines.w.zh, '舊標題', 'not again within the hour');
 });
 
 test('news sides: only stories sides frame and both ends carry; each side’s headlines, four outlets at most', async () => {
