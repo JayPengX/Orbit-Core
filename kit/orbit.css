@@ -7143,3 +7143,184 @@ html[data-look='native'] :is(.q-reorder-lift, .q-reorder-land) {
   gap: 8px;
   margin: var(--q-s-5) 0 var(--q-s-3);
 }
+
+/* ---- Orbit's window (kit/suite.mjs): every app in one home-screen app ----
+   Only there (html.q-in-suite): the switcher at the top line's left, the
+   account's mirror (this app's icon, ⌄), and after a hop to another app
+   "‹ Sports" back to it, then a forward button. On a rail or a computer's
+   side bar they stand with the account at its foot, icons only. */
+.q-suite {
+  display: flex;
+  flex: none;
+  /* (Taps reach it over a page whose top line lets them through: Transit's map.) */
+  pointer-events: auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.q-suite-btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  height: 36px;
+  min-width: 0;
+  margin: 0;
+  padding: 0 8px 0 4px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--q-glass-strong);
+  -webkit-backdrop-filter: var(--q-glass-blur);
+  backdrop-filter: var(--q-glass-blur);
+  box-shadow: var(--q-glass-rim), var(--q-glass-drop);
+  color: var(--q-label);
+  font: 600 15px/1 var(--q-font);
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--q-dur-snappy, 0.2s) var(--q-spring-snappy, ease);
+}
+.q-suite-btn:active {
+  transform: scale(0.94);
+}
+.q-suite-btn img {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+.q-suite-back img,
+.q-suite-fwd img {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+.q-suite-back {
+  max-width: 44vw;
+  padding: 0 12px 0 4px;
+}
+.q-suite-fwd {
+  padding: 0 4px 0 7px;
+}
+.q-suite-label {
+  overflow: hidden;
+  padding-left: 2px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.q-suite-chev {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  color: var(--q-label-2);
+}
+.q-suite-chev svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.q-suite-back .q-suite-chev {
+  color: var(--q-accent);
+}
+/* At the rail's foot, over the account: a tab's height each, icons only. */
+html.q-tabrail .q-appbar .q-actions > .q-suite {
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+}
+html.q-tabrail .q-appbar .q-actions > .q-suite .q-suite-btn {
+  justify-content: center;
+  width: 100%;
+  height: var(--q-tabrail-foot, 44px);
+  padding: 0;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+html.q-tabrail .q-appbar .q-actions > .q-suite .q-suite-label {
+  display: none;
+}
+html.q-tabrail.q-desk .q-appbar .q-actions > .q-suite {
+  flex-direction: row;
+  width: auto;
+}
+html.q-tabrail.q-desk .q-appbar .q-actions > .q-suite .q-suite-btn {
+  width: auto;
+  height: 44px;
+  padding: 0 6px;
+  border-radius: 12px;
+}
+@media (hover: hover) {
+  html.q-tabrail.q-desk .q-appbar .q-actions > .q-suite .q-suite-btn:hover {
+    background: color-mix(in srgb, var(--q-label) 6%, transparent);
+  }
+}
+/* The switcher's sheet: back and forward, then every app. */
+.q-suite-sheet .q-cell-icon {
+  background: none;
+}
+.q-suite-sheet .q-cell-icon img {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--q-r-icon, 7px);
+}
+.q-suite-hops {
+  display: flex;
+  gap: 8px;
+  margin: 0 16px 12px;
+}
+.q-suite-hops .q-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 12px;
+  font-size: 15px;
+}
+.q-suite-hops .q-btn img {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+.q-suite-now {
+  color: var(--q-label-2);
+  font: 500 15px/1 var(--q-font);
+}
+.q-suite-offer {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 4px 20px 12px;
+  text-align: center;
+}
+.q-suite-offer-mark {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+}
+.q-suite-offer h3 {
+  margin: 6px 0 0;
+  color: var(--q-label);
+  font: 700 22px/1.25 var(--q-font);
+}
+.q-suite-offer p {
+  margin: 0 0 8px;
+  color: var(--q-label-2);
+  font: 400 15px/1.4 var(--q-font);
+}
+.q-suite-offer .q-btn {
+  width: 100%;
+}
+.q-suite-never {
+  margin-top: 2px;
+  padding: 10px;
+  border: 0;
+  background: none;
+  color: var(--q-label-2);
+  font: 500 15px/1 var(--q-font);
+  cursor: pointer;
+}

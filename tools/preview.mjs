@@ -272,6 +272,11 @@ const gateTaps = flag('taps');
 // (the iOS Simulator's Safari: http://localhost:8123/<repo>/). The page's
 // calls to the Workers come back here (its fetch is pointed at /__ext).
 const serve = flag('serve');
+// --suite: Orbit's window (kit/suite.mjs): every app served at once, each at
+// its own folder (/Orbit-Sports/…), and /app/ (Orbit-Core's site/app/), the
+// page opened in Orbit's window. With --serve, a browser of your own hops
+// between them (tools/suite-check.mjs).
+const suite = flag('suite');
 // --live: the page asks the real proxies (the Workers let a localhost page
 // without a pass in: worker.js TRANSIT_DEV, sports.js
 // SPORTS_DEV), still with the made-up account. Orbit Transit: today's real
@@ -406,6 +411,13 @@ const h2Cert = () => {
   execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=localhost', '-keyout', join(dir, 'key.pem'), '-out', join(dir, 'cert.pem')], { stdio: 'ignore' });
   return { key: readFileSync(join(dir, 'key.pem')), cert: readFileSync(join(dir, 'cert.pem')), allowHTTP1: true };
 };
+// --suite: an address's own repo (or Orbit's door, /app/).
+function suiteFile(path) {
+  const [, seg = '', ...rest] = path.split('/');
+  if (seg === 'app') return join(served.root, 'Orbit-Core/site/app', ...rest);
+  const r = Object.values(APPS).find(([name]) => name === seg)?.[0];
+  return r ? join(served.root, r, r === 'Orbit-Class' ? 'dist' : 'public', ...rest) : join(served.dir, path.replace(/^\/[^/]+\//, '/'));
+}
 const server = (h2 && !serve ? (fn => createSecureServer(h2Cert(), fn)) : createServer)(async (req, res) => {
   const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (serve && path === '/__ext') return external(req, res).catch(() => res.end());
@@ -416,7 +428,7 @@ const server = (h2 && !serve ? (fn => createSecureServer(h2Cert(), fn)) : create
   // one the kit takes as the first it's seen (only noted, no reload).
   if (path === '/Orbit-Core/kit/version.json' && !existsSync(join(served.root, 'Orbit-Core/kit/version.json'))) return res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end('{"version":"local"}');
   // The kit, as the apps load it from Orbit-Core's Pages (kit/loader.html).
-  let file = path.startsWith('/Orbit-Core/kit/') ? join(served.root, path) : join(served.dir, path.replace(/^\/[^/]+\//, '/'));
+  let file = path.startsWith('/Orbit-Core/kit/') ? join(served.root, path) : suite ? suiteFile(path) : join(served.dir, path.replace(/^\/[^/]+\//, '/'));
   // (--cdn-lag: the CDN still on the old file at this path.)
   if (lagUntil > Date.now() && oldRoot) {
     const was = path.startsWith('/Orbit-Core/kit/') ? join(oldRoot, path) : join(oldRoot, repo, key === 'orbit' ? 'dist' : 'public', path.replace(/^\/[^/]+\//, '/'));
@@ -683,6 +695,12 @@ if (timing)
 // phone must be: --safari shows the page as Safari opens it (the kit's
 // add-to-home-screen screen).
 if (!process.argv.includes('--safari')) await context.addInitScript(() => Object.defineProperty(Navigator.prototype, 'standalone', { get: () => true }));
+if (suite)
+  await context.addInitScript(() => {
+    try {
+      sessionStorage.setItem('orbit.suite', '1');
+    } catch {}
+  });
 if (device === 'ipad') await context.addInitScript(() => Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => 5 }));
 await context.addInitScript(
   ([refresh, lang, stores]) => {

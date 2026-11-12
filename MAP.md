@@ -98,6 +98,7 @@ modules for modulepreload.
 | `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); `TOPICS`; `sideOf`, `partiesIn`, `topicsOf`, `namesRe` |
 | `ai.mjs`, `family.mjs`, `today.mjs`, `ask-orbit.mjs` | AI (mark `icons.ai`, `--q-ai`; `.q-ai-ref` a name chip): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer`, `aiAnswerWait` (answers drawn); the phone's family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天; 問 Orbit (`routeAsk`, an app's `#ask=` by `takeAsk`) |
 | `testtools.mjs` | 測試工具, hidden until unlocked (Orbit Pass › seven taps on 除錯紀錄 within 4 s): a moved clock (or a fast one: `rate`), a place, a trip's fixes played back (`playTrip({ from, fixes, rate })`, an app's own simulator handing them over; `watchPosition` fed from them), the network off/slow/failing (put in place by `boot.js` before the app runs, key `orbit.tester`; off answers the app's own files from what its service worker kept, as a phone with no connection), test notices (`pushTest`), each app's own switches (`globalThis.ORBIT_TEST_TOOLS`, read as `ORBIT_TEST?.flags?.x`), versions; a pill while anything is on |
+| `suite.mjs` | Orbit, every app in one home-screen app (`/app/`, `site/app/`; scope `/`): only in its window (`inSuite()` in orbit.mjs: the window's sessionStorage `orbit.suite`, or on iOS the device's `orbit.suite.v1`), a switcher at the top line's left (at a rail's foot with the account), back and forward across apps (`back`, `forward`; the trail in sessionStorage `orbit.suite.trail`), each app reopened where it was left (`resumeOf`), `s.go` and other apps' notices opened in place (`go`); the separate apps unchanged |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law, Beats |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs`: qrcode-generator 2.0.4 (MIT), vendored |
 | `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays` |
@@ -431,7 +432,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   it is set. Each repo publishes its built site with `deploy/cf-site.mjs`
   (§4.2): `orbit.<DOMAIN>/<slug>/` every app (`slug`,
   `SHORT` in `kit/brand.mjs`; one origin, so one Pass sign-in), `orbit-pass`
-  for `/`, `/pass/`, `/key/`, `/Orbit-Core/` and the old `/Shared-Proxy/`,
+  for `/`, `/pass/`, `/key/`, `/app/` (Orbit, `kit/suite.mjs`), `/Orbit-Core/` and the old `/Shared-Proxy/`,
   `orbit-home` for `<DOMAIN>/`, `/showcase/` (Orbit-Showcase).
   Mail is refused. `deploy.yml`
   attaches the hostnames (its token needs the zone and D1 Edit); the guard

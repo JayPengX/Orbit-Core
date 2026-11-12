@@ -202,6 +202,11 @@ if (!only.length || only.includes('site')) {
   await writeFile(`${here}site/favicon.ico`, ico(await readFile(`${here}site/icons/favicon-32.png`), 32));
   await cards('pass', `${out}pass-`, ['og', 'x']);
   for (const id of Object.keys(BRANDS)) await writeFile(`${out}${id}.svg`, appIcon(id));
+  // Orbit, every app in one home-screen app (site/app/, kit/suite.mjs): the family's mark.
+  await mkdir(`${here}site/app/icons`, { recursive: true });
+  await writeFile(`${here}site/app/favicon.svg`, familyMark());
+  for (const [file, size] of Object.entries({ 'apple-touch-icon.png': 180, 'icon-192.png': 192, 'icon-512.png': 512 })) await png(familyMark({ shape: 'square' }), size, `${here}site/app/icons/${file}`);
+  await png(familyMark({ shape: 'maskable' }), 512, `${here}site/app/icons/maskable-512.png`);
   await writeFile(`${here}site/index.html`, homePage());
   console.log('wrote site/brand and site/index.html', PASS.name);
 }

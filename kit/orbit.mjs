@@ -2051,6 +2051,18 @@ function makeSession(app, { lang, heartbeat }) {
   // A link to another app that arrives signed in (apps on a phone's home
   // screen don't share storage): a sealed sign-in, good for 3 minutes.
   s.go = async (other, hash = '') => {
+    // (In Orbit's window: opened in place, already signed in, with back to here.)
+    if (inSuite()) {
+      try {
+        return (await import('./suite.mjs')).go(other, hash);
+      } catch {}
+    }
+    // (A separate app on an iPhone or iPad: Orbit offered now and then, kit suite.mjs offer.)
+    if (isIOS() && isStandalone() && dev('suiteAsk') === true) {
+      try {
+        if ((await (await import('./suite.mjs')).offer({ to: other, lang: s.lang })) === 'stay') return;
+      } catch {}
+    }
     let target = appUrl(other, hash);
     if (isStandalone() && storedAccount()) {
       try {
@@ -3631,6 +3643,19 @@ export async function mayLocate(key, { force = false } = {}) {
   writeStore(key, '1');
   return 'yes';
 }
+// Orbit, every app in one home-screen app (suite.mjs; its page is /app/):
+// true in its window only. On an iPhone or iPad each home-screen app has its
+// own storage, so Orbit's mark there is enough; elsewhere (Android, a
+// computer) apps of one site share storage, so only the window's own
+// sessionStorage says it (set by /app/, kept across the window's pages).
+export function inSuite() {
+  try {
+    if (globalThis.sessionStorage?.getItem('orbit.suite') === '1') return true;
+    return isIOS() && isStandalone() && Boolean(globalThis.localStorage?.getItem('orbit.suite.v1'));
+  } catch {
+    return false;
+  }
+}
 export function isStandalone() {
   return Boolean(globalThis.matchMedia?.('(display-mode: standalone)').matches || globalThis.matchMedia?.('(display-mode: fullscreen)').matches || globalThis.navigator?.standalone);
 }
@@ -3817,10 +3842,11 @@ function tapPicture(spot, tap) {
     html: `<svg viewBox="0 0 120 210" width="120" height="210"><rect x="8" y="4" width="104" height="202" rx="22" class="q-tap-phone"/>${bar}${lines}<circle cx="${x}" cy="${y}" r="17" class="q-tap-ring"/><g transform="translate(${x - 11} ${y - 11}) scale(0.9167)" class="q-tap-key">${GLYPHS[tap]}</g></svg>`
   });
 }
-export function installGate(app, lang = detectLang()) {
+export function installGate(app, lang = detectLang(), as = null) {
   if (!isPhoneOrTablet()) return false;
   if (isStandalone()) {
-    if (!isIOS()) return false;
+    // (Orbit's own window holds every app: none asks to be opened from its own icon.)
+    if (!isIOS() || as || inSuite()) return false;
     const home = windowApp(app);
     return home === app ? false : insideGate(app, home, lang);
   }
@@ -3830,7 +3856,7 @@ export function installGate(app, lang = detectLang()) {
   // without loading it again): start for real.
   globalThis.matchMedia?.('(display-mode: standalone)').addEventListener?.('change', e => e.matches && location.reload());
   const en = lang === 'en';
-  const name = appName(app);
+  const name = as?.name || appName(app);
   const how = installWay();
   const { spot, tap, act, lede, steps } = installSteps(how, name, en);
   const url = location.href.split('#')[0];
@@ -3863,9 +3889,9 @@ export function installGate(app, lang = detectLang()) {
   const already = en
     ? `Already added? Open ${name} from its home-screen icon, not from a link or the browser.${how.way === 'android-chrome' || how.way === 'samsung' ? ' If the icon brings you back here, it was added as a shortcut: remove it and add it again with “Install”.' : ''}`
     : `已經加入了？請從主畫面的圖示打開 ${name}，不要從連結或瀏覽器打開。${how.way === 'android-chrome' || how.way === 'samsung' ? '圖示打開又回到這一頁，表示加成了捷徑：刪掉它，重新加入並選「安裝」。' : ''}`;
-  const gate = node('dialog', { class: 'q-gate q-install', 'aria-modal': 'true', style: `--q-accent:${APPS[app].color}` }, [
+  const gate = node('dialog', { class: 'q-gate q-install', 'aria-modal': 'true', style: `--q-accent:${as?.color || APPS[app].color}` }, [
     node('div', { class: 'q-gate-box' }, [
-      node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
+      node('img', { class: 'q-gate-icon', src: as?.icon || './favicon.svg', alt: '', width: '72', height: '72' }),
       node('p', { class: 'q-gate-brand', text: 'ORBIT' }),
       node('h1', { class: 'q-gate-title', text: en ? `Add ${name} to your home screen` : `把 ${name} 加入主畫面` }),
       lede ? node('p', { class: 'q-gate-lede', text: lede }) : null,
@@ -5939,6 +5965,8 @@ if (typeof window !== 'undefined') {
   // A notice tapped while the app is open (sw.js notificationclick): to where it points, here.
   globalThis.navigator?.serviceWorker?.addEventListener?.('message', e => {
     if (e.data?.type !== 'orbit-notice') return;
+    // (Another app's notice: taken only in Orbit's window, where every app opens in place.)
+    if (e.data.other && !inSuite()) return;
     e.ports?.[0]?.postMessage('ok');
     goNotice(e.data.url);
   });
@@ -6237,3 +6265,10 @@ function watchLive() {
   scan();
 }
 watchLive();
+
+// Orbit's window: its switcher, back and forward (last, once everything above is defined).
+if (typeof document !== 'undefined' && inSuite()) {
+  import('./suite.mjs')
+    .then(m => m.start())
+    .catch(() => {});
+}
