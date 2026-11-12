@@ -6,7 +6,7 @@
 // (.github/workflows/news-clips.yml, started by the news build's newsClips
 // when the last finds are 15 minutes old) and writes
 //
-//   news/clips.json  { at, pages: { url: { y, v?, at } }, shorts: { id: ±when } }
+//   news/clips.json  { at, pages: { url: { y, v?, i?, at, f? } }, shorts: { id: ±when } }
 //
 // through the proxy's /data/push (DATA_PUSH_SECRET): each page's clips
 // (builders/news.js pageOf: a YouTube clip played in the app, else the
@@ -60,7 +60,7 @@ for (const u of want) {
   const p = found[u];
   // (A page that wouldn't answer is asked again in a later run, 3 times at most: `f`.)
   const y = (p?.y || []).filter(id => !(shorts[id] < 0));
-  pages[u] = { y, ...(p?.v?.length ? { v: p.v } : {}), at: now, ...(p ? {} : { f: (pages[u]?.f || 0) + 1 }) };
+  pages[u] = { y, ...(p?.v?.length ? { v: p.v } : {}), ...(p?.i ? { i: p.i } : {}), at: now, ...(p ? {} : { f: (pages[u]?.f || 0) + 1 }) };
   if (y.length) clips++;
   else if (p?.v?.length) own++;
 }

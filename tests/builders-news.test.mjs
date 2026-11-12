@@ -648,7 +648,10 @@ test("the pages that refuse Cloudflare are read on GitHub: which, and their clip
   assert.deepEqual(pages['https://tvbs/1'], { i: 'https://tvbs/pic.jpg', y: ['TVBSCLIP001'] });
   assert.deepEqual(pages['https://pts/1'].y, ['OWNCLIP0001']);
   assert.deepEqual(pages['https://udn/2'], { i: '', y: [], v: ['https://video.udn.com/embed/news/1'] });
-  assert.equal(pages['https://cna/2'], undefined);
+  assert.deepEqual(pages['https://cna/2'], { i: '', y: [] });
+  withClips(pages, { pages: { 'https://cts/9': { y: [], f: 1 }, 'https://cts/8': { y: [], i: 'https://cts/pic.jpg' } } });
+  assert.equal(pages['https://cts/9'], undefined);
+  assert.deepEqual(pages['https://cts/8'], { i: 'https://cts/pic.jpg', y: [] });
   // The build starts GitHub's run when its finds are 15 minutes old, not again within 15.
   const files = new Map([[NEWS_CLIPS, { at: NOW - 20 * 60_000, pages: {} }]]);
   const store = { json: async p => files.get(p) ?? null, put: async (p, d) => (files.set(p, d), true) };
