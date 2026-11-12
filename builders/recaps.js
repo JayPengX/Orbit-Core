@@ -180,11 +180,14 @@ export async function runRecaps({ store, env, ctx, proxy, cap, now = Date.now(),
     // (v2, Jay 11-10: lines that only said the leaders again are dropped and made anew.)
     let doc = (await store.json(recapPath(day))) || { games: {} };
     if (doc.v !== 2) doc = { v: 2, games: {}, tried: {} };
+    // (Until 11-12 a game let go (null) was asked again every run, its tries
+    // past 2, each one spending the sports AI's day: those get one more go.)
+    for (const [k, n] of Object.entries(doc.tried || {})) if (n > 2) delete doc.games[k], delete doc.tried[k];
     const built = await buildDay(day, { read: url => proxy(url).catch(() => null), now }).catch(() => null);
     const events = Object.values(JSON.parse(built?.body || '{}').events || {})
       .flat()
       .map(unslimEvent)
-      .filter(e => e?.kind === 'match' && e.status?.state === 'post' && SPORTS.has(LEAGUES[e.league]?.sport) && LEAGUES[e.league]?.espn && !doc.games[`${e.league}:${e.id}`])
+      .filter(e => e?.kind === 'match' && e.status?.state === 'post' && SPORTS.has(LEAGUES[e.league]?.sport) && LEAGUES[e.league]?.espn && !(`${e.league}:${e.id}` in doc.games))
       .map(e => localEvent(e, 'zh'));
     let made = 0;
     for (const e of events.slice(0, most)) {
