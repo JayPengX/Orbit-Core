@@ -142,6 +142,9 @@ function accrue(s, t) {
 function startState(account) {
   return {
     cash: { [BASE]: 0 },
+    // NT$ per unit at the last exchange into or out of each currency (valuate's
+    // stand-in while no rate can be read).
+    fxRate: {},
     positions: {},
     loans: {},
     deposits: 0,
@@ -215,6 +218,10 @@ function applyEvent(s, e) {
         add(s.cash, e.from, -e.amount);
         add(s.cash, e.to, e.received);
         s.paid.fx += e.spreadTWD || 0;
+        if (s.fxRate && e.amount > 0 && e.received > 0) {
+          if (e.from === BASE) s.fxRate[e.to] = e.amount / e.received;
+          else if (e.to === BASE) s.fxRate[e.from] = e.received / e.amount;
+        }
         break;
       case 'fill':
         applyFill(s, e);
@@ -1549,12 +1556,14 @@ export function recallAll(account, now = Date.now()) {
 // Everything in NT$ at today's prices and rates. A holding with no quote is
 // valued at its last trade price and listed in `stale`.
 export function valuate(s, quotes, rates) {
-  const rate = cur => rates?.[cur] ?? null;
+  // (No rate read yet, e.g. a first open while prices fail: the account's own last exchange, and
+  // for a holding the rate it was bought at, rather than NT$0, which read as a 100% loss.)
+  const rate = cur => rates?.[cur] ?? s.fxRate?.[cur] ?? null;
   const out = { cash: [], positions: [], loans: [], stale: [], missingRates: [] };
   let cashTWD = 0;
   for (const [currency, amount] of Object.entries(s.cash)) {
     const r = rate(currency);
-    if (r === null) out.missingRates.push(currency);
+    if (rates?.[currency] == null) out.missingRates.push(currency);
     const twd = amount * (r ?? 0);
     cashTWD += twd;
     if (Math.abs(amount) > EPS || currency === BASE) out.cash.push({ currency, amount, twd });
@@ -1618,8 +1627,8 @@ export function valuate(s, quotes, rates) {
       });
       continue;
     }
-    const r = rate(p.currency);
-    if (r === null) out.missingRates.push(p.currency);
+    const r = rates?.[p.currency] ?? (p.cost && p.costTWD ? Math.abs(p.costTWD / p.cost) : null) ?? rate(p.currency);
+    if (rates?.[p.currency] == null) out.missingRates.push(p.currency);
     if (!q) out.stale.push(p.symbol);
     // (An option's price is in points: NT$ OPTION.mult each.)
     const m = p.kind === 'opt' ? OPTION.mult : 1;
