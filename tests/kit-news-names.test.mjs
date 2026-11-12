@@ -13,3 +13,12 @@ test('a name matches as written, a code only standing alone, never a short word 
   assert.equal(namesRe(['Heat']), null, 'a short English word is a word, not a name');
   assert.match(storyText({ title: 'a', items: [['x', 'b']], tw: { items: [['y', 'c']] } }), /a\nb\nc/);
 });
+
+test("an outlet's mark: Google's icon for its site, or the host or file named where Google has none", async () => {
+  const { OUTLETS, ICON_SITE, outletIcon } = await import('../kit/news-outlets.mjs');
+  for (const id of Object.keys(ICON_SITE)) assert.ok(OUTLETS[id], id);
+  assert.match(outletIcon('bbc'), /s2\/favicons\?domain=bbc\.com&sz=64$/);
+  assert.match(outletIcon('pts', 128), /domain=news\.pts\.org\.tw&sz=128$/);
+  assert.match(outletIcon('ctv'), /^https:\/\/www\.ctv\.com\.tw\/.+\.ico$/);
+  assert.equal(outletIcon('nope'), '');
+});

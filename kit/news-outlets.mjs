@@ -221,8 +221,23 @@ export const OUTLETS = Object.fromEntries(
   ROWS.map(([id, zh, en, site, kind, tw, cs, lr, ownerZh, ownerEn, basis, weak], i) => [id, { id, zh, en, site, kind, tw, cs, lr, owner: { zh: ownerZh, en: ownerEn }, basis, weak, region: i < TW_COUNT ? 'tw' : 'intl' }])
 );
 export const outletOf = id => OUTLETS[id] || null;
-// An outlet's mark: its site's own small icon (no picture of ours).
-export const outletIcon = (id, size = 64) => (OUTLETS[id] ? `https://www.google.com/s2/favicons?domain=${OUTLETS[id].site}&sz=${size}` : '');
+// An outlet's mark: its site's own small icon (no picture of ours), through
+// Google's icon service. Where Google has none for the outlet's site (it
+// sends a grey globe), the address it does have: another of the outlet's
+// hosts, or the site's own icon file (中視: Google knows no icon for it).
+export const ICON_SITE = {
+  pts: 'news.pts.org.tw',
+  rti: 'www.rti.org.tw',
+  ctv: 'https://www.ctv.com.tw/Cms_Data/Sites/CTV4/Files/images/favicon-32x32.ico',
+  era: 'www.eracom.com.tw',
+  titv: 'news.ipcf.org.tw',
+  kherald: 'www.koreaherald.com'
+};
+export const outletIcon = (id, size = 64) => {
+  if (!OUTLETS[id]) return '';
+  const at = ICON_SITE[id] || OUTLETS[id].site;
+  return at.startsWith('https://') ? at : `https://www.google.com/s2/favicons?domain=${at}&sz=${size}`;
+};
 
 // The side an outlet counts for in a story's bar: Taiwan's g (綠) c b (藍),
 // the English l c r; null when it has no place on that axis (unrated, or
