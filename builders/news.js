@@ -84,6 +84,7 @@ export const PAGE_READS = 12;
 // stay near 90 (each past the Runner's 40 a relay's own request).
 const S2 = 2;
 const S3 = 3;
+const S6 = 6;
 // (Taiwan's channels post more, so are read more often.)
 const CHANNEL_EVERY = { tw: 2, intl: 4 };
 const sec = (list, url, every = S3) => list.map(x => [url(x), 'rss', every]);
@@ -91,7 +92,8 @@ const sec = (list, url, every = S3) => list.map(x => [url(x), 'rss', every]);
 // 503): its 12 latest, each with the outlet's own link and summary.
 export const bing = site => `https://www.bing.com/news/search?q=site%3a${site}&format=rss&qft=sortbydate%3d%221%22&mkt=en-US&setlang=en-US&cc=US`;
 export const FEEDS = {
-  ltn: [...['all', 'politics', 'society', 'life', 'world', 'local'].map(c => [`https://news.ltn.com.tw/rss/${c}.xml`, 'rss']), ...sec(['business', 'sports'], c => `https://news.ltn.com.tw/rss/${c}.xml`)],
+  // (自由's 'all' holds every section's news: read every build, the sections every 2nd.)
+  ltn: [['https://news.ltn.com.tw/rss/all.xml', 'rss'], ...sec(['politics', 'society', 'life', 'world', 'local'], c => `https://news.ltn.com.tw/rss/${c}.xml`, S2), ...sec(['business', 'sports'], c => `https://news.ltn.com.tw/rss/${c}.xml`)],
   setn: [['https://www.setn.com/sitemapGoogleNews.xml', 'map']],
   // (Its site answers only Taiwan, Google News' feed of it refuses Cloudflare:
   // its YouTube channel's reports, each headline the clip's.)
@@ -99,7 +101,7 @@ export const FEEDS = {
   newtalk: [['https://newtalk.tw/rss/all', 'rss']],
   peoples: [['https://www.peoplenews.tw/feed/', 'rss']],
   cna: [
-    ...['politics', 'mainland', 'intworld', 'social', 'finance'].map(s => [`https://feeds.feedburner.com/rsscna/${s}`, 'rss']),
+    ...sec(['politics', 'mainland', 'intworld', 'social', 'finance'], s => `https://feeds.feedburner.com/rsscna/${s}`, S2),
     ...sec(['technology', 'lifehealth', 'culture', 'sport', 'local'], s => `https://feeds.feedburner.com/rsscna/${s}`)
   ],
   pts: [['https://news.pts.org.tw/xml/newsfeed.xml', 'rss']],
@@ -179,7 +181,49 @@ export const FEEDS = {
     [['reuters', 'reuters.com'], ['ap', 'apnews.com'], ['usatoday', 'usatoday.com'], ['axios', 'axios.com'], ['newsweek', 'newsweek.com'], ['telegraph', 'telegraph.co.uk'], ['newsmax', 'newsmax.com']].map(([o, site]) => [o, [[bing(site), 'bing', S3]]])
   ),
   // (Bing's copy of it is months old.)
-  washtimes: [['https://www.washingtontimes.com/rss/headlines/news/', 'rss', S3]]
+  washtimes: [['https://www.washingtontimes.com/rss/headlines/news/', 'rss', S3]],
+  // (11-13, Jay: more outlets, each read once an hour, every 6th build: its
+  // feed holds more than an hour's news, and a build's calls stay under 100.
+  // 中視, 台視, 非凡 publish no feed a reader can use: Bing News' of their site.)
+  ...Object.fromEntries([['ctv', 'ctv.com.tw'], ['ttv', 'news.ttv.com.tw'], ['ustv', 'news.ustv.com.tw']].map(([o, site]) => [o, [[bing(site), 'bing', S6]]])),
+  era: [['https://www.eracom.com.tw/eSitemapNews.xml', 'map', S6]],
+  titv: [['https://news.ipcf.org.tw/rss', 'rss', S6]],
+  nextapple: [['https://news.nextapple.com/api/xml/site-map/news', 'map', S6]],
+  moneyudn: [['https://money.udn.com/rssfeed/news/1001/5591?ch=money', 'rss', S6]],
+  nownews: [['https://www.nownews.com/newsSitemap-daily.xml', 'map', S6]],
+  cnews: [['https://cnews.com.tw/feed/', 'rss', S6]],
+  cnyes: [['https://news.cnyes.com/rss/v1/news/category/all', 'rss', S6]],
+  ydn: [['https://www.ydn.com.tw/rss/google.aspx', 'map', S6]],
+  focustw: [['https://focustaiwan.tw/GoogleNewsSitemap_fromRemote_cep2.xml', 'map', S6]],
+  vox: [['https://www.vox.com/rss/index.xml', 'rss', S6]],
+  intercept: [['https://theintercept.com/feed/?rss', 'rss', S6]],
+  motherjones: [['https://www.motherjones.com/feed/', 'rss', S6]],
+  slate: [['https://slate.com/feeds/all.rss', 'rss', S6]],
+  beast: [['https://www.thedailybeast.com/arc/outboundfeeds/rss/articles/', 'rss', S6]],
+  propublica: [['https://www.propublica.org/feeds/propublica/main', 'rss', S6]],
+  theweek: [['https://theweek.com/feeds.xml', 'rss', S6]],
+  cbc: [['https://www.cbc.ca/webfeed/rss/rss-world', 'rss', S6]],
+  marketwatch: [['https://feeds.content.dowjones.io/public/rss/mw_topstories', 'rss', S6]],
+  deseret: [['https://www.deseret.com/arc/outboundfeeds/rss/?outputType=xml', 'rss', S6]],
+  kherald: [['https://www.koreaherald.com/rss/newsAll', 'rss', S6]],
+  kyivind: [['https://kyivindependent.com/news-archive/rss/', 'rss', S6]],
+  moscowt: [['https://www.themoscowtimes.com/rss/news', 'rss', S6]],
+  foxbiz: [['https://moxie.foxbusiness.com/google-publisher/latest.xml', 'rss', S6]],
+  dispatch: [['https://thedispatch.com/feed/', 'rss', S6]],
+  epoch: [['https://feed.theepochtimes.com/us/feed', 'rss', S6]],
+  jtn: [['https://justthenews.com/rss.xml', 'rss', S6]],
+  beacon: [['https://freebeacon.com/feed/', 'rss', S6]],
+  townhall: [['https://townhall.com/rss/columnists/', 'rss', S6]],
+  amcon: [['https://www.theamericanconservative.com/feed/', 'rss', S6]],
+  abcau: [['https://www.abc.net.au/news/feed/51120/rss.xml', 'rss', S6]],
+  hkfp: [['https://hongkongfp.com/feed/', 'rss', S6]],
+  euronews: [['https://www.euronews.com/rss?level=theme&name=news', 'rss', S6]],
+  rappler: [['https://www.rappler.com/feed/', 'rss', S6]],
+  cnasg: [['https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511', 'rss', S6]],
+  kyodo: [['https://english.kyodonews.net/rss/all.xml', 'rss', S6]],
+  asiatimes: [['https://asiatimes.com/feed/', 'rss', S6]],
+  yonhap: [['https://en.yna.co.kr/RSS/news.xml', 'rss', S6]],
+  straits: [['https://www.straitstimes.com/news/asia/rss.xml', 'rss', S6]]
 };
 // (Outlets read only through a search's feed: their pages refuse us too.)
 const FAR = new Set(Object.entries(FEEDS).filter(([, list]) => list.every(([, kind]) => kind === 'bing' || kind === 'yt')).map(([o]) => o));
@@ -668,17 +712,21 @@ export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lan
   const note = (k, g) => (index.get(k) || index.set(k, []).get(k)).push(g);
   for (const d of docs) {
     if (!d.v.size) continue;
-    const seen = new Set();
+    // (Each near group's dot product summed piece by piece, the groups in the
+    // order first met: one pass, not a cosine for each, 11-13: two thirds of
+    // a build's CPU went to cosines.)
+    const dots = new Map();
+    for (const [p, x] of d.v) {
+      for (const g of index.get(p) || []) {
+        if ((d.it.at || 0) - g.last > GAP) continue;
+        dots.set(g, (dots.get(g) || 0) + x * g.v.get(p));
+      }
+    }
     let best = null;
     let bestSim = 0;
-    for (const p of d.v.keys()) {
-      for (const g of index.get(p) || []) {
-        if (seen.has(g)) continue;
-        seen.add(g);
-        if ((d.it.at || 0) - g.last > GAP) continue;
-        const sim = cosine(d.v, d.n, g.v, (g.n ??= norm(g.v)));
-        if (sim > bestSim) (bestSim = sim), (best = g);
-      }
+    for (const [g, dot] of dots) {
+      const sim = dot / (d.n * (g.n ??= norm(g.v)));
+      if (sim > bestSim) (bestSim = sim), (best = g);
     }
     if (best && bestSim >= join) {
       best.docs.push(d);
@@ -704,14 +752,19 @@ export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lan
     return g;
   };
   for (const g of groups) {
-    for (const k of g.v.keys())
+    // (Each pair's dot product summed over the pieces they share, then
+    // asked once, in the order met: its answer doesn't change.)
+    const dots = new Map();
+    for (const [k, x] of g.v)
       for (const h of index.get(k) || []) {
-        if (h === g) continue;
-        const a = root(g);
-        const b = root(h);
-        if (a === b || h.first > g.last + GAP || g.first > h.last + GAP) continue;
-        if (cosine(g.v, g.n, h.v, h.n) >= merge) into.set(b, a);
+        if (h === g || h.first > g.last + GAP || g.first > h.last + GAP) continue;
+        dots.set(h, (dots.get(h) || 0) + x * h.v.get(k));
       }
+    for (const [h, dot] of dots) {
+      const a = root(g);
+      const b = root(h);
+      if (a !== b && dot / (g.n * h.n) >= merge) into.set(b, a);
+    }
   }
   const whole = new Map();
   for (const g of groups) {
@@ -940,15 +993,15 @@ function matchClips(vids, sized, vecOf, lang) {
     const vv = vecOf({ t: clipTitle(v.t) });
     if (vv.size < 2) continue;
     const vn = norm(vv);
-    const near = new Set();
-    for (const k of vv.keys()) for (const x of by.get(k) || []) near.add(x);
+    const near = new Map();
+    for (const [k, y] of vv) for (const x of by.get(k) || []) near.set(x, (near.get(x) || 0) + y * x.c.get(k));
     let best = null;
     let bestSim = 0;
     let loose = null;
     let looseBy = 0;
-    for (const x of near) {
+    for (const [x, dot] of near) {
       if (v.at < x.first - 24 * HOUR || v.at > x.last + 24 * HOUR) continue;
-      const sim = cosine(vv, vn, x.c, x.cn);
+      const sim = dot / (vn * x.cn);
       if (sim > bestSim) (bestSim = sim), (best = x.r);
       if (sim < looseMid || sim >= CLIP_NEAR[lang]) continue;
       // (Its nearest headline, asked only of a story already this near.)
@@ -994,6 +1047,9 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
         const v = sumOf(r.items.filter(it => it.at >= r.last - 24 * HOUR).map(vecOf));
         return { r, v, n: norm(v), whose: lang === 'zh' ? reportsOwner(r.items.map(it => it.t)).owner : '' };
       });
+    // (Which kept stories each piece is in: a group is weighed against those only.)
+    const daysBy = new Map();
+    for (const x of lastDays) for (const k of x.v.keys()) (daysBy.get(k) || daysBy.set(k, []).get(k)).push(x);
     for (const g of groupStories(mine, lang)) {
       const hits = new Map();
       for (const it of g) {
@@ -1009,10 +1065,13 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
         let bestSim = 0;
         // (Another company's reports never join a company's story.)
         const gReports = lang === 'zh' ? g.map(it => it.t).filter(reportOf) : [];
-        for (const { r, v, n, whose } of lastDays) {
-          if (r.last < gFirst - GAP) continue;
+        const dots = new Map();
+        for (const [k, x] of gv) for (const d of daysBy.get(k) || []) dots.set(d, (dots.get(d) || 0) + x * d.v.get(k));
+        for (const d of lastDays) {
+          const { r, n, whose } = d;
+          if (!dots.has(d) || r.last < gFirst - GAP) continue;
           if (whose && gReports.length && gReports.every(t => otherReport(t, whose))) continue;
-          const sim = cosine(gv, gn, v, n);
+          const sim = dots.get(d) / (gn * n);
           if (sim > bestSim) (bestSim = sim), (best = r);
         }
         if (bestSim >= MERGE[lang]) rec = best;
