@@ -1076,6 +1076,51 @@ export const FEATURES = {
     }
   },
 
+  // Orbit News: 預測市場 (builders/news-markets.js). Code found each pair
+  // (a story and a Polymarket question sharing its names and what's asked);
+  // the AI only says whether the question is truly about the story's event
+  // (a wrong match is worse than none) and words it in both languages.
+  // The chances are Polymarket's, never the model's.
+  'news-markets': {
+    models: ['sonnet', 'sol'],
+    effort: 'low',
+    timeoutMs: 90_000,
+    maxIn: 9000,
+    parts: ({ pairs }) =>
+      text(
+        [
+          'Each item pairs a news story (its outlets’ headlines, Chinese or English) with a question from a prediction market. Decide whether a reader of this story would see the market’s question as the open question this very story raises: the same person, office, race, conflict or decision the story is about, and an outcome the story’s events bear on.',
+          'match true only when that is plainly so. Examples: reports Nvidia’s board may replace Jensen Huang ↔ "Jensen Huang announced resignation or removal by…?" true; a Taipei mayoral campaign story ↔ "Taipei Mayor Election Winner" true; US envoys in Moscow for Ukraine peace talks ↔ "Russia x Ukraine ceasefire agreement by…?" true. False: a story that only mentions the person or place in passing; a different race, office or person with a similar name; a story about a company’s stock or earnings ↔ a question about its CEO’s private life; a city council speaker’s bribery case ↔ the county’s magistrate race; anything frivolous (what someone says, wears or posts). When unsure, false.',
+          'When match is true: zh = the market’s question in natural Traditional Chinese as Taiwan writes it (台灣用語, 台灣媒體的譯名: 川普, 普丁, 澤倫斯基, 輝達, 黃仁勳; full-width ？), at most 24 characters, a question; en = the same question in plain English, at most 12 words. Keep every number and date the question has, as it writes them; add none. names: for each of the market’s options given, its name in Chinese as Taiwan’s press writes it (a Taiwanese politician’s own Chinese name, e.g. Chiang Wan-an = 蔣萬安; a foreign person’s Taiwanese transliteration), and leave an option out when you are not sure of it. When match is false: zh, en "" and names [].',
+          'Return one item per pair with its k.',
+          JSON.stringify(pairs)
+        ].join('\n')
+      ),
+    schema: obj({ items: arr(obj({ k: S, match: B, zh: S, en: S, names: arr(obj({ en: S, zh: S })) })) }),
+    clean(raw, { pairs }) {
+      const given = new Map(pairs.map(p => [p.k, p]));
+      const out = {};
+      for (const it of list(raw?.items, 40)) {
+        const p = given.get(String(it?.k || ''));
+        if (!p || typeof it.match !== 'boolean') continue;
+        if (!it.match) {
+          out[p.k] = { ok: false };
+          continue;
+        }
+        const zh = str(it.zh, 40), en = str(it.en, 120);
+        // (A question past its length, without Chinese, or with a number the market's doesn't have, is no answer.)
+        if (String(it.zh || '').trim().length > 30 || !/[一-鿿]/.test(zh) || /[一-鿿]/.test(en) || !en || !nums(`${zh} ${en}`).every(n => +n <= 31 || nums(JSON.stringify(p.market)).includes(n))) continue;
+        const names = {};
+        for (const x of list(it.names, 8)) {
+          const k = String(x?.en || '').trim(), z = str(x?.zh, 12);
+          if (p.market.options.includes(k) && /^[一-鿿·・．（）]+$/.test(z)) names[k] = z;
+        }
+        out[p.k] = { ok: true, zh, en, names };
+      }
+      return out;
+    }
+  },
+
   // Orbit News: 一句話講清楚 and 國際新聞中文標題, made once a story
   // (builders/news.js), from the outlets' own headlines and summaries only.
   'news-lines': {
