@@ -803,7 +803,10 @@ export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, i
   // (A video page doesn't lead: its headline is often "Watch: …".)
   const rank = it => (it.near ?? 0) + (STEADY.has(OUTLETS[it.o]?.kind) ? 0.12 : 0) - (it.v ? 0.3 : 0);
   const lead = items.filter(it => (it.at || now) >= at - 24 * HOUR).sort((a, b) => rank(b) - rank(a))[0];
-  const withSum = [lead, ...newest].find(it => it.d);
+  // (In the headline's own language: a Chinese headline over an English
+  // outlet's summary was seen on the iPhone, 11-12; none rather than that.)
+  const han = x => /\p{Script=Han}/u.test(x || '');
+  const withSum = [lead, ...newest].find(it => it.d && han(it.d) === han(lead.t));
   // The picture: a feed's own, else the one the outlet set on its page.
   const pics = [lead, ...newest].flatMap(it => {
     const p = pages[it.u]?.i;
