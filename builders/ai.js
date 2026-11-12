@@ -61,14 +61,16 @@ export async function newsLines({ store, env, ctx, cap, until }) {
   const need = [];
   for (const s of front) {
     const old = was[s.id];
-    // (A title once; a copy from before titles alone, with its line, made again.)
-    if (old && !old.line && (old.zh || old.en)) keep[s.id] = old;
+    // (A title once, in the language its region is asked in; a copy from before titles alone,
+    // with its line, made again; so is a world story's English title from before 11-12's fix.)
+    if (old && !old.line && old[storyFacts(s).lang]) keep[s.id] = old;
     else need.push(s);
   }
   let made = 0, calls = 0;
   for (let i = 0; i < need.length && Date.now() < until; i += NEWS_BATCH) {
     const batch = need.slice(i, i + NEWS_BATCH);
-    const r = await aiOnce(env, ctx, 'news-lines', { stories: batch.map(storyFacts) }, cap);
+    // (Each story alone: map's index as `region` asked every world story in English, 11-12.)
+    const r = await aiOnce(env, ctx, 'news-lines', { stories: batch.map(s => storyFacts(s)) }, cap);
     calls++;
     if (!r) break;
     if (r.error) continue;

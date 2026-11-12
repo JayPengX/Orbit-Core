@@ -39,6 +39,15 @@ test('news: a title in the other language, once a story; no line under it; an ol
   assert.equal(lines.a.en, 'Title a');
   assert.equal(lines.a.line, undefined);
   assert.equal(seen.length, 1);
+  // A world story is asked in Chinese (map's index was taken as its region, 11-12: every one asked in English);
+  // an old English title of one is made again.
+  const store2 = memStore({ 'news/index.json': { tw: [], intl: [story('w', 4), story('v', 4)] }, 'news/lines.json': { lines: { v: { en: 'English', m: 4 } } } });
+  const seen2 = [];
+  const env2 = claudeEnv(body => ({ items: JSON.parse(body.messages[0].content[0].text.split('\n').at(-1)).map(s => ({ id: s.id, title: s.lang === 'zh' ? `標題${s.id}` : `Title ${s.id}` })) }), seen2);
+  await newsLines({ store: store2, env: env2, cap: 10, until: Date.now() + 60_000 });
+  const asked = JSON.parse(seen2[0].messages[0].content[0].text.split('\n').at(-1));
+  assert.deepEqual(asked.map(s => s.lang), ['zh', 'zh']);
+  assert.deepEqual((await store2.json('news/lines.json')).lines.v, { zh: '標題v', m: 4 });
 });
 
 test('news sides: only stories sides frame and both ends carry; each side’s headlines, four outlets at most', async () => {
