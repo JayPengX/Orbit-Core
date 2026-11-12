@@ -310,7 +310,7 @@ export const HELP = {
         '只換那兩天，其他週照舊；調過的課標著橘色「調課」，通知也跟著換。點那節或「課表」裡的調課可以取消。'
       ]],
       ['notify', '上課提醒與假日', [
-        '每堂課開始前 5 分鐘通知你課名、時間、老師和教室，App 關著也會；開關在 Orbit Pass 的通知。',
+        '下課鐘響時通知你下一節的課名、時間、老師和教室（第一節和午休後是上課前 5 分鐘），App 關著也會；開關在 Orbit Pass 的通知。',
         '國定假日和補假沒有課，也不會通知；「下一個上課日」會跳過它們。倒數活動打開「結束後自動刪除」，活動過了就自己刪掉。'
       ]],
       ['share', '分享課表', [
@@ -330,7 +330,7 @@ export const HELP = {
         'Only those two dates change, every other week as before; a swapped class carries an orange Swap tag, and its notice follows it. Tap it, or the swap in Timetable, to undo it.'
       ]],
       ['notify', 'Class reminders and holidays', [
-        'Five minutes before each class you’re told its name, time, teacher and room, with the app closed too; the switch is in the Orbit Pass’s notifications.',
+        'At the bell you’re told the next class’s name, time, teacher and room (5 minutes before the first class and after lunch), with the app closed too; the switch is in the Orbit Pass’s notifications.',
         'Taiwan’s holidays and their make-up days off have no classes and no reminders, and the next school day skips them. A countdown with Delete when over clears itself once it has passed.'
       ]],
       ['share', 'Sharing a schedule', [
