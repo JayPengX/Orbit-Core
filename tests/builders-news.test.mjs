@@ -460,3 +460,16 @@ test('a story carries other outlets’ pictures to fall back on: each another ou
   assert.equal(s.alts.at(-1)[0], 'https://i.ytimg.com/vi/AAAAAAAAAAA/hqdefault.jpg');
   assert.equal(storyOf([item('fox', t, NOW - H), item('nyt', t, NOW - 2 * H)], 'intl', NOW).alts, undefined);
 });
+
+test('a headline chained into a story it shares nothing with is let go (11-12: Hegseth\'s impeachment held LSU\'s coach and oil prices)', () => {
+  const T = NOW - 6 * H;
+  const words = ['卓榮泰不副署老福法 批破壞憲政', '不副署老福法 卓榮泰：破壞憲政秩序', '老福法不副署 卓榮泰批憲政', '卓榮泰不副署老福法 藍委反擊', '老福法不副署 藍委批卓榮泰', '不副署老福法 立法院藍委反擊卓榮泰'];
+  const own = ['cna', 'udn', 'ltn', 'tvbs', 'setn', 'chinatimes'].map((o, i) => item(o, words[i], T + i * 10 * 60_000));
+  const stray = item('pts', '中華電信攜手青年世代 傳承歌仔戲時代魅力', T + H);
+  const recs = [{ id: 'old', r: 'tw', first: T, last: T + H, peak: 6, items: [...own, stray].map(({ o, t, u, at }) => ({ o, t, u, at })) }];
+  const out = deskOf([...own, stray], recs, T + 2 * H);
+  const kept = out.recs.find(r => r.id === 'old').items.map(it => it.u);
+  assert.ok(!kept.includes(stray.u));
+  assert.equal(kept.length, 6);
+  assert.equal(out.tw[0].n, 6);
+});
