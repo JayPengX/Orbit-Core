@@ -2432,7 +2432,8 @@ async function loadBugs() {
     $('bugs').replaceChildren(...rows);
   } catch (e) {
     $('bugs').replaceChildren();
-    $('bugs-error').textContent = e.message;
+    $('bugs-sum').textContent = '';
+    $('bugs-error').textContent = `讀不到：${e.message}`;
   }
 }
 $('bugs-mark').innerHTML = ic('ai');
@@ -2525,7 +2526,8 @@ async function loadSystem() {
     for (const id of ['beats', 'r2', 'd1', 'secrets']) $(id).replaceChildren(checkRow('bad', '讀不到', e.message, ''));
   }
   const runs = await deployRuns();
-  $('deploys').replaceChildren(...runs.map(({ name, repo, run, error }) => (run ? runRow(run, `${name} · ${run.name}`, repo) : el('li', {}, [el('span', { class: 'dot off' }), el('span', {}, [el('a', { text: name }), el('small', { text: error || '沒有紀錄' })])]))));
+  // (Each app's usual deploy is its name alone: 「· Deploy to Cloudflare」 on every row wrapped each onto two lines.)
+  $('deploys').replaceChildren(...runs.map(({ name, repo, run, error }) => (run ? runRow(run, /^Deploy to Cloudflare$/i.test(run.name) ? name : `${name} · ${run.name}`, repo) : el('li', {}, [el('span', { class: 'dot off' }), el('span', {}, [el('a', { text: name }), el('small', { text: error || '沒有紀錄' })])]))));
 }
 // Each repo's workflows, the latest run of each (Law's 裁判 backfill, Orbit-Core's
 // Workers and kit apart), from one read a repo (GitHub's open API, kept two

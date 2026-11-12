@@ -78,3 +78,9 @@ test('admin: an action says what it did after the sheet redraws (a toast), and w
   const del = page.slice(page.indexOf("const del = action('刪除帳戶'"), page.indexOf('delBtn.onclick'));
   assert.ok(del.indexOf('if (confirmRef.value.trim() !== a.ref) throw new Error(WHY.ADMIN_CONFIRM);') < del.indexOf('await sure('), '刪除: the reference first');
 });
+
+test('admin: 健康’s deploy rows name an app’s usual deploy by the app alone; a failed read of 除錯週報 never leaves 讀取中…', () => {
+  assert.ok(page.includes("runRow(run, /^Deploy to Cloudflare$/i.test(run.name) ? name : `${name} · ${run.name}`, repo)"));
+  const bugs = page.slice(page.indexOf('async function loadBugs()'), page.indexOf("$('bugs-mark').innerHTML"));
+  assert.match(bugs, /\$\('bugs-sum'\)\.textContent = '';\n\s*\$\('bugs-error'\)\.textContent = `讀不到：\$\{e\.message\}`;/);
+});
