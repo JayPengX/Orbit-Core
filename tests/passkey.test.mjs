@@ -351,3 +351,15 @@ test('the sign-in gate never asks for challenges in a loop: an answer without a 
   assert.match(gate, /if \(!begin\?\.challenge \|\| !Number\.isFinite\(begin\.exp\)\) begin = null;/);
   assert.match(gate, /setTimeout\(ask, begin \? Math\.max\(30_000, begin\.exp - Date\.now\(\) - 45_000\) : 60_000\)/);
 });
+
+test('a passkey added (or removed) asks for a new challenge: the next add lists the keys as they are now', async () => {
+  const { readFileSync } = await import('node:fs');
+  const kit = readFileSync(new URL('../kit/orbit.mjs', import.meta.url), 'utf8');
+  const add = kit.slice(kit.indexOf('async function addPasskey'), kit.indexOf('async function addPasskey') + 400);
+  assert.match(add, /await s\.passkeyAdd\(begin\.challenge, cred\);\s+ch\.renew\(\);/);
+  const rows = kit.slice(kit.indexOf('function passkeyRows'), kit.indexOf('export async function passkeyOffer'));
+  assert.match(rows, /forgetPasskey\(k\.id\);\s+ch\?\.renew\(\);/);
+  assert.match(kit, /const renew = \(\) => \(\(begin = null\), get\(\)\.catch\(\(\) => \{\}\)\);/);
+  // (A hand-over without its sealed sign-in goes as a plain link, never #qh=undefined.)
+  assert.match(kit, /if \(handoff\) target = appUrl\(other/);
+});
