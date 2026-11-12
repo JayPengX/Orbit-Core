@@ -208,3 +208,17 @@ export function teamsByZh(query, most = 6) {
 }
 // The full name (the lottery's), or the name as it came.
 export const teamZh = (key, name, sport = '') => teamNameZh(key, name, sport)?.full ?? name;
+// A US team as a news line names it ("the Rockets", "Houston", "Trail
+// Blazers", "Golden State"): its English name (teamNameZh's key), or null
+// when none is, or the words are two teams' (New York, Chicago, Sox).
+// Sports' injury notes: 「對火箭 不出賽」.
+export function usTeamIn(key, words) {
+  const t = US[key];
+  const w = fold(String(words || '').replace(/^the\s+/i, ''));
+  if (!t || !w || w === 'la') return null;
+  const hits = Object.keys(t).filter(n => {
+    const f = fold(n);
+    return f === w || f.endsWith(` ${w}`) || f.startsWith(`${w} `);
+  });
+  return new Set(hits.map(n => t[n].join('|'))).size === 1 ? hits[0] : null;
+}
