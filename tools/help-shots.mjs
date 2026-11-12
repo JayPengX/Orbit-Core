@@ -44,6 +44,7 @@ const APPS = {
   money: { app: 'money', account: 'money-demo', wait: 6000, stops: { entry: page('money', 'entry') }, top: { entry: 168 } },
   vocab: { app: 'words', account: 'shots/accounts/words-demo.txt', wait: 7000, stops: { quiz: page('words', 'answered') } },
   beats: { app: 'beats', wait: 6000, stops: { game: [...page('beats', 'game'), ...click(wait(10000))] }, hash: { game: 'create' } },
+  news: { app: 'news', wait: 9000, stops: {} },
   law: { app: 'law', wait: 8000, stops: { article: [], ask: [] }, hash: { article: 'law=B0000001&a=184', laws: 'tab=laws', rulings: 'tab=rulings', bills: 'tab=bills', mine: 'tab=mine', ask: 'tab=ask' } },
   stock: { app: 'securities', account: 'shots/accounts/securities-demo.txt', wait: 12000, stops: { stock: page('securities', 'stock') } }
 };

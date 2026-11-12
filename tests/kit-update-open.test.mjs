@@ -177,3 +177,19 @@ test('the watch downloads a newer version behind the screen and swaps only after
     }
   }
 });
+
+// A page left open in the background asks for updates only once it's back on
+// screen, so a deploy made while it was away was found a second after it came
+// back, and swapNow (only "away 5 minutes") had just been cleared: the old
+// version stayed until the next time away (2026-11-12). The first seconds back,
+// before a touch, are still the opening.
+test('an update found in the first seconds back after a long time away opens then', () => {
+  const src = readFileSync(new URL('../kit/orbit.mjs', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('export function watchUpdates('), src.indexOf('// Every app\'s page starts the watch'));
+  const swapNow = fn.slice(fn.indexOf('function swapNow('), fn.indexOf('async function swap('));
+  assert.match(swapNow, /backAt && Date\.now\(\) - backAt < BACK_MS/);
+  assert.match(fn, /backAt = awaySince != null && Date\.now\(\) - awaySince >= AWAY_MS \? Date\.now\(\) : 0;\s*awaySince = null;\s*check\(Boolean\(backAt\)\)/);
+  // (A touch, a key or a scroll: the person is using the page, never swapped in front of them.)
+  assert.match(fn, /\['pointerdown', 'keydown', 'wheel', 'touchstart'\]\) globalThis\.addEventListener\?\.\(type, \(\) => \(backAt = 0\)/);
+  assert.match(src, /const BACK_MS = 4_000;/);
+});

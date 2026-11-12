@@ -23,3 +23,14 @@ test('every tour stop has its four pictures, each asked by its own hash', async 
     }
   }
 });
+
+// The English guides name things as the English app does (Money, Edit trip, the
+// Legislative Yuan): Chinese only as a gloss in brackets, after the English word.
+test('English guides use the English names, Chinese only as a gloss in brackets', async () => {
+  const { HELP_ORDER, helpFor, tourFor } = await import('../kit/help.mjs');
+  for (const app of HELP_ORDER)
+    for (const [id, title, lines] of [...helpFor(app, 'en'), ...tourFor(app, 'en')]) {
+      const bare = [title, ...lines].join(' ').replace(/\([^()]*\)/g, '');
+      assert.doesNotMatch(bare, /[一-鿿]/, `${app}/${id}: Chinese outside a gloss`);
+    }
+});

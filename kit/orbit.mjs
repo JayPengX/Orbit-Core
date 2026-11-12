@@ -4054,6 +4054,11 @@ export function sounding() {
 
 // Away this long, coming back to the app is an opening: a newer version on the phone is shown then.
 const AWAY_MS = 5 * 60_000;
+// Back from that long away, a newer version found in the first seconds, before
+// the person touches anything, is still the opening: shown then too (the page
+// asks only once it's back, so one deployed while it was away was found just
+// after, and the old version stayed until the next time away, 2026-11-12).
+const BACK_MS = 4_000;
 let watching = null;
 export function watchUpdates({ current, key, every = 15_000 } = {}) {
   if (!current || current === 'dev' || typeof document === 'undefined') return;
@@ -4067,6 +4072,9 @@ export function watchUpdates({ current, key, every = 15_000 } = {}) {
   // look away; when the page last went out of sight (null: in sight since).
   let ready = null;
   let awaySince = null;
+  // (Back after AWAY_MS: when, until the person touches the page.)
+  let backAt = 0;
+  for (const type of ['pointerdown', 'keydown', 'wheel', 'touchstart']) globalThis.addEventListener?.(type, () => (backAt = 0), { capture: true, passive: true });
   const channel = globalThis.BroadcastChannel ? new BroadcastChannel('orbit-updates') : null;
   async function apply(latest) {
     // (Music playing: not now. The check every few seconds, or the next opening, updates once it stops.)
@@ -4106,7 +4114,8 @@ export function watchUpdates({ current, key, every = 15_000 } = {}) {
     swap(latest, n);
   }
   function swapNow() {
-    return document.visibilityState !== 'hidden' && awaySince != null && Date.now() - awaySince >= AWAY_MS && !sounding();
+    const opening = (awaySince != null && Date.now() - awaySince >= AWAY_MS) || (backAt && Date.now() - backAt < BACK_MS);
+    return document.visibilityState !== 'hidden' && Boolean(opening) && !sounding();
   }
   async function swap(latest, n) {
     const flag = `${key || 'orbit'}.reloadedTo`;
@@ -4188,8 +4197,9 @@ export function watchUpdates({ current, key, every = 15_000 } = {}) {
       const [was, tries = 0] = String(sessionStorage.getItem(`${key || 'orbit'}.reloadedTo`) || '').split('|');
       return void swap(ready, was === ready ? Number(tries) || 0 : 0);
     }
+    backAt = awaySince != null && Date.now() - awaySince >= AWAY_MS ? Date.now() : 0;
     awaySince = null;
-    check();
+    check(Boolean(backAt));
   });
   globalThis.addEventListener?.('focus', () => check());
   globalThis.addEventListener?.('online', () => check(true));
