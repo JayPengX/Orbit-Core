@@ -8,6 +8,7 @@
 import { API } from './domain.mjs';
 import { BASE, METALS, GRAMS_PER_OUNCE, FUND_CUTOFF, isTwFund, isWarrant, isCb, isFuture, futureOf, isOption, tickSize, toTick as onTickOf, SSF_RATE, optionOf, optionTick, optionExpiry, seriesFuture, OPTION, kindOf, marketOf, normalizeCurrency } from './stock-markets.mjs';
 import { BONDS, ISSUERS, CURVE_SYMBOLS, bondQuote, bondLine, curveOf } from './stock-bonds.mjs';
+import { isTradingDay } from './stock-holidays.mjs';
 
 export const PROXY_URL = API;
 const YAHOO = 'https://query1.finance.yahoo.com';
@@ -317,12 +318,23 @@ export function optPricer(symbol, taiex, table) {
   // (The settlement's moment: the table's day at 13:45.)
   const T0 = (expiry - Date.parse(`${table.date}T13:45:00+08:00`)) / YEAR;
   // (Deep in the money with no time value left: the intrinsic, at a floor volatility.)
-  const vol = impliedVol(o.right, F0, o.strike, T0, settle) ?? 0.05;
+  // (A deep in-the-money one settles at about its worth exercised and says nothing of its
+  // volatility: its pair at the strike says the same one, by put-call parity. Else a floor.)
+  const pair = table.opt?.[month]?.[o.right === 'C' ? 'P' : 'C']?.[o.strike];
+  const vol = impliedVol(o.right, F0, o.strike, T0, settle) ?? (pair > 0 ? impliedVol(o.right === 'C' ? 'P' : 'C', F0, o.strike, T0, pair) : null) ?? 0.05;
   return { basis, settle, month, price: (index, t) => {
     const F = index + basis;
     const intrinsic = Math.max(0, o.right === 'C' ? F - o.strike : o.strike - F);
     return toTick(Math.max(intrinsic, black76(o.right, F, o.strike, (expiry - t) / YEAR, vol)));
   } };
+}
+// The Taiwan close (13:30) of the trading day before `t`'s.
+function lastClose(t) {
+  for (let d = 1; d < 15; d++) {
+    const day = new Date(t + 8 * 3_600_000 - d * 86_400_000).toISOString().slice(0, 10);
+    if (isTradingDay('TW', day)) return Date.parse(`${day}T13:30:00+08:00`);
+  }
+  return t - 86_400_000;
 }
 export function optQuote(symbol, taiex, table) {
   const o = optionOf(symbol);
@@ -334,7 +346,8 @@ export function optQuote(symbol, taiex, table) {
   // day's). Priced at yesterday's index with today's hours left, a weekly near expiry was worth
   // 0.1 and read +1,339,900%. Only once today's own settlement is in, the model's from the index.
   const today = new Date(t + 8 * 3_600_000).toISOString().slice(0, 10);
-  const prev = table.date < today ? pricer.settle : Number.isFinite(taiex.prev) ? pricer.price(taiex.prev, t) : price;
+  // (Before then, the model at the last close, with the time it had left then.)
+  const prev = table.date < today ? pricer.settle : Number.isFinite(taiex.prev) ? pricer.price(taiex.prev, lastClose(t)) : price;
   // (A weekly by its day: 台指選 10/28週.)
   const due = new Date(optionExpiry(symbol) + 8 * 3_600_000);
   const name = `${OPTION.zh} ${o.week ? `${due.getUTCMonth() + 1}/${due.getUTCDate()}週` : `${o.month}月`} ${o.strike} ${o.right === 'C' ? '買權' : '賣權'}`;
