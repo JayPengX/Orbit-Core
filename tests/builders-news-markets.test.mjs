@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { trimEvent, quiet, aboutEvent, storyText, fitOf, candidates, deadline, shownEvent, runNewsMarkets, MARKETS_PATH } from '../builders/news-markets.js';
+import { trimEvent, quiet, aboutEvent, storyText, fitOf, candidates, deadline, shownEvent, labelOf, runNewsMarkets, MARKETS_PATH } from '../builders/news-markets.js';
 
 const NOW = Date.parse('2026-11-12T13:00:00Z');
 const market = (label, p, extra = {}) => ({ groupItemTitle: label, outcomes: '["Yes","No"]', outcomePrices: JSON.stringify([String(p), String(1 - p)]), oneDayPriceChange: 0.05, endDate: '2026-12-31T00:00:00Z', ...extra });
@@ -69,6 +69,7 @@ test('deadlines read as dates; a ladder by deadline, a race by its leaders', () 
   const race = shownEvent(evs[2], { zh: '台北市長誰會當選？', en: 'Who will win Taipei mayor?', names: { 'Chiang Wan-an': '蔣萬安' } });
   assert.equal(race.kind, 'pick');
   assert.deepEqual(race.rows.map(r => [r.en, r.zh, r.p]), [['Chiang Wan-an', '蔣萬安', 0.8], ['Puma Shen', undefined, 0.2]]);
+  assert.deepEqual(labelOf('Jensen Huang (No Change)', { 'Jensen Huang (No Change)': '黃仁勳（不變）' }), { en: 'No change', zh: '不換人' });
 });
 
 test('the page: only pairs the AI confirmed, at today’s prices; nothing asked with the day’s AI at 0', async () => {

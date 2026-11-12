@@ -222,6 +222,12 @@ export function deadline(label, now = Date.now()) {
 const PARTIES = { KMT: '國民黨', DPP: '民進黨', TPP: '民眾黨', Republicans: '共和黨', Republican: '共和黨', Democrats: '民主黨', Democratic: '民主黨', Labour: '工黨', Conservatives: '保守黨', Other: '其他', Independent: '無黨籍' };
 const round = (x, n = 3) => Math.round(x * 10 ** n) / 10 ** n;
 
+// An outcome's name both ways: "X (No Change)" says no change (it was cut at a phone's width), a party as Taiwan writes it.
+export function labelOf(label, names = {}) {
+  if (/\(no change\)$/i.test(label)) return { en: 'No change', zh: '不換人' };
+  const zh = names?.[label] || PARTIES[label];
+  return zh ? { en: label, zh } : { en: label };
+}
 // The event as a story shows it: one chance; chances by deadline; or the leading outcomes.
 export function shownEvent(ev, words, now = Date.now()) {
   const ms = ev.markets;
@@ -242,7 +248,7 @@ export function shownEvent(ev, words, now = Date.now()) {
     .filter(m => m.label && m.p >= 0.005)
     .sort((a, b) => b.p - a.p)
     .slice(0, 4)
-    .map(m => ({ en: m.label, ...(words.names?.[m.label] || PARTIES[m.label] ? { zh: words.names?.[m.label] || PARTIES[m.label] } : {}), p: round(m.p), d: round(m.d) }));
+    .map(m => ({ ...labelOf(m.label, words.names), p: round(m.p), d: round(m.d) }));
   return rows.length ? { ...base, kind: 'pick', rows } : null;
 }
 // The outcomes the AI is asked to name in Chinese (a pick's leading four).
