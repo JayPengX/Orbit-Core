@@ -693,15 +693,15 @@ export const TOURS = {
       ['cal', '月曆', ['這個月花了多少（設了預算就是還能花多少）；每天格子下面是當天的支出，點一天看那天每一筆。']],
       ['entry', '記一筆', ['右下角的 ＋，每個分頁都有。種類、分類和付款方式依你的習慣先選好，金額點一下就填；也能拍照記帳。']],
       ['accts', '帳戶', ['現金、銀行、悠遊卡等儲值卡、電子支付和信用卡，各自的餘額和總資產。']],
-      ['stats', '統計', ['週、月、年的支出和收入：每個分類和細項占多少、跟上一期比、最大筆、在哪裡花最多。']],
-      ['more', '更多', ['拍照記帳、分類、智慧帶入（猜中幾成）、到期提醒、固定收支和匯出。']]
+      ['stats', '統計', ['日、週、月、年的支出和收入：每個分類和細項占多少、跟上一期比、最大筆、在哪裡花最多。']],
+      ['more', '更多', ['拍照記帳、用說的記帳、問我的帳，和分類、智慧帶入（猜中幾成）、到期提醒、固定收支、匯出。']]
     ],
     en: [
       ['cal', 'Calendar', ['What this month cost (with a budget, what’s left to spend); each day’s spending under it, a tap for every entry that day.']],
       ['entry', 'Add an entry', ['The ＋ at the bottom, on every tab. Kind, category and way to pay are guessed from your habits, the amount a tap away; or log from a photo.']],
       ['accts', 'Accounts', ['Cash, banks, stored-value cards, e-wallets and credit cards, each balance and your net worth.']],
-      ['stats', 'Stats', ['Spending and income by week, month or year: each category and sub’s share, against the period before, the largest, where you spent most.']],
-      ['more', 'More', ['Photo entries, categories, smart fill (and how often it guesses right), reminders, repeats and export.']]
+      ['stats', 'Stats', ['Spending and income by day, week, month or year: each category and sub’s share, against the period before, the largest, where you spent most.']],
+      ['more', 'More', ['Add from a photo, say what you spent, ask your books; categories, smart fill (and how often it guesses right), reminders, repeats and export.']]
     ]
   },
   vocab: {
