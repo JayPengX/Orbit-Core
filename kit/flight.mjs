@@ -115,7 +115,7 @@ export const landedFix = (fix, dest) => Boolean(fix) && (fix.ground || ((Number(
 // hour of a long one); then any landing about then; then the nearest. One
 // per destination and, while there are enough, per airline; never none while
 // any plane is up (one landing earlier hands over to another, one landing
-// later is still flying when the time's up).
+// later is still flying when the time's up): the nearest three then.
 export const flown = f => {
   if (!f.from || !f.fix) return 1;
   const total = distKm(f.from, f.to);
@@ -131,13 +131,18 @@ export function choose(flights, minutes, now, want = 6) {
   const placeOf = f => f.to.iata || f.to.icao;
   const lineOf = f => f.airline?.icao || String(f.cs || f.no || '').slice(0, 3);
   const passes = [f => near(f) && flown(f) <= 0.3 && !by.has(lineOf(f)), f => near(f) && flown(f) <= 0.3, f => near(f) && !by.has(lineOf(f)), near, () => true];
-  for (const [i, ok] of passes.entries())
+  for (const [i, ok] of passes.entries()) {
+    // (The nearest whatever their time only when none lands about then, and a few:
+    // a 25-minute focus was offered 50-minute flights below its own.)
+    const last = i === passes.length - 1;
+    if (last && out.length) break;
     for (const f of sorted) {
-      if (out.length >= want) return out;
+      if (out.length >= (last ? Math.min(want, 3) : want)) return out;
       if (out.includes(f) || (i < passes.length - 1 && to.has(placeOf(f))) || !ok(f)) continue;
       out.push(f);
       to.add(placeOf(f));
       by.add(lineOf(f));
     }
+  }
   return out;
 }
