@@ -2055,7 +2055,7 @@ function makeSession(app, { lang, heartbeat }) {
     if (isStandalone() && storedAccount()) {
       try {
         const { handoff } = await s.op('handoff');
-        target = appUrl(other, [String(hash || '').replace(/^#/, ''), `qh=${handoff}`].filter(Boolean).join('&'));
+        if (handoff) target = appUrl(other, [String(hash || '').replace(/^#/, ''), `qh=${handoff}`].filter(Boolean).join('&'));
       } catch {}
     }
     globalThis.location.assign(target);
@@ -2928,7 +2928,10 @@ function addChallenge(s) {
       .then(b => (begin = b))
       .finally(() => (asking = null)));
   const fresh = () => (begin && begin.exp - Date.now() > 30_000 ? begin : null);
-  return { get, fresh };
+  // (After an add or a removal: the one in hand lists the keys as they were, so
+  // the same phone again would make a second key over its first, not be refused.)
+  const renew = () => ((begin = null), get().catch(() => {}));
+  return { get, fresh, renew };
 }
 // Made and kept: the challenge in hand (or fetched now), then the browser's
 // sheet (Face ID, Windows Hello, a phone by QR…). true once added; false if
@@ -2938,6 +2941,7 @@ async function addPasskey(s, ch) {
   try {
     const cred = await makePasskey(begin);
     await s.passkeyAdd(begin.challenge, cred);
+    ch.renew();
     return true;
   } catch (e) {
     ch.get().catch(() => {});
@@ -2978,6 +2982,7 @@ function passkeyRows(s, note) {
               try {
                 await s.passkeyRemove(k.id);
                 forgetPasskey(k.id);
+                ch?.renew();
                 note.textContent = T('已移除通行密鑰。', 'Passkey removed.');
               } catch (e) {
                 b.disabled = false;
