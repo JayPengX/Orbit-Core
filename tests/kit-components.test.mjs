@@ -210,6 +210,9 @@ test('reorder: a lifted row lands past the middles it crossed, keys follow', () 
   assert.equal(ui.reorderSlot(rows, 0, 500), 3, 'below the end: last');
   assert.equal(ui.reorderSlot(rows, 3, 20), 0, 'up to the top');
   assert.equal(ui.reorderSlot(rows, 2, 140), 2, 'on its own place');
+  // (Held at the top, a row sits on the first row's middle: the finger past it decides.)
+  assert.equal(ui.reorderSlot(rows, 1, 30), 1, 'drawn at the end: not past its middle');
+  assert.match(readFileSync(new URL('../kit/ui.mjs', import.meta.url), 'utf8'), /reorderSlot\(rows, from, r\.top \+ want \+ r\.height \/ 2\)/, 'the place follows the finger, not the held row');
   assert.deepEqual(ui.moveKey(['a', 'b', 'c', 'd'], 0, 2), ['b', 'c', 'a', 'd']);
   assert.deepEqual(ui.moveKey(['a', 'b', 'c', 'd'], 3, 0), ['d', 'a', 'b', 'c']);
   assert.deepEqual(ui.moveKey(['a', 'b'], 0, 5), ['a', 'b'], 'out of range: unchanged');
