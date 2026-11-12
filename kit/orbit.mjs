@@ -3232,7 +3232,7 @@ export const NOTICE_KINDS = {
     ['pickend', '今日推薦賽果', 'Today’s picks: final', '今日推薦每場打完，附比分。', 'When each of today’s picks ends, with the score.']
   ],
   money: [
-    ['renew', '到期提醒', 'Renewal reminder', 'TPASS 這類有效期的票，到期前一晚和當天早上。', 'For a pass like TPASS: the evening before it ends, and that morning.']
+    ['renew', '到期提醒', 'Renewal reminder', 'TPASS、訂閱、會員到期或續訂前，在你選的日子和時間。', 'Before a pass, subscription or membership ends or renews, on the days and time you pick.']
   ],
   vocab: [
     ['streak', '連續練習快斷了', 'Streak ending', '今天還沒練習單字，連續天數今晚就會歸零時。', 'When you haven’t practised today and your streak ends tonight.']
