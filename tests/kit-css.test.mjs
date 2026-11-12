@@ -69,3 +69,13 @@ test('every full-width .q-more sets its own box-sizing', () => {
   assert.match(rule[2], /width:\s*100%/);
   assert.match(rule[2], /box-sizing:\s*border-box/);
 });
+
+// Safari draws a date or time in a field at its top and further in than the
+// text beside it (新增固定收支's 開始 under 每月幾號): set in the middle, at the left.
+test('a date or time in a field sits in its middle, at its left, in Safari', () => {
+  const rule = css.match(/input\.q-field::-webkit-date-and-time-value\s*\{([^}]*)\}/)?.[1] || '';
+  assert.match(rule, /margin:\s*0/);
+  assert.match(rule, /text-align:\s*left/);
+  assert.match(rule, /line-height:\s*44px/);
+  assert.match(css, /\.q-field\s*\{[^}]*min-height:\s*44px/);
+});

@@ -1210,6 +1210,13 @@ input[type='datetime-local']::-webkit-date-and-time-value,
 input[type='month']::-webkit-date-and-time-value {
   min-width: 0;
 }
+/* In a field (.q-field, 44 px), Safari's date and time sit at the top and
+   further in than the text beside them: set in its middle, at its left. */
+input.q-field::-webkit-date-and-time-value {
+  margin: 0;
+  text-align: left;
+  line-height: 44px;
+}
 /* A full-height sheet (iOS's large detent, .q-full): it meets the column's
    sides and foot, as iOS 26's does at full height, not floating 8 px in with
    the page behind showing down its sides. */
