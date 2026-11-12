@@ -217,14 +217,15 @@
   .set { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 16px; padding: 12px 0; border-top: 1px solid var(--q-divider); }
   .set:first-of-type { border-top: 0; padding-top: 2px; }
   .set strong { font-size: 15px; }
-  .set p { grid-column: 1; margin: 0; color: var(--q-muted); font-size: 13px; line-height: 1.45; }
-  .set .val { grid-row: 1 / span 2; grid-column: 2; display: flex; align-items: center; gap: 8px; }
-  .set .val input { width: 84px; text-align: right; font-variant-numeric: tabular-nums; }
+  /* (The note runs under both the name and the value: beside the value, a 320 screen squeezed it to four characters a line.) */
+  .set p { grid-column: 1 / -1; margin: 0; color: var(--q-muted); font-size: 13px; line-height: 1.45; }
+  .set .val { grid-row: 1; grid-column: 2; display: flex; align-items: center; gap: 8px; }
+  .set .val input { box-sizing: border-box; width: 84px; text-align: right; font-variant-numeric: tabular-nums; }
   .set .val span { color: var(--q-muted); font-size: 14px; min-width: 14px; }
   .set .changed input { border-color: var(--q-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--q-accent) 18%, transparent); }
   .set .def { display: block; margin-top: 2px; font-size: 12px; color: var(--q-muted); white-space: nowrap; }
   .savebar { position: sticky; bottom: 12px; z-index: 3; display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; margin-top: 14px; padding: 12px 14px; border-radius: 16px; background: var(--q-surface); border: 1px solid var(--q-border); box-shadow: var(--q-shadow, 0 8px 30px rgba(0,0,0,.18)); }
-  .lag { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 10px; }
+  .lag { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 136px), 1fr)); gap: 8px; margin-top: 10px; }
   .lag div { padding: 10px 12px; border-radius: 12px; background: var(--q-surface-2); }
   .lag small { display: block; color: var(--q-muted); font-size: 12px; }
   .lag strong { font-size: 18px; font-variant-numeric: tabular-nums; }
