@@ -343,3 +343,11 @@ test('ten passkeys a Pass: an 11th is ECO_PASSKEY_FULL; one removed makes room',
   await t.post({ op: 'passkey-remove', qt: acct.token, id: keys[0].id });
   assert.equal((await addKey(t, acct, more)).status, 200);
 });
+
+test('the sign-in gate never asks for challenges in a loop: an answer without a challenge or an end time counts as none', async () => {
+  const { readFileSync } = await import('node:fs');
+  const kit = readFileSync(new URL('../kit/orbit.mjs', import.meta.url), 'utf8');
+  const gate = kit.slice(kit.indexOf('function passkeyGate'), kit.indexOf('function passkeyGate') + 1200);
+  assert.match(gate, /if \(!begin\?\.challenge \|\| !Number\.isFinite\(begin\.exp\)\) begin = null;/);
+  assert.match(gate, /setTimeout\(ask, begin \? Math\.max\(30_000, begin\.exp - Date\.now\(\) - 45_000\) : 60_000\)/);
+});
