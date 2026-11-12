@@ -55,3 +55,8 @@ test('admin: the search’s account rows keep a square avatar and the apps’ sh
   assert.ok(page.includes('.hit > .av { flex: none; }'));
   assert.match(page, /w\.apps\.map\(k => BRANDS\[k\]\?\.short \|\| appName\(k\)\)\.join\('、'\)/);
 });
+
+test('admin: 總覽’s 外部來源 cell names two sources at most (five names filled six lines at 320 px)', () => {
+  assert.ok(page.includes("const few = (list, word) => (list.length > 2 ? `${names(list.slice(0, 1))}等 ${list.length} 個${word}` : `${names(list)} ${word}`);"));
+  assert.ok(page.includes("bad.length ? few(bad, '壞了') : warn.length ? few(warn, '不穩')"));
+});
