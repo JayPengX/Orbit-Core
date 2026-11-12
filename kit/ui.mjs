@@ -609,19 +609,21 @@ export function toast(text, { tone = '', ms = 2200, action = null, batch = '' } 
   const prev = lastToast;
   const again = Boolean(batch) && prev?.key === batch && prev.el.isConnected !== false && !prev.el.classList?.contains('out');
   const n = again && prev.text === text ? prev.n + 1 : 1;
+  // (A toast taken away is marked gone first: a sheet's watch below never puts it back.)
+  const drop = el => el && (el.classList?.add('out'), el.remove());
   if (again) {
     clearTimeout(prev.timer);
     clearTimeout(prev.gone);
-    prev.el.remove();
+    drop(prev.el);
   }
-  document.querySelector('.q-toast')?.remove();
+  drop(document.querySelector('.q-toast'));
   const label = n > 1 ? `${text} ×${n}` : text;
   const t = h('div', { class: `q-toast${tone ? ` ${tone}` : ''}`, role: 'status', ...(action || n > 1 ? {} : { text }) });
   const mine = { el: t, key: batch, text, n, timer: 0, gone: 0 };
   const close = () => {
     clearTimeout(mine.timer);
     t.classList.add('out');
-    mine.gone = setTimeout(() => t.remove(), 320);
+    mine.gone = setTimeout(() => (t.remove(), mine.watch?.disconnect()), 320);
   };
   if (action || n > 1) {
     t.append(h('span', { class: 'q-toast-text', text: label }));
@@ -647,14 +649,24 @@ export function toast(text, { tone = '', ms = 2200, action = null, batch = '' } 
   // should its sheet close while it's up, it moves to the page. Money, 2026-11-12.)
   const over = [...(document.querySelectorAll?.('dialog[open]') || [])].filter(x => !x.classList?.contains('q-leaving')).at(-1);
   if (over && typeof t.showPopover === 'function') {
-    over.append(t);
-    try {
-      t.setAttribute('popover', 'manual');
-      t.showPopover();
-    } catch {}
+    const show = () => {
+      over.append(t);
+      try {
+        t.setAttribute('popover', 'manual');
+        t.showPopover();
+      } catch {}
+    };
+    show();
+    // A sheet that draws itself again (its innerHTML: Transit's place sheet
+    // every 20 s, and as a bus pinned from it is saved) took the toast with it
+    // at once: 已加入「上學」 never seen (Transit, 2026-11-12). Put back while it's up.
+    const watch = typeof MutationObserver === 'function' ? new MutationObserver(() => !t.isConnected && !t.classList.contains('out') && over.open && show()) : null;
+    watch?.observe(over, { childList: true });
+    mine.watch = watch;
     over.addEventListener?.(
       'close',
       () => {
+        watch?.disconnect();
         if (t.parentElement !== over || t.classList.contains('out')) return;
         try {
           t.hidePopover?.();

@@ -176,6 +176,58 @@ test('pickSeg: a few as the capsule (aria-pressed, thumb from the last pick), mo
   assert.equal(ui.segHtml([['a', 'A']], 'a', { pressed: true, cls: 'small' }), '<div class="q-seg small" role="group" style="--q-seg-n:1;--q-seg-i:0" data-to="0"><button type="button" aria-pressed="true" >A</button></div>');
 });
 
+test('toast over a sheet that draws itself again: put back while it is up, never once replaced or gone', () => {
+  const real = globalThis.setTimeout;
+  const realClear = globalThis.clearTimeout;
+  const timers = [];
+  globalThis.setTimeout = (f, ms) => timers.push({ f, ms }) && timers.length;
+  globalThis.clearTimeout = () => {};
+  const watchers = [];
+  globalThis.MutationObserver = class {
+    constructor(f) {
+      this.f = f;
+    }
+    observe(target) {
+      watchers.push(this);
+      this.target = target;
+    }
+    disconnect() {
+      this.off = true;
+    }
+  };
+  const over = new FakeEl('dialog');
+  over.open = true;
+  over.isConnected = true;
+  FakeEl.prototype.showPopover = function () {};
+  document.querySelectorAll = sel => (sel === 'dialog[open]' ? [over] : []);
+  const redraw = () => {
+    for (const c of over.children) if (c instanceof FakeEl) c.isConnected = false;
+    over.children = [];
+    for (const w of watchers) if (!w.off) w.f();
+  };
+  try {
+    body.children.length = 0;
+    const a = ui.toast('已加入「上學」', { batch: 'status' });
+    assert.ok(over.children.includes(a), 'in the sheet, over it');
+    redraw();
+    assert.ok(over.children.includes(a), 'the sheet drew itself again: the toast is back');
+    const b = ui.toast('已釘選', { batch: 'status' });
+    redraw();
+    assert.ok(over.children.includes(b));
+    assert.ok(!over.children.includes(a), 'a toast replaced stays gone');
+    for (const t of timers.splice(0)) t.f();
+    redraw();
+    assert.ok(!over.children.includes(b), 'its time up: gone, not put back');
+  } finally {
+    globalThis.setTimeout = real;
+    globalThis.clearTimeout = realClear;
+    delete globalThis.MutationObserver;
+    delete FakeEl.prototype.showPopover;
+    delete document.querySelectorAll;
+    body.children.length = 0;
+  }
+});
+
 test('toast: as before, an action button, and batch', () => {
   const real = globalThis.setTimeout;
   const realClear = globalThis.clearTimeout;
