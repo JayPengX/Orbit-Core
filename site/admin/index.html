@@ -1095,9 +1095,19 @@ function healthSummary() {
     setHealth('deploys', bad.length ? 'bad' : runs.every(r => !r.run) ? 'wait' : 'ok', bad.length ? `${bad.map(r => `${r.name} ${r.run.name}`).join('、')} 失敗` : going.length ? `${going.length} 個進行中` : `${runs.filter(r => r.run).length} 個都成功`, bad.length ? `${bad.length} 個部署失敗` : '');
   });
 }
+// A chart drawn at its own width, so its words read 11–12 px on a phone and a computer alike (one
+// fixed 700-wide drawing, scaled, read 8 px on a phone and 22 px on a computer).
+const chartWidth = (svg, H, fallback) => {
+  const W = Math.round(svg.getBoundingClientRect().width) || fallback;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  return W;
+};
+let chartData = null;
+addEventListener('resize', () => chartData && (clearTimeout(drawChart.t), (drawChart.t = setTimeout(() => drawChart(chartData), 200))));
 function drawChart(o) {
+  chartData = o;
   const svg = $('ov-chart');
-  const W = 700, H = 200, pad = 26, n = o.days.length;
+  const H = 170, W = chartWidth(svg, H, 700), pad = 20, n = o.days.length;
   const max = Math.max(1, ...o.signups, ...o.lastSeen);
   const bw = (W - pad * 2) / n;
   const y = v => H - 30 - (v / max) * (H - 62);
@@ -1107,9 +1117,9 @@ function drawChart(o) {
     const a = o.signups[i], b = o.lastSeen[i];
     out += `<rect x="${x + bw * 0.14}" y="${y(a)}" width="${bw * 0.34}" height="${H - 30 - y(a)}" rx="3" fill="var(--q-accent)"><title>${d} 新帳戶 ${a}</title></rect>`;
     out += `<rect x="${x + bw * 0.52}" y="${y(b)}" width="${bw * 0.34}" height="${H - 30 - y(b)}" rx="3" fill="var(--q-good)"><title>${d} 最後使用 ${b}</title></rect>`;
-    if ((n - 1 - i) % 2 === 0) out += `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="18" fill="currentColor" fill-opacity=".6">${Number(d.slice(5, 7))}/${Number(d.slice(8))}</text>`;
+    if ((n - 1 - i) % 2 === 0) out += `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="12" fill="currentColor" fill-opacity=".6">${Number(d.slice(5, 7))}/${Number(d.slice(8))}</text>`;
   });
-  out += `<text x="${pad}" y="18" font-size="18" fill="currentColor" fill-opacity=".6">最多 ${max}</text>`;
+  out += `<text x="${pad}" y="14" font-size="12" fill="currentColor" fill-opacity=".6">最多 ${max}</text>`;
   svg.innerHTML = out;
 }
 
@@ -1908,13 +1918,13 @@ function drawTdx(t, now) {
   );
   // The last 14 days, a bar each (the line: a day's share of the plan).
   const last = [...days].reverse().slice(-14);
-  const W = 360, H = 150, pad = 8, bw = (W - pad * 2) / 14;
+  const H = 150, W = chartWidth($('tdx-chart'), H, 360), pad = 8, bw = (W - pad * 2) / 14;
   const max = Math.max(plan / monthDays * 1.5, ...last.map(([, d]) => d.points));
   const y = v => H - 20 - (v / max) * (H - 40);
-  let out = `<line x1="${pad}" x2="${W - pad}" y1="${y(plan / monthDays)}" y2="${y(plan / monthDays)}" stroke="var(--q-bad)" stroke-dasharray="5 5" stroke-opacity=".7"/><text x="${W - pad}" y="${y(plan / monthDays) - 5}" text-anchor="end" font-size="10" fill="var(--q-bad)">每天可用 ${pts(plan / monthDays)}</text>`;
+  let out = `<line x1="${pad}" x2="${W - pad}" y1="${y(plan / monthDays)}" y2="${y(plan / monthDays)}" stroke="var(--q-bad)" stroke-dasharray="5 5" stroke-opacity=".7"/><text x="${W - pad}" y="${y(plan / monthDays) - 5}" text-anchor="end" font-size="11" fill="var(--q-bad)">每天可用 ${pts(plan / monthDays)}</text>`;
   last.forEach(([d, v], i) => {
     const x = pad + i * bw;
-    out += `<rect x="${x + bw * 0.18}" y="${y(v.points)}" width="${bw * 0.64}" height="${H - 20 - y(v.points)}" rx="3" fill="${v.points > plan / monthDays ? 'var(--q-bad)' : 'var(--q-accent)'}"><title>${d} ${pts(v.points)} 點</title></rect><text x="${x + bw / 2}" y="${H - 5}" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".6">${Number(d.slice(5, 7))}/${Number(d.slice(8))}</text>`;
+    out += `<rect x="${x + bw * 0.18}" y="${y(v.points)}" width="${bw * 0.64}" height="${H - 20 - y(v.points)}" rx="3" fill="${v.points > plan / monthDays ? 'var(--q-bad)' : 'var(--q-accent)'}"><title>${d} ${pts(v.points)} 點</title></rect><text x="${x + bw / 2}" y="${H - 5}" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".6">${Number(d.slice(5, 7))}/${Number(d.slice(8))}</text>`;
   });
   $('tdx-chart').innerHTML = last.length ? out : '';
   $('tdx-days').tBodies[0].replaceChildren(
