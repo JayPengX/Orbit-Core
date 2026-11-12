@@ -305,7 +305,8 @@
   var files = function () {
     if (!window.performance || !performance.getEntriesByType) return 0;
     return performance.getEntriesByType('resource').filter(function (r) {
-      return r.name.indexOf(location.origin) === 0 && !/version\.json/.test(r.name);
+      // (The proxy's answers under the page's own /api/ are data, not the app's files.)
+      return r.name.indexOf(location.origin) === 0 && r.name.indexOf(location.origin + '/api/') !== 0 && !/version\.json/.test(r.name);
     }).length;
   };
   var stepPart = 0;

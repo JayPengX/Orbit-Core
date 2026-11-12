@@ -5196,8 +5196,11 @@ function watchNet() {
   const own = url => {
     try {
       const u = new URL(url, location.href);
-      // The page's own files (its service worker keeps them) aren't the connection; the probe is.
-      return u.origin === location.origin && !u.searchParams.has('net');
+      // The page's own files (its service worker keeps them) aren't the connection; the probe is,
+      // and so is the proxy under the page's own address (orbit.<domain>/api/…, every call on the
+      // site since the proxy moved there: none counted, so Wi-Fi without internet never said
+      // 沒有網路連線, nor a slow one 網路連線很慢, 2026-11-12).
+      return u.origin === location.origin && !u.searchParams.has('net') && !isApi(u.href);
     } catch {
       return true;
     }
