@@ -79,7 +79,9 @@ export function offsetFor(day, time, real = realNow()) {
 // What's on, in a few words (the pill, the sheet's top line).
 export function summary(t = state()) {
   const out = [];
-  if (t.clock?.off) out.push(shortWhen(new Date(realNow() + t.clock.off)));
+  // (A fast clock's time as the page has it: boot.js's rate from `from`.)
+  const r = realNow();
+  if (t.clock?.off) out.push(shortWhen(new Date(r + t.clock.off + (t.clock.rate > 1 && t.clock.from ? (t.clock.rate - 1) * (r - t.clock.from) : 0))));
   if (t.place) out.push(en() ? t.place.en || t.place.name : t.place.name);
   if (t.feed) out.push(T(`模擬行程${t.clock?.rate > 1 ? ` ${t.clock.rate} 倍速` : ''}`, `Trip replay${t.clock?.rate > 1 ? ` ×${t.clock.rate}` : ''}`));
   if (t.net === 'off') out.push(T('離線', 'Offline'));
