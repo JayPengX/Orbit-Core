@@ -1068,8 +1068,9 @@ export function dividendTaxes(market, gross, symbol = '') {
 }
 
 // Margin: how much of a holding's value can be borrowed against (its loan
-// value), as brokers set it, and the maintenance ratio (assets ÷ debt) where
-// the broker calls and where it sells.
+// value), as brokers set it, and the maintenance ratio (整戶擔保維持率: the
+// 融資 and 融券 collateral ÷ what they owe, valuate) where the broker calls
+// and where it sells.
 //   Taiwan stocks and ETFs: 融資成數, 60% listed (.TW), 50% OTC (.TWO).
 //   Other markets: 50%, the US Reg T rule international brokers apply, for
 //   a loan against them (borrow); never 融資 (複委託 is cash only: isSubBrokered).
