@@ -1273,7 +1273,8 @@ document.addEventListener('keydown', e => {
 });
 
 // ---- 工具: a row of shortcuts to each tool ----
-$('tool-grid').innerHTML = PLACES.filter(p => p[5]).map(([name, , icon, color, , to]) => `<button type="button" class="act" data-go="tools" data-to="${to}">${tileHtml(ic(icon), color, 'sm')}<span>${escHtml(name.replace('Orbit ', ''))}</span></button>`).join('');
+// (工具's own cards only: 現在在用 lives on 帳戶, and its tile here opened 工具 and scrolled to nothing.)
+$('tool-grid').innerHTML = PLACES.filter(p => p[1] === 'tools' && p[5]).map(([name, , icon, color, , to]) => `<button type="button" class="act" data-go="tools" data-to="${to}">${tileHtml(ic(icon), color, 'sm')}<span>${escHtml(name.replace('Orbit ', ''))}</span></button>`).join('');
 
 // ---- 一個帳戶 ----
 const dialog = $('acct');

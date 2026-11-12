@@ -91,3 +91,10 @@ test('admin: on a phone tiles sit two to a row and a lone last one takes the row
   assert.ok(page.includes('main [id] { scroll-margin-top: calc(env(safe-area-inset-top) + 76px); }'));
   assert.doesNotMatch(page, /placeholder="你的 Orbit Pass"/, 'cut at 320 px');
 });
+
+test('admin: 工具’s shortcut grid holds 工具’s own six cards (現在在用 is 帳戶’s: its tile here led nowhere and sat alone on a row)', () => {
+  assert.ok(page.includes("PLACES.filter(p => p[1] === 'tools' && p[5])"));
+  const places = [...page.matchAll(/\['[^']+', '(\w+)', '\w+', '#[0-9a-f]+', '[^']*', '([\w-]+)'\]/g)].filter(m => m[1] === 'tools');
+  assert.equal(places.length, 6);
+  for (const [, , to] of places) assert.ok(page.includes(`id="${to}"`), to);
+});
