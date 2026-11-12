@@ -11,6 +11,7 @@
 //   an app (kit/brand.mjs SHORT)  orbit.<d>/<slug>…  → orbit-<slug>
 //   Orbit-Core                    orbit.<d>/… bar the apps: / (→ /pass/), /pass/,
 //                                 /key/ (the public giveaway, gift.js),
+//                                 /app/ (Orbit, every app in one: kit/suite.mjs),
 //                                 /Orbit-Core/ (and the old /Shared-Proxy/);
 //                                 <d>/Orbit-Core/ → orbit-pass
 //   Orbit-Showcase                <d>/… (Jay's homepage at /, /showcase/) → orbit-home
@@ -37,7 +38,7 @@ export function siteFor(repo, domain = DOMAIN) {
     const kitRoots = ['Orbit-Core', 'Shared-Proxy'];
     return {
       name: 'orbit-pass',
-      put: [['', '/pass'], ...kitRoots.map(r => ['', `/${r}`]), ['key', '/key'], ['favicon.ico', '/favicon.ico'], ['icons/apple-touch-icon.png', '/apple-touch-icon.png'], ['icons/apple-touch-icon.png', '/apple-touch-icon-precomposed.png']],
+      put: [['', '/pass'], ...kitRoots.map(r => ['', `/${r}`]), ['key', '/key'], ['app', '/app'], ['favicon.ico', '/favicon.ico'], ['icons/apple-touch-icon.png', '/apple-touch-icon.png'], ['icons/apple-touch-icon.png', '/apple-touch-icon-precomposed.png']],
       // The whole orbit. host bar the apps' paths (theirs are more
       // specific, so they win): the root, the family page, the kit, the root
       // icons, and a 404 for anything else. The kit on the bare host too

@@ -100,7 +100,9 @@ export function appIcon(id, { shape = 'rounded' } = {}) {
 // The family's own mark: a planet, its ring and a moon.
 export function familyMark({ shape = 'rounded', plain = false } = {}) {
   const back = plain ? '' : bg('fam-orbit', FAMILY, { shape });
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">${back}<defs><linearGradient id="orbit-planet" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0e7ff"/><stop offset="1" stop-color="#a5b4fc"/></linearGradient></defs><ellipse cx="256" cy="256" rx="220" ry="80" transform="rotate(-24 256 256)" fill="none" stroke="#fff" stroke-opacity="0.45" stroke-width="20"/><circle cx="256" cy="256" r="130" fill="url(#orbit-planet)"/><ellipse cx="256" cy="256" rx="220" ry="80" transform="rotate(-24 256 256)" fill="none" stroke="#fff" stroke-width="20" stroke-dasharray="0 330 420 2000" stroke-linecap="round"/><circle cx="440" cy="150" r="26" fill="#fff"/></svg>`;
+  // (Maskable: drawn inside the middle 80%, which every launcher's mask keeps.)
+  const [open, close] = shape === 'maskable' ? ['<g transform="translate(256 256) scale(0.78) translate(-256 -256)">', '</g>'] : ['', ''];
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">${back}${open}<defs><linearGradient id="orbit-planet" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0e7ff"/><stop offset="1" stop-color="#a5b4fc"/></linearGradient></defs><ellipse cx="256" cy="256" rx="220" ry="80" transform="rotate(-24 256 256)" fill="none" stroke="#fff" stroke-opacity="0.45" stroke-width="20"/><circle cx="256" cy="256" r="130" fill="url(#orbit-planet)"/><ellipse cx="256" cy="256" rx="220" ry="80" transform="rotate(-24 256 256)" fill="none" stroke="#fff" stroke-width="20" stroke-dasharray="0 330 420 2000" stroke-linecap="round"/><circle cx="440" cy="150" r="26" fill="#fff"/>${close}</svg>`;
 }
 
 // The developer settings (the admin panel's 開發): how fast live data is
@@ -133,6 +135,8 @@ export const DEV = {
   // expected in 30 days would run past Cloudflare's $5 plan (checked every
   // 6 hours); the numbers above stay the owner's own, the floor.
   autoScale: { def: false, group: 'scale', zh: '依人數自動調整', en: 'Scale with people', note: '人數預估會超過 Cloudflare 的額度時，上面的即時更新一起放慢（每 6 小時檢查）；有空間就回到上面的設定' },
+  // Orbit, every app in one (kit/suite.mjs): offered in the separate apps at a hop to another app.
+  suiteAsk: { def: false, group: 'orbit', zh: '推薦 Orbit（全部 App 合一）', en: 'Suggest Orbit (every app in one)', note: '分開的 App 點到別的 App 時建議改用 Orbit；可以拒絕，同一支手機最多 3 次、隔 14 天，按「不再提醒」就不再問' },
   mirror: { def: true, group: 'data', zh: '使用每晚的資料副本', en: 'Use the nightly copies', note: '關掉：所有 App 都直接問代理（除錯用）' },
   // Each paid AI feature's calls a day, everyone together (the proxy's
   // routes named in `ai`; 0 pauses it, the app then says today's AI is used up).
@@ -153,7 +157,7 @@ export const DEV = {
   aiBeats: { def: 200, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['beats-say'], zh: '節奏 AI（Beats）', en: 'Beats AI', note: '用說的做節奏（程式讀不懂時）；0 = 暫停' },
   aiFamily: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['orbit-ask', 'showcase-ask', 'rec-weekly'], zh: '全家 AI', en: 'Family AI', note: 'Orbit 助理、Showcase 問答、除錯週報；0 = 暫停' }
 };
-export const DEV_GROUPS = { proxy: '代理（sports-proxy）', sports: 'Orbit Sports', f1: 'F1', transit: 'Orbit Transit（TDX）', scale: '容量', data: '資料', ai: 'AI 每天上限（全部人一起）' };
+export const DEV_GROUPS = { proxy: '代理（sports-proxy）', sports: 'Orbit Sports', f1: 'F1', transit: 'Orbit Transit（TDX）', scale: '容量', data: '資料', orbit: 'Orbit（全部 App 合一）', ai: 'AI 每天上限（全部人一起）' };
 // The setting that caps a Gemini feature ('law-chat' → 'aiLaw').
 export const aiSettingOf = feature => Object.keys(DEV).find(k => DEV[k].ai?.includes(feature)) || null;
 

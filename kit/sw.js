@@ -419,14 +419,15 @@ self.addEventListener('message', event => {
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   const url = new URL(event.notification.data?.url || './', self.registration.scope).href;
-  const told = c =>
+  // (other: a page of another app, which answers only in Orbit's window, kit suite.mjs.)
+  const told = (c, other = false) =>
     new Promise(done => {
       const ch = new MessageChannel();
       const end = ok => (clearTimeout(t), ch.port1.close(), done(ok));
       const t = setTimeout(() => end(false), 1000);
       ch.port1.onmessage = () => end(true);
       try {
-        c.postMessage({ type: 'orbit-notice', url }, [ch.port2]);
+        c.postMessage(other ? { type: 'orbit-notice', url, other: true } : { type: 'orbit-notice', url }, [ch.port2]);
       } catch {
         end(false);
       }
@@ -434,7 +435,13 @@ self.addEventListener('notificationclick', event => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async list => {
       const open = list.find(c => c.url.startsWith(self.registration.scope));
-      if (!open) return self.clients.openWindow(url);
+      if (!open) {
+        // Orbit's window, on another app's page: it goes there itself (no second window).
+        const said = list.length ? await Promise.all(list.map(c => told(c, true))) : [];
+        const suite = list[said.indexOf(true)];
+        if (suite) return suite.focus().catch(() => suite);
+        return self.clients.openWindow(url);
+      }
       const c = await open.focus().catch(() => open);
       if (await told(c || open)) return c;
       return url !== (c || open).url && 'navigate' in (c || open) ? (c || open).navigate(url) : c;

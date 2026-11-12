@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-Hant" data-look="native">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Orbit</title>
+<meta name="description" content="Orbit 的每個 App 都在一個圖示裡：登入一次，App 之間切換、返回都在原地。" />
+<meta name="application-name" content="Orbit" />
+<meta name="apple-mobile-web-app-title" content="Orbit" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Orbit" />
+<meta property="og:title" content="Orbit" />
+<meta property="og:description" content="Orbit 的每個 App 都在一個圖示裡。" />
+<meta property="og:url" content="https://orbit.jaypengx.com/app/" />
+<meta property="og:image" content="https://orbit.jaypengx.com/pass/brand/pass-og.jpg" />
+<!-- Orbit: every app in one home-screen app (Orbit-Core kit/suite.mjs). This
+     page is only its door: opened from the icon, it goes straight on to the
+     app used last, where it was left (these first lines, before anything
+     loads); the first time, it lists the apps; in a phone's browser, it shows
+     how to add Orbit to the home screen. The keys are suite.mjs's. -->
+<script>
+!function () {
+  try {
+    var ss = sessionStorage, ls = localStorage, nav = navigator, ua = nav.userAgent || '';
+    var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || nav.standalone === true;
+    var touch = /iPhone|iPad|iPod|Android/i.test(ua) || (/Macintosh/.test(ua) && nav.maxTouchPoints > 1);
+    // (A phone's browser: added to the home screen first. Another app's own window: not Orbit's.)
+    if ((touch && !standalone) || (standalone && ss.getItem('orbit.window') && ss.getItem('orbit.suite') !== '1')) return;
+    ss.setItem('orbit.suite', '1');
+    var s = JSON.parse(ls.getItem('orbit.suite.v1') || 'null') || { apps: {} };
+    s.on = 1;
+    s.t = s.t || Date.now();
+    ls.setItem('orbit.suite.v1', JSON.stringify(s));
+    var best = null, id;
+    for (id in s.apps || {}) if (s.apps[id] && s.apps[id].home && (!best || s.apps[id].t > s.apps[best].t)) best = id;
+    if (!best || /[?&#]pick\b/.test(location.href)) return;
+    var a = s.apps[best], fresh = Date.now() - a.t < 4 * 3600e3 && a.url;
+    var to = new URL(fresh ? a.url : a.home, location.href);
+    if (fresh && a.y > 0) ss.setItem('orbit.place', JSON.stringify({ path: to.pathname, hash: to.hash, y: a.y, t: Date.now() }));
+    window.ORBIT_GONE = 1;
+    location.replace(to.href);
+  } catch (e) {}
+}();
+</script>
+<!-- kit:head -->
+<script>!function(b,d,v,h,n,m,f,i,u){try{v=localStorage.getItem('orbit.kit')||'';h=JSON.parse(localStorage.getItem('orbit.kitFiles')||'null')}catch(e){v=''}n=!!v;if(!n&&d){v=d.version;h=d}h=h&&h.version===v?h.files:null;u=function(x){var k=h&&h[x];return b+x+(k?'?v='+k:v?'?v='+encodeURIComponent(v):'')};m={'#kit/':b};f=['brand.mjs','format.mjs','hold-place.mjs','lang.mjs','orbit.mjs','suite.mjs','ui.mjs'];for(i=0;i<f.length;i++)m['#kit/'+f[i]]=u(f[i]);if(h)for(i in h)/\.mjs$/.test(i)&&(m['#kit/'+i]=u(i));window.ORBIT_KIT={base:b,version:v,noted:n,url:u};document.write('<script type="import'+'map">'+JSON.stringify({imports:m})+'<\/script><link rel="stylesheet" href="'+u('orbit.css')+'">')}('/Orbit-Core/kit/',null)</script>
+<!-- /kit:head -->
+<style>
+  .door { box-sizing: border-box; max-width: 560px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 28px) 16px calc(env(safe-area-inset-bottom) + 32px); }
+  .door-head { display: flex; align-items: center; gap: 14px; padding: 0 4px 20px; }
+  .door-head img { width: 60px; height: 60px; border-radius: 14px; }
+  .door-head h1 { margin: 0; color: var(--q-label); font: 700 34px/1.1 var(--q-font); letter-spacing: -0.02em; }
+  .door-head p { margin: 2px 0 0; color: var(--q-label-2); font: 400 15px/1.3 var(--q-font); }
+  .door .q-cell-icon { background: none; }
+  .door .q-cell-icon img { width: 30px; height: 30px; border-radius: 7px; }
+</style>
+</head>
+<body>
+<main class="door" id="door" hidden></main>
+<script type="module">
+  if (!window.ORBIT_GONE) {
+    const [{ installGate, isPhoneOrTablet, isStandalone, detectLang }, ui, { APP_ORDER, BRANDS, appIcon, pathOf }, { markSuite }] = await Promise.all([import('#kit/orbit.mjs'), import('#kit/ui.mjs'), import('#kit/brand.mjs'), import('#kit/suite.mjs')]);
+    const lang = detectLang();
+    const en = lang === 'en';
+    if (en) document.documentElement.lang = 'en';
+    const W = (zh, e) => (en ? e : zh);
+    if (isPhoneOrTablet() && !isStandalone()) {
+      installGate('suite', lang, { name: 'Orbit', color: '#4f46e5', icon: './favicon.svg' });
+    } else {
+      // The first time: which app to start in (from then on, the one used last).
+      markSuite();
+      if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+      const icon = id => Object.assign(document.createElement('img'), { src: `data:image/svg+xml,${encodeURIComponent(appIcon(id))}`, alt: '' });
+      const head = ui.h('header', { class: 'door-head' }, [ui.h('img', { src: './favicon.svg', alt: '' }), ui.h('div', {}, [ui.h('h1', { text: 'Orbit' }), ui.h('p', { text: W('從哪個 App 開始？', 'Where to start?') })])]);
+      const rows = APP_ORDER.map(id => ui.cell({ icon: icon(id), title: BRANDS[id].short, sub: BRANDS[id].role?.[lang] || '', chevron: true, onClick: () => location.assign(pathOf(id)) }));
+      const door = document.getElementById('door');
+      door.append(head, ui.list(rows, { foot: W('之後打開 Orbit，會回到你上次用的 App。', 'Orbit then opens on the app you used last.') }));
+      door.hidden = false;
+    }
+  }
+</script>
+</body>
+</html>

@@ -26,7 +26,8 @@ function tap(url, clients) {
     c.navigate = async u => did.push(['navigate', u]);
     c.postMessage = (data, [port]) => {
       did.push(['told', data.url]);
-      if (c.answers) port.postMessage('ok');
+      // (Another app's page answers only in Orbit's window: kit suite.mjs.)
+      if (c.answers && (!data.other || c.suite)) port.postMessage('ok');
     };
   }
   vm.runInNewContext(swSource, { self, caches: {}, fetch: async () => new Response(''), Response, Request, Headers, URL, AbortController, MessageChannel, setTimeout, clearTimeout, crypto, console, Promise, Date });
@@ -45,5 +46,13 @@ test('a page on an older kit is navigated there', async () => {
 });
 test('none open: a window at the address; another app open is left alone', async () => {
   const did = await tap(`${SCOPE}#game=nba/1`, [{ url: 'https://orbit.test/weather/', answers: true }]);
-  assert.deepEqual(did, [['open', `${SCOPE}#game=nba/1`]]);
+  assert.deepEqual(did, [
+    ['told', `${SCOPE}#game=nba/1`],
+    ['open', `${SCOPE}#game=nba/1`]
+  ]);
+});
+
+test("Orbit's window on another app's page: that page goes there itself, no second window", async () => {
+  const did = await tap(`${SCOPE}#game=nba/1`, [{ url: 'https://orbit.test/weather/', answers: true, suite: true }]);
+  assert.deepEqual(did, [['told', `${SCOPE}#game=nba/1`]]);
 });
