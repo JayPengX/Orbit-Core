@@ -458,6 +458,8 @@ html {
 body {
   background-color: var(--q-page);
   color: var(--q-text);
+  /* (Text a rule gives only a size inherits this, not the browser's serif: Law's 各級法院 count read in Times, 2026-11-12.) */
+  font-family: var(--q-font);
 }
 /* No browser page margin (an app's own body margin still wins). */
 :where(body) {
@@ -1648,6 +1650,7 @@ dialog.q-sheet.q-full {
 .q-chip {
   flex: none;
   display: inline-flex;
+  text-decoration: none;
   align-items: center;
   gap: 6px;
   min-height: 34px;
