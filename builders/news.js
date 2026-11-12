@@ -220,7 +220,7 @@ export const FEEDS = {
   euronews: [['https://www.euronews.com/rss?level=theme&name=news', 'rss', S6]],
   rappler: [['https://www.rappler.com/feed/', 'rss', S6]],
   cnasg: [['https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511', 'rss', S6]],
-  kyodo: [['https://english.kyodonews.net/rss/all.xml', 'rss', S6]],
+  kyodo: [[bing('english.kyodonews.net'), 'bing', S6]],
   asiatimes: [['https://asiatimes.com/feed/', 'rss', S6]],
   yonhap: [['https://en.yna.co.kr/RSS/news.xml', 'rss', S6]],
   straits: [['https://www.straitstimes.com/news/asia/rss.xml', 'rss', S6]]
