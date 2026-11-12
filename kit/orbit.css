@@ -3625,6 +3625,9 @@ dialog {
 .q-pass .q-section { margin-top: 14px; }
 .q-pass .q-section-head h2 { font-size: 17px; font-weight: 800; margin: 0 0 8px; }
 .q-pass p, .q-pass h3 { margin: 0; }
+/* The Pass tab's section labels and notes keep the sheet's spacing (the reset above took it: a label sat 4 px under the card before it, 11-12). */
+.q-pass-body > .q-sheet-h { margin: 20px 16px 3px; }
+.q-pass-body > .q-sheet-sub, .q-pass-body > .q-notice-note { margin: 4px 16px 0; }
 .q-pass .muted { color: var(--q-muted); }
 .q-pass .num { font-variant-numeric: tabular-nums; }
 .q-pass .pad { padding: 14px; }

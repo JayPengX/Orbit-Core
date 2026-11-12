@@ -963,6 +963,8 @@ export const FEATURES = {
   'showcase-ask': {
     app: 'showcase',
     tap: true,
+    // (the same question over the same cards: one answer for every visitor, a week)
+    shared: true,
     models: ['haiku', 'luna'],
     effort: { luna: 'low' },
     perPass: 20,

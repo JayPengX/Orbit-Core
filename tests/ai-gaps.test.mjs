@@ -99,3 +99,7 @@ test('the guard at pace 2 or more: every tap answers paused, nothing asked', asy
   assert.equal(seen.length, 0);
   forgetPace();
 });
+
+test('the showcase\'s 問 Orbit is shared: the same question over the same cards is one answer for every visitor', () => {
+  assert.equal(FEATURES['showcase-ask'].shared, true);
+});
