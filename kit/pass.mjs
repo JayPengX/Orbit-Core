@@ -11,7 +11,7 @@ import { APPS, AVATARS, FRAMES, MILESTONES, TIERS, DEFAULT_AVATAR, milestoneOf, 
 let helpMod = null;
 let helpLoad = null;
 export const loadHelp = () => (helpLoad ||= import('./help.mjs').then(m => (helpMod = m)).catch(e => ((helpLoad = null), Promise.reject(e))));
-import { sheet, section, list, cell } from './ui.mjs';
+import { sheet, section, list, cell, toast } from './ui.mjs';
 import { todayRows } from './today.mjs';
 import { askOrbitCard } from './ask-orbit.mjs';
 import { homeOf } from './brand.mjs';
@@ -136,13 +136,6 @@ const TABS = ['pass', 'looks', 'apps', 'help'];
 
 const el = node;
 const put = (box, ...kids) => box.replaceChildren(...kids.filter(k => k != null && k !== false));
-let toastBox = null;
-function toast(text, kind = '') {
-  if (!toastBox) return;
-  const box = el('div', { class: `toast ${kind}`, text });
-  toastBox.append(box);
-  setTimeout(() => box.remove(), 2600);
-}
 const svgUrl = svg => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 
 // ---- The sheet ------------------------------------------------------------------------------
@@ -160,7 +153,6 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
   // The four tabs switch the whole sheet: a segmented control (docs/DESIGN.md §6), pinned at its top.
   const seg = el('div', { class: 'q-seg', role: 'tablist' });
   const tabs = el('div', { class: 'q-pass-tabs' }, [seg]);
-  toastBox = el('div', { class: 'toasts q-pass-toasts', 'aria-live': 'polite' });
   // Looks chosen here, until the write that carries them comes back.
   const pending = {};
   const state = { tab: TABS.includes(tab) ? tab : 'pass', help: help || { app: s.app, topic: null }, locale, extra };
@@ -262,7 +254,7 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
     label: 'Orbit Pass',
     cls: 'q-pass',
     closeLabel: t('close'),
-    body: [tabs, body, toastBox],
+    body: [tabs, body],
     onClose() {
       account?.stop();
       if (open?.dialog === dialog) open = null;

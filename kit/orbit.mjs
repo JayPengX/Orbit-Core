@@ -3238,7 +3238,7 @@ export const NOTICE_KINDS = {
     ['renew', '到期提醒', 'Renewal reminder', 'TPASS、訂閱、會員到期或續訂前，在你選的日子和時間。', 'Before a pass, subscription or membership ends or renews, on the days and time you pick.']
   ],
   vocab: [
-    ['streak', '連續練習快斷了', 'Streak ending', '今天還沒練習單字，連續天數今晚就會歸零時。', 'When you haven’t practised today and your streak ends tonight.']
+    ['streak', '連續練習快斷了', 'Streak ending', '今天還沒練習單字、連續天數今晚就要歸零時。', 'When you haven’t practised today and your streak ends tonight.']
   ],
   stock: [
     ['alert', '價格提醒', 'Price alert', '你設定的價格提醒到價時。', 'When a price alert you set is reached.'],

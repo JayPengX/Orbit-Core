@@ -3624,8 +3624,6 @@ dialog {
 .q-pass .q-section { margin-top: 14px; }
 .q-pass .q-section-head h2 { font-size: 17px; font-weight: 800; margin: 0 0 8px; }
 .q-pass p, .q-pass h3 { margin: 0; }
-.q-pass-toasts { position: fixed; left: var(--q-mid, 50%); bottom: 24px; transform: translateX(-50%); z-index: 3; display: grid; gap: 8px; width: min(420px, calc(var(--q-vw) - 32px)); pointer-events: none; }
-.q-pass .toast { background: var(--q-surface); color: var(--q-text); border: 1px solid var(--q-border); border-radius: 12px; padding: 10px 14px; font-size: 14px; box-shadow: var(--q-shadow); }
 .q-pass .muted { color: var(--q-muted); }
 .q-pass .num { font-variant-numeric: tabular-nums; }
 .q-pass .pad { padding: 14px; }

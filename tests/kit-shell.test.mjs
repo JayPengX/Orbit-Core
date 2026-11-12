@@ -259,6 +259,14 @@ test('there is one sheet: the Pass is built by it', () => {
   for (const [name, src] of [['orbit.mjs', q], ['pass.mjs', p]]) assert.doesNotMatch(src, /(?:node|el)\('dialog', \{ class: '(?:q-sheet|`q-sheet)/, `${name} draws no private sheet`);
 });
 
+test('there is one toast: the Pass sheet says its 沒有成功 with the kit\'s glass capsule, not a white card of its own', () => {
+  const p = readFileSync(new URL('../kit/pass.mjs', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../kit/orbit.css', import.meta.url), 'utf8');
+  assert.match(p, /import \{[^}]*\btoast\b[^}]*\} from '\.\/ui\.mjs'/);
+  assert.doesNotMatch(p, /function toast\(|toastBox/);
+  assert.doesNotMatch(css, /\.q-pass-toasts|\.q-pass \.toast/);
+});
+
 // ---- empty ----
 test('empty(): an accent tile, one line, one button; an emoji and a node action still work', () => {
   const e = ui.empty({ icon: 'ticket', title: '沒有票', body: '去買', action: { label: '去看看', onTap() {} } });
