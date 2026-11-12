@@ -131,6 +131,7 @@ How to apply these: `DESIGN.md`. The rules:
 - 11-12 Nothing out of place: a piece that looks different from what's around it (its own font size, colour, corner, shadow, spacing, button or control shape; not built from the kit) is rebuilt from the kit's components in the family's style. If the kit lacks it, it goes into the kit, never a one-off.
 - Before calling UI done (Jay's test): open every tab and sheet you changed at 320 and 390, light and dark, phone on its side, tablet and computer (`node tools/shots.mjs <app> --before main`, 10-30); look for overflow, cut text, wrapped labels, empty space, pieces out of proportion, duplicates, small logos, emoji, empty screens, anything of the old look, over-explaining text, wording that isn't natural in either language; run `tools/gate.mjs`.
 - 10-30 Screenshots are authentic: the world's data always live; only what a person keeps in their account comes from a demo account built by using the app. 10-27 Framing edits are fine (crop, a zoomed callout, a headline, a background), content edits never. 11-01 One set for the READMEs and the showcase, both languages (`tools/store-shots.mjs`), nothing used twice in a set. 10-28 Shot 1 is the app's strongest hero screen; niche or just-asked features later.
+- 11-12 A screenshot set sells the app (Jay: "think like a marketer"): shot 1 makes plain what the app is for; each shot after it is one main feature that makes the app special, in proportion to how central it is, never chosen for being new (the 11-11 set gave Law four 代表會 shots and Sports mostly AI). Each headline is confident and carries a real number where one sells (counted from the data, rounded so it stays true: 「5.4 萬部法規」). Every shot shows different content (another story, game, stock, word); one shot per feature; Orbit AI one shot at most, only where it is central; never a competitor's name or a comparison. The plan with each set's one-line reason: `tools/shots/store.mjs`.
 
 ## 4. Data, money and cost
 
@@ -185,4 +186,5 @@ Gone for good, never revived: Longshot (shut down 10-31: Worker, data and secret
 | No forced resets for any pass | An issued pass is replaced at first sign-in | 11-03 |
 | Showcase demos frozen snapshots only | Live, read-only behind a showcase pass | 10-30 |
 | Screenshot sets lead with the latest feature asked for | Lead with the hero screen | 10-28 |
+| Nine shots a set, specials (AI, 議會, the flight) mixed with basics | A seller's set: what it is, then what makes it special, numbers in the headlines | 11-12 |
 | "Don't touch the Cloudflare data rename" | Done (`orbit-data`, `orbit-store`) | 10-23 |
