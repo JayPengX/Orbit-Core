@@ -27,8 +27,10 @@
 //      wrote, for how many days, fading by half in 36 hours on the front;
 //   7. the top stories' own pages read, a few a build, each once (pageOf):
 //      the picture the outlet set for it (og:image) where the feed gave none,
-//      and the clip it published on YouTube (its VideoObject's embedUrl or
-//      the article's YouTube embed), played in the app by YouTube's player.
+//      and the video in the article (Jay 11-12; Taiwan's outlets' pages,
+//      CLIPS_AT, for a story with fewer than 2): a YouTube clip (VideoObject,
+//      og:video, the article's player), played in the app by YouTube's
+//      player, never a Short; else the outlet's own player, opened on its site.
 //
 // → news/index.json: { built, tw: [story], intl: [story] } (heard of in
 //   the last 3 days); news/past.json the same for older ones, by
@@ -71,7 +73,8 @@ export const NEWS_PAST = 'news/past.json';
 const keepFor = n => (n >= 6 ? 30 : n >= 4 ? 14 : 3) * 24 * HOUR;
 const OPEN_MS = 21 * 24 * HOUR;
 const REC_ITEMS = 80;
-// Pages read a build (each once; the Runner relays past its own 40 calls).
+// Pages read a build for pictures (each once; the Runner relays past its
+// own 40 calls); CLIP_READS more for clips.
 export const PAGE_READS = 12;
 
 // Each outlet's feeds: [url, kind, every] ('rss' RSS, RDF or Atom; 'map' a
@@ -474,35 +477,81 @@ const metaOf = (html, name) => {
     new RegExp(`<meta\\b[^>]*\\bcontent=["']([^"']+)["'][^>]*(?:property|name)=["']${name}["']`, 'i').exec(html);
   return m ? plain(m[1]) : '';
 };
-// A page's own picture (og:image) and the YouTube clips it says are its own:
-// a VideoObject's embedUrl, or a YouTube player in the article. { i, y }.
+// A page's own picture (og:image) and the clips it says are its own (Jay
+// 11-12: the videos are in the articles, Taiwan's above all):
+//   y: YouTube's, played here: a VideoObject's (its embedUrl or contentUrl),
+//      og:video, or a YouTube player in the article (its src, or data-src
+//      where the page loads it late: TVBS, 華視, 中央社, 東森, 聯合…);
+//   v: the outlet's own player, played on its site: a VideoObject's video
+//      of its own (三立's mp4, 中天's), og:video, 聯合影音's player.
+// Never a YouTube link alone (a list of the channel's clips beside the
+// article: 華視's), never a Short (/shorts/). { i, y, v? }.
+const YT_ID = /^https?:\/\/(?:www\.|m\.)?(?:youtube(?:-nocookie)?\.com\/(?:embed\/|v\/|watch\?(?:[^"'#]*&)?v=)|youtu\.be\/)([\w-]{11})/;
 export function pageOf(html) {
-  const s = String(html || '').slice(0, 600_000).replace(/\\\//g, '/');
+  const s = String(html || '').slice(0, 600_000).replace(/\\\//g, '/').replace(/\\u002F/gi, '/');
   const i = metaOf(s, 'og:image') || metaOf(s, 'twitter:image');
   const y = [];
-  for (const m of s.matchAll(/embedUrl["']?\s*(?::|content=)\s*["']https?:\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/([\w-]{11})/g)) y.push(m[1]);
-  for (const m of s.matchAll(/<iframe\b[^>]*\bsrc=["'](?:https?:)?\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/([\w-]{11})/g)) y.push(m[1]);
-  return { i: /^https:\/\//.test(i) ? i : '', y: [...new Set(y)].slice(0, 2) };
+  const v = [];
+  const add = u => {
+    const url = plain(String(u || '')).trim().replace(/^\/\//, 'https://');
+    const id = YT_ID.exec(url)?.[1];
+    if (id) y.push(id);
+    else if (/^https?:\/\/[^\s"'<>]+$/.test(url) && !/youtube\.com|youtu\.be/.test(url)) v.push(url);
+  };
+  // (A VideoObject's video: each of the page's ld+json read whole, else its fields where it won't parse.)
+  for (const m of s.matchAll(/<script\b[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)) {
+    let data = null;
+    try {
+      data = JSON.parse(m[1].trim());
+    } catch {
+      if (/"@type"\s*:\s*"VideoObject"/.test(m[1])) for (const f of m[1].matchAll(/"(?:embedUrl|contentUrl)"\s*:\s*"([^"]+)"/g)) add(f[1]);
+      continue;
+    }
+    const walk = (x, depth = 0) => {
+      if (!x || typeof x !== 'object' || depth > 6) return;
+      if (Array.isArray(x)) return void x.forEach(z => walk(z, depth + 1));
+      const type = [].concat(x['@type'] || []);
+      if (type.includes('VideoObject')) add(x.embedUrl || x.contentUrl);
+      for (const k of ['@graph', 'video', 'mainEntity', 'associatedMedia']) walk(x[k], depth + 1);
+    };
+    walk(data);
+  }
+  // (Pages that say it in a tag: 公視's microdata, others' og:video.)
+  for (const m of s.matchAll(/embedUrl["']?\s*content=\s*["']([^"']+)/g)) add(m[1]);
+  for (const m of s.matchAll(/embedUrl["']?\s*:\s*["'](https?:\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/[\w-]{11})/g)) add(m[1]);
+  add(metaOf(s, 'og:video:secure_url') || metaOf(s, 'og:video:url') || metaOf(s, 'og:video'));
+  for (const m of s.matchAll(/<iframe\b[^>]*?\b(?:data-)?src=["']((?:https?:)?\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/[\w-]{11})/g)) add(m[1]);
+  for (const m of s.matchAll(/<iframe\b[^>]*?\b(?:data-)?src=["']((?:https?:)?\/\/video\.udn\.com\/embed\/[\w/]+)/g)) add(m[1]);
+  return { i: /^https:\/\//.test(i) ? i : '', y: [...new Set(y)].slice(0, 4), ...(v.length ? { v: [...new Set(v)].slice(0, 2) } : {}) };
 }
 // What one outlet puts on every page is its own, not a story's: a clip on
 // two of its pages or more (its live channel, a box beside each article), a
 // picture on two of its pages (its logo) or on three of its feed's items (a
 // stand-in). `ok(outlet, clip or picture)`; a clip counts only once two of
 // the outlet's pages were read, so a box beside them all can show.
+// A story's own clip (`mine`: its pages' addresses) may be on two of its
+// pages (中央社's two reports on one event, one clip): it's the box only
+// when on a page of another story, and counts once a page of another was read.
 export function sameOf(pages, items) {
   const n = new Map();
   const read = new Map();
+  const at = new Map();
   const count = k => n.set(k, (n.get(k) || 0) + 1);
   for (const it of items) {
     if (it.img) count(`f ${it.o} ${it.img}`);
     const p = pages[it.u];
     if (!p) continue;
-    read.set(it.o, (read.get(it.o) || 0) + 1);
+    (read.get(it.o) || read.set(it.o, []).get(it.o)).push(it.u);
     if (p.i) count(`p ${it.o} ${p.i}`);
-    for (const id of p.y || []) count(`y ${it.o} ${id}`);
+    for (const id of [...(p.y || []), ...(p.v || [])]) (at.get(`${it.o} ${id}`) || at.set(`${it.o} ${id}`, []).get(`${it.o} ${id}`)).push(it.u);
   }
   return {
-    clip: (o, id) => (read.get(o) || 0) >= 2 && (n.get(`y ${o} ${id}`) || 0) < 2,
+    clip: (o, id, mine) => {
+      const pages = read.get(o) || [];
+      const on = at.get(`${o} ${id}`) || [];
+      if (!mine) return pages.length >= 2 && on.length < 2;
+      return pages.some(u => !mine.has(u)) && on.every(u => mine.has(u));
+    },
     feedPic: (o, u) => (n.get(`f ${o} ${u}`) || 0) < 3,
     pagePic: (o, u) => (n.get(`p ${o} ${u}`) || 0) < 2
   };
@@ -702,15 +751,18 @@ export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, i
   });
   // The story's clips: each outlet's own YouTube clip on its page, or its
   // video page (played on the outlet's site), newest first, one a clip.
+  // (A page's video of its own player: the report played on its site.)
   const clips = [];
   const ids = new Set();
+  const mine = new Set(items.map(it => it.u));
   for (const it of newest) {
-    const y = (pages[it.u]?.y || []).filter(id => same.clip(it.o, id) && !ids.has(id));
+    const y = (pages[it.u]?.y || []).filter(id => same.clip(it.o, id, mine) && !ids.has(id));
     for (const id of y) {
       ids.add(id);
       clips.push([it.o, id, it.u, cleanTitle(it.t), ytPicture(id)]);
     }
-    if (it.v && !y.length) clips.push([it.o, '', it.u, cleanTitle(it.t), bigPicture(it.img || pages[it.u]?.i || '')]);
+    const own = !y.length && (it.v || (pages[it.u]?.v || []).some(u => same.clip(it.o, u, mine)));
+    if (own) clips.push([it.o, '', it.u, cleanTitle(it.t), bigPicture(it.img || pages[it.u]?.i || '')]);
   }
   // Then the channels' clips matched to it (matchClips), newest first.
   for (const v of [...vids].sort((x, z) => z.at - x.at)) {
@@ -1158,11 +1210,23 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
   let out = deskOf(items, recs, now, { pages, vids: clips });
   const want = pagesToRead(out, pages);
   const read = await Promise.all(want.map(u => readPage(u, { fetchImpl })));
-  want.forEach((u, i) => (pages[u] = read[i] || { i: '', y: [] }));
+  // (Each clip a page names asked once whether it's a Short: those are left
+  // out. The answers kept 4 days: { id: when asked, less than 0 a Short }.)
+  const shorts = Object.fromEntries(Object.entries(kept.shorts || {}).filter(([, at]) => now - Math.abs(at) <= 2 * KEEP_MS));
+  const ask = [...new Set(read.flatMap(p => p?.y || []))].filter(id => !(id in shorts));
+  const isShort = await Promise.all(ask.map(id => shortOf(id, { fetchImpl })));
+  ask.forEach((id, i) => (shorts[id] = isShort[i] ? -now : now));
+  const unread = {};
+  want.forEach((u, i) => {
+    const p = read[i];
+    const o = byUrl.get(u)?.o || new URL(u).hostname;
+    if (!p) unread[o] = (unread[o] || 0) + 1;
+    pages[u] = p ? { ...p, y: p.y.filter(id => !(shorts[id] < 0)) } : { i: '', y: [] };
+  });
   if (want.length) out = deskOf(items, recs, now, { pages, vids: clips });
   const keep = new Set([...items, ...out.recs.flatMap(r => r.items)].map(it => it.u));
   for (const u of Object.keys(pages)) if (!keep.has(u)) delete pages[u];
-  await store.put(NEWS_STATE, { items, etag, pages, recs: out.recs, vids: clips });
+  await store.put(NEWS_STATE, { items, etag, pages, recs: out.recs, vids: clips, shorts });
   // (Never an empty page over a good one: a build that read nothing keeps the last.)
   if (out.tw.length || out.intl.length) {
     await store.put(NEWS_PATH, { built: now, tw: out.tw, intl: out.intl });
@@ -1174,28 +1238,47 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
   // everywhere) while the stories build fine; the clips kept 48 hours carry them.)
   const storyFails = failed.filter(f => !/ clips: /.test(f)).length;
   const missed = failed.length && storyFails * 2 < feedsNow.length ? failed.slice(0, 12) : null;
-  return { items: items.length, fresh, clips: clips.length, pages: want.length, kept: out.recs.length, tw: out.tw.length, intl: out.intl.length, past: out.past.tw.length + out.past.intl.length, ...(missed ? { missed } : { failed }) };
+  return { items: items.length, fresh, clips: clips.length, pages: want.length, ...(Object.keys(unread).length ? { unread } : {}), ...(ask.length ? { asked: ask.length, shorts: isShort.filter(Boolean).length } : {}), kept: out.recs.length, tw: out.tw.length, intl: out.intl.length, past: out.past.tw.length + out.past.intl.length, ...(missed ? { missed } : { failed }) };
 }
 
-// Outlets whose pages carry the story's own YouTube clip.
-const CLIPS_AT = new Set(['pts', 'ebc', 'ctinews']);
-// The pages a build reads, PAGE_READS at most, top stories first (two of
-// Taiwan's to one abroad): one with a clip where a story has none yet, and
-// the lead's (else any) where it has no picture.
-export function pagesToRead(out, pages, most = PAGE_READS) {
+// Outlets whose article pages carry the story's own clip, most often first
+// (11-12, 25 of each's pages: 公視 and 華視 half of them, 中天, 東森, 中央社,
+// 聯合 one in six or eight, TVBS, 三立, ETtoday, 中時 fewer; 自由's pages
+// refuse some readers: last). 民視 is read by its channel, no page.
+export const CLIPS_AT = ['pts', 'cts', 'ctinews', 'ebc', 'cna', 'udn', 'tvbs', 'setn', 'ettoday', 'chinatimes', 'upmedia', 'mirror', 'ltn'];
+// Pages a build reads for clips (on top of PAGE_READS for pictures): a top
+// story with fewer than 2 that play here, two of its outlets' pages at most.
+export const CLIP_READS = 12;
+// The pages a build reads, top stories first (two of Taiwan's to one
+// abroad): PAGE_READS for the lead's (else any) where a story has no
+// picture, CLIP_READS for its clip outlets' where it has fewer than 2 clips.
+export function pagesToRead(out, pages, most = PAGE_READS, clipMost = CLIP_READS) {
   const order = [];
   for (let i = 0; i < 40; i++) order.push(out.tw[2 * i], out.tw[2 * i + 1], out.intl[i]);
-  const want = [];
+  const pics = [];
+  const clips = [];
+  const taken = u => pages[u] || pics.includes(u) || clips.includes(u);
   for (const s of order.filter(Boolean)) {
+    if (pics.length >= most && clips.length >= clipMost) break;
     // (Those read through a search's feed or a channel: no page of theirs to read.)
-    const fresh = s.items.filter(([o, , u]) => !pages[u] && !want.includes(u) && !FAR.has(o));
-    const clip = !s.clips?.some(c => c[1]) && fresh.find(([o]) => CLIPS_AT.has(o));
-    if (clip) want.push(clip[2]);
-    const pic = !s.img && (fresh.find(([, , u]) => u === s.items[0]?.[2]) || fresh.find(([, , u]) => u !== clip?.[2]));
-    if (pic) want.push(pic[2]);
-    if (want.length >= most) break;
+    const fresh = s.items.filter(([o, , u]) => !taken(u) && !FAR.has(o));
+    const playing = (s.clips || []).filter(c => c[1]);
+    if (playing.length < 2 && clips.length < clipMost) {
+      const has = new Set((s.clips || []).map(c => c[0]));
+      const by = new Set();
+      const picks = fresh
+        .filter(([o]) => CLIPS_AT.includes(o) && !has.has(o))
+        .sort((a, b) => CLIPS_AT.indexOf(a[0]) - CLIPS_AT.indexOf(b[0]))
+        .filter(([o]) => !by.has(o) && by.add(o))
+        .slice(0, Math.min(2 - playing.length, clipMost - clips.length));
+      clips.push(...picks.map(x => x[2]));
+    }
+    if (!s.img && pics.length < most) {
+      const pic = fresh.find(([, , u]) => u === s.items[0]?.[2] && !clips.includes(u)) || fresh.find(([, , u]) => !clips.includes(u));
+      if (pic) pics.push(pic[2]);
+    }
   }
-  return want.slice(0, most);
+  return [...clips, ...pics];
 }
 // One page read for its picture and clip; null when it can't be.
 async function readPage(url, { fetchImpl = fetch } = {}) {
@@ -1205,6 +1288,19 @@ async function readPage(url, { fetchImpl = fetch } = {}) {
     return pageOf(await res.text());
   } catch {
     return null;
+  }
+}
+
+// Whether a YouTube clip is a Short (tall: it won't play well here, Jay
+// 11-10): YouTube answers its /shorts/ address for a Short and sends any
+// other clip on to /watch. Unsure (no answer, a relay that followed the
+// redirect and lost where it went): not a Short.
+async function shortOf(id, { fetchImpl = fetch } = {}) {
+  try {
+    const res = await fetchImpl(`https://www.youtube.com/shorts/${id}`, { method: 'HEAD', redirect: 'manual', headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(6_000) });
+    return res.status === 200 && !res.redirected && /\/shorts\//.test(res.url || '');
+  } catch {
+    return false;
   }
 }
 
