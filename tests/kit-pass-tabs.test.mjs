@@ -35,3 +35,19 @@ test('Pass tabs clear the grabber when stuck', async t => {
     await browser.close();
   }
 });
+
+// The Pass tab's section labels sit with their own card, not the one before
+// (2026-11-12: `.q-pass h3 { margin: 0 }` left every label 4 px under the card above).
+test('Pass tab labels sit with the card under them', async t => {
+  if (!chromium || !existsSync(chromium.executablePath())) return t.skip('no Chromium here');
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 800 } });
+    await page.setContent(`<style>${css}</style><body><div class="q-pass"><div class="q-pass-body"><div class="q-rows" id="a" style="height:52px"></div><h3 class="q-sheet-h" id="h">通行密鑰</h3><div class="q-rows" id="b" style="height:52px"></div><p class="q-sheet-sub" id="n">note</p><h3 class="q-sheet-h" id="h2">通知</h3></div></div></body>`);
+    const r = await page.evaluate(() => { const b = id => document.getElementById(id).getBoundingClientRect(); return { above: b('h').top - b('a').bottom, below: b('b').top - b('h').bottom, note: b('n').top - b('b').bottom, after: b('h2').top - b('n').bottom }; });
+    assert.ok(r.above >= 20 && r.below <= 10, `label: ${r.above} above, ${r.below} below`);
+    assert.ok(r.note >= 6 && r.note < r.after, `note: ${r.note} under its card, the next label ${r.after} after it`);
+  } finally {
+    await browser.close();
+  }
+});
