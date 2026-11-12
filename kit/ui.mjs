@@ -583,11 +583,13 @@ export function menu(anchor, items) {
   const off = e => {
     if (!m.contains(e.target)) shut();
   };
-  const key = e => e.key === 'Escape' && shut();
-  setTimeout(() => (document.addEventListener('pointerdown', off, true), document.addEventListener('keydown', key)));
+  // (Escape closes the menu alone: let through, it also closed the sheet the
+  // menu came from, and what was typed there with it. Money, 2026-11-12.)
+  const key = e => e.key === 'Escape' && (e.preventDefault(), e.stopPropagation(), shut());
+  setTimeout(() => (document.addEventListener('pointerdown', off, true), document.addEventListener('keydown', key, true)));
   function shut() {
     document.removeEventListener('pointerdown', off, true);
-    document.removeEventListener('keydown', key);
+    document.removeEventListener('keydown', key, true);
     if (reduced()) return m.remove();
     m.classList.add('out');
     setTimeout(() => m.remove(), 220);
@@ -640,13 +642,28 @@ export function toast(text, { tone = '', ms = 2200, action = null, batch = '' } 
   // Over an open sheet (a modal dialog: the page under it is inert, its 復原
   // couldn't be tapped): inside the sheet, as a popover in the top layer
   // above it, so it sits at the screen's foot whatever the sheet's scroll.
-  const over = [...(document.querySelectorAll?.('dialog[open]') || [])].at(-1);
+  // (Not one sliding away: a toast put in the sheet that a save had just
+  // closed left with it half a second later, 記好了 and its 復原 too. And
+  // should its sheet close while it's up, it moves to the page. Money, 2026-11-12.)
+  const over = [...(document.querySelectorAll?.('dialog[open]') || [])].filter(x => !x.classList?.contains('q-leaving')).at(-1);
   if (over && typeof t.showPopover === 'function') {
     over.append(t);
     try {
       t.setAttribute('popover', 'manual');
       t.showPopover();
     } catch {}
+    over.addEventListener?.(
+      'close',
+      () => {
+        if (t.parentElement !== over || t.classList.contains('out')) return;
+        try {
+          t.hidePopover?.();
+        } catch {}
+        t.removeAttribute('popover');
+        document.body.append(t);
+      },
+      { once: true }
+    );
   } else document.body.append(t);
   mine.timer = setTimeout(close, ms);
   lastToast = batch ? mine : null;
