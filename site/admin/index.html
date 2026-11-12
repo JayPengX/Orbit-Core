@@ -1984,7 +1984,9 @@ function sourcesCell(x) {
   const bad = x.rows.filter(o => o.state === 'bad'), warn = x.rows.filter(o => o.state === 'warn');
   const n = x.rows.filter(o => o.state === 'ok').length;
   const names = list => list.map(o => o.s.zh.replace(/（.*）/, '')).join('、');
-  setHealth('sources', bad.length ? 'bad' : warn.length ? 'warn' : 'ok', bad.length ? `${names(bad)} 壞了` : warn.length ? `${names(warn)} 不穩` : `${n} 個都正常`, bad.length ? (bad.length === 1 ? `${names(bad)} 壞了` : `${bad.length} 個外部來源壞了`) : warn.length ? (warn.length === 1 ? `${names(warn)} 不穩` : `${warn.length} 個外部來源不穩`) : '');
+  // (The cell names two at most: five names filled six lines on a phone; 健康 lists them all.)
+  const few = (list, word) => (list.length > 2 ? `${names(list.slice(0, 1))}等 ${list.length} 個${word}` : `${names(list)} ${word}`);
+  setHealth('sources', bad.length ? 'bad' : warn.length ? 'warn' : 'ok', bad.length ? few(bad, '壞了') : warn.length ? few(warn, '不穩') : `${n} 個都正常`, bad.length ? (bad.length === 1 ? `${names(bad)} 壞了` : `${bad.length} 個外部來源壞了`) : warn.length ? (warn.length === 1 ? `${names(warn)} 不穩` : `${warn.length} 個外部來源不穩`) : '');
 }
 const pctOf = (f, n) => (n ? `${f / n >= 0.1 ? Math.round((f / n) * 100) : ((f / n) * 100).toFixed(1)}%` : '—');
 // The last 24 hours, an hour a bar: green answered, red failed, grey nobody asked.
