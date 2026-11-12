@@ -72,7 +72,8 @@ export const BONDS = Object.fromEntries(
 // (English in the market's shorthand, 10Y and 3M, so a name fits a phone's row.)
 export function bondName(bond, locale) {
   const years = Math.max(0, (bond.maturity - Date.now()) / YEAR);
-  const term = years < 1 ? (locale === 'zh' ? `${Math.round(years * 12)} 個月` : `${Math.round(years * 12)}M`) : locale === 'zh' ? `${Math.round(years)} 年` : `${Math.round(years)}Y`;
+  const months = Math.max(1, Math.round(years * 12));
+  const term = years < 1 ? (locale === 'zh' ? `${months} 個月` : `${months}M`) : locale === 'zh' ? `${Math.round(years)} 年` : `${Math.round(years)}Y`;
   const date = new Date(bond.maturity).toISOString().slice(0, 7).replace('-', '/');
   const issuer = locale === 'zh' ? bond.zh : bond.en;
   if (!bond.coupon) return locale === 'zh' ? `${issuer} ${term}國庫券（${date} 到期）` : `${issuer} ${term} bill (${date})`;

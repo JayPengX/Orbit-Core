@@ -608,4 +608,6 @@ test('TAIEX weekly options: each series by its Wednesday or Friday, priced on th
   const q = Q.optQuote(sym, taiex, table);
   assert.equal(q.name, '台指選 10/28週 46500 買權');
   assert.ok(q.price > 0 && q.price < 600);
+  // Its day's move is from the last settlement (the table's day before today), as TAIFEX quotes it.
+  assert.equal(q.prev, 300);
 });
