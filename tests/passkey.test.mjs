@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, webcrypto } from 'node:crypto';
 import { handleEcoRequest, passKey, WALLET_COLLECTION } from '../eco.js';
-import { PASSKEY_COLLECTION, RP_ID } from '../passkey.js';
+import { PASSKEY_COLLECTION, RP_ID, PASSKEY_MAX } from '../passkey.js';
 import { cborDecode, parseAuthData, derToRaw, b64url, unb64url } from '../webauthn.js';
 import { planClean } from '../eco-admin.js';
 
@@ -322,4 +322,24 @@ test('a fresh pass: no passkey until the pass is replaced, then one signs in to 
   assert.equal(res.status, 200);
   assert.equal(res.data.fresh, undefined);
   assert.equal((await t.post({ op: 'login', passcode: code, app: 'stock' })).status, 404);
+});
+
+// (Last: its many asks count against the session's minute, which later setups would share.)
+test('ten passkeys a Pass: an 11th is ECO_PASSKEY_FULL; one removed makes room', async () => {
+  const t = setup();
+  const acct = await signedIn(t);
+  t.advance(120_000); // (past the minute earlier tests' sessions, made the same way, spent)
+  const keys = [];
+  for (let i = 0; i < PASSKEY_MAX; i++) {
+    keys.push(await authenticator());
+    if (i % 5 === 4) t.advance(61_000); // (adding is 20 asks a minute a session)
+    assert.equal((await addKey(t, acct, keys[i])).status, 200, `key ${i + 1}`);
+  }
+  t.advance(61_000);
+  const more = await authenticator();
+  const full = await t.post({ op: 'passkey-add-begin', qt: acct.token });
+  assert.equal(full.status, 409);
+  assert.equal(full.data.error.code, 'ECO_PASSKEY_FULL');
+  await t.post({ op: 'passkey-remove', qt: acct.token, id: keys[0].id });
+  assert.equal((await addKey(t, acct, more)).status, 200);
 });
