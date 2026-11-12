@@ -205,7 +205,7 @@ export const FEEDS = {
   cbc: [['https://www.cbc.ca/webfeed/rss/rss-world', 'rss', S6]],
   marketwatch: [['https://feeds.content.dowjones.io/public/rss/mw_topstories', 'rss', S6]],
   deseret: [['https://www.deseret.com/arc/outboundfeeds/rss/?outputType=xml', 'rss', S6]],
-  kherald: [['https://www.koreaherald.com/rss/newsAll', 'rss', S6]],
+  kherald: [[bing('koreaherald.com'), 'bing', S6]],
   kyivind: [['https://kyivindependent.com/news-archive/rss/', 'rss', S6]],
   moscowt: [['https://www.themoscowtimes.com/rss/news', 'rss', S6]],
   foxbiz: [['https://moxie.foxbusiness.com/google-publisher/latest.xml', 'rss', S6]],
