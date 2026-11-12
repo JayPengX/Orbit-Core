@@ -93,7 +93,7 @@ export const STORE = {
       { zh: '直接問：明天會下雨嗎？', en: 'Just ask: will it rain tomorrow?', dark: true, hash: { zh: 'ask=明天竹北會下雨嗎', en: 'ask=Will it rain in Zhubei tomorrow?' }, wait: 20000 },
       { zh: '未來十天，哪天會下雨', en: 'Which of the next ten days it rains', page: 'rain', wait: 9000 },
       { zh: '每小時的溫度與降雨', en: 'Every hour’s temperature and rain', dark: true, page: 'day', wait: 9000 },
-      { zh: '穿什麼、帶不帶傘，直接說', en: 'What to wear, whether to take an umbrella', args: click(wait(2500), toTop("document.querySelector('.ot-advice')", 70), wait(1000)), wait: 9000 },
+      { zh: '穿什麼、帶不帶傘，直接說', en: 'What to wear, umbrella or not', args: click(wait(2500), toTop("document.querySelector('.ot-advice')", 70), wait(1000)), wait: 9000 },
       { zh: '家、學校，每個地點都顧到', en: 'Home, school, every place you keep', dark: true, args: click('#tab-places', wait(2500)), wait: 9000 }
     ]
   },
@@ -114,7 +114,7 @@ export const STORE = {
     app: 'money', brand: 'money', show: 'money', prefix: 'money', account: 'demo',
     shots: [
       { zh: '一整個月，花多少一眼看', en: 'Your month, at a glance' },
-      { zh: '幾秒記一筆，分類自動猜好', en: 'Log in seconds, the category already guessed', dark: true, page: 'entry-typed' },
+      { zh: '幾秒記一筆，分類自動猜好', en: 'Log in seconds, category guessed', dark: true, page: 'entry-typed' },
       { zh: '錢花到哪裡，一圈看懂', en: 'Where the money went', page: 'stats' },
       { zh: '銀行、信用卡、悠遊卡，全都管', en: 'Banks, cards and EasyCard, all in one', dark: true, hash: 'accts' },
       { zh: '問你的帳，答案畫成圖', en: 'Ask your books, see the answer', hash: { zh: 'ask=這個月吃飯花了多少？', en: 'ask=How much did I spend on food this month?' }, ai: [['feature:money-ask', 'money-ask']], args: click(wait(1500), sheetTop, wait(600)), wait: 9000 }
@@ -148,7 +148,7 @@ export const STORE = {
   beats: {
     app: 'beats', brand: 'beats', show: 'beats', prefix: 'beats',
     shots: [
-      { zh: '手機現做的音樂，首首不重複', en: 'Music made on your phone, never repeated', dark: true, page: 'now-playing' },
+      { zh: '手機現做的音樂，首首不重複', en: 'Endless music, made on your phone', dark: true, page: 'now-playing' },
       { zh: '49 種曲風，說想聽什麼就換', en: '49 styles: say what you want to hear', args: { zh: ask('讀書用的 lo-fi'), en: ask('lo-fi to study') } },
       { zh: '用你的素材，做成整首歌', en: 'Your own sounds, made into songs', dark: true, page: 'make' },
       { zh: '在樂器室做節拍', en: 'Make beats in the studio', page: 'studio' },
@@ -176,8 +176,8 @@ export const STORE = {
       { zh: '你的總資產，一眼看', en: 'Everything you own, at a glance', dark: true, wait: 12000 },
       { zh: '真實報價與 K 線', en: 'Real prices, real charts', page: 'stock', wait: 12000 },
       { zh: '全世界的市場，一個帳戶買', en: 'Every market, one account', dark: true, args: click('#tab-markets', wait(4000)), wait: 10000 },
-      { zh: '市價、限價、停損，像真的券商', en: 'Market, limit and stop orders, like a real broker', args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(2500), "js:[...document.querySelectorAll('[data-action=open][data-symbol=\"2317.TW\"]')].find(e => e.offsetParent).click()", wait(3000), '[data-action=trade][data-side=buy]', wait(1500)), wait: 12000 },
-      { zh: '當沖、權證、期貨，資格都照真的', en: 'Day trading and warrants, by the real rules', dark: true, args: click('#tab-fx', '[data-action=tool][data-tool=access]', wait(1500)), wait: 10000 },
+      { zh: '市價、限價、停損，像真的券商', en: 'Market, limit and stop orders', args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(2500), "js:[...document.querySelectorAll('[data-action=open][data-symbol=\"2317.TW\"]')].find(e => e.offsetParent).click()", wait(3000), '[data-action=trade][data-side=buy]', wait(1500)), wait: 12000 },
+      { zh: '當沖、權證、期貨，資格都照真的', en: 'Day trading and warrants, real rules', dark: true, args: click('#tab-fx', '[data-action=tool][data-tool=access]', wait(1500)), wait: 10000 },
       { zh: '換匯照銀行牌價', en: 'Exchange at the bank’s rates', page: 'rates', wait: 12000 }
     ]
   }
