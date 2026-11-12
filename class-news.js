@@ -395,9 +395,13 @@ export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now
     const read = await readSchool(site, fetchFn, today);
     if (!read || !read.items.length) return kept ? { ...kept, stale: true } : { site, at: now, items: [], how: read ? read.how : 'none', unread: !read };
     // (What the school's list no longer shows but did, within 45 days, stays: a fuller list.)
-    const seen = new Set(read.items.flatMap(it => [it.id, it.title.replace(/\s+/g, '')]));
+    // (One the school edited, its title changed at the same address, is that
+    // one, not a second: an address only one post of the list has is the post's.)
+    const urls = read.items.map(it => it.url);
+    const own = urls.filter(u => urls.indexOf(u) === urls.lastIndexOf(u));
+    const seen = new Set(read.items.flatMap(it => [it.id, it.title.replace(/\s+/g, '')]).concat(own));
     const from = new Date(Date.parse(`${today}T00:00:00Z`) - NEWS.days * 86_400_000).toISOString().slice(0, 10);
-    const older = (kept?.items || []).filter(it => !seen.has(it.id) && !seen.has(String(it.title || '').replace(/\s+/g, '')) && it.date >= from);
+    const older = (kept?.items || []).filter(it => !seen.has(it.id) && !seen.has(String(it.title || '').replace(/\s+/g, '')) && !seen.has(it.url) && it.date >= from);
     const items = [...read.items, ...older].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)).slice(0, NEWS.keep);
     return { site, at: now, v: NEWS_V, how: read.how, items: mergeWorded(items, kept?.items) };
   };
