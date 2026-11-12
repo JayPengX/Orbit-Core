@@ -49,3 +49,9 @@ test('admin: every check and failure is the family’s q-ask dialog, never the b
   assert.match(code, /el\('dialog', \{ class: `q-ask/);
   assert.ok(page.includes("stock: 'Orbit Securities'"), 'Securities is Orbit Securities, as on its icon');
 });
+
+test('admin: the search’s account rows keep a square avatar and the apps’ short names (a stretched avatar pushed the apps onto four lines)', () => {
+  assert.ok(page.includes('.hit > span:not(.q-tile):not(.av) { flex: 1 1 0; min-width: 0; }'));
+  assert.ok(page.includes('.hit > .av { flex: none; }'));
+  assert.match(page, /w\.apps\.map\(k => BRANDS\[k\]\?\.short \|\| appName\(k\)\)\.join\('、'\)/);
+});
