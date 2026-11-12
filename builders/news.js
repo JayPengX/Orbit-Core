@@ -812,6 +812,33 @@ const sumOf = vs => {
 // 0.075 (Chinese), the story's own above.)
 export const STRAY = { zh: 0.075, en: 0.05 };
 const STRAY_MIN = 6;
+// A company's own report (a month's 營收, a quarter's EPS) and whose it is:
+// the words before the report's in the first piece of the headline that
+// says one (「陽明Q3賺逾半個股本」 → 陽明, 「辣椒財報／…」 → 辣椒), '' when
+// it's no report or says no name. Jay's 11-10 rule: one company's report is
+// never another's story.
+const REPORT = /營收|EPS|每股|股本|獲利|財報|盈餘|自結|前[一二三四1-4]季|前\d{1,2}月|前十[一二]?月|第[一二三四1-4]季|Q[1-4]/i;
+const REPORT_AT = /\d|連[\d一二三四五六七八九十]|前[一二三四十\d]|第[一二三四\d]|Q[1-4]|今年|去年|明年|上半年|營收|EPS|每股|股本|獲利|財報|盈餘|自結|單月|稅[前後]/i;
+export function reportOf(title) {
+  for (const piece of cleanTitle(title).split(/[／/！!？?，,：:；;｜|「」【】]+/)) {
+    if (!REPORT.test(piece)) continue;
+    const name = piece.slice(0, piece.search(REPORT_AT)).replace(/^(獲利|營收|財報)+/, '').trim();
+    if (name.length >= 2 && name.length <= 8 && /[㐀-鿿A-Za-z]/.test(name)) return name;
+  }
+  return '';
+}
+// A story's reports: whose they are (`owner`, the company named in the most
+// of its headlines, two at least) and whether more than one company's are in
+// it (`mixed`). A mixed story keeps its owner's reports alone; with no owner
+// (a day's reports, one each) none of them; one company's alone, it's theirs.
+export function reportsOwner(titles) {
+  const names = [...new Set(titles.map(reportOf).filter(Boolean))];
+  const count = n => titles.filter(t => t.includes(n)).length;
+  const top = names.sort((a, b) => count(b) - count(a))[0];
+  return { owner: top && (count(top) >= 2 || names.length === 1) ? top : '', mixed: names.length >= 2 };
+}
+// Whether a headline is another company's report than the story's `owner`.
+export const otherReport = (title, owner) => Boolean(reportOf(title)) && !(owner && title.includes(owner));
 const keepOf = ({ o, t, u, at, d, img, v }) => ({ o, t, u, at, ...(d ? { d } : {}), ...(img ? { img } : {}), ...(v ? { v } : {}) });
 
 // Each channel clip to the kept story its title is nearest: near enough
@@ -872,7 +899,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
       .filter(open)
       .map(r => {
         const v = sumOf(r.items.filter(it => it.at >= r.last - 24 * HOUR).map(vecOf));
-        return { r, v, n: norm(v) };
+        return { r, v, n: norm(v), whose: lang === 'zh' ? reportsOwner(r.items.map(it => it.t)).owner : '' };
       });
     for (const g of groupStories(mine, lang)) {
       const hits = new Map();
@@ -887,8 +914,11 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
         const gn = norm(gv);
         let best = null;
         let bestSim = 0;
-        for (const { r, v, n } of lastDays) {
+        // (Another company's reports never join a company's story.)
+        const gReports = lang === 'zh' ? g.map(it => it.t).filter(reportOf) : [];
+        for (const { r, v, n, whose } of lastDays) {
           if (r.last < gFirst - GAP) continue;
+          if (whose && gReports.length && gReports.every(t => otherReport(t, whose))) continue;
           const sim = cosine(gv, gn, v, n);
           if (sim > bestSim) (bestSim = sim), (best = r);
         }
@@ -907,14 +937,27 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
         live.push(rec);
         recsHere.push(rec);
       }
+      const { owner: whose } = lang === 'zh' ? reportsOwner(rec.items.map(it => it.t)) : {};
       for (const it of g) {
         if (owner.has(it.u)) continue;
+        if (whose && otherReport(it.t, whose)) continue;
         rec.items.push(keepOf(it));
         owner.set(it.u, rec);
       }
     }
     const sized = recsHere.map(r => {
       r.items.sort((a, b) => a.at - b.at);
+      // One company's report is never another's story (Jay 11-10): a story
+      // holding several companies' keeps its owner's, a day's reports one
+      // each none (11-12: 日月光's held 中華電's and 台灣大's October). Let go,
+      // they're grouped again, apart, at the next build.
+      if (lang === 'zh') {
+        const { owner: whose, mixed } = reportsOwner(r.items.map(it => it.t));
+        if (mixed) {
+          r.items = r.items.filter(it => !otherReport(it.t, whose));
+          if (!enough(new Set(r.items.map(it => it.o)), region)) return (r.items = []), null;
+        }
+      }
       if (r.items.length > REC_ITEMS) r.items = [...r.items.slice(0, 10), ...r.items.slice(10 - REC_ITEMS)];
       let vs = r.items.map(vecOf);
       let c = sumOf(vs);
@@ -935,7 +978,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
         }
       }
       return { r, vs, c, cn: norm(c), first: r.items[0]?.at || now, last: r.items.at(-1)?.at || now };
-    });
+    }).filter(Boolean);
     const clipsOf = matchClips(vids.filter(v => OUTLETS[v.o]?.region === region), sized, vecOf, lang);
     // (The world's stories: Taiwan's outlets' on each, from Taiwan's front.)
     const twOn = region === 'intl' ? taiwanOn(out.tw, sized, vecOf) : new Map();
@@ -961,6 +1004,8 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
       .slice(0, PAST_TOP[region])
       .map(({ score, light, items: list, ...s }) => ({ ...s, items: list.filter((x, i) => list.findIndex(y => y[0] === x[0]) === i) }));
   }
+  // (A story whose headlines were all let go is kept no more.)
+  out.recs = out.recs.filter(r => r.items.length);
   return out;
 }
 

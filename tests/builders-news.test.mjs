@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ALTS, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed } from '../builders/news.js';
+import { ALTS, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -490,4 +490,35 @@ test('a headline chained into a story it shares nothing with is let go (11-12: H
   assert.ok(!kept.includes(stray.u));
   assert.equal(kept.length, 6);
   assert.equal(out.tw[0].n, 6);
+});
+
+test("a kept story of several companies' reports keeps its owner's alone (11-12: 日月光's held 中華電's and 台灣大's October)", () => {
+  const T = NOW - 6 * H;
+  const at = i => T + i * 10 * 60_000;
+  const own = [
+    item('udn', '聯發科10月營收550.26億元 月減0.67%', at(0)),
+    item('ctinews', '聯發科10月營收550.26億元！AI、ASIC助力Q4挑戰新高', at(1)),
+    item('technews', '聯發科 10 月營收年增 5.8% 達 550.25 億元', at(2)),
+    item('tvbs', '聯發科10月營收創同期新高 連3個月突破500億', at(3))
+  ];
+  const others = [item('newtalk', '中華電10月營收237.5億元創同期新高 EPS達0.46元', at(4)), item('cna', '台灣大10月每股賺0.48元 重回電信三雄EPS王', at(5)), item('ltn', '日月光投控10月營收886億元 再創新高', at(6))];
+  const day = [item('udn', '辣椒財報／前三季每股賺4.94元', at(0)), item('ltn', '智邦財報／前三季每股大賺58.09元', at(1)), item('cna', '豆府前三季每股賺12.21元 創歷年同期新高', at(2)), item('tvbs', '緯創Q3每股賺5.74元創單季新高', at(3))];
+  const keep = list => list.map(({ o, t, u, at }) => ({ o, t, u, at }));
+  const recs = [
+    { id: 'mtk', r: 'tw', first: T, last: at(6), peak: 7, items: keep([...own, ...others]) },
+    { id: 'day', r: 'tw', first: T, last: at(3), peak: 4, items: keep(day) }
+  ];
+  const out = deskOf([...own, ...others, ...day], recs, T + 2 * H);
+  const mtk = out.recs.find(r => r.id === 'mtk');
+  assert.deepEqual(mtk.items.map(it => it.u).sort(), own.map(it => it.u).sort());
+  // (A day's reports, one company each: no story.)
+  assert.equal(out.recs.find(r => r.id === 'day'), undefined);
+  assert.ok(!out.tw.some(s => s.items.some(x => /辣椒|智邦|豆府|緯創/.test(x[1] || ''))), 'no story of the day\'s reports');
+  // Owner-less mixed reports, one company's alone, a non-report: as they are.
+  assert.equal(reportOf('陽明Q3賺逾半個股本 EPS 5.32元'), '陽明');
+  assert.equal(reportOf('日月光投控連4個月營收創高'), '日月光投控');
+  assert.equal(reportOf('獲利亮眼！元大金前十月EPS 4.3元 中信金3.45元'), '元大金');
+  assert.equal(reportOf('卓榮泰不副署老福法'), '');
+  assert.deepEqual(reportsOwner(['中信金前10月EPS 3.45元', '中信金前10月賺685.5億', '獲利亮眼！元大金前十月EPS 4.3元 中信金3.45元']), { owner: '中信金', mixed: true });
+  assert.equal(otherReport('獲利亮眼！元大金前十月EPS 4.3元 中信金3.45元', '中信金'), false);
 });
