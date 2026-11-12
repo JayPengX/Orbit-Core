@@ -98,3 +98,10 @@ test('admin: 工具’s shortcut grid holds 工具’s own six cards (現在在�
   assert.equal(places.length, 6);
   for (const [, , to] of places) assert.ok(page.includes(`id="${to}"`), to);
 });
+
+test('admin: 總覽’s 14-day chart and TDX’s are drawn at their own width, words 10.5–12 px on any screen', () => {
+  assert.match(page, /const chartWidth = \(svg, H, fallback\) => \{/);
+  assert.match(page, /const H = 170, W = chartWidth\(svg, H, 700\)/);
+  assert.match(page, /const H = 150, W = chartWidth\(\$\('tdx-chart'\), H, 360\)/);
+  assert.doesNotMatch(page, /font-size="18"/);
+});
