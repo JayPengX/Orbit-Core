@@ -266,7 +266,8 @@
   .omni-out { position: absolute; left: 12px; right: 12px; top: calc(100% - 4px); max-height: min(70vh, 560px); overflow: auto; padding: 6px; border-radius: 18px; background: var(--q-elevated); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28), 0 0 0 0.5px var(--q-divider); }
   .omni-out h4 { margin: 8px 10px 4px; color: var(--q-muted); font-size: 12px; font-weight: 600; }
   .hit { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 10px; border-radius: 12px; background: none; color: var(--q-text); font-weight: 600; text-align: left; white-space: normal; }
-  .hit > span:not(.q-tile) { flex: 1 1 0; min-width: 0; }
+  .hit > span:not(.q-tile):not(.av) { flex: 1 1 0; min-width: 0; }
+  .hit > .av { flex: none; }
   .hit small { display: block; overflow: hidden; color: var(--q-muted); font-size: 12.5px; font-weight: 400; white-space: nowrap; text-overflow: ellipsis; }
   .hit em { flex: none; font-style: normal; color: var(--q-muted); font-variant-numeric: tabular-nums; }
   .hit:hover, .hit.on { background: var(--q-fill-3); }
@@ -1215,7 +1216,7 @@ async function omniDraw() {
   const pass = asPass(raw);
   if (pass) hits.push({ group: 'Orbit Pass', html: `${tileHtml(ic('key'), '#0d9488', 'sm')}<span>用這組 Pass 找帳戶<small>${escHtml(pretty(pass))}</small></span>`, run: () => findPass(pass).then(() => $('find-error').textContent && (show('accounts'), ($('search').value = raw), drawWallets())) });
   const accts = wallets.filter(w => matches(w, q)).sort((a, b) => lastOf(b) - lastOf(a));
-  for (const w of accts.slice(0, 6)) hits.push({ group: '帳戶', html: `<span class="av" style="--t:${refColor(w.ref)};width:32px;height:32px;border-radius:9px;display:grid;place-items:center;color:#fff;font:700 12px ui-monospace,monospace;background:${refColor(w.ref)}">${escHtml(w.ref.slice(0, 2).toUpperCase())}</span><span><span class="mono">${escHtml(w.ref)}</span><small>${escHtml(w.apps.map(appName).join('、') || '還沒用過')}</small></span><em>${escHtml(money(w.balance))}</em>`, run: () => openAccount(w.ref) });
+  for (const w of accts.slice(0, 6)) hits.push({ group: '帳戶', html: `<span class="av" style="--t:${refColor(w.ref)};width:32px;height:32px;border-radius:9px;display:grid;place-items:center;color:#fff;font:700 12px ui-monospace,monospace;background:${refColor(w.ref)}">${escHtml(w.ref.slice(0, 2).toUpperCase())}</span><span><span class="mono">${escHtml(w.ref)}</span><small>${escHtml(w.apps.map(k => BRANDS[k]?.short || appName(k)).join('、') || '還沒用過')}</small></span><em>${escHtml(money(w.balance))}</em>`, run: () => openAccount(w.ref) });
   if (accts.length > 6) hits.push({ group: '帳戶', html: `${tileHtml(ic('list'), '#64748b', 'sm')}<span>全部 ${accts.length} 個符合的帳戶</span>`, run: () => (show('accounts'), ($('search').value = raw), drawWallets()) });
   if (/^[0-9a-f]{6,8}$/.test(q) && !accts.length) hits.push({ group: '帳戶', html: `${tileHtml(ic('user'), '#64748b', 'sm')}<span>打開帳戶 ${escHtml(q)}</span>`, run: () => openAccount(q) });
   for (const [k, n] of Object.entries(APPS)) if (n.toLowerCase().includes(q) || k.includes(q)) hits.push({ group: 'App', html: `${appIc(k).replace('app-ic', 'app-ic" style="width:32px;height:32px')}<span>${escHtml(n)} 的帳戶<small>${wallets.filter(w => w.apps.includes(k)).length} 個用過</small></span>`, run: () => (show('accounts'), ($('search').value = n), drawWallets()) });
