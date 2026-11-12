@@ -112,8 +112,8 @@ export function pill(opener = () => openTester()) {
   if (!words.length) return;
   const b = h('button', { class: 'q-test-pill', type: 'button', 'aria-label': T('測試工具', 'Tester tools'), onclick: () => opener() }, [h('span', { 'aria-hidden': 'true', text: '🧪' }), h('span', { class: 'q-test-pill-text', text: words.join(' · ') })]);
   document.body.append(b);
-  // The clock's minutes go on.
-  if (state().clock?.off) setInterval(() => b.isConnected && (b.lastChild.textContent = summary().join(' · ')), 20_000);
+  // The clock's minutes go on (a fast clock's as often as they change: 10× is a minute in 6 s).
+  if (state().clock?.off) setInterval(() => b.isConnected && (b.lastChild.textContent = summary().join(' · ')), Math.max(1000, 20_000 / (state().clock.rate || 1)));
 }
 
 const btn = (text, onclick, cls = 'q-chip') => h('button', { class: cls, type: 'button', text, onclick });
