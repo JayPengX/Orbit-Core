@@ -1305,7 +1305,7 @@ export function pagesToRead(out, pages, most = PAGE_READS, clipMost = CLIP_READS
 // Most of Taiwan's outlets refuse Cloudflare's reads of their articles, so
 // GitHub Actions reads them (tools/news-clips.mjs, news-clips.yml, started
 // by newsClips when its last finds are 15 minutes old) and writes
-// NEWS_CLIPS: { at, pages: { url: { y, v?, at } }, shorts: { id: ±when } }
+// NEWS_CLIPS: { at, pages: { url: { y, v?, i?, at, f? } }, shorts: { id: ±when } }
 // (pageOf's clips, Shorts left out). A build takes each page's clips where
 // it read none of its own.
 export const NEWS_CLIPS = 'news/clips.json';
@@ -1329,14 +1329,15 @@ export function clipsToRead(index, done = {}, { most = 80, each = 14 } = {}) {
   }
   return want;
 }
-// A GitHub run's finds into the build's pages: each page's clips where the
-// build has none of its own (its picture stays the build's).
+// A GitHub run's pages into the build's: each page's clips where the build
+// has none of its own (its picture the build's where it has one). Those
+// without a clip too: an outlet's pages read elsewhere tell its box from a
+// story's own clip (sameOf). One that wouldn't answer (`f`) stays out.
 export function withClips(pages, found) {
   for (const [u, p] of Object.entries(found?.pages || {})) {
     const mine = pages[u];
-    if (mine && (mine.y?.length || mine.v?.length)) continue;
-    if (!p?.y?.length && !p?.v?.length) continue;
-    pages[u] = { i: mine?.i || '', y: (p.y || []).filter(id => /^[\w-]{11}$/.test(id)), ...(p.v?.length ? { v: p.v } : {}) };
+    if (!p || p.f || (mine && (mine.y?.length || mine.v?.length))) continue;
+    pages[u] = { i: mine?.i || (/^https:\/\//.test(p.i || '') ? p.i : ''), y: (p.y || []).filter(id => /^[\w-]{11}$/.test(id)), ...(p.v?.length ? { v: p.v } : {}) };
   }
   return pages;
 }
