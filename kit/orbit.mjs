@@ -1609,10 +1609,12 @@ function syncThemeColor() {
   const colour = getComputedStyle(bar).backgroundColor;
   if (!colour || /^rgba\(.*,\s*0\)$|^transparent$/.test(colour)) return;
   const metas = [...document.querySelectorAll('meta[name="theme-color"]')];
-  const meta = metas[0] || document.head.appendChild(Object.assign(document.createElement('meta'), { name: 'theme-color' }));
-  metas.slice(1).forEach(m => m.remove());
-  meta.removeAttribute('media');
-  if (meta.content !== colour) meta.content = colour;
+  if (metas.length === 1 && !metas[0].media && metas[0].content === colour) return;
+  // (A new tag, not the old one's content changed: iOS Safari, on the
+  // Simulator, kept the first colour when only the content changed, so a
+  // switch to dark left a light strip above a dark page.)
+  metas.forEach(m => m.remove());
+  document.head.appendChild(Object.assign(document.createElement('meta'), { name: 'theme-color', content: colour }));
 }
 // Back at once if an app redraws its body (innerHTML) and takes it away.
 function keepStatusStrip() {
