@@ -40,7 +40,8 @@
 //     [['MM-DD', headlines]], sides: { g, c, b } (or l, c, r), blind: 'g' |
 //     'b' | 'l' | 'r' | '' (the side that carries none of a story the other
 //     side carries widely; only a topic sides take: TOPICS' spectrum),
-//     parties: ['g','b','w'], topics: ['pol'…], imp,
+//     parties: ['g','b','w'], topics: ['pol'…], imp, live (快訊: outlets
+//     on it in the last 2 hours, only while it's breaking),
 //     clips: [[outlet, youtubeId, url, title, picture]] (a YouTube clip, or
 //     an outlet's own video page when the id is ''),
 //     items: [[outlet, title, url, at, video?]] }  (each outlet's newest first).
@@ -621,6 +622,10 @@ export const MERGE = { zh: 0.36, en: 0.3 };
 // An English summary's words count for this much of a headline's.
 const SUM_WEIGHT = 0.4;
 const GAP = 24 * HOUR;
+// 快訊: outlets on a story in the last BURST, a new one's (LIVE_NEW) or an old one's new turn's (LIVE_TURN).
+export const BURST = 2 * HOUR;
+export const LIVE_NEW = 7;
+export const LIVE_TURN = 10;
 
 const add = (v, k, x) => v.set(k, (v.get(k) || 0) + x);
 
@@ -817,6 +822,11 @@ export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, i
   const wrote = [...per.values()].reduce((a, b) => a + b, 0);
   const weight = kinds[0]?.weight ?? 1;
   const imp = (n + 2 * Math.log2(wrote) + 1.5 * Math.min(days.size - 1, 6)) * (sides[left] && sides[right] ? 1.2 : 1) * (1 - light * 0.7) * weight;
+  // 快訊 (breaking, Jay 11-12: 黃仁勳's going sat 19th for an hour): many
+  // outlets on it in the last 2 hours, a story new within 4 hours or a big
+  // new turn of an old one (news, not a game or a show); ranked up while it lasts.
+  const heat = byOutlet.size && [...byOutlet.values()].filter(list => (list[0].at || now) >= now - BURST).length;
+  const live = weight >= 1 && light < 0.3 && ((heat >= LIVE_NEW && now - first <= 4 * HOUR) || heat >= LIVE_TURN);
   return {
     id: idOf(items.reduce((a, b) => ((a.at || 0) <= (b.at || 0) ? a : b)).u),
     title: cleanTitle(lead.t),
@@ -841,7 +851,8 @@ export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, i
     clips: clips.slice(0, 4),
     items: [...byOutlet.values()].flat().map(it => [it.o, cleanTitle(it.t), it.u, it.at || now, ...(it.v ? [1] : [])]),
     // (Ranked on the front page by importance fading by half in 36 hours.)
-    score: imp * 0.5 ** ((now - at) / (36 * HOUR)),
+    score: imp * 0.5 ** ((now - at) / (36 * HOUR)) * (live ? 1 + 0.12 * (Math.min(heat, 12) - 2) : 1),
+    ...(live ? { live: heat } : {}),
     light
   };
 }
