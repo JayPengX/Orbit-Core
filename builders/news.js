@@ -754,10 +754,13 @@ export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, i
     const p = pages[it.u]?.i;
     return [it.img && same.feedPic(it.o, it.img) && [bigPicture(it.img), it.o], p && same.pagePic(it.o, p) && [p, it.o]];
   });
-  // The story's clips: each outlet's own YouTube clip on its page, or its
-  // video page (played on the outlet's site), newest first, one a clip.
-  // (A page's video of its own player: the report played on its site.)
+  // The story's clips: each outlet's own YouTube clip on its page, then the
+  // channels' clips matched to it (matchClips), newest first; the outlets'
+  // own video pages (played on their sites) only after those, should room be
+  // left (Jay 11-13: a world story's 8 video pages had kept every channel
+  // clip out, and none played here).
   const clips = [];
+  const own = [];
   const ids = new Set();
   const mine = new Set(items.map(it => it.u));
   for (const it of newest) {
@@ -766,17 +769,19 @@ export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, i
       ids.add(id);
       clips.push([it.o, id, it.u, cleanTitle(it.t), ytPicture(id)]);
     }
-    const own = !y.length && (it.v || (pages[it.u]?.v || []).some(u => same.clip(it.o, u, mine)));
-    if (own) clips.push([it.o, '', it.u, cleanTitle(it.t), bigPicture(it.img || pages[it.u]?.i || '')]);
+    if (!y.length && (it.v || (pages[it.u]?.v || []).some(u => same.clip(it.o, u, mine)))) own.push([it.o, '', it.u, cleanTitle(it.t), bigPicture(it.img || pages[it.u]?.i || '')]);
   }
-  // Then the channels' clips matched to it (matchClips), newest first.
   for (const v of [...vids].sort((x, z) => z.at - x.at)) {
     if (ids.has(v.y) || clips.length >= CLIPS_MAX) continue;
     ids.add(v.y);
     clips.push([v.o, v.y, `https://www.youtube.com/watch?v=${v.y}`, clipTitle(v.t), ytPicture(v.y)]);
   }
-  // (Those that play here first, then the outlets' own video pages.)
-  clips.sort((a, b) => Boolean(b[1]) - Boolean(a[1]));
+  // (Each outlet's first before any outlet's second: many voices, not one
+  // channel's six takes.)
+  const turn = new Map();
+  const seen = clips.map(c => turn.set(c[0], (turn.get(c[0]) || 0) + 1).get(c[0]));
+  const played = clips.map((c, i) => [c, seen[i], i]).sort((a, b) => a[1] - b[1] || a[2] - b[2]).map(x => x[0]);
+  clips.splice(0, clips.length, ...played, ...own);
   // (A thumbnail's size, The Guardian's 140 kept from before, only when no other.)
   const withImg = pics.find(p => p && !SMALL_PIC.test(p[0])) || pics.find(Boolean) || (clips[0]?.[4] && [clips[0][4], clips[0][0]]);
   // Others to show should a phone fail to load it (an outlet that refuses
@@ -848,7 +853,7 @@ export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, i
     parties,
     topics,
     imp: Math.round(imp * 10) / 10,
-    clips: clips.slice(0, 4),
+    clips: clips.slice(0, CLIPS_SHOWN),
     items: [...byOutlet.values()].flat().map(it => [it.o, cleanTitle(it.t), it.u, it.at || now, ...(it.v ? [1] : [])]),
     // (Ranked on the front page by importance fading by half in 36 hours.)
     score: imp * 0.5 ** ((now - at) / (36 * HOUR)) * (live ? 1 + 0.12 * (Math.min(heat, 12) - 2) : 1),
@@ -907,14 +912,23 @@ const keepOf = ({ o, t, u, at, d, img, v }) => ({ o, t, u, at, ...(d ? { d } : {
 // Each channel clip to the kept story its title is nearest: near enough
 // (CLIP_NEAR, the title against the story's middle), from a day before its
 // first headline to a day after its last. → Map(rec → clips).
+// (Or a little less near the middle but near one of its headlines too,
+// CLIP_LOOSE: a channel's title runs long with its own words, 寶林茶室's
+// 「婦:終身洗腎沒賠償?!」, and a big story's middle is wide; Jay 11-13 "a lot of
+// news only got a few video". Both must hold: a headline alone took
+// 蔣萬安's campaign clip to another 沈伯洋 story.)
 export const CLIP_NEAR = { zh: 0.24, en: 0.28 };
+export const CLIP_LOOSE = { zh: [0.15, 0.17], en: [0.2, 0.4] };
 const CLIPS_MAX = 8;
+// (A story's clips shown: its sheet's row scrolls.)
+export const CLIPS_SHOWN = 6;
 function matchClips(vids, sized, vecOf, lang) {
   const out = new Map();
   if (!vids.length || !sized.length) return out;
   // (Which stories each piece is in: a clip is weighed against those only.)
   const by = new Map();
   for (const x of sized) for (const k of x.c.keys()) (by.get(k) || by.set(k, []).get(k)).push(x);
+  const [looseMid, looseHead] = CLIP_LOOSE[lang];
   for (const v of vids) {
     const vv = vecOf({ t: clipTitle(v.t) });
     if (vv.size < 2) continue;
@@ -923,12 +937,21 @@ function matchClips(vids, sized, vecOf, lang) {
     for (const k of vv.keys()) for (const x of by.get(k) || []) near.add(x);
     let best = null;
     let bestSim = 0;
+    let loose = null;
+    let looseBy = 0;
     for (const x of near) {
       if (v.at < x.first - 24 * HOUR || v.at > x.last + 24 * HOUR) continue;
       const sim = cosine(vv, vn, x.c, x.cn);
       if (sim > bestSim) (bestSim = sim), (best = x.r);
+      if (sim < looseMid || sim >= CLIP_NEAR[lang]) continue;
+      // (Its nearest headline, asked only of a story already this near.)
+      x.ns ||= x.vs.map(norm);
+      let head = 0;
+      for (let i = 0; i < x.vs.length; i++) head = Math.max(head, cosine(vv, vn, x.vs[i], x.ns[i]));
+      if (head >= looseHead && sim + head > looseBy) (looseBy = sim + head), (loose = x.r);
     }
-    if (best && bestSim >= CLIP_NEAR[lang]) (out.get(best) || out.set(best, []).get(best)).push(v);
+    const to = best && bestSim >= CLIP_NEAR[lang] ? best : loose;
+    if (to) (out.get(to) || out.set(to, []).get(to)).push(v);
   }
   return out;
 }

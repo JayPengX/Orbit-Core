@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ALTS, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN } from '../builders/news.js';
+import { ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -663,4 +663,43 @@ test("the pages that refuse Cloudflare are read on GitHub: which, and their clip
   files.set(NEWS_CLIPS, { at: NOW + 6 * 60_000, pages: { a: {} } });
   assert.deepEqual(await newsClips({ store, env: { GH_ACTIONS_TOKEN: 't' }, now: NOW + 20 * 60_000, fetchImpl }), { found: 1, age: 14 });
   assert.equal(calls.length, 1);
+});
+
+test('a story\'s clips: those that play here before the outlets\' own video pages, each outlet once before twice (Jay 11-13: few videos)', () => {
+  const t = 'Nvidia CEO Jensen Huang resigns after affair';
+  // (A world story whose outlets put up 8 video pages of their own: the
+  // channels' clips matched to it still come in, and lead.)
+  const items = ['cnn', 'bloomberg', 'aljazeera', 'nbc', 'abc', 'cbs', 'sky', 'fox'].map((o, i) => item(o, `${t} ${i}`, NOW - (i + 1) * H, { v: 1 }));
+  const vids = [
+    { o: 'cbs', y: 'CBS00000001', t, at: NOW - H },
+    { o: 'cbs', y: 'CBS00000002', t, at: NOW - 2 * H },
+    { o: 'cbs', y: 'CBS00000003', t, at: NOW - 3 * H },
+    { o: 'sky', y: 'SKY00000001', t, at: NOW - 4 * H },
+    { o: 'ap', y: 'AP000000001', t, at: NOW - 5 * H }
+  ];
+  const s = storyOf(items, 'intl', NOW, { vids });
+  assert.equal(s.clips.length, CLIPS_SHOWN);
+  assert.deepEqual(s.clips.slice(0, 5).map(c => c[1]), ['CBS00000001', 'SKY00000001', 'AP000000001', 'CBS00000002', 'CBS00000003']);
+  // (Then the outlets' own, played on their sites.)
+  assert.deepEqual(s.clips.slice(5).map(c => [c[0], c[1]]), [['cnn', '']]);
+});
+
+test('a channel\'s clip a little off a big story\'s middle still finds it when one of its headlines is near too (CLIP_LOOSE)', () => {
+  assert.ok(CLIP_LOOSE.zh[0] < CLIP_NEAR.zh && CLIP_LOOSE.en[0] < CLIP_NEAR.en);
+  const T = NOW - 6 * H;
+  // (A story of many takes on 寶林茶室's verdict: a channel's clip, long with
+  // its own words, sits off its middle.)
+  const heads = ['寶林茶室案一審宣判 負責人遭判1年10月', '寶林茶室中毒釀6死判決出爐 負責人判1年10月', '寶林茶室毒粿條案宣判 家屬不滿輕判', '寶林茶室案判決 倖存者哽咽太不公平', '米酵菌酸中毒案宣判 寶林茶室負責人判刑', '寶林茶室案一審 檢方將上訴'];
+  const items = ['cna', 'udn', 'ltn', 'tvbs', 'setn', 'chinatimes'].map((o, i) => item(o, heads[i], T + i * 10 * 60_000));
+  const vids = [
+    // (0.23 off the middle, 0.20 off its 倖存者 headline: taken.)
+    { o: 'ctinews', y: 'CTI00000001', t: '寶林茶室案判決 倖存者哽咽!? 婦:終身洗腎沒賠償?! 20261112', at: T + H },
+    // (0.15 off the middle, no headline near: left out.)
+    { o: 'ctinews', y: 'CTI00000002', t: '寶林茶室 倖存者哽咽太不公平!? 婦:終身洗腎沒賠償?! 店長無罪 20261112', at: T + H },
+    { o: 'ctinews', y: 'CTI00000003', t: '颱風明天登陸 全台嚴防豪雨', at: T + H }
+  ];
+  const out = deskOf(items, [], NOW, { vids });
+  const s = out.tw.find(x => x.title.includes('寶林'));
+  assert.ok(s, 'the story');
+  assert.deepEqual(s.clips.map(c => c[1]), ['CTI00000001']);
 });
