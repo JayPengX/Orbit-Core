@@ -99,10 +99,22 @@
     var own = function (u) {
       return /\/(Orbit-Core\/kit|kit)\/|version\.json/.test(u) && !/\/api\//.test(u);
     };
+    // Off: the app's own files (its word list, its data folder) answered as a
+    // phone with no connection gets them, from what the service worker kept,
+    // never straight from the network (Orbit Words opened on 單字表沒有載入).
+    var offline = function (input) {
+      var gone = new TypeError('Failed to fetch (測試工具：離線)');
+      var u = new URL(String((input && input.url) || input || ''), location.href);
+      if (u.origin !== location.origin || /\/api\//.test(u.pathname) || !window.caches) return Promise.reject(gone);
+      return caches.match(input).then(function (r) {
+        if (r) return r;
+        throw gone;
+      });
+    };
     window.fetch = function (input, init) {
       var u = String((input && input.url) || input || '');
       if (own(u)) return realFetch(input, init);
-      if (net === 'off') return Promise.reject(new TypeError('Failed to fetch (測試工具：離線)'));
+      if (net === 'off') return offline(input);
       if (net === 'fail') return Promise.resolve(new Response(JSON.stringify({ error: 'tester', message: '測試工具：讀取失敗' }), { status: 503, headers: { 'content-type': 'application/json' } }));
       return new Promise(function (ok) {
         setTimeout(ok, 8000);
