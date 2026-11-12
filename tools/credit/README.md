@@ -16,4 +16,5 @@ into `out/<job>.jsonl`. Locally: `node jobs/<job>.mjs size` guesses the cost wit
 | 8b-articles | Sonnet 5.5 | The next 3,500 articles of those laws, the same way |
 | 2a-run | each feature's own Claude model | Every AI feature's examples answered as live |
 | 2b-review | Opus 5.5 | Each feature reviewed on those answers: findings, exact prompt edits, new examples |
+| 2c-run, 2d-review | as 2a, 2b | 2a and 2b again on 11-12's prompts (the stabilize week's real-answer check) |
 | 1-gold | Sonnet 5.5 | Job 5's 3,706 questions checked against their articles' text: Law's test set |
