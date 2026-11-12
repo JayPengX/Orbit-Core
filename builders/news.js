@@ -1297,14 +1297,16 @@ export function pagesToRead(out, pages, most = PAGE_READS, clipMost = CLIP_READS
 // it read none of its own.
 export const NEWS_CLIPS = 'news/clips.json';
 // The pages a GitHub run reads: every clip outlet's report on Taiwan's
-// stories with fewer than 2 clips, top stories first, not read before;
+// stories with fewer than 2 clips, top stories first, not read before
+// (華視's refuses a reader asking fast: asked again later);
 // `most` a run, `each` an outlet (a site that's asked too fast refuses: 華視).
 export function clipsToRead(index, done = {}, { most = 80, each = 14 } = {}) {
   const want = [];
   const per = new Map();
   for (const s of index?.tw || []) {
     if ((s.clips || []).filter(c => c[1]).length >= 2) continue;
-    const its = (s.items || []).filter(([o, , u]) => CLIPS_AT.includes(o) && !done[u] && !want.includes(u)).sort((a, b) => CLIPS_AT.indexOf(a[0]) - CLIPS_AT.indexOf(b[0]));
+    // (A page that wouldn't answer, `f` times, is asked again in a later run, 3 times at most.)
+    const its = (s.items || []).filter(([o, , u]) => CLIPS_AT.includes(o) && !(done[u] && !(done[u].f < 3)) && !want.includes(u)).sort((a, b) => CLIPS_AT.indexOf(a[0]) - CLIPS_AT.indexOf(b[0]));
     for (const [o, , u] of its) {
       if ((per.get(o) || 0) >= each) continue;
       per.set(o, (per.get(o) || 0) + 1);
