@@ -81,6 +81,7 @@ export function summary(t = state()) {
   const out = [];
   if (t.clock?.off) out.push(shortWhen(new Date(realNow() + t.clock.off)));
   if (t.place) out.push(en() ? t.place.en || t.place.name : t.place.name);
+  if (t.feed) out.push(T(`模擬行程${t.clock?.rate > 1 ? ` ${t.clock.rate} 倍速` : ''}`, `Trip replay${t.clock?.rate > 1 ? ` ×${t.clock.rate}` : ''}`));
   if (t.net === 'off') out.push(T('離線', 'Offline'));
   if (t.net === 'slow') out.push(T('網路慢', 'Slow'));
   if (t.net === 'fail') out.push(T('伺服器錯誤', 'Server errors'));
@@ -162,6 +163,25 @@ function placePart() {
         set({ name: T('自訂', 'Custom'), en: 'Custom', ...p });
       }, 'q-btn primary')
     ])
+  ];
+}
+
+// A trip replayed into the page's GPS (boot.js `feed`), started by an app's
+// own tool (Transit's 模擬行程): `fixes` [[got s, lat, lng, acc, at s]] from
+// `from` (the page's time it starts), the clock `rate` times as fast. The page reloads into it.
+export function playTrip({ from = Date.now(), fixes, rate = 1 }) {
+  const real = realNow();
+  save({ ...state(), on: 1, place: undefined, feed: { from, fixes }, clock: { off: from - real, rate, from: real } });
+}
+function feedPart() {
+  const t = state();
+  if (!t.feed) return [];
+  const n = t.feed.fixes?.length || 0;
+  const at = globalThis.ORBIT_TEST?.feedAt || 0;
+  return [
+    head(T('模擬行程', 'Trip replay')),
+    sub(at >= n ? T(`${n} 個位置都送完了`, `All ${n} fixes sent`) : T(`第 ${at} / ${n} 個位置${t.clock?.rate > 1 ? `，${t.clock.rate} 倍速` : ''}`, `Fix ${at} of ${n}${t.clock?.rate > 1 ? `, ×${t.clock.rate}` : ''}`)),
+    h('div', { class: 'q-chips wrap' }, [btn(T('停止模擬', 'Stop replay'), () => save({ ...state(), feed: undefined, clock: undefined }))])
   ];
 }
 
@@ -307,6 +327,7 @@ export function openTester(s = globalThis.ORBIT_TEST_SESSION) {
   const body = [
     words.length ? h('p', { class: 'q-test-now', text: T(`模擬中：${words.join(' · ')}`, `Changed: ${words.join(' · ')}`) }) : sub(T('只在這台裝置的這個 App 有效。測試時做的新增、修改照樣會存進你的 Orbit Pass。', 'This device and app only. What you add or change while testing is still saved to your Orbit Pass.')),
     ...appPart(s?.app),
+    ...feedPart(),
     ...clockPart(),
     ...placePart(),
     ...netPart(),
