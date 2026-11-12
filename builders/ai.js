@@ -14,6 +14,9 @@
 //            few batches a run until done (kept whole in private/ai/words-cards.json).
 //   sides    news/sides.json   { built, sides: { id: { sides: { g: { zh, en }… }, diff, m, at } } }
 //            各方怎麼說: how each side's outlets framed the day's top stories.
+//   brief    news/briefs.json  { built, briefs: { id: { points: [{ zh, en }], m, at } } }
+//            重點整理: a story's few points in our own words, from its outlets'
+//            headlines and feed summaries (Jay 11-13: reading kept in the app).
 //   sports   sports/recaps/<YYYY-MM-DD>.json  { built, games: { espnId: { line } } }
 //            賽後三句話's "why" line for each finished game (builders/recaps.js).
 //   preview  sports/previews/<YYYY-MM-DD>.json  { v, built, games: { '<league>:<id>': { points, who } } }
@@ -158,6 +161,66 @@ export async function newsSides({ store, env, ctx, cap, until, now = Date.now() 
   return { made, calls, kept: Object.keys(keep).length, ...(missed.length ? { missed: missed.slice(0, 6) } : {}) };
 }
 
+// ---- News: 重點整理, a story's points in our own words ----
+// The front's biggest stories (3 outlets or more), each made once and again
+// when its coverage has grown by half and 3 hours have passed. Told from
+// its outlets' headlines and the summaries their feeds gave (the builder's
+// 48 hours, private/news/items.json.gz); never an article.
+const NEWS_BRIEFS = 'news/briefs.json';
+export const BRIEFS_TOP = { tw: 24, intl: 14 };
+const BRIEFS_BATCH = 4;
+export const BRIEF_AGAIN = 3 * 3_600_000;
+// A story as the AI is told it: an outlet's headline once (10 at most) and
+// up to 6 outlets' summaries, each cut short.
+export function briefFacts(s, sums = new Map()) {
+  const seen = new Set();
+  const heads = [];
+  const said = [];
+  for (const [outlet, title, url] of s.items || []) {
+    if (seen.has(outlet)) continue;
+    seen.add(outlet);
+    if (heads.length < 10) heads.push(String(title).slice(0, 90));
+    const d = sums.get(url);
+    if (d && said.length < 6 && !said.includes(d)) said.push(String(d).slice(0, 200));
+  }
+  if (s.sum && !said.length) said.push(String(s.sum).slice(0, 200));
+  return { id: s.id, heads, sums: said };
+}
+export const briefWanted = s => (s.n || 0) >= 3;
+export async function newsBriefs({ store, env, ctx, cap, until, now = Date.now() }) {
+  const index = await store.json('news/index.json');
+  if (!index) return { skipped: 'no index' };
+  const was = (await store.json(NEWS_BRIEFS))?.briefs || {};
+  const front = ['tw', 'intl'].flatMap(r => (index[r] || []).filter(briefWanted).slice(0, BRIEFS_TOP[r]));
+  const keep = {};
+  const need = [];
+  for (const s of front) {
+    const old = was[s.id];
+    if (old && ((s.m || 0) < (old.m || 0) * 1.5 || now - (old.at || 0) < BRIEF_AGAIN)) keep[s.id] = old;
+    else need.push(s);
+  }
+  let made = 0, calls = 0;
+  const missed = [];
+  if (need.length && Date.now() < until) {
+    // (Each outlet's own summary, by its link, from the builder's kept headlines.)
+    const state = await store.json('private/news/items.json.gz').catch(() => null);
+    const sums = new Map((state?.items || []).filter(it => it?.u && it.d).map(it => [it.u, it.d]));
+    for (let i = 0; i < need.length && Date.now() < until; i += BRIEFS_BATCH) {
+      const batch = need.slice(i, i + BRIEFS_BATCH);
+      const r = await aiOnce(env, ctx, 'news-brief', { stories: batch.map(s => briefFacts(s, sums)) }, cap);
+      calls++;
+      if (!r) break;
+      if (r.error) missed.push(r.error);
+      else for (const s of batch) if (r.out?.[s.id]) ((keep[s.id] = { points: r.out[s.id], m: s.m || 0, at: now }), made++);
+        else missed.push(`dropped ${s.id}`);
+    }
+  }
+  // (An old one kept for a story still on the front that this run couldn't remake.)
+  for (const s of need) if (!keep[s.id] && was[s.id]) keep[s.id] = was[s.id];
+  await store.put(NEWS_BRIEFS, { built: now, briefs: keep });
+  return { made, calls, kept: Object.keys(keep).length, ...(missed.length ? { missed: missed.slice(0, 6) } : {}) };
+}
+
 // ---- Words: the list's study cards, made once ----
 const WORDS_BATCH = 25;
 export async function wordsCards({ store, env, ctx, cap, until, fetchImpl = fetch }) {
@@ -209,6 +272,7 @@ export async function runAi({ store, env, proxy, now = Date.now(), cap = async (
   };
   await step('news', 'news-lines', c => newsLines({ store, env, ctx, cap: c, until }));
   await step('sides', 'news-sides', c => newsSides({ store, env, ctx, cap: c, until, now }));
+  await step('brief', 'news-brief', c => newsBriefs({ store, env, ctx, cap: c, until, now }));
   await step('sports', 'sports-recap', c => runRecaps({ store, env, ctx, proxy, cap: c, now, until }));
   await step('preview', 'sports-preview', c => runPreviews({ store, env, ctx, proxy, cap: c, now, until }));
   await step('f1', 'f1-story', c => runF1Stories({ store, env, ctx, proxy, cap: c, now, until }));

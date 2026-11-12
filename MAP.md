@@ -132,7 +132,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | Rows | `list` / `cell` (grouped), `rowCard`, `section` / `sectionHead` / `sectionHtml`, `.q-list-head` |
 | The focal number | `.q-focus`, graphite; `heroCardHtml` only when the focus is an action; `stats` / `statsHtml`, `.q-fig` |
 | Colour on a card | `.q-band` (`--band`; `.q-band-mark`, `-text`, `-end`): a row inset on the colour of what it identifies (a team, a line, a category); never a card filled with the app's colour |
-| Small pieces | `tile` / `tileHtml`, `tag` / `tagHtml` (one exception per row), `.q-chip` (taps only), `toggle` (`.q-switch`), `.q-add` (an add row), `search`, `menu`, `.q-badge`, `progressRing`, `monthCalendar`, `rail`, `actionGrid`, `panelGrid`, `leagueTile`, `matchCard`, `liveStrip`, `stockRow`, `movePill`, `placeTile`, `ballRow` |
+| Small pieces | `tile` / `tileHtml`, `tag` / `tagHtml` (one exception per row), `.q-chip` (taps only), `toggle` (`.q-switch`), `followButton` (`.q-follow`: + 追蹤 / ✓ 追蹤中), `.q-add` (an add row), `search`, `menu`, `.q-badge`, `progressRing`, `monthCalendar`, `rail`, `actionGrid`, `panelGrid`, `leagueTile`, `matchCard`, `liveStrip`, `stockRow`, `movePill`, `placeTile`, `ballRow` |
 | Putting in order | `reorder(box, { onChange })`, a `grip()` / `gripHtml()` per row; `.q-row-open` for a row that also opens |
 | A list's more | `moreToggle`/`moreHtml` (`.q-more`): 再看 7 則 / 收起, one quiet bar (`less: null` pages); a way on `goBar`/`goHtml`; `summaryHtml`. Never accent links |
 | Nothing here | `empty({ icon, title, body, action })` / `emptyHtml` |
@@ -355,7 +355,7 @@ writing a file only when it changed (`builders/store.js`):
 | `news-markets.js` | `news/markets.json`: Polymarket's open markets beside the stories they're about (code finds, AI `news-markets` confirms; no Taiwan vote's in its 10 quiet days) | :14 :44 |
 | `tools/flight-pool.mjs` (`flight.yml`) | `flight/` | 10 min |
 | `tools/news-clips.mjs` (`news-clips.yml`) | `news/clips.json`: the clips in Taiwan's articles (those outlets refuse Cloudflare), taken into the stories by `news.js` | started by `newsClips` (15 min) |
-| `ai.js`, `recaps.js`, `previews.js`, `f1story.js`; `filings.js` | AI made once: `news/lines.json`, `sides.json`, `words/cards/`, `sports/` (`recaps/`, `previews/`, `f1/stories/`); 重大訊息 as rows: `stock/filings/` | :04 :24 :34 :54 |
+| `ai.js`, `recaps.js`, `previews.js`, `f1story.js`; `filings.js` | AI made once: `news/lines.json`, `sides.json`, `briefs.json` (重點整理), `words/cards/`, `sports/` (`recaps/`, `previews/`, `f1/stories/`); 重大訊息 as rows: `stock/filings/` | :04 :24 :34 :54 |
 
 A season is kept until the next one's first game.
 

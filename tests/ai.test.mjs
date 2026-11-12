@@ -163,3 +163,16 @@ test('every feature’s prompt fits its maxIn with its input at its longest', as
     }
   }
 });
+
+// 重點整理 (News, builders/ai.js newsBriefs): our own words, the outlets' numbers only.
+test('a story’s points keep only their own words and the material’s numbers', () => {
+  const stories = [{ id: 'a', heads: ['寶林茶室案一審宣判 負責人遭判1年10月'], sums: ['寶林茶室食物中毒案釀6人死亡，台北地方法院一審依過失致死罪判處負責人1年10月'] }];
+  const clean = raw => FEATURES['news-brief'].clean(raw, { stories });
+  const ok = { zh: '北院一審判負責人1年10月徒刑', en: 'The Taipei court gave the owner 1 year and 10 months.' };
+  const out = clean({ items: [{ id: 'a', points: [ok, { zh: '食物中毒案造成6人死亡', en: 'The food poisoning killed 6 people.' }] }] });
+  assert.equal(out.a.length, 2);
+  // (A number the material lacks, a copied run of the summary, Simplified Chinese: each point dropped; one left is too few.)
+  assert.equal(clean({ items: [{ id: 'a', points: [ok, { zh: '共有9人送醫', en: '9 were hospitalised.' }] }] }).a, undefined);
+  assert.equal(clean({ items: [{ id: 'a', points: [ok, { zh: '台北地方法院一審依過失致死罪判處負責人', en: 'Judged.' }] }] }).a, undefined);
+  assert.equal(clean({ items: [{ id: 'a', points: [ok, { zh: '负责人将上诉', en: 'The owner will appeal.' }] }] }).a, undefined);
+});
