@@ -66,3 +66,15 @@ test('admin: 現在在用’s priority passes are the account list’s own rows,
   assert.match(page, /<h3 class="door-pri-head">優先通行<\/h3><div class="q-rowcard">\$\{priority\.map\(p => acctItem\(/);
   assert.doesNotMatch(page, /el\('button', \{ class: 'link', text: p\.ref/);
 });
+
+test('admin: an action says what it did after the sheet redraws (a toast), and what the server would refuse is said before the check', () => {
+  assert.match(page, /import \{ icons, tileHtml, heroCardHtml, escHtml, toast \} from '\.\.\/kit\/ui\.mjs';/);
+  assert.match(page, /dialog\.addEventListener\('close', sayOn\);\nasync function openAccount\(ref\) \{\n  sayOn\(\);/);
+  assert.match(page, /if \(ok\.textContent !== '已取消'\) box\.saidAt = Date\.now\(\);/);
+  const reset = page.slice(page.indexOf("const reset = action('重置帳戶'"), page.indexOf('resetBtn.onclick'));
+  assert.ok(reset.indexOf('if (!asPass(pass.value)) throw') < reset.indexOf('await sure('), '重置: the pass first');
+  const grant = page.slice(page.indexOf("const grant = action('調整金額'"), page.indexOf('grantBtn.onclick'));
+  assert.ok(grant.indexOf('throw new Error(WHY.ADMIN_BAD_AMOUNT)') > 0 && grant.indexOf('throw new Error(WHY.ADMIN_BAD_AMOUNT)') < grant.indexOf('await sure('), '調整金額: the amount and reason first');
+  const del = page.slice(page.indexOf("const del = action('刪除帳戶'"), page.indexOf('delBtn.onclick'));
+  assert.ok(del.indexOf('if (confirmRef.value.trim() !== a.ref) throw new Error(WHY.ADMIN_CONFIRM);') < del.indexOf('await sure('), '刪除: the reference first');
+});

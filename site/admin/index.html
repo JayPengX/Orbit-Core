@@ -704,7 +704,7 @@
 <script type="importmap">{"imports":{"#kit/":"../kit/"}}</script>
 <script type="module">
 import { DEV, DEV_GROUPS, cleanDev, BRANDS, appIcon, familyMark, pathOf } from '../kit/brand.mjs';
-import { icons, tileHtml, heroCardHtml, escHtml } from '../kit/ui.mjs';
+import { icons, tileHtml, heroCardHtml, escHtml, toast } from '../kit/ui.mjs';
 import { API, DOMAIN } from '../kit/domain.mjs';
 import { passkeyName } from '../kit/passkey.mjs';
 import { SOURCES, SOURCE_BY_ID, GROUPS as SOURCE_GROUPS, freshAt, sourceState } from '../kit/sources.mjs';
@@ -1268,7 +1268,15 @@ $('tool-grid').innerHTML = PLACES.filter(p => p[5]).map(([name, , icon, color, ,
 const dialog = $('acct');
 $('acct-close').onclick = () => dialog.close();
 dialog.addEventListener('click', e => e.target === dialog && dialog.close());
+// An action's word (已入帳…, 已刪除…) when the sheet redraws or closes right after it, as most do within
+// a second: the kit's toast, or it was gone before it could be read.
+const sayOn = () => {
+  const b = [...$('acct-body').querySelectorAll('.action')].find(x => Date.now() - (x.saidAt || 0) < 5000);
+  if (b) (toast(b.querySelector('.ok').textContent), (b.saidAt = 0));
+};
+dialog.addEventListener('close', sayOn);
 async function openAccount(ref) {
+  sayOn();
   $('acct-title').textContent = `帳戶 ${ref}`;
   $('acct-body').replaceChildren(el('p', { class: 'muted', text: '載入中…' }));
   if (!dialog.open) dialog.showModal();
@@ -1287,6 +1295,7 @@ function action(title, text, controls, run) {
     await busy(btn, async () => {
       try {
         ok.textContent = (await run(...args)) || '完成';
+        if (ok.textContent !== '已取消') box.saidAt = Date.now();
       } catch (e) {
         err.textContent = e.message;
       }
@@ -1319,6 +1328,7 @@ function drawAccount(a) {
   const grantBtn = el('button', { class: 'primary', text: '入帳' });
   const grant = action('調整金額', '', [[amt], [note, grantBtn]], async () => {
     const v = Number(amt.value);
+    if (!v || !Number.isFinite(v) || Math.abs(v) > 1_000_000 || !note.value.trim()) throw new Error(WHY.ADMIN_BAD_AMOUNT);
     if (!(await sure(`${v >= 0 ? '加' : '扣'} ${money(Math.abs(v))} 給帳戶 ${a.ref}？`, { body: `原因：${note.value}`, ok: v >= 0 ? '入帳' : '扣款' }))) return '已取消';
     const r = await admin('grant', { wallet: a.ref, amount: v, note: note.value });
     setTimeout(reload, 900);
@@ -1355,6 +1365,8 @@ function drawAccount(a) {
   const resetBtn = el('button', { class: 'danger', text: '重置' });
   const reset = action('重置帳戶', '本人要求時（要他的 Pass）：保留 Pass 和勾選的 App，其他重來。無法復原。', [pass, resetBtn], async () => {
     const keep = keepBoxes.map(l => l.querySelector('input')).filter(i => i.checked).map(i => i.value);
+    // (What the server would refuse is said before the check, never after a 重置 that then fails.)
+    if (!asPass(pass.value)) throw new Error('先輸入他本人的 Orbit Pass（10 碼）。');
     if (!(await sure(`重置帳戶 ${a.ref}？`, { body: `保留：${keep.length ? keep.map(appName).join('、') : '無'}。無法復原。`, ok: '重置', danger: true }))) return '已取消';
     const r = await admin('reset', { passcode: pass.value, keep });
     setTimeout(reload, 900);
@@ -1393,6 +1405,7 @@ function drawAccount(a) {
   const confirmRef = el('input', { class: 'grow', autocomplete: 'off', placeholder: `輸入 ${a.ref} 確認` });
   const delBtn = el('button', { class: 'danger', text: '刪除' });
   const del = action('刪除帳戶', 'Pass、錢包、所有 App 的資料和通知都刪掉。無法復原，建議先匯出。', [confirmRef, delBtn], async () => {
+    if (confirmRef.value.trim() !== a.ref) throw new Error(WHY.ADMIN_CONFIRM);
     if (!(await sure(`永久刪除帳戶 ${a.ref}？`, { body: `餘額 ${money(a.balance)}。無法復原。`, ok: '刪除', danger: true }))) return '已取消';
     const r = await admin('delete', { wallet: a.ref, confirm: confirmRef.value.trim() });
     setTimeout(() => (dialog.close(), loadWallets(), loaded.delete('overview')), 900);
