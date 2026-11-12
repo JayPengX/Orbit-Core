@@ -143,3 +143,23 @@ test('a model\'s simplified characters are written as Taiwan\'s, and only those 
   assert.deepEqual(twChars({ zh: '熱刺Romero遭紅牌罚下，兵工厂', list: ['进球', 3], en: 'Arsenal' }), { zh: '熱刺Romero遭紅牌罰下，兵工厂', list: ['進球', 3], en: 'Arsenal' });
   assert.equal(twChars('皇后 頭髮 公里 台北'), '皇后 頭髮 公里 台北');
 });
+
+// Every prompt fits its own maxIn at its inputs' longest (11-12: 11-11's
+// longer prompts passed it, so 賽後三句話 and 賽前看點 threw on every real
+// game, each throw spending the day's count): a tap's input at its own caps,
+// a builder's facts at their builder's cut (recaps 2,400, previews 2,600, F1 2,400).
+test('every feature’s prompt fits its maxIn with its input at its longest', async () => {
+  const { EXAMPLES } = await import('../ai-fixtures.js');
+  const long = v => (typeof v === 'string' ? v.repeat(Math.ceil(4000 / Math.max(1, v.length))).slice(0, 4000) : Array.isArray(v) ? v.map(long) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, long(x)])) : v);
+  const built = { 'sports-recap': 2400, 'sports-preview': 2600, 'f1-story': 2400 };
+  for (const [name, f] of Object.entries(FEATURES)) {
+    for (const x of EXAMPLES[name] || []) {
+      let input = f.tap ? f.input?.(long(x.input)) : x.input;
+      if (built[name]) input = { ...x.input, facts: x.input.facts.repeat(4).slice(0, built[name]) };
+      if (!input) continue;
+      const parts = await f.parts(input, {});
+      const size = parts.reduce((n, p) => n + (p.text?.length || 0), 0);
+      assert.ok(size <= (f.maxIn || 12_000), `${name} (${x.name}): ${size} chars, maxIn ${f.maxIn}`);
+    }
+  }
+});

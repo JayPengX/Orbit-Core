@@ -122,7 +122,7 @@ export const FEATURES = {
     tap: true,
     models: ['haiku', 'luna'],
     effort: { luna: 'low' },
-    maxIn: 6000,
+    maxIn: 6800,
     perPass: 40,
     perMinute: 10,
     input(raw) {
@@ -170,7 +170,7 @@ export const FEATURES = {
     tap: true,
     models: ['haiku', 'luna'],
     effort: { luna: 'low' },
-    maxIn: 5000,
+    maxIn: 7000,
     perPass: 40,
     perMinute: 10,
     input(raw) {
@@ -352,7 +352,7 @@ export const FEATURES = {
     tap: true,
     models: ['luna', 'haiku'],
     effort: { luna: 'low' },
-    maxIn: 2000,
+    maxIn: 2300,
     perPass: 30,
     perMinute: 6,
     input(raw) {
@@ -418,7 +418,7 @@ export const FEATURES = {
     tap: true,
     models: ['haiku', 'luna'],
     effort: { luna: 'low' },
-    maxIn: 1500,
+    maxIn: 2700,
     perPass: 4,
     perMinute: 3,
     input(raw) {
@@ -588,7 +588,7 @@ export const FEATURES = {
   // can't write, from the game's own facts only, every number one of theirs.
   'sports-recap': {
     models: ['haiku', 'luna'],
-    maxIn: 3000,
+    maxIn: 5200,
     parts: ({ facts }) =>
       text(
         [
@@ -627,7 +627,7 @@ export const FEATURES = {
   'sports-preview': {
     models: ['haiku', 'luna'],
     effort: { luna: 'low' },
-    maxIn: 3200,
+    maxIn: 5400,
     parts: ({ facts }) =>
       text(
         [
@@ -675,7 +675,7 @@ export const FEATURES = {
   // cars. Every number must be the digest's.
   'f1-story': {
     models: ['haiku', 'luna'],
-    maxIn: 3000,
+    maxIn: 4600,
     parts: ({ facts }) =>
       text(
         [
@@ -730,7 +730,7 @@ export const FEATURES = {
     tap: true,
     models: ['luna', 'haiku'],
     effort: { luna: 'low' },
-    maxIn: 1200,
+    maxIn: 1600,
     perPass: 40,
     perMinute: 10,
     input(raw) {
@@ -793,7 +793,7 @@ export const FEATURES = {
     tap: true,
     models: ['haiku', 'luna'],
     effort: { luna: 'low' },
-    maxIn: 6000,
+    maxIn: 7000,
     perPass: 40,
     perMinute: 10,
     input(raw) {
@@ -834,7 +834,7 @@ export const FEATURES = {
     tap: true,
     shared: true,
     models: ['haiku', 'luna'],
-    maxIn: 2400,
+    maxIn: 5000,
     perPass: 40,
     perMinute: 8,
     input(raw) {
@@ -876,7 +876,7 @@ export const FEATURES = {
     app: 'stock',
     tap: true,
     models: ['haiku', 'luna'],
-    maxIn: 1200,
+    maxIn: 2600,
     perPass: 30,
     perMinute: 6,
     input(raw) {
