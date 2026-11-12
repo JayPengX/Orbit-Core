@@ -4,7 +4,7 @@
 //   node tools/preview.mjs <app> [hash…] [--out dir] [--width 390] [--height 844]
 //                          [--full] [--lang zh|en] [--dark] [--wait ms] [--click selector|js:code|xy:x,y]
 //                          [--type 'selector=text']  (fills a field after the clicks)
-//                          [--store 'key=value']  (a localStorage entry to start with)
+//                          [--store 'key=value']  (a localStorage entry to start with; a reload keeps the page's own)
 //                          [--geo lat,lon]  (where the phone is; Transit's default 新竹車站)
 //                          [--geo-path 'lat,lon;…' --geo-every ms]  (the phone moving, during --wait)
 //                          [--safari]  (opened in Safari, not from the home screen: the install screen)
@@ -687,7 +687,10 @@ if (device === 'ipad') await context.addInitScript(() => Object.defineProperty(N
 await context.addInitScript(
   ([refresh, lang, stores]) => {
     try {
-      for (const [k, v] of stores) localStorage.setItem(k, v);
+      // (Only as the page starts: a reload keeps what the page wrote since, as a phone
+      // would; a trip replayed by the tester reloads into its own clock and fixes.)
+      if (!sessionStorage.getItem('orbit.preview.seeded')) for (const [k, v] of stores) localStorage.setItem(k, v);
+      sessionStorage.setItem('orbit.preview.seeded', '1');
       if (refresh) localStorage.setItem('orbit.refresh', refresh);
       if (refresh) localStorage.setItem('orbit.account', '0123456789abcdef');
       localStorage.setItem('orbit.lang', lang);
