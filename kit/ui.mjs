@@ -1997,8 +1997,10 @@ export function leagueTile({ logo = '', name = '', sub = '', onOpen = null, data
 // its shadow, and past a third of the width, or flicked, it slides off and back() runs; short of
 // that it glides home. target(): the page to move (the screen's open page with a way back), or
 // null when there is nowhere to go back to (a tab's first screen). Never under an open sheet, a
-// field, or a row that scrolls sideways. Returns a function that stops it.
-export function edgeBack({ target, back, edge = 24 } = {}) {
+// field, or a row that scrolls sideways. within(): a page inside a sheet (Securities' 資格): the
+// sheet (or null when it has no inner page open), its own left edge, only while it is the top one.
+// Returns a function that stops it.
+export function edgeBack({ target, back, edge = 24, within = null } = {}) {
   if (typeof document === 'undefined' || !target || !back) return () => {};
   let el = null, x0 = 0, y0 = 0, t0 = 0, dx = 0, on = false;
   const clear = () => {
@@ -2010,7 +2012,11 @@ export function edgeBack({ target, back, edge = 24 } = {}) {
   };
   const down = e => {
     const t = e.touches?.[0];
-    if (!t || e.touches.length > 1 || t.clientX > edge || document.querySelector('dialog[open]')) return;
+    if (!t || e.touches.length > 1) return;
+    const root = within?.();
+    if (within) {
+      if (!root || !root.contains(e.target) || [...document.querySelectorAll('dialog[open]')].at(-1) !== root.closest('dialog') || t.clientX - root.getBoundingClientRect().left > edge) return;
+    } else if (t.clientX > edge || document.querySelector('dialog[open]')) return;
     if (e.target.closest?.('input, textarea, select, [contenteditable], [data-noswipe]')) return;
     const page = target();
     if (!page) return;
@@ -2040,7 +2046,7 @@ export function edgeBack({ target, back, edge = 24 } = {}) {
     if (!el) return;
     if (!on) return void (el = null);
     const page = el;
-    const w = innerWidth;
+    const w = page.getBoundingClientRect().width || innerWidth;
     const fast = dx / Math.max(1, performance.now() - t0) > 0.5 && dx > 40;
     const go = dx > w / 3 || fast;
     page.style.transition = `transform ${go ? 220 : 260}ms cubic-bezier(.2,.8,.2,1)`;
