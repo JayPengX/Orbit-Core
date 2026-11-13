@@ -78,7 +78,7 @@ export { F1Log } from './f1-live.js';
 // The door's Durable Object (door.js), bound as DOOR: who gets in when too many come at once.
 export { Door } from './door.js';
 import { doorOf, doorSlow, limitOf, graceShut, fullBody } from './door.js';
-import { makeRunner, runsInRunner, toRunner, tickRunner, partOf } from './runner.js';
+import { makeRunner, runsInRunner, toRunner, tickRunner, partOf, CRON_PARTS, SHARDS, RELAYS } from './runner.js';
 
 // ---- Bilingual error responses ----------------------------------------
 //
@@ -1493,7 +1493,13 @@ async function route(request, env, ctx, headers, origin) {
     // Today's D1 rows written by query and Durable Objects' time by namespace (guard.js useDetail).
     if (check === 'detail') {
       if (!env.GUARD) return json({ error: 'no guard' }, 200, headers);
-      return new Response(await (await env.GUARD.fetch('https://quota-guard/detail')).text(), { status: 200, headers: { ...headers, 'Content-Type': 'application/json' } });
+      const d = await (await env.GUARD.fetch('https://quota-guard/detail')).json().catch(e => ({ error: String(e?.message || e) }));
+      if (Array.isArray(d.objects) && env.RUNNER) {
+        const names = [...CRON_PARTS.map(p => `cron:${p}`), ...Array.from({ length: SHARDS }, (_, i) => `route:${i}`), ...Array.from({ length: RELAYS }, (_, i) => `relay:${i}`)];
+        const byId = Object.fromEntries(names.map(n => [env.RUNNER.idFromName(n).toString(), n]));
+        for (const o of d.objects) o.name = byId[o.id] || '';
+      }
+      return json(d, 200, headers);
     }
     if (check === 'cpu') {
       if (!env.GUARD) return json({ error: 'no guard' }, 200, headers);
