@@ -60,7 +60,9 @@ const FUND_BATCH = 40;
 // and the day's range move on (liveTw). Yahoo down, TWSE's alone.
 const MIS_URL = 'https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=';
 const MIS_BATCH = 40;
-const misChannel = symbol => `${/\.TWO$/i.test(symbol) ? 'otc' : 'tse'}_${symbol.replace(/\.TWO?$/i, '').toLowerCase()}.tw`;
+// The two indexes by MIS's own channels (加權指數 is also 台指期's and 選擇權's base).
+export const MIS_INDEX = { '^TWII': 'tse_t00.tw', '^TWOII': 'otc_o00.tw' };
+const misChannel = symbol => MIS_INDEX[symbol] || `${/\.TWO$/i.test(symbol) ? 'otc' : 'tse'}_${symbol.replace(/\.TWO?$/i, '').toLowerCase()}.tw`;
 export function misQuote(symbol, m, now = Date.now()) {
   const n = x => (Number(x) > 0 ? Number(x) : null);
   const best = s => n(String(s || '').split('_')[0]);
@@ -81,7 +83,7 @@ export function misQuote(symbol, m, now = Date.now()) {
     symbol,
     name: m.n || symbol,
     shortName: m.n || symbol,
-    kind: isWarrant(symbol) ? 'warrant' : kindOf(/^00/.test(code) ? 'ETF' : 'EQUITY', symbol),
+    kind: MIS_INDEX[symbol] ? 'index' : isWarrant(symbol) ? 'warrant' : kindOf(/^00/.test(code) ? 'ETF' : 'EQUITY', symbol),
     traded: last != null,
     market: 'TW',
     currency: 'TWD',
@@ -515,7 +517,7 @@ export async function fetchQuotes(symbols, { range = '1d', interval = '5m' } = {
   const batches = [];
   for (let i = 0; i < wanted.length; i += SPARK_BATCH) batches.push(wanted.slice(i, i + SPARK_BATCH));
   // (Today's quotes while Taiwan's market is open: TWSE's live beside Yahoo's late ones.)
-  const listed = range === '1d' && twOpen() ? wanted.filter(x => isTwListed(x) || isWarrant(x)) : [];
+  const listed = range === '1d' && twOpen() ? wanted.filter(x => isTwListed(x) || isWarrant(x) || MIS_INDEX[x]) : [];
   const misRead = listed.length ? fetchMisQuotes(listed).catch(() => new Map()) : null;
   const results = await Promise.allSettled(
     batches.map(batch =>
