@@ -142,3 +142,27 @@ test('a convertible bond’s terms: maturity, conversion price, put, company', a
   assert.equal(t.maturity, cbMaturity('12561.TWO'));
   assert.equal(cbTerms('2330.TW'), null);
 });
+
+test('加權指數 live from TWSE while open: 台指期 moves with it, not 20 minutes behind', async () => {
+  const { fetchQuotes, useQuotesReader } = await import('../kit/stock-quotes.mjs');
+  const at = s => Date.parse(`2026-11-13T${s}+08:00`) / 1000;
+  const meta = { symbol: '^TWII', regularMarketPrice: 44209.36, chartPreviousClose: 43091.87, currency: 'TWD', instrumentType: 'INDEX', exchangeTimezoneName: 'Asia/Taipei', regularMarketTime: at('10:32:35'), currentTradingPeriod: { regular: { start: at('09:00:00'), end: at('13:30:00') } } };
+  const t00 = { c: 't00', ex: 'tse', n: '發行量加權股價指數', d: '20261113', t: '10:52:00', h: '44489.48', l: '43719.75', y: '43091.87', z: '43957.32' };
+  const realNow = Date.now;
+  Date.now = () => Date.parse('2026-11-13T10:52:30+08:00');
+  try {
+    let asked = '';
+    useQuotesReader(async url => {
+      if (url.includes('mis.twse.com.tw')) return (asked = url), { msgArray: [t00] };
+      return { spark: { result: [{ symbol: '^TWII', response: [{ meta, timestamp: [], indicators: { quote: [{ close: [] }] } }] }] } };
+    });
+    const q = (await fetchQuotes(['^TWII'])).get('^TWII');
+    assert.match(asked, /tse_t00\.tw/);
+    assert.equal(q.price, 43957.32);
+    assert.equal(q.live, 'TWSE');
+    assert.equal(q.marketTime, Date.parse('2026-11-13T10:52:00+08:00'));
+  } finally {
+    Date.now = realNow;
+    useQuotesReader(null);
+  }
+});
