@@ -6,7 +6,8 @@
 // class-news). Built once per school an hour and kept in R2
 // (`class-news/<host>.json`), shared by every student of that school; a title
 // already worded is never sent again.
-//   → { site, at, items: [{ id, title, url, date, unit, line, who, act, by }] }
+//   → { site, at, items: [{ id, title, url, date, unit, line, who, act, by, en, actEn }] }
+// (en, actEn: line and act in English, the same answer's: Jay 11-13, a full English Orbit.)
 // who: [] not for students, 'all', '1' '2' '3' (the school's grades), 'jh'
 // (its 國中部), 'some' (a team, those who signed up). An item the AI hasn't
 // worded (capped, failed) comes with its title alone.
@@ -328,12 +329,12 @@ export async function readSchool(site, fetchFn, today) {
 
 // ---- Wording (built once) ----
 // The new items worded by the AI (class-news), the ones worded before kept as they were.
-const WORDS = ['line', 'who', 'act', 'by'];
+const WORDS = ['line', 'who', 'act', 'by', 'en', 'actEn'];
 export function mergeWorded(items, before = [], worded = {}) {
   const old = new Map(before.filter(x => x.line != null && x.who != null).map(x => [x.id, x]));
   return items.map(it => {
     const w = worded[it.id] || old.get(it.id);
-    return w ? { ...it, ...Object.fromEntries(WORDS.map(k => [k, w[k]])) } : it;
+    return w ? { ...it, ...Object.fromEntries(WORDS.filter(k => w[k] !== undefined).map(k => [k, w[k]])) } : it;
   });
 }
 
@@ -349,7 +350,7 @@ const edge = () => (typeof caches !== 'undefined' && caches.default) || null;
 // one answers at once too and is read again behind; none: the school's own
 // titles now (code-read), the AI's lines written behind (`wording`), the
 // phone asking again a few seconds on. One wording at a time a school.
-const NEWS_V = 3; // the class-news prompt's version: a new one words every school again
+const NEWS_V = 4; // the class-news prompt's version: a new one words every school again (4: English beside, Jay 11-13)
 const unworded = x => (x?.items || []).some(it => it.line == null);
 export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now = Date.now(), build = true, force = false } = {}) {
   const key = keyOf(site);
@@ -358,7 +359,7 @@ export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now
     kept = (await (await env.DATA?.get(key))?.json?.()) || null;
   } catch {}
   // (A copy worded by an older prompt: its words dropped, so it's worded again.)
-  if (kept && kept.v !== NEWS_V) kept = { ...kept, v: NEWS_V, at: kept.at, items: (kept.items || []).map(({ line, who, act, by, ...it }) => it) };
+  if (kept && kept.v !== NEWS_V) kept = { ...kept, v: NEWS_V, at: kept.at, items: (kept.items || []).map(({ line, who, act, by, en, actEn, ...it }) => it) };
   const later = p => (ctx?.waitUntil ? ctx.waitUntil(p.catch(() => {})) : p.catch(() => {}));
   const put = v => env.DATA?.put(key, JSON.stringify(v), { httpMetadata: { contentType: 'application/json' } }) || Promise.resolve();
   const today = twDay(now);
@@ -371,7 +372,7 @@ export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now
       if (!fresh.length) break;
       const r = await aiOnce(env, ctx, 'class-news', { school: new URL(site).hostname, today, items: fresh }, cap);
       // (Failing, each is marked tried, '' its line: the title shows, asked again with the next read.)
-      const worded = r?.out || Object.fromEntries(fresh.map(it => [it.id, { line: '', who: null, act: '', by: '' }]));
+      const worded = r?.out || Object.fromEntries(fresh.map(it => [it.id, { line: '', who: null, act: '', by: '', en: '', actEn: '' }]));
       out = { ...out, items: mergeWorded(out.items, [], worded) };
       await put({ ...out, wordingAt: out.items.some(it => it.line == null) ? out.wordingAt || now : 0 });
     }

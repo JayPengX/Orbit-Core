@@ -61,15 +61,16 @@ test('學校公告: who it’s for, a line and a deadline only from the title', 
     {
       items: [
         { id: 'a1', who: ['all'], line: '第二次期中考的考程出來了', act: '看考程', by: '' },
-        { id: 'b2', who: ['3', 'bad'], line: '高三學習成果 11/20 前上傳', act: '上傳學習歷程', by: '2026-11-20' },
-        { id: 'c3', who: [], line: '午餐 12 月起換廠商', act: '', by: '2026-12-01' },
+        { id: 'b2', who: ['3', 'bad'], line: '高三學習成果 11/20 前上傳', act: '上傳學習歷程', by: '2026-11-20', en: 'Upload your learning portfolio by 11/20.', actEn: 'Upload' },
+        { id: 'c3', who: [], line: '午餐 12 月起換廠商', act: '', by: '2026-12-01', en: '午餐 changes', actEn: '' },
         { id: 'zz', who: ['all'], line: 'not given', act: '', by: '' }
       ]
     },
     { items }
   );
   assert.deepEqual(Object.keys(out), ['a1', 'b2', 'c3']);
-  assert.deepEqual(out.b2, { line: '高三學習成果 11/20 前上傳', who: ['3'], act: '上傳學習歷程', by: '2026-11-20' });
+  assert.deepEqual(out.b2, { line: '高三學習成果 11/20 前上傳', who: ['3'], act: '上傳學習歷程', by: '2026-11-20', en: 'Upload your learning portfolio by 11/20', actEn: 'Upload' });
+  assert.equal(out.c3.en, '', 'English with Chinese in it');
   assert.equal(out.c3.line, '', 'a number the title never gave');
   assert.equal(out.c3.by, '', 'a deadline the title never gave');
   assert.ok(f.parts({ school: 'x.edu.tw', today: '2026-11-11', items }).text === undefined);
