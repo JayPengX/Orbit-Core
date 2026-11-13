@@ -18,7 +18,13 @@ import { aiOnce } from '../ai.js';
 import { NEWS_PATH } from './news.js';
 
 export const MARKETS_PATH = 'news/markets.json';
-const MEMORY = 'private/news/markets.v5.json';
+const MEMORY = 'private/news/markets.v4.json';
+// The words' version: a market worded under an older prompt is worded again,
+// its old words shown until then (never a page emptied by a prompt change).
+// 2: a person's name as written in English unless the headlines write it in Chinese (Jay 11-13).
+export const WORDS_V = 2;
+// AI calls a run (each batch can take a few of the Worker's 50 subrequests; the rest wait for the next run).
+const CALLS = 4;
 const LINES = 'news/lines.json';
 const GAMMA = 'https://gamma-api.polymarket.com/events';
 // Polymarket's sections whose markets stories can be about (50 each, busiest first).
@@ -320,12 +326,14 @@ export async function runNewsMarkets({ store, env, ctx = null, cap = async () =>
   // Asked: a pair never asked, or whose story's coverage doubled since (12 hours on).
   const need = found.filter(({ s, ev }) => {
     const was = pairs[`${s.id}|${ev.id}`];
-    return !was || ((s.m || 0) >= 2 * (was.m || 0) && now - (was.at || 0) > AGAIN) || (was.ok && !words[ev.id]);
+    return !was || ((s.m || 0) >= 2 * (was.m || 0) && now - (was.at || 0) > AGAIN) || (was.ok && words[ev.id]?.v !== WORDS_V);
   });
   let calls = 0, asked = 0;
   const missed = [];
   const c = await cap('news-markets');
-  for (let i = 0; i < need.length && Date.now() < until; i += BATCH) {
+  // (Never-asked pairs first, then the ones only re-worded.)
+  need.sort((a, b) => !!pairs[`${a.s.id}|${a.ev.id}`] - !!pairs[`${b.s.id}|${b.ev.id}`]);
+  for (let i = 0; i < need.length && calls < CALLS && Date.now() < until; i += BATCH) {
     const batch = need.slice(i, i + BATCH);
     const r = await aiOnce(env, ctx, 'news-markets', { pairs: batch.map(x => pairFacts(x, lines[x.s.id])) }, c);
     calls++;
@@ -340,7 +348,7 @@ export async function runNewsMarkets({ store, env, ctx = null, cap = async () =>
       if (!a) continue;
       asked++;
       pairs[k] = { ok: a.ok ? 1 : 0, m: x.s.m || 0, at: now };
-      if (a.ok) words[x.ev.id] = { zh: a.zh, en: a.en, labels: { ...(words[x.ev.id]?.labels || {}), ...a.labels } };
+      if (a.ok) words[x.ev.id] = { zh: a.zh, en: a.en, labels: words[x.ev.id]?.v === WORDS_V ? { ...words[x.ev.id].labels, ...a.labels } : a.labels, v: WORDS_V };
     }
   }
   // The page: each story's confirmed markets, best fit first, at today's prices.
