@@ -133,9 +133,24 @@
   } else {
     suite.markSuite();
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+    // Opened after it was closed (no trail in this window yet), as an app
+    // opens: the list, every app at its start, unless something is live
+    // (Jay 2026-11-13: "keep where I was even if I closed it? weird"). A
+    // return to an Orbit the phone kept is the host's (an hour's grace).
+    let fresh = false;
+    try {
+      fresh = !sessionStorage.getItem('orbit.suite.trail');
+    } catch {}
+    if (fresh) {
+      const saved = suite.savedSuite();
+      for (const id of Object.keys(saved.apps || {})) saved.apps[id] = { ...saved.apps[id], url: saved.apps[id].home || null, y: 0 };
+      try {
+        localStorage.setItem('orbit.suite.v1', JSON.stringify(saved));
+      } catch {}
+    }
     const go = () => {
       const pick = /[?&#]pick\b/.test(location.href);
-      const first = window.ORBIT_FIRST || (pick ? null : suite.launchTarget?.(suite.savedSuite(), suite.liveSaved?.() || {}) || null);
+      const first = window.ORBIT_FIRST || (pick ? null : suite.launchTarget?.(suite.savedSuite(), suite.liveSaved?.() || {}, Date.now(), fresh ? 0 : undefined) || null);
       if (first) hold(first);
       else showList();
     };
