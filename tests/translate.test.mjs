@@ -40,7 +40,7 @@ test('the month: a day spends its share of what is left, never past the cap', ()
   assert.equal(freshMeter({ month: '2026-10', chars: 400_000, day: '2026-10-31', today: 9 }, now).chars, 0);
 });
 
-test('translate: once over the day’s share it stops; a refused key waits an hour; no key asks nothing', async () => {
+test('translate: once over the day’s share it stops; a refused key waits a while; no key asks nothing', async () => {
   const store = memStore();
   const seen = [];
   const out = await translate(env, store, ['Hello there', 'Hello there', ''], 'zh-TW', { fetchImpl: googleFake(seen) });
