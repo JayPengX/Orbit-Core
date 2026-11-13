@@ -14,7 +14,7 @@
 import { json, isAllowedOrigin } from './http.js';
 import { fail, twDay, passOf, passKey, countOf, addOne } from './law.js';
 import { sessionLimited } from './orbit-token.js';
-import { twOnly, viaTaiwan, buildKeyOk, buildHost } from './law-hosts.js';
+import { twOnly, viaTaiwan, buildKeyOk, buildHost, judicialData } from './law-hosts.js';
 
 export const PAGE_LIMITS = { perPass: 500, perMinute: 60, buildPerMinute: 720, hops: 5, timeoutMs: 20_000, maxHtml: 2 * 1024 * 1024, maxBytes: 6 * 1024 * 1024, fileBytes: 40 * 1024 * 1024 };
 const LONG = new Set(['judgment.judicial.gov.tw', 'cons.judicial.gov.tw']);
@@ -184,4 +184,24 @@ export async function handleLawPage(request, env, ctx, headers, session, fetchFn
   if (out.body) return new Response(out.body, { status: 200, headers: { ...headers, 'Content-Type': out.ctype || 'application/pdf', 'Cache-Control': 'no-store', ...(out.size ? { 'Content-Length': String(out.size) } : {}) } });
   if (cache) ctx?.waitUntil?.(cache.put(key, new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `max-age=${ttlOf(url)}` } })).catch(() => {}));
   return json({ ...out, cached: false }, 200, headers);
+}
+
+// /law-judicial?u=: 司法院's open data for the rulings store's build (its key only), read from
+// Taiwan through the relay: JDoc's API (POST) and the monthly archives (a member token, files of
+// a few hundred MB, streamed through, never kept). Nothing else.
+export async function handleLawJudicial(request, env, headers, fetchFn = null) {
+  if (request.method !== 'GET' && request.method !== 'POST') return fail('method', 405, headers);
+  if (!buildKeyOk(request.headers.get('X-Build-Key'), env?.LAW_BUILD_KEY)) return fail('pass', 401, headers);
+  const raw = new URL(request.url).searchParams.get('u') || '';
+  if (!judicialData(raw)) return fail('host', 400, headers);
+  const go = fetchFn || (env?.GEMINI_RELAY ? (u, init) => env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, init) : fetch);
+  const pick = ['Content-Type', 'Authorization', 'Accept'].filter(h => request.headers.get(h)).map(h => [h, request.headers.get(h)]);
+  let r;
+  try {
+    r = await go(raw, { method: request.method, headers: Object.fromEntries(pick), body: request.method === 'POST' ? await request.text() : undefined });
+  } catch {
+    return fail('upstream', 502, headers, { status: 0 });
+  }
+  const size = r.headers.get('Content-Length');
+  return new Response(r.body, { status: r.status, headers: { ...headers, 'Content-Type': r.headers.get('Content-Type') || 'application/octet-stream', 'Cache-Control': 'no-store', ...(size ? { 'Content-Length': size } : {}) } });
 }

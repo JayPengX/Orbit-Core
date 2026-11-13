@@ -76,6 +76,11 @@ export function judgmentPage(raw) {
   }
   return u.protocol === 'https:' && !u.username && !u.password && !u.port && u.hostname.toLowerCase() === 'judgment.judicial.gov.tw' && JUDGMENT.test(u.pathname);
 }
+// 司法院's open data, the rulings store's two doors (Orbit-Law scripts/backfill-rulings.mjs): JDoc's
+// API and the monthly archives turned GitHub's runners away too (every read since 10-22 'fetch
+// failed'), so the build reads them from Taiwan through /law-judicial with its key. These calls only.
+const JUDICIAL_DATA = [/^https:\/\/data\.judicial\.gov\.tw\/jdg\/api\/(Auth|JList|JDoc)$/, /^https:\/\/opendata\.judicial\.gov\.tw\/(data\/api\/rest\/categories\/051\/resources|api\/MemberTokens|api\/FilesetLists\/\d+\/file)$/];
+export const judicialData = raw => typeof raw === 'string' && JUDICIAL_DATA.some(r => r.test(raw));
 // A page read from Taiwan: a county's rule page or a judgment.
 export const viaTaiwan = raw => twOnly(raw) || judgmentPage(raw);
 

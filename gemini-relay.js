@@ -7,13 +7,14 @@
 // Hong Kong, where a caller's colo can be (wrangler.toml's history). No
 // address of its own: only the proxy reaches it. Also the county 法規 rule
 // pages that serve only Taiwan (law-hosts.js), for /law-page's build key,
-// and 司法院's judgment pages (same file), for a Pass's reads and /law-chat;
+// and 司法院's judgment pages (same file), for a Pass's reads and /law-chat, and its open data for
+// Law's rulings store (/law-judicial, the build's key);
 // and 人事行政總處's 停班停課 page (typhoon.js), for Orbit Weather; schools'
 // sites for Orbit Class's 學校公告 (class-news.js). And
 // TheSportsDB's CPBL day list for a game's final (push.js): its free key
 // answers the proxy's shared addresses with 429 most of the time, so a
 // second way out.
-import { viaTaiwan, buildHost } from './law-hosts.js';
+import { viaTaiwan, buildHost, judicialData } from './law-hosts.js';
 import { DGPA_NDS } from './typhoon.js';
 import { tsdbCpblDay } from './kit/catalog.mjs';
 import { schoolRead } from './class-news.js';
@@ -28,6 +29,11 @@ export default {
     if ((viaTaiwan(to) || buildHost(to) || to === DGPA_NDS || tsdbCpblDay(to)) && request.method === 'GET') {
       const pick = ['User-Agent', 'Accept', 'Accept-Language'].filter(h => request.headers.get(h)).map(h => [h, request.headers.get(h)]);
       return fetch(to, { headers: Object.fromEntries(pick), redirect: 'manual' });
+    }
+    // (司法院's open data for Law's rulings store, law-page.js handleLawJudicial: its API's POSTs, the archives' files.)
+    if (judicialData(to) && (request.method === 'GET' || request.method === 'POST')) {
+      const pick = ['Content-Type', 'Authorization', 'Accept'].filter(h => request.headers.get(h)).map(h => [h, request.headers.get(h)]);
+      return fetch(to, { method: request.method, headers: { 'User-Agent': 'Orbit-Law rulings store (+https://orbit.jaypengx.com/law/)', ...Object.fromEntries(pick) }, body: request.method === 'GET' ? undefined : request.body });
     }
     // (A school's site for Orbit Class's 學校公告摘要, class-news.js: its pages, and ischool's news list, a POST.)
     if (schoolRead(to, request.method)) {
