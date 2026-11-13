@@ -49,8 +49,9 @@ const WORDS_LIST = 'https://orbit.jaypengx.com/words/data/words.json';
 // ---- News: one line and two titles a story ----
 // (Every world story near the front in Chinese: Jay 11-13, an English title on a Chinese page.)
 const NEWS_TOP = { tw: 15, intl: 60 };
-// A title made before 11-13's rule (the event, never the topic) is made again.
-export const LINES_V = 2;
+// A title made before 11-13's rules (the event, never the topic; a foreign name
+// in English unless Taiwan's press fixes one) is made again.
+export const LINES_V = 3;
 const NEWS_BATCH = 12;
 // A title made again once the story's own title has changed, an hour after it was last made at most.
 export const TITLE_AGAIN = 3_600_000;
@@ -252,7 +253,7 @@ export function briefFacts(s, sums = new Map()) {
   return { id: s.id, heads, sums: said.slice(0, 8) };
 }
 // A brief made before 11-13's kinds (what happened, background, next) is made again.
-export const BRIEF_V = 2;
+export const BRIEF_V = 3;
 export const briefWanted = s => (s.n || 0) >= 3;
 export async function newsBriefs({ store, env, ctx, cap, until, now = Date.now() }) {
   const index = await store.json('news/index.json');

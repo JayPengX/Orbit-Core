@@ -188,3 +188,13 @@ test('news: a title is told the headlines nearest the story, never its drift (Ja
   assert.ok(b.heads.indexOf('Pence leaves door open to 2028 White House run') > 3, 'the drift last');
   assert.equal(b.sums[0], 'Trump said the US did not need a deal.');
 });
+
+test('news AI: a foreign name stays in English unless Taiwan’s press fixes one, an English word counting about two characters (11-13: 史考特科洛姆)', async () => {
+  const { FEATURES, NAMES_RULE, zhLen } = await import('../ai-features.js');
+  assert.ok(NAMES_RULE.includes('川普') && NAMES_RULE.includes('黃仁勳') && NAMES_RULE.includes('Scott Colom'));
+  for (const f of ['news-lines', 'news-brief', 'news-sides']) assert.ok(JSON.stringify(FEATURES[f].parts({ stories: [] })).includes('Never make up a Chinese transliteration'), f);
+  assert.equal(zhLen('Scott Colom 當選'), 2 + 1 + 2 + 1 + 2);
+  const stories = [{ id: 'a', lang: 'zh', heads: ['Democrat Scott Colom wins Mississippi Senate seat'] }];
+  const out = FEATURES['news-lines'].clean({ items: [{ id: 'a', title: '民主黨 Scott Colom 贏得密西西比州參議員席次' }] }, { stories });
+  assert.equal(out.a?.zh, '民主黨 Scott Colom 贏得密西西比州參議員席次');
+});
