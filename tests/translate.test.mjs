@@ -3,7 +3,7 @@
 // cap kept, each text once, only a story's own texts.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { translate, peopleIn, shielded, unshield, dayLeft, freshMeter, withMonth, TR_METER, TR_MONTH } from '../translate.js';
+import { translate, peopleIn, shielded, shieldedEn, unshield, dayLeft, freshMeter, withMonth, TR_METER, TR_MONTH } from '../translate.js';
 import { newsTr, storyTr, wanted, NEWS_TR, trPath } from '../builders/news-tr.js';
 
 const memStore = (seed = {}) => {
@@ -106,4 +106,11 @@ test('a day alone is this month’s (the one before when it’s still ahead); a 
   const fetchImpl = async (u, init) => new Response(JSON.stringify({ data: { translations: JSON.parse(init.body).q.map(() => ({ translatedText: '沒有談判。' })) } }));
   const out = await translate(env, memStore(), ['No talks underway', 'Talks ended.'], 'zh-TW', { fetchImpl });
   assert.deepEqual(out, { 'No talks underway': '沒有談判', 'Talks ended.': '沒有談判。' });
+});
+
+test('Chinese to English: a well-known name and Taiwan’s bodies as Taiwan writes them in English', () => {
+  assert.equal(shieldedEn('賴清德與川普通話'), '<span translate="no">Lai Ching-te</span>與<span translate="no">Trump</span>通話');
+  assert.equal(shieldedEn('法人：台股走高'), '<span translate="no">analysts</span>：<span translate="no">Taiwan stocks</span>走高');
+  assert.equal(shieldedEn('三大法人買超'), '三大法人買超');
+  assert.equal(shieldedEn('藍委質詢 <b>'), '<span translate="no">KMT legislator</span>質詢 &lt;b&gt;');
 });

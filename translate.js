@@ -135,9 +135,37 @@ export function shielded(text, people = []) {
   }
   return out + esc(text.slice(at));
 }
+// Chinese going to English: a well-known name as its English one (賴清德 →
+// Lai Ching-te, never a pinyin guess; a one-word one where there is one:
+// 川普 → Trump), and Taiwan's own words for its bodies and parties
+// (藍委 → KMT legislator, 法人： → analysts:), each kept as written here.
+const ZH_EN = (() => {
+  const out = {};
+  for (const [en, zh] of Object.entries(KNOWN)) if (!out[zh] || (!/\s/.test(en) && /\s/.test(out[zh]))) out[zh] = en;
+  return out;
+})();
+export const TW_EN = {
+  國民黨: 'KMT', 民進黨: 'DPP', 民眾黨: 'TPP', 藍營: 'the KMT', 綠營: 'the DPP', 白營: 'the TPP', 藍委: 'KMT legislator', 綠委: 'DPP legislator', 白委: 'TPP legislator', 立委: 'legislator',
+  行政院: 'the Executive Yuan', 立法院: 'the Legislative Yuan', 司法院: 'the Judicial Yuan', 監察院: 'the Control Yuan', 考試院: 'the Examination Yuan', 總統府: 'the Presidential Office',
+  陸委會: 'the Mainland Affairs Council', 國台辦: 'China’s Taiwan Affairs Office', 中選會: 'the Central Election Commission', 金管會: 'the Financial Supervisory Commission', 央行: 'the central bank', 疾管署: 'Taiwan CDC', 衛福部: 'the Ministry of Health and Welfare', 國防部: 'the Ministry of National Defense', 外交部: 'the Ministry of Foreign Affairs', 經濟部: 'the Ministry of Economic Affairs', 交通部: 'the Ministry of Transportation', 教育部: 'the Ministry of Education', 內政部: 'the Ministry of the Interior', 海巡署: 'the Coast Guard Administration', 氣象署: 'the Central Weather Administration',
+  台積電: 'TSMC', 鴻海: 'Foxconn', 聯發科: 'MediaTek', 輝達: 'Nvidia', 加權指數: 'TAIEX', 台股: 'Taiwan stocks', 外資: 'foreign investors', 投信: 'investment trusts', 自營商: 'dealers'
+};
+const ZH_KEYS = [...Object.keys(ZH_EN), ...Object.keys(TW_EN), '法人'].sort((a, b) => b.length - a.length);
+const ZH_RE = new RegExp(ZH_KEYS.map(rx).join('|'), 'g');
+export function shieldedEn(text) {
+  return esc(text).replace(ZH_RE, (w, at, all) => {
+    // (法人 is analysts only where it speaks: 法人：, 法人指出, 法人認為, 法人預估.)
+    if (w === '法人') return /^(?:[：:]|指出|認為|預估|表示|分析)/.test(all.slice(at + 2)) ? '<span translate="no">analysts</span>' : w;
+    return `<span translate="no">${esc(ZH_EN[w] || TW_EN[w])}</span>`;
+  });
+}
+
 // Google's answer back to plain text, in Taiwan's way of writing it.
 export function unshield(html, to) {
-  let t = unesc(String(html || '').replace(/<\/?span[^>]*>/g, '')).replace(/\s+/g, ' ').trim();
+  let h = String(html || '');
+  // (In English a kept word never runs into the next: Trump's, not Trumpsaid.)
+  if (to !== 'zh-TW') h = h.replace(/<\/span>(?=[A-Za-z0-9(])/g, '</span> ').replace(/(?<=[A-Za-z0-9,)])<span/g, ' <span');
+  let t = unesc(h.replace(/<\/?span[^>]*>/g, '')).replace(/\s+/g, ' ').trim();
   if (to === 'zh-TW') {
     // (A name kept in English inside Chinese: a space either side, as Taiwan's press writes it.)
     t = t
@@ -210,7 +238,7 @@ export async function translate(env, store, texts, to, { people = [], now = Date
   try {
     for (let i = 0; i < pick.length; i += 100) {
       const part = pick.slice(i, i + 100);
-      const asked = part.map(t => (zh ? shielded(prep(t), typeof people === 'function' ? people(t) : people) : esc(prep(t))));
+      const asked = part.map(t => (zh ? shielded(prep(t), typeof people === 'function' ? people(t) : people) : shieldedEn(prep(t))));
       const got = await google(env, asked, to, { fetchImpl, html: true });
       spent += part.reduce((n, t, k) => n + asked[k].length, 0);
       part.forEach((t, k) => {
