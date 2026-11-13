@@ -284,7 +284,30 @@ function place() {
   const rail = document.documentElement.classList.contains('q-tabrail');
   const into = rail ? document.getElementById('top-actions') : document.querySelector('.q-appbar-inner');
   if (!into) return;
-  if (bar.parentNode !== into || (!rail && into.firstElementChild !== bar)) into.prepend(bar);
+  if (into.firstElementChild !== bar) into.prepend(bar);
+  fit(rail && !document.documentElement.classList.contains('q-desk') ? into : null);
+}
+// A rail's foot is short of room on a phone on its side (five tabs and an
+// action leave about a tab's height): never over a tab. The most that fits,
+// in order: this app, back and forward one over the other; without forward;
+// this app alone; this app beside the account. (The rest in the sheet.)
+const FITS = ['', 'q-suite-lean1', 'q-suite-lean2', 'q-suite-lean2 q-suite-row'];
+function fit(foot) {
+  const set = cls => {
+    bar.className = `q-suite ${cls}`.trim();
+    for (const f of document.querySelectorAll('.q-suite-rowed')) if (f !== foot || !/row/.test(cls)) f.classList.remove('q-suite-rowed');
+    if (foot && /row/.test(cls)) foot.classList.add('q-suite-rowed');
+  };
+  if (!foot) return set('');
+  let above = 0;
+  for (const e of document.querySelectorAll('.q-tabbar, .q-tab-action')) {
+    const r = e.getBoundingClientRect();
+    if (r.height && getComputedStyle(e).display !== 'none') above = Math.max(above, r.bottom);
+  }
+  for (const cls of FITS) {
+    set(cls);
+    if (foot.getBoundingClientRect().top >= above + 8) return;
+  }
 }
 
 let sheetOpen = null;
@@ -398,6 +421,9 @@ export function start() {
     // (The app may draw its top line later, or redraw the account's box.)
     new MutationObserver(() => place()).observe(document.querySelector('.q-appbar') || document.body, { childList: true, subtree: true });
     new MutationObserver(() => place()).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    // (The tabs may come later; a phone turned on its side.)
+    globalThis.addEventListener('resize', () => place());
+    for (const ms of [300, 1500, 4000]) setTimeout(place, ms);
   };
   if (document.body) mount();
   else document.addEventListener('DOMContentLoaded', mount, { once: true });

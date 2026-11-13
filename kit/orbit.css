@@ -7256,6 +7256,22 @@ html.q-tabrail .q-appbar .q-actions > .q-suite .q-suite-btn img {
   height: 28px;
   border-radius: 7.5px;
 }
+/* (Short of room: forward, then back, kept to the sheet; at the least this
+   app beside the account, never over a tab. suite.mjs fit().) */
+html.q-tabrail:not(.q-desk) .q-suite.q-suite-lean1 > .q-suite-fwd,
+html.q-tabrail:not(.q-desk) .q-suite.q-suite-lean2 > :is(.q-suite-back, .q-suite-fwd) {
+  display: none;
+}
+html.q-tabrail:not(.q-desk) .q-appbar .q-actions.q-suite-rowed {
+  flex-direction: row;
+  width: auto;
+}
+html.q-tabrail:not(.q-desk) .q-appbar .q-actions.q-suite-rowed > :is(.q-suite, .q-icon-btn, .q-account:not(.q-framed)) {
+  width: calc(var(--q-tabrail-cw) - 8px);
+}
+html.q-tabrail:not(.q-desk) .q-appbar .q-actions.q-suite-rowed > .q-account.q-framed {
+  margin: calc((var(--q-tabrail-foot, 44px) - var(--q-tabrail-face, 36px)) / 2);
+}
 html.q-tabrail.q-desk .q-appbar .q-actions > .q-suite {
   flex-direction: row;
   width: auto;
