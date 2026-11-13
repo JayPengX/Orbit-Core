@@ -150,3 +150,24 @@ test('the build reads any gov.tw page from Taiwan (a township’s site), never a
   const bad = await handleLawPage(new Request(`https://proxy.test/law-page?v=1&u=${encodeURIComponent('https://example.com/')}`, { headers: { 'X-Build-Key': KEY } }), env, null, {}, null, async () => new Response('direct'));
   assert.equal(bad.status, 401);
 });
+
+test('/law-judicial: 司法院\'s open data for the rulings build, its key only, from Taiwan, these calls only', async () => {
+  const { judicialData } = await import('../law-hosts.js');
+  const { handleLawJudicial } = await import('../law-page.js');
+  for (const ok of ['https://data.judicial.gov.tw/jdg/api/Auth', 'https://data.judicial.gov.tw/jdg/api/JDoc', 'https://opendata.judicial.gov.tw/data/api/rest/categories/051/resources', 'https://opendata.judicial.gov.tw/api/MemberTokens', 'https://opendata.judicial.gov.tw/api/FilesetLists/12345/file']) assert.equal(judicialData(ok), true, ok);
+  for (const bad of ['https://data.judicial.gov.tw/jdg/api/Other', 'http://data.judicial.gov.tw/jdg/api/Auth', 'https://opendata.judicial.gov.tw/api/FilesetLists/x/file', 'https://evil.com/jdg/api/Auth', 'https://data.judicial.gov.tw/jdg/api/Auth?x=1', 'https://judgment.judicial.gov.tw/FJUD/data.aspx']) assert.equal(judicialData(bad), false, bad);
+  const KEY = 'k'.repeat(32);
+  const seen = [];
+  const env = { LAW_BUILD_KEY: KEY, GEMINI_RELAY: { fetch: async (u, init) => (seen.push([u, init.method, init.body, init.headers]), new Response('{"Token":"t"}', { headers: { 'Content-Type': 'application/json' } })) } };
+  const at = (u, init = {}) => new Request(`https://proxy.test/law-judicial?u=${encodeURIComponent(u)}`, init);
+  const AUTH = 'https://data.judicial.gov.tw/jdg/api/Auth';
+  assert.equal((await handleLawJudicial(at(AUTH, { method: 'POST', body: '{}' }), env, {})).status, 401, 'no key');
+  assert.equal((await handleLawJudicial(at(AUTH, { method: 'POST', body: '{}', headers: { 'X-Build-Key': 'x'.repeat(32) } }), env, {})).status, 401, 'wrong key');
+  assert.equal((await handleLawJudicial(at('https://evil.com/', { headers: { 'X-Build-Key': KEY } }), env, {})).status, 400);
+  assert.equal((await handleLawJudicial(at(AUTH, { method: 'PUT', headers: { 'X-Build-Key': KEY } }), env, {})).status, 405);
+  const r = await handleLawJudicial(at(AUTH, { method: 'POST', body: '{"user":"u"}', headers: { 'X-Build-Key': KEY, 'Content-Type': 'application/json' } }), env, {});
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { Token: 't' });
+  assert.equal(seen[0][0], `https://gemini-relay/?to=${encodeURIComponent(AUTH)}`, 'through the relay');
+  assert.deepEqual([seen[0][1], seen[0][2], seen[0][3]['Content-Type'], 'X-Build-Key' in seen[0][3]], ['POST', '{"user":"u"}', 'application/json', false], 'the key never passed on');
+});
