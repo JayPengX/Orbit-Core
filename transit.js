@@ -534,8 +534,10 @@ const runMemo = new Map();
 // of 新竹's buses on 2026-10-23) from one between its buses: a phone reads
 // this (a few KB) instead of the city's whole answer. It changes in hours,
 // not seconds: read again each 10 minutes at most, from the city's buses'
-// places (TDX A1: 新竹市's 23 KB, 台北's 425 KB, 公路客運's 725 KB; the same
-// read as /transit/gps's), `total` its routes (the weekly packs' index), the
+// places (TDX A1: 新竹市's 23 KB, 台北's 425 KB; the same read as
+// /transit/gps's; 公路客運's, all Taiwan, its routes' ids alone, a fifth less:
+// TDX still sends each bus's times and states, ~300 KB; 9 MB of people's 14 MB
+// of TDX 2026-11-10…13, on a free tier counting bytes), `total` its routes (the weekly packs' index), the
 // share on the road out of. Until 2026-11-06 it was every stop's estimate,
 // read each minute: 公路客運's 14.7 MB a read (TDX bills what it sends: a
 // tenth of a point each), a city's up to 8 MB. A busy city's whole estimates
@@ -583,7 +585,7 @@ export async function running(env, city, deps = {}) {
     return { status: 200, body };
   }
   // Else its buses' places: a copy up to 10 minutes old as it is.
-  const path = city === 'InterCity' ? `basic/v2/Bus/RealTimeByFrequency/InterCity?$select=${GPS_SELECT}` : cityGpsPath(city);
+  const path = city === 'InterCity' ? 'basic/v2/Bus/RealTimeByFrequency/InterCity?$select=RouteUID' : cityGpsPath(city);
   const got = await tdxGet(env, path, { ...deps, oldest: RUN_FRESH });
   let rows = null;
   try {

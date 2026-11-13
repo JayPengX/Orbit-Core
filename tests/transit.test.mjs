@@ -965,10 +965,10 @@ test("buses due: a city's stops (or routes) asked alone, a big one never whole h
   resetEta();
   await runningAt('Taipei', NOW + 20_500 + 11 * 60_000);
   assert.equal(log.length, n + 2);
-  // 公路客運's: its buses' places, all Taiwan (725 KB a read, where every stop's estimates were 14.7 MB).
+  // 公路客運's: its buses, all Taiwan, by route alone (725 KB a read with their places; every stop's estimates were 14.7 MB).
   const inter = await runningAt('InterCity', NOW + 30_000);
   assert.equal(inter.total, 485);
-  assert.match(decodeURIComponent(log.at(-1)), /RealTimeByFrequency\/InterCity\?\$select=RouteUID,/);
+  assert.match(decodeURIComponent(log.at(-1)), /RealTimeByFrequency\/InterCity\?\$select=RouteUID(&|$)/);
   assert.ok(!log.some(u => /EstimatedTimeOfArrival\/InterCity\?\$select/.test(decodeURIComponent(u))));
   assert.equal((await ask('city=Taipei&stops=nope')).status, 400);
   // 公路客運 (all Taiwan, too big to keep whole): its stops' own ask.
