@@ -1332,7 +1332,7 @@ function parseTarget(target) {
     // TWSE's announcement lists: 公開申購 (publicForm), 處置 (punish), 注意 (notice).
     if (u.hostname === 'www.twse.com.tw' && !/^\/rwd\/zh\/announcement\/(publicForm|punish|notice)$/.test(u.pathname)) return null;
     if (u.hostname === GCIS_HOST && !gcisOk(u)) return null;
-    if (u.hostname === 'mis.twse.com.tw' && !(u.pathname === '/stock/api/getStockInfo.jsp' && [...u.searchParams.keys()].join() === 'ex_ch' && /^(tse|otc)_[0-9A-Z]{4,6}\.tw(\|(tse|otc)_[0-9A-Z]{4,6}\.tw){0,49}$/i.test(u.searchParams.get('ex_ch') || ''))) return null;
+    if (u.hostname === 'mis.twse.com.tw' && !(u.pathname === '/stock/api/getStockInfo.jsp' && [...u.searchParams.keys()].join() === 'ex_ch' && /^(tse|otc)_([0-9A-Z]{4,6}|t00|o00)\.tw(\|(tse|otc)_([0-9A-Z]{4,6}|t00|o00)\.tw){0,49}$/i.test(u.searchParams.get('ex_ch') || ''))) return null;
     if (u.hostname === ELTA_VOD_HOST && (!/^\/sports\/play\/1\/\d{1,6}$/.test(u.pathname) || u.search)) return null;
     // A search (its words, in English as seen from Taiwan) or a video's page, nothing else.
     if (u.hostname === YT_HOST && !(u.pathname === '/results' ? [...u.searchParams.keys()].every(k => ['search_query', 'hl', 'gl'].includes(k)) && (u.searchParams.get('search_query') || '').length > 0 && (u.searchParams.get('search_query') || '').length <= 200 : u.pathname === '/watch' && [...u.searchParams.keys()].join() === 'v' && /^[\w-]{11}$/.test(u.searchParams.get('v')))) return null;
