@@ -41,9 +41,11 @@ const direct = (...a) => globalThis.__orbitDirectFetch.apply(globalThis, a);
 function patchFetch() {
   if (globalThis.__orbitDirectFetch) return;
   globalThis.__orbitDirectFetch = globalThis.fetch;
-  globalThis.fetch = function (input, init) {
-    const b = budget.getStore();
-    if (!b || ++b.n <= DIRECT) return direct(input, init);
+  // (Past the platform's own count, which also has the calls made other ways
+  // (a binding's, the AI's): the call relayed, and the rest of the invocation's
+  // too. 2026-11-13: 重大訊息's lists, read last in the AI builder's run, were
+  // refused "Too many subrequests" at 30-odd of ours, every run for 3 hours.)
+  const relayed = (b, input, init) => {
     const req = new Request(input, init);
     const headers = new Headers(req.headers);
     headers.set(RELAY_MARK, '1');
@@ -51,6 +53,17 @@ function patchFetch() {
     if (call) headers.set(SOURCE_MARK, JSON.stringify(call));
     b.relayed++;
     return b.ns.get(b.ns.idFromName(`relay:${b.n % RELAYS}`)).fetch(new Request(req, { headers }));
+  };
+  const tooMany = e => /too many subrequests/i.test(String(e?.message || e));
+  globalThis.fetch = function (input, init) {
+    const b = budget.getStore();
+    if (!b) return direct(input, init);
+    if (++b.n > DIRECT) return relayed(b, input, init);
+    return (async () => direct(input, init))().catch(e => {
+      if (!tooMany(e)) throw e;
+      b.n = Math.max(b.n, DIRECT);
+      return relayed(b, input, init);
+    });
   };
 }
 
