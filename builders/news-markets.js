@@ -120,6 +120,8 @@ export const NAMES = {
   china: ['中國', '中共', '大陸'], taiwan: ['台灣', '臺灣'], 'united states': ['美國'], us: ['美國'], iran: ['伊朗'], israel: ['以色列'], russia: ['俄羅斯', '俄國', '俄'], ukraine: ['烏克蘭', '烏'], japan: ['日本'], 'south korea': ['南韓', '韓國'], 'north korea': ['北韓'], philippines: ['菲律賓'], india: ['印度'],
   france: ['法國'], germany: ['德國'], 'united kingdom': ['英國'], uk: ['英國'], spain: ['西班牙'], italy: ['義大利'], venezuela: ['委內瑞拉'], lebanon: ['黎巴嫩'], syria: ['敘利亞'], lithuania: ['立陶宛'], sweden: ['瑞典'], 'new zealand': ['紐西蘭'], indonesia: ['印尼'], mexico: ['墨西哥'], canada: ['加拿大'], brazil: ['巴西']
 };
+// Taiwan's cities and counties: a race's place.
+const TW_PLACES = new Set(['taipei', 'new taipei', 'taoyuan', 'taichung', 'tainan', 'kaohsiung', 'keelung', 'hsinchu city', 'hsinchu county', 'miaoli', 'changhua', 'nantou', 'yunlin', 'chiayi city', 'chiayi county', 'pingtung', 'yilan', 'hualien', 'taitung', 'penghu', 'kinmen', 'lienchiang']);
 // Names in a great many stories: they count, but alone never make a match.
 const BROAD = new Set(['china', 'taiwan', 'united states', 'us', 'trump', 'iran', 'israel', 'russia', 'ukraine', 'japan', 'south korea', 'north korea', 'india', 'france', 'germany', 'united kingdom', 'uk', 'kmt', 'dpp', 'tpp', 'fed', 'fomc', 'xi', 'pla', 'apple', 'google', 'meta', 'amazon', 'microsoft', 'nato', 'united nations', 'philippines']);
 // What the question is about, each in English (the market's and a world story's words) and Chinese.
@@ -189,10 +191,14 @@ const strong = (text, at, share) => at(text.title) || (text.heads.length > 0 && 
 // How well an event fits a story, 0 when it can't: the question's own
 // names all in the story, what it asks too, and a name past the broad ones
 // with one thing more, or two broad names. The AI confirms what passes.
-export function fitOf(text, about) {
-  const names = about.names.filter(n => strong(text, t => nameAt(t, n), 1 / 3));
-  // (The question's own sharp names in the story's title: a story of 苗栗's debate that names 台中 inside isn't 台中's race.)
-  if (about.must.some(n => !nameAt(text.title, n))) return 0;
+export function fitOf(text, about, also = []) {
+  // (The question's own sharp names in the story's title: a story of 苗栗's debate that names 台中 inside isn't 台中's race.
+  // A race's place may be left out of a title that names one of its candidates (最新民調領先李四川8.4個百分點),
+  // or that names no other place while its headlines name the race's (Jay 11-13).)
+  const elsewhere = [...TW_PLACES].some(p => !about.must.includes(p) && nameAt(text.title, p));
+  const placed = n => TW_PLACES.has(n) && (also.some(z => text.title.zh.includes(z)) || (!elsewhere && strong(text, t => nameAt(t, n), 1 / 3)));
+  if (about.must.some(n => !nameAt(text.title, n) && !placed(n))) return 0;
+  const names = about.names.filter(n => strong(text, t => nameAt(t, n), 1 / 3) || (about.must.includes(n) && placed(n)));
   // (A name no table knows, in an English story's words: "Alice Huang" isn't Jensen Huang.)
   if (!text.cjk && about.unknown.some(w => !strong(text, t => enHas(t.en, w.toLowerCase()), 1 / 4))) return 0;
   const asks = about.concepts[0];
@@ -205,14 +211,15 @@ export function fitOf(text, about) {
 }
 
 // Each story's candidates: its best two events, by fit then money traded.
-export function candidates(stories, events, lines = {}) {
+// (words: each market's words as the AI gave them; its options' Chinese names, a race's candidates, can stand for its place.)
+export function candidates(stories, events, lines = {}, words = {}) {
   const abouts = events.map(ev => [ev, aboutEvent(ev)]).filter(([, a]) => a.names.length);
   const out = [];
   for (const s of stories) {
     const text = storyText(s, lines[s.id]);
     const fits = [];
     for (const [ev, a] of abouts) {
-      const score = fitOf(text, a);
+      const score = fitOf(text, a, Object.values(words[ev.id]?.labels || {}).map(l => l.who && l.zh).filter(z => z && z.length >= 2));
       if (score) fits.push({ ev, score });
     }
     fits.sort((x, y) => y.score - x.score || y.ev.vol - x.ev.vol);
@@ -334,10 +341,10 @@ export async function runNewsMarkets({ store, env, ctx = null, cap = async () =>
   const lines = (await store.json(LINES).catch(() => null))?.lines || {};
   const events = (await readEvents(fetchImpl, now)).filter(ev => !quiet(ev, now));
   const stories = ['tw', 'intl'].flatMap(r => (index[r] || []).slice(0, TOP).filter(s => (s.topics || []).some(t => TOPICS.has(t))).map(s => ({ ...s, region: r })));
-  const found = candidates(stories, events, lines);
   const mem = (await store.json(MEMORY).catch(() => null)) || {};
   const pairs = mem.pairs || {};
   const words = mem.words || {};
+  const found = candidates(stories, events, lines, words);
   // Asked: a pair never asked, or whose story's coverage doubled since (12 hours on).
   const need = found.filter(({ s, ev }) => {
     const was = pairs[`${s.id}|${ev.id}`];

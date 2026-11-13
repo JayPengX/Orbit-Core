@@ -51,6 +51,14 @@ test('a race’s place must be in the story’s title: 苗栗’s debate naming 
   assert.equal(fitOf(storyText(s), aboutEvent(TAICHUNG)), 0);
 });
 
+test('a race’s story whose title names a candidate, or no other place, finds its race (新北 poll story, Jay 11-13)', () => {
+  const poll = tw('g', '最新民調領先李四川8.4個百分點 蘇巧慧：11/28才是最終戰', ['新北市長最新民調落後蘇巧慧8.4個百分點 李四川有最新回應！', '新北選戰倒數15天！最新民調蘇巧慧領先李四川8.4個百分點', '鋒燦民調／決戰新北！蘇巧慧領先李四川8.4%']);
+  assert.ok(fitOf(storyText(poll), aboutEvent(evs[3])) > 0, 'its headlines name 新北, its title no other place');
+  assert.ok(fitOf(storyText({ ...poll, items: [] }), aboutEvent(evs[3]), ['李四川', '蘇巧慧']) > 0, 'its title names a candidate');
+  assert.equal(fitOf(storyText({ ...poll, items: [] }), aboutEvent(evs[3])), 0);
+  assert.equal(fitOf(storyText(poll), aboutEvent(evs[2])), 0, 'never 台北’s race');
+});
+
 test('Taipei’s race and New Taipei’s are never each other’s', () => {
   const taipei = tw('d', '台北市長選戰／沈伯洋提市民大道縫合', ['台北市長選戰 蔣萬安回應', '北市選戰 沈伯洋政見']);
   const newTaipei = tw('e', '新北市長選戰 李四川拚勝選', ['新北選戰民調 李四川領先', '蘇巧慧搶年輕票 新北市長選舉']);
