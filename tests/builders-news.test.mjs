@@ -720,3 +720,41 @@ test('a story\'s picture is an outlet\'s photo before a video\'s thumbnail, its 
   // (Only a thumbnail to show: it's shown.)
   assert.equal(storyOf([item('ftv', t, NOW - H, { img: thumb }), item('cts', t, NOW - 2 * H)], 'tw', NOW).img, thumb);
 });
+
+test('a story drifted from its core lets the drift go, and the drift starts its own story (Jay 11-13: Trump ending the Iran talks held Pence\'s 2028 run)', () => {
+  const T = NOW - 30 * H;
+  const at = i => T + i * 20 * 60_000;
+  const core = [
+    ['ap', 'Trump says US does not need a deal with Iran, pulls Vance from talks'],
+    ['cnn', 'Trump tells Vance to turn his focus away from Iran: we don’t need a deal'],
+    ['nbc', 'Trump says the US doesn’t need a deal with Iran'],
+    ['guardian', 'Trump says no deal needed on Iran and orders Vance to focus on corruption'],
+    ['wapo', 'Trump says no deal needed with Iran, pulls Vance off negotiations'],
+    ['latimes', 'Trump pulls Vance from Iran talks, saying we don’t need a deal'],
+    ['semafor', 'Trump says US doesn’t need Iran deal']
+  ].map(([o, t], i) => item(o, t, at(i)));
+  const drift = [
+    ['fox', 'Pence leaves door open to 2028 White House run after midterm losses'],
+    ['dailycaller', 'Former Vice President Mike Pence threatens to run for president again in 2028'],
+    ['washtimes', 'Pence weighs a 2028 White House run as GOP licks midterm wounds']
+  ].map(([o, t], i) => item(o, t, at(8 + i)));
+  // (Chained in by Vance and Iran: each near enough to the whole when it came.)
+  const linked = item('hill', 'Pence rebukes Vance over Iran as he weighs a 2028 run', at(7));
+  const all = [...core, linked, ...drift];
+  const recs = [{ id: 'iran', r: 'intl', first: T, last: at(10), peak: 11, items: all.map(({ o, t, u, at }) => ({ o, t, u, at })) }];
+  const out = deskOf(all, recs, T + 12 * H);
+  const iran = out.intl.find(s => s.id === 'iran');
+  assert.ok(iran.items.every(x => !/Pence/.test(x[1]) || /Iran/.test(x[1])), 'Pence’s 2028 run let go');
+  assert.equal(iran.n, core.length + 1);
+  const pence = out.intl.find(s => s.id !== 'iran' && s.items.some(x => /2028/.test(x[1])));
+  assert.ok(pence && pence.n >= 2, 'the 2028 run, a story of its own');
+  assert.equal(new Set(out.intl.map(s => s.id)).size, out.intl.length, 'ids never shared');
+});
+
+test('a political story isn’t also sport by a word in it (Jay 11-13: Rubio’s jets to football games, "why is this sport")', () => {
+  const heads = ['Karoline Leavitt roasted for her defense of Rubio after reports he spent $1.2 million on private trips', 'Rubio relies on costly military jets to attend college football games', 'Marco Rubio spent over $1.2m of taxpayer money traveling to son’s football games', 'Flying by pricey military jet, Rubio rarely misses a Florida football game'];
+  const t = topicsOf(heads, 'en');
+  assert.equal(t[0], 'pol');
+  assert.ok(!t.includes('sport'));
+  assert.ok(topicsOf(['亞冠賽中職聯隊0比5遭日本完封', '亞冠賽／首戰遭日本完封 中華隊先發抗澳'], 'zh').includes('sport'), 'a game abroad stays sport');
+});

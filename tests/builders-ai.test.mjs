@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { HOOKS } from '../builders/words-hooks.mjs';
-import { newsLines, TITLE_AGAIN, storyFacts, wordsCards, cardsPath, sidesWanted, sideFacts, newsSides } from '../builders/ai.js';
+import { newsLines, TITLE_AGAIN, LINES_V, storyFacts, briefFacts, wordsCards, cardsPath, sidesWanted, sideFacts, newsSides } from '../builders/ai.js';
 import { gameFacts, swings } from '../builders/recaps.js';
 
 const memStore = (seed = {}) => {
@@ -30,7 +30,7 @@ test('news: a title in the other language, once a story; no line under it; an ol
   const f = storyFacts(story('a', 3), 'tw');
   assert.deepEqual(f, { id: 'a', lang: 'en', heads: ['Ta', '標題一', '標題三', '標題四'] }, 'its title, then an outlet once, three, no summary');
   assert.equal(storyFacts(story('w', 1), 'intl').lang, 'zh');
-  const store = memStore({ 'news/index.json': { tw: [story('a', 3), story('b', 10), story('c', 2)], intl: [] }, 'news/lines.json': { lines: { b: { en: 'Old title', m: 6, t: 'Tb', at: Date.now() - 2 * TITLE_AGAIN }, c: { line: '舊的一句話', zh: '舊', en: 'old', m: 2 }, gone: { en: 'x', m: 1 } } } });
+  const store = memStore({ 'news/index.json': { tw: [story('a', 3), story('b', 10), story('c', 2)], intl: [] }, 'news/lines.json': { lines: { b: { en: 'Old title', m: 6, t: 'Tb', at: Date.now() - 2 * TITLE_AGAIN, v: LINES_V }, c: { line: '舊的一句話', zh: '舊', en: 'old', m: 2 }, gone: { en: 'x', m: 1 } } } });
   const seen = [];
   const env = claudeEnv(body => ({ items: JSON.parse(body.messages[0].content[0].text.split('\n').at(-1)).map(s => ({ id: s.id, title: `Title ${s.id}` })) }), seen);
   const r = await newsLines({ store, env, cap: 10, until: Date.now() + 60_000 });
@@ -51,10 +51,17 @@ test('news: a title in the other language, once a story; no line under it; an ol
   const v = (await store2.json('news/lines.json')).lines.v;
   assert.deepEqual([v.zh, v.m, v.t], ['標題v', 4, 'Tv']);
   // A story that turned (its title isn't the one its line was made from) is made again, an hour on.
-  const turned = (t, ago) => memStore({ 'news/index.json': { tw: [], intl: [{ ...story('w', 4), title: 'New turn' }] }, 'news/lines.json': { lines: { w: { zh: '舊標題', m: 4, t, at: Date.now() - ago } } } });
+  const turned = (t, ago) => memStore({ 'news/index.json': { tw: [], intl: [{ ...story('w', 4), title: 'New turn' }] }, 'news/lines.json': { lines: { w: { zh: '舊標題', m: 4, t, at: Date.now() - ago, v: LINES_V } } } });
   const store3 = turned('Old turn', 2 * TITLE_AGAIN);
   await newsLines({ store: store3, env: env2, cap: 10, until: Date.now() + 60_000 });
   assert.equal((await store3.json('news/lines.json')).lines.w.zh, '標題w');
+  // (One made before 11-13's rule is made again; a vague one is never kept, the outlets' own over it.)
+  const old = memStore({ 'news/index.json': { tw: [], intl: [story('w', 4)] }, 'news/lines.json': { lines: { w: { zh: '伊朗議題受關注', m: 4, t: 'Tw', at: Date.now() } } } });
+  await newsLines({ store: old, env: env2, cap: 10, until: Date.now() + 60_000 });
+  assert.equal((await old.json('news/lines.json')).lines.w.zh, '標題w');
+  const vague = claudeEnv(() => ({ items: [{ id: 'w', title: '伊朗議題受關注' }] }));
+  await newsLines({ store: old, env: vague, cap: 10, until: Date.now() + 60_000 });
+  assert.equal((await old.json('news/lines.json')).lines.w.zh, '標題w', 'a vague new title is no answer');
   const store4 = turned('Old turn', TITLE_AGAIN / 2);
   await newsLines({ store: store4, env: env2, cap: 10, until: Date.now() + 60_000 });
   assert.equal((await store4.json('news/lines.json')).lines.w.zh, '舊標題', 'not again within the hour');
@@ -71,11 +78,15 @@ test('news sides: only stories sides frame and both ends carry; each side’s he
   assert.deepEqual(f.sides.b, ['藍一', '藍二']);
   assert.ok(!JSON.stringify(f).includes('官媒'), 'state media has no side');
   const store = memStore({ 'news/index.json': { tw: [s, { ...s, id: 'biz', topics: ['biz'] }], intl: [] } });
-  const env = claudeEnv(() => ({ items: [{ id: 'x', sides: [{ side: 'g', zh: '綠營強調', en: 'Green stress' }, { side: 'b', zh: '藍營強調', en: 'Blue stress' }, { side: 'r', zh: '不在', en: 'absent' }], diff: { zh: '差在 99 人', en: 'differ' } }] }));
+  // (Every side that carried it, or none, Jay 11-13: 各方怎麼說 showed 偏左 and 中間, no 偏右 though ten carried it.)
+  const partial = claudeEnv(() => ({ items: [{ id: 'x', sides: [{ side: 'g', zh: '綠營強調', en: 'Green stress' }, { side: 'b', zh: '藍營強調', en: 'Blue stress' }], diff: { zh: '', en: '' } }] }));
+  assert.equal((await newsSides({ store, env: partial, cap: 10, until: Date.now() + 60_000 })).made, 0, 'a side left out: no answer');
+  await store.put('news/sides.json', { sides: { x: { sides: { g: { zh: '舊', en: 'old' }, b: { zh: '舊', en: 'old' } }, m: 9, at: Date.now() } } });
+  const env = claudeEnv(() => ({ items: [{ id: 'x', sides: [{ side: 'g', zh: '綠營強調', en: 'Green stress' }, { side: 'c', zh: '中間強調', en: 'Centre stress' }, { side: 'b', zh: '藍營強調', en: 'Blue stress' }, { side: 'r', zh: '不在', en: 'absent' }], diff: { zh: '差在 99 人', en: 'differ' } }] }));
   const r = await newsSides({ store, env, cap: 10, until: Date.now() + 60_000 });
-  assert.equal(r.made, 1);
+  assert.equal(r.made, 1, 'an old answer missing a side is made again');
   const out = (await store.json('news/sides.json')).sides.x;
-  assert.deepEqual(Object.keys(out.sides), ['g', 'b'], 'a side the story doesn’t have is dropped');
+  assert.deepEqual(Object.keys(out.sides), ['g', 'c', 'b'], 'a side the story doesn’t have is dropped');
   assert.equal(out.diff, null, 'a number not in the headlines drops the line');
   const again = await newsSides({ store, env, cap: 10, until: Date.now() + 60_000 });
   assert.equal(again.calls, 0, 'told once until coverage doubles and 6 hours pass');
@@ -158,4 +169,22 @@ test('a game’s facts: only what the card doesn’t show (no leaders), players 
   for (let k = 0; k < 3; k++) (h += 3), dull.push({ id: String(k), scoringPlay: true, homeScore: h, awayScore: a + k, team: { id: '1' }, period: { number: 1 }, clock: { displayValue: '1:00' }, text: 'x' });
   assert.equal(gameFacts({ ...comp(9, 2, [3, 2, 2, 2], [1, 1, 0, 0]), plays: dull }, e), null);
   assert.equal(swings({ winprobability: [] }).length, 0);
+});
+
+test('news: a title is told the headlines nearest the story, never its drift (Jay 11-13: 「伊朗議題受關注」 from Pence’s and Mark Kelly’s 2028)', () => {
+  const s = { id: 'i', title: 'Trump says no need for Iran deal, Vance should focus on US', items: [
+    ['fox', 'Pence leaves door open to 2028 White House run'],
+    ['politico', 'Mark Kelly on Trump, the Iran war and his 2028 decision'],
+    ['dispatch', 'How the Iran war exposes cracks in America’s foundation'],
+    ['ap', 'Trump pulls Vance from Iran talks, says no deal needed'],
+    ['nbc', 'Trump says the US doesn’t need a deal with Iran'],
+    ['cnn', 'Trump tells Vance to focus away from Iran: no deal needed']
+  ] };
+  const f = storyFacts(s, 'intl');
+  assert.equal(f.heads.length, 4);
+  assert.ok(f.heads.every(t => !/Pence|Kelly|cracks/.test(t)), f.heads.join(' | '));
+  const b = briefFacts({ ...s, sum: 'Trump said the US did not need a deal.' }, new Map());
+  assert.equal(b.heads[0], s.title);
+  assert.ok(b.heads.indexOf('Pence leaves door open to 2028 White House run') > 3, 'the drift last');
+  assert.equal(b.sums[0], 'Trump said the US did not need a deal.');
 });

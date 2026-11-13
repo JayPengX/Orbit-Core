@@ -28,6 +28,7 @@
 //            賽前看點: up to two points before each game of today and tomorrow (builders/previews.js).
 // Lean input (Jay 11-10): code picks and trims the facts before any call.
 import { aiOnce } from '../ai.js';
+import { VAGUE } from '../ai-features.js';
 import { runRecaps } from './recaps.js';
 import { runPreviews } from './previews.js';
 import { runF1Stories } from './f1story.js';
@@ -35,7 +36,7 @@ import { runRecWeekly } from '../rec-weekly.js';
 import { usage as meterUsage } from '../transit.js';
 import { sideOf } from '../kit/news-outlets.mjs';
 import { SPORT_PATH } from '../kit/news-sport.mjs';
-import { SPORT_WHO } from './news.js';
+import { SPORT_WHO, piecesOf } from './news.js';
 import { HOOKS } from './words-hooks.mjs';
 import { newsTr } from './news-tr.js';
 
@@ -46,25 +47,34 @@ export const letterOf = w => (/^[a-z]/i.test(w) ? w[0].toLowerCase() : '_');
 const WORDS_LIST = 'https://orbit.jaypengx.com/words/data/words.json';
 
 // ---- News: one line and two titles a story ----
-const NEWS_TOP = { tw: 15, intl: 25 };
+// (Every world story near the front in Chinese: Jay 11-13, an English title on a Chinese page.)
+const NEWS_TOP = { tw: 15, intl: 60 };
+// A title made before 11-13's rule (the event, never the topic) is made again.
+export const LINES_V = 2;
 const NEWS_BATCH = 12;
 // A title made again once the story's own title has changed, an hour after it was last made at most.
 export const TITLE_AGAIN = 3_600_000;
-// A story as the AI is told it: its outlets' headlines (5 at most, the most
-// outlets' own), each with its summary only on the first, cut short.
-// A story as the AI is told it: its outlets' headlines (an outlet once,
-// three at most), and the language its title is wanted in (a world story's
-// in Chinese, a Taiwan story's in English). Nothing else: a title is all
-// it writes (Jay 11-10: the one line under it only said the headline again).
+// A story as the AI is told it: its own title (the turn it's on, 11-12: the
+// newest three spoke of who comes after him, not that he'd gone), then the
+// outlets' headlines nearest the rest of the story (an outlet once, three
+// at most), and the language its title is wanted in (a world story's in
+// Chinese, a Taiwan story's in English). Nearest, not newest (Jay 11-13:
+// 「伊朗議題受關注」, from Pence's 2028 run, Mark Kelly's and an essay on
+// the war beside Trump ending the Iran talks: all they shared was Iran).
+// Nothing else: a title is all it writes (Jay 11-10: the one line under
+// it only said the headline again).
 export function storyFacts(s, region = s.region) {
+  const cut = t => String(t).slice(0, 90);
+  const heads = s.title ? [cut(s.title)] : [];
+  const lang = region === 'intl' ? 'en' : 'zh';
+  const list = (s.items || []).map(([outlet, title], i) => ({ outlet, t: cut(title), i, p: new Set(piecesOf(String(title), lang)) }));
+  // (How much of each headline the others share, piece by piece.)
+  for (const a of list) a.near = a.p.size ? list.reduce((n, b) => (b === a ? n : n + [...a.p].filter(x => b.p.has(x)).length / a.p.size), 0) : 0;
   const seen = new Set();
-  // (The story's own title first: the turn it's on, 11-12: the newest three spoke of who comes after him, not that he'd gone.)
-  const heads = s.title ? [String(s.title).slice(0, 90)] : [];
-  for (const [outlet, title] of s.items || []) {
-    if (heads.includes(String(title).slice(0, 90))) continue;
-    if (seen.has(outlet) || heads.length >= 4) continue;
-    seen.add(outlet);
-    heads.push(String(title).slice(0, 90));
+  for (const it of [...list].sort((a, b) => b.near - a.near || a.i - b.i)) {
+    if (heads.includes(it.t) || seen.has(it.outlet) || heads.length >= 4) continue;
+    seen.add(it.outlet);
+    heads.push(it.t);
   }
   return { id: s.id, lang: region === 'intl' ? 'zh' : 'en', heads };
 }
@@ -82,7 +92,7 @@ export async function newsLines({ store, env, ctx, cap, until }) {
     // (Again when the story has turned: its title isn't the one it was made from, an hour on
     // (11-12: 黃仁勳 resigned, his world story's Chinese title still said the board was weighing it).)
     const turned = old && old.t !== s.title && !(Date.now() - (old.at || 0) < TITLE_AGAIN);
-    if (old && !old.line && old[storyFacts(s).lang] && !turned) keep[s.id] = old;
+    if (old && !old.line && old[storyFacts(s).lang] && !turned && old.v === LINES_V) keep[s.id] = old;
     else need.push(s);
   }
   let made = 0, calls = 0;
@@ -93,10 +103,11 @@ export async function newsLines({ store, env, ctx, cap, until }) {
     calls++;
     if (!r) break;
     if (r.error) continue;
-    for (const s of batch) if (r.out[s.id]) (keep[s.id] = { ...r.out[s.id], m: s.m || 0, t: s.title, at: Date.now() }), made++;
+    for (const s of batch) if (r.out[s.id]) (keep[s.id] = { ...r.out[s.id], m: s.m || 0, t: s.title, at: Date.now(), v: LINES_V }), made++;
   }
   // (An old line kept for a story still on the front that this run couldn't reach.)
-  for (const s of need) if (!keep[s.id] && was[s.id]) keep[s.id] = was[s.id];
+  // (Never a vague one, 伊朗議題受關注: the outlets' own headline over it.)
+  for (const s of need) if (!keep[s.id] && was[s.id] && !VAGUE.test(`${was[s.id].zh || ''} ${was[s.id].en || ''}`)) keep[s.id] = was[s.id];
   await store.put(NEWS_LINES, { built: Date.now(), lines: keep });
   return { made, calls, kept: Object.keys(keep).length };
 }
@@ -179,9 +190,11 @@ export async function newsSides({ store, env, ctx, cap, until, now = Date.now() 
     const old = was[s.id];
     const t = prev?.tries?.[s.id];
     if (t) tries[s.id] = t;
-    if (old && ((s.m || 0) < (old.m || 0) * 2 || now - (old.at || 0) < 6 * 3_600_000)) keep[s.id] = old;
+    // (One that left out a side the story has is made again, 11-13: no 偏右 though ten carried it.)
+    const whole = old && Object.keys(sideFacts(s, r).sides).every(k => old.sides?.[k]);
+    if (old && whole && ((s.m || 0) < (old.m || 0) * 2 || now - (old.at || 0) < 6 * 3_600_000)) keep[s.id] = old;
     else if (t && (t.n >= SIDES_TRIES || now - t.at < SIDES_RETRY) && (s.m || 0) < (t.m || 0) * 2) {
-      if (old) keep[s.id] = old;
+      if (whole) keep[s.id] = old;
     } else need.push([s, r]);
   }
   let made = 0, calls = 0;
@@ -203,7 +216,7 @@ export async function newsSides({ store, env, ctx, cap, until, now = Date.now() 
           tries[s.id] = { n: t && (s.m || 0) < (t.m || 0) * 2 ? t.n + 1 : 1, at: now, m: s.m || 0 };
         }
   }
-  for (const [s] of need) if (!keep[s.id] && was[s.id]) keep[s.id] = was[s.id];
+  for (const [s, r] of need) if (!keep[s.id] && was[s.id] && Object.keys(sideFacts(s, r).sides).every(k => was[s.id].sides?.[k])) keep[s.id] = was[s.id];
   await store.put(NEWS_SIDES, { built: now, sides: keep, ...(Object.keys(tries).length ? { tries } : {}) });
   return { made, calls, kept: Object.keys(keep).length, ...(missed.length ? { missed: missed.slice(0, 6) } : {}) };
 }
@@ -217,33 +230,40 @@ const NEWS_BRIEFS = 'news/briefs.json';
 export const BRIEFS_TOP = { tw: 24, intl: 14 };
 const BRIEFS_BATCH = 4;
 export const BRIEF_AGAIN = 3 * 3_600_000;
-// A story as the AI is told it: an outlet's headline once (10 at most) and
-// up to 6 outlets' summaries, each cut short.
+// A story as the AI is told it: its title, then an outlet's headline once
+// (12 at most, nearest the story first, as storyFacts) and up to 8
+// outlets' summaries, each cut short, the title's own first.
 export function briefFacts(s, sums = new Map()) {
+  const near = storyFacts(s, s.region || 'tw');
+  const order = new Map(near.heads.map((t, i) => [t, i]));
   const seen = new Set();
-  const heads = [];
+  const heads = s.title ? [String(s.title).slice(0, 90)] : [];
   const said = [];
-  for (const [outlet, title, url] of s.items || []) {
+  const items = [...(s.items || [])].sort((a, b) => (order.get(String(a[1]).slice(0, 90)) ?? 99) - (order.get(String(b[1]).slice(0, 90)) ?? 99));
+  for (const [outlet, title, url] of items) {
     if (seen.has(outlet)) continue;
     seen.add(outlet);
-    if (heads.length < 10) heads.push(String(title).slice(0, 90));
+    const t = String(title).slice(0, 90);
+    if (heads.length < 12 && !heads.includes(t)) heads.push(t);
     const d = sums.get(url);
-    if (d && said.length < 6 && !said.includes(d)) said.push(String(d).slice(0, 200));
+    if (d && said.length < 8 && !said.includes(d)) said.push(String(d).slice(0, 280));
   }
-  if (s.sum && !said.length) said.push(String(s.sum).slice(0, 200));
-  return { id: s.id, heads, sums: said };
+  if (s.sum && !said.includes(s.sum)) said.unshift(String(s.sum).slice(0, 280));
+  return { id: s.id, heads, sums: said.slice(0, 8) };
 }
+// A brief made before 11-13's kinds (what happened, background, next) is made again.
+export const BRIEF_V = 2;
 export const briefWanted = s => (s.n || 0) >= 3;
 export async function newsBriefs({ store, env, ctx, cap, until, now = Date.now() }) {
   const index = await store.json('news/index.json');
   if (!index) return { skipped: 'no index' };
   const was = (await store.json(NEWS_BRIEFS))?.briefs || {};
-  const front = ['tw', 'intl'].flatMap(r => (index[r] || []).filter(briefWanted).slice(0, BRIEFS_TOP[r]));
+  const front = ['tw', 'intl'].flatMap(r => (index[r] || []).filter(briefWanted).slice(0, BRIEFS_TOP[r]).map(s => ({ ...s, region: r })));
   const keep = {};
   const need = [];
   for (const s of front) {
     const old = was[s.id];
-    if (old && ((s.m || 0) < (old.m || 0) * 1.5 || now - (old.at || 0) < BRIEF_AGAIN)) keep[s.id] = old;
+    if (old && old.v === BRIEF_V && ((s.m || 0) < (old.m || 0) * 1.5 || now - (old.at || 0) < BRIEF_AGAIN)) keep[s.id] = old;
     else need.push(s);
   }
   let made = 0, calls = 0;
@@ -258,7 +278,7 @@ export async function newsBriefs({ store, env, ctx, cap, until, now = Date.now()
       calls++;
       if (!r) break;
       if (r.error) missed.push(r.error);
-      else for (const s of batch) if (r.out?.[s.id]) ((keep[s.id] = { points: r.out[s.id], m: s.m || 0, at: now }), made++);
+      else for (const s of batch) if (r.out?.[s.id]) ((keep[s.id] = { points: r.out[s.id], m: s.m || 0, at: now, v: BRIEF_V }), made++);
         else missed.push(`dropped ${s.id}`);
     }
   }

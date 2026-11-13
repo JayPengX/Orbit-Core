@@ -69,6 +69,10 @@ export const spanOf = scope =>
   });
 
 // Simplified Chinese's common characters (never Taiwan's).
+// A headline that names a topic, not what happened (伊朗議題受關注, X成焦點, draws attention).
+// 重點整理's kinds, in the order shown: what happened, the background, what comes next.
+export const BRIEF_KINDS = ['what', 'why', 'next'];
+export const VAGUE = /受關注|引關注|引發關注|成焦點|成為焦點|引熱議|引發熱議|引發討論|備受矚目|受矚目|draws? attention|in (?:the )?spotlight|in focus|under scrutiny$/i;
 const SIMPLIFIED = /[这们说时会发对经还为业东车长门见现问间关开应实点两亿国联军华负责将诉讯认让议论员总统选举区际头条报导历图书话语气乐听觉进远运过边达迁递务动劳卫监检验证调审决签约贸币价钱银财费额购买卖损伤医疗药灾难护]/;
 // A point that copies the material: any 12 characters running (Chinese) of it found in it.
 const copied = (zh, material) => {
@@ -1070,7 +1074,7 @@ export const FEATURES = {
       text(
         [
           'You compare how each side’s news outlets framed the same story, using only the headlines each side gave it. Sides: in Taiwan g = 偏綠 (green-leaning), c = 中間, b = 偏藍 (blue-leaning); for world news l = left-leaning (偏左), c = centre (中間), r = right-leaning (偏右). In diff, name sides with exactly these labels.',
-          'For each story, for each side it gives (and only those): the one framing choice that sets that side’s headlines apart from the other sides: what they lead with, who they quote, or the word they choose. Exactly one point in one short clause: never join a second point with 並, 還, 、 or ；, even when the side has 4 headlines (pick the single most telling one). Before using a word, voice or fact, check every other side’s headlines: if any other side has it too (same word or same meaning, e.g. 鬧劇 and "farce", or both quote Vance), it does not set this side apart, so pick something else. If nothing sets a side apart, leave that side out. Good: 用「反嗆」形容沈伯洋的回應. Bad (a list, too long, thrown away): 引述萬斯與赫格塞斯斥彈劾為「荒謬」「鬧劇」，並提到民主黨預告一月再推。 Facts a side leaves out go in diff, not here. zh: aim for 12–22 字, never over 30 字 counting punctuation and 「」 (hard limit: a longer line is thrown away and that side shows nothing), no full stop at the end, Traditional Chinese (台灣用語) with full-width punctuation (，：；); en: at most 18 words, the same point as zh. Quote a headline’s telling word: in zh in 「」 (an English word translated into Chinese as Taiwan writes it; no English left inside zh, e.g. Low-T → 「低睪固酮」), in en in "" (a Chinese word translated into English).',
+          'For each story, for every side it gives (each one, and only those): the one framing choice that sets that side’s headlines apart from the other sides: what they lead with, who they quote, or the word they choose. Exactly one point in one short clause: never join a second point with 並, 還, 、 or ；, even when the side has 4 headlines (pick the single most telling one). Before using a word, voice or fact, check every other side’s headlines: if any other side has it too (same word or same meaning, e.g. 鬧劇 and "farce", or both quote Vance), it does not set this side apart, so pick something else. If nothing sets a side apart, say plainly what its headlines lead with (e.g. 聚焦舒默面臨黨內挑戰); never leave a side out (Jay: every side that covered it shows). Good: 用「反嗆」形容沈伯洋的回應. Bad (a list, too long, thrown away): 引述萬斯與赫格塞斯斥彈劾為「荒謬」「鬧劇」，並提到民主黨預告一月再推。 Facts a side leaves out go in diff, not here. zh: aim for 12–22 字, never over 30 字 counting punctuation and 「」 (hard limit: a longer line is thrown away and that side shows nothing), no full stop at the end, Traditional Chinese (台灣用語) with full-width punctuation (，：；); en: at most 18 words, the same point as zh. Quote a headline’s telling word: in zh in 「」 (an English word translated into Chinese as Taiwan writes it; no English left inside zh, e.g. Low-T → 「低睪固酮」), in en in "" (a Chinese word translated into English).',
           'diff: choose it before writing the side lines, then keep it out of them. One fact, voice or number that a reader of one side would miss AND that none of your side lines mentions, not even in other words (if a side line says Democrats promise more in Jan, a diff about January moves is a repeat); say which side has it and which lacks it (e.g. 只有偏綠標題提到…). zh at most 40 字, en at most 24 words, one point, zh and en saying the same thing. The reader already sees each side’s line above it: if a side line already names it (e.g. that line mentions Iran), it does not count. Never restate or sum up the lines, never quote a word they quote. Both "" when no such fact is left.',
           'Never say which side is right, never call an outlet biased or propaganda, and add no word of your own that judges a headline or a person (not 嘲諷/mocking, 調侃/jab, 聳動/sensational, 強硬/hardline, 怒/angrily) unless it translates that headline’s own word. Every number you write must be in the headlines, written in digits as the headline writes it (300, not 三百; 1原因 stays 1). Names as the headlines write them; when sides spell one person differently (赫塞斯/赫格塞斯), use one form everywhere. In zh, a foreign name in the Chinese form Taiwan media use (Hegseth = 赫格塞斯, Vance = 萬斯); if you don’t know it, keep the English name. In en, a Taiwanese name only in the English name that person is actually known by (蔣萬安 = Chiang Wan-an, 沈伯洋 = Puma Shen, 賴清德 = Lai Ching-te); never build a romanization yourself from the characters. If unsure, use a role the headlines give (the mayor) or "his rival" instead.',
           'Return one item per story with its id.',
@@ -1093,7 +1097,8 @@ export const FEATURES = {
           if (String(x?.zh || '').trim().length > 34 || String(x?.en || '').trim().length > 160) continue;
           if (src.sides[k]?.length && zh && en && numbersFrom(zh + ' ' + en, text)) sides[k] = { zh, en };
         }
-        if (Object.keys(sides).length < 2) continue;
+        // (Every side that carried it, or none: a missing 偏右 reads as if the right said nothing, Jay 11-13.)
+        if (Object.keys(sides).length < 2 || Object.keys(src.sides).some(k => src.sides[k]?.length && !sides[k])) continue;
         const dz = str(it.diff?.zh, 80), de = str(it.diff?.en, 200);
         const whole = String(it.diff?.zh || '').trim().length <= 46 && String(it.diff?.en || '').trim().length <= 200;
         // (A diff that only says each side's line again is dropped: sidesRecap.)
@@ -1105,23 +1110,26 @@ export const FEATURES = {
   },
 
   // Orbit News' 重點整理 (built once a story, builders/ai.js newsBriefs; Jay
-  // 11-13: "make it more in app"): what happened, in a few short points of
-  // our own words, from the outlets' own headlines and feed summaries only
-  // (never an article: outlets mark them 禁止轉載), each number theirs.
+  // 11-13: "make it more in app"): what happened, the background, what
+  // comes next (Jay 11-13: points that didn't help him understand the
+  // news), in a few short points of our own words, from the outlets' own
+  // headlines and feed summaries only (never an article: outlets mark them
+  // 禁止轉載), each number theirs.
   'news-brief': {
     models: ['haiku', 'luna'],
     timeoutMs: 60_000,
-    maxIn: 12000,
+    maxIn: 16000,
     parts: ({ stories }) =>
       text(
         [
-          'Each item is one news story: several outlets’ headlines ("heads") and the short summaries their feeds gave ("sums"). For each, write what a reader needs to know in 2 to 4 short points, the most important first: what happened, then the key details (who, numbers, where, when), then what comes next or how those involved responded, if the material says so. Each point one plain sentence of your own words: never copy a sentence or a phrase of more than 8 characters from the material, never quote a headline, no outlet’s name, no opinion of yours, no “according to reports”.',
-          'Only what the material states; if outlets disagree on a fact or a number, leave it out. A claim or accusation keeps who made it (檢方起訴, 涉嫌, X says), never stated as fact. Numbers: copy each exactly as the material writes it (digits stay digits, number words stay words; no unit or currency conversion, no turning "next year" into a year). Names as the material writes them; a foreign name in zh in the form Taiwan’s media use (川普, 普丁, 黃仁勳), else keep the English; in en a Taiwanese person only by the English name they’re known by (賴清德 = Lai Ching-te), else by their role.',
+          'Each item is one news story: several outlets’ headlines ("heads", the first the story’s own, the rest nearest it first) and the short summaries their feeds gave ("sums"). The story is the one event the first headline reports; leave out headlines about something else. For each, write a brief a reader understands in ten seconds, as 2 to 4 points, each with its kind k:',
+          '"what" (first; one, or two when a second is needed for the key detail): what happened: who did what, with the key fact (a number, a place, a date). "why" (one, when the material gives it): the background a reader needs: what led to this, or what it changes or puts at stake. "next" (one, when the material gives it): what comes next (a vote, a deadline, a hearing), or how those involved or affected responded. Never a "why" or "next" the material doesn’t state: then leave that kind out.',
+          'Each point one plain sentence of your own words: never copy a sentence or a phrase of more than 8 characters from the material, never quote a headline, no outlet’s name, no opinion of yours, no “according to reports”. Only what the material states; if outlets disagree on a fact or a number, leave it out. A claim or accusation keeps who made it (檢方起訴, 涉嫌, X says), never stated as fact. Numbers: copy each exactly as the material writes it (digits stay digits, number words stay words; no unit or currency conversion, no turning "next year" into a year). Names as the material writes them; a foreign name in zh in the form Taiwan’s media use (川普, 普丁, 范斯, 黃仁勳), else keep the English; in en a Taiwanese person only by the English name they’re known by (賴清德 = Lai Ching-te), else by their role.',
           'zh: Traditional Chinese as Taiwan writes it (台灣用語; never Simplified), full-width punctuation (，：「」) with half-width digits, each point at most 40 characters, no full stop at the end. en: plain natural English, each point at most 22 words, the same points in the same order as zh. Return one item per story with its id; skip none.',
           JSON.stringify(stories)
         ].join('\n')
       ),
-    schema: obj({ items: arr(obj({ id: S, points: arr(obj({ zh: S, en: S })) })) }),
+    schema: obj({ items: arr(obj({ id: S, points: arr(obj({ k: S, zh: S, en: S })) })) }),
     clean(raw, { stories }) {
       const given = new Map(stories.map(s => [s.id, s]));
       const out = {};
@@ -1132,13 +1140,17 @@ export const FEATURES = {
         const points = [];
         for (const p of list(it.points, 4)) {
           const zh0 = String(p?.zh || '').trim(), en0 = String(p?.en || '').trim();
+          const k = BRIEF_KINDS.includes(p?.k) ? p.k : 'what';
           // (Past its length it was cut mid-word: a point said too long is left out; so is Simplified Chinese.)
           if (!zh0 || !en0 || zh0.length > 46 || en0.split(/\s+/).length > 28 || SIMPLIFIED.test(zh0)) continue;
           const zh = zh0.replace(/[。.]$/, '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
           if (copied(zh, material)) continue;
-          if (numbersFrom(zh + ' ' + en0, material)) points.push({ zh, en: en0 });
+          // (One background and one next at most; what happened first.)
+          if (k !== 'what' && points.some(x => x.k === k)) continue;
+          if (numbersFrom(zh + ' ' + en0, material)) points.push({ k, zh, en: en0 });
         }
-        if (points.length >= 2) out[src.id] = points;
+        points.sort((x, y) => BRIEF_KINDS.indexOf(x.k) - BRIEF_KINDS.indexOf(y.k));
+        if (points.length >= 2 && points[0].k === 'what') out[src.id] = points;
       }
       return out;
     }
@@ -1216,8 +1228,9 @@ export const FEATURES = {
     parts: ({ stories }) =>
       text(
         [
-          'For each news story below (its outlets’ headlines), write one short neutral headline in the language its "lang" asks, whatever language the headlines are in. "zh": Traditional Chinese as Taiwan writes it (台灣用語 and Taiwan’s names, e.g. 聯準會, 川普, 雪梨; never Simplified even if the headlines are: 联→聯, 国→國, 发→發, 亿→億), full-width punctuation (，：「」) but half-width digits and Latin letters (2027, AI; never ２０２７), at most 20 characters counting every character including punctuation, digits and letters. "en": English, at most 14 words, no Chinese characters.',
-          'Say only what all the headlines agree on; drop any outlet’s adjectives, framing, questions and exclamation marks, and every outlet tag or label even if all headlines carry one (影／, 快訊, 獨家, 【】, ｜ETtoday, 中央社, LIVE:, Opinion:). If a headline reports a claim or accusation, keep who made it (e.g. 檢方起訴, 涉嫌, X says); never state it as fact. Numbers: copy each number exactly as a headline writes it (number words stay words, e.g. 兩次 / two; digits stay digits); no unit or currency conversion (no 萬/億 ↔ million/billion) and no turning "next year" into a year. If the headlines give different numbers, or a number would need converting, leave it out. Names: use a person’s or body’s name only as a headline gives it or in its well-known official form in the target language; if unsure, use their role (e.g. the premier, 行政院長). Return one item per story with its id; skip none.',
+          'For each news story below (its outlets’ headlines, the first one the story’s own), write one short neutral headline in the language its "lang" asks, whatever language the headlines are in. "zh": Traditional Chinese as Taiwan writes it (台灣用語 and Taiwan’s names, e.g. 聯準會, 川普, 范斯, 雪梨; never Simplified even if the headlines are: 联→聯, 国→國, 发→發, 亿→億), full-width punctuation (，：「」) but half-width digits and Latin letters (2027, AI; never ２０２７), at most 24 characters counting every character including punctuation, digits and letters. "en": English, at most 14 words, no Chinese characters.',
+          'The headline says the one event the first headline reports, as a reader would want it in a newspaper: who did what (the main person or body by name, and the action), plus the key fact if it fits. Good: 川普稱不需與伊朗達成協議，撤回范斯談判任務; Bad: 伊朗議題受關注, 美伊關係引發討論, X成焦點, X引熱議 (a topic, not news). If other headlines report something else, ignore them.',
+          'Say only what the headlines state; drop any outlet’s adjectives, framing, questions and exclamation marks, and every outlet tag or label even if all headlines carry one (影／, 快訊, 獨家, 【】, ｜ETtoday, 中央社, LIVE:, Opinion:). If a headline reports a claim or accusation, keep who made it (e.g. 檢方起訴, 涉嫌, X says); never state it as fact. Numbers: copy each number exactly as a headline writes it (number words stay words, e.g. 兩次 / two; digits stay digits); no unit or currency conversion (no 萬/億 ↔ million/billion) and no turning "next year" into a year. If the headlines give different numbers, or a number would need converting, leave it out. Names: use a person’s or body’s name only as a headline gives it or in its well-known official form in the target language; if unsure, use their role (e.g. the premier, 行政院長). Return one item per story with its id; skip none.',
           JSON.stringify(stories)
         ].join('\n')
       ),
@@ -1229,8 +1242,10 @@ export const FEATURES = {
         const s = given.get(String(it?.id || ''));
         if (!s) continue;
         const t0 = String(it?.title || '').trim();
-        if (s.lang === 'zh' ? t0.length > 22 : (t0.length > 110 || t0.split(/\s+/).length > 14)) continue;
-        const title = s.lang === 'zh' ? str(t0, 22).replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/(?<!\d),|,(?!\d)/g, '，').replace(/(?<!\d):|:(?!\d)/g, '：') : str(t0, 110);
+        if (s.lang === 'zh' ? t0.length > 26 : (t0.length > 110 || t0.split(/\s+/).length > 14)) continue;
+        // (A topic said, not news: 伊朗議題受關注, Jay 11-13 "not so helpful".)
+        if (VAGUE.test(t0)) continue;
+        const title = s.lang === 'zh' ? str(t0, 26).replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/(?<!\d),|,(?!\d)/g, '，').replace(/(?<!\d):|:(?!\d)/g, '：') : str(t0, 110);
         const hasCjk = /[\u3000-\u303f\u4e00-\u9fff\uff01-\uff5e]/.test(title);
         const simplified = /[这们说时会发对经还为业东车长门见现问间关开应实点两亿国联军华]/.test(title);
         if (title && !simplified && hasCjk === (s.lang === 'zh') && numbersFrom(title, JSON.stringify(s.heads))) out[s.id] = { [s.lang]: title };
