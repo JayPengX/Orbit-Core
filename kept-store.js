@@ -53,13 +53,20 @@ export async function keptRead(env, key, opts) {
 
 // `value` kept `ttlS` seconds, as JSON (`raw`: a text kept as it is). `metadata`: small strings
 // kept beside it (read with keptText's `meta`). Never throws (a failed write is a copy not kept).
-export async function keptPut(env, key, data, ttlS, { metadata = {}, raw = false, now = Date.now() } = {}) {
+// `orKv`: a count that must not be lost (Google's calls a day, what holds the bill under the free
+// month): written to KV when R2 refuses (R2 was off on 2026-11-13 when the paid plan ended).
+export async function keptPut(env, key, data, ttlS, { metadata = {}, raw = false, orKv = false, now = Date.now() } = {}) {
   const value = raw ? String(data) : JSON.stringify(data);
   const r2 = bucketOf(env);
   try {
     if (r2) {
       const meta = Object.fromEntries(Object.entries(metadata).map(([k, v]) => [k, String(v)]));
-      await r2.put(PREFIX + key, value, { httpMetadata: { contentType: 'application/json' }, customMetadata: { ...meta, exp: String(now + Math.max(60, ttlS) * 1000) } });
+      try {
+        await r2.put(PREFIX + key, value, { httpMetadata: { contentType: 'application/json' }, customMetadata: { ...meta, exp: String(now + Math.max(60, ttlS) * 1000) } });
+      } catch (err) {
+        if (!orKv || !env?.RATE_LIMIT_KV) throw err;
+        await env.RATE_LIMIT_KV.put(key, value, { expirationTtl: Math.max(60, Math.ceil(ttlS)) });
+      }
     } else if (env?.RATE_LIMIT_KV) {
       await env.RATE_LIMIT_KV.put(key, value, { expirationTtl: Math.max(60, Math.ceil(ttlS)), ...(Object.keys(metadata).length && { metadata }) });
     }
