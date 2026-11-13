@@ -451,6 +451,33 @@ test('the front keeps each topic’s best past its cap (Jay 11-10: 科學 had on
 });
 
 
+test('Taiwan’s sports story finds the world’s by the AI’s English names, a game only a game (Jay 11-13: 柯瑞, "why is this Taiwan outlet only")', () => {
+  const items = [
+    item('ap', 'Stephen Curry injury: Warriors star to miss at least two weeks with oblique tear', NOW - 6 * H),
+    item('usatoday', 'Steph Curry injury update: Warriors star suffers oblique tear', NOW - 5 * H),
+    item('cbssports', 'Warriors’ Stephen Curry out at least two weeks with oblique tear', NOW - 5.5 * H),
+    item('reuters', 'South Korea and US discuss North Korea nuclear issue', NOW - 6 * H),
+    item('ap', 'South Korea, US envoys meet on North Korea nuclear talks', NOW - 5 * H),
+    item('ctinews', 'NBA/勇士戰力拉警報 柯瑞側腹斜肌撕裂、至少休2周', NOW - 5 * H),
+    item('ltn', '柯瑞腹斜肌撕裂缺陣勇士慘了？柯爾：狀況已比預期的好', NOW - 4.5 * H),
+    item('tvbs', '柯瑞腹斜肌撕裂恐休近一個月！勇士陷考驗', NOW - 4 * H),
+    item('udn', 'U23世界盃台灣明戰南韓 超級循環賽首戰', NOW - 5 * H),
+    item('ltn', 'U23世界盃／中華隊明對決南韓 超級循環賽開打', NOW - 4.6 * H),
+    item('cna', 'U23世界盃 台灣晉級超級循環賽首戰南韓', NOW - 4.4 * H)
+  ];
+  const first = deskOf(items, [], NOW);
+  const curry = first.tw.find(s => /柯瑞/.test(s.title));
+  const u23 = first.tw.find(s => /U23/.test(s.title));
+  assert.ok(curry && u23);
+  assert.ok(!first.intl.find(s => /Curry/.test(s.title)).tw, 'no English word in 柯瑞');
+  const who = { [curry.id]: { p: ['Stephen Curry'], t: ['Golden State Warriors'], en: 'Stephen Curry out at least a month with oblique tear' }, [u23.id]: { p: [], t: ['Chinese Taipei', 'South Korea'], en: 'Chinese Taipei face South Korea in U23 World Cup Super Round' } };
+  const out = deskOf(items, first.recs, NOW, { who });
+  const world = out.intl.find(s => /Curry/.test(s.title));
+  assert.ok(world.tw?.n >= 2);
+  assert.equal(out.tw.find(s => /柯瑞/.test(s.title)).world, world.id);
+  assert.ok(!out.intl.find(s => /Korea/.test(s.title))?.tw, 'Taiwan’s game with South Korea isn’t Korea’s news');
+});
+
 test('Taiwan’s outlets on a world story: joined by the names and words they share, never by a lookalike (Jay 11-10)', () => {
   const items = [
     item('bbc', 'Pope Leo celebrates huge open-air Mass in Argentina', NOW - 6 * H),
@@ -757,4 +784,12 @@ test('a political story isn’t also sport by a word in it (Jay 11-13: Rubio’s
   assert.equal(t[0], 'pol');
   assert.ok(!t.includes('sport'));
   assert.ok(topicsOf(['亞冠賽中職聯隊0比5遭日本完封', '亞冠賽／首戰遭日本完封 中華隊先發抗澳'], 'zh').includes('sport'), 'a game abroad stays sport');
+});
+
+test('a sports headline naming a team or a player, not the sport, is sport (Jay 11-13: the Curry injury, "why is this Taiwan outlet only")', () => {
+  assert.deepEqual(topicsOf(['Steph Curry injury update: What we know as Warriors star’s night ends early', 'Stephen Curry injury: Warriors star to miss at least two weeks with oblique tear'], 'en'), ['sport']);
+  assert.deepEqual(topicsOf(['What to know for the first week after the NFL’s wild trade deadline'], 'en'), ['sport']);
+  assert.deepEqual(topicsOf(['James Harden breaks slump, leads Cavaliers over Knicks'], 'en'), ['sport']);
+  assert.deepEqual(topicsOf(['比想像嚴重！柯瑞腹斜肌撕裂預計至少缺席1個月', '柯瑞腹斜肌撕裂缺陣勇士慘了？柯爾：狀況已比預期的好', '受傷後更衣室喊話「我沒事」 柯瑞右腹斜肌撕裂恐缺席一個月'], 'zh'), ['sport']);
+  assert.ok(!topicsOf(['Jets scramble as Russian bombers near Alaska', 'Fighter jets intercept bombers'], 'en').includes('sport'), 'a word that is also a nickname stays out');
 });
