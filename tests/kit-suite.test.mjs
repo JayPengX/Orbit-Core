@@ -138,3 +138,14 @@ test('the apps warmed first: back, forward, then the ones used lately here', () 
   const saved = { apps: { weather: { t: now - 1000 }, money: { t: now - 20 * 86_400_000 }, law: { t: now - 5000 }, transit: { t: now } } };
   assert.deepEqual(S.warmOrder(t, saved, 'transit', now), ['match', 'news', 'weather', 'law']);
 });
+
+test("Orbit's window closes only the oldest quiet apps: never the one shown, never one playing", async () => {
+  const { toClose, KEEP } = await import('../kit/suite.mjs');
+  const f = (app, used, playing = false) => ({ app, used, playing });
+  const list = [f('beats', 1, true), f('match', 2), f('law', 3), f('transit', 4), f('weather', 5), f('money', 6), f('news', 7)];
+  assert.equal(KEEP, 3);
+  // shown: news; quiet ones by recency: money, weather, transit kept; law and match closed; beats plays on.
+  assert.deepEqual(toClose(list, 'news').sort(), ['law', 'match']);
+  assert.deepEqual(toClose(list.slice(0, 3), 'law'), []);
+  assert.deepEqual(toClose([f('beats', 1, true), f('a', 2), f('b', 3), f('c', 4), f('d', 5)], 'beats', 3), ['a']);
+});

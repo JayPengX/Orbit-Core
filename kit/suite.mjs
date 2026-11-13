@@ -15,7 +15,11 @@
 //   - each app opened again where it was left (its address and scroll), as
 //     an app on the phone keeps its place;
 //   - links between apps (the kit's s.go, an <a> to another app, a notice)
-//     open in place: no handed-over sign-in, no Safari sheet.
+//     open in place: no handed-over sign-in, no Safari sheet;
+//   - every app opened kept running (Jay 2026-11-13): /app/ holds each in a
+//     frame of its own and a switch shows another (host, below), so Beats
+//     plays on and back is instant. Without the host (a computer's preview),
+//     a switch opens the page, and back uses the browser's own history.
 //
 // Kept on the device:
 //   localStorage orbit.suite.v1    { on, t, apps: { <id>: { url, y, t, home } } }  where each app was left
@@ -161,11 +165,22 @@ function open(url, y = 0) {
   }
   location.assign(to.href);
 }
+// Orbit's window holding this app (site/app/: each app in a frame of its
+// own, kept running while another is shown), or null.
+export function hostOf(w = globalThis) {
+  try {
+    return (w.parent !== w && w.parent?.ORBIT_HOST) || null;
+  } catch {
+    return null;
+  }
+}
 // Another app: a deep link (`hash`) as asked, else where it was left.
 export function go(other, hash = '') {
   if (!BRANDS[other]) return;
   const h = String(hash || '').replace(/^#/, '');
   if (other === app && !h) return;
+  const H = hostOf();
+  if (H) return void (remember(), H.go(other, h ? `${pathOf(other)}#${h}` : null));
   // (The app just before or after this one: as it was left, not opened again.)
   if (!h) {
     const t = readTrail();
@@ -197,6 +212,8 @@ function traverse(by, to) {
 }
 const hlNow = () => globalThis.history?.length || 0;
 export function back() {
+  const H = hostOf();
+  if (H) return void (remember(), H.back());
   const t = readTrail();
   const to = backOf(t);
   if (!to) return;
@@ -207,6 +224,8 @@ export function back() {
   open(to.url || resumeOf(savedSuite(), to.app).url, to.y || 0);
 }
 export function forward() {
+  const H = hostOf();
+  if (H) return void (remember(), H.forward());
   const t = readTrail();
   const to = forwardOf(t);
   if (!to) return;
@@ -424,7 +443,16 @@ export function start() {
   try {
     sessionStorage.removeItem('orbit.launch');
   } catch {}
-  land();
+  const H = hostOf();
+  // (Held by Orbit's window: it keeps the trail; asked to redraw when shown.)
+  if (H) globalThis.__orbitSuite = { draw: () => draw(), remember: () => remember(), app };
+  // An app page opened as the whole window on a phone (a notice, an old
+  // trail): into Orbit's window, which holds it with the others.
+  else if (globalThis.matchMedia?.('(display-mode: standalone)').matches || globalThis.navigator?.standalone === true) {
+    location.replace(`/app/?open=${encodeURIComponent(here())}`);
+    return;
+  }
+  if (!H) land();
   remember();
   const mount = () => {
     draw();
@@ -442,7 +470,7 @@ export function start() {
   document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && remember());
   // Back from the browser's own memory (a computer's back button): the trail again.
   globalThis.addEventListener('pageshow', e => {
-    if (!e.persisted) return;
+    if (!e.persisted || hostOf()) return;
     // (An app that showed its loading screen on the way out: it is here, as left.)
     document.getElementById('loading')?.setAttribute('hidden', '');
     land();
@@ -452,6 +480,176 @@ export function start() {
   globalThis.addEventListener('pagehide', () => clearTimeout(fallback));
   warmSoon();
   globalThis.addEventListener('hashchange', () => remember());
+}
+
+// ---- Orbit's window: every app held at once (site/app/) ----
+// Jay 2026-11-13: an app switched away from keeps running, Beats playing
+// on, however many apps are opened after it; back shows an app as it was
+// left, never loaded again. Each app opens in a frame of its own, the
+// whole window (inside the phone's safe area); a switch shows another
+// frame. Kept: the one shown, any that's playing sound (never closed), and
+// the KEEP (3) most lately used others (a phone's memory); past that the oldest quiet one is
+// closed (where it was is kept, so it opens there again). A hidden frame
+// reads as hidden to its app (document.visibilityState), so its live
+// updates pause as on a locked phone, unless it's playing.
+export const KEEP = 3;
+// The frames to close: never the one shown or a playing one; the oldest first.
+export function toClose(frames, shown, keep = KEEP) {
+  const quiet = frames.filter(f => f.app !== shown && !f.playing).sort((a, b) => b.used - a.used);
+  return quiet.slice(keep).map(f => f.app);
+}
+// Playing sound: the app says so to the phone (Beats' now playing) or a sound or video of its own is running.
+function playing(w) {
+  try {
+    if (w?.navigator?.mediaSession?.playbackState === 'playing') return true;
+    for (const m of w?.document?.querySelectorAll?.('audio, video') || []) if (!m.paused && !m.ended && !m.muted) return true;
+  } catch {}
+  return false;
+}
+export function host(box, { first = null } = {}) {
+  const frames = new Map();
+  let shown = null;
+  const top = document;
+  // Hidden to the app inside: shown only while this one is (and the phone's screen is).
+  const look = (f, on) => {
+    const d = f.el.contentDocument;
+    if (!d || !f.el.contentWindow) return;
+    const away = !on && !playing(f.el.contentWindow);
+    if (!d.__orbitLook) {
+      d.__orbitLook = true;
+      try {
+        Object.defineProperty(d, 'visibilityState', { configurable: true, get: () => (d.__orbitAway || top.visibilityState === 'hidden' ? 'hidden' : 'visible') });
+        Object.defineProperty(d, 'hidden', { configurable: true, get: () => d.visibilityState === 'hidden' });
+      } catch {}
+    }
+    if (d.__orbitAway === away) return;
+    d.__orbitAway = away;
+    d.dispatchEvent(new Event('visibilitychange'));
+  };
+  const make = (id, url, y) => {
+    const to = new URL(url || resumeOf(savedSuite(), id).url, location.href);
+    if (y > 0) writeJson('sessionStorage', PLACE_KEY, { path: to.pathname, hash: to.hash, y, t: Date.now() });
+    const el = document.createElement('iframe');
+    el.className = 'q-suite-frame';
+    el.title = short(id);
+    el.setAttribute('allow', 'autoplay; fullscreen; geolocation; microphone; camera; clipboard-read; clipboard-write; web-share; publickey-credentials-get; publickey-credentials-create; screen-wake-lock');
+    el.src = to.href;
+    const f = { app: id, el, used: Date.now() };
+    // A frame that went to another app's page (a link, a notice): that app's
+    // frame takes the page; this one goes back to where it was.
+    el.addEventListener('load', () => {
+      let w;
+      try {
+        w = el.contentWindow;
+        void w.location.pathname;
+      } catch {
+        return;
+      }
+      const there = appAt(w.location.pathname);
+      if (there && there !== id) {
+        const url = keepable(`${w.location.pathname}${w.location.search}${w.location.hash}`);
+        el.src = resumeOf(savedSuite(), id).url;
+        api.go(there, url);
+        return;
+      }
+      look(f, shown === id);
+      if (shown === id) w.__orbitSuite?.draw?.();
+    });
+    frames.set(id, f);
+    box.append(el);
+    return f;
+  };
+  const tidy = () => {
+    const list = [...frames.values()].map(f => ({ app: f.app, used: f.used, playing: playing(f.el.contentWindow) }));
+    for (const id of toClose(list, shown)) {
+      const f = frames.get(id);
+      try {
+        f.el.contentWindow?.__orbitSuite?.remember?.();
+      } catch {}
+      f.el.remove();
+      frames.delete(id);
+    }
+  };
+  const show = (id, url = null, y = 0) => {
+    if (!BRANDS[id]) return;
+    let f = frames.get(id);
+    if (!f) f = make(id, url, y);
+    else if (url) {
+      try {
+        const w = f.el.contentWindow;
+        const to = new URL(url, location.href);
+        if (to.pathname === w.location.pathname && to.search === w.location.search) {
+          if (to.hash !== w.location.hash) w.location.hash = to.hash;
+        } else w.location.assign(to.href);
+      } catch {
+        f.el.src = url;
+      }
+    }
+    const was = shown;
+    shown = id;
+    f.used = Date.now();
+    for (const g of frames.values()) {
+      const on = g === f;
+      g.el.classList.toggle('q-suite-shown', on);
+      g.el.toggleAttribute('inert', !on);
+      g.el.setAttribute('aria-hidden', on ? 'false' : 'true');
+      look(g, on);
+    }
+    if (was !== id) {
+      try {
+        f.el.contentWindow?.__orbitSuite?.draw?.();
+        f.el.contentWindow?.focus?.();
+      } catch {}
+    }
+    document.title = 'Orbit';
+    tidy();
+  };
+  const api = {
+    go(id, url = null) {
+      if (!BRANDS[id]) return;
+      if (id !== shown) writeTrail(jump(readTrail(), id, url || (frames.has(id) ? null : resumeOf(savedSuite(), id).url)));
+      show(id, url);
+    },
+    back() {
+      const t = readTrail();
+      const to = backOf(t);
+      if (!to) return;
+      writeTrail(step(t, -1));
+      show(to.app, frames.has(to.app) ? null : to.url, to.y || 0);
+    },
+    forward() {
+      const t = readTrail();
+      const to = forwardOf(t);
+      if (!to) return;
+      writeTrail(step(t, 1));
+      show(to.app, frames.has(to.app) ? null : to.url, to.y || 0);
+    },
+    // An address (a notice's): its app shown there.
+    open(url) {
+      const id = appAt(new URL(url, location.href).pathname);
+      if (id) api.go(id, url);
+    },
+    shown: () => shown,
+    held: () => [...frames.keys()]
+  };
+  globalThis.ORBIT_HOST = api;
+  // Back on the phone's screen: the shown one to its app again; a frame that stopped playing may go quiet.
+  top.addEventListener('visibilitychange', () => {
+    for (const f of frames.values()) {
+      const d = f.el.contentDocument;
+      if (d) d.dispatchEvent(new Event('visibilitychange'));
+    }
+  });
+  setInterval(() => {
+    for (const f of frames.values()) if (f.app !== shown) look(f, false);
+    tidy();
+  }, 15000);
+  if (first) {
+    const t = readTrail();
+    writeTrail(t.list[t.i]?.app === first.app ? t : arrive(t, first.app, first.url));
+    show(first.app, first.url, first.y || 0);
+  }
+  return api;
 }
 
 // ---- In a separate app: Orbit suggested on a hop to another app ----
