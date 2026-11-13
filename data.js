@@ -52,7 +52,15 @@ async function readFile(env, ctx, path, request) {
   // (A file not built yet is noted at the edge for 2 minutes: an app asks
   // again every 15 s, each an R2 read for nothing.)
   if (hit) return hit.headers.get('X-Data-Missing') ? new Response('', { status: 404 }) : hit;
-  const obj = env.DATA ? await env.DATA.get(path) : null;
+  // (R2 unreachable or not bound, as on 2026-11-13 when the paid plan's end switched it off: a
+  // failure, 503, never "not there", so a phone keeps the copy it has.)
+  if (!env.DATA) return new Response('', { status: 503, headers: { 'Retry-After': '300', 'X-Data-Off': '1' } });
+  let obj;
+  try {
+    obj = await env.DATA.get(path);
+  } catch {
+    return new Response('', { status: 503, headers: { 'Retry-After': '60', 'X-Data-Off': '1' } });
+  }
   if (!obj) {
     if (cache) ctx.waitUntil(cache.put(key, new Response('', { headers: { 'X-Data-Missing': '1', 'Cache-Control': 'public, max-age=120' } })));
     return new Response('', { status: 404 });
