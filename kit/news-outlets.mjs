@@ -319,7 +319,7 @@ export const TOPICS = [
   {
     id: 'eco', zh: '經濟', en: 'Economy', on: true,
     zh_: rx('經濟|GDP|景氣|出口|進口|關稅|貿易|匯率|央行|升息|降息|利率|通膨|物價|油價|電價|水價|薪資|加薪|基本工資|最低工資|勞保|年金|退休金|稅|預算|財政|普發|補助|補貼|振興|紓困|股市|台股|美股|股價|國安基金|護盤|房價|房市|打房|囤房|信用管制|失業|就業|缺工|產業|外資|投資|供應鏈|消費|零售|內需|營收|財報|經濟部|金管會|證交所|銀行|保險|壽險|台幣|美元|漲價|企業|台商|鴻海|侵權|337'),
-    en_: [rxi('econom\\w*|tariffs?|trade|trading|inflation|prices?|pricing|Fed|Federal Reserve|interest rates?|rates|jobs|jobless|unemployment|wages?|budget\\w*|tax|taxes|taxpayers?|debt|deficit|stocks?|markets?|Wall Street|recession|GDP|banks?|banking|housing|rent|mortgages?|oil|SNAP|Medicaid|Medicare|Social Security|earnings|profits?|revenue|investors?|investment|billion|trillion|dollar|currency|exports?|imports?|layoffs?|retail|consumers?|spending|costs?|affordab\\w*|insurance|compan(?:y|ies)|business\\w*|industr\\w*|CEO|bonds?|crypto\\w*|bitcoin|auto\\w*|manufactur\\w*')],
+    en_: [rxi('econom\\w*|tariffs?|trade(?! deadline)|trading|inflation|prices?|pricing|Fed|Federal Reserve|interest rates?|rates|jobs|jobless|unemployment|wages?|budget\\w*|tax|taxes|taxpayers?|debt|deficit|stocks?|markets?|Wall Street|recession|GDP|banks?|banking|housing|rent|mortgages?|oil|SNAP|Medicaid|Medicare|Social Security|earnings|profits?|revenue|investors?|investment|billion|trillion|dollar|currency|exports?|imports?|layoffs?|retail|consumers?|spending|costs?|affordab\\w*|insurance|compan(?:y|ies)|business\\w*|industr\\w*|CEO|bonds?|crypto\\w*|bitcoin|auto\\w*|manufactur\\w*')],
     enAt: [rxi('plants?|factor(?:y|ies)')]
   },
   {
@@ -367,8 +367,12 @@ export const TOPICS = [
   },
   {
     id: 'sport', zh: '運動', en: 'Sport', on: true, spectrum: false, weight: 0.6,
-    zh_: rx('運動員|選手|球員|球隊|教練|賽事|奪冠|冠軍|金牌|銀牌|銅牌|奧運|帕運|亞運|世大運|全運會|經典賽|世界盃|12強|中華隊|中職|日職|韓職|美職|大聯盟|MLB|NBA|NFL|NHL|PLG|TPBL|P\\.?LEAGUE|棒球|籃球|足球|網球|羽球|桌球|排球|高爾夫|田徑|游泳|舉重|跆拳|柔道|拳擊|射箭|自由車|馬拉松|鐵人|F1|賽車|大谷'),
-    en_: [/\b(?:NBA|NFL|MLB|NHL|FIFA|UEFA|F1)\b/, rxi('sports?|athletes?|coach(?:es)?|tournaments?|championships?|medals?|Olympic\\w*|Paralympic\\w*|World Cup|Premier League|soccer|football|basketball|baseball|tennis|golf|cricket|rugby|boxing|marathon|Formula 1|Super Bowl|World Series|playoffs?|Wimbledon')]
+    zh_: rx('運動員|選手|球員|球隊|教練|賽事|奪冠|冠軍|金牌|銀牌|銅牌|奧運|帕運|亞運|世大運|全運會|經典賽|世界盃|12強|中華隊|中職|日職|韓職|美職|大聯盟|MLB|NBA|NFL|NHL|PLG|TPBL|P\\.?LEAGUE|棒球|籃球|足球|網球|羽球|桌球|排球|高爾夫|田徑|游泳|舉重|跆拳|柔道|拳擊|射箭|自由車|馬拉松|鐵人|F1|賽車|大谷|季後賽|例行賽|總冠軍賽|戰報|連勝|連敗|傷退|傷兵|缺陣|全壘打|開轟|三分球|籃板|助攻|大三元|自由球員|選秀|英超|西甲|德甲|義甲|歐冠|勇士|湖人|塞爾提克|尼克|公鹿|灰狼|金塊|獨行俠|快艇|拓荒者|馬刺|溜馬|活塞|巫師|暴龍|道奇|洋基|大都會|小熊|教士隊|水手隊|藍鳥|紅襪|柯瑞|詹皇|唐西奇|文班亞馬|杜蘭特|字母哥|約基奇|梅西|C羅|山本由伸|鈴木誠也'),
+    // (English sports headlines name a team or a play more than the sport:
+    // "Steph Curry injury update: … Warriors star's night ends early" was
+    // 科技, Jay 11-13. Nicknames that are also words, Jets, Bills, Giants,
+    // Bulls, Heat, Chiefs, are left out.)
+    en_: [/\b(?:NBA|WNBA|NFL|MLB|NHL|MLS|NCAA|FIFA|UEFA|F1|ATP|WTA|PGA|LPGA|UFC|NASCAR|MVP|All-Star)\b/, rxi('sports?|athletes?|coach(?:es)?|tournaments?|championships?|medals?|Olympic\\w*|Paralympic\\w*|World Cup|Premier League|Champions League|Nations League|La Liga|Serie A|Bundesliga|soccer|football|basketball|baseball|hockey|tennis|golf|cricket|rugby|boxing|marathon|Formula (?:1|One)|Grand Prix|Super Bowl|World Series|Stanley Cup|playoffs?|postseason|preseason|offseason|Wimbledon|quarterbacks?|touchdowns?|innings|pitchers?|home runs?|rebounds|triple-double|hat-trick|strikers?|midfielders?|goalkeepers?|free agen\\w*|trade deadline|lockout|Week \\d+|Steph(?:en)? Curry|LeBron|Ohtani|Messi|Mahomes|Wembanyama|Don[cč]i[cć]|Lakers|Celtics|Knicks|Warriors|Cavaliers|Cavs|Pistons|Wizards|Mavericks|Nuggets|Timberwolves|Grizzlies|Pelicans|Raptors|76ers|Sixers|Bucks|Hornets|Clippers|Trail Blazers|Spurs|Pacers|Vikings|49ers|Packers|Steelers|Cowboys|Ravens|Bengals|Broncos|Seahawks|Buccaneers|Dolphins|Colts|Jaguars|Yankees|Dodgers|Red Sox|White Sox|Mets|Cubs|Astros|Phillies|Braves|Mariners|Padres|Orioles|Blue Jays|Brewers|Diamondbacks|Maple Leafs|Bruins|Oilers|Canadiens|Blackhawks|Man(?:chester)? (?:United|City|Utd)|Arsenal|Chelsea|Tottenham|Crystal Palace|Real Madrid|Bayern|Juventus|Aston Villa|Paris Saint-Germain')]
   }
 ];
 // A story's topics (ids, most named first): the one named most (by a

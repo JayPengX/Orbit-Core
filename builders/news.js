@@ -1092,7 +1092,7 @@ function matchClips(vids, sized, vecOf, lang) {
 // carry it and it has a topic. recs: the stories kept, [{ id, r, first,
 // last, peak, items }]. → { tw, intl } (the front: heard of in NOW_MS,
 // ranked), past: { tw, intl } (older, by importance), recs (to keep).
-export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
+export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} } = {}) {
   // (A kept headline read again takes the feed's picture as it is now: a
   // larger one, once the build asks for it.)
   const fresh = new Map(items.filter(it => it.img).map(it => [it.u, it.img]));
@@ -1226,7 +1226,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
     }
     const clipsOf = matchClips(vids.filter(v => OUTLETS[v.o]?.region === region), sized, vecOf, lang);
     // (The world's stories: Taiwan's outlets' on each, from Taiwan's front.)
-    const twOn = region === 'intl' ? taiwanOn(out.tw, sized, vecOf) : new Map();
+    const twOn = region === 'intl' ? taiwanOn(out.tw, sized, vecOf, who) : new Map();
     for (const { r, vs, c, cn } of sized) {
       const s = storyOf(r.items.map((it, i) => ({ ...it, near: cosine(vs[i], norm(vs[i]), c, cn) })), region, now, { pages, same, vids: clipsOf.get(r) || [] });
       r.first = s.first;
@@ -1306,16 +1306,23 @@ export function frontOf(stories, top) {
 // and two more words shared (or a name and one, nearer), within a day of it. → Map(world rec → [Taiwan's stories]).
 export const TW_NEAR = 0.4;
 const NAME_KEYS = new Set(Object.values(NAMES).flatMap(v => piecesOf(v, 'en')));
-function taiwanOn(twStories, sized, vecOf) {
+function taiwanOn(twStories, sized, vecOf, who = {}) {
   const index = new Map();
   for (const z of sized) for (const k of z.c.keys()) (index.get(k) || index.set(k, []).get(k)).push(z);
   const out = new Map();
+  const sport = new Map();
+  const isSport = z => (sport.has(z) ? sport.get(z) : sport.set(z, topicsOf(z.r.items.map(it => it.t), 'en').includes('sport')).get(z));
   for (const s of twStories) {
     const v = new Map();
     for (const it of s.items) {
       const en = enOf(it[1]);
       if (en) for (const [k, w] of vecOf({ t: en })) add(v, k, w);
     }
+    // (A sports story: the AI's English title and its players' and teams'
+    // names, a name each, the way the world's headlines put them.)
+    const sw = s.topics.includes('sport') && who[s.id];
+    const names = new Set(sw ? [...(sw.p || []), ...(sw.t || [])].flatMap(n => piecesOf(n, 'en')) : []);
+    if (sw?.en) for (const [k, w] of vecOf({ t: `${sw.en} ${[...(sw.p || []), ...(sw.t || [])].join(' ')}` })) add(v, k, w);
     if (v.size < 2) continue;
     const vn = norm(v);
     const shared = new Map();
@@ -1324,7 +1331,9 @@ function taiwanOn(twStories, sized, vecOf) {
     let bestSim = 0;
     for (const [z, keys] of shared) {
       // (A name shared, a place, a person, a body abroad, and a word more.)
-      if (keys.length < 2 || !keys.some(k => NAME_KEYS.has(k)) || s.at < z.first - GAP || s.first > z.last + GAP) continue;
+      if (keys.length < 2 || !keys.some(k => NAME_KEYS.has(k) || names.has(k)) || s.at < z.first - GAP || s.first > z.last + GAP) continue;
+      // (A game joins a game: Taiwan's U23 team facing South Korea isn't Korea's news.)
+      if (sw && !isSport(z)) continue;
       const sim = cosine(v, vn, z.c, z.cn);
       if (sim > bestSim && (keys.length >= 3 || sim >= TW_NEAR + 0.15)) (bestSim = sim), (best = z);
     }
@@ -1449,7 +1458,11 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
     if (!p) (unread[o] ||= []).push(whyNot[u] || '?');
     pages[u] = p ? { ...p, y: p.y.filter(id => !(shorts[id] < 0)) } : { i: '', y: [] };
   });
-  const out = deskOf(items, recs, now, { pages, vids: clips });
+  // (The AI's reading of Taiwan's sports stories, English title and names, so
+  // 柯瑞's injury finds the world's story on Curry: Jay 11-13 "why is this
+  // Taiwan outlet only".)
+  const who = (await store.json(SPORT_WHO).catch(() => null))?.who || {};
+  const out = deskOf(items, recs, now, { pages, vids: clips, who });
   const keep = new Set([...items, ...out.recs.flatMap(r => r.items)].map(it => it.u));
   for (const u of Object.keys(pages)) if (!keep.has(u)) delete pages[u];
   await store.put(NEWS_STATE, { items, etag, pages, recs: out.recs, vids: clips, shorts });
@@ -1462,7 +1475,6 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
   // reading of its names and its title in the other language (builders/ai.js
   // sportWho → news/sport-who.json), where it has made one yet.
   if (out.sport.tw.length || out.sport.intl.length) {
-    const who = (await store.json(SPORT_WHO).catch(() => null))?.who || {};
     const withWho = list => list.map(s => (who[s.id] ? { ...s, who: { p: who[s.id].p || [], t: who[s.id].t || [] }, ...(who[s.id].zh ? { zh: who[s.id].zh } : {}), ...(who[s.id].en ? { en: who[s.id].en } : {}) } : s));
     await store.put(SPORT_PATH, { v: SPORT_VERSION, built: now, tw: withWho(out.sport.tw), intl: withWho(out.sport.intl) });
   }
