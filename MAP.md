@@ -417,7 +417,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   - `news-site.yml`: News's site (this repo's token), started by `newsSite`;
   - `news-clips.yml`: the clips in Taiwan's articles, started by `newsClips`;
   - every app repo's deploy workflow: its own site, to Cloudflare.
-- Every 3 hours: `free-watch.yml` (`tools/free-watch.mjs`), started by the proxy's cron (`ops.js` startFreeWatch; GitHub's timer as a spare): pages, routes, cron jobs, free allowances; a failed run mails Jay.
+- Every 3 hours: `free-watch.yml` (`tools/free-watch.mjs`, started by the cron's `startFreeWatch`): pages, routes, cron jobs, free amounts; a failure mails Jay.
 - By hand: `build.yml` (a builder now, a check), `tail.yml` (logs),
   `audit.yml` (secret names, store counts), `zone-speed.yml` (zone speed), `credit.yml` (`tools/credit/`).
 - Never a cancelling `concurrency:` (a cancel mails Jay): copy the `queue`
