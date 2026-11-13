@@ -174,11 +174,12 @@ export async function google(env, texts, to, { fetchImpl = fetch, html = false }
 // 'zh-TW' or 'en'. `people`: names to keep (peopleIn of the story's
 // English), or a function giving each text its own.
 // The meter is read and written here, once a call.
-export async function translate(env, store, texts, to, { people = [], now = Date.now(), fetchImpl = fetch, cap = TR_MONTH, max = Infinity } = {}) {
+export async function translate(env, store, texts, to, { people = [], now = Date.now(), fetchImpl = fetch, cap = TR_MONTH, max = Infinity, force = false } = {}) {
   const want = [...new Set(texts.map(t => String(t || '').trim()).filter(Boolean))];
   if (!want.length || !googleKey(env)) return {};
   const meter = await readMeter(store, now);
-  if (meter.off && meter.off > now) return {};
+  // (`force`: a run by hand asks at once, a key just turned on.)
+  if (meter.off && meter.off > now && !force) return {};
   let left = Math.min(dayLeft(meter, now, cap), max);
   const pick = [];
   for (const t of want) {
