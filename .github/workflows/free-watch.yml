@@ -1,0 +1,29 @@
+# The free plans' watch (tools/free-watch.mjs): every page and route a phone
+# reaches, the cron jobs' health, and every allowance (Cloudflare's day,
+# Google's month) against its free amount. From 2026-11-13 Orbit pays only for
+# its domain: a failed run (GitHub mails it) is something broken or near a limit.
+name: Free plans' watch
+
+on:
+  schedule:
+    - cron: '17 */3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tools
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pages, routes, cron jobs and allowances
+        run: node tools/free-watch.mjs
+        env:
+          DATA_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET }}

@@ -639,10 +639,10 @@ export function parseAir(sites, forecast, lat, lon, county) {
 
 // ---- KV --------------------------------------------------------------------------
 
-// Kept in R2 since 2026-11-13 (kept-store.js: KV's Free plan takes 1,000 writes a day, and
+// Kept in D1 since 2026-11-13 (kept-store.js: KV's Free plan takes 1,000 writes a day, and
 // the cells, their scores and the counts here were most of them); the names stay.
 export const kvJson = (env, key) => keptRead(env, key);
-export const kvPut = (env, key, value, ttlS) => keptPut(env, key, value, ttlS, { orKv: key.startsWith('weather:google:') });
+export const kvPut = (env, key, value, ttlS) => keptPut(env, key, value, ttlS);
 
 // ---- Kept answers: Cloudflare's cache first, KV at most hourly ----------------------
 //

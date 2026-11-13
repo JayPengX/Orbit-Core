@@ -1,6 +1,7 @@
 // Orbit Law's /law-ask: a Pass of Orbit Law's, a law's articles read here,
 // Gemini's answer checked against them, kept by the law's version, and a
 // Pass's day capped.
+import { keptRead } from '../kept-store.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeD1 } from './fake-d1.mjs';
@@ -247,7 +248,7 @@ test('a bill is explained from its own 對照表 only, each change citing an art
     const again = await (await ask(BILL_ASK, { env, pass: 'bill' })).json();
     assert.equal(gemini.length, calls);
     assert.deepEqual([again.cached, again.left, again.changes], [true, LAW_LIMITS.perPass - 1, j.changes]);
-    assert.ok(env.RATE_LIMIT_KV.m.has('law:bill:v1:202110000010000|zh'));
+    assert.ok(await keptRead(env, 'law:bill:v1:202110000010000|zh'));
     assert.equal((await (await ask({ ...BILL_ASK, lang: 'en' }, { env, pass: 'bill' })).json()).cached, false);
   } finally {
     reply = { answer: '輔助宣告由法院為之。', points: [{ text: '可聲請輔助宣告', cites: ['第15條之1'] }, { text: '外部條文', cites: ['16'] }, { text: '沒有出處', cites: [] }], covered: true };
@@ -355,7 +356,7 @@ test('no question: the article explained (gist, why, examples, terms, today), on
     const calls = gemini.length;
     assert.equal((await (await ask({ p: 'B0000001', arts: ['15-1'], lang: 'zh' }, { env, pass: 'explain' })).json()).cached, true);
     assert.equal(gemini.length, calls);
-    assert.ok([...env.RATE_LIMIT_KV.m.keys()].some(k => k.startsWith('law:explain:v2:')));
+    assert.ok((await env.STORE.prepare("SELECT key FROM kept WHERE key LIKE 'law:explain:v2:%'").first())?.key);
   } finally {
     reply = saved;
   }
