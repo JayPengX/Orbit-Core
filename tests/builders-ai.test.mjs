@@ -198,3 +198,9 @@ test('news AI: a foreign name stays in English unless Taiwan’s press fixes one
   const out = FEATURES['news-lines'].clean({ items: [{ id: 'a', title: '民主黨 Scott Colom 贏得密西西比州參議員席次' }] }, { stories });
   assert.equal(out.a?.zh, '民主黨 Scott Colom 贏得密西西比州參議員席次');
 });
+
+test('news AI: a Chinese title never keeps an English number unit (11-13: 「$30.1 billion推動航空改革」)', async () => {
+  const { FEATURES } = await import('../ai-features.js');
+  const stories = [{ id: 'a', lang: 'zh', heads: ['White House urges Congress to provide $30.1 billion for air traffic overhaul'] }];
+  assert.deepEqual(FEATURES['news-lines'].clean({ items: [{ id: 'a', title: '白宮籲國會提供$30.1 billion推動航空改革' }] }, { stories }), {});
+});
