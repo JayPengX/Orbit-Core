@@ -204,8 +204,8 @@ export async function translate(env, store, texts, to, { people = [], now = Date
   } catch (e) {
     meter.fail = (meter.fail || 0) + 1;
     meter.why = String(e?.message || e).slice(0, 200);
-    // (A refused key (not on yet, 403) waits an hour before it's asked again.)
-    if (/google 4\d\d/.test(meter.why)) meter.off = now + 3_600_000;
+    // (A refused key (not on yet, 403) waits 15 minutes before it's asked again.)
+    if (/google 4\d\d/.test(meter.why)) meter.off = now + 900_000;
   }
   if (spent) Object.assign(meter, { chars: meter.chars + spent, today: (meter.today || 0) + spent, n: (meter.n || 0) + 1, off: 0 });
   await store.put(TR_METER, { ...meter, at: now });
