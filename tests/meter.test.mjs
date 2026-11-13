@@ -1,5 +1,6 @@
 // The month's meter (transit.js): counts added in D1, none lost or written
 // over; TDX's points from its calls and their bytes; KV's copy from D1.
+import { keptRead } from '../kept-store.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeD1 } from './fake-d1.mjs';
@@ -85,7 +86,7 @@ test('D1 failing: the counts wait for the next write, never dropped', async () =
   assert.equal(row.n, 1);
 });
 
-test("the cron copies D1 to KV (every isolate's read), KV's counts from before D1 added in once", async () => {
+test("the cron copies D1's meter to the kept copy (every isolate's read), KV's counts from before D1 added in once", async () => {
   const kv = memKv();
   const env = { STORE: fakeD1(), RATE_LIMIT_KV: kv };
   resetMeter();
@@ -95,17 +96,17 @@ test("the cron copies D1 to KV (every isolate's read), KV's counts from before D
   await spend(env, 'maps', 1, NOW);
   const first = await mirrorMeter(env, NOW);
   assert.equal(first.seeded, MONTH);
-  const doc = () => JSON.parse(kv.store.get(`transit:use:${MONTH}`));
-  assert.deepEqual(doc(), { [`tdx:b:2026-11-03`]: 900, maps: 41, [`tdx:b:${DAY}`]: 1, [`tdx:vb:${DAY}`]: 2_000_000, 'tdxf:?': 1, 'tdxfv:?': 2_000_000 });
+  const doc = () => keptRead(env, `transit:use:${MONTH}`);
+  assert.deepEqual((await doc()), { [`tdx:b:2026-11-03`]: 900, maps: 41, [`tdx:b:${DAY}`]: 1, [`tdx:vb:${DAY}`]: 2_000_000, 'tdxf:?': 1, 'tdxfv:?': 2_000_000 });
   // Again: nothing added twice.
   await spend(env, 'maps', 1, NOW);
   // (Not written again within 10 minutes: KV's Free plan has 1,000 writes a day.)
   await mirrorMeter(env, NOW + 120_000);
-  assert.equal(doc().maps, 41);
+  assert.equal((await doc()).maps, 41);
   const second = await mirrorMeter(env, NOW + 600_000);
   assert.equal(second.seeded, undefined);
-  assert.equal(doc().maps, 42);
-  assert.equal(doc()[`tdx:b:2026-11-03`], 900);
+  assert.equal((await doc()).maps, 42);
+  assert.equal((await doc())[`tdx:b:2026-11-03`], 900);
   // An isolate reading later sees it all.
   resetMeter();
   const pts = tdxPoints(await tdxUse(env, NOW + 660_000), NOW + 660_000, {});

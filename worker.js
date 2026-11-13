@@ -1732,8 +1732,8 @@ async function cronTick(event, env, ctx, part) {
     if (min === 20 && tick.getUTCHours() % 6 === 0) run('capacity', () => capacityCron(env, ECO_DEPS));
     // R2's folders for the panel's 健康 (ops.js countFolders), every 6 hours (and on the first run after a deploy).
     if (env.DATA && min === 40 && (tick.getUTCHours() % 6 === 0 || !(await keptText(env, FOLDERS_KEY)))) run('data-folders', () => countFolders(env));
-    // What the Worker kept for itself in R2 (kept-store.js) and has ended, deleted: every 6 hours.
-    if (env.DATA && min === 42 && tick.getUTCHours() % 6 === 0) run('kept-sweep', () => sweepKept(env));
+    // What the Worker kept for itself (kept-store.js, D1) and has ended, deleted: every 6 hours.
+    if (min === 42 && tick.getUTCHours() % 6 === 0) run('kept-sweep', () => sweepKept(env));
 }
 
 // The Runner (runner.js): heavy routes and the crons' work, 30 s of CPU each.

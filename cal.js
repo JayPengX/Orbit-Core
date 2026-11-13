@@ -24,7 +24,7 @@ const passOfClass = session => (session?.a === 'orbit' && typeof session.d === '
 const newToken = () => [...crypto.getRandomValues(new Uint8Array(18))].map(b => 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join('');
 
 export async function handleCal(request, env, headers, session, path) {
-  // (Kept in R2 since 2026-11-13, kept-store.js: KV's Free plan takes 1,000 writes a day.)
+  // (Kept in D1 since 2026-11-13, kept-store.js: KV's Free plan takes 1,000 writes a day.)
   if (!env.RATE_LIMIT_KV && !env.DATA) return json({ error: 'setup' }, 503, headers);
   const m = /^\/cal\/([a-z2-9]{18})\.ics$/.exec(path);
   if (m) {

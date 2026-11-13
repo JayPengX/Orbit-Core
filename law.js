@@ -481,7 +481,7 @@ export const askKey = q => String(q).normalize('NFKC').toLowerCase().replace(/\s
 
 // An answer kept in KV (RATE_LIMIT_KV): read, null when it isn't (or KV
 // fails); kept for ttl seconds after the answer is sent.
-// (In R2 since 2026-11-13, kept-store.js: KV's Free plan takes 1,000 writes a day.)
+// (In D1 since 2026-11-13, kept-store.js: KV's Free plan takes 1,000 writes a day.)
 export const kept = (env, key) => keptRead(env, key);
 export function keep(env, ctx, key, value, ttl) {
   const p = keptPut(env, key, value, ttl);
