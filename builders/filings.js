@@ -88,14 +88,16 @@ export function filingOf(r) {
 }
 
 export async function runFilings({ store, now = Date.now(), get = u => fetch(u, { headers: { Accept: 'application/json' } }) }) {
+  const why = [];
   const lists = await Promise.all(
-    [TWSE_FILINGS, TPEX_FILINGS].map(u =>
+    [TWSE_FILINGS, TPEX_FILINGS].map((u, i) =>
       get(u)
-        .then(r => (r.ok ? r.json() : null))
-        .catch(() => null)
+        .then(r => (r.ok ? r.json() : ((why[i] = `${r.status}`), null)))
+        .catch(e => ((why[i] = String(e?.message || e).slice(0, 60)), null))
     )
   );
-  if (!lists.some(Array.isArray)) return { failed: 'lists' };
+  // (Why each list wasn't read, in the run's note: the admin panel's 系統, free-watch.)
+  if (!lists.some(Array.isArray)) return { failed: `lists: TWSE ${why[0] || '?'}, TPEx ${why[1] || '?'}` };
   const all = lists.flatMap(l => (Array.isArray(l) ? l : [])).map(filingOf).filter(Boolean);
   const seen = (await store.json(SEEN)) || { ids: {} };
   const fresh = all.filter(f => !(f.id in seen.ids) && now - Date.parse(f.at) < WEEK);
