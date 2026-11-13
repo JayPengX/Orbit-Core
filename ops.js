@@ -39,6 +39,9 @@ async function beatsTable(db) {
 const noteOf = r => {
   if (r == null) return '';
   try {
+    // (A run that failed in part: the parts that failed first, so the note says why.)
+    const failed = r && typeof r === 'object' ? Object.entries(r).filter(([, v]) => v && typeof v === 'object' && (Array.isArray(v.failed) ? v.failed.length : v.failed)) : [];
+    if (failed.length) return JSON.stringify(Object.fromEntries(failed.map(([k, v]) => [k, { failed: v.failed }]))).slice(0, 160);
     return (typeof r === 'string' ? r : JSON.stringify(r)).slice(0, 160);
   } catch {
     return '';
