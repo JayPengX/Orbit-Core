@@ -29,6 +29,12 @@ export const MIN_DAYS = 3;
 const KEEP_DAYS = 14;
 const EPS = { pop: 0.01, temp: 0.1 };
 const SOURCES = ['google', 'cwa'];
+// A place's usual temperature error (the served hours past 6 hours' lead,
+// less the station's reading): a decaying average, 5% an hour (half its
+// weight in ~14 hours), tried once 24 hours are in. Scored in the shadow as
+// `biased` (never served) until it shows it beats `served`.
+export const BIAS_RATE = 0.05;
+export const BIAS_MIN = 24;
 
 const emptySkill = () => ({ snaps: [], days: {}, lastRain: 0, lastTemp: 0 });
 const add = (days, date, kind, lead, source, value) => {
@@ -59,6 +65,7 @@ export function scoreHour(sk, { rain, obs }, now) {
   if (obs?.temp != null && obs.at) {
     const T = Math.floor(obs.at / HOUR) * HOUR;
     if (T > sk.lastTemp) {
+      const errs = [];
       for (const s of sk.snaps) {
         const h = s.h.find(x => x[0] === T);
         const lead = T - s.at;
@@ -67,6 +74,17 @@ export function scoreHour(sk, { rain, obs }, now) {
         SOURCES.forEach((src, i) => h[3 + i] != null && add(sk.days, twDay(T), 'temp', bucket, src, Math.abs(h[3 + i] - obs.temp)));
         // What the app showed (the blend, its first hours from the station): scored, never weighted.
         if (h[5] != null) add(sk.days, twDay(T), 'temp', bucket, 'served', Math.abs(h[5] - obs.temp));
+        // Tried in the shadow (BIAS): the served hours less this place's usual
+        // error, learned from the hours before this one only, faded in as the
+        // station's anchor fades out.
+        if (h[5] != null && sk.bias?.n >= BIAS_MIN) add(sk.days, twDay(T), 'temp', bucket, 'biased', Math.abs(h[5] - sk.bias.v * Math.min(1, lead / (6 * HOUR)) - obs.temp));
+        if (h[5] != null && lead >= 6 * HOUR) errs.push(h[5] - obs.temp);
+      }
+      // The place's usual error past the anchor's hours: a decaying average (BIAS_RATE an hour).
+      if (errs.length) {
+        const e = errs.reduce((a, x) => a + x, 0) / errs.length;
+        const b = sk.bias || { v: 0, n: 0 };
+        sk.bias = { v: Math.round((b.n ? b.v + BIAS_RATE * (e - b.v) : e) * 1000) / 1000, n: b.n + 1 };
       }
       sk.lastTemp = T;
     }
