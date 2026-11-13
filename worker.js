@@ -1681,7 +1681,8 @@ async function handle(request, env, ctx) {
     try {
       // (Our tools' calls, a page on localhost, never count as a source's health: sources.js.)
       const res = await (LOCAL_ORIGIN.test(origin) ? asSourceCall({ quiet: true }, () => route(request, env, ctx, headers, origin)) : route(request, env, ctx, headers, origin));
-      if (res.status >= 500) countError(env, ctx, request);
+      // (Not R2 switched off (data.js, X-Data-Off): every phone's read of the outage was a D1 write, 7,000 of the Free plan's 100,000 rows on 2026-11-13; free-watch reports it.)
+      if (res.status >= 500 && !res.headers.get('X-Data-Off')) countError(env, ctx, request);
       return timed(res, t0);
     } catch (error) {
       console.log('route failed', new URL(request.url).pathname, String(error?.message || error).slice(0, 200));
