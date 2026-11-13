@@ -169,3 +169,11 @@ test('Orbit opens on something live, else the last app within an hour, else the 
   assert.deepEqual(launchTarget(saved, { transit: live.transit }, now + 2 * AWAY_MS), { app: 'transit', url: '/Orbit-Transit/#trip', y: 0 });
   assert.equal(launchTarget({ apps: {} }, {}, now), null);
 });
+
+test("an app held in Orbit's window gets the phone's safe area written in (a frame is told none)", async () => {
+  const { withInsets } = await import('../kit/suite.mjs');
+  const ins = { top: 59, bottom: 34, left: 0, right: 0 };
+  assert.equal(withInsets('--q-bar-gap: max(calc(env(safe-area-inset-bottom) - 14px), 12px);', ins), '--q-bar-gap: max(calc(34px - 14px), 12px);');
+  assert.equal(withInsets('bottom: max(12px, env(safe-area-inset-bottom, 0px)); top: env( safe-area-inset-top , var(--x, 4px))', ins), 'bottom: max(12px, 34px); top: 59px');
+  assert.equal(withInsets('padding: 0', ins), 'padding: 0');
+});

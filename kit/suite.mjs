@@ -543,10 +543,57 @@ function playing(w) {
   } catch {}
   return false;
 }
+// A frame is told none of the phone's safe area (env(safe-area-inset-*) is
+// 0 inside it), so its app would draw under the clock and the home bar, and
+// padding the frame instead stacks on the app's own gap (Jay 2026-11-13: the
+// tabs sat higher than in the separate app). So the frame fills the screen
+// and each env(safe-area-inset-*) in the app's style sheets is written as
+// this window's own value, kept up as the phone turns.
+const INSET = /env\(\s*safe-area-inset-(top|right|bottom|left)\s*(?:,(?:[^()]|\([^()]*\))*)?\)/g;
+export const withInsets = (css, ins) => css.replace(INSET, (m, side) => `${Math.round(ins[side] || 0)}px`);
+function insetsNow() {
+  const p = document.createElement('div');
+  p.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)';
+  document.body.append(p);
+  const c = getComputedStyle(p);
+  const ins = { top: parseFloat(c.paddingTop) || 0, right: parseFloat(c.paddingRight) || 0, bottom: parseFloat(c.paddingBottom) || 0, left: parseFloat(c.paddingLeft) || 0 };
+  p.remove();
+  return ins;
+}
+const told = new WeakMap();
+function tellInsets(doc, ins) {
+  const walk = rules => {
+    for (const r of rules || []) {
+      if (r.style) {
+        const was = told.get(r) ?? r.style.cssText;
+        if (was.includes('safe-area-inset')) {
+          told.set(r, was);
+          r.style.cssText = withInsets(was, ins);
+        }
+      }
+      if (r.cssRules) walk(r.cssRules);
+    }
+  };
+  for (const sheet of doc?.styleSheets || []) {
+    try {
+      walk(sheet.cssRules);
+    } catch {}
+  }
+}
 export function host(box, { first = null, list = null } = {}) {
   const frames = new Map();
   let shown = null;
   const top = document;
+  let ins = insetsNow();
+  const inset = f => {
+    try {
+      tellInsets(f.el.contentDocument, ins);
+    } catch {}
+  };
+  globalThis.addEventListener('resize', () => {
+    ins = insetsNow();
+    for (const f of frames.values()) inset(f);
+  });
   // Hidden to the app inside: shown only while this one is (and the phone's screen is).
   const look = (f, on) => {
     const d = f.el.contentDocument;
@@ -589,9 +636,26 @@ export function host(box, { first = null, list = null } = {}) {
         api.go(there, url);
         return;
       }
+      inset(f);
+      // (Style sheets an app adds later: a sheet's own, a font's.)
+      try {
+        new w.MutationObserver(() => inset(f)).observe(w.document.head, { childList: true });
+        w.document.addEventListener('load', e => e.target?.tagName === 'LINK' && inset(f), true);
+      } catch {}
       look(f, shown === id);
       if (shown === id) w.__orbitSuite?.draw?.();
     });
+    // (Before its load, as its first screen paints.)
+    const early = setInterval(() => {
+      try {
+        const d = el.contentDocument;
+        if (d && d.readyState !== 'loading' && d.location.href !== 'about:blank') inset(f);
+        if (d?.readyState === 'complete') clearInterval(early);
+      } catch {
+        clearInterval(early);
+      }
+    }, 50);
+    setTimeout(() => clearInterval(early), 15000);
     frames.set(id, f);
     box.append(el);
     return f;
@@ -666,6 +730,11 @@ export function host(box, { first = null, list = null } = {}) {
     open(url) {
       const id = appAt(new URL(url, location.href).pathname);
       if (id) api.go(id, url);
+    },
+    // (The safe area as written into the frames: a test sets a phone's.)
+    insets(v) {
+      if (v) ((ins = v), frames.forEach(inset));
+      return ins;
     },
     shown: () => shown,
     held: () => [...frames.keys()]
