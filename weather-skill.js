@@ -108,10 +108,21 @@ export async function scoreCell(env, cell, { fetchFn = fetch, now = Date.now() }
 // temp: {…}, days }.
 export function summarize(skills) {
   const sums = { pop: {}, temp: {} };
+  // The temperature by lead (short: under 6 hours), only where `served` was
+  // scored too: the three side by side over the same hours.
+  const paired = {};
   const dates = new Set();
   for (const sk of skills) {
     for (const [date, d] of Object.entries(sk?.days || {})) {
       dates.add(date);
+      for (const [lead, bucket] of Object.entries(d.temp || {})) {
+        if (!bucket.served) continue;
+        for (const [src, [sum, n]] of Object.entries(bucket)) {
+          const t = ((paired[lead] ||= {})[src] ||= [0, 0]);
+          t[0] += sum;
+          t[1] += n;
+        }
+      }
       for (const kind of ['pop', 'temp']) {
         for (const bucket of Object.values(d[kind] || {})) {
           for (const [src, [sum, n]] of Object.entries(bucket)) {
@@ -125,7 +136,8 @@ export function summarize(skills) {
   }
   const mean = o => Object.fromEntries(Object.entries(o).map(([s, [sum, n]]) => [s, n ? Math.round((sum / n) * 1e4) / 1e4 : null]));
   const count = o => Object.fromEntries(Object.entries(o).map(([s, [, n]]) => [s, n]));
-  return { pop: mean(sums.pop), temp: mean(sums.temp), n: { pop: count(sums.pop), temp: count(sums.temp) }, days: dates.size };
+  const byLead = Object.fromEntries(Object.entries(paired).map(([lead, o]) => [lead, { ...mean(o), n: count(o) }]));
+  return { pop: mean(sums.pop), temp: mean(sums.temp), n: { pop: count(sums.pop), temp: count(sums.temp) }, days: dates.size, byLead };
 }
 
 // Where the weights go from `prev` given the scores (lower is better).

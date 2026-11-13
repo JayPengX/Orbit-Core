@@ -77,6 +77,16 @@ test('the cron: scores the recent cells, moves the weights once a day after 3 da
   assert.equal(summarize([{ days }]).days, 3);
 });
 
+test('the served temperature beside the sources by lead, over the same hours only', () => {
+  const days = {
+    '2026-11-09': { temp: { short: { google: [30, 10], cwa: [20, 10] } } },
+    '2026-11-11': { temp: { short: { google: [12, 10], cwa: [10, 10], served: [8, 10] }, long: { google: [15, 10], cwa: [14, 10], served: [16, 10] } } }
+  };
+  const { byLead } = summarize([{ days }]);
+  assert.deepEqual(byLead.short, { google: 1.2, cwa: 1, served: 0.8, n: { google: 10, cwa: 10, served: 10 } });
+  assert.equal(byLead.long.served, 1.6);
+});
+
 test('push accepts weather checks, and only sane ones', () => {
   const now = Date.parse('2026-10-02T00:00:00Z');
   const list = cleanItems([
