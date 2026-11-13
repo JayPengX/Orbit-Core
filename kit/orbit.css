@@ -7211,6 +7211,10 @@ html[data-look='native'] :is(.q-reorder-lift, .q-reorder-land) {
 .q-suite-switch {
   padding: 0 6px 0 4px;
 }
+/* (An icon at the capsule's end as far from its edge as from top and foot.) */
+.q-suite-back:last-child {
+  padding-right: 4px;
+}
 .q-suite-chev {
   display: inline-grid;
   flex: none;

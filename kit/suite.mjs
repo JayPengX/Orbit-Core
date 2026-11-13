@@ -166,6 +166,12 @@ export function go(other, hash = '') {
   if (!BRANDS[other]) return;
   const h = String(hash || '').replace(/^#/, '');
   if (other === app && !h) return;
+  // (The app just before or after this one: as it was left, not opened again.)
+  if (!h) {
+    const t = readTrail();
+    if (backOf(t)?.app === other) return back();
+    if (forwardOf(t)?.app === other) return forward();
+  }
   remember();
   const to = h ? { url: `${pathOf(other)}#${h}`, y: 0 } : resumeOf(savedSuite(), other);
   if (other === app) return open(to.url);
@@ -433,6 +439,8 @@ export function start() {
   // Back from the browser's own memory (a computer's back button): the trail again.
   globalThis.addEventListener('pageshow', e => {
     if (!e.persisted) return;
+    // (An app that showed its loading screen on the way out: it is here, as left.)
+    document.getElementById('loading')?.setAttribute('hidden', '');
     land();
     draw();
   });
