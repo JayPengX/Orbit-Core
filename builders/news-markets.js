@@ -240,6 +240,14 @@ const round = (x, n = 3) => Math.round(x * 10 ** n) / 10 ** n;
 // "Resigned/removed; Over $4T" beside "…; Under $4T" is Over $4T).
 export function labelOf(label, labels = {}, short = label) {
   if (/\(no change\)$/i.test(label)) return { en: 'No change', zh: '不換人' };
+  // (A dollar threshold worded in code, its side exactly as Polymarket counts it: Over $4T is $4T or more.)
+  const t = String(short).match(/^(Over|Under|Above|Below) \$(\d+(?:\.\d+)?)\s*([TBM])$/i);
+  if (t) {
+    const n = +t[2], unit = t[3].toUpperCase();
+    const amt = unit === 'T' ? `${n}兆` : unit === 'B' ? `${round(n * 10, 1)}億` : `${n}百萬`;
+    const up = /^(over|above)$/i.test(t[1]);
+    return { en: short, zh: up ? `${amt}美元以上` : `未達${amt}美元` };
+  }
   const l = labels?.[label] || {};
   // (A person: the name as the market writes it, in Chinese only as the story's headlines do.)
   if (l.who) return { en: short, ...(l.zh ? { zh: l.zh } : {}), who: 1 };

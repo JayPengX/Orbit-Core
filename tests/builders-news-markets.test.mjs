@@ -72,6 +72,8 @@ test('deadlines read as dates; a ladder by deadline, a race by its leaders', () 
   // (One name the AI wasn't sure of: the whole card in the names as written, never half Chinese.)
   const half = shownEvent(evs[2], { zh: '台北市長誰會當選？', en: 'Who will win Taipei mayor?', labels: { 'Chiang Wan-an': { zh: '蔣萬安' } } });
   assert.deepEqual(half.rows.map(r => [r.en, r.zh]), [['Chiang Wan-an', undefined], ['Puma Shen', undefined]]);
+  // (A dollar threshold worded in code: Over is that or more, Under is short of it, never 不逾 or 以下.)
+  assert.deepEqual(['Over $4T', 'Under $4T', 'Over $500B', 'Under $2.5B'].map(x => labelOf(x, {}, x).zh), ['4兆美元以上', '未達4兆美元', '5000億美元以上', '未達25億美元']);
   assert.deepEqual(labelOf('Jensen Huang (No Change)', { 'Jensen Huang (No Change)': { zh: '黃仁勳續任' } }), { en: 'No change', zh: '不換人' });
 });
 
@@ -87,7 +89,7 @@ test('options that share a part are told apart by the rest: never two rows both 
   assert.deepEqual(shortLabels(['Ian Buck', 'Rene Haas']), ['Ian Buck', 'Rene Haas']);
   const ev = { id: '9', slug: 'x', markets: [{ label: 'Resigned/removed; Over $4T', p: 0.6, d: 0 }, { label: 'Resigned/removed; Under $4T', p: 0.4, d: 0 }] };
   const shown = shownEvent(ev, { zh: '黃仁勳去職時，輝達市值會在4兆美元以上嗎？', en: 'If Jensen Huang leaves, will Nvidia be worth over $4 trillion?', labels: { 'Resigned/removed; Over $4T': { zh: '4兆美元以上' }, 'Resigned/removed; Under $4T': { zh: '4兆美元以下' } } });
-  assert.deepEqual(shown.rows.map(r => [r.en, r.zh]), [['Over $4T', '4兆美元以上'], ['Under $4T', '4兆美元以下']]);
+  assert.deepEqual(shown.rows.map(r => [r.en, r.zh]), [['Over $4T', '4兆美元以上'], ['Under $4T', '未達4兆美元']], 'the side worded in code, whatever the AI said');
 });
 
 test('the AI is told how the market is settled: what’s already decided, the day it ends, how the card shows it', () => {
