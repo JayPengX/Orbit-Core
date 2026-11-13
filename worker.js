@@ -55,6 +55,7 @@ import { PASSKEY_COLLECTION } from './passkey.js';
 import { backupStore } from './store-backup.js';
 import { paceOf } from './pace.js';
 import { beat, tellOwner, systemReport, countFolders, FOLDERS_KEY } from './ops.js';
+import { sweepKept, keptText } from './kept-store.js';
 import { applyScale } from './capacity.js';
 import { handleSports, sportsCron, useDevSettings } from './sports.js';
 import { handleToday } from './sports-today.js';
@@ -1730,7 +1731,9 @@ async function cronTick(event, env, ctx, part) {
     // The live refreshes by how many people there are (capacity.js), every 6 hours.
     if (min === 20 && tick.getUTCHours() % 6 === 0) run('capacity', () => capacityCron(env, ECO_DEPS));
     // R2's folders for the panel's 健康 (ops.js countFolders), every 6 hours (and on the first run after a deploy).
-    if (env.DATA && min === 40 && (tick.getUTCHours() % 6 === 0 || !(await env.RATE_LIMIT_KV?.get(FOLDERS_KEY).catch(() => null)))) run('data-folders', () => countFolders(env));
+    if (env.DATA && min === 40 && (tick.getUTCHours() % 6 === 0 || !(await keptText(env, FOLDERS_KEY)))) run('data-folders', () => countFolders(env));
+    // What the Worker kept for itself in R2 (kept-store.js) and has ended, deleted: every 6 hours.
+    if (env.DATA && min === 42 && tick.getUTCHours() % 6 === 0) run('kept-sweep', () => sweepKept(env));
 }
 
 // The Runner (runner.js): heavy routes and the crons' work, 30 s of CPU each.

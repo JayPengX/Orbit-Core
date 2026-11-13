@@ -36,6 +36,7 @@ import { rulingId, rulingJob } from './law-ruling.js';
 import { townAsk, townJob } from './law-town.js';
 import { SITE } from './kit/domain.mjs';
 import { packReader, isPack, isPackList } from './kit/data-pack.mjs';
+import { keptRead, keptPut } from './kept-store.js';
 
 // Orbit Law's data as its site publishes it (orbit.<domain>/law/data/), read
 // through the service binding LAW_SITE (the orbit-law Worker's files: a
@@ -480,15 +481,11 @@ export const askKey = q => String(q).normalize('NFKC').toLowerCase().replace(/\s
 
 // An answer kept in KV (RATE_LIMIT_KV): read, null when it isn't (or KV
 // fails); kept for ttl seconds after the answer is sent.
-export async function kept(env, key) {
-  try {
-    return env.RATE_LIMIT_KV ? await env.RATE_LIMIT_KV.get(key, { type: 'json' }) : null;
-  } catch {
-    return null;
-  }
-}
+// (In R2 since 2026-11-13, kept-store.js: KV's Free plan takes 1,000 writes a day.)
+export const kept = (env, key) => keptRead(env, key);
 export function keep(env, ctx, key, value, ttl) {
-  if (env.RATE_LIMIT_KV) ctx?.waitUntil?.(env.RATE_LIMIT_KV.put(key, JSON.stringify(value), { expirationTtl: ttl }).catch(() => {}));
+  const p = keptPut(env, key, value, ttl);
+  if (ctx?.waitUntil) ctx.waitUntil(p);
 }
 
 // Gemini's answer to one prompt, as JSON (a throw: the route's 502).

@@ -14,6 +14,7 @@
 //
 // KV: `cal:who:<hash of the pass>` → the token; `cal:<token>` → the calendar,
 // kept 60 days from its last upload (the app sends it again at least weekly).
+import { keptText, keptPut, keptDelete } from './kept-store.js';
 import { json, isAllowedOrigin, bodyText, sha256Hex } from './http.js';
 import { sessionLimited } from './orbit-token.js';
 
@@ -23,12 +24,12 @@ const passOfClass = session => (session?.a === 'orbit' && typeof session.d === '
 const newToken = () => [...crypto.getRandomValues(new Uint8Array(18))].map(b => 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join('');
 
 export async function handleCal(request, env, headers, session, path) {
-  const kv = env.RATE_LIMIT_KV;
-  if (!kv) return json({ error: 'setup' }, 503, headers);
+  // (Kept in R2 since 2026-11-13, kept-store.js: KV's Free plan takes 1,000 writes a day.)
+  if (!env.RATE_LIMIT_KV && !env.DATA) return json({ error: 'setup' }, 503, headers);
   const m = /^\/cal\/([a-z2-9]{18})\.ics$/.exec(path);
   if (m) {
     if (request.method !== 'GET' && request.method !== 'HEAD') return json({ error: 'method' }, 405, headers);
-    const ics = await kv.get(`cal:${m[1]}`);
+    const ics = await keptText(env, `cal:${m[1]}`);
     if (!ics) return new Response('', { status: 404 });
     return new Response(request.method === 'HEAD' ? null : ics, { headers: { 'Content-Type': 'text/calendar; charset=utf-8', 'Cache-Control': 'private, max-age=900' } });
   }
@@ -38,9 +39,9 @@ export async function handleCal(request, env, headers, session, path) {
   if (!pass) return json({ error: 'signin' }, 401, headers);
   if (sessionLimited(`cal:${pass}`, 6)) return json({ error: 'busy' }, 429, headers);
   const whoKey = `cal:who:${(await sha256Hex(`cal|${pass}`)).slice(0, 32)}`;
-  const token = await kv.get(whoKey);
+  const token = await keptText(env, whoKey);
   if (request.method === 'DELETE') {
-    if (token) await Promise.all([kv.delete(`cal:${token}`), kv.delete(whoKey)]);
+    if (token) await Promise.all([keptDelete(env, `cal:${token}`), keptDelete(env, whoKey)]);
     return json({ ok: true }, 200, headers);
   }
   if (request.method !== 'POST') return json({ error: 'method' }, 405, headers);
@@ -50,13 +51,13 @@ export async function handleCal(request, env, headers, session, path) {
     body = JSON.parse(text || 'null');
   } catch {}
   if (body?.off === true) {
-    if (token) await Promise.all([kv.delete(`cal:${token}`), kv.delete(whoKey)]);
+    if (token) await Promise.all([keptDelete(env, `cal:${token}`), keptDelete(env, whoKey)]);
     return json({ ok: true }, 200, headers);
   }
   const ics = body?.ics;
   if (typeof ics !== 'string' || ics.length > CAL_MAX || !ics.startsWith('BEGIN:VCALENDAR') || !ics.trimEnd().endsWith('END:VCALENDAR')) return json({ error: 'ics' }, 400, headers);
   const t = token || newToken();
-  await kv.put(`cal:${t}`, ics, { expirationTtl: CAL_KEEP_S });
-  if (!token) await kv.put(whoKey, t);
+  await keptPut(env, `cal:${t}`, ics, CAL_KEEP_S, { raw: true });
+  if (!token) await keptPut(env, whoKey, t, 10 * 365 * 86_400, { raw: true });
   return json({ url: `/cal/${t}.ics` }, 200, headers);
 }

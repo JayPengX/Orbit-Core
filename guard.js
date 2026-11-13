@@ -512,12 +512,13 @@ export async function guardRun(env, { fetcher = fetch, now = Date.now(), kv = en
   // The pace for the proxy (pace.js), only when it changes.
   if ((state.pace || 0) !== (prev.pace || 0)) {
     state.paceSince = now;
-    await kv.put(PACE_KEY, JSON.stringify({ pace: state.pace || 0, ...PACES[state.pace || 0], at: now, why: state.paceWhy || null }));
+    await kv.put(PACE_KEY, JSON.stringify({ pace: state.pace || 0, ...PACES[state.pace || 0], at: now, why: state.paceWhy || null })).catch(() => {});
   }
   const changed = acts.length || !!prev.stopped !== !!state.stopped || prev.error !== state.error || prev.armed !== armed || (state.pace || 0) !== (prev.pace || 0) || (state.alert || 0) !== (prev.alert || 0) || state.account !== prev.account || prev.pace === undefined;
   if (changed || !prev.at || now - (prev.saved || 0) >= 3_600_000) {
     state.saved = now;
-    await kv.put(STATE_KEY, JSON.stringify(state));
+    // (A write KV refuses, past its 1,000 a day: kept for the next run, which tries again.)
+    await kv.put(STATE_KEY, JSON.stringify(state)).catch(() => {});
   }
   return state;
 }

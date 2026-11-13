@@ -568,7 +568,7 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
     // (司法院's judgment pages serve only Taiwan: read through the relay there.)
     const fetcher = env?.GEMINI_RELAY ? (u, init) => (viaTaiwan(u) ? env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, { headers: init?.headers, signal: init?.signal }) : fetch(u, init)) : fetch;
     // (A judgment's gist, once read, kept 90 days: 司法院's site is the slowest read of a turn.)
-    const gists = env.RATE_LIMIT_KV ? { get: jid => env.RATE_LIMIT_KV.get(`law:jd:v1:${jid}`, { type: 'json' }), put: (jid, t) => keep(env, ctx, `law:jd:v1:${jid}`, t, 90 * 86_400) } : null;
+    const gists = env.RATE_LIMIT_KV || env.DATA ? { get: jid => kept(env, `law:jd:v1:${jid}`), put: (jid, t) => keep(env, ctx, `law:jd:v1:${jid}`, t, 90 * 86_400) } : null;
     // (The councils and 代表會 a question names: law-local.js, alongside.)
     const [more, local] = await Promise.all([
       moreFor(`${asked} ${plan.terms.join(' ')}`, articles, { mine: chat.mine, items, today: day, cities: chat.city, fetcher, gists }),
