@@ -184,7 +184,7 @@ w;dur=`, noted by the 除錯紀錄 when slow.
 | `/law-chat` | `law-chat.js`, `ai-other.js` | 問法律: a plan (Flash-Lite), up to 14 articles (and delegated ones) from Law's index, answered from those by Sonnet (failing: Sol), cites checked; grounded by `law-ground.js`, `law-more.js`, `law-local.js` (councils); 16 turns back; 30 a day a Pass |
 | `/law-page` | `law-page.js`, `law-hosts.js` | A gov.tw / edu.tw page read in Law, cleaned; edge cache only; Taiwan-only via the relay (build key: any gov.tw; `file=1`: raw); 500 a day a Pass |
 | `/law-live` | `law-live.js` | 立法院's IVOD streams now, 60 s at the edge (last good read 30 min); ours only |
-| `/news-tr` | `builders/news-tr.js` (`storyTr`), `translate.js` | News in one language (Google, capped free): `news/tr.json`, `tr/<id>.json` |
+| `/news-tr`, `/tr` | `builders/news-tr.js`, `translate.js` | One language, Google: `news/tr.json`, `tr/<id>.json`; kit `translateMarked` |
 | `/class-news` | `class-news.js` | Class's 學校公告: a school's boards read via the relay, kept 45 days, new titles worded once; R2 |
 | `/money-read` | `money-read.js` | Money's 拍照記帳: a picture → `{ buys, left }`, read by Gemini, checked; on a tap; 30 a day a Pass, 300 in all |
 | `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |
