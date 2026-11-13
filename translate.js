@@ -29,13 +29,15 @@ export function freshMeter(m, now = Date.now()) {
   if (base.day !== day) Object.assign(base, { day, today: 0 });
   return base;
 }
-// What today may still spend: the month's rest over its days left (today
-// one of them), so a busy day never leaves the month's end without.
+// What today may still spend: twice the month's rest over its days left
+// (today one of them): a day of catching up (every headline at once) can
+// run, and each day after is a share of what's left, so the month's end is
+// never without.
 export function dayLeft(m, now = Date.now(), cap = TR_MONTH) {
   const d = new Date(now + 8 * 3_600_000);
   const days = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate() - d.getUTCDate() + 1;
   const rest = Math.max(0, cap - (m.chars - (m.today || 0)));
-  return Math.max(0, Math.min(cap - m.chars, Math.floor(rest / days) - (m.today || 0)));
+  return Math.max(0, Math.min(cap - m.chars, Math.floor((2 * rest) / days) - (m.today || 0)));
 }
 export async function readMeter(store, now = Date.now()) {
   return freshMeter(await store.json(TR_METER).catch(() => null), now);
