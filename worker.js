@@ -1490,6 +1490,11 @@ async function route(request, env, ctx, headers, origin) {
     }
     // CPU by route from the Workers Logs (guard.js cpuByRoute): what passes the
     // Free plan's 10 ms a request. ?group= a logs key, ?keys=1 the keys, ?script=, ?hours=, ?where=.
+    // Today's D1 rows written by query and Durable Objects' time by namespace (guard.js useDetail).
+    if (check === 'detail') {
+      if (!env.GUARD) return json({ error: 'no guard' }, 200, headers);
+      return new Response(await (await env.GUARD.fetch('https://quota-guard/detail')).text(), { status: 200, headers: { ...headers, 'Content-Type': 'application/json' } });
+    }
     if (check === 'cpu') {
       if (!env.GUARD) return json({ error: 'no guard' }, 200, headers);
       const q = new URL(request.url).searchParams;
