@@ -3,7 +3,7 @@
 // cap kept, each text once, only a story's own texts.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { translate, peopleIn, shielded, unshield, dayLeft, freshMeter, TR_METER, TR_MONTH } from '../translate.js';
+import { translate, peopleIn, shielded, unshield, dayLeft, freshMeter, withMonth, TR_METER, TR_MONTH } from '../translate.js';
 import { newsTr, storyTr, wanted, NEWS_TR, trPath } from '../builders/news-tr.js';
 
 const memStore = (seed = {}) => {
@@ -97,4 +97,13 @@ test('a story opened: only its own texts, only those not in the reader’s langu
   const en = await storyTr({ store, env, id: 'a', to: 'en', texts: ['暴風襲擊', 'Big storm'], find, fetchImpl: googleFake(seen) });
   assert.deepEqual(en.tr, { 暴風襲擊: 'EN(暴風襲擊)' });
   assert.equal((await storyTr({ store, env, id: 'zz', to: 'en', texts: [], find })).error, 'story');
+});
+
+test('a day alone is this month’s (the one before when it’s still ahead); a headline gets no stop it didn’t have', async () => {
+  const at = Date.parse('2026-11-13T04:00:00Z');
+  assert.equal(withMonth('衛生所12日實施，3日起報名，2026年11月1日公告', at), '衛生所11月12日實施，11月3日起報名，2026年11月1日公告');
+  assert.equal(withMonth('28日發生', at), '10月28日發生');
+  const fetchImpl = async (u, init) => new Response(JSON.stringify({ data: { translations: JSON.parse(init.body).q.map(() => ({ translatedText: '沒有談判。' })) } }));
+  const out = await translate(env, memStore(), ['No talks underway', 'Talks ended.'], 'zh-TW', { fetchImpl });
+  assert.deepEqual(out, { 'No talks underway': '沒有談判', 'Talks ended.': '沒有談判。' });
 });

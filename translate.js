@@ -151,6 +151,20 @@ export function unshield(html, to) {
   return t;
 }
 
+// A Chinese report's day alone (12日) is this month's, as Taiwan's press
+// writes it; a translator guesses another month (11-13: 12日 → December
+// 12th). The month put in from when it was reported (Taiwan's), the
+// month before when the day is still ahead of it.
+export function withMonth(text, at = Date.now()) {
+  const d = new Date(at + 8 * 3_600_000);
+  return String(text).replace(/(?<![月\d])(\d{1,2})日/g, (all, day) => {
+    const n = +day;
+    if (n < 1 || n > 31) return all;
+    const m = n > d.getUTCDate() + 1 ? ((d.getUTCMonth() + 11) % 12) + 1 : d.getUTCMonth() + 1;
+    return `${m}月${n}日`;
+  });
+}
+
 // ---- Providers ----
 // Google v2: texts in one call (128 at most, 30k characters asked), → their translations in order.
 export async function google(env, texts, to, { fetchImpl = fetch, html = false } = {}) {
@@ -174,7 +188,7 @@ export async function google(env, texts, to, { fetchImpl = fetch, html = false }
 // 'zh-TW' or 'en'. `people`: names to keep (peopleIn of the story's
 // English), or a function giving each text its own.
 // The meter is read and written here, once a call.
-export async function translate(env, store, texts, to, { people = [], now = Date.now(), fetchImpl = fetch, cap = TR_MONTH, max = Infinity, force = false } = {}) {
+export async function translate(env, store, texts, to, { people = [], now = Date.now(), fetchImpl = fetch, cap = TR_MONTH, max = Infinity, force = false, prep = t => t } = {}) {
   const want = [...new Set(texts.map(t => String(t || '').trim()).filter(Boolean))];
   if (!want.length || !googleKey(env)) return {};
   const meter = await readMeter(store, now);
@@ -194,11 +208,13 @@ export async function translate(env, store, texts, to, { people = [], now = Date
   try {
     for (let i = 0; i < pick.length; i += 100) {
       const part = pick.slice(i, i + 100);
-      const asked = zh ? part.map(t => shielded(t, typeof people === 'function' ? people(t) : people)) : part;
-      const got = await google(env, asked, to, { fetchImpl, html: zh });
+      const asked = part.map(t => (zh ? shielded(prep(t), typeof people === 'function' ? people(t) : people) : esc(prep(t))));
+      const got = await google(env, asked, to, { fetchImpl, html: true });
       spent += part.reduce((n, t, k) => n + asked[k].length, 0);
       part.forEach((t, k) => {
-        const v = zh ? unshield(got[k], to) : unesc(got[k]).trim();
+        let v = unshield(got[k], to);
+        // (A headline with no stop of its own gets none: 談判。 → 談判; Nothing. → Nothing.)
+        if (!/[.!?。！？…]\s*["'”」』)]?$/.test(t)) v = v.replace(zh ? /。$/ : /\.$/, '');
         if (v && v !== t) out[t] = v;
       });
     }
