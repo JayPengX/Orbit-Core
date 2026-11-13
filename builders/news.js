@@ -240,10 +240,11 @@ export const FEEDS = {
   // (11-13, Jay: "you really should include sport outlet not using existing
   // outlet to get sport news": the sports outlets themselves, each feed once
   // an hour at its own turn.)
-  espn: [['news', 4], ['nba/news', 3], ['mlb/news', 0], ['soccer/news', 5]].map(([l, at]) => [`https://www.espn.com/espn/rss/${l}`, 'rss', S6, at]),
+  // ESPN and The Athletic refuse our servers' RSS calls, so they come through Bing News.
+  espn: [[bing('espn.com'), 'bing', S6, 4]],
   yahoosports: [['https://sports.yahoo.com/rss/', 'rss', S6, 4]],
   skysports: [['12040', 4], ['11095', 0]].map(([l, at]) => [`https://www.skysports.com/rss/${l}`, 'rss', S6, at]),
-  athletic: [['https://www.nytimes.com/athletic/rss/news/', 'rss', S6, 3]],
+  athletic: [[bing('nytimes.com/athletic'), 'bing', S6, 3]],
   si: [['https://www.si.com/feed', 'rss', S6, 5]]
 };
 // (Outlets read only through a search's feed: their pages refuse us too.)
