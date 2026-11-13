@@ -344,7 +344,7 @@ export async function runAi({ store, env, proxy, now = Date.now(), cap = async (
   // (Not the AI: plain translation of what the AI didn't title, Google's free month (builders/news-tr.js).)
   if (!only || only === 'tr')
     try {
-      out.tr = await newsTr({ store, env, now: Date.now() });
+      out.tr = await newsTr({ store, env, now: Date.now(), force: only === 'tr' });
     } catch (e) {
       out.tr = { failed: String(e?.message || e).slice(0, 200) };
     }

@@ -57,7 +57,7 @@ export function wanted(index, lines, was, now = Date.now()) {
   return { keep, ask };
 }
 
-export async function newsTr({ store, env, now = Date.now(), fetchImpl = fetch }) {
+export async function newsTr({ store, env, now = Date.now(), fetchImpl = fetch, force = false }) {
   const index = await store.json('news/index.json');
   if (!index) return { skipped: 'no index' };
   const lines = (await store.json(NEWS_LINES).catch(() => null))?.lines || {};
@@ -75,7 +75,7 @@ export async function newsTr({ store, env, now = Date.now(), fetchImpl = fetch }
       if (!seen.has(s.id)) seen.set(s.id, storyPeople(s));
       return seen.get(s.id);
     };
-    const got = await translate(env, store, mine.map(a => a.text), to, { people, now, fetchImpl });
+    const got = await translate(env, store, mine.map(a => a.text), to, { people, now, fetchImpl, force });
     for (const a of mine) {
       const v = got[a.text];
       if (!v) continue;
