@@ -944,6 +944,14 @@ export function idOf(u) {
   for (let i = 0; i < u.length; i++) h = Math.imul(h ^ u.charCodeAt(i), 0x01000193) >>> 0;
   return h.toString(36);
 }
+// (A new story's id never one a kept story has: a headline let go from a
+// story it gave its id to can start one of its own.)
+const freeId = (u, recs) => {
+  const taken = new Set(recs.map(r => r.id));
+  let id = idOf(u);
+  for (let i = 2; taken.has(id); i++) id = idOf(`${u}#${i}`);
+  return id;
+};
 const enough = (outlets, region) => outlets.size >= FEWEST[region] || (outlets.size >= 2 && [...outlets].some(o => STEADY.has(OUTLETS[o]?.kind)));
 const sumOf = vs => {
   const v = new Map();
@@ -956,6 +964,52 @@ const sumOf = vs => {
 // 0.075 (Chinese), the story's own above.)
 export const STRAY = { zh: 0.075, en: 0.05 };
 const STRAY_MIN = 6;
+// A story's core and what it keeps (Jay 11-13, a world story of 38 outlets
+// over four days: "spread text … not so helpful trying to understand it"):
+// a story grows a headline at a time, each near enough to the whole, and
+// drifts (Trump pulling Vance from the Iran talks held Pence's 2028 run,
+// Mark Kelly's, Hegseth's impeachment: Vance and Iran in each). Its core is
+// the headlines most others are near (near JOIN to at least half as many
+// as the best-joined headline); a headline is the story's if it is near
+// that core (CORE), else let go, grouped again at the next build.
+export const CORE = { zh: 0.2, en: 0.2 };
+export function coreKeep(vs, lang) {
+  const ns = vs.map(norm);
+  // (A wire's headline that ten outlets ran word for word counts once: its
+  // copies near each other would make the core that one wording, 11-13: 中央社's
+  // 「黃仁勳辭輝達執行長 科技界憂…」 left out every report of who took over.)
+  const one = [];
+  for (let i = 0; i < vs.length; i++) if (!one.some(j => cosine(vs[i], ns[i], vs[j], ns[j]) >= 0.9)) one.push(i);
+  const nb = new Map(one.map(i => [i, 0]));
+  for (let a = 0; a < one.length; a++)
+    for (let b = a + 1; b < one.length; b++) {
+      const i = one[a], j = one[b];
+      if (cosine(vs[i], ns[i], vs[j], ns[j]) >= JOIN[lang]) nb.set(i, nb.get(i) + 1), nb.set(j, nb.get(j) + 1);
+    }
+  const top = Math.max(...nb.values());
+  if (top < 2) return vs.map(() => true);
+  const core = sumOf(one.filter(i => nb.get(i) * 2 >= top).map(i => vs[i]));
+  const cn = norm(core);
+  return vs.map((v, i) => cosine(v, ns[i], core, cn) >= CORE[lang]);
+}
+// Which of a story's headlines it keeps: those near its core (coreKeep) and
+// not sharing next to nothing with the rest (STRAY: a group joins the story
+// of any one headline it holds, 11-12: the Hegseth impeachment story held
+// LSU's coach, China's car sales and oil prices), as long as enough outlets
+// are left (else all). vs: the headlines' weighed pieces.
+export function keptOf(vs, lang, region, outlets) {
+  if (vs.length < STRAY_MIN) return vs.map(() => true);
+  const near = coreKeep(vs, lang);
+  const c = sumOf(vs);
+  const keep = vs.map((v, i) => {
+    if (!near[i]) return false;
+    const rest = new Map(c);
+    for (const [k, x] of v) rest.set(k, rest.get(k) - x);
+    return cosine(v, norm(v), rest, norm(rest)) >= STRAY[lang];
+  });
+  return enough(new Set(outlets.filter((_, i) => keep[i])), region) ? keep : vs.map(() => true);
+}
+
 // A company's own report (a month's 營收, a quarter's EPS) and whose it is:
 // the words before the report's in the first piece of the headline that
 // says one (「陽明Q3賺逾半個股本」 → 陽明, 「辣椒財報／…」 → 辣椒), '' when
@@ -1052,6 +1106,13 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
     const mine = items.filter(it => OUTLETS[it.o]?.region === region && now - (it.at || now) <= WINDOW[region] && !fillerOf(it, lang));
     const vecOf = weigh(mine, lang);
     const recsHere = live.filter(r => r.r === region);
+    // Each kept story back to its core first: what drifted from it is let go
+    // before today's groups are placed, so it can join or start the story
+    // it's really about (11-13: Pence's 2028 run out of Trump's Iran deal).
+    for (const r of recsHere) {
+      const keep = keptOf(r.items.map(vecOf), lang, region, r.items.map(it => it.o));
+      if (keep.some(k => !k)) r.items = r.items.filter((_, i) => keep[i]);
+    }
     const owner = new Map();
     for (const r of recsHere) for (const it of r.items) owner.set(it.u, r);
     const open = r => now - r.first <= OPEN_MS;
@@ -1067,6 +1128,26 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
     const daysBy = new Map();
     for (const x of lastDays) for (const k of x.v.keys()) (daysBy.get(k) || daysBy.set(k, []).get(k)).push(x);
     const loose = [];
+    // A new story from a group, if it has a topic and enough outlets carry it.
+    const startOf = g => {
+      const texts = g.map(it => (lang === 'en' ? `${it.t} ${it.d || ''}` : it.t));
+      const kinds = topicsOf(texts, lang);
+      if (!kinds.length && !partiesIn(texts.join(' ')).length) return null;
+      // (A kind past the sides, health, science, sport…, needs only two:
+      // its tab isn't empty, and there's no side to weigh, Jay 11-10.)
+      const outlets = new Set(g.map(it => it.o));
+      if (!enough(outlets, region) && !(outlets.size >= 2 && TOPIC[kinds[0]]?.spectrum === false)) {
+        // (Sports' one-outlet reports, an injury, a move, aren't a story on
+        // News' pages, but are what Orbit Sports links to: news/sport.json.)
+        if (kinds.includes('sport')) loose.push(g);
+        return null;
+      }
+      const firstIt = g.reduce((a, b) => ((a.at || 0) <= (b.at || 0) ? a : b));
+      const rec = { id: freeId(firstIt.u, live), r: region, first: firstIt.at || now, last: firstIt.at || now, peak: 0, items: [] };
+      live.push(rec);
+      recsHere.push(rec);
+      return rec;
+    };
     for (const g of groupStories(mine, lang)) {
       const hits = new Map();
       for (const it of g) {
@@ -1093,24 +1174,8 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
         }
         if (bestSim >= MERGE[lang]) rec = best;
       }
-      if (!rec) {
-        const texts = g.map(it => (lang === 'en' ? `${it.t} ${it.d || ''}` : it.t));
-        const kinds = topicsOf(texts, lang);
-        if (!kinds.length && !partiesIn(texts.join(' ')).length) continue;
-        // (A kind past the sides, health, science, sport…, needs only two:
-        // its tab isn't empty, and there's no side to weigh, Jay 11-10.)
-        const outlets = new Set(g.map(it => it.o));
-        if (!enough(outlets, region) && !(outlets.size >= 2 && TOPIC[kinds[0]]?.spectrum === false)) {
-          // (Sports' one-outlet reports, an injury, a move, aren't a story on
-          // News' pages, but are what Orbit Sports links to: news/sport.json.)
-          if (kinds.includes('sport')) loose.push(g);
-          continue;
-        }
-        const firstIt = g.reduce((a, b) => ((a.at || 0) <= (b.at || 0) ? a : b));
-        rec = { id: idOf(firstIt.u), r: region, first: firstIt.at || now, last: firstIt.at || now, peak: 0, items: [] };
-        live.push(rec);
-        recsHere.push(rec);
-      }
+      if (!rec) rec = startOf(g);
+      if (!rec) continue;
       const { owner: whose } = lang === 'zh' ? reportsOwner(rec.items.map(it => it.t)) : {};
       for (const it of g) {
         if (owner.has(it.u)) continue;
@@ -1119,7 +1184,8 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
         owner.set(it.u, rec);
       }
     }
-    const sized = recsHere.map(r => {
+    const freed = [];
+    const sizeOf = r => {
       r.items.sort((a, b) => a.at - b.at);
       // One company's report is never another's story (Jay 11-10): a story
       // holding several companies' keeps its owner's, a day's reports one
@@ -1133,26 +1199,31 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
         }
       }
       if (r.items.length > REC_ITEMS) r.items = [...r.items.slice(0, 10), ...r.items.slice(10 - REC_ITEMS)];
+      // (What came in with this build's groups and drifted from the core, let go.)
       let vs = r.items.map(vecOf);
-      let c = sumOf(vs);
-      // A headline that shares next to nothing with the rest of its story
-      // came in with a group it was chained into (a group joins the story of
-      // any one headline it holds): let go. 11-12: the Hegseth impeachment
-      // story held LSU's coach, China's car sales and oil prices.
-      if (r.items.length >= STRAY_MIN) {
-        const keep = vs.map(v => {
-          const rest = new Map(c);
-          for (const [k, x] of v) rest.set(k, rest.get(k) - x);
-          return cosine(v, norm(v), rest, norm(rest)) >= STRAY[lang];
-        });
-        if (keep.some(k => !k) && keep.filter(Boolean).length >= FEWEST[region]) {
-          r.items = r.items.filter((_, i) => keep[i]);
-          vs = vs.filter((_, i) => keep[i]);
-          c = sumOf(vs);
-        }
+      const keep = keptOf(vs, lang, region, r.items.map(it => it.o));
+      if (keep.some(k => !k)) {
+        freed.push(...r.items.filter((_, i) => !keep[i]));
+        r.items = r.items.filter((_, i) => keep[i]);
+        vs = vs.filter((_, i) => keep[i]);
       }
+      const c = sumOf(vs);
       return { r, vs, c, cn: norm(c), first: r.items[0]?.at || now, last: r.items.at(-1)?.at || now };
-    }).filter(Boolean);
+    };
+    const sized = recsHere.map(sizeOf).filter(Boolean);
+    // What was let go of today's starts a story of its own where enough
+    // outlets carry it (11-12's 政院 answering 羅大佑 with 「皇后大道東」, out of
+    // 蔣萬安's praise of him): else it would join its old story by the one
+    // headline it shares at every build and be let go again.
+    const today = new Set(mine.map(it => it.u));
+    for (const it of freed) owner.delete(it.u);
+    for (const g of groupStories(freed.filter(it => today.has(it.u)), lang)) {
+      const rec = startOf(g);
+      if (!rec) continue;
+      for (const it of g) rec.items.push(keepOf(it)), owner.set(it.u, rec);
+      const x = sizeOf(rec);
+      if (x) sized.push(x);
+    }
     const clipsOf = matchClips(vids.filter(v => OUTLETS[v.o]?.region === region), sized, vecOf, lang);
     // (The world's stories: Taiwan's outlets' on each, from Taiwan's front.)
     const twOn = region === 'intl' ? taiwanOn(out.tw, sized, vecOf) : new Map();

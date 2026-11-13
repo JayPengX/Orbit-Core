@@ -296,7 +296,7 @@ export const TOPICS = [
     id: 'pol', zh: '政治', en: 'Politics', on: true,
     zh_: rx('立法院|立委|行政院|政院|總統|賴清德|蕭美琴|卓榮泰|國民黨|民進黨|民眾黨|時代力量|藍白|藍綠|綠營|藍營|白營|綠委|藍委|白委|黨團|黨主席|黨部|朝野|選舉|大選|初選|選戰|參選|候選人|罷免|公投|議會|議員|議長|縣長|市長|縣府|市府|首長|內閣|部長|閣揆|政委|發言人|府方|修法|三讀|覆議|釋憲|倒閣|政黨|政治|政府|官員|民調|監察院|考試院|監委|總預算|施政|政見|國會|質詢|擬參選|角逐|提名|徵召|黨內|出馬|選區|選情|後援會|造勢|站台|競選|輔選',
       '鄭麗文|劉建國|黃國昌|柯文哲|朱立倫|蔣萬安|盧秀燕|侯友宜|沈伯洋|連勝文|柯志恩|陳其邁|黃偉哲|林佳龍|鄭文燦|韓國瑜|江啟臣|傅崐萁|王世堅|吳思瑤|林岱樺|賴士葆|翁曉玲|徐巧芯|謝國樑|高虹安|張善政|李四川|陳亭妃|王定宇|林右昌|管碧玲|劉世芳|陳時中|蘇巧慧|李彥秀|羅智強|洪孟楷|葉元之|黃珊珊|吳靜怡|張啟楷|卓冠廷|王鴻薇|苗博雅|蔡英文|馬英九'),
-    en_: [rxi('Trump\\w*|Biden|Harris|Vance|Obama|Congress\\w*|Senate|Senators?|House (?:Speaker|Republicans?|Democrats?|GOP|votes?|passe[sd]|panel|committee|floor|majority)|Speaker|Republicans?|Democrats?|Dems?|GOP|MAGA|White House|elections?|electoral|midterms?|voters?|votes?|voting|ballots?|campaign\\w*|governors?|mayors?|parliament\\w*|prime minister|president\\w*|ministers?|government|gov\'t|shutdown|impeach\\w*|legislat\\w*|politic\\w*|polls?|administration|lawmakers?|cabinet|part(?:y|ies)|opposition|coalition|referendum|constitution\\w*|regime|officials?|liberals?|conservatives?|progressives?|left-wing|right-wing|woke|Labour|Tories|Mamdani|Newsom|Starmer|blue states?|red states?')]
+    en_: [rxi('Trump\\w*|Biden|Harris|Vance|Obama|Rubio|Leavitt|Bessent|Lutnick|Secretary of State|press secretary|cabinet|administration|lawmakers?|politic\\w*|Congress\\w*|Senate|Senators?|House (?:Speaker|Republicans?|Democrats?|GOP|votes?|passe[sd]|panel|committee|floor|majority)|Speaker|Republicans?|Democrats?|Dems?|GOP|MAGA|White House|elections?|electoral|midterms?|voters?|votes?|voting|ballots?|campaign\\w*|governors?|mayors?|parliament\\w*|prime minister|president\\w*|ministers?|government|gov\'t|shutdown|impeach\\w*|legislat\\w*|politic\\w*|polls?|administration|lawmakers?|cabinet|part(?:y|ies)|opposition|coalition|referendum|constitution\\w*|regime|officials?|liberals?|conservatives?|progressives?|left-wing|right-wing|woke|Labour|Tories|Mamdani|Newsom|Starmer|blue states?|red states?')]
   },
   {
     id: 'cs', zh: '兩岸', en: 'Cross-strait', zhAbroad: '中國', enAbroad: 'China', on: true,
@@ -394,7 +394,12 @@ export function topicsOf(texts, lang = 'zh') {
   // (The first is what it's about; another only where 40% of its headlines
   // name it: a doctor's car crash isn't 健康, Jay 11-10.)
   const ranked = (hits.length ? [...hits, ...near] : []).sort((a, b) => b[1] - a[1]);
-  return ranked.filter(([, m], i) => !i || m >= list.length * SECOND).slice(0, 3).map(([id]) => id);
+  // (A political story isn't also sport, culture or life by a word in it:
+  // Rubio flying military jets to his son's football games is politics, Jay
+  // 11-13 "why is this sport". A world story stays sport or health: a
+  // national team's game abroad, an outbreak.)
+  const pol = ranked[0]?.[0] === 'pol';
+  return ranked.filter(([id, m], i) => !i || (m >= list.length * SECOND && !(pol && TOPICS.find(t => t.id === id)?.spectrum === false))).slice(0, 3).map(([id]) => id);
 }
 // A topic's name: region 'intl' takes its own where it has one (中國, not 兩岸).
 export function topicWord(id, lang = 'zh', region = 'tw') {
