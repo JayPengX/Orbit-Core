@@ -1435,7 +1435,12 @@ async function route(request, env, ctx, headers, origin) {
   // Orbit News in one language: a story's own headlines and summary in the reader's, as it's opened (builders/news-tr.js).
   if (path === '/news-tr' && request.method === 'POST') return handleNewsTr(request, env, headers);
   // Any app's own words in the reader's language (translate.js handleTr): a Pass's, short, each kept a month.
-  if (path === '/tr') return handleTr(request, env, headers, await sessionOf(request, env));
+  // (A Pass session, or the dev door as Transit's, a few a minute: a localhost preview sees the English it will get.)
+  if (path === '/tr') {
+    const signed = await sessionOf(request, env, READ_GRACE_MS);
+    const dev = !signed && LOCAL_ORIGIN.test(origin) && !sessionLimited(`tr:dev:${ip}`, 20);
+    return handleTr(request, env, headers, signed || (dev ? { s: 'dev' } : null));
+  }
   if (path === '/class-news') return handleClassNews(request, env, ctx, headers, await sessionOf(request, env), { cap: await aiCap(env, ctx, 'class-news') });
   if (path === '/money-read') return handleMoneyRead(request, env, headers, await sessionOf(request, env), lawGemini('money-read'), await aiCap(env, ctx, 'money-read'));
   // The bill's guard (guard.js), as it last read the bill: armed or not,
