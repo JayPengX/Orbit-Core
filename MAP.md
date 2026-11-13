@@ -76,8 +76,6 @@ modules for modulepreload.
 - **Updates.** On a quick link `sw.js pageFirst` opens the server's page
   (the new version, started once); else boot.js reloads behind the cover.
   An open page swaps only after 5 minutes away (`AWAY_MS`).
-- **A phone may run an older kit:** a new export is read with a fallback
-  (`kitUI.newThing?.(…)`), never imported by name.
 - **Kit CSS loads after the app's**: an override needs higher specificity.
 
 ### 3.2 Modules
@@ -96,8 +94,8 @@ modules for modulepreload.
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); each app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
 | `passkey.mjs` | Passkeys in the browser: made, used, named (`passkeyHere()` false where a browser can't) |
 | `news-outlets.mjs`, `news-sport.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); `TOPICS`; `sideOf`, `partiesIn`, `topicsOf`, `namesRe`; Sports' 相關新聞 matching |
-| `ai.mjs`, `family.mjs`, `today.mjs`, `ask-orbit.mjs` | AI (mark `icons.ai`, `--q-ai`; `.q-ai-ref` a name chip): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer`, `aiAnswerWait` (answers drawn); the phone's family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天; 問 Orbit (`routeAsk`, an app's `#ask=` by `takeAsk`) |
-| `testtools.mjs` | 測試工具, hidden until unlocked (Orbit Pass › seven taps on 除錯紀錄 within 4 s): a moved clock (or a fast one: `rate`), a place, a trip's fixes played back (`playTrip({ from, fixes, rate })`, an app's own simulator handing them over; `watchPosition` fed from them), the network off/slow/failing (put in place by `boot.js` before the app runs, key `orbit.tester`; off answers the app's own files from what its service worker kept, as a phone with no connection), test notices (`pushTest`), each app's own switches (`globalThis.ORBIT_TEST_TOOLS`, read as `ORBIT_TEST?.flags?.x`), versions; a pill while anything is on |
+| `ai.mjs`, `family.mjs`, `today.mjs`, `ask-orbit.mjs` | AI (mark `icons.ai`, `--q-ai`; `.q-ai-ref` a name chip): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer`, `aiAnswerWait` (answers drawn); the family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天; 問 Orbit (`routeAsk`, an app's `#ask=` by `takeAsk`) |
+| `testtools.mjs` | 測試工具, hidden until unlocked (Orbit Pass › seven taps on 除錯紀錄 within 4 s): a moved clock (or a fast one: `rate`), a place, a trip's fixes played back (`playTrip({ from, fixes, rate })`, fed to `watchPosition`), the network off/slow/failing (`boot.js`, key `orbit.tester`; off: the app's own files from its service worker, as with no connection), test notices (`pushTest`), each app's own switches (`globalThis.ORBIT_TEST_TOOLS`, read as `ORBIT_TEST?.flags?.x`), versions; a pill while anything is on |
 | `suite.mjs` | Orbit, every app in one home-screen app (`/app/`, `site/app/`; scope `/`; `inSuite()`): a switcher at the top line's left or a rail's foot (`fit`), each app held in a frame of `host` (kept running, a playing one never closed, `toClose`), back and forward across apps (trail in sessionStorage `orbit.suite.trail`), reopened where left (`resumeOf`), `s.go` and notices in place |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law, Beats |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs`: qrcode-generator 2.0.4 (MIT), vendored |
@@ -291,7 +289,7 @@ A read (`kit proxyJson`) goes down these until one answers:
 
 | Store | Binding | What's in it |
 | --- | --- | --- |
-| D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data, the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced (§5.3); `gemini_call`: every Gemini call (`gemini-use.js`); `law_day`: the AI caps' counts a day; `gift`, `gift_claim`: the giveaway (`gift.js`); `beats`: each job's last run and failures (`ops.js`); `meter`: Google's and TDX's counts a month (`transit.js`); `push_kv`: notices' devices and lists (`push.js`); `kept`: what the Worker keeps for itself (`kept-store.js`: weather cells, scores and Google's count a day, TDX's last reads and meter, AI's and Law's kept answers, calendar feeds), swept every 6 hours (not KV: 1,000 writes a day); `data_file`: R2's files while R2 refuses (`data-fallback.js`); `sources`: outside calls by hour (`sources.js`) |
+| D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data and what's under way (§5.3), the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced (§5.3); `gemini_call`: every Gemini call (`gemini-use.js`); `law_day`: the AI caps' counts a day; `gift`, `gift_claim`: the giveaway (`gift.js`); `beats`: each job's last run and failures (`ops.js`); `meter`: Google's and TDX's counts a month (`transit.js`); `push_kv`: notices' devices and lists (`push.js`); `kept`: what the Worker keeps for itself (`kept-store.js`: weather cells, scores and Google's count a day, TDX's last reads and meter, AI's and Law's kept answers, calendar feeds), swept every 6 hours (not KV: 1,000 writes a day); `data_file`: R2's files while R2 refuses (`data-fallback.js`); `sources`: outside calls by hour (`sources.js`) |
 | R2 `orbit-data` | `DATA` | Public: the builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `station/`, `rail/`, `tdx/`, `where.json`), the proxy's kept reads (`mirror/`), the radar's (`weather/`), schools' news (`class-news/`), `flight/`. Never served: `private/` (nightly backups `private/store/`, Firestore's last copy) |
 | KV | `RATE_LIMIT_KV` | Few writes (Free: 1,000 a day for the account): the guard's state, pace and alerts (`guard:*`); copies from before D1's `kept`, read until they end; the showcase's passes a day (`showcase:passes:*`); the door's state (`door:state`); `ops:data-folders` |
 | Durable Objects | `F1_LOG`, `DOOR`, `RUNNER`, `CLOCK` | `F1Log`: F1's laps; `Door`: seats and the line; `Runner` (`runner.js`): heavy routes, crons by alarm, relays past 40 outside calls or when refused; `GuardClock`: the guard's alarm |
@@ -317,7 +315,10 @@ A new Cloudflare product goes into `guard.js` `PLAN` with it.
   account's id, written only if it's still the version read (`updated`, a
   precondition; a lost race throws). `passSync` (§3.2) merges the Pass's
   copy before any write, never over a copy it couldn't read; the rest write
-  through the session.
+  through the session, reading it first when taken back.
+- **Under way** (`eco-now`, RULEBOOK 11-13): a shelf per account and app
+  (`q.putNow`, the live session's; `now` in replies) and the notebook's
+  (`mergeHeard`), newer per key (`mergeShelf`).
 - **Nothing lost:** a save is refused if it would turn JSON data into
   anything else or was merged over an older copy (`base`). Every version a
   write or delete replaces goes to D1's `history` (whole 2 days, daily 30),
@@ -378,7 +379,7 @@ A season is kept until the next one's first game.
 ## 7. The economy
 
 The numbers live in `eco.js` and the kit's `orbit.mjs` (the same tables in
-both; RULEBOOK §4): NT$200,000 to open, NT$10,000 every Monday, 急難紓困
+both; amounts in RULEBOOK §4): the pay, 急難紓困
 (`kit/pay.mjs`), 財富等級 rewards, 1% a month overdraft, no personal loan.
 Money is shown and written only in Securities (資金), never on the Pass sheet; `eco:` ids are the Worker's alone.
 Broker rules (`stock-access.mjs`, `-credit`): Securities' MAP.md.
