@@ -75,6 +75,13 @@ test('deadlines read as dates; a ladder by deadline, a race by its leaders', () 
   assert.deepEqual(labelOf('Jensen Huang (No Change)', { 'Jensen Huang (No Change)': { zh: '黃仁勳續任' } }), { en: 'No change', zh: '不換人' });
 });
 
+test('a person keeps the name as written unless the headlines write it in Chinese (Jay 11-13: for names, English for accuracy)', () => {
+  const ev = { id: '8', slug: 'next-ceo', markets: [{ label: 'Ian Buck', p: 0.3, d: 0 }, { label: 'Colette Kress', p: 0.14, d: 0 }, { label: 'Jensen Huang (No Change)', p: 0.1, d: 0 }] };
+  const shown = shownEvent(ev, { zh: '誰接任黃仁勳？', en: 'q', labels: { 'Ian Buck': { who: 1, en: 'Buck' }, 'Colette Kress': { who: 1, zh: '克瑞斯' } } });
+  assert.deepEqual(shown.rows.map(r => [r.en, r.zh]), [['Ian Buck', undefined], ['Colette Kress', '克瑞斯'], ['No change', '不換人']]);
+  assert.ok(shown.rows.every(r => !('who' in r)));
+});
+
 test('options that share a part are told apart by the rest: never two rows both $4T', () => {
   assert.deepEqual(shortLabels(['Resigned/removed; Over $4T', 'Resigned/removed; Under $4T']), ['Over $4T', 'Under $4T']);
   assert.deepEqual(shortLabels(['Ian Buck', 'Rene Haas']), ['Ian Buck', 'Rene Haas']);
@@ -109,7 +116,7 @@ test('the page: only pairs the AI confirmed, at today’s prices; nothing asked 
   const story = tw('a', '傳輝達董事會擬撤換黃仁勳', ['輝達董事會深夜討論黃仁勳去留', '黃仁勳恐丟工作 6票就能撤換']);
   const files = new Map([
     ['news/index.json', { tw: [{ ...story, topics: ['tech'] }], intl: [] }],
-    ['private/news/markets.v4.json', { pairs: { 'a|1': { ok: 1, m: 2, at: NOW } }, words: { 1: { zh: '黃仁勳何時宣布卸任？', en: 'When will Jensen Huang step down?', labels: {} } } }]
+    ['private/news/markets.v5.json', { pairs: { 'a|1': { ok: 1, m: 2, at: NOW } }, words: { 1: { zh: '黃仁勳何時宣布卸任？', en: 'When will Jensen Huang step down?', labels: {} } } }]
   ]);
   const store = { json: async p => files.get(p) ?? null, put: async (p, d) => (files.set(p, JSON.parse(JSON.stringify(d))), true) };
   const fetchImpl = async url => ({ ok: true, json: async () => (/tag_slug=tech/.test(url) ? [JENSEN, ALICE] : []) });
