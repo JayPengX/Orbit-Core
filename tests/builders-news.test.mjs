@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN } from '../builders/news.js';
+import { teamsOf, otherGame, ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -796,4 +796,18 @@ test('a sports headline naming a team or a player, not the sport, is sport (Jay 
   assert.deepEqual(topicsOf(['James Harden breaks slump, leads Cavaliers over Knicks'], 'en'), ['sport']);
   assert.deepEqual(topicsOf(['比想像嚴重！柯瑞腹斜肌撕裂預計至少缺席1個月', '柯瑞腹斜肌撕裂缺陣勇士慘了？柯爾：狀況已比預期的好', '受傷後更衣室喊話「我沒事」 柯瑞右腹斜肌撕裂恐缺席一個月'], 'zh'), ['sport']);
   assert.ok(!topicsOf(['Jets scramble as Russian bombers near Alaska', 'Fighter jets intercept bombers'], 'en').includes('sport'), 'a word that is also a nickname stays out');
+});
+
+test('two games never one story: one outlet’s template previews naming other teams stay apart (Sports 11-13: AP’s NBA Cup)', () => {
+  const at = NOW - 2 * H;
+  const its = [
+    item('ap', 'Rockets and Jazz meet Friday in NBA Cup group stage', at),
+    item('ap', 'Warriors visit Spurs Friday in NBA Cup group stage', at + 60_000),
+    item('ap', 'Pelicans host Grizzlies Friday in NBA Cup group stage', at + 120_000),
+    item('reuters', 'Blazers take on Kings in NBA Cup group stage action Friday', at + 180_000)
+  ];
+  const groups = groupStories(its, 'en');
+  assert.ok(groups.every(g => g.length === 1), groups.map(g => g.map(it => it.t).join(' + ')).join(' | '));
+  assert.equal(teamsOf('Senators push AI bill', 'en'), null, 'a Senators’ bill isn’t a game');
+  assert.ok(!otherGame(teamsOf('Curry out as Warriors face Spurs', 'en'), teamsOf('Warriors visit Spurs Friday in NBA Cup group stage', 'en')));
 });
