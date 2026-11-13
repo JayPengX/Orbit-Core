@@ -420,6 +420,10 @@ export function start() {
   if (!app) return;
   started = true;
   document.documentElement.classList.add('q-in-suite');
+  // (Orbit's own loading screen was for its launch only: kit/boot.js.)
+  try {
+    sessionStorage.removeItem('orbit.launch');
+  } catch {}
   land();
   remember();
   const mount = () => {

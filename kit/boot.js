@@ -221,7 +221,18 @@
   };
   var title = box.getAttribute('data-title') || document.title;
   var logo = box.getAttribute('data-logo') || './favicon.svg';
-  box.className = 'loading q-boot';
+  // Orbit opened from its icon (site/app/ marks the moment it goes on to an
+  // app): Orbit's own screen, its mark and name, not the app's. A switch to
+  // another app later shows that app's, as it opens.
+  var launch = 0;
+  try {
+    launch = Number(sessionStorage.getItem('orbit.launch')) || 0;
+  } catch (e) {}
+  if (launch && Date.now() - launch < 30000) {
+    title = 'Orbit';
+    logo = '/app/favicon.svg';
+  } else launch = 0;
+  box.className = launch ? 'loading q-boot q-boot-orbit' : 'loading q-boot';
   box.setAttribute('role', 'status');
   box.setAttribute('aria-live', 'polite');
   box.innerHTML =

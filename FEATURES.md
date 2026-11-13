@@ -16,6 +16,7 @@ To remove a feature on purpose, delete its line here in the same commit and say 
 - The keyboard never pushes content off screen — `kit/orbit.mjs`: `watchKeyboard`
 - Add to Home Screen gate — `kit/orbit.mjs`: `installGate`
 - Orbit, every app in one home-screen app: one sign-in, a switcher, back and forward across apps, each app reopened where it was left — `kit/suite.mjs`, `kit/orbit.mjs`, `site/app/index.html`: `export function inSuite`, `export function back`, `export function forward`, `export function resumeOf`, `orbit.suite.v1`
+- Orbit's own loading screen when opened from its icon (its mark, name and indigo, not the app's) — `kit/boot.js`, `site/app/index.html`: `orbit.launch`, `q-boot-orbit`
 - Updates swap only once every file is on the phone — `kit/orbit.mjs`: `updateReady`
 - Pass: 里程碑 medals, passkeys, 除錯紀錄 — `kit/pass.mjs`, `kit/help.mjs`, `kit/orbit.mjs`: `里程碑`, `passkey`, `除錯紀錄`
 - A typhoon day off acts like a holiday — `kit/dayoff.mjs`: `dayOffOn`, `loadDayOff`
