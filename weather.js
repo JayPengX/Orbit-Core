@@ -45,6 +45,7 @@
 // entry (`bySource`), for the scoring that moves the blend's weights; it is
 // never in the answer.
 
+import { keptRead, keptPut } from './kept-store.js';
 import { radarAt } from './weather-radar.js';
 import { STATIONS } from './weather-stations.js';
 import { twDay } from './kit/format.mjs';
@@ -638,19 +639,10 @@ export function parseAir(sites, forecast, lat, lon, county) {
 
 // ---- KV --------------------------------------------------------------------------
 
-export async function kvJson(env, key) {
-  try {
-    const v = env.RATE_LIMIT_KV && (await env.RATE_LIMIT_KV.get(key));
-    return v ? JSON.parse(v) : null;
-  } catch {
-    return null;
-  }
-}
-export async function kvPut(env, key, value, ttlS) {
-  try {
-    if (env.RATE_LIMIT_KV) await env.RATE_LIMIT_KV.put(key, JSON.stringify(value), { expirationTtl: Math.max(60, ttlS) });
-  } catch {}
-}
+// Kept in R2 since 2026-11-13 (kept-store.js: KV's Free plan takes 1,000 writes a day, and
+// the cells, their scores and the counts here were most of them); the names stay.
+export const kvJson = (env, key) => keptRead(env, key);
+export const kvPut = (env, key, value, ttlS) => keptPut(env, key, value, ttlS);
 
 // ---- Kept answers: Cloudflare's cache first, KV at most hourly ----------------------
 //

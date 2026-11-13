@@ -17,6 +17,7 @@
 import { json, isAllowedOrigin, bodyText, sha256Hex } from './http.js';
 import { sessionLimited } from './orbit-token.js';
 import { countOf, addOne } from './law.js';
+import { keptRead, keptPut } from './kept-store.js';
 import { streamOther, makerOf } from './ai-other.js';
 import { logCall } from './gemini-use.js';
 import { paceOf } from './pace.js';
@@ -220,8 +221,8 @@ export async function handleAi(request, env, ctx, headers, session, { cap = 0, g
   const input = f.input(body?.input);
   if (!input) return json({ error: 'input' }, 400, headers);
   // (A `shared` feature's answer is kept for everyone a week, by what it was asked: the same filing, one call.)
-  const keptKey = f.shared && env.RATE_LIMIT_KV ? `ai:kept:${name}:${(await sha256Hex(JSON.stringify(input))).slice(0, 32)}` : '';
-  const kept = keptKey ? await env.RATE_LIMIT_KV.get(keptKey, 'json').catch(() => null) : null;
+  const keptKey = f.shared && (env.RATE_LIMIT_KV || env.DATA) ? `ai:kept:${name}:${(await sha256Hex(JSON.stringify(input))).slice(0, 32)}` : '';
+  const kept = keptKey ? await keptRead(env, keptKey) : null;
   if (kept?.out) return json({ out: kept.out, ask: null, left: f.perPass, model: kept.model || null, kept: true }, 200, headers);
   // Spent before the call: the Pass's count first (a capped one adds nothing to the day's).
   const day = twDay();
@@ -233,7 +234,7 @@ export async function handleAi(request, env, ctx, headers, session, { cap = 0, g
   try {
     const { out, ask, model } = await runFeature(env, ctx, name, input, { gemini, answers: f.clarify ? answersOf(body?.input?.answers) : [] });
     if (keptKey && out && !ask) {
-      const put = env.RATE_LIMIT_KV.put(keptKey, JSON.stringify({ out, model: providerOf(model) }), { expirationTtl: 8 * 86_400 }).catch(() => {});
+      const put = keptPut(env, keptKey, { out, model: providerOf(model) }, 8 * 86_400);
       if (ctx?.waitUntil) ctx.waitUntil(put);
       else await put;
     }

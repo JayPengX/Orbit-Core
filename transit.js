@@ -46,6 +46,7 @@ import { SHOWCASE_ORIGINS } from './showcase.js';
 import { cleanDev } from './kit/devconfig.mjs';
 import { twDay } from './kit/format.mjs';
 import { kvJson, kvPut } from './weather.js';
+import { keptText, keptPut } from './kept-store.js';
 import { freeTdx, freeEta, freeGps } from './transit-free.js';
 
 export const TDX_BASE = 'https://tdx.transportdata.tw/api/';
@@ -1086,7 +1087,7 @@ const warmKey = req => `tdx:warm:${req.path}?${req.query}`;
 const warmMarked = new Map(); // raw path → when this isolate last marked it
 async function warmRead(env, req) {
   try {
-    const r = await env.RATE_LIMIT_KV?.getWithMetadata(warmKey(req));
+    const r = await keptText(env, warmKey(req), { meta: true });
     return r?.value ? { body: r.value, at: Number(r.metadata?.at) || 0 } : null;
   } catch {
     return null;
@@ -1094,7 +1095,7 @@ async function warmRead(env, req) {
 }
 async function warmWrite(env, req, body, at) {
   try {
-    await env.RATE_LIMIT_KV?.put(warmKey(req), body, { metadata: { at }, expirationTtl: req.rule.tier === 'live' ? 2 * 86_400 : 14 * 86_400 });
+    await keptPut(env, warmKey(req), body, req.rule.tier === 'live' ? 2 * 86_400 : 14 * 86_400, { metadata: { at }, raw: true });
   } catch {}
 }
 // (A city asked: kept warm for the next 10 minutes. Once each 5 minutes an isolate.)

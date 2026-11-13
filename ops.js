@@ -18,6 +18,7 @@
 //     collections, R2's folders, which secrets and bindings are set (never
 //     their values).
 
+import { keptRead, keptPut } from './kept-store.js';
 import { STATE_KEY as GUARD_STATE, PACES } from './guard.js';
 import { paceOf } from './pace.js';
 import { notifyNow } from './push.js';
@@ -128,13 +129,13 @@ export async function tellOwner(env, deps) {
   const kv = env.RATE_LIMIT_KV;
   if (!kv) return { off: 'no KV' };
   const g = JSON.parse((await kv.get(GUARD_STATE).catch(() => null)) || 'null');
-  const told = JSON.parse((await kv.get(TOLD_KEY).catch(() => null)) || 'null');
+  const told = await keptRead(env, TOLD_KEY);
   const mark = news(g, told);
   if (!mark) return { news: false };
   const account = await alertAccount(env, deps);
   if (!account) return { news: true, told: 'no account set' };
   const r = await tell(env, account, lang => billNotice(g, lang));
-  if (r === 'sent' || r === 'none' || r === 'off') await kv.put(TOLD_KEY, JSON.stringify({ ...mark, at: Date.now(), r }));
+  if (r === 'sent' || r === 'none' || r === 'off') await keptPut(env, TOLD_KEY, { ...mark, at: Date.now(), r }, 400 * 86_400);
   return { news: true, told: r, mark };
 }
 
@@ -167,16 +168,16 @@ export async function dataFolders(bucket, { pages = 30 } = {}) {
 export const FOLDERS_KEY = 'ops:data-folders';
 export async function countFolders(env) {
   const out = { ...(await dataFolders(env.DATA)), at: Date.now() };
-  await env.RATE_LIMIT_KV?.put(FOLDERS_KEY, JSON.stringify(out), { expirationTtl: 2 * 86_400 });
+  await keptPut(env, FOLDERS_KEY, out, 2 * 86_400);
   return { files: Object.values(out.folders).reduce((n, f) => n + f.files, 0) };
 }
 async function foldersKept(env) {
-  return JSON.parse((await env.RATE_LIMIT_KV?.get(FOLDERS_KEY)) || 'null') || { pending: true };
+  return (await keptRead(env, FOLDERS_KEY)) || { pending: true };
 }
 export async function systemReport(env, deps) {
   const kv = env.RATE_LIMIT_KV;
   const g = kv ? JSON.parse((await kv.get(GUARD_STATE).catch(() => null)) || 'null') : null;
-  const told = kv ? JSON.parse((await kv.get(TOLD_KEY).catch(() => null)) || 'null') : null;
+  const told = kv || env.DATA ? await keptRead(env, TOLD_KEY) : null;
   const [pace, rows, store, data, account] = await Promise.all([
     paceOf(env),
     beats(env).catch(e => ({ error: String(e?.message || e) })),
