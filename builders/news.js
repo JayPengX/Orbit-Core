@@ -724,9 +724,32 @@ export function weigh(items, lang) {
 }
 
 // items: [{ o, t, u, d, at, img }] of one region → stories (unranked).
+// The teams a sports headline names (Sports' 11-13: AP's「Rockets and Jazz
+// meet Friday in NBA Cup group stage」,「Warriors visit Spurs Friday…」and
+// Reuters' Blazers-Kings, one template each, were made one story). Two
+// headlines or stories that both name teams and share none are two games,
+// never joined. Read only where a headline is sport's (a Senators' bill isn't
+// Ottawa's). null: none named, or not sport.
+const NICKS = ('Hawks|Celtics|Nets|Hornets|Bulls|Cavaliers|Cavs|Mavericks|Mavs|Nuggets|Pistons|Warriors|Rockets|Pacers|Clippers|Lakers|Grizzlies|Heat|Bucks|Timberwolves|Pelicans|Knicks|Thunder|Magic|76ers|Sixers|Suns|Trail Blazers|Blazers|Kings|Spurs|Raptors|Jazz|Wizards|' +
+  'Diamondbacks|D-backs|Braves|Orioles|Red Sox|Cubs|White Sox|Reds|Guardians|Rockies|Tigers|Astros|Royals|Angels|Dodgers|Marlins|Brewers|Twins|Mets|Yankees|Athletics|Phillies|Pirates|Padres|Giants|Mariners|Cardinals|Rays|Rangers|Blue Jays|Nationals|' +
+  'Falcons|Ravens|Bills|Panthers|Bears|Bengals|Browns|Cowboys|Broncos|Lions|Packers|Texans|Colts|Jaguars|Chiefs|Raiders|Chargers|Rams|Dolphins|Vikings|Patriots|Saints|Jets|Eagles|Steelers|49ers|Seahawks|Buccaneers|Bucs|Titans|Commanders|' +
+  'Ducks|Bruins|Sabres|Flames|Hurricanes|Blackhawks|Avalanche|Blue Jackets|Stars|Red Wings|Oilers|Canadiens|Predators|Devils|Islanders|Senators|Flyers|Penguins|Sharks|Kraken|Blues|Lightning|Maple Leafs|Canucks|Golden Knights|Capitals|Wild|Mammoth');
+const TEAM_EN = new RegExp(`\\b(?:${NICKS})\\b`, 'g');
+const TEAM_ZH = /老鷹|塞爾提克|籃網|黃蜂|公牛|騎士|獨行俠|金塊|活塞|勇士|火箭|溜馬|快艇|湖人|灰熊|熱火|公鹿|灰狼|鵜鶘|尼克|雷霆|魔術|76人|太陽|拓荒者|國王|馬刺|暴龍|爵士|巫師|響尾蛇|金鶯|紅襪|小熊|白襪|紅人|守護者|落磯|老虎|太空人|皇家|天使|道奇|馬林魚|釀酒人|雙城|大都會|洋基|運動家|費城人|海盜|教士|巨人|水手|紅雀|光芒|遊騎兵|藍鳥|國民|兄弟|統一獅|桃猿|悍將|味全龍|台鋼雄鷹/g;
+const SPORT_TOPIC = TOPICS.find(t => t.id === 'sport');
+export function teamsOf(title, lang) {
+  const t = String(title || '');
+  if (!(lang === 'en' ? SPORT_TOPIC.en_ : [SPORT_TOPIC.zh_]).some(re => re.test(t))) return null;
+  const found = t.match(lang === 'en' ? TEAM_EN : TEAM_ZH);
+  return found ? new Set(found.map(x => x.toLowerCase())) : null;
+}
+// (Both name teams, none the same: two games.)
+export const otherGame = (a, b) => Boolean(a && b && ![...a].some(x => b.has(x)));
+const withTeams = (into, more) => (more ? new Set([...(into || []), ...more]) : into);
+
 export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lang] } = {}) {
   const vecOf = weigh(items, lang);
-  const docs = items.map(it => ({ it, v: vecOf(it) })).filter(d => d.v.size);
+  const docs = items.map(it => ({ it, v: vecOf(it), teams: teamsOf(it.t, lang) })).filter(d => d.v.size);
   for (const d of docs) d.n = norm(d.v);
   docs.sort((a, b) => (a.it.at || 0) - (b.it.at || 0));
   let groups = [];
@@ -747,6 +770,7 @@ export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lan
     let best = null;
     let bestSim = 0;
     for (const [g, dot] of dots) {
+      if (otherGame(d.teams, g.teams)) continue;
       const sim = dot / (d.n * (g.n ??= norm(g.v)));
       if (sim > bestSim) (bestSim = sim), (best = g);
     }
@@ -757,10 +781,11 @@ export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lan
         add(best.v, k, x);
       }
       best.n = null;
+      best.teams = withTeams(best.teams, d.teams);
       best.last = Math.max(best.last, d.it.at || 0);
       best.first = Math.min(best.first, d.it.at || 0);
     } else {
-      const g = { docs: [d], v: new Map(d.v), n: d.n, last: d.it.at || 0, first: d.it.at || 0 };
+      const g = { docs: [d], v: new Map(d.v), n: d.n, teams: d.teams, last: d.it.at || 0, first: d.it.at || 0 };
       groups.push(g);
       for (const k of d.v.keys()) note(k, g);
     }
@@ -785,7 +810,7 @@ export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lan
     for (const [h, dot] of dots) {
       const a = root(g);
       const b = root(h);
-      if (a !== b && dot / (g.n * h.n) >= merge) into.set(b, a);
+      if (a !== b && !otherGame(a.teams, b.teams) && dot / (g.n * h.n) >= merge) into.set(b, a), (a.teams = withTeams(a.teams, b.teams));
     }
   }
   const whole = new Map();
@@ -990,14 +1015,23 @@ export function coreKeep(vs, lang) {
   const one = [];
   for (let i = 0; i < vs.length; i++) if (!one.some(j => cosine(vs[i], ns[i], vs[j], ns[j]) >= 0.9)) one.push(i);
   const nb = new Map(one.map(i => [i, 0]));
+  // (Its headlines near each other, joined: the core is the largest such
+  // group's best joined, never two groups' mix: 11-13, a story held Harry
+  // Kane's record and Wes Moore's book, its core both, keeping everything.)
+  const root = new Map(one.map(i => [i, i]));
+  const find = i => (root.get(i) === i ? i : (root.set(i, find(root.get(i))), root.get(i)));
   for (let a = 0; a < one.length; a++)
     for (let b = a + 1; b < one.length; b++) {
       const i = one[a], j = one[b];
-      if (cosine(vs[i], ns[i], vs[j], ns[j]) >= JOIN[lang]) nb.set(i, nb.get(i) + 1), nb.set(j, nb.get(j) + 1);
+      if (cosine(vs[i], ns[i], vs[j], ns[j]) >= JOIN[lang]) nb.set(i, nb.get(i) + 1), nb.set(j, nb.get(j) + 1), root.set(find(i), find(j));
     }
-  const top = Math.max(...nb.values());
+  const size = new Map();
+  for (const i of one) size.set(find(i), (size.get(find(i)) || 0) + 1);
+  const big = [...size].sort((a, b) => b[1] - a[1])[0][0];
+  const mine = one.filter(i => find(i) === big);
+  const top = Math.max(...mine.map(i => nb.get(i)));
   if (top < 2) return vs.map(() => true);
-  const core = sumOf(one.filter(i => nb.get(i) * 2 >= top).map(i => vs[i]));
+  const core = sumOf(mine.filter(i => nb.get(i) * 2 >= top).map(i => vs[i]));
   const cn = norm(core);
   return vs.map((v, i) => cosine(v, ns[i], core, cn) >= CORE[lang]);
 }
@@ -1172,12 +1206,15 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
         let bestSim = 0;
         // (Another company's reports never join a company's story.)
         const gReports = lang === 'zh' ? g.map(it => it.t).filter(reportOf) : [];
+        // (A game never joins another game's story.)
+        const gTeams = g.reduce((t, it) => withTeams(t, teamsOf(it.t, lang)), null);
         const dots = new Map();
         for (const [k, x] of gv) for (const d of daysBy.get(k) || []) dots.set(d, (dots.get(d) || 0) + x * d.v.get(k));
         for (const d of lastDays) {
           const { r, n, whose } = d;
           if (!dots.has(d) || r.last < gFirst - GAP) continue;
           if (whose && gReports.length && gReports.every(t => otherReport(t, whose))) continue;
+          if (gTeams && otherGame(gTeams, (d.teams ??= r.items.reduce((t, it) => withTeams(t, teamsOf(it.t, lang)), null)))) continue;
           const sim = dots.get(d) / (gn * n);
           if (sim > bestSim) (bestSim = sim), (best = r);
         }
