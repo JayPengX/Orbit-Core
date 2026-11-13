@@ -1546,14 +1546,17 @@ export const NEWS_CLIPS = 'news/clips.json';
 // stories (those with fewer than 2 clips first), top stories first, not read before
 // (華視's refuses a reader asking fast: asked again later);
 // `most` a run, `each` an outlet (a site that's asked too fast refuses: 華視).
+const CLIPS_TOP = 60;
 export function clipsToRead(index, done = {}, { most = 120, each = 14 } = {}) {
   const want = [];
   const per = new Map();
-  // (Stories with fewer than 2 clips first, then every other's clip outlets
-  // without one yet: Jay 11-13, 公視's clip missed beside three others'.)
+  // (The top stories' first, those with fewer than 2 clips ahead, then
+  // every other's clip outlets without one yet: Jay 11-13, 公視's clip
+  // missed beside three others'.)
   const few = s => (s.clips || []).filter(c => c[1]).length < 2;
   const tw = index?.tw || [];
-  for (const s of [...tw.filter(few), ...tw.filter(s => !few(s))]) {
+  const top = tw.slice(0, CLIPS_TOP), rest = tw.slice(CLIPS_TOP);
+  for (const s of [...top.filter(few), ...top.filter(s => !few(s)), ...rest.filter(few), ...rest.filter(s => !few(s))]) {
     const has = new Set((s.clips || []).filter(c => c[1]).map(c => c[0]));
     // (A page that wouldn't answer, `f` times, is asked again in a later run, 3 times at most.)
     const its = (s.items || []).filter(([o, , u]) => CLIPS_AT.includes(o) && !has.has(o) && !(done[u] && !(done[u].f < 3)) && !want.includes(u)).sort((a, b) => CLIPS_AT.indexOf(a[0]) - CLIPS_AT.indexOf(b[0]));
