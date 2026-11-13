@@ -1229,6 +1229,50 @@ export const FEATURES = {
     }
   },
 
+  // Orbit News' sports stories, for Orbit Sports' links to them (kit
+  // news-sport.mjs, builders/ai.js sportWho): the people and teams a story
+  // names, in English as ESPN writes them (code can't read 柯瑞 as Stephen
+  // Curry), and its title in the other language (a page all one language).
+  // Code finds the matches; this only reads the names.
+  'news-sport': {
+    models: ['haiku', 'luna'],
+    timeoutMs: 60_000,
+    parts: ({ stories }) =>
+      text(
+        [
+          'Each item below is one sports news story (its outlets’ headlines). For each, return:',
+          '"people": every athlete and coach the headlines name, each by the full name English sports media (ESPN) use, e.g. 柯瑞 → Stephen Curry, 詹皇 → LeBron James, 大谷翔平 → Shohei Ohtani, 鈴木誠也 → Seiya Suzuki, 孫興慜 → Son Heung-min. A Taiwanese player or coach with no usual English name: leave him out. Only names you are sure of; a nickname or surname you can’t tie to one person with certainty, leave out. Never add a person the headlines don’t name.',
+          '"teams": every club the headlines name, by its full English name as ESPN writes it (湖人 → Los Angeles Lakers, 道奇 → Los Angeles Dodgers, 兵工廠 → Arsenal, 曼城 → Manchester City, 76人 → Philadelphia 76ers); a national side by its country (中華隊 → Chinese Taipei). Where a nickname could be two clubs (勇士: Golden State Warriors in basketball, Atlanta Braves in baseball), use the headlines’ sport; unsure, leave it out.',
+          '"title": one short neutral headline in the language "want" asks. "zh": Traditional Chinese as Taiwan writes it (Taiwan’s sports names: 柯瑞, 詹姆斯, 湖人, 道奇, 英超), full-width punctuation but half-width digits and Latin letters, at most 22 characters. "en": English, at most 14 words, no Chinese characters, people and clubs by their English names. Say only what the headlines say; drop outlet tags (NBA／, 快訊, 影／, 【】, ｜ETtoday), adjectives and exclamation marks; copy every number exactly as written, convert none.',
+          'Return one item per story with its id; skip none (empty lists where nobody is named).',
+          JSON.stringify(stories)
+        ].join('\n')
+      ),
+    schema: obj({ items: arr(obj({ id: S, people: arr(S), teams: arr(S), title: S })) }),
+    clean(raw, { stories }) {
+      const given = new Map(stories.map(s => [s.id, s]));
+      const latin = x => /^[\p{Script=Latin}0-9 .,'’&()\-]{2,48}$/u.test(x);
+      const out = {};
+      for (const it of list(raw?.items, 200)) {
+        const s = given.get(String(it?.id || ''));
+        if (!s) continue;
+        const p = [...new Set(list(it?.people, 8).map(x => String(x || '').trim()).filter(latin))].slice(0, 6);
+        const t = [...new Set(list(it?.teams, 6).map(x => String(x || '').trim()).filter(latin))].slice(0, 4);
+        const row = { p, t };
+        const t0 = String(it?.title || '').trim();
+        const zh = s.want === 'zh';
+        if (zh ? t0.length <= 24 : t0.length <= 110 && t0.split(/\s+/).length <= 14) {
+          const title = zh ? str(t0, 24).replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/(?<!\d),|,(?!\d)/g, '，').replace(/(?<!\d):|:(?!\d)/g, '：') : str(t0, 110);
+          const hasCjk = /[\u3000-\u303f\u4e00-\u9fff\uff01-\uff5e]/.test(title);
+          const simplified = /[这们说时会发对经还为业东车长门见现问间关开应实点两亿国联军华伤赛场练员队]/.test(title);
+          if (title && !simplified && hasCjk === zh && numbersFrom(title, JSON.stringify(s.heads))) row[s.want] = title;
+        }
+        out[s.id] = row;
+      }
+      return out;
+    }
+  },
+
   // Orbit Law's: 拍合約幫你看, 會議紀錄變表格, 法案週報 (law-ai.js).
   ...LAW_FEATURES
 };

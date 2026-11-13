@@ -17,6 +17,11 @@
 //   brief    news/briefs.json  { built, briefs: { id: { points: [{ zh, en }], m, at } } }
 //            重點整理: a story's few points in our own words, from its outlets'
 //            headlines and feed summaries (Jay 11-13: reading kept in the app).
+//   sport    news/sport-who.json  { built, who: { id: { p, t, zh | en, at } } }
+//            Orbit News' sports stories (news/sport.json) for Orbit Sports'
+//            links: the people and teams each names, in English (柯瑞 →
+//            Stephen Curry; code matches them), and its title in the other
+//            language; each story once (news-sport); the news build puts them in.
 //   sports   sports/recaps/<YYYY-MM-DD>.json  { built, games: { espnId: { line } } }
 //            賽後三句話's "why" line for each finished game (builders/recaps.js).
 //   preview  sports/previews/<YYYY-MM-DD>.json  { v, built, games: { '<league>:<id>': { points, who } } }
@@ -29,6 +34,8 @@ import { runF1Stories } from './f1story.js';
 import { runRecWeekly } from '../rec-weekly.js';
 import { usage as meterUsage } from '../transit.js';
 import { sideOf } from '../kit/news-outlets.mjs';
+import { SPORT_PATH } from '../kit/news-sport.mjs';
+import { SPORT_WHO } from './news.js';
 
 const NEWS_LINES = 'news/lines.json';
 export const WORDS_CARDS = 'private/ai/words-cards.json';
@@ -90,6 +97,44 @@ export async function newsLines({ store, env, ctx, cap, until }) {
   for (const s of need) if (!keep[s.id] && was[s.id]) keep[s.id] = was[s.id];
   await store.put(NEWS_LINES, { built: Date.now(), lines: keep });
   return { made, calls, kept: Object.keys(keep).length };
+}
+
+// ---- News: the sports stories' names, for Orbit Sports' links ----
+// Every story of a sport Sports shows (not the NFL's, hockey's, colleges'),
+// newest first, each once; a run's batches while there's time, at most
+// SPORT_RUNS (a quiet hour's few, a busy evening's many over a few runs).
+const SPORT_BATCH = 15;
+const SPORT_RUNS = 6;
+export function sportFacts(s) {
+  const seen = new Set();
+  const heads = [];
+  for (const [outlet, title] of [[s.by, s.title], ...(s.items || [])]) {
+    const t = String(title || '').slice(0, 90);
+    if (!t || heads.includes(t) || seen.has(outlet) || heads.length >= 3) continue;
+    seen.add(outlet);
+    heads.push(t);
+  }
+  return { id: s.id, want: /\p{Script=Han}/u.test(s.title) ? 'en' : 'zh', heads };
+}
+export async function sportWho({ store, env, ctx, cap, until }) {
+  const pack = await store.json(SPORT_PATH);
+  if (!pack) return { skipped: 'no sport pack' };
+  const was = (await store.json(SPORT_WHO))?.who || {};
+  const stories = [...(pack.tw || []), ...(pack.intl || [])].sort((a, b) => b.at - a.at);
+  const keep = {};
+  for (const s of stories) if (was[s.id]) keep[s.id] = was[s.id];
+  const need = stories.filter(s => !keep[s.id]);
+  let made = 0, calls = 0;
+  for (let i = 0; i < need.length && calls < SPORT_RUNS && Date.now() < until; i += SPORT_BATCH) {
+    const batch = need.slice(i, i + SPORT_BATCH);
+    const r = await aiOnce(env, ctx, 'news-sport', { stories: batch.map(sportFacts) }, cap);
+    calls++;
+    if (!r) break;
+    if (r.error) continue;
+    for (const s of batch) if (r.out[s.id]) (keep[s.id] = { ...r.out[s.id], at: Date.now() }), made++;
+  }
+  await store.put(SPORT_WHO, { built: Date.now(), who: keep });
+  return { made, calls, kept: Object.keys(keep).length, left: need.length - made };
 }
 
 // ---- News: 各方怎麼說, how each side framed a story ----
@@ -273,6 +318,7 @@ export async function runAi({ store, env, proxy, now = Date.now(), cap = async (
   await step('news', 'news-lines', c => newsLines({ store, env, ctx, cap: c, until }));
   await step('sides', 'news-sides', c => newsSides({ store, env, ctx, cap: c, until, now }));
   await step('brief', 'news-brief', c => newsBriefs({ store, env, ctx, cap: c, until, now }));
+  await step('sport', 'news-sport', c => sportWho({ store, env, ctx, cap: c, until }));
   await step('sports', 'sports-recap', c => runRecaps({ store, env, ctx, proxy, cap: c, now, until }));
   await step('preview', 'sports-preview', c => runPreviews({ store, env, ctx, proxy, cap: c, now, until }));
   await step('f1', 'f1-story', c => runF1Stories({ store, env, ctx, proxy, cap: c, now, until }));
