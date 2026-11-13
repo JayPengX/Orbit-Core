@@ -70,6 +70,7 @@ import { handleCal } from './cal.js';
 import { logCall, callsSince, reliability, spendOf, lastFailed } from './gemini-use.js';
 import { handleAi, handleAiBuild, aiTry } from './ai.js';
 import { storyTr } from './builders/news-tr.js';
+import { handleTr } from './translate.js';
 import { r2Store } from './builders/store.js';
 import { handleClassNews, classNewsTry, classNewsPeek, classNewsRead } from './class-news.js';
 import { FEATURES } from './ai-features.js';
@@ -1433,6 +1434,8 @@ async function route(request, env, ctx, headers, origin) {
   // Orbit Class's 學校公告摘要 (class-news.js): a school's list read by code, worded once an hour by the AI, kept in R2.
   // Orbit News in one language: a story's own headlines and summary in the reader's, as it's opened (builders/news-tr.js).
   if (path === '/news-tr' && request.method === 'POST') return handleNewsTr(request, env, headers);
+  // Any app's own words in the reader's language (translate.js handleTr): a Pass's, short, each kept a month.
+  if (path === '/tr') return handleTr(request, env, headers, await sessionOf(request, env));
   if (path === '/class-news') return handleClassNews(request, env, ctx, headers, await sessionOf(request, env), { cap: await aiCap(env, ctx, 'class-news') });
   if (path === '/money-read') return handleMoneyRead(request, env, headers, await sessionOf(request, env), lawGemini('money-read'), await aiCap(env, ctx, 'money-read'));
   // The bill's guard (guard.js), as it last read the bill: armed or not,

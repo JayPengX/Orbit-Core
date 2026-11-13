@@ -114,3 +114,23 @@ test('Chinese to English: a well-known name and Taiwan’s bodies as Taiwan writ
   assert.equal(shieldedEn('三大法人買超'), '三大法人買超');
   assert.equal(shieldedEn('藍委質詢 <b>'), '<span translate="no">KMT legislator</span>質詢 &lt;b&gt;');
 });
+
+test('POST /tr: a Pass’s short texts only, each kept so the next phone asks Google nothing', async () => {
+  const { handleTr } = await import('../translate.js');
+  const kv = new Map();
+  const r2 = new Map();
+  const env = {
+    GOOGLE_WEATHER_KEY: 'k',
+    RATE_LIMIT_KV: { get: async k => kv.get(k) ?? null, getWithMetadata: async k => ({ value: kv.get(k) ?? null, metadata: null }), put: async (k, v) => void kv.set(k, v) },
+    DATA: { get: async k => (r2.has(k) ? { arrayBuffer: async () => new TextEncoder().encode(r2.get(k)).buffer, customMetadata: {} } : null), head: async () => null, put: async (k, v) => void r2.set(k, new TextDecoder().decode(v)) }
+  };
+  let asks = 0;
+  const fetchImpl = async (u, init) => (asks++, new Response(JSON.stringify({ data: { translations: JSON.parse(init.body).q.map(q => ({ translatedText: `EN ${q.length}` })) } })));
+  const req = body => new Request('https://w/tr', { method: 'POST', body: JSON.stringify(body) });
+  assert.equal((await handleTr(req({ to: 'en', texts: ['公告'] }), env, {}, null, { fetchImpl })).status, 401);
+  const r = await (await handleTr(req({ to: 'en', texts: ['本公司綠線改道', 'Already English', 'x'.repeat(300)] }), env, {}, { app: 'transit' }, { fetchImpl })).json();
+  assert.deepEqual(r.tr, { 本公司綠線改道: 'EN 7' });
+  const again = await (await handleTr(req({ to: 'en', texts: ['本公司綠線改道'] }), env, {}, { app: 'transit' }, { fetchImpl })).json();
+  assert.deepEqual(again.tr, { 本公司綠線改道: 'EN 7' });
+  assert.equal(asks, 1);
+});

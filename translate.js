@@ -15,6 +15,10 @@
 // guessed Chinese one; a well-known one Taiwan writes one way (川普, 黃仁勳,
 // 賴清德) is written that way (KNOWN).
 
+import { keptText, keptPut } from './kept-store.js';
+import { r2Store } from './builders/store.js';
+import { sha256Hex } from './http.js';
+
 export const TR_MONTH = 480_000;
 export const TR_METER = 'private/tr-meter.json';
 export const googleKey = env => env.GOOGLE_TRANSLATE_KEY || env.GOOGLE_WEATHER_KEY || '';
@@ -257,4 +261,43 @@ export async function translate(env, store, texts, to, { people = [], now = Date
   if (spent) Object.assign(meter, { chars: meter.chars + spent, today: (meter.today || 0) + spent, n: (meter.n || 0) + 1, off: 0 });
   await store.put(TR_METER, { ...meter, at: now });
   return out;
+}
+
+// ---- POST /tr: any app's own words put into the reader's language ----
+// (Jay 11-13: a full English Orbit.) What an app shows in the other
+// language with no source in the reader's (a law's name the MOJ never put
+// into English, a bus company's notice, a fund's name): short texts, a
+// signed-in Pass's, each kept a month (the Worker's `kept`, D1) so the next
+// phone asks Google nothing. → { tr: { text: translation } }.
+export const TR_ONE = 200;
+export const TR_CALL = 3_000;
+const TR_KEEP_S = 30 * 86_400;
+export async function handleTr(request, env, headers, session, { fetchImpl = fetch, now = Date.now() } = {}) {
+  const out = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json' } });
+  if (request.method !== 'POST') return out({ error: 'method' }, 405);
+  if (!session) return out({ error: 'pass' }, 401);
+  let body = {};
+  try {
+    body = JSON.parse(await request.text());
+  } catch {}
+  const to = body.to === 'zh-TW' ? 'zh-TW' : body.to === 'en' ? 'en' : '';
+  if (!to) return out({ error: 'to' }, 400);
+  const han = t => /[㐀-鿿]/.test(t);
+  const want = [...new Set((Array.isArray(body.texts) ? body.texts : []).slice(0, 40).map(t => String(t || '').replace(/\s+/g, ' ').trim()))].filter(t => t && t.length <= TR_ONE && han(t) === (to === 'en'));
+  const tr = {};
+  const keyOf = async t => `tr:${to}:${(await sha256Hex(t)).slice(0, 32)}`;
+  const need = [];
+  for (const t of want) {
+    const hit = await keptText(env, await keyOf(t), { now }).catch(() => null);
+    if (hit) tr[t] = hit;
+    else need.push(t);
+  }
+  if (need.length && env.DATA) {
+    const got = await translate(env, r2Store(env.DATA), need, to, { now, fetchImpl, max: TR_CALL, prep: t => (to === 'en' ? withMonth(t, now) : t) });
+    for (const [t, v] of Object.entries(got)) {
+      tr[t] = v;
+      await keptPut(env, await keyOf(t), v, TR_KEEP_S, { raw: true, now }).catch(() => {});
+    }
+  }
+  return out({ tr });
 }

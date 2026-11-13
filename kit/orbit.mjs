@@ -743,6 +743,87 @@ export async function workerJson(path, query, { timeout = 8000, body = null, err
     return null;
   }
 }
+
+// One language (Jay 11-13: "a full English experience"): an English page's
+// Chinese with no English of its own (a law the MOJ never translated, a bus
+// company's notice, a fund's name) put into English by plain translation
+// (the Worker's POST /tr, Google, each text kept a month there and here on
+// the phone). An app opts in for what it draws inside `root`: every short
+// piece of text (an element holding text only, up to 200 characters) still
+// in Chinese, unless it or a parent says `translate="no"` or `data-keep`;
+// drawn again (a redraw, a list growing), asked again, from the phone's copy
+// at once. The Chinese stays as written when none can be had (offline, the
+// month's characters gone). → a stop function.
+const TR_STORE = 'orbit.tr.en';
+const TR_HAN = /[\u3400-\u9fff]/;
+let trKept = null;
+const trMemory = () => {
+  if (trKept) return trKept;
+  try {
+    trKept = new Map(Object.entries(JSON.parse(localStorage.getItem(TR_STORE) || '{}')));
+  } catch {
+    trKept = new Map();
+  }
+  return trKept;
+};
+const trSave = () => {
+  try {
+    const all = [...trMemory()].slice(-1500);
+    localStorage.setItem(TR_STORE, JSON.stringify(Object.fromEntries(all)));
+  } catch {}
+};
+export function translateMarked(root = globalThis.document?.body, { lang = globalThis.document?.documentElement?.lang } = {}) {
+  if (!root || !/^en/.test(lang || '') || typeof MutationObserver === 'undefined') return () => {};
+  const asked = new Set();
+  let timer = 0;
+  let busy = false;
+  const pieces = () =>
+    [...root.querySelectorAll('*')].filter(el => {
+      if (el.childElementCount || !el.firstChild || /^(SCRIPT|STYLE|TEXTAREA|INPUT|OPTION|svg|path|title)$/i.test(el.tagName) || el.closest('[translate="no"], [data-keep]')) return false;
+      const t = el.textContent.trim();
+      return t.length > 0 && t.length <= 200 && TR_HAN.test(t);
+    });
+  const paint = () => {
+    const kept = trMemory();
+    const left = [];
+    for (const el of pieces()) {
+      const t = el.textContent.trim();
+      const v = kept.get(t);
+      if (v) {
+        el.textContent = v;
+        el.lang = 'en';
+        el.dataset.zh = t;
+      } else left.push(t);
+    }
+    return left;
+  };
+  const run = async () => {
+    const want = [...new Set(paint())].filter(t => !asked.has(t)).slice(0, 40);
+    if (!want.length || busy) return;
+    busy = true;
+    for (const t of want) asked.add(t);
+    const r = await workerJson('/tr', '', { body: JSON.stringify({ to: 'en', texts: want }), timeout: 12_000 });
+    busy = false;
+    // (No answer (not signed in yet, offline): asked again on the next redraw.)
+    if (!r) for (const t of want) asked.delete(t);
+    const got = Object.entries(r?.tr || {}).filter(([, v]) => typeof v === 'string' && v && !TR_HAN.test(v));
+    if (got.length) {
+      for (const [k, v] of got) trMemory().set(k, v);
+      trSave();
+      paint();
+    }
+    // (More waiting than one ask takes: the next forty.)
+    if (got.length && pieces().some(el => !asked.has(el.textContent.trim()))) later();
+  };
+  const later = () => {
+    clearTimeout(timer);
+    timer = setTimeout(run, 350);
+  };
+  const watch = new MutationObserver(later);
+  watch.observe(root, { childList: true, subtree: true, characterData: true });
+  later();
+  return () => (watch.disconnect(), clearTimeout(timer));
+}
 // Which app asks: the proxy counts each app's asks apart (Securities' quotes
 // left running never use up Sports' minute).
 const appParam = () => (dataSession?.app ? `&app=${dataSession.app}` : '');
