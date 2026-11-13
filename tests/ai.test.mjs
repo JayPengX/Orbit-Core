@@ -195,6 +195,15 @@ test('news-markets: a person’s Chinese name only as the story’s headlines wr
   assert.deepEqual(out['a|1'].labels, { 'Ian Buck': { en: 'Ian Buck', who: 1 }, 'Colette Kress': { zh: '克瑞斯', en: 'Colette Kress', who: 1 } });
 });
 
+test('news-markets: a Taiwan race’s candidates by their own names; a kept name stays in English in the question', () => {
+  const clean = FEATURES['news-markets'].clean;
+  const race = [{ k: 'a|1', story: ['基隆市長選戰升溫'], market: { q: 'Keelung Mayor Election Winner', about: '', kind: 'pick', tw: true, options: ['Hsieh Kuo-liang'] } }];
+  assert.deepEqual(clean({ items: [{ k: 'a|1', match: true, zh: '誰會當選基隆市長？', en: 'Who will win Keelung mayor?', options: [{ o: 'Hsieh Kuo-liang', who: true, zh: '謝國樑', en: 'Hsieh Kuo-liang' }] }] }, { pairs: race })['a|1'].labels, { 'Hsieh Kuo-liang': { zh: '謝國樑', en: 'Hsieh Kuo-liang', who: 1 } });
+  const alice = [{ k: 'a|1', story: ['黃仁勳女兒'], market: { q: 'Alice Huang arrested by...?', about: '', kind: 'dates', keep: ['Alice Huang'], options: [] } }];
+  assert.equal(clean({ items: [{ k: 'a|1', match: true, zh: '黃樂會被逮捕嗎？', en: 'Will Alice Huang be arrested?', options: [] }] }, { pairs: alice })['a|1'], undefined);
+  assert.equal(clean({ items: [{ k: 'a|1', match: true, zh: 'Alice Huang會被逮捕嗎？', en: 'Will Alice Huang be arrested?', options: [] }] }, { pairs: alice })['a|1'].zh, 'Alice Huang會被逮捕嗎？');
+});
+
 test('news-markets: each option’s short label, Chinese without Latin or a number it lacks, never two alike', () => {
   const pairs = [{ k: 'a|1', story: ['輝達董事會討論黃仁勳去留'], market: { q: 'Jensen Huang out + Nvidia market cap', about: '', options: ['Resigned/removed; Over $4T', 'Resigned/removed; Under $4T', 'Rene Haas', 'Ian Buck'] } }];
   const out = FEATURES['news-markets'].clean({ items: [{ k: 'a|1', match: true, zh: '黃仁勳去職時，輝達市值會在4兆美元以上嗎？', en: 'If Jensen Huang leaves, will Nvidia be worth over $4 trillion?', options: [
