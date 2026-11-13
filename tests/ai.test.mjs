@@ -177,6 +177,15 @@ test('a story’s points keep only their own words and the material’s numbers'
   assert.equal(clean({ items: [{ id: 'a', points: [ok, { zh: '负责人将上诉', en: 'The owner will appeal.' }] }] }).a, undefined);
 });
 
+test('news-markets: a question says when it settles, unless its rows each show a deadline', () => {
+  const clean = FEATURES['news-markets'].clean;
+  const market = { q: 'Jensen Huang resigned or removed & Nvidia above $4T end of 2026?', about: '', kind: 'pick', ends: '2026-12-31', options: ['Resigned/removed; Over $4T', 'Resigned/removed; Under $4T'] };
+  const ask = (m, zh, en) => clean({ items: [{ k: 'a|1', match: true, zh, en, options: [] }] }, { pairs: [{ k: 'a|1', story: [], market: m }] })['a|1'];
+  assert.equal(ask(market, '黃仁勳已宣布去職，輝達2026年底市值會達4兆美元嗎？', 'With Jensen Huang’s exit announced, will Nvidia be worth $4T at the end of 2026?').zh, '黃仁勳已宣布去職，輝達2026年底市值會達4兆美元嗎？');
+  assert.equal(ask(market, '輝達2027年底市值會達4兆美元嗎？', 'Will Nvidia be worth $4T at the end of 2027?'), undefined, 'a year the market lacks');
+  assert.equal(ask({ ...market, kind: 'dates', ends: undefined }, '黃仁勳2026年底前會卸任嗎？', 'Will Jensen Huang step down by the end of 2026?'), undefined, 'a ladder’s rows say the dates');
+});
+
 test('news-markets: each option’s short label, Chinese without Latin or a number it lacks, never two alike', () => {
   const pairs = [{ k: 'a|1', story: ['輝達董事會討論黃仁勳去留'], market: { q: 'Jensen Huang out + Nvidia market cap', about: '', options: ['Resigned/removed; Over $4T', 'Resigned/removed; Under $4T', 'Rene Haas', 'Ian Buck'] } }];
   const out = FEATURES['news-markets'].clean({ items: [{ k: 'a|1', match: true, zh: '黃仁勳去職時，輝達市值會在4兆美元以上嗎？', en: 'If Jensen Huang leaves, will Nvidia be worth over $4 trillion?', options: [

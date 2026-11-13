@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { trimEvent, quiet, aboutEvent, storyText, fitOf, candidates, deadline, shownEvent, labelOf, shortLabels, runNewsMarkets, MARKETS_PATH } from '../builders/news-markets.js';
+import { trimEvent, quiet, aboutEvent, storyText, fitOf, candidates, deadline, shownEvent, labelOf, shortLabels, pairFacts, endsOf, runNewsMarkets, MARKETS_PATH } from '../builders/news-markets.js';
 
 const NOW = Date.parse('2026-11-12T13:00:00Z');
 const market = (label, p, extra = {}) => ({ groupItemTitle: label, outcomes: '["Yes","No"]', outcomePrices: JSON.stringify([String(p), String(1 - p)]), oneDayPriceChange: 0.05, endDate: '2026-12-31T00:00:00Z', ...extra });
@@ -83,11 +83,33 @@ test('options that share a part are told apart by the rest: never two rows both 
   assert.deepEqual(shown.rows.map(r => [r.en, r.zh]), [['Over $4T', '4兆美元以上'], ['Under $4T', '4兆美元以下']]);
 });
 
+test('the AI is told how the market is settled: what’s already decided, the day it ends, how the card shows it', () => {
+  const combo = event('7', 'Jensen Huang resigned or removed & Nvidia above $4T end of 2026?', ['NVIDIA', 'Jensen Huang'], [
+    market('Resigned/removed; Over $4T', 0.56, { endDate: '2027-01-01T04:59:00Z' }),
+    market('Resigned/removed; Under $4T', 0.45, { endDate: '2027-01-01T04:59:00Z' }),
+    market('Not resigned/removed; Over $4T', 0, { closed: true }),
+    market('Not resigned/removed; Under $4T', 0, { closed: true })
+  ]);
+  combo.negRisk = true;
+  const ev = trimEvent(combo, NOW);
+  assert.equal(endsOf(ev), '2026-12-31', 'a deadline of 11:59 PM ET is the 31st, never Taiwan’s 1/1');
+  const facts = pairFacts({ s: tw('a', '輝達董事會撤換黃仁勳', ['輝達宣布黃仁勳卸任']), ev }).market;
+  assert.equal(facts.kind, 'pick');
+  assert.equal(facts.ends, '2026-12-31');
+  assert.deepEqual(facts.settled, ['Not resigned/removed; Over $4T', 'Not resigned/removed; Under $4T']);
+  assert.equal(pairFacts({ s: tw('a', 'x', []), ev: evs[0] }).market.ends, undefined, 'a ladder’s rows each show their deadline');
+  // (Options that exclude each other: chances that add to 100%, flagged for the page to round to 100.)
+  const shown = shownEvent(ev, { zh: '黃仁勳已宣布去職，輝達2026年底市值會達4兆美元嗎？', en: 'q', labels: {} }, NOW);
+  assert.equal(shown.one, 1);
+  assert.deepEqual(shown.rows.map(r => r.p), [0.554, 0.446]);
+  assert.equal(shownEvent(evs[2], { zh: 'q', en: 'q', labels: {} }, NOW).one, undefined, 'not negRisk: each its own chance');
+});
+
 test('the page: only pairs the AI confirmed, at today’s prices; nothing asked with the day’s AI at 0', async () => {
   const story = tw('a', '傳輝達董事會擬撤換黃仁勳', ['輝達董事會深夜討論黃仁勳去留', '黃仁勳恐丟工作 6票就能撤換']);
   const files = new Map([
     ['news/index.json', { tw: [{ ...story, topics: ['tech'] }], intl: [] }],
-    ['private/news/markets.v3.json', { pairs: { 'a|1': { ok: 1, m: 2, at: NOW } }, words: { 1: { zh: '黃仁勳何時宣布卸任？', en: 'When will Jensen Huang step down?', labels: {} } } }]
+    ['private/news/markets.v4.json', { pairs: { 'a|1': { ok: 1, m: 2, at: NOW } }, words: { 1: { zh: '黃仁勳何時宣布卸任？', en: 'When will Jensen Huang step down?', labels: {} } } }]
   ]);
   const store = { json: async p => files.get(p) ?? null, put: async (p, d) => (files.set(p, JSON.parse(JSON.stringify(d))), true) };
   const fetchImpl = async url => ({ ok: true, json: async () => (/tag_slug=tech/.test(url) ? [JENSEN, ALICE] : []) });

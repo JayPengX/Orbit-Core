@@ -10,14 +10,15 @@
 // Run on its own even minutes (run.js SLOTS 'markets', every 30 minutes).
 //
 // news/markets.json: { built, stories: { id: [{ e, slug, zh, en,
-//   kind: 'yes' | 'dates' | 'pick', rows: [{ p, d, en?, zh?, md? }] }] } }
-// p a chance (0–1), d its move in a day (−1–1), md a deadline (M/D or Y/M/D).
+//   kind: 'yes' | 'dates' | 'pick', one?, rows: [{ p, d, en?, zh?, md? }] }] } }
+// p a chance (0–1), d its move in a day (−1–1), md a deadline (M/D or Y/M/D);
+// one: the options exclude each other (their chances add to 100%).
 // Its memory (each pair's answer, each market's words): private/news/markets.json.
 import { aiOnce } from '../ai.js';
 import { NEWS_PATH } from './news.js';
 
 export const MARKETS_PATH = 'news/markets.json';
-const MEMORY = 'private/news/markets.v3.json';
+const MEMORY = 'private/news/markets.v4.json';
 const LINES = 'news/lines.json';
 const GAMMA = 'https://gamma-api.polymarket.com/events';
 // Polymarket's sections whose markets stories can be about (50 each, busiest first).
@@ -63,7 +64,10 @@ export function trimEvent(e, now = Date.now()) {
   if (tags.some(t => SKIP_TAGS.test(t)) || SKIP_TITLE.test(e.title)) return null;
   if ((Number(e.volume) || 0) < MIN_VOL) return null;
   const markets = [];
+  // (The options already settled: "Not resigned/removed; …" closed tells the question's first half is decided.)
+  const gone = [];
   for (const m of e.markets) {
+    if (m?.closed && m.groupItemTitle) gone.push(String(m.groupItemTitle).trim());
     if (!m || m.closed || m.active === false) continue;
     const outs = arrOf(m.outcomes);
     const p = Number(arrOf(m.outcomePrices)[0]);
@@ -73,7 +77,8 @@ export function trimEvent(e, now = Date.now()) {
     markets.push({ label: String(m.groupItemTitle || '').trim(), p, d: Number(m.oneDayPriceChange) || 0, end });
   }
   if (!markets.length) return null;
-  return { id: String(e.id), slug: String(e.slug || ''), title: String(e.title).trim(), about: String(e.description || '').replace(/\s+/g, ' ').slice(0, 300), tags, vol: Number(e.volume) || 0, markets };
+  // (What it resolves on: the threshold, the side that counts, the deadline. negRisk: its options exclude each other.)
+  return { id: String(e.id), slug: String(e.slug || ''), title: String(e.title).trim(), about: String(e.description || '').replace(/\s+/g, ' ').slice(0, 600), tags, vol: Number(e.volume) || 0, one: e.negRisk === true, gone: gone.slice(0, 6), markets };
 }
 
 export async function readEvents(fetchImpl = fetch, now = Date.now()) {
@@ -262,10 +267,21 @@ export function shownEvent(ev, words, now = Date.now()) {
     .sort((a, b) => b.p - a.p)
     .slice(0, 4);
   const short = shortLabels(picked.map(m => m.label));
-  let rows = picked.map((m, i) => ({ ...labelOf(m.label, words.labels, short[i]), p: round(m.p), d: round(m.d) }));
+  // (Options that exclude each other are chances that add to 100%: each price
+  // over all of theirs, never 56% beside 45%. The page then rounds them to 100.)
+  const sum = ms.reduce((a, m) => a + m.p, 0);
+  const one = ev.one && sum > 0.9 && sum < 1.1;
+  let rows = picked.map((m, i) => ({ ...labelOf(m.label, words.labels, short[i]), p: round(one ? m.p / sum : m.p), d: round(m.d) }));
   // (Every row in Chinese or none: never 伊恩·巴克 beside Rene Haas.)
   if (rows.some(r => !r.zh)) rows = rows.map(({ zh, ...r }) => r);
-  return rows.length ? { ...base, kind: 'pick', rows } : null;
+  return rows.length ? { ...base, kind: 'pick', ...(one ? { one: 1 } : {}), rows } : null;
+}
+// How the card shows it (the AI words the question to fit): one chance, a ladder of deadlines, or options.
+export const kindOf = ev => (ev.markets.length === 1 ? 'yes' : ev.markets.every(m => deadline(m.label)) ? 'dates' : 'pick');
+// The day it's settled by, as the market's US Eastern clock reads it (a deadline of 11:59 PM ET, never Taiwan's next morning).
+export function endsOf(ev) {
+  const end = Math.max(0, ...ev.markets.map(m => m.end || 0));
+  return end ? new Date(end - 5 * 3_600_000).toISOString().slice(0, 10) : '';
 }
 // The outcomes the AI is asked to label (a pick's leading four).
 export const optionsOf = ev => (ev.markets.length > 1 && !ev.markets.every(m => deadline(m.label)) ? [...ev.markets].filter(m => m.label).sort((a, b) => b.p - a.p).slice(0, 4).map(m => m.label) : []);
@@ -280,7 +296,11 @@ export function pairFacts({ s, ev }, line) {
     heads.push(String(title).slice(0, 100));
   }
   if (line?.en && s.region !== 'intl') heads.push(String(line.en).slice(0, 100));
-  return { k: `${s.id}|${ev.id}`, story: heads, market: { q: ev.title, about: ev.about, options: optionsOf(ev) } };
+  const kind = kindOf(ev);
+  const market = { q: ev.title, about: ev.about, kind, options: optionsOf(ev) };
+  if (kind !== 'dates' && endsOf(ev)) market.ends = endsOf(ev);
+  if (ev.gone?.length && kind === 'pick') market.settled = ev.gone;
+  return { k: `${s.id}|${ev.id}`, story: heads, market };
 }
 
 export async function runNewsMarkets({ store, env, ctx = null, cap = async () => 0, now = Date.now(), fetchImpl = fetch, until = now + 4 * 60_000 }) {
