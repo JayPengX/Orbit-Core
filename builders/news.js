@@ -51,7 +51,7 @@
 
 import { OUTLETS, TOPICS, SECOND, sideOf, partiesIn, topicsOf } from '../kit/news-outlets.mjs';
 import { enOf, NAMES } from './news-words.js';
-import { SPORT_PATH, SPORT_VERSION, SPORT_MS, sportKind, sportText, sportsIn } from '../kit/news-sport.mjs';
+import { SPORT_PATH, SPORT_VERSION, SPORT_MS, storyKind, sportText, sportsIn } from '../kit/news-sport.mjs';
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
 export const NEWS_PATH = 'news/index.json';
@@ -1263,7 +1263,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
 
 // Orbit Sports' links to the news (news/sport.json, kit news-sport.mjs): the
 // sports stories of the last three days, a one-outlet report too, newest
-// first, `top` a region; each with its kind (sportKind: 傷病, 禁賽, 換帥, 轉隊),
+// first, `top` a region; each with its kind (storyKind, from its headline: 傷病, 禁賽, 換帥, 轉隊),
 // and those of a sport Sports never shows (the NFL, hockey, colleges) left
 // out. A story is News' own (News opens it from a link), lighter: no clips'
 // pictures past its first, no score.
@@ -1279,7 +1279,7 @@ export function sportDesk(stories, top) {
     })
     .sort((a, b) => b.s.at - a.s.at)
     .slice(0, top)
-    .map(({ s: { score, light, alts, ...s }, text }) => ({ ...s, clips: (s.clips || []).slice(0, 2), k: sportKind(text) }));
+    .map(({ s: { score, light, alts, ...s }, text }) => ({ ...s, clips: (s.clips || []).slice(0, 2), k: storyKind(s) }));
 }
 
 // The front: the TOP stories by score, then each topic's best past them
@@ -1475,7 +1475,7 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
   // reading of its names and its title in the other language (builders/ai.js
   // sportWho → news/sport-who.json), where it has made one yet.
   if (out.sport.tw.length || out.sport.intl.length) {
-    const withWho = list => list.map(s => (who[s.id] ? { ...s, who: { p: who[s.id].p || [], t: who[s.id].t || [] }, ...(who[s.id].zh ? { zh: who[s.id].zh } : {}), ...(who[s.id].en ? { en: who[s.id].en } : {}) } : s));
+    const withWho = list => list.map(s => (who[s.id] ? { ...s, who: { p: who[s.id].p || [], t: who[s.id].t || [], ...(Array.isArray(who[s.id].a) ? { a: who[s.id].a } : {}) }, ...(who[s.id].zh ? { zh: who[s.id].zh } : {}), ...(who[s.id].en ? { en: who[s.id].en } : {}) } : s));
     await store.put(SPORT_PATH, { v: SPORT_VERSION, built: now, tw: withWho(out.sport.tw), intl: withWho(out.sport.intl) });
   }
   // (A few feeds missing is a normal build. Only half or more of the stories' feeds asked

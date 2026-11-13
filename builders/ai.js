@@ -136,7 +136,8 @@ export async function sportWho({ store, env, ctx, cap, until }) {
   const was = (await store.json(SPORT_WHO))?.who || {};
   const stories = [...(pack.tw || []), ...(pack.intl || [])].sort((a, b) => b.at - a.at);
   const keep = {};
-  for (const s of stories) if (was[s.id]) keep[s.id] = was[s.id];
+  // (One read before `a`, the clubs it's about, 11-13: read again, the newest first.)
+  for (const s of stories) if (was[s.id] && Array.isArray(was[s.id].a)) keep[s.id] = was[s.id];
   const need = stories.filter(s => !keep[s.id]);
   let made = 0, calls = 0;
   for (let i = 0; i < need.length && calls < SPORT_RUNS && Date.now() < until; i += SPORT_BATCH) {

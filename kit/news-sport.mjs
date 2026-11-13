@@ -34,18 +34,18 @@ const KIND_RES = [
   ],
   [
     'injury',
-    /受傷|傷勢|傷兵|傷病|傷退|傷癒|傷停|養傷|帶傷|舊傷|新傷|傷號|缺陣|開刀|手術|拉傷|扭傷|挫傷|骨折|撕裂|韌帶|腦震盪|痠痛|發炎|復健|休養|高掛免戰牌|[膝肩踝腿腳手肘背腰腹臀頸腕指趾筋]傷|腿筋|腹斜肌|腹股溝|阿基里斯腱|核磁共振|MRI/,
-    /\binjur(?:y|ies|ed)\b|\bhurt\b|\bsprain(?:s|ed)?\b|\bstrain(?:s|ed)?\b|\btorn\b|\bfracture[sd]?\b|\bsurgery\b|\bconcussion\b|\bruled out\b|\bday-to-day\b|\bsidelined\b|\bsetback\b|\bMRI\b|\binjured list\b|\bACL\b|\bhamstring\b|\bAchilles\b|\bwill miss\b|\bto miss\b|\bout (?:for|indefinitely|with)\b|\bdoubtful\b|\bfitness (?:doubt|test|blow)\b|\bknock\b/i
+    /受傷|傷勢|傷兵|傷病|傷退|缺席|傷癒|傷停|養傷|帶傷|舊傷|新傷|傷號|缺陣|開刀|手術|拉傷|扭傷|挫傷|骨折|撕裂|韌帶|腦震盪|痠痛|發炎|復健|休養|高掛免戰牌|[膝肩踝腿腳手肘背腰腹臀頸腕指趾筋]傷|腿筋|腹斜肌|腹股溝|阿基里斯腱|核磁共振|MRI/,
+    /\binjur(?:y|ies|ed)\b|\bhurt\b|\bsprain(?:s|ed)?\b|\bstrain(?:s|ed)?\b|\btorn\b|\bfracture[sd]?\b|\bsurgery\b|\bconcussion\b|\bruled out\b|\bday-to-day\b|\bsidelined\b|\bsetback\b|\bMRI\b|\binjured list\b|\bACL\b|\bhamstring\b|\bAchilles\b|\bwill miss\b|\bto miss\b|(?<!called )\bout (?:for|indefinitely|with)\b|\bdoubtful\b|\bfitness (?:doubt|test|blow)\b|\bknock\b/i
   ],
   [
     'coach',
-    /(?:總教練|教頭|主帥|總管|教練)[^，。！？\s]{0,6}(?:下課|去職|離職|解聘|開除|撤換|請辭|辭職|走人|接任|上任|出任|就任|續任)|(?:解聘|開除|撤換|聘請|聘任|延攬|任命|新任|接掌|接任)[^，。！？\s]{0,8}(?:總教練|教頭|主帥|教練)|換帥|新帥|新教頭|新總教練|代理總教練|臨時主帥/,
-    /\b(?:fire[sd]?|sack(?:s|ed)?|dismiss(?:es|ed)?|part(?:s|ed)? ways with|hire[sd]?|appoint(?:s|ed)?|name[sd]?|replace[sd]?)\b[^.:;]{0,40}\b(?:coach|manager|boss)\b|\b(?:coach|manager|boss)\b[^.:;]{0,30}\b(?:fired|sacked|dismissed|hired|appointed|resigns?|steps down|leaves|departs|out)\b|\binterim (?:coach|manager|boss)\b/i
+    /(?:總教練|教頭|主帥|總管|教練)[^，。！？\s]{0,6}(?:下課|去職|離職|解聘|開除|撤換|請辭|辭職|走人|接任|上任|出任|就任|續任)|(?:解聘|開除|撤換|聘請|聘任|延攬|任命|新任|接掌|接任)[^，。！？\s]{0,8}(?:總教練|教頭|主帥|教練)|換帥|新帥|新教頭|新總教練|代理總教練|臨時主帥|遭解[雇僱]|解[雇僱]主帥|下課/,
+    /\bnew (?:head )?(?:coach|manager|boss)\b|\b(?:fire[sd]?|sack(?:s|ed)?|dismiss(?:es|ed)?|part(?:s|ed)? ways with|hire[sd]?|appoint(?:s|ed)?|name[sd]?|announce[sd]?|replace[sd]?)\b[^.:;]{0,40}\b(?:coach|manager|boss)\b|\b(?:coach|manager|boss)\b[^.:;]{0,30}\b(?:fired|sacked|dismissed|hired|appointed|resigns?|steps down|leaves|departs|out)\b|\binterim (?:coach|manager|boss)\b|\bsack(?:s|ed|ing)?\b/i
   ],
   [
     'move',
     /交易|轉隊|轉會|簽約|簽下|簽回|加盟|續約|合約|自由球員|自由市場|釋出|租借|買斷|轉戰|報價|頂薪|入札|入團|讓渡|DFA|非保護名單|換來|送走|挖角|選秀/,
-    /\btrade[sd]?\b|\btrading\b|\bsign(?:s|ed|ing)?\b|\btransfer(?:s|red)?\b|\bdeal\b|\bcontract\b|\bfree agen(?:t|cy|ts)\b|\bwaive[sd]?\b|\breleased?\b|\bloan\b|\bextension\b|\bacquire[sd]?\b|\bposting\b|\bposted\b|\bnon-tender|\bqualifying offer\b|\bDFA\b|\bdesignated for assignment\b|\bdraft(?:ed)?\b/i
+    /\btrade[sd]?\b|\btrading\b|\bsign(?:s|ed|ing)?\b|\btransfer(?:s|red)?\b|\b(?:[\w-]+-year|minor-league|contract|max|rookie|trade) deal\b|\bcontract\b|\bfree agen(?:t|cy|ts)\b|\bwaive[sd]?\b|\breleased?\b|\bloan\b|\bextension\b|\bacquire[sd]?\b|\bposting\b|\bposted\b|\bnon-tender|\bqualifying offer\b|\bDFA\b|\bdesignated for assignment\b|\bdraft(?:ed)?\b/i
   ]
 ];
 // A story's kind, from its headlines and summary (`text`), the first that
@@ -53,6 +53,20 @@ const KIND_RES = [
 export function sportKind(text) {
   const t = String(text || '');
   for (const [k, zh, en] of KIND_RES) if (zh.test(t) || en.test(t)) return k;
+  return '';
+}
+// A story's kind from its headline (its title and the AI's titles of it),
+// never its summary or its links' (Jay 11-13: 「勇士致電公牛醞釀交易補強」
+// tagged 傷病, its summary telling of Curry's injury as the reason).
+// Its own title first, then the AI's (a translation of it). A trade said
+// in it is a move, whatever injury led to it (「柯瑞倒下勇士加速交易？」).
+const TRADE = /交易|\btrade[sd]?\b|\btrading\b/i;
+export function storyKind(s) {
+  for (const t of [s?.title, [s?.zh, s?.en].filter(Boolean).join('\n')]) {
+    const k = sportKind(t);
+    if (k && k !== 'ban' && TRADE.test(t)) return 'move';
+    if (k) return k;
+  }
   return '';
 }
 // Its name on a row's tag.
@@ -91,8 +105,11 @@ const FAMILY = { basketball: 'basketball', baseball: 'baseball', soccer: 'soccer
 export function sportText(s) {
   return [s?.title, s?.zh, s?.en, s?.sum, ...(s?.items || []).flatMap(it => [it[1], it[2]])].filter(Boolean).join('\n');
 }
-// Its own words: the title, the AI's titles and the summary (not its links').
-const ownText = s => [s?.title, s?.zh, s?.en, s?.sum].filter(Boolean).join('\n');
+// Its own words: its title and the AI's titles of it (not its summary, which
+// names the other side of the game he was hurt in: 「威爾森手部骨折」, the
+// Bulls', "…in Wednesday's loss to the Spurs", stood under 勇士 v 馬刺, 11-13;
+// nor its links').
+const ownText = s => [s?.title, s?.zh, s?.en].filter(Boolean).join('\n');
 // Whether the family's AI has read who it's about (builders/ai.js sportWho).
 const readBy = s => Boolean(s?.who && (s.who.p?.length || s.who.t?.length));
 const escRe = w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -173,8 +190,14 @@ export function namesTeam(text, ways, who = null, { loose = false, about = '' } 
   if (!ways?.name) return false;
   const t = String(text || '');
   const f = fold(t);
-  // The AI's reading of a Chinese story: the team as ESPN names it.
-  if ((who?.t || []).some(x => fold(x) === fold(ways.name) || (ways.short && wordIn(fold(x), fold(ways.short)) && sportsIn(x).size === 0 && fold(x).endsWith(fold(ways.short))))) return true;
+  // The clubs the AI says it's about (`a`): those, and only those (an
+  // opponent it names is no story of that club's: Jay 11-13, 威爾森's
+  // fracture "in a loss to the Spurs" under 勇士 v 馬刺).
+  if (Array.isArray(who?.a)) return who.a.some(x => fold(x) === fold(ways.name));
+  // The AI's reading of a Chinese story: the team as ESPN names it (of
+  // several, those the title names too, below: Dončić's ankle "against the
+  // Bucks" was no Bucks story).
+  if ((who?.t || []).length === 1 && who.t.some(x => fold(x) === fold(ways.name) || (ways.short && wordIn(fold(x), fold(ways.short)) && sportsIn(x).size === 0 && fold(x).endsWith(fold(ways.short))))) return true;
   if (wordIn(f, fold(ways.name))) return true;
   if (ways.zhFull && t.includes(ways.zhFull)) return true;
   const sports = sportsIn(about || t);
@@ -238,7 +261,7 @@ export function cleanSport(raw) {
   for (const region of ['tw', 'intl'])
     for (const s of Array.isArray(raw?.[region]) ? raw[region] : [])
       if (s && typeof s.id === 'string' && typeof s.title === 'string' && Array.isArray(s.items) && Number.isFinite(s.at))
-        list.push({ ...s, region, k: KIND_NAMES[s.k] ? s.k : '', who: s.who && typeof s.who === 'object' ? { p: (s.who.p || []).filter(x => typeof x === 'string'), t: (s.who.t || []).filter(x => typeof x === 'string') } : null });
+        list.push({ ...s, region, k: storyKind(s), who: s.who && typeof s.who === 'object' ? { p: (s.who.p || []).filter(x => typeof x === 'string'), t: (s.who.t || []).filter(x => typeof x === 'string'), ...(Array.isArray(s.who.a) ? { a: s.who.a.filter(x => typeof x === 'string') } : {}) } : null });
   list.sort((a, b) => b.at - a.at);
   return { built: Number(raw?.built) || 0, list };
 }

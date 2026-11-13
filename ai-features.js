@@ -1283,12 +1283,13 @@ export const FEATURES = {
           'Each item below is one sports news story (its outlets’ headlines). For each, return:',
           '"people": every athlete and coach the headlines name, each by the full name English sports media (ESPN) use, e.g. 柯瑞 → Stephen Curry, 詹皇 → LeBron James, 大谷翔平 → Shohei Ohtani, 鈴木誠也 → Seiya Suzuki, 孫興慜 → Son Heung-min. A Taiwanese player or coach with no usual English name: leave him out. Only names you are sure of; a nickname or surname you can’t tie to one person with certainty, leave out. Never add a person the headlines don’t name.',
           '"teams": every club the headlines name, by its full English name as ESPN writes it (湖人 → Los Angeles Lakers, 道奇 → Los Angeles Dodgers, 兵工廠 → Arsenal, 曼城 → Manchester City, 76人 → Philadelphia 76ers); a national side by its country (中華隊 → Chinese Taipei). Where a nickname could be two clubs (勇士: Golden State Warriors in basketball, Atlanta Braves in baseball), use the headlines’ sport; unsure, leave it out.',
+          '"about": the clubs the story is about, by the same English names: the club of each athlete or coach it is about (his club now, even where the headlines don’t name it: 史馬特 → Houston Rockets), a game’s two sides, a club’s own news. Never a club named only as an opponent, a past club or a place something happened (Caleb Wilson hurt in a loss to the Spurs: Chicago Bulls only; Smart banned for games against the Jazz and the Heat: Houston Rockets only). Unsure of a player’s club: leave it out.',
           '"title": one short neutral headline in the language "want" asks. "zh": Traditional Chinese as Taiwan writes it (Taiwan’s sports names: 柯瑞, 詹姆斯, 湖人, 道奇, 英超), full-width punctuation but half-width digits and Latin letters, at most 22 characters. "en": English, at most 14 words, no Chinese characters, people and clubs by their English names. Say only what the headlines say; drop outlet tags (NBA／, 快訊, 影／, 【】, ｜ETtoday), adjectives and exclamation marks; copy every number exactly as written, convert none.',
           'Return one item per story with its id; skip none (empty lists where nobody is named).',
           JSON.stringify(stories)
         ].join('\n')
       ),
-    schema: obj({ items: arr(obj({ id: S, people: arr(S), teams: arr(S), title: S })) }),
+    schema: obj({ items: arr(obj({ id: S, people: arr(S), teams: arr(S), about: arr(S), title: S })) }),
     clean(raw, { stories }) {
       const given = new Map(stories.map(s => [s.id, s]));
       const latin = x => /^[\p{Script=Latin}0-9 .,'’&()\-]{2,48}$/u.test(x);
@@ -1298,7 +1299,8 @@ export const FEATURES = {
         if (!s) continue;
         const p = [...new Set(list(it?.people, 8).map(x => String(x || '').trim()).filter(latin))].slice(0, 6);
         const t = [...new Set(list(it?.teams, 6).map(x => String(x || '').trim()).filter(latin))].slice(0, 4);
-        const row = { p, t };
+        const a = [...new Set(list(it?.about, 6).map(x => String(x || '').trim()).filter(latin))].slice(0, 4);
+        const row = { p, t, a };
         const t0 = String(it?.title || '').trim();
         const zh = s.want === 'zh';
         if (zh ? t0.length <= 24 : t0.length <= 110 && t0.split(/\s+/).length <= 14) {
