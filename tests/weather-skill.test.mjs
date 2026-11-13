@@ -1,7 +1,7 @@
 // Who's been right (weather-skill.js): snapshots, scores, the weights.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scoreHour, takeSnapshot, summarize, nextWeights, weatherCron, skillReport, FLOOR, STEP } from '../weather-skill.js';
+import { scoreHour, takeSnapshot, summarize, nextWeights, weatherCron, skillReport, FLOOR, STEP, BIAS_MIN } from '../weather-skill.js';
 import { DEFAULT_WEIGHTS } from '../weather.js';
 import { cleanItems } from '../push.js';
 
@@ -98,4 +98,21 @@ test('push accepts weather checks, and only sane ones', () => {
   assert.equal(list.length, 2);
   assert.deepEqual(list[0].check, { weather: { lat: 25.0341, lon: 121.5646, kind: 'brief' } });
   assert.equal(list[1].until, now + 10 * H);
+});
+
+test('a place that runs 2° warm: its usual error learned past the anchor hours, the corrected hours scored in the shadow', () => {
+  const sk = { snaps: [], days: {}, lastRain: 0, lastTemp: 0 };
+  const truth = t => 20 + 4 * Math.sin((t / H / 24) * 2 * Math.PI);
+  // A snapshot each hour for three days, served always 2° warm.
+  for (let i = 0; i < 72; i++) {
+    const at = T0 + i * H;
+    sk.snaps.push({ at, h: Array.from({ length: 24 }, (_, k) => { const t = at + k * H; return [t, null, null, truth(t) + 2.5, truth(t) + 1.5, truth(t) + 2]; }) });
+    sk.snaps = sk.snaps.filter(s => at - s.at < 26 * H);
+    scoreHour(sk, { obs: { temp: truth(at), at } }, at);
+  }
+  assert.ok(sk.bias.n >= BIAS_MIN);
+  assert.ok(Math.abs(sk.bias.v - 2) < 0.01, String(sk.bias.v));
+  const { byLead } = summarize([sk]);
+  assert.ok(byLead.long.biased < 0.2 && byLead.long.served === 2, JSON.stringify(byLead.long));
+  assert.ok(byLead.short.biased < byLead.short.served, 'faded in over the first 6 hours');
 });
