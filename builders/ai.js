@@ -36,6 +36,7 @@ import { usage as meterUsage } from '../transit.js';
 import { sideOf } from '../kit/news-outlets.mjs';
 import { SPORT_PATH } from '../kit/news-sport.mjs';
 import { SPORT_WHO } from './news.js';
+import { HOOKS } from './words-hooks.mjs';
 
 const NEWS_LINES = 'news/lines.json';
 export const WORDS_CARDS = 'private/ai/words-cards.json';
@@ -292,14 +293,17 @@ export async function wordsCards({ store, env, ctx, cap, until, fetchImpl = fetc
       else (doc.skip ||= {})[w.w] = (doc.skip[w.w] || 0) + 1;
     }
   }
-  if (made || calls) {
+  // (The hooks put right by hand, words-hooks.mjs: over the AI's, and the files written again when one changes.)
+  let fixed = 0;
+  for (const [w, hook] of Object.entries(HOOKS)) if (doc.cards[w] && doc.cards[w].hook !== hook) (doc.cards[w] = { ...doc.cards[w], hook }), fixed++;
+  if (made || calls || fixed) {
     await store.put(WORDS_CARDS, { built: Date.now(), cards: doc.cards, skip: doc.skip || {} });
     // (Each letter's file, written only when it changed: store.put compares.)
     const by = {};
     for (const [w, c] of Object.entries(doc.cards)) (by[letterOf(w)] ||= {})[w] = c;
     for (const [l, cards] of Object.entries(by)) await store.put(cardsPath(l), { cards });
   }
-  return { made, calls, total: Object.keys(doc.cards).length, of: rows.length };
+  return { made, calls, ...(fixed ? { fixed } : {}), total: Object.keys(doc.cards).length, of: rows.length };
 }
 
 // The 'ai' run: each step while there's time (5 minutes of the run's 8).
