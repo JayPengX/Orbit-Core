@@ -235,6 +235,20 @@ export const EXAMPLES = {
   'news-brief': [
     { name: 'taiwan and world', input: { stories: [{"id":"1m8r087","heads":["寶林食物中毒案6死 負責人判1年10月","6死27傷! \"寶林中毒案\"負責人判1年10個月 倖存者:判太輕","「寶林案6死」負責人一審1年10月 倖存者：判太輕","寶林茶室釀6死！負責人最重1年10月受害者怒了 北市府：《食安法》刑責有提高必要","寶林茶室案一審宣判 北市府：持續協助受害者求償","寶林茶室案一審輕判！北市府籲應加重刑責 將持續協助求償"],"sums":["寶林茶室食物中毒案釀6人死亡，台北地方法院審理近2年，一審今天(12日)宣判，依過失致死罪判處負責人黎仿軒1年10月，代班廚師胡清富判8月徒刑。台北地檢署回應…"]},{"id":"j708b5","heads":["Trump Wants Apple's Tim Cook to Replace Jenson Huang as NVIDIA CEO","Trump says ex Apple CEO Cook should replace Huang at Nvidia","Who is Colette Kress, Nvidia’s interim CEO? Longtime exec takes top spot after Jensen Huan","Jensen Huang is out: Read the internal memos","The Latest: Nvidia CEO Jensen Huang resigns after his affair raises US security concerns","Jensen Huang's exit from Nvidia raises critical questions about the future of AI"],"sums":["Nvidia announced on Thursday that CEO Jensen Huang was stepping down after an alleged affair raised security concerns."]}] } }
   ],
+  'news-sport': [
+    {
+      name: 'both ways',
+      input: {
+        stories: [
+          { id: 'p1', want: 'en', heads: ['柯瑞傷勢MRI結果出爐！確診腹斜肌撕裂至少缺席2週：回歸時間成謎', 'NBA／勇士柯瑞腹斜肌撕裂 至少缺陣兩週'] },
+          { id: 'p2', want: 'en', heads: ['拒絕合格報價進入自由市場，鈴木誠也的成長也讓身價提升'] },
+          { id: 'p3', want: 'zh', heads: ['Manchester United fires Michael Carrick as head coach, lines up US coach'] },
+          { id: 'p4', want: 'zh', heads: ['Sixers coach Nick Nurse explains LeBron James sitting vs. Raptors'] },
+          { id: 'p5', want: 'en', heads: ['亞冠賽/中華隊首戰林子崴扛先發 力抗23歲金丸夢斗'] }
+        ]
+      }
+    }
+  ],
   'news-lines': [
     {
       name: 'both ways',

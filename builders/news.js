@@ -51,6 +51,7 @@
 
 import { OUTLETS, TOPICS, SECOND, sideOf, partiesIn, topicsOf } from '../kit/news-outlets.mjs';
 import { enOf, NAMES } from './news-words.js';
+import { SPORT_PATH, SPORT_VERSION, SPORT_MS, sportKind, sportText, sportsIn } from '../kit/news-sport.mjs';
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
 export const NEWS_PATH = 'news/index.json';
@@ -67,6 +68,8 @@ const TOP = { tw: 180, intl: 140 };
 const PAST_TOP = { tw: 400, intl: 300 };
 export const NOW_MS = 72 * HOUR;
 export const NEWS_PAST = 'news/past.json';
+// The family's AI's reading of each sports story (builders/ai.js sportWho).
+export const SPORT_WHO = 'news/sport-who.json';
 // A story is kept by how wide it went: carried by 6 outlets or more, 30
 // days after its last headline; by 4, 14 days; else 3. It takes new
 // headlines for 21 days from its first (then a new one starts), and keeps
@@ -85,6 +88,7 @@ export const PAGE_READS = 12;
 const S2 = 2;
 const S3 = 3;
 const S6 = 6;
+const S12 = 12;
 // (Taiwan's channels post more, so are read more often.)
 const CHANNEL_EVERY = { tw: 2, intl: 4 };
 const sec = (list, url, every = S3) => list.map(x => [url(x), 'rss', every]);
@@ -105,7 +109,7 @@ export const FEEDS = {
     ...sec(['technology', 'lifehealth', 'culture', 'sport', 'local'], s => `https://feeds.feedburner.com/rsscna/${s}`)
   ],
   pts: [['https://news.pts.org.tw/xml/newsfeed.xml', 'rss']],
-  ettoday: [['https://feeds.feedburner.com/ettoday/realtime', 'rss']],
+  ettoday: [['https://feeds.feedburner.com/ettoday/realtime', 'rss'], ['https://feeds.feedburner.com/ettoday/sport', 'rss', S12, 0]],
   ebc: [['https://news.ebc.net.tw/sitemap/realtime.xml', 'map']],
   storm: [['https://www.storm.mg/sitemaps/1/article-news-1.xml', 'map']],
   mirror: [['https://www.mirrormedia.mg/rss/rss.xml', 'rss']],
@@ -125,13 +129,14 @@ export const FEEDS = {
   bbc: [
     ['https://feeds.bbci.co.uk/news/world/rss.xml', 'rss'],
     ['https://feeds.bbci.co.uk/news/world/asia/rss.xml', 'rss'],
-    ...sec(['technology', 'science_and_environment', 'health', 'business'], s => `https://feeds.bbci.co.uk/news/${s}/rss.xml`)
+    ...sec(['technology', 'science_and_environment', 'health', 'business'], s => `https://feeds.bbci.co.uk/news/${s}/rss.xml`),
+    ['https://feeds.bbci.co.uk/sport/rss.xml', 'rss', S6, 3]
   ],
   wsj: [['https://feeds.a.dj.com/rss/RSSWorldNews.xml', 'rss']],
   ft: [['https://www.ft.com/world?format=rss', 'rss']],
   hill: [['https://thehill.com/policy/international/feed/', 'rss']],
   csm: [['https://rss.csmonitor.com/feeds/world', 'rss']],
-  guardian: [['https://www.theguardian.com/world/rss', 'rss'], ...sec(['technology', 'science'], s => `https://www.theguardian.com/${s}/rss`)],
+  guardian: [['https://www.theguardian.com/world/rss', 'rss'], ...sec(['technology', 'science'], s => `https://www.theguardian.com/${s}/rss`), ['https://www.theguardian.com/football/rss', 'rss', S6, 1]],
   nyt: [['https://rss.nytimes.com/services/xml/rss/nyt/World.xml', 'rss'], ...sec(['US', 'Business', 'Technology', 'Science', 'Health'], s => `https://rss.nytimes.com/services/xml/rss/nyt/${s}.xml`)],
   wapo: [['https://feeds.washingtonpost.com/rss/world', 'rss'], ...sec(['politics', 'business/technology'], s => `https://feeds.washingtonpost.com/rss/${s}`)],
   aljazeera: [['https://www.aljazeera.com/xml/rss/all.xml', 'rss']],
@@ -141,14 +146,14 @@ export const FEEDS = {
   nbc: [['https://feeds.nbcnews.com/nbcnews/public/world', 'rss'], ...sec(['politics'], s => `https://feeds.nbcnews.com/nbcnews/public/${s}`)],
   cbs: [['https://www.cbsnews.com/latest/rss/world', 'rss'], ...sec(['us', 'technology', 'health'], s => `https://www.cbsnews.com/latest/rss/${s}`)],
   abc: [['https://abcnews.go.com/abcnews/internationalheadlines', 'rss'], ...sec(['usheadlines', 'politicsheadlines', 'technologyheadlines'], s => `https://abcnews.go.com/abcnews/${s}`)],
-  fox: [['https://moxie.foxnews.com/google-publisher/world.xml', 'rss'], ...sec(['us', 'politics', 'tech', 'health'], s => `https://moxie.foxnews.com/google-publisher/${s}.xml`)],
-  nypost: [['https://nypost.com/world-news/feed/', 'rss']],
+  fox: [['https://moxie.foxnews.com/google-publisher/world.xml', 'rss'], ...sec(['us', 'politics', 'tech', 'health'], s => `https://moxie.foxnews.com/google-publisher/${s}.xml`), ['https://moxie.foxnews.com/google-publisher/sports.xml', 'rss', S12, 11]],
+  nypost: [['https://nypost.com/world-news/feed/', 'rss'], ['https://nypost.com/sports/feed/', 'rss', S12, 8]],
   wexam: [['https://www.washingtonexaminer.com/feed/', 'rss']],
   breitbart: [['https://feeds.feedburner.com/breitbart', 'rss']],
   dailycaller: [['https://dailycaller.com/feed/', 'rss']],
   natreview: [['https://www.nationalreview.com/feed/', 'rss']],
   dailymail: [['https://www.dailymail.co.uk/news/worldnews/index.rss', 'rss']],
-  latimes: [['https://www.latimes.com/world-nation/rss2.0.xml', 'rss', S2]],
+  latimes: [['https://www.latimes.com/world-nation/rss2.0.xml', 'rss', S2], ['https://www.latimes.com/sports/rss2.0.xml', 'rss', S12, 7]],
   bloomberg: [['https://feeds.bloomberg.com/politics/news.rss', 'rss', S2]],
   bi: [['https://feeds.businessinsider.com/custom/all', 'rss', S2]],
   semafor: [['https://www.semafor.com/rss.xml', 'rss', S2]],
@@ -223,7 +228,14 @@ export const FEEDS = {
   kyodo: [[bing('english.kyodonews.net'), 'bing', S6]],
   asiatimes: [['https://asiatimes.com/feed/', 'rss', S6]],
   yonhap: [['https://en.yna.co.kr/RSS/news.xml', 'rss', S6]],
-  straits: [['https://www.straitstimes.com/news/asia/rss.xml', 'rss', S6]]
+  straits: [['https://www.straitstimes.com/news/asia/rss.xml', 'rss', S6]],
+  // (11-13, Jay: "if orbit news can't support sport news well enough then it
+  // should": the sports desks of the outlets above, and CBS Sports' for the
+  // leagues Orbit Sports shows, once an hour (the others' every 2 hours): the
+  // injuries, moves and coaches Sports' pages link to, often one outlet's
+  // report: news/sport.json. Each its own turn, `at`, set where the other
+  // feeds and the channels leave a build lightest (under 100 calls a build).)
+  cbssports: [['nba', 3], ['mlb', 1], ['soccer', 5]].map(([l, at]) => [`https://www.cbssports.com/rss/headlines/${l}/`, 'rss', S6, at])
 };
 // (Outlets read only through a search's feed: their pages refuse us too.)
 const FAR = new Set(Object.entries(FEEDS).filter(([, list]) => list.every(([, kind]) => kind === 'bing' || kind === 'yt')).map(([o]) => o));
@@ -303,7 +315,8 @@ export function feedsDue(feeds, now) {
   const out = [];
   let i = 0;
   for (const [o, list] of Object.entries(feeds))
-    for (const [url, kind, every = 1] of list) if (every === 1 || (slot + i++) % every === 0) out.push([o, url, kind]);
+    // (A feed with its own turn, `at`, leaves the others' turns as they were: the sports desks, 11-13.)
+    for (const [url, kind, every = 1, at] of list) if (every === 1 || (at != null ? (slot + at) % every === 0 : (slot + i++) % every === 0)) out.push([o, url, kind]);
   return out;
 }
 
@@ -1033,7 +1046,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
   const every = new Map();
   for (const it of [...live.flatMap(r => r.items), ...items]) every.set(it.u, it);
   const same = sameOf(pages, [...every.values()]);
-  const out = { tw: [], intl: [], past: { tw: [], intl: [] }, recs: live };
+  const out = { tw: [], intl: [], past: { tw: [], intl: [] }, recs: live, sport: { tw: [], intl: [] } };
   for (const region of ['tw', 'intl']) {
     const lang = region === 'tw' ? 'zh' : 'en';
     const mine = items.filter(it => OUTLETS[it.o]?.region === region && now - (it.at || now) <= WINDOW[region] && !fillerOf(it, lang));
@@ -1053,6 +1066,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
     // (Which kept stories each piece is in: a group is weighed against those only.)
     const daysBy = new Map();
     for (const x of lastDays) for (const k of x.v.keys()) (daysBy.get(k) || daysBy.set(k, []).get(k)).push(x);
+    const loose = [];
     for (const g of groupStories(mine, lang)) {
       const hits = new Map();
       for (const it of g) {
@@ -1086,7 +1100,12 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
         // (A kind past the sides, health, science, sport…, needs only two:
         // its tab isn't empty, and there's no side to weigh, Jay 11-10.)
         const outlets = new Set(g.map(it => it.o));
-        if (!enough(outlets, region) && !(outlets.size >= 2 && TOPIC[kinds[0]]?.spectrum === false)) continue;
+        if (!enough(outlets, region) && !(outlets.size >= 2 && TOPIC[kinds[0]]?.spectrum === false)) {
+          // (Sports' one-outlet reports, an injury, a move, aren't a story on
+          // News' pages, but are what Orbit Sports links to: news/sport.json.)
+          if (kinds.includes('sport')) loose.push(g);
+          continue;
+        }
         const firstIt = g.reduce((a, b) => ((a.at || 0) <= (b.at || 0) ? a : b));
         rec = { id: idOf(firstIt.u), r: region, first: firstIt.at || now, last: firstIt.at || now, peak: 0, items: [] };
         live.push(rec);
@@ -1151,7 +1170,14 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
         for (const t of twOn.get(r)) t.world = s.id;
       }
       (now - s.at <= NOW_MS ? out[region] : out.past[region]).push(s);
+      if (s.topics.includes('sport') && now - s.at <= SPORT_MS) out.sport[region].push(s);
     }
+    // (Each one-outlet sports report a story of its own, as the builder would make it.)
+    for (const g of loose) {
+      const s = storyOf(g.map(it => ({ ...it, near: 0 })), region, now, { pages, same });
+      if (s.topics.includes('sport') && s.light < 0.5 && now - s.at <= SPORT_MS) out.sport[region].push(s);
+    }
+    out.sport[region] = sportDesk(out.sport[region], SPORT_TOP[region]);
     out[region] = frontOf(out[region], TOP[region]).map(({ score, light, ...s }) => s);
     // (The past lighter: each outlet's newest headline only.)
     out.past[region] = out.past[region]
@@ -1162,6 +1188,27 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
   // (A story whose headlines were all let go is kept no more.)
   out.recs = out.recs.filter(r => r.items.length);
   return out;
+}
+
+// Orbit Sports' links to the news (news/sport.json, kit news-sport.mjs): the
+// sports stories of the last three days, a one-outlet report too, newest
+// first, `top` a region; each with its kind (sportKind: 傷病, 禁賽, 換帥, 轉隊),
+// and those of a sport Sports never shows (the NFL, hockey, colleges) left
+// out. A story is News' own (News opens it from a link), lighter: no clips'
+// pictures past its first, no score.
+export const SPORT_TOP = { tw: 260, intl: 260 };
+export function sportDesk(stories, top) {
+  const seen = new Set();
+  return stories
+    .filter(s => !seen.has(s.id) && seen.add(s.id))
+    .map(s => ({ s, text: sportText(s) }))
+    .filter(({ text }) => {
+      const sp = sportsIn(text);
+      return !(sp.has('other') && sp.size === 1);
+    })
+    .sort((a, b) => b.s.at - a.s.at)
+    .slice(0, top)
+    .map(({ s: { score, light, alts, ...s }, text }) => ({ ...s, clips: (s.clips || []).slice(0, 2), k: sportKind(text) }));
 }
 
 // The front: the TOP stories by score, then each topic's best past them
@@ -1340,13 +1387,21 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
     await store.put(NEWS_PATH, { built: now, tw: out.tw, intl: out.intl });
     await store.put(NEWS_PAST, { built: now, ...out.past });
   }
+  // Orbit Sports' links: the sports stories, each with the family's AI's
+  // reading of its names and its title in the other language (builders/ai.js
+  // sportWho → news/sport-who.json), where it has made one yet.
+  if (out.sport.tw.length || out.sport.intl.length) {
+    const who = (await store.json(SPORT_WHO).catch(() => null))?.who || {};
+    const withWho = list => list.map(s => (who[s.id] ? { ...s, who: { p: who[s.id].p || [], t: who[s.id].t || [] }, ...(who[s.id].zh ? { zh: who[s.id].zh } : {}), ...(who[s.id].en ? { en: who[s.id].en } : {}) } : s));
+    await store.put(SPORT_PATH, { v: SPORT_VERSION, built: now, tw: withWho(out.sport.tw), intl: withWho(out.sport.intl) });
+  }
   // (A few feeds missing is a normal build. Only half or more of the stories' feeds asked
   // failing is the build's failure, what the beat and the panel's 外部來源 call broken.)
   // (Channels' clips apart: YouTube's feeds can all 404 for a day (11-11, every channel from
   // everywhere) while the stories build fine; the clips kept 48 hours carry them.)
   const storyFails = failed.filter(f => !/ clips: /.test(f)).length;
   const missed = failed.length && storyFails * 2 < feedsNow.length ? failed.slice(0, 12) : null;
-  return { items: items.length, fresh, clips: clips.length, pages: want.length, ...(Object.keys(unread).length ? { unread } : {}), ...(ask.length ? { asked: ask.length, shorts: isShort.filter(Boolean).length } : {}), kept: out.recs.length, tw: out.tw.length, intl: out.intl.length, past: out.past.tw.length + out.past.intl.length, ...(missed ? { missed } : { failed }) };
+  return { items: items.length, fresh, clips: clips.length, pages: want.length, ...(Object.keys(unread).length ? { unread } : {}), ...(ask.length ? { asked: ask.length, shorts: isShort.filter(Boolean).length } : {}), kept: out.recs.length, tw: out.tw.length, intl: out.intl.length, sport: out.sport.tw.length + out.sport.intl.length, past: out.past.tw.length + out.past.intl.length, ...(missed ? { missed } : { failed }) };
 }
 
 // Outlets whose article pages carry the story's own clip, most often first

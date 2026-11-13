@@ -212,7 +212,9 @@ const ROWS = [
   ['kyodo', '共同社', 'Kyodo News', 'kyodonews.net', 'nonprofit', null, null, 0, '共同通信社（非營利社團）', 'Kyodo News (a members’ cooperative)', ['mbfc'], false],
   ['asiatimes', '亞洲時報', 'Asia Times', 'asiatimes.com', 'private', null, null, 0, 'Asia Times Holdings', 'Asia Times Holdings', ['mbfc'], false],
   ['yonhap', '韓聯社', 'Yonhap', 'yna.co.kr', 'gov', null, null, 1, '聯合通訊社（政府出資）', 'Yonhap (government-funded)', ['mbfc'], false],
-  ['straits', '海峽時報', 'The Straits Times', 'straitstimes.com', 'private', null, null, 1, '新報業媒體信託', 'SPH Media Trust', ['mbfc'], false]
+  ['straits', '海峽時報', 'The Straits Times', 'straitstimes.com', 'private', null, null, 1, '新報業媒體信託', 'SPH Media Trust', ['mbfc'], false],
+  // (11-13: a sports desk, for Orbit Sports' links to the news: no rating of its own, placed as CBS News, its group's.)
+  ['cbssports', 'CBS Sports', 'CBS Sports', 'cbssports.com', 'private', null, null, -1, '派拉蒙', 'Paramount', ['group'], true]
 ];
 
 // Taiwan's outlets come first in ROWS; the rest (from the BBC) are the English ones.
