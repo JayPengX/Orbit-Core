@@ -22,10 +22,12 @@
 <meta property="og:url" content="https://orbit.jaypengx.com/app/" />
 <meta property="og:image" content="https://orbit.jaypengx.com/pass/brand/pass-og.jpg" />
 <!-- Orbit: every app in one home-screen app (Orbit-Core kit/suite.mjs). This
-     page is only its door: opened from the icon, it goes straight on to the
-     app used last, where it was left (these first lines, before anything
-     loads); the first time, it lists the apps; in a phone's browser, it shows
-     how to add Orbit to the home screen. The keys are suite.mjs's. -->
+     page is Orbit's window: each app opened is held in a frame of its own
+     (kit suite.mjs host), kept running while another is shown. Opened from
+     the icon it goes on with the app used last, where it was left (these
+     first lines pick it, before anything loads); the first time, it lists
+     the apps; in a phone's browser, it shows how to add Orbit to the home
+     screen. The keys are suite.mjs's. -->
 <script>
 !function () {
   try {
@@ -39,20 +41,23 @@
     s.on = 1;
     s.t = s.t || Date.now();
     ls.setItem('orbit.suite.v1', JSON.stringify(s));
-    var best = null, id;
-    for (id in s.apps || {}) if (s.apps[id] && s.apps[id].home && (!best || s.apps[id].t > s.apps[best].t)) best = id;
-    if (!best || /[?&#]pick\b/.test(location.href)) return;
-    var a = s.apps[best], fresh = Date.now() - a.t < 4 * 3600e3 && a.url;
-    var to = new URL(fresh ? a.url : a.home, location.href);
-    if (fresh && a.y > 0) ss.setItem('orbit.place', JSON.stringify({ path: to.pathname, hash: to.hash, y: a.y, t: Date.now() }));
+    var open = /[?&]open=([^&#]+)/.exec(location.search);
+    if (open) {
+      window.ORBIT_FIRST = { url: decodeURIComponent(open[1]), y: 0 };
+    } else {
+      var best = null, id;
+      for (id in s.apps || {}) if (s.apps[id] && s.apps[id].home && (!best || s.apps[id].t > s.apps[best].t)) best = id;
+      if (!best || /[?&#]pick\b/.test(location.href)) return;
+      var a = s.apps[best], fresh = Date.now() - a.t < 4 * 3600e3 && a.url;
+      window.ORBIT_FIRST = { url: fresh ? a.url : a.home, y: fresh && a.y > 0 ? a.y : 0 };
+    }
     ss.setItem('orbit.launch', String(Date.now()));
-    window.ORBIT_GONE = 1;
-    location.replace(to.href);
+    document.documentElement.className += ' q-suite-host';
   } catch (e) {}
 }();
 </script>
 <!-- kit:head -->
-<script>window.ORBIT_GONE||!function(b,d,v,h,n,m,f,i,u){try{v=localStorage.getItem('orbit.kit')||'';h=JSON.parse(localStorage.getItem('orbit.kitFiles')||'null')}catch(e){v=''}n=!!v;if(!n&&d){v=d.version;h=d}h=h&&h.version===v?h.files:null;u=function(x){var k=h&&h[x];return b+x+(k?'?v='+k:v?'?v='+encodeURIComponent(v):'')};m={'#kit/':b};f=['brand.mjs','format.mjs','hold-place.mjs','lang.mjs','orbit.mjs','suite.mjs','ui.mjs'];for(i=0;i<f.length;i++)m['#kit/'+f[i]]=u(f[i]);if(h)for(i in h)/\.mjs$/.test(i)&&(m['#kit/'+i]=u(i));window.ORBIT_KIT={base:b,version:v,noted:n,url:u};document.write('<script type="import'+'map">'+JSON.stringify({imports:m})+'<\/script><link rel="stylesheet" href="'+u('orbit.css')+'">')}('/Orbit-Core/kit/',null)</script>
+<script>!function(b,d,v,h,n,m,f,i,u){try{v=localStorage.getItem('orbit.kit')||'';h=JSON.parse(localStorage.getItem('orbit.kitFiles')||'null')}catch(e){v=''}n=!!v;if(!n&&d){v=d.version;h=d}h=h&&h.version===v?h.files:null;u=function(x){var k=h&&h[x];return b+x+(k?'?v='+k:v?'?v='+encodeURIComponent(v):'')};m={'#kit/':b};f=['brand.mjs','format.mjs','hold-place.mjs','lang.mjs','orbit.mjs','suite.mjs','ui.mjs'];for(i=0;i<f.length;i++)m['#kit/'+f[i]]=u(f[i]);if(h)for(i in h)/\.mjs$/.test(i)&&(m['#kit/'+i]=u(i));window.ORBIT_KIT={base:b,version:v,noted:n,url:u};document.write('<script type="import'+'map">'+JSON.stringify({imports:m})+'<\/script><link rel="stylesheet" href="'+u('orbit.css')+'">')}('/Orbit-Core/kit/',null)</script>
 <!-- /kit:head -->
 <style>
   .door { box-sizing: border-box; max-width: 560px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 28px) 16px calc(env(safe-area-inset-bottom) + 32px); }
@@ -62,30 +67,47 @@
   .door-head p { margin: 2px 0 0; color: var(--q-label-2); font: 400 15px/1.3 var(--q-font); }
   .door .q-cell-icon { background: none; }
   .door .q-cell-icon img { width: 30px; height: 30px; border-radius: 7px; }
+  /* Orbit's window: each app's frame the whole screen inside the phone's safe
+     area (a frame is told none of it), the band around it the page's own colour. */
+  html.q-suite-host, html.q-suite-host body { height: 100%; margin: 0; overflow: hidden; background: var(--q-bg, #f2f2f7); }
+  .q-suite-frames { position: fixed; inset: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+  .q-suite-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--q-bg, #f2f2f7); visibility: hidden; pointer-events: none; }
+  .q-suite-frame.q-suite-shown { visibility: visible; pointer-events: auto; }
+  @media (prefers-color-scheme: dark) { html.q-suite-host, html.q-suite-host body { background: var(--q-bg, #000); } }
 </style>
 </head>
 <body>
 <main class="door" id="door" hidden></main>
+<div class="q-suite-frames" id="frames"></div>
 <script type="module">
-  if (!window.ORBIT_GONE) {
-    const [{ installGate, isPhoneOrTablet, isStandalone, detectLang }, ui, { APP_ORDER, BRANDS, appIcon, pathOf }, { markSuite }] = await Promise.all([import('#kit/orbit.mjs'), import('#kit/ui.mjs'), import('#kit/brand.mjs'), import('#kit/suite.mjs')]);
-    const lang = detectLang();
-    const en = lang === 'en';
-    if (en) document.documentElement.lang = 'en';
-    const W = (zh, e) => (en ? e : zh);
-    if (isPhoneOrTablet() && !isStandalone()) {
-      installGate('suite', lang, { name: 'Orbit', color: '#4f46e5', icon: './favicon.svg' });
-    } else {
-      // The first time: which app to start in (from then on, the one used last).
-      markSuite();
-      if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
-      const icon = id => Object.assign(document.createElement('img'), { src: `data:image/svg+xml,${encodeURIComponent(appIcon(id))}`, alt: '' });
-      const head = ui.h('header', { class: 'door-head' }, [ui.h('img', { src: './favicon.svg', alt: '' }), ui.h('div', {}, [ui.h('h1', { text: 'Orbit' }), ui.h('p', { text: W('從哪個 App 開始？', 'Where to start?') })])]);
-      const rows = APP_ORDER.map(id => ui.cell({ icon: icon(id), title: BRANDS[id].short, sub: BRANDS[id].role?.[lang] || '', chevron: true, onClick: () => location.assign(pathOf(id)) }));
-      const door = document.getElementById('door');
-      door.append(head, ui.list(rows, { foot: W('之後打開 Orbit，會回到你上次用的 App。', 'Orbit then opens on the app you used last.') }));
-      door.hidden = false;
-    }
+  const [{ installGate, isPhoneOrTablet, isStandalone, detectLang }, ui, { APP_ORDER, BRANDS, appIcon }, suite] = await Promise.all([import('#kit/orbit.mjs'), import('#kit/ui.mjs'), import('#kit/brand.mjs'), import('#kit/suite.mjs')]);
+  const lang = detectLang();
+  const en = lang === 'en';
+  if (en) document.documentElement.lang = 'en';
+  const W = (zh, e) => (en ? e : zh);
+  const hold = first => {
+    document.documentElement.classList.add('q-suite-host');
+    document.getElementById('door').hidden = true;
+    // (An older kit without the host: on to the app as before.)
+    const app = suite.appAt?.(new URL(first.url, location.href).pathname);
+    if (!suite.host || !app) return void location.assign(first.url);
+    suite.host(document.getElementById('frames'), { first: { ...first, app } });
+  };
+  if (window.ORBIT_FIRST) {
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+    hold(window.ORBIT_FIRST);
+  } else if (isPhoneOrTablet() && !isStandalone()) {
+    installGate('suite', lang, { name: 'Orbit', color: '#4f46e5', icon: './favicon.svg' });
+  } else {
+    // The first time: which app to start in (from then on, the one used last).
+    suite.markSuite();
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+    const icon = id => Object.assign(document.createElement('img'), { src: `data:image/svg+xml,${encodeURIComponent(appIcon(id))}`, alt: '' });
+    const head = ui.h('header', { class: 'door-head' }, [ui.h('img', { src: './favicon.svg', alt: '' }), ui.h('div', {}, [ui.h('h1', { text: 'Orbit' }), ui.h('p', { text: W('從哪個 App 開始？', 'Where to start?') })])]);
+    const rows = APP_ORDER.map(id => ui.cell({ icon: icon(id), title: BRANDS[id].short, sub: BRANDS[id].role?.[lang] || '', chevron: true, onClick: () => hold({ url: suite.resumeOf(suite.savedSuite(), id).url, y: 0 }) }));
+    const door = document.getElementById('door');
+    door.append(head, ui.list(rows, { foot: W('之後打開 Orbit，會回到你上次用的 App。', 'Orbit then opens on the app you used last.') }));
+    door.hidden = false;
   }
 </script>
 </body>

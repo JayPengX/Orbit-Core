@@ -3504,11 +3504,20 @@ export function linkHref(href, { home = inHomeApp(), way = linkWay(), here = typ
   }
   return `x-safari-${href}`;
 }
+// The window a page outside goes from: Orbit's own when this app is held in
+// it (kit suite.mjs host), so Safari's address opens from the window itself.
+function outer() {
+  try {
+    return globalThis.top !== globalThis && globalThis.top.location.origin === location.origin ? globalThis.top : globalThis;
+  } catch {
+    return globalThis;
+  }
+}
 // A link opened by code (a tap's own handler): the way the person chose.
 export function openLink(href) {
   const to = linkHref(href);
   if (to !== href) {
-    location.href = to;
+    outer().location.href = to;
     return null;
   }
   return globalThis.open?.(href, '_blank', 'noopener') ?? null;
@@ -3521,9 +3530,15 @@ if (typeof document !== 'undefined' && !document.__orbitLinks) {
     const a = e.target?.closest?.('a[href]');
     if (!a || a.hasAttribute('download') || a.hasAttribute('data-q-quick')) return;
     const to = linkHref(a.href);
-    if (to === a.href) return;
+    if (to === a.href) {
+      // (Held in Orbit's window: another site opens over it, never inside an app's frame.)
+      if (outer() === globalThis || (a.target && a.target !== '_self') || !/^https?:/i.test(a.href) || new URL(a.href).origin === location.origin) return;
+      e.preventDefault();
+      globalThis.open(a.href, '_blank', 'noopener');
+      return;
+    }
     e.preventDefault();
-    location.href = to;
+    outer().location.href = to;
   });
 }
 // The Pass sheet's row: the switch, with what it does now.
@@ -3557,6 +3572,12 @@ export function goNotice(url) {
   } catch {
     return;
   }
+  // (Held in Orbit's window: the app it's for shown there, at that place.)
+  let host = null;
+  try {
+    host = globalThis.parent !== globalThis ? globalThis.parent.ORBIT_HOST : null;
+  } catch {}
+  if (host?.open && to.origin === location.origin) return void host.open(`${to.pathname}${to.search}${to.hash}`);
   if (to.origin !== location.origin || to.pathname !== location.pathname) return void location.assign(to.href);
   if (to.hash && to.hash !== location.hash) return void (location.hash = to.hash);
   if (to.hash) globalThis.dispatchEvent?.(new HashChangeEvent('hashchange', { oldURL: location.href, newURL: location.href }));
