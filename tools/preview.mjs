@@ -1159,9 +1159,9 @@ if (googleMap) {
   await context.route(/^https:\/\/maps\.(googleapis|gstatic)\.com\//, async route => {
     const req = route.request();
     const url = req.url();
-    // (Maps' own calls, a POST's body and its type, go as they are, from the site.)
+    // (Maps' own calls go from the site, the page's address in a POST's body the site's too.)
     if (req.method() !== 'GET') {
-      const r = await fetch(asSite(url), { method: req.method(), headers: { ...req.headers(), referer: site, origin: new URL(site).origin }, body: req.postDataBuffer() }).catch(() => null);
+      const r = await fetch(asSite(url), { method: req.method(), headers: { ...req.headers(), referer: site, origin: new URL(site).origin }, body: req.postDataBuffer() && asSite(req.postDataBuffer().toString()) }).catch(() => null);
       if (!r) return route.abort();
       return route.fulfill({ status: r.status, contentType: r.headers.get('content-type') || 'application/octet-stream', headers: { 'Access-Control-Allow-Origin': '*' }, body: Buffer.from(await r.arrayBuffer()) });
     }
