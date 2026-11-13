@@ -34,7 +34,7 @@ test('the month: a day spends its share of what is left, never past the cap', ()
   const m = freshMeter(null, now);
   assert.equal(m.month, '2026-11');
   // 18 days left in November (13th..30th).
-  assert.equal(dayLeft(m, now), Math.floor(TR_MONTH / 18));
+  assert.equal(dayLeft(m, now), Math.floor((2 * TR_MONTH) / 18));
   assert.equal(dayLeft({ ...m, chars: TR_MONTH, today: 0 }, now), 0);
   // (A new month starts at nothing.)
   assert.equal(freshMeter({ month: '2026-10', chars: 400_000, day: '2026-10-31', today: 9 }, now).chars, 0);

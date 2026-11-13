@@ -45,12 +45,19 @@ export function wanted(index, lines, was, now = Date.now()) {
     const ai = lines[s.id]?.[k];
     const fresh = now - (old.at || 0) < TR_AGAIN;
     if (!ai && s.title) {
-      if (old[k] && (old.t === s.title || fresh)) Object.assign(e, { [k]: old[k], t: old.t });
-      else ask.push({ s, field: 'title', text: s.title });
+      if (old[k] && !old.old && (old.t === s.title || fresh)) Object.assign(e, { [k]: old[k], t: old.t });
+      else {
+        ask.push({ s, field: 'title', text: s.title });
+        // (One made the old way shows till its new one comes.)
+        if (old.old && old[k] && old.t === s.title) Object.assign(e, { [k]: old[k], t: old.t });
+      }
     }
     if (s.sum && s.rank < SUM_TOP) {
-      if (old.sum && (old.s === s.sum || fresh)) Object.assign(e, { sum: old.sum, s: old.s });
-      else ask.push({ s, field: 'sum', text: s.sum });
+      if (old.sum && !old.old && (old.s === s.sum || fresh)) Object.assign(e, { sum: old.sum, s: old.s });
+      else {
+        ask.push({ s, field: 'sum', text: s.sum });
+        if (old.old && old.sum && old.s === s.sum) Object.assign(e, { sum: old.sum, s: old.s });
+      }
     } else if (old.sum && old.s === s.sum) Object.assign(e, { sum: old.sum, s: old.s });
     keep[s.id] = e;
   }
@@ -64,7 +71,8 @@ export async function newsTr({ store, env, now = Date.now(), fetchImpl = fetch, 
   if (!index) return { skipped: 'no index' };
   const lines = (await store.json(NEWS_LINES).catch(() => null))?.lines || {};
   const doc = await store.json(NEWS_TR).catch(() => null);
-  const was = doc?.v === TR_V ? doc.tr || {} : {};
+  // (Made the old way: kept till made again, but an English one whose source names a day alone (v1's 12日 → December).)
+  const was = doc?.v === TR_V ? doc.tr || {} : Object.fromEntries(Object.entries(doc?.tr || {}).filter(([, e]) => !(e.en && /\d日/.test(`${e.t} ${e.s || ''}`))).map(([id, e]) => [id, { ...e, at: 0, old: 1 }]));
   const { keep, ask } = wanted(index, lines, was, now);
   let made = 0;
   for (const to of ['zh-TW', 'en']) {
