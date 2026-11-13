@@ -24,6 +24,7 @@
 import { json } from './http.js';
 import { sessionLimited } from './orbit-token.js';
 import { sha256, gunzip } from './builders/store.js';
+import { dataOffNow } from './data-fallback.js';
 
 const TYPES = { json: 'application/json', gz: 'application/gzip', txt: 'text/plain; charset=utf-8', html: 'text/html; charset=utf-8' };
 const typeOf = path => TYPES[/\.([a-z]+)$/.exec(path)?.[1]] || 'application/octet-stream';
@@ -61,6 +62,8 @@ async function readFile(env, ctx, path, request) {
   } catch {
     return new Response('', { status: 503, headers: { 'Retry-After': '60', 'X-Data-Off': '1' } });
   }
+  // (R2 refusing and D1 without a copy: still a failure, not "not there".)
+  if (!obj && dataOffNow()) return new Response('', { status: 503, headers: { 'Retry-After': '60', 'X-Data-Off': '1' } });
   if (!obj) {
     if (cache) ctx.waitUntil(cache.put(key, new Response('', { headers: { 'X-Data-Missing': '1', 'Cache-Control': 'public, max-age=120' } })));
     return new Response('', { status: 404 });
