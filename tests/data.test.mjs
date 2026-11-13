@@ -113,3 +113,12 @@ test('private/ (the store\'s backup) is never served', async () => {
   assert.equal((await ask('/data/private/firestore-backup.jsonl.gz', {}, { DATA })).status, 404);
   assert.equal((await ask('/data/private%2Ffirestore-backup.jsonl.gz', {}, { DATA })).status, 404);
 });
+
+test('R2 switched off or unbound (2026-11-13): a read is a 503 failure, never a 404 "not there", so a phone keeps its copy', async () => {
+  const off = { get: async () => { throw new Error('get: Please enable R2 through the Cloudflare Dashboard. (10042)'); } };
+  for (const env of [{ DATA: off }, {}]) {
+    const res = await ask('/data/sports/bounds.json', {}, env);
+    assert.equal(res.status, 503);
+  }
+  assert.equal((await ask('/data/sports/none.json', {}, { DATA: fakeR2() })).status, 404);
+});
