@@ -10,7 +10,7 @@
 // Run on its own even minutes (run.js SLOTS 'markets', every 30 minutes).
 //
 // news/markets.json: { built, stories: { id: [{ e, slug, zh, en,
-//   kind: 'yes' | 'dates' | 'pick', one?, rows: [{ p, d, en?, zh?, md? }] }] } }
+//   kind: 'yes' | 'dates' | 'pick', one?, rows: [{ p, d, en?, zh?, md?, who? }] }] } }
 // p a chance (0–1), d its move in a day (−1–1), md a deadline (M/D or Y/M/D);
 // one: the options exclude each other (their chances add to 100%).
 // Its memory (each pair's answer, each market's words): private/news/markets.json.
@@ -18,7 +18,7 @@ import { aiOnce } from '../ai.js';
 import { NEWS_PATH } from './news.js';
 
 export const MARKETS_PATH = 'news/markets.json';
-const MEMORY = 'private/news/markets.v4.json';
+const MEMORY = 'private/news/markets.v5.json';
 const LINES = 'news/lines.json';
 const GAMMA = 'https://gamma-api.polymarket.com/events';
 // Polymarket's sections whose markets stories can be about (50 each, busiest first).
@@ -234,6 +234,8 @@ const round = (x, n = 3) => Math.round(x * 10 ** n) / 10 ** n;
 export function labelOf(label, labels = {}, short = label) {
   if (/\(no change\)$/i.test(label)) return { en: 'No change', zh: '不換人' };
   const l = labels?.[label] || {};
+  // (A person: the name as the market writes it, in Chinese only as the story's headlines do.)
+  if (l.who) return { en: short, ...(l.zh ? { zh: l.zh } : {}), who: 1 };
   const zh = l.zh || PARTIES[label];
   const en = l.en || short;
   return zh ? { en, zh } : { en };
@@ -272,8 +274,10 @@ export function shownEvent(ev, words, now = Date.now()) {
   const sum = ms.reduce((a, m) => a + m.p, 0);
   const one = ev.one && sum > 0.9 && sum < 1.1;
   let rows = picked.map((m, i) => ({ ...labelOf(m.label, words.labels, short[i]), p: round(one ? m.p / sum : m.p), d: round(m.d) }));
-  // (Every row in Chinese or none: never 伊恩·巴克 beside Rene Haas.)
-  if (rows.some(r => !r.zh)) rows = rows.map(({ zh, ...r }) => r);
+  // (A person without a Chinese name the headlines use keeps theirs in English, Jay 11-13; any
+  // other row without Chinese turns the whole card to the options as written, never half-translated.)
+  if (rows.some(r => !r.zh && !r.who)) rows = rows.map(({ zh, ...r }) => r);
+  rows = rows.map(({ who, ...r }) => r);
   return rows.length ? { ...base, kind: 'pick', ...(one ? { one: 1 } : {}), rows } : null;
 }
 // How the card shows it (the AI words the question to fit): one chance, a ladder of deadlines, or options.

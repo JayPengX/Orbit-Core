@@ -186,6 +186,15 @@ test('news-markets: a question says when it settles, unless its rows each show a
   assert.equal(ask({ ...market, kind: 'dates', ends: undefined }, '黃仁勳2026年底前會卸任嗎？', 'Will Jensen Huang step down by the end of 2026?'), undefined, 'a ladder’s rows say the dates');
 });
 
+test('news-markets: a person’s Chinese name only as the story’s headlines write it, never a guessed one', () => {
+  const pairs = [{ k: 'a|1', story: ['輝達財務長克瑞斯接任臨時CEO'], market: { q: 'Next CEO of NVIDIA?', about: '', kind: 'pick', options: ['Ian Buck', 'Colette Kress'] } }];
+  const out = FEATURES['news-markets'].clean({ items: [{ k: 'a|1', match: true, zh: '誰將接任輝達執行長？', en: 'Who will be Nvidia’s next CEO?', options: [
+    { o: 'Ian Buck', who: true, zh: '巴克', en: 'Ian Buck' },
+    { o: 'Colette Kress', who: true, zh: '克瑞斯', en: 'Colette Kress' }
+  ] }] }, { pairs });
+  assert.deepEqual(out['a|1'].labels, { 'Ian Buck': { en: 'Ian Buck', who: 1 }, 'Colette Kress': { zh: '克瑞斯', en: 'Colette Kress', who: 1 } });
+});
+
 test('news-markets: each option’s short label, Chinese without Latin or a number it lacks, never two alike', () => {
   const pairs = [{ k: 'a|1', story: ['輝達董事會討論黃仁勳去留'], market: { q: 'Jensen Huang out + Nvidia market cap', about: '', options: ['Resigned/removed; Over $4T', 'Resigned/removed; Under $4T', 'Rene Haas', 'Ian Buck'] } }];
   const out = FEATURES['news-markets'].clean({ items: [{ k: 'a|1', match: true, zh: '黃仁勳去職時，輝達市值會在4兆美元以上嗎？', en: 'If Jensen Huang leaves, will Nvidia be worth over $4 trillion?', options: [
