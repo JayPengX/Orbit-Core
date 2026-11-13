@@ -50,3 +50,12 @@ test('no D1 (a test, a local run): env as it was', () => {
   const env = { DATA: offR2 };
   assert.equal(withDataFallback(env), env);
 });
+
+test('no R2 bound (a deploy that found R2 off): D1 alone, and a file it lacks counts as R2 off (a 503, not a 404)', async () => {
+  resetDataFallback();
+  const { dataOffNow } = await import('../data-fallback.js');
+  const env = withDataFallback({ STORE: fakeD1() });
+  assert.equal(await env.DATA.get('none.json'), null);
+  assert.equal(dataOffNow(), true);
+  resetDataFallback();
+});

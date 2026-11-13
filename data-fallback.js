@@ -106,8 +106,13 @@ const wrapped = new WeakMap();
 let offUntil = 0;
 export function withDataFallback(env, now = () => Date.now()) {
   if (!env?.STORE?.prepare) return env;
-  if (wrapped.has(env)) return wrapped.get(env);
+  if (wrapped.has(env)) {
+    if (!env.DATA) offUntil = now() + OFF_MS;
+    return wrapped.get(env);
+  }
   const r2 = env.DATA || null;
+  // (No R2 bound at all, as when a deploy found R2 off: D1 alone, and a file it lacks is a failure.)
+  if (!r2) offUntil = now() + OFF_MS;
   const d1 = d1Bucket(env.STORE, now);
   const either = method => async (...args) => {
     if (r2 && now() >= offUntil) {
