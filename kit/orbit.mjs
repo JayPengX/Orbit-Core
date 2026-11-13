@@ -1700,6 +1700,18 @@ function makeSession(app, { lang, heartbeat }) {
   let nowTime = null;
   let famTime = null;
   let shelf = null;
+  // (Orbit's window opens on an app with something under way: kit suite.mjs
+  // setLive. `until`: when it ends by itself. Only from the place that runs it.)
+  const liveKeys = {};
+  function tellLive() {
+    if (!inSuite()) return;
+    const mine = Object.values(liveKeys).filter(x => x.on);
+    const any = mine.length > 0 || Object.values(shelf || {}).some(e => e && e.v != null);
+    const until = mine.length && mine.every(x => x.until) ? Math.max(...mine.map(x => x.until)) : null;
+    import('./suite.mjs')
+      .then(m => m.setLive?.(app, any, { url: `${location.pathname}${location.hash}`, until }))
+      .catch(() => {});
+  }
   const sawData = res => typeof res?.updateTime === 'string' && (res.payload !== undefined || res.unchanged) && (dataAt = res.updateTime);
   try {
     const kept = JSON.parse(readStore(tokenKey) || 'null');
@@ -1827,6 +1839,7 @@ function makeSession(app, { lang, heartbeat }) {
       nowTime = data.nowTime ?? '';
       shelf = data.now;
       emit('now', shelf);
+      tellLive();
     }
     return data;
   }
@@ -1874,7 +1887,13 @@ function makeSession(app, { lang, heartbeat }) {
       .finally(() => (putting = null));
     return putting;
   }
-  s.putNow = (key, v, at = Date.now()) => putLater({ set: { [key]: { v: v ?? null, at } } });
+  s.putNow = (key, v, at = Date.now(), opts = null) => {
+    if (s.canSave !== false) {
+      liveKeys[key] = { on: v != null, until: Number(opts?.until) || null };
+      tellLive();
+    }
+    return putLater({ set: { [key]: { v: v ?? null, at } } });
+  };
   globalThis.addEventListener?.('orbit-family', event => event?.detail && putLater({ family: event.detail }, 4000));
 
   // Every way of signing in ends here: a refresh token for this device.

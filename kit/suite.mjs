@@ -114,6 +114,43 @@ export function lastApp(saved) {
   return best?.id || null;
 }
 
+// ---- Where Orbit opens (Jay 2026-11-13) ----
+// Something live (a trip under way, a YouBike rental, a bus alert counting
+// down, 專注飛行, Beats playing): that app, on that screen, however long
+// away; the one started last if several. Else back within AWAY_MS: the app
+// used last, where it was left. Else (or the first time) the list of apps,
+// the one used last on top. The same on a return to an Orbit the phone kept.
+export const AWAY_MS = 3_600_000;
+export const LIVE_KEY = 'orbit.suite.live.v1';
+// What's live now: { app, url } entries still running, the latest first.
+export function liveNow(live, now = Date.now()) {
+  return Object.entries(live || {})
+    .filter(([id, v]) => BRANDS[id] && v && (v.until ? Number(v.until) > now : now - (Number(v.t) || 0) < 12 * 3_600_000))
+    .sort((a, b) => (Number(b[1].t) || 0) - (Number(a[1].t) || 0))
+    .map(([id, v]) => ({ app: id, url: v.url || null }));
+}
+// The app to open, { app, url, y }, or null for the list.
+export function launchTarget(saved, live, now = Date.now(), away = AWAY_MS) {
+  const on = liveNow(live, now)[0];
+  if (on) return { app: on.app, url: on.url || resumeOf(saved, on.app, now).url, y: on.url ? 0 : resumeOf(saved, on.app, now).y };
+  // (Orbit's window says which app it showed and when it was left: kept apps behind it note their own times too.)
+  const last = BRANDS[saved?.last] ? saved.last : lastApp(saved);
+  const left = Number(saved?.left) || Number(saved?.apps?.[last]?.t) || 0;
+  if (!last || now - left >= away) return null;
+  return { app: last, ...resumeOf(saved, last, now) };
+}
+// An app says it's in the middle of something (on) or done (null): Orbit
+// opens on it while it lasts. `until`: when it ends by itself (a timer).
+export function setLive(id, on, { url = null, until = null } = {}) {
+  if (!BRANDS[id]) return;
+  const all = readJson('localStorage', LIVE_KEY) || {};
+  // (Its start kept: "the one started last" is by when it started, not its latest change.)
+  if (on) all[id] = { t: all[id]?.t || Date.now(), url: url ? keepable(url) : null, ...(until ? { until: Number(until) } : {}) };
+  else delete all[id];
+  writeJson('localStorage', LIVE_KEY, all);
+}
+export const liveSaved = () => readJson('localStorage', LIVE_KEY) || {};
+
 // ---- On the device ----
 const readJson = (store, key) => {
   try {
@@ -506,7 +543,7 @@ function playing(w) {
   } catch {}
   return false;
 }
-export function host(box, { first = null } = {}) {
+export function host(box, { first = null, list = null } = {}) {
   const frames = new Map();
   let shown = null;
   const top = document;
@@ -602,6 +639,7 @@ export function host(box, { first = null } = {}) {
       } catch {}
     }
     document.title = 'Orbit';
+    writeJson('localStorage', SUITE_KEY, { ...savedSuite(), last: id, left: 0 });
     tidy();
   };
   const api = {
@@ -633,12 +671,25 @@ export function host(box, { first = null } = {}) {
     held: () => [...frames.keys()]
   };
   globalThis.ORBIT_HOST = api;
-  // Back on the phone's screen: the shown one to its app again; a frame that stopped playing may go quiet.
+  // Off the phone's screen: which app, and when (where Orbit opens next). Back
+  // on it: the rules of launchTarget again, with a playing app live too.
+  let awayAt = 0;
   top.addEventListener('visibilitychange', () => {
+    if (top.visibilityState === 'hidden') {
+      awayAt = Date.now();
+      if (shown) writeJson('localStorage', SUITE_KEY, { ...savedSuite(), last: shown, left: awayAt });
+    }
     for (const f of frames.values()) {
       const d = f.el.contentDocument;
       if (d) d.dispatchEvent(new Event('visibilitychange'));
     }
+    if (top.visibilityState !== 'visible' || !awayAt) return;
+    const live = { ...liveSaved() };
+    for (const f of frames.values()) if (playing(f.el.contentWindow) && !live[f.app]) live[f.app] = { t: f.used };
+    const to = launchTarget(savedSuite(), live);
+    awayAt = 0;
+    if (!to) return void list?.();
+    if (to.app !== shown) api.go(to.app, frames.has(to.app) && !liveSaved()[to.app]?.url ? null : to.url);
   });
   setInterval(() => {
     for (const f of frames.values()) if (f.app !== shown) look(f, false);
