@@ -530,7 +530,8 @@ export async function guardRun(env, { fetcher = fetch, now = Date.now(), kv = en
 const DETAIL_Q = {
   d1: `query($a: string!, $ds: Date!, $de: Date!) { viewer { accounts(filter: { accountTag: $a }) { x: d1QueriesAdaptiveGroups(limit: 40, filter: { date_geq: $ds, date_leq: $de }, orderBy: [sum_rowsWritten_DESC]) { count sum { rowsRead rowsWritten } dimensions { query } } } } }`,
   doTime: `query($a: string!, $ds: Date!, $de: Date!) { viewer { accounts(filter: { accountTag: $a }) { x: durableObjectsPeriodicGroups(limit: 100, filter: { date_geq: $ds, date_leq: $de }) { sum { activeTime } dimensions { namespaceId } } } } }`,
-  doCalls: `query($a: string!, $ds: Date!, $de: Date!) { viewer { accounts(filter: { accountTag: $a }) { x: durableObjectsInvocationsAdaptiveGroups(limit: 100, filter: { date_geq: $ds, date_leq: $de }) { sum { requests } dimensions { namespaceId } } } } }`
+  doCalls: `query($a: string!, $ds: Date!, $de: Date!) { viewer { accounts(filter: { accountTag: $a }) { x: durableObjectsInvocationsAdaptiveGroups(limit: 100, filter: { date_geq: $ds, date_leq: $de }) { sum { requests } dimensions { namespaceId } } } } }`,
+  doObjects: `query($a: string!, $ds: Date!, $de: Date!) { viewer { accounts(filter: { accountTag: $a }) { x: durableObjectsPeriodicGroups(limit: 40, filter: { date_geq: $ds, date_leq: $de }, orderBy: [sum_activeTime_DESC]) { sum { activeTime } dimensions { objectId } } } } }`
 };
 export async function useDetail(env, { fetcher = fetch, now = Date.now(), kv = env.RATE_LIMIT_KV } = {}) {
   if (!env.CF_GUARD_TOKEN) return { off: true };
@@ -538,7 +539,7 @@ export async function useDetail(env, { fetcher = fetch, now = Date.now(), kv = e
   const a = env.CF_ACCOUNT_ID || state.account || (await accountOf(env, fetcher));
   const v = { a, ds: isoDay(now), de: isoDay(now) };
   const run = q => graphql(env, fetcher, q, v).then(r => r.x || [], e => ({ error: String(e?.message || e).slice(0, 200) }));
-  const [d1, doTime, doCalls] = await Promise.all([run(DETAIL_Q.d1), run(DETAIL_Q.doTime), run(DETAIL_Q.doCalls)]);
+  const [d1, doTime, doCalls, doObjects] = await Promise.all([run(DETAIL_Q.d1), run(DETAIL_Q.doTime), run(DETAIL_Q.doCalls), run(DETAIL_Q.doObjects)]);
   // (Namespace ids named by their class, when the token may list them.)
   const names = await fetcher(`${API}/accounts/${a}/workers/durable_objects/namespaces?per_page=100`, { headers: { Authorization: `Bearer ${env.CF_GUARD_TOKEN}` } })
     .then(r => r.json())
@@ -551,6 +552,8 @@ export async function useDetail(env, { fetcher = fetch, now = Date.now(), kv = e
     at: now,
     d1: Array.isArray(d1) ? d1.map(r => ({ written: r.sum?.rowsWritten || 0, read: r.sum?.rowsRead || 0, n: r.count || 0, query: String(r.dimensions?.query || '').slice(0, 160) })) : d1,
     do: Object.entries(ns).map(([id, x]) => ({ ns: names[id] || id, ...x })).sort((p, q) => (q.gbs || 0) - (p.gbs || 0)),
+    // (Each object's GB-s; the proxy names its own: 'cron:main', 'route:0'…)
+    objects: Array.isArray(doObjects) ? doObjects.map(r => ({ id: r.dimensions?.objectId, gbs: Math.round(((r.sum?.activeTime || 0) / 1e6) * 0.125) })) : doObjects,
     errors: [doTime, doCalls].filter(x => x?.error).map(x => x.error)
   };
 }
