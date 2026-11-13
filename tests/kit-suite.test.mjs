@@ -149,3 +149,23 @@ test("Orbit's window closes only the oldest quiet apps: never the one shown, nev
   assert.deepEqual(toClose(list.slice(0, 3), 'law'), []);
   assert.deepEqual(toClose([f('beats', 1, true), f('a', 2), f('b', 3), f('c', 4), f('d', 5)], 'beats', 3), ['a']);
 });
+
+test('Orbit opens on something live, else the last app within an hour, else the list', async () => {
+  const { launchTarget, liveNow, AWAY_MS } = await import('../kit/suite.mjs');
+  const now = 1_800_000_000_000;
+  const saved = { apps: { match: { url: '/Orbit-Sports/#g', y: 40, t: now - 10 * 60_000, home: '/Orbit-Sports/' }, law: { url: '/Orbit-Law/', y: 0, t: now - 3 * 3_600_000, home: '/Orbit-Law/' } } };
+  assert.equal(AWAY_MS, 3_600_000);
+  // Back within the hour: the last app, where it was left.
+  assert.deepEqual(launchTarget(saved, {}, now), { app: 'match', url: '/Orbit-Sports/#g', y: 40 });
+  // Away an hour or more, nothing live: the list.
+  assert.equal(launchTarget(saved, {}, now + AWAY_MS), null);
+  // Orbit's window said which app it showed and when it was left.
+  assert.equal(launchTarget({ ...saved, last: 'law', left: now - 5 * 60_000 }, {}, now).app, 'law');
+  assert.equal(launchTarget({ ...saved, last: 'match', left: now - 2 * AWAY_MS }, {}, now), null);
+  // Something live wins however long away; the one started last of two; a timer that ran out is not live.
+  const live = { transit: { t: now - 5 * 3_600_000, url: '/Orbit-Transit/#trip' }, orbit: { t: now - 3_600_000, until: now + 60_000 }, money: { t: now - 60_000, until: now - 1 } };
+  assert.deepEqual(liveNow(live, now).map(x => x.app), ['orbit', 'transit']);
+  assert.equal(launchTarget(saved, live, now + 2 * AWAY_MS).app, 'transit');
+  assert.deepEqual(launchTarget(saved, { transit: live.transit }, now + 2 * AWAY_MS), { app: 'transit', url: '/Orbit-Transit/#trip', y: 0 });
+  assert.equal(launchTarget({ apps: {} }, {}, now), null);
+});
