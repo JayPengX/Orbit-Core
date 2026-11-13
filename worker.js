@@ -54,7 +54,7 @@ import { readDev, capacityCron, CONFIG_COLLECTION, ADMIN_TOOLS } from './eco-adm
 import { PASSKEY_COLLECTION } from './passkey.js';
 import { backupStore } from './store-backup.js';
 import { paceOf } from './pace.js';
-import { beat, tellOwner, systemReport, countFolders, FOLDERS_KEY } from './ops.js';
+import { beat, tellOwner, systemReport, countFolders, FOLDERS_KEY, startFreeWatch } from './ops.js';
 import { sweepKept, keptText } from './kept-store.js';
 import { withDataFallback, sweepDataFiles } from './data-fallback.js';
 import { applyScale } from './capacity.js';
@@ -1749,6 +1749,8 @@ async function cronTick(event, env, ctx, part) {
     if (env.DATA && min === 40 && (tick.getUTCHours() % 6 === 0 || !(await keptText(env, FOLDERS_KEY)))) run('data-folders', () => countFolders(env));
     // What the Worker kept for itself (kept-store.js, D1) and has ended, deleted: every 6 hours.
     if (min === 42 && tick.getUTCHours() % 6 === 0) run('kept-sweep', async () => ({ kept: await sweepKept(env), files: await sweepDataFiles(env) }));
+    // The free plans' watch (free-watch.yml) started every 3 hours: GitHub's own timer ran it none of the first 6 (2026-11-13).
+    if (min === 17 && tick.getUTCHours() % 3 === 0) run('free-watch', () => startFreeWatch(env));
 }
 
 // The Runner (runner.js): heavy routes and the crons' work, 30 s of CPU each.
