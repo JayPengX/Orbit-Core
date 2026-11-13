@@ -202,3 +202,16 @@ export async function systemReport(env, deps) {
     bindings: Object.fromEntries(BINDINGS.map(k => [k, !!env[k]]))
   };
 }
+
+// The free plans' watch (tools/free-watch.mjs) started on GitHub, as
+// news-clips is (builders/news.js): GitHub's schedule runs late or not at all.
+export async function startFreeWatch(env, fetchImpl = fetch) {
+  if (!env?.GH_ACTIONS_TOKEN) return { off: 'no token' };
+  const go = await fetchImpl('https://api.github.com/repos/JayPengX/Orbit-Core/actions/workflows/free-watch.yml/dispatches', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.GH_ACTIONS_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'orbit-ops', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ref: 'main' }),
+    signal: AbortSignal.timeout(10_000)
+  });
+  return go.ok ? { started: true } : { failed: `start: HTTP ${go.status}` };
+}
