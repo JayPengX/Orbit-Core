@@ -331,11 +331,11 @@ export const FEATURES = {
           'line: a short headline for a student, ≤ 24 字: the thing first, then when (學測報名 11/20 截止; 第二次期中考考程表; 寒假志工服務營隊，4 天; 流感疫苗補接種). Not a sentence: no 。 at the end, never starting with a verb (下載, 參加, 可申請). Not the title again: drop 【轉知】, 公告, unit names, the grade (高三, 一年級: who shows it) and this school’s own name, but keep 進修部 / 夜間部 first when the post is only for that division, but keep the name of an outside school or organizer (南華大學特殊選才說明會; 伊甸寒假服務學習營隊); no filler (請同學留意, 歡迎參加) and no word twice; the when is a date, deadline or length, else leave it out (not 營隊，2027寒假). Every date and number must be one the title or text gives. The when is the deadline or the day it happens, not a sign-up start already past.',
           'act: what they must do, ≤ 10 字 (報名, 繳回條, 上傳學習歷程, 帶…), "" when there is nothing to do beyond showing up or knowing it (not 準時到考, 留意); a concrete thing the post tells them to do counts (17:30前離校, 帶健保卡); a time or number only as the title or text gives it.',
           'by: the deadline, or the day it happens, as YYYY-MM-DD when the title or text gives one (民國年 + 1911: 115年 = 2026, 116年 = 2027; 學年度 is not a year: 115學年度第1學期 runs 2026-08 to 2027-01, 第2學期 2027-02 to 2027-07; a month and day alone is the one nearest today, so a date a few weeks back stays this year). Only an end or the day itself, never a start (11/9起報名 is not a deadline), else "".',
-          'Write line and act in Traditional Chinese as Taiwan writes it (台灣用語, 全形標點 ，、), never Simplified. Return one item per announcement with its id.',
+          'Write line and act in Traditional Chinese as Taiwan writes it (台灣用語, 全形標點 ，、), never Simplified. Then en and actEn: the same line and act written for a student who reads English, natural plain English (not a word-for-word translation of the Chinese), en at most 12 words, actEn at most 4 words or "" when act is "", the same dates and numbers (11/20, not November 20th), names of outside schools and bodies in their own English names when you know them for sure, else described (a university’s info session); no Chinese characters. Return one item per announcement with its id.',
           JSON.stringify(items.map(it => ({ id: it.id, title: it.title, unit: it.unit || it.kind || '', text: (it.desc || '').slice(0, 400) })))
         ].join('\n')
       ),
-    schema: obj({ items: arr(obj({ id: S, who: arr({ type: 'string', enum: ['all', '1', '2', '3', 'jh', 'some'] }), line: S, act: S, by: S })) }),
+    schema: obj({ items: arr(obj({ id: S, who: arr({ type: 'string', enum: ['all', '1', '2', '3', 'jh', 'some'] }), line: S, act: S, by: S, en: S, actEn: S })) }),
     clean(raw, { items, today }) {
       const given = new Map(items.map(it => [it.id, it]));
       const out = {};
@@ -352,7 +352,10 @@ export const FEATURES = {
           line: line && numbersFrom(line, `${src} ${byOk ? by : ''}`) ? line : '',
           who: [...new Set(list(x.who, 6).filter(w => ['all', '1', '2', '3', 'jh', 'some'].includes(w)))],
           act: (a => a && numbersFrom(a, src) ? a : '')(str(x.act, 20)),
-          by: byOk ? by : ''
+          by: byOk ? by : '',
+          // (English beside it, in the same answer: never Chinese in it, its numbers the source's.)
+          en: (e => e && !/[\u3400-\u9fff]/.test(e) && numbersFrom(e, `${src} ${byOk ? by : ''}`) ? e : '')(str(x.en, 110).replace(/[.!]+$/, '')),
+          actEn: (e => e && !/[\u3400-\u9fff]/.test(e) && numbersFrom(e, src) ? e : '')(str(x.actEn, 40))
         };
       }
       return Object.keys(out).length ? out : null;
