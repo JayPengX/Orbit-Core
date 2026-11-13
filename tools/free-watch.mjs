@@ -66,7 +66,8 @@ async function allowances(transitStatus) {
   const s = g.body;
   if (s.error) bad(`guard: ${s.error}`);
   if (s.stopped) bad(`guard: the proxy is stopped (${JSON.stringify(s.stopped).slice(0, 120)})`);
-  if (Date.now() - (s.at || 0) > 40 * 60_000) bad(`guard: last read the bill ${Math.round((Date.now() - (s.at || 0)) / 60_000)} min ago`);
+  // (The guard reads the bill each 5 minutes and keeps it hourly when nothing changed: KV's 1,000 writes a day.)
+  if (Date.now() - (s.at || 0) > 75 * 60_000) bad(`guard: last read the bill ${Math.round((Date.now() - (s.at || 0)) / 60_000)} min ago`);
   const shares = Object.entries(s.share || {}).sort((a, b) => b[1] - a[1]);
   // (A share of the day so far: projected to the day's end from how much of it has passed.)
   const day = s.period ? Math.min(1, Math.max(0.05, ((s.at || Date.now()) - s.period.start) / (s.period.end - s.period.start))) : 1;
