@@ -3,7 +3,7 @@
 // that's news related, for example injury").
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sportKind, sportsIn, teamWays, namesTeam, playerWays, namesPlayer, newsAbout, cleanSport, storyTitle, SPORT_MS } from '../kit/news-sport.mjs';
+import { sportKind, storyKind, sportsIn, teamWays, namesTeam, playerWays, namesPlayer, newsAbout, cleanSport, storyTitle, SPORT_MS } from '../kit/news-sport.mjs';
 import { deskOf, sportDesk } from '../builders/news.js';
 
 const T = (league, name, short, sport) => ({ league, name, short, sport });
@@ -145,4 +145,29 @@ test("a story the AI has read is about whom it says and its own words name, neve
   // (Not read yet: its links still count, as before.)
   const unread = cleanSport({ intl: [{ ...luka, who: null }] });
   assert.equal(newsAbout(unread, { teams: [SAS], now }).length, 1);
+});
+
+test("a story's kind is its headline's: a trade is a move whatever injury led to it, a summary's injury never tags it (Jay 11-13)", () => {
+  assert.equal(storyKind({ title: '勇士致電公牛醞釀交易補強 鎖定場均12.8分7.4籃板大前鋒史密斯', sum: '在當家一哥柯瑞驚傳腹斜肌撕裂…' }), 'move');
+  assert.equal(storyKind({ title: 'NBA／柯瑞倒下勇士加速交易？美媒點名「2長人」', en: 'After Curry injury, Warriors look to trade' }), 'move');
+  assert.equal(storyKind({ title: '柯瑞傷勢更新，勇士考慮補強' }), 'injury');
+  assert.equal(storyKind({ title: "Marcus Smart called out for 'fake toughness' after throwing punch at Warriors' Charles Bassey", zh: '史馬特揮拳遭驅逐 恐再遭處分' }), 'ban');
+  assert.equal(storyKind({ title: '賀中華隊亞冠賽奪首勝！必勝客披薩買大送大', en: 'Pizza Hut offers a 666-yuan deal after the win' }), '');
+  assert.equal(storyKind({ title: 'Mauricio Pochettino announced as new Manchester United manager' }), 'coach');
+});
+
+test("the clubs a story is about are the AI's `a` where it gave them; an opponent named in passing is none of its (Jay 11-13: 威爾森's fracture under 勇士 v 馬刺)", () => {
+  const now = Date.parse('2026-11-13T12:00Z');
+  const SAS = T('nba', 'San Antonio Spurs', 'Spurs', 'basketball');
+  const CHI = T('nba', 'Chicago Bulls', 'Bulls', 'basketball');
+  const MIA = T('nba', 'Miami Heat', 'Heat', 'basketball');
+  const HOU = T('nba', 'Houston Rockets', 'Rockets', 'basketball');
+  const wilson = { id: 'w', title: 'Caleb Wilson out 4-6 weeks with hand fracture in big Bulls blow', zh: '威爾森手部骨折，缺陣4-6週', sum: "Bulls rookie Caleb Wilson will miss 4 to 6 weeks after a fractured right hand suffered in Wednesday's loss to the Spurs.", items: [['reuters', 'Minus injured rookie Caleb Wilson, Bulls encounter restless Hawks', 'https://www.reuters.com/sports/basketball/minus-injured-rookie-caleb-wilson-bulls-encounter-restless-hawks'], ['ap', 'Wembanyama, Harper lead Spurs past Bulls', 'https://apnews.com/article/spurs-bulls']], at: now - 3_600_000, who: { p: ['Caleb Wilson'], t: ['Chicago Bulls', 'Atlanta Hawks'] } };
+  const smart = { id: 's', title: '史馬特暴力揮拳遭NBA重罰禁賽3場 對爵士、巫師與熱火3戰不能打', items: [], at: now - 3_600_000, who: { p: ['Marcus Smart'], t: ['Utah Jazz', 'Washington Wizards', 'Miami Heat'], a: ['Houston Rockets'] } };
+  const pack = cleanSport({ intl: [wilson], tw: [smart] });
+  assert.deepEqual(newsAbout(pack, { teams: [SAS], now }).map(s => s.id), [], 'the Spurs only in its summary');
+  assert.deepEqual(newsAbout(pack, { teams: [CHI], now }).map(s => s.id), ['w']);
+  assert.deepEqual(newsAbout(pack, { teams: [T('nba', 'Atlanta Hawks', 'Hawks', 'basketball')], now }).map(s => s.id), [], 'one of several the AI names, not in its title');
+  assert.deepEqual(newsAbout(pack, { teams: [MIA], now }).map(s => s.id), [], 'the Heat only as a game he misses');
+  assert.deepEqual(newsAbout(pack, { teams: [HOU], now }).map(s => s.id), ['s']);
 });
