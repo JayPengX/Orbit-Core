@@ -35,3 +35,19 @@ test("a point that says the card again, or a player typed out, is let go", () =>
   assert.equal(clean({ points: [{ k: 'out', zh: '{t:16}主將缺陣30天', en: '{t:16} without {p:4594268} for 30 days' }] }, { facts }), null, 'a number not in the facts');
   assert.deepEqual(clean({ points: [] }, { facts }), { points: [] });
 });
+
+test("basketball's streak is the card's 連勝敗: never in the digest or a point; the last ten only when it says more (Jay 11-13)", () => {
+  const stats = (streak, ten) => [{ name: 'streak', displayValue: streak }, { name: 'Last Ten Games', displayValue: ten }];
+  const summary = (a, b) => ({
+    header: { competitions: [{ competitors: [{ ...team('24', 'San Antonio Spurs'), homeAway: 'home' }, { ...team('9', 'Golden State Warriors'), homeAway: 'away' }] }] },
+    boxscore: { teams: [{ team: { id: '24' }, statistics: stats(...a) }, { team: { id: '9' }, statistics: stats(...b) }] }
+  });
+  const e = { league: 'nba', id: '1', start: '2026-11-14T02:30Z' };
+  assert.equal(previewFacts(summary(['W10', '10-0'], ['L1', '7-3']), e), null, 'W10 and 10-0: both on the card');
+  const f = previewFacts(summary(['W2', '9-1'], ['L1', '7-3']), e);
+  assert.match(f.facts, /\{t:24\} 9-1 in the last ten/);
+  assert.doesNotMatch(f.facts, /straight/);
+  const clean = FEATURES['sports-preview'].clean;
+  const facts = 'NBA (basketball)\nTeams: {t:24} = home (San Antonio Spurs); {t:9} = away (Golden State Warriors)\nPreview (AP):\nSan Antonio has won 10 straight.';
+  assert.equal(clean({ points: [{ k: 'run', zh: '{t:24}豪取10連勝，近10場保持全勝', en: '{t:24} have won 10 straight' }] }, { facts }), null);
+});

@@ -91,6 +91,10 @@ const FAMILY = { basketball: 'basketball', baseball: 'baseball', soccer: 'soccer
 export function sportText(s) {
   return [s?.title, s?.zh, s?.en, s?.sum, ...(s?.items || []).flatMap(it => [it[1], it[2]])].filter(Boolean).join('\n');
 }
+// Its own words: the title, the AI's titles and the summary (not its links').
+const ownText = s => [s?.title, s?.zh, s?.en, s?.sum].filter(Boolean).join('\n');
+// Whether the family's AI has read who it's about (builders/ai.js sportWho).
+const readBy = s => Boolean(s?.who && (s.who.p?.length || s.who.t?.length));
 const escRe = w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // A name standing as a word in folded text ("curry" in "steph curry's", not in "curryville").
 const wordIn = (folded, name) => Boolean(name) && new RegExp(`(?:^|[^a-z0-9])${escRe(name)}(?:$|[^a-z0-9])`).test(folded);
@@ -163,7 +167,9 @@ export function teamWays(team) {
 // Whether a story names this team (its words, `ways` from teamWays).
 // `loose`: a nickname is enough unless the story is plainly another sport's
 // (his surname beside it already says it's him: "Curry負傷退場 勇士連勝止步").
-export function namesTeam(text, ways, who = null, { loose = false } = {}) {
+// `about`: the text that says what sport the story is (its links' headlines
+// too), where the names are looked for in less (newsAbout: its own words).
+export function namesTeam(text, ways, who = null, { loose = false, about = '' } = {}) {
   if (!ways?.name) return false;
   const t = String(text || '');
   const f = fold(t);
@@ -171,7 +177,7 @@ export function namesTeam(text, ways, who = null, { loose = false } = {}) {
   if ((who?.t || []).some(x => fold(x) === fold(ways.name) || (ways.short && wordIn(fold(x), fold(ways.short)) && sportsIn(x).size === 0 && fold(x).endsWith(fold(ways.short))))) return true;
   if (wordIn(f, fold(ways.name))) return true;
   if (ways.zhFull && t.includes(ways.zhFull)) return true;
-  const sports = sportsIn(t);
+  const sports = sportsIn(about || t);
   // A nickname alone: only where the story is plainly of its sport.
   const sure = sports.has(ways.sport) ? !(sports.size > 1 && sports.has('other')) : loose && !sports.size;
   if (ways.short && ways.short.length >= 3 && sure && capIn(t, ways.short)) return true;
@@ -202,7 +208,7 @@ const PLAIN = new Set(['brown', 'young', 'white', 'green', 'black', 'king', 'pri
 // Whether a story is about this player (`ways` from playerWays): his whole
 // name, his own Chinese name, the AI's reading of a Chinese story, or his
 // surname with his team named beside it.
-export function namesPlayer(text, ways, who = null) {
+export function namesPlayer(text, ways, who = null, { about = '' } = {}) {
   if (!ways?.full && !(ways?.zh?.length >= 2)) return false;
   const t = String(text || '');
   const f = fold(t);
@@ -219,7 +225,7 @@ export function namesPlayer(text, ways, who = null) {
   if (ways.surname && ways.first.length >= 4)
     for (const m of t.matchAll(new RegExp(`(?:^|[^A-Za-z])([A-Z][a-z]{2,})\\s+${escRe(ways.surname.replace(/^./, c => c.toUpperCase()))}(?:$|[^A-Za-z])`, 'g')))
       if (ways.first.startsWith(fold(m[1]))) return true;
-  if (ways.surname && ways.surname.length >= 4 && !PLAIN.has(ways.surname) && ways.team && capIn(t, ways.surname.replace(/^./, c => c.toUpperCase())) && wordIn(f, ways.surname) && namesTeam(t, ways.team, who, { loose: true })) return true;
+  if (ways.surname && ways.surname.length >= 4 && !PLAIN.has(ways.surname) && ways.team && capIn(t, ways.surname.replace(/^./, c => c.toUpperCase())) && wordIn(f, ways.surname) && namesTeam(t, ways.team, who, { loose: true, about })) return true;
   return false;
 }
 
@@ -253,9 +259,14 @@ export function newsAbout(pack, { players = [], teams = [], both = false, kinds 
   for (const s of pack?.list || []) {
     if (!(s.at >= from && s.at <= to) || now - s.at > SPORT_MS) continue;
     if (kinds && !kinds.includes(s.k)) continue;
-    const text = sportText(s);
-    const hitP = pw.some(w => namesPlayer(text, w, s.who));
-    const hitT = tw.length ? (both ? tw.every(w => namesTeam(text, w, s.who)) : tw.some(w => namesTeam(text, w, s.who))) : false;
+    // (A story the AI has read, `who`: named in its own words or by the AI,
+    // never only in one of its links' headlines. A round-up the story drew
+    // in, "Doncic helps Lakers beat Hawks; Wembanyama powers Spurs", put
+    // Dončić's ankle under the Warriors v Spurs: Jay 2026-11-13.)
+    const all = sportText(s);
+    const text = readBy(s) ? ownText(s) : all;
+    const hitP = pw.some(w => namesPlayer(text, w, s.who, { about: all }));
+    const hitT = tw.length ? (both ? tw.every(w => namesTeam(text, w, s.who, { about: all })) : tw.some(w => namesTeam(text, w, s.who, { about: all }))) : false;
     if (hitP || hitT) out.push({ s, p: hitP });
   }
   // (A player's own story ahead of his team's; then its kind; then the newest.)

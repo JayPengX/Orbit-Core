@@ -125,3 +125,24 @@ test('the builder keeps one outlet\'s sports report, never a story on News\' pag
   assert.deepEqual(desk.map(s => s.id), ['m']);
   assert.ok(!('score' in desk[0]) && !('light' in desk[0]));
 });
+
+test("a story the AI has read is about whom it says and its own words name, never a team only in one of its links (Jay 11-13: Dončić's ankle under the Warriors v Spurs)", () => {
+  const now = Date.parse('2026-11-13T08:00Z');
+  const luka = {
+    id: 'luka',
+    title: "Lakers' Luka Dončić 'feeling good' after injury scare, per report",
+    zh: '東契奇傷勢更新：湖人球星扭傷腳踝',
+    sum: 'Los Angeles Lakers star Luka Dončić had an injury scare against the Milwaukee Bucks.',
+    items: [['x', 'Luka Doncic’s 32 points help Lakers beat Hawks; Wembanyama powers Spurs', 'https://www.aljazeera.com/sports/2026/11/10/nba-doncic-lakers-wembanyama-spurs-curry-warriors']],
+    at: now - 3_600_000,
+    k: 'injury',
+    who: { p: ['Luka Dončić'], t: ['Los Angeles Lakers', 'Milwaukee Bucks'] }
+  };
+  const pack = cleanSport({ intl: [luka] });
+  const SAS = T('nba', 'San Antonio Spurs', 'Spurs', 'basketball');
+  assert.equal(newsAbout(pack, { teams: [GSW, SAS], kinds: ['injury'], now }).length, 0);
+  assert.equal(newsAbout(pack, { teams: [T('nba', 'Los Angeles Lakers', 'Lakers', 'basketball')], now }).length, 1);
+  // (Not read yet: its links still count, as before.)
+  const unread = cleanSport({ intl: [{ ...luka, who: null }] });
+  assert.equal(newsAbout(unread, { teams: [SAS], now }).length, 1);
+});

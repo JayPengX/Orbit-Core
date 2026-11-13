@@ -11,7 +11,7 @@
 // table. Every number the points write must be one of the digest's.
 //
 // → sports/previews/<YYYY-MM-DD>.json (Taiwan's day the game starts):
-//   { v: 1, built, games: { '<league>:<id>': { points: [{ k, zh, en }], who } | null }, at: { key: ms } }
+//   { v: 1, built, games: { '<league>:<id>': { points: [{ k, zh, en }], who } | null }, at: { key: ms }, rev: { key: n } }
 import { aiOnce } from '../ai.js';
 import { buildDay } from '../sports-today.js';
 import { LEAGUES, SITE, unslimEvent, localEvent } from '../kit/sports-espn.mjs';
@@ -20,6 +20,7 @@ import { twDay } from '../kit/format.mjs';
 export const previewPath = day => `sports/previews/${day}.json`;
 const SPORTS = new Set(['basketball', 'baseball', 'soccer']);
 const HOUR = 3_600_000;
+const REV = 2;
 const cut = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
 const tok = id => `{t:${id}}`;
 const ord = n => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th'}`;
@@ -189,13 +190,17 @@ export function previewFacts(summary, e) {
     const r = wl(recordOf(c, type));
     if (r && r.w + r.l + r.d >= 4 && (r.l === 0 || r.w === 0)) worth.push(`${tok(c.id || c.team?.id)} ${recordOf(c, type)} ${type === 'home' ? 'at home' : 'on the road'} this season`);
   }
-  // A run longer than the five the card shows; the last ten when lopsided.
+  // The last ten when lopsided, and not what the streak already says (the
+  // card's 連勝敗 row shows the streak, W10: Jay 11-13, 「馬刺豪取10連勝，近10場
+  // 保持全勝」 over a W10 was nothing new). Football's card has no streak: a
+  // run of six or more there.
   for (const t of summary?.boxscore?.teams || []) {
     const st = Object.fromEntries((t.statistics || []).map(s => [s.name, s.displayValue]));
     const m = /^([WL])(\d+)$/.exec(st.streak || '');
-    if (m && +m[2] >= 6) worth.push(`${tok(t.team?.id)} ${m[1] === 'W' ? 'won' : 'lost'} ${m[2]} straight`);
+    if (sport === 'soccer' && m && +m[2] >= 6) worth.push(`${tok(t.team?.id)} ${m[1] === 'W' ? 'won' : 'lost'} ${m[2]} straight`);
     const ten = wl(st['Last Ten Games']);
-    if (ten && ten.w + ten.l === 10 && (ten.w >= 9 || ten.l >= 9)) worth.push(`${tok(t.team?.id)} ${st['Last Ten Games']} in the last ten`);
+    const said = m ? +m[2] >= Math.max(ten?.w || 0, ten?.l || 0) : false;
+    if (ten && ten.w + ten.l === 10 && (ten.w >= 9 || ten.l >= 9) && !said) worth.push(`${tok(t.team?.id)} ${st['Last Ten Games']} in the last ten`);
   }
   // The meetings past this season's (football's head-to-head: the card shows the last five's results; only a long series' summary).
   if (sport === 'soccer') {
@@ -221,13 +226,16 @@ export async function runPreviews({ store, env, ctx, proxy, cap, now = Date.now(
   for (const day of [twDay(now), twDay(now + 86_400_000)]) {
     if (Date.now() >= until) break;
     let doc = (await store.json(previewPath(day))) || null;
-    if (doc?.v !== 1) doc = { v: 1, games: {}, at: {}, tried: {} };
+    if (doc?.v !== 1) doc = { v: 1, games: {}, at: {}, tried: {}, rev: {} };
+    // (`rev`: the rules each game's points were made by; a game not begun
+    // made by older ones is made again. 2: never a streak the card shows, 11-13.)
+    doc.rev ||= {};
     const built = await buildDay(day, { read: url => proxy(url).catch(() => null), now }).catch(() => null);
     const due = e => {
       const key = `${e.league}:${e.id}`;
       const start = Date.parse(e.start);
       if (!(start > now) || start - now > 40 * HOUR) return false;
-      if (!(key in doc.games)) return true;
+      if (!(key in doc.games) || (doc.rev[key] || 1) < REV) return true;
       // (Again once, near the start, when made a day before.)
       const at = doc.at?.[key] || 0;
       return start - now < 6 * HOUR && start - at > 20 * HOUR;
@@ -250,6 +258,7 @@ export async function runPreviews({ store, env, ctx, proxy, cap, now = Date.now(
       if (!g) {
         doc.games[key] = null;
         doc.at[key] = now;
+        doc.rev[key] = REV;
         made++;
         continue;
       }
@@ -258,7 +267,7 @@ export async function runPreviews({ store, env, ctx, proxy, cap, now = Date.now(
       if (!r) break;
       if (r.error) {
         doc.tried = { ...doc.tried, [key]: (doc.tried?.[key] || 0) + 1 };
-        if (doc.tried[key] >= 2) (doc.games[key] = doc.games[key] || null), (doc.at[key] = now);
+        if (doc.tried[key] >= 2) (doc.games[key] = doc.games[key] || null), (doc.at[key] = now), (doc.rev[key] = REV);
         made++;
         continue;
       }
@@ -266,10 +275,11 @@ export async function runPreviews({ store, env, ctx, proxy, cap, now = Date.now(
       const who = Object.fromEntries(Object.entries(g.people).filter(([id]) => said.includes(`{p:${id}}`)));
       doc.games[key] = r.out.points?.length ? { points: r.out.points, who } : null;
       doc.at[key] = now;
+      doc.rev[key] = REV;
       made++;
     }
     // (Games of days gone dropped from the file's bookkeeping; a day's file is that day's alone.)
-    if (made) await store.put(previewPath(day), { v: 1, built: now, games: doc.games, at: doc.at, tried: doc.tried || {} });
+    if (made) await store.put(previewPath(day), { v: 1, built: now, games: doc.games, at: doc.at, tried: doc.tried || {}, rev: doc.rev });
     out.made += made;
     out.days[day] = { left: events.length - made };
   }
