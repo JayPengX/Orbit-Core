@@ -69,6 +69,8 @@ import { handleMoneyRead } from './money-read.js';
 import { handleCal } from './cal.js';
 import { logCall, callsSince, reliability, spendOf, lastFailed } from './gemini-use.js';
 import { handleAi, handleAiBuild, aiTry } from './ai.js';
+import { storyTr } from './builders/news-tr.js';
+import { r2Store } from './builders/store.js';
 import { handleClassNews, classNewsTry, classNewsPeek, classNewsRead } from './class-news.js';
 import { FEATURES } from './ai-features.js';
 import { handleFlight } from './flight.js';
@@ -1312,6 +1314,31 @@ async function sessionOf(request, env, grace = 0) {
   return qt ? readToken(await tokenSecret(env), qt, 'ses', Date.now() - grace) : null;
 }
 
+// POST /news-tr { id, to, texts }: a story's own texts in the reader's
+// language (Google's free month, translate.js; each kept in news/tr/<id>.json).
+// The stories read from R2 a minute at a time per isolate.
+let newsPages = null;
+async function handleNewsTr(request, env, headers) {
+  if (!env.DATA) return json({ error: 'off' }, 503, headers);
+  let body = {};
+  try {
+    body = await request.json();
+  } catch {}
+  const store = r2Store(env.DATA);
+  const now = Date.now();
+  if (!newsPages || now - newsPages.at > 60_000) newsPages = { at: now, list: null, past: null };
+  const find = async id => {
+    const look = list => (list || []).find(s => s.id === id);
+    newsPages.list ||= store.json('news/index.json').then(d => [...(d?.intl || []), ...(d?.tw || [])]).catch(() => []);
+    const hit = look(await newsPages.list);
+    if (hit) return hit;
+    newsPages.past ||= store.json('news/past.json').then(d => [...(d?.intl || []), ...(d?.tw || [])]).catch(() => []);
+    return look(await newsPages.past);
+  };
+  const out = await storyTr({ store, env, id: String(body.id || ''), to: String(body.to || ''), texts: body.texts, now, find });
+  return json(out, out.error ? 400 : 200, headers);
+}
+
 // Every route, by path (fetch below answers anything that throws).
 async function route(request, env, ctx, headers, origin) {
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
@@ -1404,6 +1431,8 @@ async function route(request, env, ctx, headers, origin) {
     return handleAi(request, env, ctx, headers, session, { cap: FEATURES[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai') });
   }
   // Orbit Class's 學校公告摘要 (class-news.js): a school's list read by code, worded once an hour by the AI, kept in R2.
+  // Orbit News in one language: a story's own headlines and summary in the reader's, as it's opened (builders/news-tr.js).
+  if (path === '/news-tr' && request.method === 'POST') return handleNewsTr(request, env, headers);
   if (path === '/class-news') return handleClassNews(request, env, ctx, headers, await sessionOf(request, env), { cap: await aiCap(env, ctx, 'class-news') });
   if (path === '/money-read') return handleMoneyRead(request, env, headers, await sessionOf(request, env), lawGemini('money-read'), await aiCap(env, ctx, 'money-read'));
   // The bill's guard (guard.js), as it last read the bill: armed or not,
