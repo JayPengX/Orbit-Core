@@ -22,3 +22,4 @@ To remove a feature on purpose, delete its line here in the same commit and say 
 - Pass: 里程碑 medals, passkeys, 除錯紀錄 — `kit/pass.mjs`, `kit/help.mjs`, `kit/orbit.mjs`: `里程碑`, `passkey`, `除錯紀錄`
 - A typhoon day off acts like a holiday — `kit/dayoff.mjs`: `dayOffOn`, `loadDayOff`
 - Law's live feed keeps its last good read — `law-live.js`: `KEY_LAST`
+- One account, many places: what an app is in the middle of goes to the Pass from the place that runs it and is handed to the place that takes it over; the family's notebook follows the account, so separate home-screen apps hear each other — `kit/orbit.mjs`, `kit/family.mjs`, `eco.js`: `s.putNow = `, `emit('now', shelf)`, `mergeHeard`, `orbit-family`, `NOW_COLLECTION`, `mergeShelf`

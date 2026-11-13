@@ -17,7 +17,7 @@
 import { REC_WEEKLY, REC_PREFIX } from './rec-weekly.js';
 import { doorReport, doorSet } from './door.js';
 import { systemReport, alertAccount, tell, OPS_DOC, beats } from './ops.js';
-import { passAccount, updateWallet, deleteAccount, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet } from './eco.js';
+import { passAccount, updateWallet, deleteAccount, ECO_APPS, NOW_COLLECTION, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet } from './eco.js';
 import { sendPush, dueLists } from './push.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, TDX_BOOK, tdxPoints, tdxGuard, tdxUse, tdxPlan } from './transit.js';
 import { aiUse, callsSince } from './gemini-use.js';
@@ -92,7 +92,7 @@ export async function capacityCron(env, deps) {
 // them for Longshot, 2026-10-22.)
 export const RETIRED_COLLECTIONS = ['orbit-schedules', 'eco-links', 'stock-study-leagues', 'odds-open', 'odds-settled', 'odds-tickets', 'kambi-results', 'odds-study-accounts', 'orbit-slip'];
 // (A function: eco.js and this file import each other.)
-const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, CONFIG_COLLECTION, PASSKEY_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]);
+const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, CONFIG_COLLECTION, PASSKEY_COLLECTION, NOW_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]);
 // The store's batches go 500 at a time; a call stops after this many so it
 // stays inside the Worker's limits.
 const PER_CALL = 1500;
@@ -302,6 +302,9 @@ export async function planClean(env, deps) {
     if (!keep().has(name)) continue;
     if (Object.values(ECO_APPS).some(a => a.collection === name)) {
       for (const d of docs) if (!accounts.has(d.id)) deletes.push([name, d.id]);
+    } else if (name === NOW_COLLECTION) {
+      // What was under way for an account that's gone (`<account>_<app or family>`).
+      for (const d of docs) if (!accounts.has(d.id.slice(0, d.id.lastIndexOf('_')))) deletes.push([name, d.id]);
     } else if (name === INBOX_COLLECTION) {
       for (const d of docs) if (!inboxIds.has(d.id) || !accounts.has(d.id.split('-')[0])) deletes.push([name, d.id]);
     } else if (name === PASSKEY_COLLECTION) {

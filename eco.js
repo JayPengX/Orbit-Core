@@ -52,6 +52,7 @@
 //   POST   /eco { op: 'share-redeem', qt, key }       a copy of that schedule
 //   POST   /eco { op: 'admin', token, action }        the store's clean-up
 //   POST   /eco { op: 'passkey-…' }                    passkeys (passkey.js)
+//   POST   /eco { op: 'now', qt, set?, family? }       what's under way, the family's notebook (below)
 
 import { cleanReport, REC_PREFIX } from './rec-weekly.js';
 import { retire } from './money.js';
@@ -353,6 +354,123 @@ export const gen = wallet => wallet?.sec?.gen || 0;
 const liveOf = (wallet, app) => (lives(wallet)[app] ? { app, t: lives(wallet)[app].t } : null);
 const goLive = (w, app, sid, now) => ({ ...w, live: { ...lives(w), [app]: { sid, t: now } } });
 
+// ---- One account, many places: what's under way, the family's notebook (eco-now) ----
+//
+// Jay 2026-11-13: a trip started in Orbit wasn't in the Transit app (each
+// home-screen app keeps its own storage on an iPhone). What a person is in
+// the middle of is the account's, not one screen's. Two kinds of shelf, one
+// document each in `eco-now`:
+//   <account>_<app>     what that app is in the middle of, by key (Transit's
+//                       nav, rental, alerts; Class's flight). Written only by
+//                       the app's live session (one place runs it at a time);
+//                       the place that becomes live gets it with its claim and
+//                       goes on from where it was
+//   <account>_family    the family's notebook (kit family.mjs): what the apps
+//                       tell each other, written by any of the account's
+//                       sessions, so separate home-screen apps hear each other
+//                       as the apps inside Orbit do
+// A shelf is { [key]: { v, at } }: per key the newer `at` wins (never past the
+// Worker's now); `v: null` is an end, kept a day so an older copy elsewhere
+// can't bring it back. No history (it's what's under way, not data to put
+// back) and no KV: a few D1 writes a trip.
+//   POST /eco { op: 'now', qt, set?: { key: { v, at } }, family?: { … } }
+//        → { nowTime?, familyTime?, moved? }   (moved: not live, `set` refused)
+// Every session reply for an app (sign-in, refresh, read with data) carries
+// `now` / `family` with `nowTime` / `familyTime` unless the device holds that
+// version already (`ns` / `fs`).
+export const NOW_COLLECTION = 'eco-now';
+export const SHELF_MAX = 200_000;
+export const SHELF_KEYS = 64;
+const ENDED_KEEP = 24 * 3_600_000;
+const SHELF_KEY = /^[a-z][a-z0-9._-]{0,40}$/i;
+export const FAMILY_SHELF = 'family';
+export const shelfId = (docId, name) => `${docId}_${name}`;
+// A shelf as sent: only well-formed entries ({ v, at }, at a positive time), or null for none.
+export function cleanShelf(x) {
+  if (!isObj(x)) return null;
+  const out = {};
+  for (const [k, e] of Object.entries(x).slice(0, SHELF_KEYS)) {
+    if (!SHELF_KEY.test(k) || !isObj(e) || !(Number(e.at) > 0) || e.v === undefined) continue;
+    out[k] = { v: e.v, at: Math.round(Number(e.at)) };
+  }
+  return Object.keys(out).length ? out : null;
+}
+export function mergeShelf(stored, patch, now) {
+  const out = { ...(isObj(stored) ? stored : {}) };
+  for (const [k, e] of Object.entries(patch || {})) {
+    // (A phone clock set ahead never wins over every later change.)
+    const at = Math.min(e.at, now);
+    if (out[k] && out[k].at >= at) continue;
+    out[k] = { v: e.v, at };
+  }
+  for (const [k, e] of Object.entries(out)) if (!isObj(e) || (e.v === null && now - e.at > ENDED_KEEP)) delete out[k];
+  return out;
+}
+const parseShelf = doc => {
+  if (!doc?.exists) return {};
+  try {
+    const v = JSON.parse(doc.payload);
+    return isObj(v) ? v : {};
+  } catch {
+    return {};
+  }
+};
+// The app's shelf and the family's for a reply, each unless the device holds that version (`ns`, `fs`).
+async function readShelves(env, deps, docId, app, { ns, fs } = {}) {
+  const [a, f] = await Promise.all([deps.fsGet(env, NOW_COLLECTION, shelfId(docId, app)), deps.fsGet(env, NOW_COLLECTION, shelfId(docId, FAMILY_SHELF))]);
+  const out = {};
+  // (A version held: its time, '' for none yet; nothing held: no `ns`/`fs` at all.)
+  if (!(typeof ns === 'string' && ns === a.updateTime)) Object.assign(out, { now: parseShelf(a), nowTime: a.updateTime || '' });
+  if (!(typeof fs === 'string' && fs === f.updateTime)) Object.assign(out, { family: parseShelf(f), familyTime: f.updateTime || '' });
+  return out;
+}
+// A patch merged into a shelf, over the version read (read again when another got in between).
+async function putShelf(env, deps, id, patch, now) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const doc = await deps.fsGet(env, NOW_COLLECTION, id);
+    const had = parseShelf(doc);
+    const next = mergeShelf(had, patch, now);
+    const text = JSON.stringify(next);
+    if (doc.exists && text === JSON.stringify(had)) return { time: doc.updateTime };
+    if (text.length > SHELF_MAX) return { tooBig: true };
+    try {
+      return { time: (await deps.fsWrite(env, NOW_COLLECTION, id, text, doc.exists ? { updateTime: doc.updateTime } : { exists: false })).updateTime };
+    } catch (error) {
+      if (!error.precondition) throw error;
+    }
+  }
+  return { lost: true };
+}
+async function ecoNow(ctx) {
+  const { env, deps, headers, request, body, secret } = ctx;
+  const now = deps.now();
+  const c = await readToken(secret, body.qt, 'ses', now);
+  if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
+  if (sessionLimited(`now:${c.a}:${c.s}`, limitOf(c, 30), 60_000, now)) return deps.errorJson('RATE_LIMITED', 429, headers, request);
+  const set = ECO_APPS[c.a] ? cleanShelf(body.set) : null;
+  const family = cleanShelf(body.family);
+  if (!set && !family) return deps.errorJson('ECO_NOW_EMPTY', 400, headers, request);
+  const doc = await deps.fsGet(env, WALLET_COLLECTION, c.d);
+  const wallet = doc.exists ? parseWallet(doc.payload) : null;
+  if (!wallet || gen(wallet) !== c.g) return deps.errorJson('ECO_SIGNED_OUT', 401, headers, request);
+  const out = {};
+  if (set) {
+    // Only the place that runs the app now: one opened since has taken it over.
+    if (!isActive(wallet, c)) Object.assign(out, { moved: true, live: liveOf(wallet, c.a) });
+    else {
+      const r = await putShelf(env, deps, shelfId(c.d, c.a), set, now);
+      if (r.tooBig) return deps.errorJson('ECO_NOW_TOO_BIG', 413, headers, request);
+      if (r.time) out.nowTime = r.time;
+    }
+  }
+  if (family) {
+    const r = await putShelf(env, deps, shelfId(c.d, FAMILY_SHELF), family, now);
+    if (r.tooBig) return deps.errorJson('ECO_NOW_TOO_BIG', 413, headers, request);
+    if (r.time) out.familyTime = r.time;
+  }
+  return deps.json(out, 200, headers);
+}
+
 // ---- Handler ---------------------------------------------------------------
 //
 // deps: the Worker's own plumbing, passed in so this file stays testable:
@@ -378,6 +496,7 @@ const OPS = {
   'share-redeem': shareRedeem,
   relief: ecoRelief,
   past: ecoPast,
+  now: ecoNow,
   bug: ecoBug,
   admin: ctx => handleAdmin(ctx),
   'passkey-begin': passkeyBegin,
@@ -442,6 +561,7 @@ export async function handleEcoRequest(request, env, headers, ip, deps, waitUnti
       if (app) {
         Object.assign(out, await appData(env, deps, app, docId, url.searchParams.get('since')));
         if (url.searchParams.get('inbox') === '1') out.inbox = await readInbox(env, deps, wallet, app);
+        if (out.active && app === claims.a) Object.assign(out, await readShelves(env, deps, docId, app, { ns: url.searchParams.get('ns'), fs: url.searchParams.get('fs') }));
       }
       return json(out, 200, headers);
     }
@@ -606,7 +726,7 @@ export async function signIn(ctx, docId, { passcode = null } = {}) {
   const turned = await doorFor(ctx, docId, result.wallet);
   if (turned) return turned;
   const c = { d: docId, s: sid, a: app, g: gen(result.wallet), f: freshPass(result.wallet), p: priorityPass(result.wallet) };
-  const out = await sessionReply(env, deps, secret, result, c, now, { app: c.f ? '' : app, inbox: !c.f && body.inbox });
+  const out = await sessionReply(env, deps, secret, result, c, now, { app: c.f ? '' : app, inbox: !c.f && body.inbox, shelves: {} });
   out.refresh = await refreshToken(secret, c, now);
   if (passcode) out.passcode = passcode;
   if (c.f) out.fresh = true;
@@ -631,7 +751,7 @@ function sameWallet(out, w) {
   return out;
 }
 
-async function sessionReply(env, deps, secret, result, c, now, { app, inbox = false, since = '' } = {}) {
+async function sessionReply(env, deps, secret, result, c, now, { app, inbox = false, since = '', shelves = null } = {}) {
   const out = {
     token: await sessionToken(secret, c, now),
     active: true,
@@ -645,6 +765,8 @@ async function sessionReply(env, deps, secret, result, c, now, { app, inbox = fa
     Object.assign(out, await appData(env, deps, app, c.d, since));
     if (inbox) out.inbox = await readInbox(env, deps, result.wallet, app);
   }
+  // (What's under way and the family's notebook: the place now live goes on from where they are.)
+  if (shelves && !c.f && ECO_APPS[c.a]) Object.assign(out, await readShelves(env, deps, c.d, c.a, shelves));
   return out;
 }
 
@@ -703,7 +825,7 @@ async function ecoRefresh(ctx) {
   if (!live || paydayEntries(wallet, now).length) {
     result = await updateWallet(env, deps, c.d, w => goLive(touchApp(mergeWallet(w, { entries: paydayEntries(w, now) }), app, now), app, c.s, now));
   }
-  const out = sameWallet(await sessionReply(env, deps, secret, result, claims, now, { app: body.data && !claims.f ? app : '', inbox: !claims.f && body.inbox, since: str(body.since, 100) }), w);
+  const out = sameWallet(await sessionReply(env, deps, secret, result, claims, now, { app: body.data && !claims.f ? app : '', inbox: !claims.f && body.inbox, since: str(body.since, 100), shelves: { ns: str(body.ns, 100), fs: str(body.fs, 100) } }), w);
   out.refresh = await refreshToken(secret, claims, now);
   if (claims.f) out.fresh = true;
   // Taken back from the same app open somewhere else meanwhile: this copy
@@ -995,6 +1117,7 @@ export async function deleteAccount(env, deps, docId, { retire: gone = false } =
   if (gone && wallet) await retire(env, deps, wallet).catch(() => {});
   for (const ids of Object.values(wallet?.inbox || {})) for (const id of ids) await deps.fsDelete(env, INBOX_COLLECTION, id);
   for (const { collection } of Object.values(ECO_APPS)) await deps.fsDelete(env, collection, docId);
+  for (const name of [...Object.keys(ECO_APPS), FAMILY_SHELF]) await deps.fsDelete(env, NOW_COLLECTION, shelfId(docId, name));
   await dropIndex(env, deps, docId, passkeyIds(wallet));
   await deps.fsDelete(env, WALLET_COLLECTION, docId);
 }

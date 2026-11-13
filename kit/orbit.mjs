@@ -36,7 +36,7 @@ import { API, SITE as HOME, isApi } from './domain.mjs';
 import { passkeyHere, passkeyName, deviceName, makePasskey, usePasskey, forgetPasskey, cancelled } from './passkey.mjs';
 import { icons, tile, pullToRefresh, setSheetDetent, toast, h as node } from './ui.mjs';
 import { scrollBusy } from './hold-place.mjs';
-import { breakAfter } from './family.mjs';
+import { breakAfter, mergeHeard } from './family.mjs';
 // (A picture drawn again never flashes: steady-pics.mjs, on import.)
 import './steady-pics.mjs';
 // (A phone's own outside reads counted, and sent back when one fails: source-watch.mjs, on import.)
@@ -462,7 +462,7 @@ function cachePayload(app, account, payload) {
 // again took 5 (2026-10-31).
 export const callWait = (bytes, tries = 1) => (tries ? 10_000 : 5_000) + Math.round(bytes / 20);
 export const CALL_RETRY_MS = 1_500;
-async function call(method, query = '', body) {
+async function call(method, query = '', body, { keepalive = false } = {}) {
   const text = body ? JSON.stringify(body) : undefined;
   if (globalThis.navigator?.onLine === false) throw Object.assign(new Error('offline'), { code: 'OFFLINE' });
   let res;
@@ -472,6 +472,8 @@ async function call(method, query = '', body) {
         method,
         headers: body ? { 'Content-Type': 'text/plain;charset=UTF-8' } : {},
         body: text,
+        // (Sent as the page is put away: carried on after it, up to the browser's 64 KB.)
+        ...(keepalive && (text?.length || 0) < 60_000 ? { keepalive: true } : {}),
         signal: AbortSignal.timeout(callWait(text?.length || 0, tries))
       });
       break;
@@ -1072,6 +1074,12 @@ function keptJson(url, key, { ttl, keep }, read) {
 // q.pass                        the account's id on this device ('' signed out)
 // q.read({ data, inbox })       { wallet, pool, payload, inbox } (app data when data)
 // q.write({ payload, wallet })  only while live
+// q.putNow(key, v, at)          what this app is in the middle of (a trip, a
+//                               timer), v null once it's over: on the Pass
+//                               while this place runs the app (eco.js eco-now)
+// q.now, q.on('now', shelf => …) the Pass's { key: { v, at } } as the last
+//                               sign-in, claim or read brought it: the place
+//                               that takes the app over goes on from there
 // q.proxy(url, extra)           the data proxy's address for `url`, signed in
 
 // No two-finger zoom in any Orbit app. iOS ignores the viewport's
@@ -1686,6 +1694,12 @@ function makeSession(app, { lang, heartbeat }) {
   // known). Sent with each save (`seen`): one over a version this device never
   // saw keeps the one it replaces on the Pass (doc-store.js history).
   let dataAt = null;
+  // What's under way and the family's notebook as the Pass last gave them
+  // (eco.js eco-now): their versions (null: none read yet), so an unchanged
+  // one isn't sent again; `shelf`, this app's.
+  let nowTime = null;
+  let famTime = null;
+  let shelf = null;
   const sawData = res => typeof res?.updateTime === 'string' && (res.payload !== undefined || res.unchanged) && (dataAt = res.updateTime);
   try {
     const kept = JSON.parse(readStore(tokenKey) || 'null');
@@ -1752,6 +1766,9 @@ function makeSession(app, { lang, heartbeat }) {
     get live() {
       return live;
     },
+    get now() {
+      return shelf;
+    },
     // A save goes through: live, or quiet only for another tab of this
     // browser (the same session: nothing a person did is held back).
     get canSave() {
@@ -1800,8 +1817,65 @@ function makeSession(app, { lang, heartbeat }) {
     }
     if (typeof data.payload === 'string') cachePayload(app, storedAccount(), data.payload);
     if (data.active != null) setActive(Boolean(data.active), data.live || null);
+    if (data.family && typeof data.family === 'object') {
+      famTime = data.familyTime ?? '';
+      // (Facts told here the Pass hasn't got yet go up: told before it kept them, or offline.)
+      const up = mergeHeard(data.family);
+      if (Object.keys(up).length) putLater({ family: up }, 4000);
+    }
+    if (data.now && typeof data.now === 'object') {
+      nowTime = data.nowTime ?? '';
+      shelf = data.now;
+      emit('now', shelf);
+    }
     return data;
   }
+
+  // ---- What's under way and the family's notebook, on the Pass ----
+  // Coalesced (a second or so: a few writes a trip), sent at once as the
+  // page is put away (iOS stops it next), tried again later when it didn't
+  // get through. This app's own only from the place that runs it: a paused
+  // copy's state is the one taken over, never sent over the new one.
+  const pending = { set: {}, family: {} };
+  let putTimer = 0;
+  let putting = null;
+  let putHooked = false;
+  function putLater(part, ms = 1200) {
+    for (const k of ['set', 'family']) Object.assign(pending[k], part[k] || {});
+    if (!putHooked && typeof document !== 'undefined') {
+      putHooked = true;
+      document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && putNow({ keepalive: true }));
+      globalThis.addEventListener?.('pagehide', () => putNow({ keepalive: true }));
+    }
+    if (!putTimer) putTimer = setTimeout(() => putNow(), ms);
+  }
+  async function putNow({ keepalive = false } = {}) {
+    clearTimeout(putTimer);
+    putTimer = 0;
+    if (putting) await putting;
+    const set = s.canSave ? pending.set : {};
+    const family = pending.family;
+    pending.set = {};
+    pending.family = {};
+    const body = { ...(Object.keys(set).length ? { set } : {}), ...(Object.keys(family).length ? { family } : {}) };
+    if (!(body.set || body.family) || !storedAccount()) return;
+    putting = withToken(qt => call('POST', '', { op: 'now', qt, ...body }, { keepalive }))
+      .then(res => {
+        if (res.nowTime) nowTime = res.nowTime;
+        if (res.familyTime) famTime = res.familyTime;
+        if (res.moved) setActive(false, res.live || live);
+      })
+      .catch(error => {
+        // (Refused for good: too big, or an older Worker. Moved: the place that took over has it.)
+        if (error?.status === 400 || error?.status === 413 || error?.code === 'ECO_SESSION_MOVED' || error?.code === 'ECO_SIGNED_OUT') return;
+        for (const k of ['set', 'family']) for (const [key, e] of Object.entries(body[k] || {})) if (!(pending[k][key]?.at >= e.at)) pending[k][key] = e;
+        if (!putTimer) putTimer = setTimeout(() => putNow(), 30_000);
+      })
+      .finally(() => (putting = null));
+    return putting;
+  }
+  s.putNow = (key, v, at = Date.now()) => putLater({ set: { [key]: { v: v ?? null, at } } });
+  globalThis.addEventListener?.('orbit-family', event => event?.detail && putLater({ family: event.detail }, 4000));
 
   // Every way of signing in ends here: a refresh token for this device.
   const signIn = body => claimed(call('POST', '', { ...body, app, inbox: true }).then(res => absorb({ ...res, active: true })));
@@ -1851,7 +1925,7 @@ function makeSession(app, { lang, heartbeat }) {
     const ref = readStore(KEY.refresh);
     if (!ref) return signedOut();
     try {
-      const res = absorb(await call('POST', '', { op: 'refresh', refresh: ref, app, claim, data, inbox: data, w: wallet ? walletAt : '', since: data ? since : '' }));
+      const res = absorb(await call('POST', '', { op: 'refresh', refresh: ref, app, claim, data, inbox: data, w: wallet ? walletAt : '', since: data ? since : '', ...(nowTime != null ? { ns: nowTime } : {}), ...(famTime != null ? { fs: famTime } : {}) }));
       if (data) sawData(res);
       if (res.same) res.wallet = wallet;
       return res;
@@ -1930,7 +2004,7 @@ function makeSession(app, { lang, heartbeat }) {
   // the same, { unchanged: true, updateTime } comes back without `payload`.
   // An older Worker sends the data anyway: no `unchanged` means changed.)
   s.read = ({ data = false, inbox = false, since = '' } = {}) =>
-    withToken(qt => call('GET', qs({ qt, app: data ? app : '', inbox: inbox ? '1' : '', w: wallet ? walletAt : '', since: data ? since : '' }))).then(res => {
+    withToken(qt => call('GET', qs({ qt, app: data ? app : '', inbox: inbox ? '1' : '', w: wallet ? walletAt : '', since: data ? since : '', ns: data ? nowTime : '', fs: data ? famTime : '' }))).then(res => {
       absorb(res);
       if (data) sawData(res);
       if (res.same) res.wallet = wallet;
