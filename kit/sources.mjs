@@ -107,7 +107,7 @@ export const SOURCES = [
   { id: 'taifex', zh: '期交所', group: 'money', apps: ['stock'], feeds: '期貨、選擇權', hosts: ['openapi.taifex.com.tw', 'www.taifex.com.tw'], where: ['worker'] },
   { id: 'funds', zh: '投信投顧公會、鉅亨', group: 'money', apps: ['stock'], feeds: '境內基金淨值', hosts: ['www.sitca.org.tw', 'fund.api.cnyes.com'], where: ['worker'] },
   { id: 'gcis', zh: '經濟部商工登記', group: 'money', apps: ['money'], feeds: '統編的公司名（拍照記帳）', hosts: ['data.gcis.nat.gov.tw'], where: ['worker'] },
-  { id: 'google-translate', zh: 'Google 翻譯', group: 'money', apps: ['stock'], feeds: '公司介紹翻成你的語言', hosts: ['clients5.google.com', 'translate.googleapis.com'], where: ['worker'] },
+  { id: 'google-translate', zh: 'Google 翻譯', group: 'money', apps: ['stock', 'news'], feeds: '公司介紹、新聞標題與摘要翻成你的語言', hosts: ['clients5.google.com', 'translate.googleapis.com', 'translation.googleapis.com'], where: ['worker'] },
 
   // ---- 法律 ----
   { id: 'law-moj', zh: '全國法規資料庫', group: 'law', apps: ['law'], feeds: '法律、命令、修法', hosts: [], where: ['github'], fresh: { law: 'laws', every: 2 * DAY } },

@@ -37,6 +37,7 @@ import { sideOf } from '../kit/news-outlets.mjs';
 import { SPORT_PATH } from '../kit/news-sport.mjs';
 import { SPORT_WHO } from './news.js';
 import { HOOKS } from './words-hooks.mjs';
+import { newsTr } from './news-tr.js';
 
 const NEWS_LINES = 'news/lines.json';
 export const WORDS_CARDS = 'private/ai/words-cards.json';
@@ -320,6 +321,13 @@ export async function runAi({ store, env, proxy, now = Date.now(), cap = async (
     }
   };
   await step('news', 'news-lines', c => newsLines({ store, env, ctx, cap: c, until }));
+  // (Not the AI: plain translation of what the AI didn't title, Google's free month (builders/news-tr.js).)
+  if (!only || only === 'tr')
+    try {
+      out.tr = await newsTr({ store, env, now: Date.now() });
+    } catch (e) {
+      out.tr = { failed: String(e?.message || e).slice(0, 200) };
+    }
   await step('sides', 'news-sides', c => newsSides({ store, env, ctx, cap: c, until, now }));
   await step('brief', 'news-brief', c => newsBriefs({ store, env, ctx, cap: c, until, now }));
   await step('sport', 'news-sport', c => sportWho({ store, env, ctx, cap: c, until }));
