@@ -2,6 +2,7 @@
 // is told (lean: code picks the facts), what's kept, what's asked again.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { HOOKS } from '../builders/words-hooks.mjs';
 import { newsLines, TITLE_AGAIN, storyFacts, wordsCards, cardsPath, sidesWanted, sideFacts, newsSides } from '../builders/ai.js';
 import { gameFacts, swings } from '../builders/recaps.js';
 
@@ -117,6 +118,17 @@ test('words: cards a batch at a time, each letter its own small file, a word tha
   await wordsCards({ store, env, cap: 10, until: Date.now() + 60_000, fetchImpl });
   const r3 = await wordsCards({ store, env, cap: 10, until: Date.now() + 60_000, fetchImpl });
   assert.equal(r3.calls, 0, '“able” missed twice: not asked again');
+});
+
+test('words: a hook put right by hand replaces the AI\'s, and its letter file is written again', async () => {
+  const store = memStore();
+  await store.put('private/ai/words-cards.json', { cards: { toxic: { ex: [], hook: 'tox- 毒（源自希臘字 toxon 毒箭）', confuse: [] } }, skip: {} });
+  const fetchImpl = async () => new Response(JSON.stringify([['toxic', 'adj.', 5, 'adj. 有毒的', 'x']]));
+  const r = await wordsCards({ store, env: claudeEnv(() => ({ cards: [] })), cap: 10, until: Date.now() + 60_000, fetchImpl });
+  assert.equal(r.fixed, 1);
+  assert.equal((await store.json(cardsPath('t'))).cards.toxic.hook, HOOKS.toxic);
+  const again = await wordsCards({ store, env: claudeEnv(() => ({ cards: [] })), cap: 10, until: Date.now() + 60_000, fetchImpl });
+  assert.equal(again.fixed, undefined, 'once is enough');
 });
 
 test('a game’s facts: only what the card doesn’t show (no leaders), players and teams as tokens, nothing when nothing explains it', () => {

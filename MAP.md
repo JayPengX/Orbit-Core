@@ -355,7 +355,7 @@ writing a file only when it changed (`builders/store.js`):
 | `news-markets.js` | `news/markets.json`: Polymarket's open markets beside the stories they're about (code finds, AI `news-markets` confirms; no Taiwan vote's in its 10 quiet days) | :14 :44 |
 | `tools/flight-pool.mjs` (`flight.yml`) | `flight/` | 10 min |
 | `tools/news-clips.mjs` (`news-clips.yml`) | `news/clips.json`: the clips in Taiwan's articles (those outlets refuse Cloudflare), taken into the stories by `news.js` | started by `newsClips` (15 min) |
-| `ai.js`, `recaps.js`, `previews.js`, `f1story.js`; `filings.js` | AI made once: `news/lines.json`, `sides.json`, `briefs.json` (重點整理), `sport-who.json`, `words/cards/`, `sports/` (`recaps/`, `previews/`, `f1/stories/`); 重大訊息 as rows: `stock/filings/` | :04 :24 :34 :54 |
+| `ai.js` (+ `words-hooks.mjs`, Words hooks put right by hand), `recaps.js`, `previews.js`, `f1story.js`; `filings.js` | AI made once: `news/lines.json`, `sides.json`, `briefs.json` (重點整理), `sport-who.json`, `words/cards/`, `sports/` (`recaps/`, `previews/`, `f1/stories/`); 重大訊息 as rows: `stock/filings/` | :04 :24 :34 :54 |
 
 A season is kept until the next one's first game.
 
