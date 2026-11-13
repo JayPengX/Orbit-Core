@@ -45,6 +45,7 @@
     var a = s.apps[best], fresh = Date.now() - a.t < 4 * 3600e3 && a.url;
     var to = new URL(fresh ? a.url : a.home, location.href);
     if (fresh && a.y > 0) ss.setItem('orbit.place', JSON.stringify({ path: to.pathname, hash: to.hash, y: a.y, t: Date.now() }));
+    ss.setItem('orbit.launch', String(Date.now()));
     window.ORBIT_GONE = 1;
     location.replace(to.href);
   } catch (e) {}

@@ -580,6 +580,19 @@ textarea {
   box-shadow: 0 14px 34px -10px rgba(14, 17, 22, 0.35);
   animation: orbit-breathe 1.8s ease-in-out infinite;
 }
+/* (Orbit's own launch, kit/boot.js: its name is the title, its indigo the
+   bar's, never the app's colour behind it.) */
+.q-boot-orbit .q-boot-brand {
+  display: none;
+}
+.q-boot-orbit {
+  --q-accent: #4f46e5;
+}
+@media (prefers-color-scheme: dark) {
+  .q-boot-orbit {
+    --q-accent: #818cf8;
+  }
+}
 .q-boot-brand {
   margin: 12px 0 0;
   font-size: 11px;
