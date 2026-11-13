@@ -214,7 +214,16 @@ const ROWS = [
   ['yonhap', '韓聯社', 'Yonhap', 'yna.co.kr', 'gov', null, null, 1, '聯合通訊社（政府出資）', 'Yonhap (government-funded)', ['mbfc'], false],
   ['straits', '海峽時報', 'The Straits Times', 'straitstimes.com', 'private', null, null, 1, '新報業媒體信託', 'SPH Media Trust', ['mbfc'], false],
   // (11-13: a sports desk, for Orbit Sports' links to the news: no rating of its own, placed as CBS News, its group's.)
-  ['cbssports', 'CBS Sports', 'CBS Sports', 'cbssports.com', 'private', null, null, -1, '派拉蒙', 'Paramount', ['group'], true]
+  ['cbssports', 'CBS Sports', 'CBS Sports', 'cbssports.com', 'private', null, null, -1, '派拉蒙', 'Paramount', ['group'], true],
+  // (11-13, Jay: the sports outlets themselves. Placed as their group's news
+  // outlet where it has one (ESPN as ABC News, The Athletic as The New York
+  // Times); the rest unrated, 中間 marked weak.
+  // A game has no sides: none of it shows on a sports story.)
+  ['espn', 'ESPN', 'ESPN', 'espn.com', 'private', null, null, -1, '迪士尼', 'Disney', ['group'], true],
+  ['athletic', 'The Athletic', 'The Athletic', 'theathletic.com', 'private', null, null, -1, '紐約時報公司', 'The New York Times Company', ['group'], true],
+  ['yahoosports', 'Yahoo 體育', 'Yahoo Sports', 'sports.yahoo.com', 'private', null, null, 0, 'Yahoo（阿波羅）', 'Yahoo (Apollo)', ['stance'], true],
+  ['skysports', 'Sky Sports', 'Sky Sports', 'skysports.com', 'private', null, null, 0, '天空（康卡斯特）', 'Sky (Comcast)', ['stance'], true],
+  ['si', '運動畫刊', 'Sports Illustrated', 'si.com', 'private', null, null, 0, 'Minute Media', 'Minute Media', ['stance'], true]
 ];
 
 // Taiwan's outlets come first in ROWS; the rest (from the BBC) are the English ones.

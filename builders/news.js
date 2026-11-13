@@ -129,7 +129,8 @@ export const FEEDS = {
   bbc: [
     ['https://feeds.bbci.co.uk/news/world/rss.xml', 'rss'],
     ['https://feeds.bbci.co.uk/news/world/asia/rss.xml', 'rss'],
-    ...sec(['technology', 'science_and_environment', 'health', 'business'], s => `https://feeds.bbci.co.uk/news/${s}/rss.xml`),
+    // (Its sections every hour, room for the sports outlets' feeds, 11-13.)
+    ...sec(['technology', 'science_and_environment', 'health', 'business'], s => `https://feeds.bbci.co.uk/news/${s}/rss.xml`, S6),
     ['https://feeds.bbci.co.uk/sport/rss.xml', 'rss', S6, 3]
   ],
   wsj: [['https://feeds.a.dj.com/rss/RSSWorldNews.xml', 'rss']],
@@ -137,7 +138,7 @@ export const FEEDS = {
   hill: [['https://thehill.com/policy/international/feed/', 'rss']],
   csm: [['https://rss.csmonitor.com/feeds/world', 'rss']],
   guardian: [['https://www.theguardian.com/world/rss', 'rss'], ...sec(['technology', 'science'], s => `https://www.theguardian.com/${s}/rss`), ['https://www.theguardian.com/football/rss', 'rss', S6, 1]],
-  nyt: [['https://rss.nytimes.com/services/xml/rss/nyt/World.xml', 'rss'], ...sec(['US', 'Business', 'Technology', 'Science', 'Health'], s => `https://rss.nytimes.com/services/xml/rss/nyt/${s}.xml`)],
+  nyt: [['https://rss.nytimes.com/services/xml/rss/nyt/World.xml', 'rss'], ...sec(['US', 'Business', 'Technology', 'Science', 'Health'], s => `https://rss.nytimes.com/services/xml/rss/nyt/${s}.xml`, S6)],
   wapo: [['https://feeds.washingtonpost.com/rss/world', 'rss'], ...sec(['politics', 'business/technology'], s => `https://feeds.washingtonpost.com/rss/${s}`)],
   aljazeera: [['https://www.aljazeera.com/xml/rss/all.xml', 'rss']],
   economist: [['https://www.economist.com/asia/rss.xml', 'rss', S2], ['https://www.economist.com/china/rss.xml', 'rss', S2]],
@@ -235,7 +236,15 @@ export const FEEDS = {
   // injuries, moves and coaches Sports' pages link to, often one outlet's
   // report: news/sport.json. Each its own turn, `at`, set where the other
   // feeds and the channels leave a build lightest (under 100 calls a build).)
-  cbssports: [['nba', 3], ['mlb', 1], ['soccer', 5]].map(([l, at]) => [`https://www.cbssports.com/rss/headlines/${l}/`, 'rss', S6, at])
+  cbssports: [['nba', 3], ['mlb', 1], ['soccer', 5]].map(([l, at]) => [`https://www.cbssports.com/rss/headlines/${l}/`, 'rss', S6, at]),
+  // (11-13, Jay: "you really should include sport outlet not using existing
+  // outlet to get sport news": the sports outlets themselves, each feed once
+  // an hour at its own turn.)
+  espn: [['news', 4], ['nba/news', 3], ['mlb/news', 0], ['soccer/news', 5]].map(([l, at]) => [`https://www.espn.com/espn/rss/${l}`, 'rss', S6, at]),
+  yahoosports: [['https://sports.yahoo.com/rss/', 'rss', S6, 4]],
+  skysports: [['12040', 4], ['11095', 0]].map(([l, at]) => [`https://www.skysports.com/rss/${l}`, 'rss', S6, at]),
+  athletic: [['https://www.nytimes.com/athletic/rss/news/', 'rss', S6, 3]],
+  si: [['https://www.si.com/feed', 'rss', S6, 5]]
 };
 // (Outlets read only through a search's feed: their pages refuse us too.)
 const FAR = new Set(Object.entries(FEEDS).filter(([, list]) => list.every(([, kind]) => kind === 'bing' || kind === 'yt')).map(([o]) => o));
