@@ -826,6 +826,11 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
   // --ai-log file: each AI ask without a saved answer, as the phone sent it (for tools/shots/ai/, build.yml as-phone).
   if (!aiFixture && aiLog && ['/law-ask', '/law-chat', '/ai', '/class-news'].includes(aiPath)) writeFileSync(aiLog, `${JSON.stringify({ path: aiPath, body })}\n`, { flag: 'a' });
   if (aiFixture) return route.fulfill({ status: 200, contentType: aiFixture[1].endsWith('.ndjson') ? 'application/x-ndjson' : 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: readFileSync(aiFixture[1], 'utf8') });
+  // --live: plain translation (/tr, /news-tr) from the real Worker through its dev door, so an English page shows the English it will get.
+  if (live && ['/tr', '/news-tr'].includes(aiPath)) {
+    const r = await fetch(`https://api.jaypengx.com${aiPath}`, { method: 'POST', headers: { Origin: 'http://localhost:8080', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => null);
+    return route.fulfill({ status: r?.status || 502, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: r ? await r.text() : '{}' });
+  }
   // Orbit Securities' orders, plans and 新股申購 (stock-fill.js): the
   // Worker's own code on a store of the run's, today's real data.
   if (new URL(req.url()).pathname === '/stock') {
