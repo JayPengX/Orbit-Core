@@ -1258,6 +1258,8 @@ export const FEATURES = {
         if (s.lang === 'zh' ? zhLen(t0) > 26 : (t0.length > 110 || t0.split(/\s+/).length > 14)) continue;
         // (A topic said, not news: 伊朗議題受關注, Jay 11-13 "not so helpful".)
         if (VAGUE.test(t0)) continue;
+        // (A number left in English inside Chinese, 「$30.1 billion推動」: one that needs converting stays out.)
+        if (s.lang === 'zh' && /\d\s*(?:million|billion|trillion|bn|m)\b/i.test(t0)) continue;
         const title = s.lang === 'zh' ? str(t0, 60).replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/(?<!\d),|,(?!\d)/g, '，').replace(/(?<!\d):|:(?!\d)/g, '：') : str(t0, 110);
         const hasCjk = /[\u3000-\u303f\u4e00-\u9fff\uff01-\uff5e]/.test(title);
         const simplified = /[这们说时会发对经还为业东车长门见现问间关开应实点两亿国联军华]/.test(title);
