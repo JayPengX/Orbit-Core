@@ -112,6 +112,14 @@ test('the AI is told how the market is settled: what’s already decided, the da
   assert.equal(shownEvent(evs[2], { zh: 'q', en: 'q', labels: {} }, NOW).one, undefined, 'not negRisk: each its own chance');
 });
 
+test('a person no table knows stays as the market writes them; Taiwan’s races are told so', () => {
+  const alice = pairFacts({ s: tw('a', 'x', []), ev: evs[1] }).market;
+  assert.deepEqual(alice.keep, ['Alice Huang']);
+  assert.equal(alice.tw, undefined);
+  assert.equal(pairFacts({ s: tw('a', 'x', []), ev: evs[0] }).market.keep, undefined, 'Jensen Huang is known: 黃仁勳');
+  assert.equal(pairFacts({ s: tw('a', 'x', []), ev: evs[2] }).market.tw, true);
+});
+
 test('the page: only pairs the AI confirmed, at today’s prices; nothing asked with the day’s AI at 0', async () => {
   const story = tw('a', '傳輝達董事會擬撤換黃仁勳', ['輝達董事會深夜討論黃仁勳去留', '黃仁勳恐丟工作 6票就能撤換']);
   const files = new Map([

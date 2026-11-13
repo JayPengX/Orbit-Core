@@ -21,8 +21,9 @@ export const MARKETS_PATH = 'news/markets.json';
 const MEMORY = 'private/news/markets.v4.json';
 // The words' version: a market worded under an older prompt is worded again,
 // its old words shown until then (never a page emptied by a prompt change).
-// 2: a person's name as written in English unless the headlines write it in Chinese (Jay 11-13).
-export const WORDS_V = 2;
+// 2: a person's name as written in English unless the headlines write it in Chinese (Jay 11-13);
+// 3: Taiwan's candidates by their own Chinese names, a question's unknown person kept in English.
+export const WORDS_V = 3;
 // AI calls a run (each batch can take a few of the Worker's 50 subrequests; the rest wait for the next run).
 const CALLS = 4;
 const LINES = 'news/lines.json';
@@ -153,7 +154,7 @@ const enHas = (text, name) => {
 const usOf = t => t.replace(/\bU\.S\.A?\.?|\bUSA\b|\bUS\b/g, ' us ');
 
 // The capitals in a question that start it or ask it, never a name.
-const ASKS = new Set(['will', 'who', 'what', 'which', 'when', 'where', 'how', 'next', 'the', 'largest', 'best', 'highest', 'top', 'second', 'third', 'new', 'final', 'senior', 'mayor', 'mayoral', 'election', 'elections', 'winner', 'president', 'presidential', 'prime', 'minister', 'secretary', 'defense', 'party', 'general', 'county', 'city', 'magistrate', 'nominee', 'senate', 'house', 'ceo', 'combo', 'margin', 'victory', 'local', 'military', 'clash', 'ceasefire', 'agreement', 'deal', 'by', 'before', 'end', 'of', 'in', 'out', 'and', 'or', 'x', 'vs', 'leader', 'minority', 'majority', 'democratic', 'republican', 'governor', 'legislative', 'chinese', 'american', 'taiwanese', 'russian', 'israeli', 'iranian', 'european', 'ipo', 'ai', 'fed', 'gdp', 'cpi', 'q1', 'q2', 'q3', 'q4', 'list', 'companies', 'company', 'decision', 'rate', 'rates', 'tariff', 'nuclear', 'energy', 'effective', 'begins', 'announced', 'resignation', 'removal', 'arrested', 'impeached', 'charged', 'federally', 'released', 'visits', 'meet', 'meets', 'summit', 'monthly', 'annual', 'inflation', 'pp', 'vox'].concat(MONTHS_LONG));
+const ASKS = new Set(['will', 'who', 'what', 'which', 'when', 'where', 'how', 'next', 'the', 'largest', 'best', 'highest', 'top', 'second', 'third', 'new', 'final', 'senior', 'mayor', 'mayoral', 'election', 'elections', 'winner', 'president', 'presidential', 'prime', 'minister', 'secretary', 'defense', 'party', 'general', 'county', 'city', 'magistrate', 'nominee', 'senate', 'house', 'ceo', 'combo', 'margin', 'victory', 'local', 'military', 'clash', 'ceasefire', 'agreement', 'deal', 'by', 'before', 'end', 'of', 'in', 'out', 'and', 'or', 'x', 'vs', 'leader', 'minority', 'majority', 'democratic', 'republican', 'governor', 'legislative', 'chinese', 'american', 'taiwanese', 'russian', 'israeli', 'iranian', 'european', 'ipo', 'ai', 'fed', 'gdp', 'cpi', 'q1', 'q2', 'q3', 'q4', 'list', 'companies', 'company', 'decision', 'rate', 'rates', 'tariff', 'nuclear', 'energy', 'effective', 'begins', 'announced', 'resignation', 'removal', 'arrested', 'impeached', 'charged', 'federally', 'released', 'visits', 'meet', 'meets', 'summit', 'monthly', 'annual', 'inflation', 'pp', 'vox', 'first', 'fourth', 'fifth', 'another'].concat(MONTHS_LONG));
 // An event's names (those its question names, and the sharp ones its tags
 // add), what it asks (the first concept is the question's own), and the
 // capitalised names no table knows (an English story must name them too).
@@ -308,6 +309,12 @@ export function pairFacts({ s, ev }, line) {
   if (line?.en && s.region !== 'intl') heads.push(String(line.en).slice(0, 100));
   const kind = kindOf(ev);
   const market = { q: ev.title, about: ev.about, kind, options: optionsOf(ev) };
+  // (A person no table knows keeps the name as the market writes it: Alice Huang, never a guessed 黃樂. Jay 11-13.)
+  const unknown = aboutEvent(ev).unknown;
+  const keep = [...new Set([...ev.title.matchAll(/\b[A-Z][a-z'-]+(?: [A-Z][a-z'-]+){1,2}\b/g)].map(m => m[0]).filter(n => unknown.includes(n.split(' ')[0]) && !NAMES[n.toLowerCase()]))];
+  if (keep.length) market.keep = keep;
+  // (Taiwan's own races: each candidate by their own Chinese name.)
+  if (ev.tags.some(t => /taiwan/i.test(t))) market.tw = true;
   if (kind !== 'dates' && endsOf(ev)) market.ends = endsOf(ev);
   if (ev.gone?.length && kind === 'pick') market.settled = ev.gone;
   return { k: `${s.id}|${ev.id}`, story: heads, market };
