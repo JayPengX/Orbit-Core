@@ -91,7 +91,8 @@ export async function newsTr({ store, env, now = Date.now(), fetchImpl = fetch, 
   const m = await readMeter(store, now).catch(() => null);
   const use = m ? { month: m.month, chars: m.chars, today: m.today || 0, ...(m.off > now ? { off: String(m.why || '').slice(0, 10) } : {}) } : null;
   await store.put(NEWS_TR, { built: now, use, tr });
-  return { made, asked: ask.length, kept: Object.keys(tr).length, use };
+  // (The failure's whole reason to the run's log only, never the public file.)
+  return { made, asked: ask.length, kept: Object.keys(tr).length, use, ...(m?.off > now ? { why: m.why } : {}) };
 }
 
 // ---- A story opened (worker.js /news-tr) ----
