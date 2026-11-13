@@ -617,6 +617,8 @@ test("the videos in Taiwan's articles (Jay 11-12): each outlet's way of putting 
   assert.deepEqual(pagesToRead({ tw: [story], intl: [] }, {}), ['https://pts/1']);
   assert.deepEqual(pagesToRead({ tw: [{ ...story, clips: [['pts', 'AAAAAAAAAAA'], ['ebc', 'BBBBBBBBBBB']] }], intl: [] }, {}), []);
   assert.deepEqual(pagesToRead({ tw: [{ ...story, items: [...story.items, ['ebc', 'x', 'https://ebc/1', NOW]], clips: [['pts', 'AAAAAAAAAAA']] }], intl: [] }, {}), ['https://ebc/1']);
+  // (Three clips in, 公視's page still read: Jay 11-13, "it doesn't get all videos".)
+  assert.deepEqual(pagesToRead({ tw: [{ ...story, clips: [['ftv', 'AAAAAAAAAAA'], ['ebc', 'BBBBBBBBBBB'], ['mirror', 'CCCCCCCCCCC']] }], intl: [] }, {}), ['https://pts/1']);
   assert.ok(CLIPS_AT.every(o => OUTLETS[o]?.region === 'tw'), 'Taiwan’s outlets');
   const many = Array.from({ length: 30 }, (_, i) => ({ ...story, items: story.items.map(([o, t, u, at]) => [o, t, `${u}/${i}`, at]), img: '' }));
   const want = pagesToRead({ tw: many, intl: [] }, {});
@@ -663,7 +665,9 @@ test("the pages that refuse Cloudflare are read on GitHub: which, and their clip
       s([['pts', 'AAAAAAAAAAA']], [['udn', 'https://udn/2'], ['cna', 'https://cna/2']])
     ]
   };
-  assert.deepEqual(clipsToRead(index, { 'https://pts/1': { y: [] } }), ['https://cts/1', 'https://tvbs/1', 'https://cna/2', 'https://udn/2']);
+  assert.deepEqual(clipsToRead(index, { 'https://pts/1': { y: [] } }), ['https://cts/1', 'https://tvbs/1', 'https://cna/2', 'https://udn/2', 'https://udn/1']);
+  // (A story with clips enough still has its other outlets' read, after: 公視's missed beside three, Jay 11-13.)
+  assert.ok(!clipsToRead({ tw: [s([['pts', 'AAAAAAAAAAA'], ['ebc', 'BBBBBBBBBBB']], [['pts', 'https://pts/9'], ['udn', 'https://udn/9']])] }).includes('https://pts/9'), 'an outlet with its clip in already isn’t read again');
   assert.deepEqual(clipsToRead(index, {}, { each: 1, most: 3 }), ['https://pts/1', 'https://cts/1', 'https://tvbs/1']);
   // (A page that wouldn't answer: asked again, 3 times at most.)
   assert.ok(clipsToRead(index, { 'https://cts/1': { y: [], f: 2 } }).includes('https://cts/1'));

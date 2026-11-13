@@ -1491,7 +1491,9 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
 // (11-12, 25 of each's pages: 公視 and 華視 half of them, 中天, 東森, 中央社,
 // 聯合 one in six or eight, TVBS, 三立, ETtoday, 中時 fewer; 自由's pages
 // refuse some readers: last). 民視 is read by its channel, no page.
-export const CLIPS_AT = ['pts', 'cts', 'ctinews', 'ebc', 'cna', 'udn', 'tvbs', 'setn', 'ettoday', 'chinatimes', 'upmedia', 'mirror', 'ltn'];
+// (11-13, Jay "it doesn't get all videos": 年代's pages each carry its own
+// clip, 壹蘋's half, 台視's and 原民台's some.)
+export const CLIPS_AT = ['pts', 'era', 'cts', 'nextapple', 'ctinews', 'ebc', 'ttv', 'cna', 'udn', 'tvbs', 'setn', 'ettoday', 'chinatimes', 'upmedia', 'mirror', 'titv', 'ltn'];
 // Those whose pages answer Cloudflare (the rest refuse it, 11-12: TVBS,
 // 聯合, 中央社, 三立, 自由…): read here too. Every one of CLIPS_AT is read on
 // GitHub (clipsToRead, tools/news-clips.mjs), its finds in NEWS_CLIPS.
@@ -1501,7 +1503,7 @@ export const CLIPS_HERE = ['pts', 'ctinews', 'ebc'];
 export const CLIP_READS = 6;
 // The pages a build reads, top stories first (two of Taiwan's to one
 // abroad): PAGE_READS for the lead's (else any) where a story has no
-// picture, CLIP_READS for its clip outlets' where it has fewer than 2 clips.
+// picture, CLIP_READS for its clip outlets' that have no clip in it yet.
 export function pagesToRead(out, pages, most = PAGE_READS, clipMost = CLIP_READS) {
   const order = [];
   for (let i = 0; i < 40; i++) order.push(out.tw[2 * i], out.tw[2 * i + 1], out.intl[i]);
@@ -1512,15 +1514,16 @@ export function pagesToRead(out, pages, most = PAGE_READS, clipMost = CLIP_READS
     if (pics.length >= most && clips.length >= clipMost) break;
     // (Those read through a search's feed or a channel: no page of theirs to read.)
     const fresh = s.items.filter(([o, , u]) => !taken(u) && !FAR.has(o));
-    const playing = (s.clips || []).filter(c => c[1]);
-    if (playing.length < 2 && clips.length < clipMost) {
+    // (Every clip outlet's page, however many clips a story has: 公視's own
+    // was missed beside three others', Jay 11-13 "it doesn't get all videos".)
+    if (clips.length < clipMost) {
       const has = new Set((s.clips || []).map(c => c[0]));
       const by = new Set();
       const picks = fresh
         .filter(([o]) => CLIPS_HERE.includes(o) && !has.has(o))
         .sort((a, b) => CLIPS_HERE.indexOf(a[0]) - CLIPS_HERE.indexOf(b[0]))
         .filter(([o]) => !by.has(o) && by.add(o))
-        .slice(0, Math.min(2 - playing.length, clipMost - clips.length));
+        .slice(0, Math.min(2, clipMost - clips.length));
       clips.push(...picks.map(x => x[2]));
     }
     if (!s.img && pics.length < most) {
@@ -1540,16 +1543,20 @@ export function pagesToRead(out, pages, most = PAGE_READS, clipMost = CLIP_READS
 // it read none of its own.
 export const NEWS_CLIPS = 'news/clips.json';
 // The pages a GitHub run reads: every clip outlet's report on Taiwan's
-// stories with fewer than 2 clips, top stories first, not read before
+// stories (those with fewer than 2 clips first), top stories first, not read before
 // (華視's refuses a reader asking fast: asked again later);
 // `most` a run, `each` an outlet (a site that's asked too fast refuses: 華視).
-export function clipsToRead(index, done = {}, { most = 80, each = 14 } = {}) {
+export function clipsToRead(index, done = {}, { most = 120, each = 14 } = {}) {
   const want = [];
   const per = new Map();
-  for (const s of index?.tw || []) {
-    if ((s.clips || []).filter(c => c[1]).length >= 2) continue;
+  // (Stories with fewer than 2 clips first, then every other's clip outlets
+  // without one yet: Jay 11-13, 公視's clip missed beside three others'.)
+  const few = s => (s.clips || []).filter(c => c[1]).length < 2;
+  const tw = index?.tw || [];
+  for (const s of [...tw.filter(few), ...tw.filter(s => !few(s))]) {
+    const has = new Set((s.clips || []).filter(c => c[1]).map(c => c[0]));
     // (A page that wouldn't answer, `f` times, is asked again in a later run, 3 times at most.)
-    const its = (s.items || []).filter(([o, , u]) => CLIPS_AT.includes(o) && !(done[u] && !(done[u].f < 3)) && !want.includes(u)).sort((a, b) => CLIPS_AT.indexOf(a[0]) - CLIPS_AT.indexOf(b[0]));
+    const its = (s.items || []).filter(([o, , u]) => CLIPS_AT.includes(o) && !has.has(o) && !(done[u] && !(done[u].f < 3)) && !want.includes(u)).sort((a, b) => CLIPS_AT.indexOf(a[0]) - CLIPS_AT.indexOf(b[0]));
     for (const [o, , u] of its) {
       if ((per.get(o) || 0) >= each) continue;
       per.set(o, (per.get(o) || 0) + 1);
