@@ -116,7 +116,7 @@ test('the page: only pairs the AI confirmed, at today’s prices; nothing asked 
   const story = tw('a', '傳輝達董事會擬撤換黃仁勳', ['輝達董事會深夜討論黃仁勳去留', '黃仁勳恐丟工作 6票就能撤換']);
   const files = new Map([
     ['news/index.json', { tw: [{ ...story, topics: ['tech'] }], intl: [] }],
-    ['private/news/markets.v5.json', { pairs: { 'a|1': { ok: 1, m: 2, at: NOW } }, words: { 1: { zh: '黃仁勳何時宣布卸任？', en: 'When will Jensen Huang step down?', labels: {} } } }]
+    ['private/news/markets.v4.json', { pairs: { 'a|1': { ok: 1, m: 2, at: NOW } }, words: { 1: { zh: '黃仁勳何時宣布卸任？', en: 'When will Jensen Huang step down?', labels: {} } } }]
   ]);
   const store = { json: async p => files.get(p) ?? null, put: async (p, d) => (files.set(p, JSON.parse(JSON.stringify(d))), true) };
   const fetchImpl = async url => ({ ok: true, json: async () => (/tag_slug=tech/.test(url) ? [JENSEN, ALICE] : []) });
