@@ -15,9 +15,11 @@
 // every few minutes costs one translation an hour, not ten). The rest of a
 // story (each outlet's headline, a summary lower down) is translated when
 // a person opens it (worker.js /news-tr, handleNewsTr).
-import { translate, peopleIn, readMeter } from '../translate.js';
+import { translate, peopleIn, readMeter, withMonth } from '../translate.js';
 
 export const NEWS_TR = 'news/tr.json';
+// (A new way of asking (2: a day's month put in, a headline's stop left off) asks every text again.)
+export const TR_V = 2;
 export const TR_AGAIN = 3_600_000;
 // The summaries translated ahead: the stories at the top of each side.
 export const SUM_TOP = 12;
@@ -61,7 +63,8 @@ export async function newsTr({ store, env, now = Date.now(), fetchImpl = fetch, 
   const index = await store.json('news/index.json');
   if (!index) return { skipped: 'no index' };
   const lines = (await store.json(NEWS_LINES).catch(() => null))?.lines || {};
-  const was = (await store.json(NEWS_TR).catch(() => null))?.tr || {};
+  const doc = await store.json(NEWS_TR).catch(() => null);
+  const was = doc?.v === TR_V ? doc.tr || {} : {};
   const { keep, ask } = wanted(index, lines, was, now);
   let made = 0;
   for (const to of ['zh-TW', 'en']) {
@@ -75,7 +78,7 @@ export async function newsTr({ store, env, now = Date.now(), fetchImpl = fetch, 
       if (!seen.has(s.id)) seen.set(s.id, storyPeople(s));
       return seen.get(s.id);
     };
-    const got = await translate(env, store, mine.map(a => a.text), to, { people, now, fetchImpl, force });
+    const got = await translate(env, store, mine.map(a => a.text), to, { people, now, fetchImpl, force, prep: t => (to === 'en' ? withMonth(t, whose.get(t)?.at || now) : t) });
     for (const a of mine) {
       const v = got[a.text];
       if (!v) continue;
@@ -90,7 +93,7 @@ export async function newsTr({ store, env, now = Date.now(), fetchImpl = fetch, 
   // (The month so far beside them, for the admin panel and a look from outside: characters, and a failure's code.)
   const m = await readMeter(store, now).catch(() => null);
   const use = m ? { month: m.month, chars: m.chars, today: m.today || 0, ...(m.off > now ? { off: String(m.why || '').slice(0, 10) } : {}) } : null;
-  await store.put(NEWS_TR, { built: now, use, tr });
+  await store.put(NEWS_TR, { built: now, v: TR_V, use, tr });
   // (The failure's whole reason to the run's log only, never the public file.)
   return { made, asked: ask.length, kept: Object.keys(tr).length, use, ...(m?.off > now ? { why: m.why } : {}) };
 }
@@ -113,15 +116,15 @@ export async function storyTr({ store, env, id, to, texts, now = Date.now(), fet
   const own = storyTexts(s);
   const want = [...new Set((Array.isArray(texts) ? texts : []).slice(0, 60).map(t => String(t || '').trim()))].filter(t => own.has(t) && hasHan(t) === (to === 'en'));
   const path = trPath(s.id);
-  const kept = (await store.json(path).catch(() => null)) || {};
+  const kept = (k => (k?.v === TR_V ? k : {}))(await store.json(path).catch(() => null));
   const mine = { ...(kept[to] || {}) };
   const need = want.filter(t => !mine[t]);
   if (need.length) {
     const people = to === 'zh-TW' ? peopleIn([s.sum, ...(s.items || []).map(it => it[1])]) : [];
-    const got = await translate(env, store, need, to, { people, now, fetchImpl, max: STORY_MAX });
+    const got = await translate(env, store, need, to, { people, now, fetchImpl, max: STORY_MAX, prep: t => (to === 'en' ? withMonth(t, s.at || now) : t) });
     if (Object.keys(got).length) {
       Object.assign(mine, got);
-      await store.put(path, { ...kept, [to]: mine, at: now });
+      await store.put(path, { ...kept, v: TR_V, [to]: mine, at: now });
     }
   }
   return { tr: Object.fromEntries(want.filter(t => mine[t]).map(t => [t, mine[t]])) };
