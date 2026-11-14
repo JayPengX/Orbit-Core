@@ -30,7 +30,7 @@ Words used below:
 | 6 | Back after an hour or more, something live | As rule 4: as left. |
 | 7 | A tab tapped | That app exactly as left, with no reload and an animated switch. |
 | 8 | The 進行中 tab tapped (or the 進行中 card on home, or its row in the switcher) | What's under way, in full: a Transit trip's navigation, never its small bar. Other live apps show as left. |
-| 9 | Switching to another app while a trip is in full navigation | Allowed straight away: the switcher stays on screen over navigation. The trip goes on, and Transit's tab says 進行中. |
+| 9 | Switching to another app while a trip is in full navigation | Allowed straight away: the switcher is a button on the trip's own bar (beside ⋯ and 結束), never floating over the step's card. The trip goes on, and Transit's tab says 進行中. |
 | 10 | A trip minimized in Transit | Transit stays on its own screen with the trip's bar. In every other app, Transit's tab says 進行中. |
 | 11 | A trip or timer ends | Its 進行中 goes within 15 seconds. The tab stays as a plain tab. |
 | 12 | A tab closed with ✕ in the ⌄ switcher | It's gone. If it was showing: the latest other tab, or home if none. A live app has no ✕: it's ended in its own app. |
@@ -46,7 +46,7 @@ Words used below:
 - 4, 7, 12, 13: the frame host (`host`: `show`, `close`, `toClose`, `KEEP`).
 - 8: the host's `full(id)` and `takeFull(id)`, which Transit reads at its start and
   on the window's `orbit-full` event.
-- 9: Transit's `transit.css` (the switcher kept over navigation in Orbit).
+- 9: `openSwitcher`, from the `apps` button on Transit's trip bar (`nav.mjs`).
 - 10, 11: `setLive` (from the kit session's `putNow`) and the host's 15-second redraw.
 - 15: `noBounce` and `html.q-in-suite` in `orbit.css`.
 - 16: `start()` only runs inside Orbit's window (`inSuite`).
