@@ -71,3 +71,15 @@ test('the build keeps each front story’s facts in parts, no AI', async () => {
 test('made ahead for everyone stays paused without AI_BULK', async () => {
   assert.equal(await aiOnce({}, null, 'news-brief', { stories: [brief] }, 10), null);
 });
+
+test('a game’s line is asked only of a game over (its preview only of one to come), read from ESPN, nothing else', async () => {
+  const env = envWith({}, () => ({}));
+  const urls = [];
+  const live = async u => (urls.push(u), new Response(JSON.stringify({ header: { competitions: [{ date: new Date(Date.now() + 3_600_000).toISOString(), status: { type: { state: 'in' } }, competitors: [] }] } })));
+  assert.equal((await handleAiOpen(ask('f=sports-recap&id=nba:401700001'), env, null, {}, { ip: '1', cap: 10, fetchImpl: live })).status, 404, 'still being played');
+  assert.equal((await handleAiOpen(ask('f=sports-preview&id=nba:401700001'), env, null, {}, { ip: '1', cap: 10, fetchImpl: live })).status, 404, 'already begun');
+  assert.equal((await handleAiOpen(ask('f=sports-recap&id=nope:1'), env, null, {}, { ip: '1', cap: 10, fetchImpl: live })).status, 404, 'a league never asked');
+  assert.equal(urls.length, 2);
+  assert.match(urls[0], /\/summary\?event=401700001$/);
+  assert.equal(env.calls(), 0);
+});
