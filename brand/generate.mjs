@@ -4,12 +4,12 @@
 // and <!-- /brand -->) and its manifest. The marks and words are the kit's
 // (kit/brand.mjs). Needs Playwright's Chromium:
 //   node brand/generate.mjs            everything
-//   node brand/generate.mjs match site  only those
+//   node brand/generate.mjs match site  only those (looks: Orbit's alone)
 import { writeFile, readFile, mkdir, rm, access } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { BRANDS, FAMILY, PASS, SITE_URL, appIcon, familyMark, homeOf, pathOf, shortPathOf } from '../kit/brand.mjs';
+import { BRANDS, FAMILY, PASS, SITE_URL, LOOKS, appIcon, familyMark, homeOf, lookApp, orbitIcon, pathOf, shortPathOf } from '../kit/brand.mjs';
 import { FORMATS, shareCard } from './marks.mjs';
 import { DOMAIN } from '../kit/domain.mjs';
 
@@ -202,13 +202,28 @@ if (!only.length || only.includes('site')) {
   await writeFile(`${here}site/favicon.ico`, ico(await readFile(`${here}site/icons/favicon-32.png`), 32));
   await cards('pass', `${out}pass-`, ['og', 'x']);
   for (const id of Object.keys(BRANDS)) await writeFile(`${out}${id}.svg`, appIcon(id));
-  // Orbit, every app in one home-screen app (site/app/, kit/suite.mjs): the family's mark.
+  await writeFile(`${here}site/index.html`, homePage());
+  console.log('wrote site/brand and site/index.html', PASS.name);
+}
+// Orbit (site/app/, kit/suite.mjs): its mark, and every look an Orbit can
+// wear (kit/brand.mjs LOOKS) as the pictures a phone takes at Add to Home
+// Screen (site/app/looks/<look>/: apple.png for an iPhone, icon.png and
+// maskable.png for Android; kit/orbit-mine.mjs lookFiles). An app's look is
+// that app's own icons.
+if (!only.length || only.includes('site') || only.includes('looks')) {
   await mkdir(`${here}site/app/icons`, { recursive: true });
   await writeFile(`${here}site/app/favicon.svg`, familyMark());
   for (const [file, size] of Object.entries({ 'apple-touch-icon.png': 180, 'icon-192.png': 192, 'icon-512.png': 512 })) await png(familyMark({ shape: 'square' }), size, `${here}site/app/icons/${file}`);
   await png(familyMark({ shape: 'maskable' }), 512, `${here}site/app/icons/maskable-512.png`);
-  await writeFile(`${here}site/index.html`, homePage());
-  console.log('wrote site/brand and site/index.html', PASS.name);
+  await rm(`${here}site/app/looks`, { recursive: true, force: true });
+  for (const look of LOOKS.filter(l => !lookApp(l))) {
+    const dir = `${here}site/app/looks/${look}/`;
+    await mkdir(dir, { recursive: true });
+    await png(orbitIcon(look, { shape: 'square' }), 180, `${dir}apple.png`);
+    await png(orbitIcon(look, { shape: 'square' }), 512, `${dir}icon.png`);
+    await png(orbitIcon(look, { shape: 'maskable' }), 512, `${dir}maskable.png`);
+  }
+  console.log('wrote site/app: Orbit and', LOOKS.filter(l => !lookApp(l)).length, 'looks');
 }
 await browser.close();
 
@@ -241,7 +256,7 @@ function homePage() {
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f2f7"><meta name="theme-color" media="(prefers-color-scheme: dark)" content="#05051a">
 <link rel="icon" href="${at}brand/family-orbit.svg" type="image/svg+xml"><link rel="icon" href="${at}icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="manifest" href="/app/manifest.webmanifest"><link rel="apple-touch-icon" href="/app/icons/apple-touch-icon.png"><meta name="apple-mobile-web-app-title" content="Orbit"><meta name="application-name" content="Orbit">
-<script>(()=>{let s=false;try{s=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true||sessionStorage.getItem('orbit.suite')==='1'}catch{}if(s)location.replace('/app/'+location.search+location.hash)})()</script>
+<script>(()=>{let s=false;try{s=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true||sessionStorage.getItem('orbit.suite')==='1'||sessionStorage.getItem('orbit.addr')==='/'}catch{}if(s)location.replace('/app/'+location.search+location.hash)})()</script>
 ${og('type', 'website')}${og('site_name', 'Orbit')}${og('title', 'Orbit')}${og('description', 'Orbit：每天用得到的 App，一個 Orbit Pass。')}${og('url', home)}${og('image', `${SITE_URL}${DOMAIN ? '/pass/' : '/Orbit-Core/'}brand/pass-og.jpg`)}${og('image:width', 1200)}${og('image:height', 630)}
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${SITE_URL}${DOMAIN ? '/pass/' : '/Orbit-Core/'}brand/pass-x.jpg">
 <script>(()=>{let l;try{l=localStorage.getItem('orbit.lang')}catch{}if(l!=='zh'&&l!=='en'){const n=navigator.languages?.length?navigator.languages:[navigator.language||'zh-TW'];l=n.some(x=>/^zh/i.test(x))?'zh':'en'}if(l==='en')document.documentElement.lang='en'})()</script>

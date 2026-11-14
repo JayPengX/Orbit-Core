@@ -27,6 +27,7 @@
 //   sessionStorage orbit.suite     '1': this window is Orbit
 //   sessionStorage orbit.suite.trail { list: [{ app, url, y }], i }  the hops, for back and forward
 import { APP_ORDER, BRANDS, appIcon, pathOf } from './brand.mjs';
+import { appsOf, setupOf } from './orbit-mine.mjs';
 
 export const SUITE_KEY = 'orbit.suite.v1';
 export const SUITE_TAB = 'orbit.suite';
@@ -367,6 +368,11 @@ function drawTabs(H) {
   // or focus in sight from any app, a tap back to it. Jay 2026-11-14.)
   const all = H.tabs().filter(x => x.app !== app);
   const tabs = [...all.filter(x => x.live), ...all.filter(x => !x.live)];
+  // (A one-app Orbit, nothing else open: the app as it is on its own, no switcher. kit orbit-mine.mjs)
+  if (!tabs.length && appsOf().length === 1 && appsOf()[0] === app) {
+    bar?.remove();
+    return;
+  }
   const max = tabs.some(x => x.live) ? TABS_MAX - 1 : TABS_MAX;
   bar ||= el('div', { class: 'q-suite', role: 'group', 'aria-label': 'Orbit' });
   bar.replaceChildren(
@@ -460,16 +466,17 @@ async function switcher() {
     }
     open = grid.children.length ? el('div', { class: 'q-sw-sec' }, [head(W('開著的 App', 'Open apps')), grid]) : null;
   }
-  // (Every app under Apps, five by two: the open ones left out made rows of
-  // four, four and one, Jay 11-14 "don't like the three line when we have exactly 10".)
-  const rest = APP_ORDER;
+  // (Every app of this Orbit under Apps, five by two for all ten: the open ones
+  // left out made rows of four, four and one, Jay 11-14 "don't like the three
+  // line when we have exactly 10". This Orbit's apps: kit orbit-mine.mjs.)
+  const rest = appsOf();
   const all = rest.length
     ? el('div', { class: 'q-sw-sec' }, [
         open ? head('Apps') : null,
         el('div', { class: 'q-sw-grid' }, rest.map(id => tile(id, { now: id === app, onClick: () => (close(), id === app ? null : go(id)) })))
       ])
     : null;
-  const s = ui.sheet({ title: 'Orbit', cls: 'q-suite-sheet', body: [hops, open, all].filter(Boolean), onClose: () => (sheetOpen = null) });
+  const s = ui.sheet({ title: setupOf().name || 'Orbit', cls: 'q-suite-sheet', body: [hops, open, all].filter(Boolean), onClose: () => (sheetOpen = null) });
   sheetOpen = s;
   function close() {
     s.close?.();
@@ -523,8 +530,8 @@ function warmSoon() {
 async function warm() {
   const done = readJson('sessionStorage', WARM_KEY) || {};
   const sw = navigator.serviceWorker;
-  // Every app's worker (each keeps its own page: a first opening starts from the phone).
-  for (const id of APP_ORDER) {
+  // Every app's worker in this Orbit (each keeps its own page: a first opening starts from the phone).
+  for (const id of appsOf()) {
     if (id === app || done[`sw:${id}`]) continue;
     await idle();
     const path = pathOf(id);
@@ -534,7 +541,7 @@ async function warm() {
   }
   // The likely next ones: their first screen's own files (named by their hash, kept until they change).
   for (const id of warmOrder(readTrail(), savedSuite(), app)) {
-    if (done[id]) continue;
+    if (done[id] || !appsOf().includes(id)) continue;
     await idle();
     const path = pathOf(id);
     const page = await fetch(path, { credentials: 'same-origin' })
@@ -603,6 +610,17 @@ function sheetHold(root = document) {
   );
 }
 
+// This page is the address Orbit's window put up for the app it showed
+// (site/app addressOf, sessionStorage orbit.addr), reloaded in that window
+// (a computer's tab): back into Orbit, there.
+function reloadedInOrbit() {
+  try {
+    return sessionStorage.getItem('orbit.addr') === location.pathname && globalThis.top === globalThis;
+  } catch {
+    return false;
+  }
+}
+
 let started = false;
 export function start() {
   if (started || typeof document === 'undefined') return;
@@ -623,7 +641,7 @@ export function start() {
   }
   // An app page opened as the whole window on a phone (a notice, an old
   // trail): into Orbit's window, which holds it with the others.
-  else if (globalThis.matchMedia?.('(display-mode: standalone)').matches || globalThis.navigator?.standalone === true) {
+  else if (globalThis.matchMedia?.('(display-mode: standalone)').matches || globalThis.navigator?.standalone === true || reloadedInOrbit()) {
     location.replace(`/app/?open=${encodeURIComponent(here())}`);
     return;
   }
@@ -718,7 +736,9 @@ function tellInsets(doc, ins) {
     } catch {}
   }
 }
-export function host(box, { first = null, list = null } = {}) {
+// onShow(id): told each app shown (the page puts it in the address); mine():
+// this Orbit's apps (kit orbit-mine.mjs), the ones a return may land on.
+export function host(box, { first = null, list = null, onShow = null, mine = null } = {}) {
   const frames = new Map();
   let shown = null;
   const top = document;
@@ -901,6 +921,7 @@ export function host(box, { first = null, list = null } = {}) {
     writeJson('localStorage', SUITE_KEY, { ...savedSuite(), last: id, left: 0 });
     tidy();
     redraw();
+    onShow?.(id);
   };
   const api = {
     go(id, url = null) {
@@ -988,8 +1009,11 @@ export function host(box, { first = null, list = null } = {}) {
     if (top.visibilityState !== 'visible' || !awayAt) return;
     const live = { ...liveSaved() };
     for (const f of frames.values()) if (playing(f.el.contentWindow) && !live[f.app]) live[f.app] = { t: f.used };
-    const to = launchTarget(savedSuite(), live);
+    let to = launchTarget(savedSuite(), live);
     awayAt = 0;
+    // (Another Orbit's app, where Orbits share storage: this one's home.)
+    const ours = mine?.();
+    if (to && ours && !ours.includes(to.app) && !live[to.app]) to = null;
     if (!to) return void list?.();
     if (to.app !== shown) api.go(to.app, frames.has(to.app) && !liveSaved()[to.app]?.url ? null : to.url);
   });

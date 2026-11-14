@@ -95,8 +95,9 @@ modules for modulepreload.
 | `passkey.mjs`, `pass-mail.mjs` | Passkeys in the browser (`passkeyHere()`); the recovery email's screens |
 | `news-outlets.mjs`, `news-sport.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); `TOPICS`; `sideOf`, `partiesIn`, `topicsOf`, `namesRe`; Sports' 相關新聞 matching |
 | `ai.mjs`, `family.mjs`, `today.mjs`, `ask-orbit.mjs` | AI (mark `icons.ai`, `--q-ai`; `.q-ai-ref` a name chip): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer`, `aiAnswerWait` (answers drawn); the family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天; 問 Orbit (`routeAsk`, an app's `#ask=` by `takeAsk`); `act.mjs` `readAct`: a command said (start a focus, add a countdown, follow a team, a round of words) read by code, no AI call |
-| `testtools.mjs` | 測試工具, hidden until unlocked (Orbit Pass › seven taps on 除錯紀錄 within 4 s): a moved clock (or a fast one: `rate`), a place, a trip's fixes played back (`playTrip({ from, fixes, rate })`, fed to `watchPosition`), the network off/slow/failing (`boot.js`, key `orbit.tester`; off: the app's files from its service worker), test notices (`pushTest`), each app's own switches (`globalThis.ORBIT_TEST_TOOLS`, read as `ORBIT_TEST?.flags?.x`), versions; a pill while anything is on |
-| `suite.mjs` | Orbit, every app in one home-screen app (`/app/`, `site/app/`; `inSuite()`): each app a frame of `host`, kept running (`toClose`), tabs and the ⌄ switcher; what the person sees in every case: `docs/ORBIT.md` |
+| `testtools.mjs` | 測試工具, hidden until unlocked (seven taps on 除錯紀錄 in 4 s): a moved or fast clock, a place, a trip's fixes played back (`playTrip`), the network off/slow/failing (`boot.js`, `orbit.tester`), test notices (`pushTest`), each app's switches (`ORBIT_TEST_TOOLS`, `ORBIT_TEST?.flags?.x`), versions; a pill while anything is on |
+| `suite.mjs` | Orbit (`site/app/`; `inSuite()`): each app a frame of `host`, kept running (`toClose`), tabs, the ⌄ switcher; behaviour: `docs/ORBIT.md` |
+| `orbit-mine.mjs` | An Orbit's setup (name, apps, look) as the tag its icon opens (`/app/?o=`), its manifest, apps changed in it (Pass `orbits`) |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law, Beats |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs`: qrcode-generator 2.0.4 (MIT), vendored |
 | `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays` |
@@ -189,6 +190,7 @@ w;dur=`, noted by the 除錯紀錄 when slow, and `LOCKED` (never runs as a page
 | `/money-read` | `money-read.js` | Money's 拍照記帳: a picture → `{ buys, left }`, read by Gemini, checked; on a tap; 30 a day a Pass, 300 in all |
 | `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |
 | `/flight` | `flight.js`, `kit/flight.mjs` | Class's 專注飛行: real planes landing in about N minutes; pool: R2 `flight/` (§5.5) |
+| `/orbit-manifest` | `orbit-manifest.js` | An Orbit's manifest, from its tag |
 | `/gift` | `gift.js` | 公開領取 at `/key/` (`site/key/`), set in admin; one a device (D1 `gift_claim`), `op: 'go'` a `#qh=` into an app; unreplaced back after `hold` hours |
 | `/showcase/pass` | `showcase.js` | The showcase's pass: demos' reads, 問 Orbit (`showcase-ask`); capped per address a day |
 | `/data/…` | `data.js` | R2, public reads (§5.5); `/data/build` (POST, Bearer `DATA_PUSH_SECRET`, `build.yml`) runs a builder now |

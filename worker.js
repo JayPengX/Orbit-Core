@@ -89,6 +89,7 @@ export { F1Log } from './f1-live.js';
 export { Door } from './door.js';
 import { doorOf, doorSlow, limitOf, graceShut, fullBody } from './door.js';
 import { makeRunner, runsInRunner, toRunner, tickRunner, partOf, CRON_PARTS, SHARDS, RELAYS } from './runner.js';
+import { handleOrbitManifest } from './orbit-manifest.js';
 
 // ---- Bilingual error responses ----------------------------------------
 //
@@ -1376,6 +1377,8 @@ async function route(request, env, ctx, headers, origin) {
     if (request.method === 'POST' && session && !(await maySpend(session))) return errorJson('PASS_LEVEL', 403, headers, request);
     return path === '/gemini' ? handleGeminiRequest(request, env, headers, ip, ctx, session) : handleNlEditRequest(request, env, headers, ip, ctx, session);
   }
+  // One Orbit's manifest, read from its tag (orbit-manifest.js): its name and icon at Add to Home Screen.
+  if (path === '/orbit-manifest') return handleOrbitManifest(request, headers);
   if (path === '/eco') return handleEcoRequest(request, env, headers, ip, ECO_DEPS, p => ctx.waitUntil(p));
   // The data proxy for Sports and Securities (sports.js): its own
   // session gate and per-app limits.
