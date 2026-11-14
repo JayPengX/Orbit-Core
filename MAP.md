@@ -186,7 +186,7 @@ w;dur=`, noted by the 除錯紀錄 when slow, and `LOCKED` (never runs as a page
 | `/law-chat` | `law-chat.js`, `ai-other.js` | 問法律: a plan (Flash-Lite), up to 14 articles (and delegated ones) from Law's index, answered from those by Sonnet (failing: Sol), cites checked; grounded by `law-ground.js`, `law-more.js`, `law-local.js` (councils); 16 turns back; 30 a day a Pass |
 | `/law-page` | `law-page.js`, `law-hosts.js` | A gov.tw/edu.tw page in Law, cleaned, edge-cached, via Taiwan (build key: any gov.tw, `file=1` raw, `/law-judicial` 司法院's API); 500 a day a Pass; `/law-audio` (`law-audio.js`): a 代表會's Drive recording, its true type |
 | `/law-live` | `law-live.js` | 立法院's IVOD streams now, 60 s at the edge (last good read 30 min); ours only |
-| `/news-tr`, `/tr` | `builders/news-tr.js`, `translate.js` | One language, Google (`TR_PAID`), only for what is on screen (a list's titles in one batch of 30, a story's words as it opens; nothing made ahead): `news/tr/<id>.json`, `tr/<id>.json`; kit `translateMarked`. New ones only for a 完整 pass; D1 `tr_day` caps a day |
+| `/news-tr`, `/tr` | `builders/news-tr.js`, `translate.js` | One language, Google (`TR_PAID`), on-screen titles only: `news/tr/<id>.json`, `tr/<id>.json`; kit `translateMarked`. New ones only for a 完整 pass; D1 `tr_day` caps a day |
 | `/class-news` | `class-news.js` | Class's 學校公告: a school's boards read via the relay, kept 45 days, new titles worded once; R2 |
 | `/money-read` | `money-read.js` | Money's 拍照記帳: a picture → `{ buys, left }`, read by Gemini, checked; on a tap; 30 a day a Pass, 300 in all |
 | `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |
@@ -294,7 +294,7 @@ A read (`kit proxyJson`) goes down these until one answers:
 
 | Store | Binding | What's in it |
 | --- | --- | --- |
-| D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data and what's under way (§5.3), the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced; `gemini_call`: every AI call, each maker's day cap (`gemini-use.js`); `law_day`: the AI caps' counts a day; `ai_use`: each account's Orbit AI used (`ai-allow.js`); `gift`, `gift_claim`: the retired giveaway's, unread; `beats`: each job's last run and failures (`ops.js`); `meter`: Google's and TDX's counts a month (`transit.js`); `push_kv`: notices' devices and lists (`push.js`); `kept`: the Worker's own (`kept-store.js`), swept 6-hourly (not KV); `data_file`: R2's files while R2 refuses (`data-fallback.js`); `sources`: outside calls by hour (`sources.js`); `usage`: counts by day, app, kind, key (`usage.js`) |
+| D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data and what's under way (§5.3), the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced; `gemini_call`: every AI call, each maker's day cap (`gemini-use.js`); `law_day`: the AI caps' counts a day; `ai_use`: each account's Orbit AI used (`ai-allow.js`); `gift`, `gift_claim`: retired; `beats`: each job's last run and failures (`ops.js`); `meter`: Google's and TDX's counts a month (`transit.js`); `push_kv`: notices' devices and lists (`push.js`); `kept`: the Worker's own (`kept-store.js`), swept 6-hourly; `data_file`: R2's files while R2 refuses (`data-fallback.js`); `sources`: outside calls by hour (`sources.js`); `usage`: counts by day, app, kind, key (`usage.js`) |
 | R2 `orbit-data` | `DATA` | Public: builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `station/`, `rail/`, `tdx/`, `where.json`), proxy's kept reads (`mirror/`), radar's (`weather/`), schools' news (`class-news/`), `flight/`. Never served: `private/` (nightly backups `private/store/`, Firestore's last copy) |
 | KV | `RATE_LIMIT_KV` | Few writes (Free: 1,000 a day for the account): the guard's state, pace and alerts (`guard:*`); copies from before D1's `kept`, read until they end; the showcase's passes a day (`showcase:passes:*`); the door's state (`door:state`); `ops:data-folders` |
 | Durable Objects | `F1_LOG`, `DOOR`, `RUNNER`, `CLOCK` | `F1Log`: F1's laps; `Door`: seats and the line; `Runner` (`runner.js`): heavy routes, crons by alarm, relays past 40 outside calls or when refused; `GuardClock`: the guard's alarm |
@@ -394,7 +394,7 @@ Broker rules (`stock-access.mjs`, `-credit`): Securities' MAP.md.
 ## 8. Notices (`/push`)
 
 Apps hand the Worker coming notices (`schedulePush`); it sends them by
-Web Push and can check first (an ESPN final, a price, weather, a bus). One device per person per app. Subscriptions live in D1 (`push_kv`, `pushStore(env)`), never read from `RATE_LIMIT_KV` directly: the admin's `push-test`, `pushes`, `broadcast` and account delete (`eco-admin.js`) all go through it; `push-test` answers per subscription (none, accepted by Apple or the push service, gone and removed, failed with its status). Orbit (`/app/`) subscribes with its own worker (scope `/app/`), saved under each framed app's slug;  each kind in `NOTICE_KINDS` can be off; one due in class waits for the break (`classHold`).
+Web Push and can check first (an ESPN final, a price, weather, a bus). One device per person per app; each kind in `NOTICE_KINDS` can be off; one due in class waits for the break (`classHold`).
 
 ## 9. Speeds, capacity and the bill
 
