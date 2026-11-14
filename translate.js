@@ -224,7 +224,10 @@ export async function google(env, texts, to, { fetchImpl = fetch, html = false }
 // The meter is read and written here, once a call.
 export async function translate(env, store, texts, to, { people = [], now = Date.now(), fetchImpl = fetch, cap = TR_MONTH, max = Infinity, force = false, prep = t => t } = {}) {
   const want = [...new Set(texts.map(t => String(t || '').trim()).filter(Boolean))];
-  if (!want.length || !googleKey(env)) return {};
+  // (Off unless env TR_PAID 'on' (11-14): Google bills every character, its free 500,000 never
+  // applied (the bill: NT$67 for this month's 102,517). What's translated stays kept; the rest
+  // shows the outlet's own words.)
+  if (!want.length || !googleKey(env) || env?.TR_PAID !== 'on') return {};
   const meter = await readMeter(store, now);
   // (`force`: a run by hand asks at once, a key just turned on.)
   if (meter.off && meter.off > now && !force) return {};

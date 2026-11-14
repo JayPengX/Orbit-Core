@@ -17,7 +17,7 @@ const googleFake = (seen = []) => async (u, init) => {
   const t = body.q.map(q => (body.target === 'en' ? `EN(${q})` : q.replace(/(^|<\/span>)([^<]+)/g, (_, a, b) => `${a}譯${b.length}`)));
   return new Response(JSON.stringify({ data: { translations: t.map(translatedText => ({ translatedText })) } }));
 };
-const env = { GOOGLE_WEATHER_KEY: 'k' };
+const env = { GOOGLE_WEATHER_KEY: 'k', TR_PAID: 'on' };
 
 test('names: a person stays in English, a well-known one in Taiwan’s Chinese; places and bodies are not people', () => {
   const p = peopleIn(['Karoline Leavitt defended Marco Rubio on Tuesday after the White House said Prime Minister Keir Starmer would visit New York.', 'Examining Jensen Huang, critics say Tim Cook was not told about the deal at the Supreme Court.']);
@@ -121,6 +121,7 @@ test('POST /tr: a Pass’s short texts only, each kept so the next phone asks Go
   const r2 = new Map();
   const env = {
     GOOGLE_WEATHER_KEY: 'k',
+    TR_PAID: 'on',
     RATE_LIMIT_KV: { get: async k => kv.get(k) ?? null, getWithMetadata: async k => ({ value: kv.get(k) ?? null, metadata: null }), put: async (k, v) => void kv.set(k, v) },
     DATA: { get: async k => (r2.has(k) ? { arrayBuffer: async () => new TextEncoder().encode(r2.get(k)).buffer, customMetadata: {} } : null), head: async () => null, put: async (k, v) => void r2.set(k, new TextDecoder().decode(v)) }
   };
@@ -133,4 +134,11 @@ test('POST /tr: a Pass’s short texts only, each kept so the next phone asks Go
   const again = await (await handleTr(req({ to: 'en', texts: ['本公司綠線改道'] }), env, {}, { app: 'transit' }, { fetchImpl })).json();
   assert.deepEqual(again.tr, { 本公司綠線改道: 'EN 7' });
   assert.equal(asks, 1);
+});
+
+test('paid translation is off unless TR_PAID is on (Google bills every character, 11-14)', async () => {
+  let asked = 0;
+  const got = await translate({ GOOGLE_WEATHER_KEY: 'k' }, { json: async () => null, put: async () => true }, ['Hello'], 'zh-TW', { fetchImpl: async () => (asked++, new Response('{}')) });
+  assert.deepEqual(got, {});
+  assert.equal(asked, 0);
 });
