@@ -7,9 +7,10 @@
 //   node brand/generate.mjs match site  only those (looks: Orbit's alone)
 import { writeFile, readFile, mkdir, rm, access } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { BRANDS, FAMILY, PASS, SITE_URL, LOOKS, appIcon, familyMark, homeOf, lookApp, orbitIcon, shortPathOf } from '../kit/brand.mjs';
+import { BRANDS, FAMILY, PASS, SITE_URL, LOOKS, ORBIT_PALETTES, appIcon, familyMark, homeOf, lookApp, orbitIcon, shortPathOf } from '../kit/brand.mjs';
 import { FORMATS, shareCard } from './marks.mjs';
 
 // The global one, or a Mac's in ~/.local/opt/playwright (as tools/preview.mjs).
@@ -229,6 +230,34 @@ if (!only.length || only.includes('site') || only.includes('looks')) {
     await png(orbitIcon(look, { shape: 'maskable' }), 512, `${dir}maskable.png`);
   }
   console.log('wrote site/app: Orbit and', LOOKS.filter(l => !lookApp(l)).length, 'looks');
+}
+// The showcase and Jay's homepage (Orbit-Showcase, at the bare domain): the
+// showcase wears Orbit's mark; each gets link-preview cards (share/), a
+// link with ?v= from its picture.
+if ((!only.length || only.includes('showcase')) && existsSync(`${here}../Orbit-Showcase/public/`)) {
+  const pub = `${here}../Orbit-Showcase/public/`;
+  await writeFile(`${pub}favicon.svg`, familyMark());
+  for (const [file, size] of Object.entries({ 'apple-touch-icon.png': 180, 'icon-192.png': 192, 'icon-512.png': 512 })) await png(familyMark({ shape: 'square' }), size, `${pub}icons/${file}`);
+  await png(familyMark(), 32, `${pub}icons/favicon-32.png`);
+  const night = ORBIT_PALETTES.find(p => p.id === 'night').bg;
+  const sites = [
+    { dir: pub, url: 'https://jaypengx.com/showcase/', who: { short: 'Showcase', brand: 'ORBIT', icon: familyMark(), paint: night, pitch: { zh: '十個 App，都能直接試玩' } } },
+    { dir: `${pub}home/`, url: 'https://jaypengx.com/', who: { short: 'JayPengX', icon: await readFile(`${pub}home/favicon.svg`, 'utf8'), paint: ['#3730a3', '#1e1b4b', '#020617'], pitch: { zh: 'Orbit 系列 App，和它們怎麼做出來的' } } }
+  ];
+  for (const { dir, url, who } of sites) {
+    await cards(who, `${dir}share/`);
+    const v = {};
+    for (const { file } of Object.values(FORMATS)) v[file] = createHash('sha1').update(await readFile(`${dir}share/${file}`)).digest('hex').slice(0, 8);
+    const at = file => `${url}share/${file}?v=${v[file]}`;
+    const block = ['<!-- cards: Orbit-Core brand/generate.mjs -->', `<meta property="og:image" content="${at('og.jpg')}" />`, '<meta property="og:image:width" content="1200" />', '<meta property="og:image:height" content="630" />', `<meta property="og:image" content="${at('square.jpg')}" />`, '<meta property="og:image:width" content="1200" />', '<meta property="og:image:height" content="1200" />', '<meta name="twitter:card" content="summary_large_image" />', `<meta name="twitter:image" content="${at('x.jpg')}" />`, '<!-- /cards -->'].join('\n');
+    const page = await readFile(`${dir}index.html`, 'utf8');
+    const next = page.includes('<!-- cards: Orbit-Core brand/generate.mjs -->')
+      ? page.replace(/<!-- cards: Orbit-Core brand\/generate\.mjs -->[\s\S]*?<!-- \/cards -->/, block)
+      : page.replace(/<meta property="og:image" content="[^"]*" \/>\n<meta name="twitter:card" content="summary" \/>/, block);
+    if (next === page && !page.includes(block)) throw new Error(`${dir}index.html: no card tags to replace`);
+    await writeFile(`${dir}index.html`, next);
+  }
+  console.log('wrote Orbit-Showcase: its icons, its cards and the homepage\'s');
 }
 await browser.close();
 

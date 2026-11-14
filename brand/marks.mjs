@@ -47,6 +47,8 @@ const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 // Whose card: an app id, 'pass', or 'family' (Orbit itself: the home of every
 // app, orbit.<domain>/ and /app/). Orbit Class's own id is 'orbit'.
 function subject(id) {
+  // (A card of its own, as { short, icon, paint, pitch, brand }: the showcase, Jay's homepage.)
+  if (id && typeof id === 'object') return { brand: '', ...id };
   if (id === 'family') return { short: 'Orbit', icon: familyMark({ shape: 'rounded' }), paint: ORBIT_PALETTES.find(p => p.id === 'night').bg, pitch: { zh: '每天用得到的 App，都在這裡' }, brand: '' };
   const a = id === 'pass' ? PASS : BRANDS[id];
   return { short: a.short, icon: appIcon(id), paint: a.paint, pitch: a.pitch, brand: 'ORBIT' };
