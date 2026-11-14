@@ -110,7 +110,7 @@
 <main class="door" id="door" hidden></main>
 <div class="q-suite-frames" id="frames"></div>
 <script type="module">
-  const [{ installGate, isPhoneOrTablet, isStandalone, detectLang, storedAccount, orbitSession, accountSheet }, ui, { APP_ORDER, BRANDS, appIcon }, suite] = await Promise.all([import('#kit/orbit.mjs'), import('#kit/ui.mjs'), import('#kit/brand.mjs'), import('#kit/suite.mjs')]);
+  const [{ installGate, isPhoneOrTablet, isStandalone, detectLang, storedAccount, orbitSession, accountSheet }, ui, { APP_ORDER, BRANDS, appIcon, pathOf }, suite] = await Promise.all([import('#kit/orbit.mjs'), import('#kit/ui.mjs'), import('#kit/brand.mjs'), import('#kit/suite.mjs')]);
   const lang = detectLang();
   const en = lang === 'en';
   if (en) document.documentElement.lang = 'en';
@@ -132,7 +132,7 @@
     held = suite.host(document.getElementById('frames'), { first: { ...first, app }, list: () => showList() });
   };
   // The list of apps, the one used last on top (over the apps held, on a return).
-  const icon = id => Object.assign(document.createElement('img'), { className: 'door-icon', src: `data:image/svg+xml,${encodeURIComponent(appIcon(id))}`, alt: '' });
+  const icon = id => Object.assign(document.createElement('img'), { className: 'door-icon', src: `data:image/svg+xml,${encodeURIComponent(appIcon(id, { crisp: true }))}`, alt: '' });
   // Signed in first (Jay 2026-11-13): Orbit is the Pass's, one sign-in for every app.
   const signedIn = () => !storedAccount || !!storedAccount();
   let session = null;
@@ -165,6 +165,14 @@
     const r = suite.resumeOf(suite.savedSuite(), id);
     hold({ url: r.url, y: r.y });
   };
+  // (Something under way: shown in full, docs/ORBIT.md rule 8.)
+  const openLive = id => {
+    if (held?.full) return void ((door.hidden = true), held.full(id));
+    try {
+      sessionStorage.setItem(suite.FULL_KEY || 'orbit.suite.full', JSON.stringify({ app: id, t: Date.now() }));
+    } catch {}
+    hold({ url: pathOf(id), y: 0 });
+  };
   const role = id => BRANDS[id].role?.[lang] || '';
   function showList() {
     if (!signedIn()) return showSignIn(showList);
@@ -180,14 +188,14 @@
     const rest = APP_ORDER.filter(id => id !== first && !recent.includes(id));
     const head = ui.h('header', { class: 'door-head' }, [ui.h('img', { src: './favicon.svg', alt: '' }), ui.h('div', {}, [ui.h('h1', { text: 'Orbit' }), ui.h('p', { text: dayLine() })])]);
     const row = id =>
-      ui.h('button', { class: 'door-row', type: 'button', style: `--app:${BRANDS[id].color}`, onclick: () => openApp(id) }, [
+      ui.h('button', { class: 'door-row', type: 'button', style: `--app:${BRANDS[id].color}`, onclick: () => (live.has(id) ? openLive(id) : openApp(id)) }, [
         icon(id),
         ui.h('span', { class: 'door-name', text: BRANDS[id].short }),
         live.has(id) ? ui.h('span', { class: 'door-live', text: W('進行中', 'Under way') }) : ui.h('span', { class: 'door-role', text: role(id) }),
       ]);
     const group = (label, ids) => (ids.length ? ui.h('section', { class: 'door-group' }, [label ? ui.h('h2', { text: label }) : null, ui.h('div', { class: 'door-rows' }, ids.map(row))]) : null);
     const hero = first
-      ? ui.h('button', { class: 'door-hero', type: 'button', style: `--app:${BRANDS[first].color}`, onclick: () => openApp(first), 'aria-label': `${BRANDS[first].short}，${live.has(first) ? W('進行中', 'under way') : W('上次用的', 'used last')}` }, [
+      ? ui.h('button', { class: 'door-hero', type: 'button', style: `--app:${BRANDS[first].color}`, onclick: () => (live.has(first) ? openLive(first) : openApp(first)), 'aria-label': `${BRANDS[first].short}，${live.has(first) ? W('進行中', 'under way') : W('上次用的', 'used last')}` }, [
           icon(first),
           ui.h('span', { class: 'door-hero-text' }, [
             live.has(first) ? ui.h('span', { class: 'door-live', text: W('進行中', 'Under way') }) : ui.h('span', { class: 'door-hero-kicker', text: W('接著用', 'Pick up') }),
@@ -217,7 +225,10 @@
     } catch {}
     if (fresh) {
       const saved = suite.savedSuite();
-      for (const id of Object.keys(saved.apps || {})) saved.apps[id] = { ...saved.apps[id], url: saved.apps[id].home || null, y: 0 };
+      // (With something under way, the app looked at last is kept as it was: docs/ORBIT.md rule 3.)
+      const live = (suite.liveNow?.(suite.liveSaved?.() || {}) || []).length > 0;
+      const keep = live ? (BRANDS[saved.last] && saved.last) || suite.lastApp?.(saved) : null;
+      for (const id of Object.keys(saved.apps || {})) if (id !== keep) saved.apps[id] = { ...saved.apps[id], url: saved.apps[id].home || null, y: 0 };
       try {
         localStorage.setItem('orbit.suite.v1', JSON.stringify(saved));
       } catch {}

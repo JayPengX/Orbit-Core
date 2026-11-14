@@ -5652,7 +5652,7 @@ export function tabBar({ tabs, onSelect, onShow = null, hash = id => `#${id}`, n
   const appId = document.documentElement?.dataset?.app;
   const name = BRANDS[appId]?.name || document.getElementById?.('title')?.textContent?.trim() || '';
   if (name) nav.style.setProperty('--q-desk-name', JSON.stringify(name));
-  if (BRANDS[appId]) nav.style.setProperty('--q-desk-mark', `url("data:image/svg+xml,${encodeURIComponent(appIcon(appId))}")`);
+  if (BRANDS[appId]) nav.style.setProperty('--q-desk-mark', `url("data:image/svg+xml,${encodeURIComponent(appIcon(appId, { crisp: true }))}")`);
   const again = id => {
     if ((globalThis.scrollY || 0) > 4) globalThis.scrollTo({ top: 0, behavior: reducedMotion() ? 'auto' : 'smooth' });
     else onSelect(id, { again: true });

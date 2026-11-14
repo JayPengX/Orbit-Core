@@ -132,11 +132,15 @@ export function liveNow(live, now = Date.now()) {
 // The app to open, { app, url, y }, or null for the list.
 export function launchTarget(saved, live, now = Date.now(), away = AWAY_MS) {
   const on = liveNow(live, now)[0];
-  // (At its start, as the app on its own opens: it shows what's under way itself.
-  // The screen it had when minimized was the 路線 sheet, put back: Jay 2026-11-14.)
-  if (on) return { app: on.app, url: pathOf(on.app), y: 0 };
   // (Orbit's window says which app it showed and when it was left: kept apps behind it note their own times too.)
   const last = BRANDS[saved?.last] ? saved.last : lastApp(saved);
+  // Something under way: the app looked at last, as it was left, the one
+  // under way a 進行中 tab beside it (Jay 2026-11-14: a trip running, Orbit
+  // opened again on Transit "rather than what I was looking at"). That app
+  // itself: at its start, as on its own, where it shows what's under way
+  // (the screen it was minimized on was the 路線 sheet).
+  if (on && last && last !== on.app) return { app: last, ...resumeOf(saved, last, now) };
+  if (on) return { app: on.app, url: pathOf(on.app), y: 0 };
   const left = Number(saved?.left) || Number(saved?.apps?.[last]?.t) || 0;
   if (!last || now - left >= away) return null;
   return { app: last, ...resumeOf(saved, last, now) };
@@ -152,6 +156,18 @@ export function setLive(id, on, { url = null, until = null } = {}) {
   writeJson('localStorage', LIVE_KEY, all);
 }
 export const liveSaved = () => readJson('localStorage', LIVE_KEY) || {};
+// The 進行中 tab tapped: what's under way shown in full (a minimized trip's
+// navigation), not the screen it was left on. The app asks once, at its
+// start and on the window's 'orbit-full' event: takeFull('transit').
+export const FULL_KEY = 'orbit.suite.full';
+export function takeFull(id) {
+  const want = readJson('sessionStorage', FULL_KEY);
+  if (!want || want.app !== id || Date.now() - (Number(want.t) || 0) > 60_000) return false;
+  try {
+    globalThis.sessionStorage?.removeItem(FULL_KEY);
+  } catch {}
+  return true;
+}
 
 // ---- On the device ----
 const readJson = (store, key) => {
@@ -301,7 +317,7 @@ const en = () => /^en/i.test(document.documentElement.lang || '');
 const W = (zh, e) => (en() ? e : zh);
 const icons = new Map();
 const iconOf = id => {
-  if (!icons.has(id)) icons.set(id, `data:image/svg+xml,${encodeURIComponent(appIcon(id))}`);
+  if (!icons.has(id)) icons.set(id, `data:image/svg+xml,${encodeURIComponent(appIcon(id, { crisp: true }))}`);
   return icons.get(id);
 };
 const short = id => BRANDS[id]?.short || id;
@@ -356,7 +372,7 @@ function drawTabs(H) {
   bar.replaceChildren(
     el('button', { class: 'q-suite-btn q-suite-switch', type: 'button', 'aria-label': W(`切換 App（現在：${short(app)}）`, `Switch apps (now ${short(app)})`), onclick: () => switcher() }, [img(app), el('span', { class: 'q-suite-chev', html: svg(DOWN) })]),
     ...tabs.slice(0, max).map(x =>
-      el('button', { class: `q-suite-btn q-suite-tab${x.live ? ' q-suite-on' : ''}`, type: 'button', 'aria-label': W(`${short(x.app)}${x.live ? '（進行中）' : ''}`, `${short(x.app)}${x.live ? ' (under way)' : ''}`), onclick: () => (remember(), H.go(x.app)) }, [img(x.app), x.live ? el('span', { class: 'q-suite-dot', 'aria-hidden': 'true' }) : null, x.live ? el('span', { class: 'q-suite-live', text: W('進行中', 'Live') }) : null])
+      el('button', { class: `q-suite-btn q-suite-tab${x.live ? ' q-suite-on' : ''}`, type: 'button', 'aria-label': W(`${short(x.app)}${x.live ? '（進行中）' : ''}`, `${short(x.app)}${x.live ? ' (under way)' : ''}`), onclick: () => (remember(), x.live && H.full ? H.full(x.app) : H.go(x.app)) }, [img(x.app), x.live ? el('span', { class: 'q-suite-dot', 'aria-hidden': 'true' }) : null, x.live ? el('span', { class: 'q-suite-live', text: W('進行中', 'Live') }) : null])
     )
   );
   place();
@@ -428,8 +444,9 @@ async function switcher() {
         icon: img(x.app),
         title: short(x.app),
         sub: x.live ? W('進行中', 'Under way') : x.app === app ? W('目前', 'Open') : BRANDS[x.app].role?.[en() ? 'en' : 'zh'] || '',
-        trailing: el('button', { class: 'q-suite-x', type: 'button', 'aria-label': W(`關閉 ${short(x.app)}`, `Close ${short(x.app)}`), html: svg('M7 7l10 10M17 7L7 17'), onclick: e => (e.stopPropagation(), shut(x.app)) }),
-        onClick: () => (close(), x.app === app ? null : H.go(x.app))
+        // (Something under way isn't closed from here: it's ended in its app.)
+        trailing: x.live ? null : el('button', { class: 'q-suite-x', type: 'button', 'aria-label': W(`關閉 ${short(x.app)}`, `Close ${short(x.app)}`), html: svg('M7 7l10 10M17 7L7 17'), onclick: e => (e.stopPropagation(), shut(x.app)) }),
+        onClick: () => (close(), x.live && H.full ? H.full(x.app) : x.app === app ? null : H.go(x.app))
       });
       row.set(x.app, r);
       return r;
@@ -837,7 +854,18 @@ export function host(box, { first = null, list = null } = {}) {
     // The apps open here, the latest first, and which have something under way.
     tabs() {
       const on = liveSet();
-      return [...frames.values()].sort((a, b) => b.used - a.used).map(f => ({ app: f.app, live: on.has(f.app) }));
+      const held = [...frames.values()].sort((a, b) => b.used - a.used).map(f => ({ app: f.app, live: on.has(f.app) }));
+      // (Under way but not open here, as after Orbit was closed: a tab all the same.)
+      return [...held, ...[...on].filter(id => BRANDS[id] && !frames.has(id)).map(id => ({ app: id, live: true }))];
+    },
+    // What's under way in that app, in full (its 進行中 tab): takeFull.
+    full(id) {
+      if (!BRANDS[id]) return;
+      writeJson('sessionStorage', FULL_KEY, { app: id, t: Date.now() });
+      api.go(id);
+      try {
+        frames.get(id)?.el.contentWindow?.dispatchEvent(new Event('orbit-full'));
+      } catch {}
     },
     // An app closed (✕): the one shown closed shows the latest other, or the list.
     close(id) {
