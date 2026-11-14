@@ -7163,8 +7163,9 @@ html[data-look='native'] :is(.q-reorder-lift, .q-reorder-land) {
 /* An app held in Orbit's window: its scroll that runs past the end bounces
    there, never carries on into Orbit's window (which moved, tabs and all:
    Jay 2026-11-14, News at the foot of 媒體). */
-html.q-in-suite {
-  overscroll-behavior-y: contain;
+html.q-in-suite,
+html.q-in-suite body {
+  overscroll-behavior-y: none;
 }
 /* ---- Orbit's window (kit/suite.mjs): every app in one home-screen app ----
    Only there (html.q-in-suite): one slim glass capsule at the top line's

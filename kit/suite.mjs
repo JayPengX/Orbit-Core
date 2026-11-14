@@ -517,6 +517,44 @@ async function warm() {
   }
 }
 
+// An app's page held in a frame: its own scroll stops at either end, with no
+// bounce. On an iPhone a frame's page that bounced past its foot took its
+// fixed tab bar up with it, the black of the frame under (Jay 2026-11-14,
+// Sports 賽事); overscroll-behavior alone isn't kept there. A drag that
+// would only pull the page past an end is held, unless something inside it
+// (a sheet, a list) still has room to scroll that way.
+// past(top, height, view, dy): dy > 0 the finger going down (to the top).
+export const pastEnd = (top, height, view, dy) => (dy > 0 && top <= 0) || (dy < 0 && top + view >= height - 1);
+function roomIn(el, dy, root) {
+  for (let n = el; n && n !== root.body && n !== root.documentElement; n = n.parentElement) {
+    if (n.scrollHeight <= n.clientHeight + 1) continue;
+    if (!/auto|scroll/.test(globalThis.getComputedStyle?.(n).overflowY || '')) continue;
+    if (!pastEnd(n.scrollTop, n.scrollHeight, n.clientHeight, dy)) return true;
+  }
+  return false;
+}
+function noBounce(root = document) {
+  let x = 0;
+  let y = 0;
+  root.addEventListener('touchstart', e => e.touches.length === 1 && ((x = e.touches[0].clientX), (y = e.touches[0].clientY)), { passive: true });
+  root.addEventListener(
+    'touchmove',
+    e => {
+      if (e.touches.length !== 1 || !e.cancelable) return;
+      const dy = e.touches[0].clientY - y;
+      // (A sideways swipe, a carousel's or a row's, is never held.)
+      if (!dy || Math.abs(e.touches[0].clientX - x) > Math.abs(dy)) return;
+      // (A map, a drawing, a slider: their own drag.)
+      if (e.target.closest?.('.leaflet-container, .maplibregl-map, .gm-style, canvas, input[type=range], [data-own-drag]')) return;
+      const se = root.scrollingElement || root.documentElement;
+      if (!pastEnd(se.scrollTop, se.scrollHeight, globalThis.innerHeight || se.clientHeight, dy) || roomIn(e.target, dy, root)) return;
+      // (The pull-to-refresh at the top is the app's own, drawn by kit ui.mjs: it still runs.)
+      e.preventDefault();
+    },
+    { passive: false },
+  );
+}
+
 let started = false;
 export function start() {
   if (started || typeof document === 'undefined') return;
@@ -530,7 +568,10 @@ export function start() {
   } catch {}
   const H = hostOf();
   // (Held by Orbit's window: it keeps the trail; asked to redraw when shown.)
-  if (H) globalThis.__orbitSuite = { draw: () => draw(), remember: () => remember(), app };
+  if (H) {
+    globalThis.__orbitSuite = { draw: () => draw(), remember: () => remember(), app };
+    noBounce();
+  }
   // An app page opened as the whole window on a phone (a notice, an old
   // trail): into Orbit's window, which holds it with the others.
   else if (globalThis.matchMedia?.('(display-mode: standalone)').matches || globalThis.navigator?.standalone === true) {
