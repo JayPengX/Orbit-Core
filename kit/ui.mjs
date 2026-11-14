@@ -190,7 +190,7 @@ export function dayStrip(s, { days = [], current = null, onPick = () => {}, labe
     s.key = key;
     const again = anchor && s.row.querySelector(`[data-day="${anchor.day}"]`);
     if (again) s.row.scrollLeft += again.getBoundingClientRect().left - s.row.getBoundingClientRect().left - anchor.at;
-    else s.reveal ??= 'center';
+    else s.reveal ??= 'jump';
   }
   for (const chip of s.row.children) chip.setAttribute('aria-pressed', String(chip.dataset.day === current));
   // A day chosen elsewhere (📅, a swipe): brought into view; one tapped on the
@@ -207,8 +207,24 @@ export function dayStrip(s, { days = [], current = null, onPick = () => {}, labe
   s.edges();
   return s.wrap;
 }
-// dayStrip's record: the next draw brings the chosen day to the middle.
-export const dayRecenter = s => void (s.reveal = 'center');
+// A section switched to (a tab, a door, a topic) comes in from the side of
+// the one it's beside, a short glide on the screen's own thread (opacity and
+// a move: nothing laid out again), never a cut (Jay 2026-11-14: "switching
+// between these should be more animated and smooth"). dir: 1 from the right,
+// -1 from the left, 0 rising in place. Returns the animation (or null).
+export const GLIDE_MS = 240;
+export function glideIn(el, dir = 0) {
+  if (!el || reduced() || typeof el.animate !== 'function') return null;
+  el.getAnimations?.().forEach(a => a.id === 'q-glide' && a.cancel());
+  const from = dir ? `translateX(${Math.sign(dir) * 24}px)` : 'translateY(8px)';
+  const a = el.animate([{ transform: from, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: GLIDE_MS, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+  a.id = 'q-glide';
+  return a;
+}
+// dayStrip's record: the next draw brings the chosen day to the middle, at
+// once (days come in, the page drawn again: nobody moved, nothing glides;
+// Jay 2026-11-14, Law's 議程 "animate and scroll when I come").
+export const dayRecenter = s => void (s.reveal = 'jump');
 function daySync(s) {
   const v = s.clamp(s.current || new Date().toISOString().slice(0, 10)) || '';
   if (s.input.value !== v) s.input.value = v;
@@ -220,12 +236,13 @@ function firstDayInView(row) {
   return chip ? { day: chip.dataset.day, at: chip.getBoundingClientRect().left - left } : null;
 }
 // The chosen chip to the middle of the row once the row has a width (drawn
-// under the loading screen it has none): at once the first time, gently after.
+// under the loading screen it has none): at once the first time and when the
+// days were only drawn again ('jump'), gently for a day the person chose.
 function dayReveal(s) {
   const go = () => {
     const chip = s.row.querySelector('[aria-pressed="true"]');
     if (!chip || !s.row.isConnected || !s.row.clientWidth) return false;
-    s.row.scrollTo({ left: chip.offsetLeft - s.row.offsetLeft - s.row.clientWidth / 2 + chip.clientWidth / 2, behavior: s.shown ? 'smooth' : 'auto' });
+    s.row.scrollTo({ left: chip.offsetLeft - s.row.offsetLeft - s.row.clientWidth / 2 + chip.clientWidth / 2, behavior: s.shown && s.reveal !== 'jump' ? 'smooth' : 'auto' });
     s.reveal = null;
     s.shown = true;
     return true;
