@@ -9,8 +9,10 @@
 //   (the bus packs: GitHub's weekly build from TDX's GTFS since 2026-11,
 //   tools/gtfs-buses.mjs, started from here: :22 at 19 UTC daily, kickBuses,
 //   when none ran in a week; buses.js runBuses only by hand, POST /data/build?job=buses)
-//   :04 :24 :34 :54  the family's AI made once (ai.js: news lines, game recaps and previews, word cards);
-//                then the listed companies' 重大訊息 (filings.js)
+//   :04 :34      the family's AI made once (ai.js: news lines, game recaps and previews, word cards);
+//                then the listed companies' 重大訊息 (filings.js). Twice an hour: with the bulk AI
+//                paused it's the lead stories ahead and the facts /ai/open reads, a minute
+//                of the Runner each run (11-14)
 //   :00 :10 :18 :30 :40 :50  Orbit News' stories (every outlet's feed, news.js),
 //                and its site published when News's main moved (newsSite)
 //   :14 :44      預測市場: Polymarket's markets beside the stories they're about (news-markets.js)
@@ -45,7 +47,7 @@ export const WINPROB_HOUR = 23;
 // `proxy(url, trim)`: a read through the data proxy's route (its trims and edge cache), its JSON or null.
 // One job a run (each run its own 30 s of CPU: the whole hour's work in one
 // went past it, 2026-10-13), each on its own even minute of the hour.
-export const SLOTS = { 0: 'news', 4: 'ai', 6: 'f1kept', 10: 'news', 14: 'markets', 16: 'watch', 18: 'news', 20: 'cutouts', 22: 'daily', 24: 'ai', 26: 'f1kept', 30: 'news', 34: 'ai', 40: 'news', 44: 'markets', 46: 'f1kept', 50: 'news', 54: 'ai' };
+export const SLOTS = { 0: 'news', 4: 'ai', 6: 'f1kept', 10: 'news', 14: 'markets', 16: 'watch', 18: 'news', 20: 'cutouts', 22: 'daily', 26: 'f1kept', 30: 'news', 34: 'ai', 40: 'news', 44: 'markets', 46: 'f1kept', 50: 'news' };
 
 // `proxy(url, trim)`: a read through the data proxy's route (its trims and edge cache), its JSON or null.
 // `pace` (pace.js): at 1 only what phones would miss runs, from 2 nothing
