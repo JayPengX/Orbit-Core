@@ -42,6 +42,8 @@ import { breakAfter, mergeHeard } from './family.mjs';
 import './steady-pics.mjs';
 // (A phone's own outside reads counted, and sent back when one fails: source-watch.mjs, on import.)
 import './source-watch.mjs';
+// (How the apps are used, as counts with no id: usage.mjs, on import; its switch on the Pass sheet.)
+import { usageProbe, usageTab, usageOn, setUsageOn, adoptUsage, usageNoticeSeen, markUsageNotice } from './usage.mjs';
 
 export const ECO_URL = `${API}/eco`;
 export const PROXY_URL = `${API}/sports-proxy`;
@@ -413,6 +415,9 @@ export function storedAccount() {
   const id = readStore(KEY.account) || '';
   return /^[0-9a-f]{16}$/.test(id) && readStore(KEY.refresh) ? id : '';
 }
+// (What usage.mjs counts a device by: signed in or not, in Orbit or not; never who.)
+usageProbe.signed = () => Boolean(storedAccount());
+usageProbe.inSuite = () => inSuite();
 function accountOf(refresh) {
   try {
     const body = String(refresh).split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
@@ -1995,6 +2000,7 @@ function makeSession(app, { lang, heartbeat }) {
     // The pass's notice switches (newer here: sent up).
     adoptNotifyPrefs(w);
     adoptLinkWay(w);
+    adoptUsage(w);
     emit('wallet', w);
     setTimeout(() => syncPrefs(s), 0);
     setTimeout(() => syncOrbits(s), 0);
@@ -2319,8 +2325,10 @@ function makeSession(app, { lang, heartbeat }) {
     // Worker opens nothing else with it; eco.js freshPass).
     if (first?.fresh) first = await freshGate(s, first);
     s.first = first;
-    // A while after opening signed in: the one-time passkey offer.
-    // (Then, on an open it didn't show, the recovery email's.)
+    // A moment after opening: the one-time note on usage counts (usageNotice);
+    // a while after, signed in: the passkey offer (then, on an open it didn't
+    // show, the recovery email's).
+    setTimeout(() => usageNotice(s), 4_000);
     if (!first?.offline) setTimeout(() => passkeyOffer(s).then(shown => shown || mailOffer(s)).catch(() => {}), 12_000);
     // The loading screen's line (boot.js): signed in, the app's data next.
     globalThis.__bootStep?.('', 0.8);
@@ -3270,6 +3278,8 @@ export function passAccount(s, { extra = null, close = () => {}, looks = () => {
     node('h3', { class: 'q-sheet-h', text: T('通知', 'Notifications') }),
     ...notifyRows(s, note),
     ...(inHomeApp() ? [node('h3', { class: 'q-sheet-h', text: T('連結', 'Links') }), linkRows(s)] : []),
+    node('h3', { class: 'q-sheet-h', text: T('隱私', 'Privacy') }),
+    usageRows(s),
     testerHead(s, T('除錯紀錄', 'Debug log'), close),
     recRows(s, note),
     ...(testerOn() ? [node('div', { class: 'q-rows' }, [act(T('測試工具', 'Tester tools'), () => (close(), openTester(s)))])] : []),
@@ -4106,6 +4116,57 @@ function linkRows(s) {
       })
     ])
   ]);
+}
+
+// ---- Usage counts (usage.mjs): the switch and the one-time note ----------------
+// (Jay 2026-11-14: collect what helps, with a policy.) Counts with no id;
+// what and why: /privacy/. On unless turned off here, following the pass.
+export const PRIVACY_URL = `${HOME}/privacy/`;
+export const TERMS_URL = `${HOME}/terms/`;
+// (Over the app, never in its place: a Home Screen app has no back button.)
+const openPolicy = (url = PRIVACY_URL) => globalThis.open?.(url, '_blank', 'noopener');
+function usageRows(s) {
+  const en = s.lang === 'en';
+  const T = (zh, e) => (en ? e : zh);
+  const gpc = globalThis.navigator?.globalPrivacyControl === true;
+  const say = () => (gpc ? T('瀏覽器要求不追蹤：不傳送', 'Your browser asks not to be tracked: nothing sent') : usageOn() ? T('只有匿名的次數，不知道你是誰', 'Anonymous counts only, never who you are') : T('關閉：什麼都不傳送', 'Off: nothing is sent'));
+  const sub = node('small', { class: 'q-notice-sub', text: say() });
+  const policy = node('button', { class: 'q-row-btn', type: 'button', text: T('隱私權政策與使用條款', 'Privacy policy and terms'), onclick: () => openPolicy() });
+  return node('div', { class: 'q-rows' }, [
+    node('div', { class: 'q-notice-row master' }, [
+      tile(icons.chart || icons.ai || '', 'var(--q-gray, #8e8e93)'),
+      node('div', { class: 'q-notice-text' }, [node('strong', { text: T('使用統計', 'Usage stats') }), sub]),
+      gpc
+        ? node('span')
+        : toggle(usageOn(), T('使用統計', 'Usage stats'), on => {
+            setUsageOn(on, s);
+            sub.textContent = say();
+            return true;
+          })
+    ]),
+    policy
+  ]);
+}
+// Once on a device, a moment after an app opens: what's counted, the
+// policy, and off in one tap (a quiet banner, as Orbit's others).
+export function usageNotice(s) {
+  if (typeof document === 'undefined' || usageNoticeSeen() || !usageOn() || globalThis.navigator?.webdriver || installCovered) return;
+  if (document.querySelector('dialog[open]') || document.visibilityState === 'hidden' || bannerEl?.isConnected) return;
+  const T = (zh, e) => (s?.lang === 'en' ? e : zh);
+  const shown = quietTip({
+    mark: node('span', { class: 'q-tip-mark', html: icons.chart || icons.ai || '' }),
+    label: T('使用統計', 'Usage stats'),
+    title: T('匿名使用統計', 'Anonymous usage stats'),
+    line: T('Orbit 只記哪些功能被打開、快不快、有沒有出錯，不知道你是誰。', 'Orbit counts which features open, how fast and what breaks, never who you are.'),
+    go: T('隱私權政策', 'Privacy policy'),
+    never: T('關閉統計', 'Turn off'),
+    onGo: () => openPolicy(),
+    onNever: () => {
+      setUsageOn(false, s);
+      toast(T('使用統計已關閉', 'Usage stats are off'));
+    }
+  });
+  if (shown) markUsageNotice();
 }
 
 // Where a notice's tap points (its #hash), in the open page: a new hash as
@@ -6161,6 +6222,7 @@ export function tabBar({ tabs, onSelect, onShow = null, hash = id => `#${id}`, n
   // the page to one screen), is taken there once the app has drawn the tab.)
   let want = 0;
   const choose = id => {
+    usageTab(id);
     lit(id);
     cancelAnimationFrame(pending);
     clearTimeout(mend);

@@ -30,7 +30,7 @@
 //                          for any symbol, for when Yahoo answers 429)
 //
 //   app   sports | securities | words | orbit | weather | transit | beats | law | money | news (or the repo's folder name)
-//         | admin [overview accounts money health usage dev tools]  (the admin panel, made-up accounts, --people n of them; money: the 證券的錢 sheet)
+//         | admin [overview accounts use money health usage dev tools]  (the admin panel, made-up accounts, --people n of them; money: the 證券的錢 sheet)
 //
 // Orbit Transit: /transit is answered by transit.js itself on made-up TDX
 // answers around 新竹車站 (tests/fixtures/transit; until the TDX key is set no
@@ -945,6 +945,24 @@ if (key === 'admin') {
   const { logCall } = await import('../gemini-use.js');
   const usage = { promptTokenCount: 1800, cachedContentTokenCount: 400, candidatesTokenCount: 220, thoughtsTokenCount: 90 };
   for (let i = 0; i < 60; i++) await logCall(env, { feature: ['law-ask', 'law-chat', 'money-read', 'nl-edit'][i % 4], model: i % 4 === 1 ? 'gemini-3.7-flash' : 'gemini-3.5-flash-lite', status: i === 7 ? 429 : 200, usage, at: Date.now() - i * 2.7 * 3_600_000 });
+  // (使用, made up: 35 days of usage beacons, usage.js over the same D1.)
+  {
+    const { takeUsage, flushUsage } = await import('../usage.js');
+    const { weekOf } = await import('../kit/usage.mjs');
+    const apps = ['money', 'transit', 'match', 'orbit', 'weather', 'news', 'suite'];
+    const tabs = { money: ['today', 'month', 'add'], transit: ['map', 'plan', 'near'], match: ['today', 'follow'], orbit: ['now', 'week', 'todo'], weather: ['now', 'week'], news: ['top', 'side'], suite: ['home'] };
+    const dims = i => ({ where: ['orbit', 'home', 'web'][i % 3], dev: ['phone', 'phone', 'tablet', 'computer'][i % 4], os: ['ios', 'ios', 'android', 'mac'][i % 4], lang: i % 5 ? 'zh' : 'en', theme: i % 3 ? 'dark' : 'light', signed: i % 4 ? 'yes' : 'no' });
+    for (let d = 34; d >= 0; d--) {
+      const t = now - d * DAY;
+      const people = 6 + Math.round(10 * (1 - d / 35)) + (d % 7 === 0 ? 3 : 0);
+      for (let i = 0; i < people; i++) {
+        const app = apps[(i + d) % apps.length];
+        const firstWeek = weekOf(new Date(t - (i % 5) * 7 * DAY + 8 * 3_600_000).toISOString().slice(0, 10));
+        takeUsage({ v: 1, app, open: 1 + (i % 3), day: [1, 1], week: [i % 3 === 0 ? 1 : 0, i % 3 === 0 ? 1 : 0], month: [i % 9 === 0 ? 1 : 0, i % 9 === 0 ? 1 : 0], fresh: [i === 0 ? 1 : 0, i === 0 ? 1 : 0], dims: dims(i + d), coh: firstWeek, tabs: Object.fromEntries(tabs[app].map((k, j) => [k, 1 + ((i + j) % 4)])), step: i % 6 === 0 ? { 'pass:signin-shown': 1, ...(i % 12 === 0 ? { 'pass:signin-ok': 1 } : {}) } : {}, load: 400 + ((i * 397 + d * 131) % 4200), sec: 60 + ((i * 53) % 900), err: i % 9 === 0 ? { "Cannot read properties of undefined (reading '…') @app.js:#": 1 } : {} }, t);
+      }
+    }
+    await flushUsage(env, null, { force: true });
+  }
   // (外部來源, made up: a day of the proxy's and phones' calls, one source
   // broken for two hours, one unsteady; the jobs' heartbeats; R2's and Law's ages.)
   {

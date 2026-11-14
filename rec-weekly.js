@@ -152,3 +152,29 @@ export async function runRecWeekly({ store, env, ctx, cap, now = Date.now(), aiO
   await store.put(REC_WEEKLY, out, { always: true });
   return { week, reports: reports.length, groups: groups.length, m: out.m, failed: out.failed };
 }
+
+// Sent 除錯紀錄 go after REC_KEEP_DAYS (the privacy policy's word; the
+// nightly backup's slot). One R2 list of the days, then their files.
+export const REC_KEEP_DAYS = 90;
+export async function pruneReports(env, now = Date.now()) {
+  if (!env?.DATA) return { off: true };
+  const before = twDay(now - REC_KEEP_DAYS * DAY);
+  const days = [];
+  let cursor;
+  do {
+    const r = await env.DATA.list({ prefix: REC_PREFIX, delimiter: '/', cursor });
+    for (const p of r.delimitedPrefixes || []) {
+      const day = p.slice(REC_PREFIX.length, -1);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(day) && day < before) days.push(p);
+    }
+    cursor = r.truncated ? r.cursor : undefined;
+  } while (cursor);
+  let removed = 0;
+  for (const prefix of days.slice(0, 30)) {
+    const r = await env.DATA.list({ prefix, limit: 1000 });
+    const keys = r.objects.map(o => o.key);
+    if (keys.length) await env.DATA.delete(keys);
+    removed += keys.length;
+  }
+  return { removed };
+}
