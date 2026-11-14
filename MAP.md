@@ -47,7 +47,7 @@ orbit-site (site.js): the domain's hosts as custom domains
 | Orbit Securities | `stock` | `/securities/` | Orbit-Securities | `stock-study-accounts` |
 
 Order: `APP_ORDER`. Orbit-Showcase: Jay's homepage, `/showcase/`. This repo's site has the family page
-(`/`) and the admin page (`site/admin/`). A new app: a `slug` in
+(`/`) and the admin page (`site/admin/`, at `/admin/` alone). A new app: a `slug` in
 `kit/brand.mjs` and a collection in `eco.js` `ECO_APPS`.
 
 **An app's shape.** `public/index.html` is `<html data-look="native">` (DESIGN
@@ -431,7 +431,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   it is set. Each repo publishes its built site with `deploy/cf-site.mjs`
   (§4.2; `SITE_HEADERS`, `site/_headers`: no other site's frame): `orbit.<DOMAIN>/<slug>/` every app (`slug`,
   `SHORT` in `kit/brand.mjs`; one origin, so one Pass sign-in), `orbit-pass`
-  for `/`, `/pass/`, `/key/`, `/app/` (Orbit, `kit/suite.mjs`), `/Orbit-Core/` and the old `/Shared-Proxy/`,
+  for `/`, `/pass/`, `/key/`, `/app/` (Orbit, `kit/suite.mjs`), `/admin/`, `/Orbit-Core/` and the old `/Shared-Proxy/`,
   `orbit-home` for `<DOMAIN>/`, `/showcase/` (Orbit-Showcase).
   Mail in is refused. `deploy.yml`
   attaches the hostnames (its token needs the zone and D1 Edit); the guard

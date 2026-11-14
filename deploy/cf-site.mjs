@@ -11,6 +11,7 @@
 //   an app (kit/brand.mjs SHORT)  orbit.<d>/<slug>…  → orbit-<slug>
 //   Orbit-Core                    orbit.<d>/… bar the apps: / (the family's home), /pass/ (→ /),
 //                                 /key/ (the public giveaway, gift.js),
+//                                 /admin/ (the owner's panel, there alone),
 //                                 /app/ (Orbit, every app in one: kit/suite.mjs),
 //                                 /Orbit-Core/ (and the old /Shared-Proxy/);
 //                                 <d>/Orbit-Core/ → orbit-pass
@@ -38,15 +39,18 @@ export function siteFor(repo, domain = DOMAIN) {
     const kitRoots = ['Orbit-Core', 'Shared-Proxy'];
     return {
       name: 'orbit-pass',
-      put: [['', '/pass'], ['index.html', '/index.html'], ...kitRoots.map(r => ['', `/${r}`]), ['key', '/key'], ['app', '/app'], ['favicon.ico', '/favicon.ico'], ['icons/apple-touch-icon.png', '/apple-touch-icon.png'], ['icons/apple-touch-icon.png', '/apple-touch-icon-precomposed.png']],
+      put: [['', '/pass'], ['index.html', '/index.html'], ...kitRoots.map(r => ['', `/${r}`]), ['key', '/key'], ['app', '/app'], ['admin', '/admin'], ['favicon.ico', '/favicon.ico'], ['icons/apple-touch-icon.png', '/apple-touch-icon.png'], ['icons/apple-touch-icon.png', '/apple-touch-icon-precomposed.png']],
+      // (The owner's panel at /admin/ alone, Jay 2026-11-14: not also under /pass/ and the kit's
+      // paths, where it was until then; those addresses go to it.)
+      skip: ['admin'],
       // The whole orbit. host bar the apps' paths (theirs are more
       // specific, so they win): the root, the family page, the kit, the root
       // icons, and a 404 for anything else. The kit on the bare host too
       // (the showcase loads it).
       routes: [`${orbit}/*`, ...kitRoots.map(r => `${d}/${r}*`)],
       // (The family's home is the root since 2026-11-14, Jay: "orbit.jaypengx.com is the home for
-      // all those apps"; its pictures stay under /pass/, and the admin page at /pass/admin/.)
-      redirects: ['/pass/ / 301', '/pass/index.html / 301']
+      // all those apps"; its pictures stay under /pass/.)
+      redirects: ['/pass/ / 301', '/pass/index.html / 301', ...['/pass', ...kitRoots.map(r => `/${r}`)].flatMap(at => [`${at}/admin https://${orbit}/admin/ 301`, `${at}/admin/ https://${orbit}/admin/ 301`, `${at}/admin/* https://${orbit}/admin/:splat 301`])]
     };
   }
   if (repo === 'Orbit-Showcase') {
@@ -77,7 +81,7 @@ export const SITE_HEADERS = "/*\n  Access-Control-Allow-Origin: *\n  X-Content-T
 
 // A repo's own _headers (its paths as on its own site, e.g. /samples/*),
 // moved under each place the build is put (/beats/samples/*).
-export function ownHeaders(text, put) {
+export function ownHeaders(text, put, skip = []) {
   const blocks = [];
   let cur = null;
   for (const line of String(text || '').split('\n')) {
@@ -87,9 +91,10 @@ export function ownHeaders(text, put) {
   }
   const out = [];
   for (const [from, to] of put) {
-    if (from !== '') continue;
     const at = to === '/' ? '' : to;
-    for (const b of blocks) if (b.path.startsWith('/') && b.rules.length) out.push(at + b.path, ...b.rules);
+    // (A folder put on its own path carries its part: /admin/* with ['admin', '/admin'].)
+    const mine = from === '' ? b => b.path.startsWith('/') && !skip.some(f => b.path.startsWith(`/${f}/`)) : b => b.path.startsWith(`/${from}/`);
+    for (const b of blocks) if (mine(b) && b.rules.length) out.push(at + (from === '' ? b.path : b.path.slice(from.length + 1)), ...b.rules);
   }
   return out.length ? out.join('\n') + '\n' : '';
 }
@@ -119,6 +124,7 @@ async function main() {
     else await mkdir(join(dest, '..'), { recursive: true }).then(() => cp(src, dest));
   }
   for (const junk of ['_redirects', '_headers', '.assetsignore']) for (const [, to] of site.put) await rm(join(out, to, junk), { force: true }).catch(() => {}); // (a file put, e.g. /favicon.ico: nothing under it)
+  for (const [from, to] of site.put) if (from === '') for (const s of site.skip || []) await rm(join(out, to, s), { recursive: true, force: true });
   const own = await readFile(join(resolve(built), '_headers'), 'utf8').catch(() => '');
   const files = await walk(out);
   if (files.length > MAX_FILES) throw new Error(`${files.length} files: over ${MAX_FILES}`);
@@ -128,7 +134,7 @@ async function main() {
   const taken = new Set(site.redirects.map(r => r.split(/\s+/)[0]));
   const redirects = [...site.redirects, ...folderRules(files).filter(r => !taken.has(r.split(' ')[0]))];
   await writeFile(join(out, '_redirects'), redirects.join('\n') + '\n');
-  await writeFile(join(out, '_headers'), ownHeaders(own, site.put) + SITE_HEADERS);
+  await writeFile(join(out, '_headers'), ownHeaders(own, site.put, site.skip) + SITE_HEADERS);
   const zone = DOMAIN.trim().toLowerCase();
   const config = {
     name: site.name,

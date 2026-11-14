@@ -33,11 +33,13 @@ test('every static site: nosniff and framed only by its own pages; the admin pan
   assert.match(SITE_HEADERS, /Content-Security-Policy: frame-ancestors 'self'/);
   // (The kit stays readable from the bare domain: the showcase loads it.)
   assert.match(SITE_HEADERS, /Access-Control-Allow-Origin: \*/);
-  const admin = ownHeaders(readFileSync(new URL('../site/_headers', import.meta.url), 'utf8'), siteFor('Orbit-Core').put);
-  for (const at of ['/pass/admin/*', '/Orbit-Core/admin/*']) {
-    const block = admin.split(/\n(?=\/)/).find(b => b.startsWith(at));
-    assert.ok(block, at);
-    assert.match(block, /frame-ancestors 'none'/);
-    assert.match(block, /X-Frame-Options: DENY/);
-  }
+  const core = siteFor('Orbit-Core');
+  const admin = ownHeaders(readFileSync(new URL('../site/_headers', import.meta.url), 'utf8'), core.put, core.skip);
+  const blocks = admin.split(/\n(?=\/)/);
+  const block = blocks.find(b => b.startsWith('/admin/*'));
+  assert.ok(block, '/admin/*');
+  assert.match(block, /frame-ancestors 'none'/);
+  assert.match(block, /X-Frame-Options: DENY/);
+  // (Only there: no copy of it under /pass/ or the kit's paths.)
+  assert.deepEqual(blocks.filter(b => /^\/[^/\s]+\/admin\//.test(b)), []);
 });

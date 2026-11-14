@@ -211,7 +211,7 @@ export function mailRender(input = {}) {
 // ---- The admin panel's alerts (mail-alerts.js) ----
 const TONE = { bad: { dot: '#dc2626', bg: '#fef2f2', zh: '要處理', en: 'Needs you' }, warn: { dot: '#d97706', bg: '#fffbeb', zh: '注意', en: 'Heads-up' }, ok: { dot: '#16a34a', bg: '#f0fdf4', zh: '已恢復', en: 'Recovered' } };
 // issues: [{ tone: 'bad'|'warn', title, detail, go, again }], fixed: [{ title }].
-export function alertMail({ issues = [], fixed = [], admin = `${SITE}/Orbit-Core/admin/`, lang = 'zh', test = false } = {}) {
+export function alertMail({ issues = [], fixed = [], admin = `${SITE}/admin/`, lang = 'zh', test = false } = {}) {
   const W = WORDS[lang === 'en' ? 'en' : 'zh'];
   const zh = lang !== 'en';
   const bad = issues.filter(i => i.tone === 'bad').length;

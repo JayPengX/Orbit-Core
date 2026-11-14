@@ -68,7 +68,7 @@ test('admin: 現在在用’s priority passes are the account list’s own rows,
 });
 
 test('admin: an action says what it did after the sheet redraws (a toast), and what the server would refuse is said before the check', () => {
-  assert.match(page, /import \{ icons, tileHtml, heroCardHtml, escHtml, toast \} from '\.\.\/kit\/ui\.mjs';/);
+  assert.match(page, /import \{ icons, tileHtml, heroCardHtml, escHtml, toast \} from '\/Orbit-Core\/kit\/ui\.mjs';/);
   assert.match(page, /dialog\.addEventListener\('close', sayOn\);\nasync function openAccount\(ref\) \{\n  sayOn\(\);/);
   assert.match(page, /if \(ok\.textContent !== '已取消'\) box\.saidAt = Date\.now\(\);/);
   const reset = page.slice(page.indexOf("const reset = action('重置帳戶'"), page.indexOf('resetBtn.onclick'));

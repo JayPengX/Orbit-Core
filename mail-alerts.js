@@ -191,7 +191,7 @@ export async function mailAlerts(env, deps, now = deps.now()) {
   let next = state;
   let sent = null;
   if (mail) {
-    const m = alertMail({ ...mail, admin: `${SITE}/Orbit-Core/admin/` });
+    const m = alertMail({ ...mail, admin: `${SITE}/admin/` });
     try {
       sent = await sendMail(env, { to: set.to, ...m, from: { name: 'Orbit 警示', user: 'alerts' }, kind: 'alert' }, { now });
       next = settle(state, mail, true, now);

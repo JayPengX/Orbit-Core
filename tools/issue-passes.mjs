@@ -4,7 +4,7 @@
 //
 // The first time, it makes your admin token: a random one, kept only on this
 // computer (Desktop/Orbit 管理金鑰.txt, readable by you alone; the admin
-// page, Orbit-Core/admin/, takes it too), put on GitHub as the
+// page, orbit.<domain>/admin/, takes it too), put on GitHub as the
 // secret ECO_ADMIN_TOKEN, and deployed to the eco Worker (it waits for that).
 // Then it asks the Worker for the passes, 100 at a time, and writes them to
 // ~/Documents/Orbit Passes <date>.txt as they come: nothing goes in a repo,
