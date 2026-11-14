@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { teamsOf, otherGame, gameOf, unboiled, ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN, blindOf, oneSidedOf } from '../builders/news.js';
+import { piecesOf, teamsOf, otherGame, gameOf, unboiled, ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, TOPIC_MIN_OF, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN, blindOf, oneSidedOf } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS, SPORTS_OUTLETS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -265,6 +265,10 @@ test('filler is left out by its section or its words; light headlines are told a
   assert.equal(fillerOf({ u: 'https://x.tw/1', t: '立法院三讀通過預算案' }, 'zh'), '');
   assert.equal(fillerOf({ u: 'https://x.com/1', t: 'Powerball jackpot climbs to $900 million' }, 'en'), 'lottery');
   assert.equal(fillerOf({ u: 'https://x.com/1', t: 'Senate passes the budget' }, 'en'), '');
+  // (11-14: routine wraps glued China's drills and Xi's speech under 「Taiwan shares close up」.)
+  assert.equal(fillerOf({ u: 'https://x.com/1', t: 'Taiwan shares close up 1.35%' }, 'en'), 'roundup');
+  assert.equal(fillerOf({ u: 'https://x.com/1', t: 'Taiwan News Quick Take' }, 'en'), 'roundup');
+  assert.equal(fillerOf({ u: 'https://x.com/1', t: 'Taiwan shares drop as Nvidia scandal hits chipmakers' }, 'en'), '');
   assert.ok(softOf('全聯年菜開賣 買一送一', 'zh'));
   assert.ok(softOf('他退黨原因曝', 'zh'));
   assert.ok(!softOf('卓榮泰不副署老福法', 'zh'));
@@ -274,6 +278,9 @@ test('topics: the sides\' own, and the kinds past them; a game of Pokémon has n
   assert.deepEqual(topicsOf(['Pokémon Legends Z-A sales top 10 million'], 'en'), []);
   assert.deepEqual(topicsOf(['國1麻豆段聯結車追撞 全線封閉'], 'zh'), ['life']);
   assert.deepEqual(topicsOf(['NBA／勇士逆轉湖人'], 'zh'), ['sport']);
+  // (11-14: Taiwan's 亞冠賽 reports named no sport word, 「亞冠賽不敵日本！韓國慘吞對戰12連敗」 had no topic.)
+  assert.equal(topicsOf(['亞冠賽不敵日本！韓國慘吞對戰12連敗 韓媒絕望痛批'], 'zh')[0], 'sport');
+  assert.ok(topicsOf(['台日職棒交流賽拍板 明年3／6連兩晚攻大巨蛋'], 'zh').includes('sport'));
   assert.deepEqual(topicsOf(['金馬獎入圍名單出爐'], 'zh'), ['culture']);
   assert.deepEqual(topicsOf(['NASA telescope spots water on an asteroid'], 'en'), ['sci']);
   assert.deepEqual(topicsOf(['賴清德出席國防論壇', '國軍漢光演習登場'], 'zh'), ['def', 'pol']);
@@ -481,6 +488,15 @@ test('the front keeps each topic’s best past its cap (Jay 11-10: 科學 had on
   assert.deepEqual(out.slice(20).map(s => s.id), ['s2', 's1']);
   assert.ok(out.filter(s => s.topics[0] === 'pol').length === 20);
   assert.ok(TOPIC_MIN >= 10);
+});
+
+test('運動 keeps more past the cap, a national team\'s game abroad counted as sport (Jay 11-14: regular outlets bring good sports stories too)', () => {
+  const st = (id, topics, score) => ({ id, topics, score });
+  const many = Array.from({ length: 30 }, (_, i) => st(`p${i}`, ['pol'], 100 - i));
+  const games = Array.from({ length: 50 }, (_, i) => st(`g${i}`, i % 2 ? ['world', 'sport'] : ['sport'], 1 - i / 100));
+  const out = frontOf([...many, ...games], 20);
+  assert.equal(out.filter(s => s.topics.includes('sport')).length, TOPIC_MIN_OF.sport);
+  assert.ok(out.some(s => s.topics[0] === 'world'));
 });
 
 
@@ -872,4 +888,10 @@ test('sports and the rest are two desks; one game is one story; betting and boil
   assert.equal(fillerOf({ t: 'Harry Kane breaks caps record as England reach Nations League knockouts', u: 'https://x/2' }, 'en'), '');
   assert.equal(unboiled('Copyright 2026 The Associated Press. All Rights Reserved. Passengers wait at a terminal.'), 'Passengers wait at a terminal.');
   assert.equal(unboiled('Kane scored again. Continue reading...'), 'Kane scored again.');
+});
+
+test('a word sharing six letters with another thing stays whole: Starship isn\'t Starshield (11-14)', () => {
+  const a = new Set(piecesOf('SpaceX aborts attempt to catch Starship booster rocket', 'en'));
+  assert.ok(!piecesOf('Zelenskiy says Starshield speed limited again', 'en').some(p => a.has(p)));
+  assert.ok(piecesOf('Impeachment vote', 'en').includes('impeac'));
 });

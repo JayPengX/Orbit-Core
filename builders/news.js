@@ -529,6 +529,10 @@ const FILLER_WORDS = {
     // (Betting tips, fantasy advice and TV listings aren't news: the
     // Telegraph's「Spain vs England predictions: … tips and odds」 held a
     // whole Nations League round in one story, Jay 11-14.)
+    // (A wire's routine market wrap and a paper's round-up column: about
+    // nothing but Taiwan, they held China's drills, Xi's reunification speech
+    // and Jensen Huang under 「Taiwan shares close up 1.35%」, 11-14.)
+    ['roundup', /^Taiwan (?:shares|stocks) (?:open|close|end|finish)\b|\bNews Quick Take$/i],
     ['betting', /\b(?:tips and odds|odds,? (?:and )?(?:predictions?|picks)|predictions?(?:,| and| &)? (?:odds|picks|tips|lineups)|vs?\.? .{1,40}\bpredictions?\b|best bets?|betting (?:tips|odds|lines?|preview)|expert picks|picks against the spread|parlays?|prop bets?|player props|fantasy (?:football|basketball|baseball|hockey|value|points)|start(?:\/| or )sit|how to watch|live stream|TV channel)\b/i]
   ]
 };
@@ -651,7 +655,11 @@ export const bigPicture = u =>
 const EN_STOP = new Set('a an the and or but of to in on at for from by with as is are was were be been being it its this that these those after before over under into about amid says say said new will would could can may might has have had not no than more most up down out off how why what who when where which while vs his her their our your they he she we you us them news live update updates latest report reports top first year years day days week'.split(' '));
 // (English words cut to their first six letters: impeach, impeachment;
 // hacked, hacking. Short headlines need the forms to meet.)
-const stem = w => w.slice(0, 6);
+// (Words that share their six letters with another of a different thing
+// whole: SpaceX's Starship's flight joined Ukraine's Starshield story by
+// 「starsh」 alone, 11-14.)
+const WHOLE = new Set(['starship', 'starships', 'starshield']);
+const stem = w => (WHOLE.has(w) ? w : w.slice(0, 6));
 // A headline's pieces: Chinese in two-character pieces, other words whole
 // (English stemmed lightly, short words and numbers of one digit left out).
 // The words of a company's monthly report (營收, 年增, 創新高…): every
@@ -1450,15 +1458,23 @@ export function oneSidedOf(stories, region, was = null) {
 // to TOPIC_MIN (its first topic's), so a quiet day's 科學 or 運動 isn't cut
 // for the 150th politics story (Jay 11-10: tabs nearly empty).
 export const TOPIC_MIN = 12;
+// (運動 more: a day's games and moves are many, and the general outlets'
+// reports of them are News' too, Jay 11-14: "regular outlet like taiwan
+// ones … could also bring goods"; the tab had 13 of the 85 sports stories
+// two outlets or more carried. A story is 運動's when sport is any of its
+// topics: a national team's game abroad is 國際 first.)
+export const TOPIC_MIN_OF = { sport: 40 };
+const frontTopic = s => (s.topics.includes('sport') ? 'sport' : s.topics[0]);
 export function frontOf(stories, top) {
   const ranked = [...stories].sort((a, b) => b.score - a.score);
   const front = ranked.slice(0, top);
   const have = new Map();
-  for (const s of front) have.set(s.topics[0], (have.get(s.topics[0]) || 0) + 1);
+  for (const s of front) have.set(frontTopic(s), (have.get(frontTopic(s)) || 0) + 1);
   for (const s of ranked.slice(top)) {
-    const n = have.get(s.topics[0]) || 0;
-    if (n >= TOPIC_MIN) continue;
-    have.set(s.topics[0], n + 1);
+    const k = frontTopic(s);
+    const n = have.get(k) || 0;
+    if (n >= (TOPIC_MIN_OF[k] ?? TOPIC_MIN)) continue;
+    have.set(k, n + 1);
     front.push(s);
   }
   return front;
