@@ -438,7 +438,6 @@ async function switcher() {
   const head = text => el('h3', { class: 'q-sw-head', text });
   // (Orbit's window: the apps open in it, each closed with ✕, then the rest.)
   let open = null;
-  let shown = new Set();
   if (H?.tabs) {
     const grid = el('div', { class: 'q-sw-grid q-sw-tray' });
     const shut = id => {
@@ -447,7 +446,6 @@ async function switcher() {
       if (!grid.children.length) open.hidden = true;
     };
     for (const x of H.tabs()) {
-      shown.add(x.app);
       const t = tile(x.app, {
         // (The one in front is ringed; 目前 under it said it again.)
         sub: x.live ? W('進行中', 'Live') : '',
@@ -461,11 +459,13 @@ async function switcher() {
       grid.append(t);
     }
     open = grid.children.length ? el('div', { class: 'q-sw-sec' }, [head(W('開著的 App', 'Open apps')), grid]) : null;
-  } else shown = new Set();
-  const rest = APP_ORDER.filter(id => !shown.has(id));
+  }
+  // (Every app under Apps, five by two: the open ones left out made rows of
+  // four, four and one, Jay 11-14 "don't like the three line when we have exactly 10".)
+  const rest = APP_ORDER;
   const all = rest.length
     ? el('div', { class: 'q-sw-sec' }, [
-        open ? head(W('其他 App', 'Other apps')) : null,
+        open ? head('Apps') : null,
         el('div', { class: 'q-sw-grid' }, rest.map(id => tile(id, { now: id === app, onClick: () => (close(), id === app ? null : go(id)) })))
       ])
     : null;
@@ -622,6 +622,13 @@ function noBounce(root = document) {
         return;
       }
       const dy = at - y;
+      // (A sheet open over the page: a swipe in it scrolls the sheet or
+      // nothing, never the page behind it, Jay 11-14 the switcher's.)
+      const sheet = e.target.closest?.('dialog[open]');
+      if (sheet) {
+        if (dy && Math.abs(e.touches[0].clientX - x) <= Math.abs(dy) && !roomIn(e.target, dy, root)) e.preventDefault();
+        return;
+      }
       // (A sideways swipe, a carousel's or a row's, is never held.)
       if (!dy || Math.abs(e.touches[0].clientX - x) > Math.abs(dy)) return;
       // (A map, a drawing, a slider: their own drag.)
