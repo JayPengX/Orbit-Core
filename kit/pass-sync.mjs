@@ -22,13 +22,11 @@
 //   writes its payload, so it can only have changed if another device
 //   opened the app and saved in those seconds.
 // - otherwise read once the kit's claim on return has landed (its `claim`
-//   event; an older kit's `wallet`), or CLAIM_WAIT_MS on without one: a read
+//   event), or CLAIM_WAIT_MS on without one: a read
 //   before the claim saw "not live" and was read again when it came back.
 // - a copy the same as the one last merged or written here (its updateTime)
 //   isn't decoded, merged or redrawn again.
 //
-// Loaded with import('#kit/pass-sync.mjs').catch(() => null): an older kit
-// cached on a phone lacks it (that load stays on the app's own copy).
 //
 //   const sync = passSync(q, { decode, apply, encode });   q: orbitSession(…)
 //   await sync.first(await q.start(), { local })  the sign-in's reply
@@ -155,9 +153,8 @@ export function passSync(q, { decode, apply, encode, now = Date.now }) {
         stale();
         if (live) this.sync();
       });
-      // The kit's claim on return came back (an older kit: its wallet).
+      // The kit's claim on return came back.
       q.on?.('claim', () => wait && go());
-      q.on?.('wallet', () => wait && go());
       doc?.addEventListener?.('visibilitychange', () => {
         if (doc.visibilityState === 'hidden') {
           hiddenAt = now();

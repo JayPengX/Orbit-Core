@@ -7,7 +7,7 @@
 // `id` stays what the apps and the pass store under (stock, match,
 // vocab…); only the names and looks are the brand's.
 
-import { SITE, DOMAIN, onDomain } from './domain.mjs';
+import { SITE, onDomain } from './domain.mjs';
 
 export const GOLD = '#f5c451';
 export const FAMILY = { name: 'Orbit', from: '#312e81', to: '#020617', ink: '#1e1b4b', accent: '#a5b4fc', tag: { zh: '每天用得到的 App，一個 Orbit Pass', en: 'Everyday apps, one Orbit Pass' } };
@@ -33,14 +33,14 @@ export const BRANDS = {
 };
 export const APP_ORDER = Object.keys(BRANDS);
 export const SITE_URL = SITE;
-// An app's folder: /<repo>/ on GitHub Pages, /<slug>/ on the family's own
-// domain (site.js serves each slug from its repo's Pages and sends the
-// repo's path there). pathOf: as the page it runs on has it.
+// An app's folder: /<slug>/ on the family's domain, /<repo>/ in a local
+// preview (tools/preview.mjs serves each repo at its own folder). pathOf: as
+// the page it runs on has it.
 export const repoPathOf = id => (BRANDS[id] ? `/${BRANDS[id].repo}/` : '/');
 export const shortPathOf = id => (BRANDS[id] ? `/${BRANDS[id].slug}/` : '/');
 export const pathOf = id => (onDomain ? shortPathOf(id) : repoPathOf(id));
 // Where an app lives, for its links shared outside (a QR code, a share card, a notice).
-export const homeOf = id => `${SITE_URL}${DOMAIN ? shortPathOf(id) : repoPathOf(id)}`;
+export const homeOf = id => `${SITE_URL}${shortPathOf(id)}`;
 // The apps' folders on orbit.<domain>, by their short name. (The showcase is
 // on the bare domain: site.js.)
 export const SHORT = Object.fromEntries(Object.values(BRANDS).map(b => [b.slug, b.repo]));

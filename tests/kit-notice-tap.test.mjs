@@ -1,7 +1,7 @@
 // A notice's tap opens what it is about (Jay 2026-11-06: "for sport it open
 // that game"): kit sw.js hands the address to an open page (orbit.mjs
 // goNotice), which goes there in place even when it is on that address; a
-// page that doesn't answer (an older kit) is navigated; none open, a window.
+// page that doesn't answer is navigated; none open, a window.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -40,7 +40,7 @@ test('an open app is told where the notice points, in place', async () => {
   const did = await tap(`${SCOPE}#game=nba/1/2026-11-06`, [{ url: `${SCOPE}#game=nba/1/2026-11-06`, answers: true }]);
   assert.deepEqual(did, [['told', `${SCOPE}#game=nba/1/2026-11-06`]]);
 });
-test('a page on an older kit is navigated there', async () => {
+test('a page that does not answer is navigated there', async () => {
   const did = await tap(`${SCOPE}#game=nba/1`, [{ url: SCOPE, answers: false }]);
   assert.deepEqual(did, [['told', `${SCOPE}#game=nba/1`], ['navigate', `${SCOPE}#game=nba/1`]]);
 });

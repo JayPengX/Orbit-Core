@@ -4,8 +4,6 @@
 // whether it's over (a qualifying only after its last part: each part ends
 // with the chequered flag), and a session's order the moment it's over (ESPN's
 // results came minutes to hours later).
-//
-// Loaded with import() and a fallback (an older kit cached on a phone lacks it).
 
 export const F1_LIVE = 'https://f1-live.orbit/now.json';
 export const f1Archive = start => `https://f1-live.orbit/session.json?start=${encodeURIComponent(new Date(start).toISOString())}`;

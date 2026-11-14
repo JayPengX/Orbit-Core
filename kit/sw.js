@@ -414,8 +414,8 @@ self.addEventListener('message', event => {
 // A tap on an Orbit notice (orbit.mjs notify, push.js): opens the app where it
 // points (#game=…, #pin=…, a tab). An app already open is handed the address
 // (orbit.mjs goNotice): it goes there in place, even to the address it is on
-// already (a sheet closed since); a page that doesn't answer in a second (an
-// older kit) is navigated, and none open gets a new window there.
+// already (a sheet closed since); a page that doesn't answer in a second is
+// navigated, and none open gets a new window there.
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   const url = new URL(event.notification.data?.url || './', self.registration.scope).href;

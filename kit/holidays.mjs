@@ -7,10 +7,6 @@
 // calendar (TWSE also closes the two days before Lunar New Year, which
 // aren't days off for anyone else).
 //
-// Loaded with import('#kit/holidays.mjs').catch(() => null) or statically
-// where the kit's own files are: an older kit without it is every weekday a
-// working day, as before.
-//
 //   twHoliday(t)    the holiday's name ({ zh, en }) on Taiwan's day of t (a Date, ms or 'YYYY-MM-DD'), else null
 //   twDayOff(t)     a weekend or a holiday
 //   twWorkday(t)    the opposite (a 補班 Saturday too)

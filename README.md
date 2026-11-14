@@ -93,7 +93,7 @@ orbit-workers-proxy (one Worker)
    /cal           Class's timetable as a calendar subscription
    /showcase/pass a short read-only pass for the showcase's live demos
 quota-guard   reads the use every 5 minutes; paces the proxy through the Free plan's day
-orbit-<app>   each app's static files at orbit.jaypengx.com/<app>/ (orbit-pass: the kit and /pass/, orbit-home: jaypengx.com)
+orbit-<app>   each app's static files at orbit.jaypengx.com/<app>/ (orbit-pass: the kit and the root's pages, orbit-home: jaypengx.com)
 orbit-site    holds the hostnames; longshot.jaypengx.com's shutdown notice
 ```
 

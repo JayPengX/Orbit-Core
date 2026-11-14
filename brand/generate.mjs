@@ -9,9 +9,8 @@ import { writeFile, readFile, mkdir, rm, access } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { BRANDS, FAMILY, PASS, SITE_URL, LOOKS, appIcon, familyMark, homeOf, lookApp, orbitIcon, pathOf, shortPathOf } from '../kit/brand.mjs';
+import { BRANDS, FAMILY, PASS, SITE_URL, LOOKS, appIcon, familyMark, homeOf, lookApp, orbitIcon, shortPathOf } from '../kit/brand.mjs';
 import { FORMATS, shareCard } from './marks.mjs';
-import { DOMAIN } from '../kit/domain.mjs';
 
 // The global one, or a Mac's in ~/.local/opt/playwright (as tools/preview.mjs).
 const require = createRequire(`${execSync('npm root -g').toString().trim()}/`);
@@ -227,7 +226,7 @@ if (!only.length || only.includes('site') || only.includes('looks')) {
 }
 await browser.close();
 
-// The family's home (orbit.<d>/, the root; /pass/ forwards here): Orbit first, the
+// The family's home (orbit.<d>/, the root): Orbit first, the
 // whole family in one home-screen app (/app/), then each app on its own,
 // the Pass that signs into all of them last. In one language at a time
 // (Jay 2026-10-27: "mixed with two languages"): written in Chinese, each text
@@ -236,15 +235,15 @@ await browser.close();
 // 2026-11-14: the language is picked by itself). Jay 2026-11-14: "look
 // better", not more on it; the lines are the brand's short pitches.
 function homePage() {
-  const home = `${SITE_URL}${DOMAIN ? '/' : '/Orbit-Core/'}`;
-  // (served at the root, its files stay where the site is: /pass/…)
-  const at = DOMAIN ? '/pass/' : './';
+  const home = `${SITE_URL}/`;
+  // (served at the root, its pictures where the kit is: /Orbit-Core/…)
+  const at = '/Orbit-Core/';
   const two = (tag, t, attrs = '') => `<${tag}${attrs} data-en="${esc(t.en)}">${esc(t.zh)}</${tag}>`;
   const chev = '<svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>';
   const ids = Object.keys(BRANDS);
   const card = id => {
     const b = BRANDS[id];
-    return `<a class="app" href="${DOMAIN ? shortPathOf(id) : pathOf(id)}"><img src="${at}brand/${id}.svg" alt="" width="48" height="48"><span class="t"><strong>${esc(b.name)}</strong>${two('small', b.pitch)}</span>${chev}</a>`;
+    return `<a class="app" href="${shortPathOf(id)}"><img src="${at}brand/${id}.svg" alt="" width="48" height="48"><span class="t"><strong>${esc(b.name)}</strong>${two('small', b.pitch)}</span>${chev}</a>`;
   };
   const stack = ids.map((id, i) => `<img src="${at}brand/${id}.svg" alt="" width="40" height="40" style="--i:${i}">`).join('');
   const og = (k, v) => `<meta property="og:${k}" content="${esc(v)}">`;
@@ -257,8 +256,8 @@ function homePage() {
 <link rel="icon" href="${at}brand/family-orbit.svg" type="image/svg+xml"><link rel="icon" href="${at}icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="manifest" href="/app/manifest.webmanifest"><link rel="apple-touch-icon" href="/app/icons/apple-touch-icon.png"><meta name="apple-mobile-web-app-title" content="Orbit"><meta name="application-name" content="Orbit">
 <script>(()=>{let s=false;try{s=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true||sessionStorage.getItem('orbit.suite')==='1'||sessionStorage.getItem('orbit.addr')==='/'}catch{}if(s)location.replace('/app/'+location.search+location.hash)})()</script>
-${og('type', 'website')}${og('site_name', 'Orbit')}${og('title', 'Orbit')}${og('description', 'Orbit：每天用得到的 App，一個 Orbit Pass。')}${og('url', home)}${og('image', `${SITE_URL}${DOMAIN ? '/pass/' : '/Orbit-Core/'}brand/pass-og.jpg`)}${og('image:width', 1200)}${og('image:height', 630)}
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${SITE_URL}${DOMAIN ? '/pass/' : '/Orbit-Core/'}brand/pass-x.jpg">
+${og('type', 'website')}${og('site_name', 'Orbit')}${og('title', 'Orbit')}${og('description', 'Orbit：每天用得到的 App，一個 Orbit Pass。')}${og('url', home)}${og('image', `${SITE_URL}/Orbit-Core/brand/pass-og.jpg`)}${og('image:width', 1200)}${og('image:height', 630)}
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${SITE_URL}/Orbit-Core/brand/pass-x.jpg">
 <script>(()=>{let l;try{l=localStorage.getItem('orbit.lang')}catch{}if(l!=='zh'&&l!=='en'){const n=navigator.languages?.length?navigator.languages:[navigator.language||'zh-TW'];l=n.some(x=>/^zh/i.test(x))?'zh':'en'}if(l==='en')document.documentElement.lang='en'})()</script>
 <style>
 :root{color-scheme:light dark;--page:#f2f2f7;--glow:rgba(99,102,241,.16);--cell:#fff;--label:#000;--label-2:rgba(60,60,67,.6);--sep:rgba(60,60,67,.18);--press:rgba(0,0,0,.04);--btn:#4f46e5;--btn-ink:#fff;--ring:#f2f2f7}

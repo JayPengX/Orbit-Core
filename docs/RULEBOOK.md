@@ -26,6 +26,7 @@ into absolutes; push back when a rule makes things worse.
 - 10-19 Concrete work only: no general polish sweeps; walk the screens you changed.
 - Fast and whole: the smallest correct change, the same fault fixed everywhere it lives, and any doc it made wrong, in the same round. Find the real cause and say it in a sentence; fix the rule, not the case (no hard-coded exception for the place Jay tested).
 - 10-20 Prune whole: what goes is deleted everywhere (code, tests, help, proxy, data); no `off` flags, no backward-compatibility code, nothing kept "in case". Refactor freely while the tests pass.
+- 11-14 No legacy forwards or back-compat: a page, route or file lives at one address; when it moves, the old address is deleted, never forwarded (no redirect, no second copy). No code for an old kit, an old API shape, an old storage key or an old host once its week is up. The only things kept: what people's saved data still needs to read (their books, accounts, timetables, sign-ins until they run out), and the installed standalone apps (Money's home-screen app keeps working with its data).
 - 10-30 "Faster" means a substantial, measured improvement: find where the wait really goes, cut it structurally, report before/after times.
 - 10-23 Secrets stay sealed in Cloudflare/GitHub; never ask Jay to dig up keys. While he's away or quota is out: don't ask, wait for the reset and resume.
 - Questions to Jay: tap options (a decision card, with "Other"), never typed questions, never overnight; one message when everything is done. Flag anything waiting on him at once.
@@ -49,7 +50,7 @@ into absolutes; push back when a rule makes things worse.
 
 **Code.**
 - 10-27 Anything two apps use lives in the Orbit-Core kit, never copied; look first (`node tools/kit-find.mjs <word>`, `--apps` finds copies) and move duplicates there when you see them. 11-03 Apps stay thin: device storage, Pass sync, patching a screen in place and every shared piece are the kit's; an app keeps only what is truly its own.
-- A new kit export is read with a fallback (`kitUI.newThing?.(…)`): a phone may still run an older kit, and importing a missing name stops the app. Once every phone has the kit it can go direct.
+- A new kit export is read with a fallback (`kitUI.newThing?.(…)`): a phone may still run an older kit, and importing a missing name stops the app. 11-14 After a week it goes direct (`kitUI.newThing(…)`), its fallback deleted.
 - One rule, one function, used by every view that shows it (Sports' `onAir`), so screens can't disagree. UI from the kit; draw your own only for what is truly the app's (a pitch, a map, a chart).
 - Ids never change with a name (storage keys, cache names, manifests' `id`). Saved copies carry a version in their key (`fx.day.v4`), bumped when the meaning changes. A failed read is a failure, never "nothing there", and is never saved; never an older copy over a newer one.
 
