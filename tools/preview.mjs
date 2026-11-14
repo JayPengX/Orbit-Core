@@ -280,6 +280,11 @@ const serve = flag('serve');
 // page opened in Orbit's window. With --serve, a browser of your own hops
 // between them (tools/suite-check.mjs).
 const suite = flag('suite');
+// --door (with --suite): Orbit's own page (/app/) opened instead of the app's
+// (its home, tabs, switcher and setup); a --script is handed the hash as the
+// scene to set up (tools/shots/orbit-scenes.mjs).
+const door = flag('door');
+const safari = flag('safari');
 // --live: the page asks the real proxies (the Workers let a localhost page
 // without a pass in: worker.js TRANSIT_DEV, sports.js
 // SPORTS_DEV), still with the made-up account. Orbit Transit: today's real
@@ -707,7 +712,7 @@ if (timing)
 // Opened from the home screen (iOS's navigator.standalone), as every app on a
 // phone must be: --safari shows the page as Safari opens it (the kit's
 // add-to-home-screen screen).
-if (!process.argv.includes('--safari')) await context.addInitScript(() => Object.defineProperty(Navigator.prototype, 'standalone', { get: () => true }));
+if (!safari) await context.addInitScript(() => Object.defineProperty(Navigator.prototype, 'standalone', { get: () => true }));
 if (suite)
   await context.addInitScript(() => {
     try {
@@ -1365,7 +1370,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
   const cdp = profile && engine !== 'webkit' ? await context.newCDPSession(page) : null;
   if (cdp) await cdp.send('Profiler.enable').then(() => cdp.send('Profiler.setSamplingInterval', { interval: 500 })).then(() => cdp.send('Profiler.start'));
   // (With --net, from the page's first bytes: a slow connection's whole load is what's measured below.)
-  const went = await page.goto(key === 'admin' ? `${base}admin/` : `${base}${hash ? `#${hash}` : ''}`, net ? { waitUntil: 'commit' } : {}).then(() => '', e => e.message.split('\n')[0]);
+  const went = await page.goto(key === 'admin' ? `${base}admin/` : door ? base.replace(/[^/]+\/$/, 'app/') : `${base}${hash ? `#${hash}` : ''}`, net ? { waitUntil: 'commit' } : {}).then(() => '', e => e.message.split('\n')[0]);
   if (went) console.log(`net: the page didn't open (${went})`);
   if (net && !first && !went) {
     // When the loading screen went (a person stuck behind it is the bug), and what the page says.

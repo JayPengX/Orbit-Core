@@ -64,6 +64,19 @@ const say = text => click(wait(6000), "js:document.querySelector('.bt-stations, 
 const ask = text => click(wait(6000), "js:(i=>{const s=i.closest('section')||i.parentElement;let p=s.parentElement;while(p&&!(p.scrollHeight>p.clientHeight+1&&/auto|scroll/.test(getComputedStyle(p).overflowY)))p=p.parentElement;const box=p||document.scrollingElement;box.scrollTop+=s.getBoundingClientRect().top-60})(document.querySelector('.bt-stations textarea, .bt-stations input, .bt-sec textarea, .bt-sec input'))", wait(800), `js:(i=>{i.value=${JSON.stringify(text)};i.dispatchEvent(new Event('input',{bubbles:true}))})(document.querySelector('.bt-stations textarea, .bt-stations input, .bt-sec textarea, .bt-sec input'))`, wait(1200));
 const town = name => click(wait(3500), `js:[...document.querySelectorAll('[data-town]')].find(e=>e.offsetParent&&/${name}/.test(e.textContent))?.click()`, wait(6000));
 export const STORE = {
+  // Orbit itself (this repo's README): every app in one, signed in once, what's under way kept, an Orbit
+  // of your own. Opened at /app/ (preview --suite --door), each scene set up by tools/shots/orbit-scenes.mjs.
+  core: {
+    app: 'sports', brand: 'family', show: null, prefix: 'orbit', args: ['--suite', '--door', '--script', 'tools/shots/orbit-scenes.mjs'],
+    shots: [
+      { zh: '十個 App，一個 Orbit', en: 'Ten apps, one Orbit', hash: 'switcher' },
+      { zh: '切換 App，不重新載入', en: 'Switch apps, nothing reloads', device: 'computer', hash: 'rail', wait: 3000 },
+      { zh: '一個 Orbit Pass，每個 App 都登入', en: 'One Orbit Pass signs in every app', hash: 'pass', wait: 3000 },
+      { zh: '正在播、正在走的，一直都在', en: 'What’s under way stays with you', hash: 'tabs', wait: 3000 },
+      { zh: '自己取名、挑 App 和圖示', en: 'Your own name, apps and icon', device: 'tablet', hash: 'school', args: ['--safari'], wait: 3000 },
+      { zh: '一次加好，或只放一個 App', en: 'Add it in one tap, or just one app', hash: 'add', args: ['--safari'], wait: 3000 }
+    ]
+  },
   // Every way to get around Taiwan in one plan, live, with a recommendation. Shoot in Taiwan's morning.
   transit: {
     app: 'transit', brand: 'transit', show: 'transit', prefix: 'transit', args: ['--google-map'],
