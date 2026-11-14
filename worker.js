@@ -34,7 +34,7 @@
 // (First: the outside calls counted, sources.js, before anything keeps a fetch of its own.)
 import { watchRelay, flushSources, asSourceCall, pruneSources, takeBeacon, readSources } from './sources.js';
 import { SOURCES, freshAt, sourceState } from './kit/sources.mjs';
-import { handleLawAsk, useLawSite, addOne, twDay } from './law.js';
+import { handleLawAsk, useLawSite, addOne, countOf, twDay } from './law.js';
 import { handleLawChat, lawChatTimes, lawCompare, COMPARE_QS } from './law-chat.js';
 import { otherAnswer, streamOther, makerOf, modelsOf } from './ai-other.js';
 import { DEV, aiSettingOf } from './kit/brand.mjs';
@@ -1241,7 +1241,8 @@ const ECO_DEPS = {
   now: () => Date.now(),
   // A count a Taiwan day in D1, everyone together (new passes a day, eco.js
   // ecoCreate; the Pass's mails, pass-mail.js), with the AI caps' counts.
-  dayCount: (env, k, day = twDay(), by = 1) => addOne(env, k, day, by),
+  // (by 0: only read; addOne answers a count of 0 as unreadable.)
+  dayCount: (env, k, day = twDay(), by = 1) => (by === 0 ? countOf(env, k, day) : addOne(env, k, day, by)),
   mailBudget: async env => (await readDev(env, ECO_DEPS)).mailDay,
   // The Pass's codes and notices (pass-mail.js), from pass@ the domain through mail.js (Resend for anyone's address).
   sendMail: (env, m) => sendMail(env, { to: m.to, subject: m.subject, html: mailPage(m), text: m.text, from: { name: 'Orbit Pass', user: 'pass' }, kind: 'pass' }),
