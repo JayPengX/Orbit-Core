@@ -2177,7 +2177,10 @@ function makeSession(app, { lang, heartbeat }) {
     emit('signedout');
     // Signed out while in use (another device signed everyone out, the
     // pass changed): straight back to the sign-in screen, like a new device.
-    if (started && had && typeof location !== 'undefined') setTimeout(() => location.reload(), 60);
+    // In Orbit's window: the window itself, so Orbit's own sign-in, never
+    // the app's (Jay 11-14: signed out in an app, he landed on that app's
+    // sign-in page).
+    if (started && had && typeof location !== 'undefined') setTimeout(startOver, 60);
     return { signedOut: true };
   }
   // Every call with the session token: a fresh one on expiry, once.
@@ -3098,7 +3101,24 @@ export function accountButton(s, { extra = null } = {}) {
   btn.addEventListener('pointerdown', warmPass, { passive: true });
   btn.addEventListener('click', () => accountSheet(s, { extra: extra ? extra() : null }));
   warmPassLater();
+  shownAccount = { s, extra };
   return btn;
+}
+// The account this page drew its button for, as Orbit's switcher shows it
+// at its top (suite.mjs; Jay 11-14: the Pass, its settings and signing out
+// reached from the switcher, not only from inside an app): the face worn,
+// the account's number, and its sheet. null before the app drew its button.
+let shownAccount = null;
+export function passNow() {
+  if (!shownAccount) return null;
+  const { s, extra } = shownAccount;
+  const a = avatarOf(s.wallet);
+  return {
+    signedIn: Boolean(storedAccount()),
+    face: a || s.wallet ? avatarSrc(a?.id || DEFAULT_AVATAR) : '',
+    no: accountNumber(s.pass),
+    open: () => accountSheet(s, { extra: extra ? extra() : null })
+  };
 }
 
 // ---- Dialogs: Orbit's own, never the browser's alert/confirm ---------------------------
@@ -3306,7 +3326,7 @@ export function passAccount(s, { extra = null, close = () => {}, looks = () => {
         async () => {
           if (!(await ask({ lang: s.lang, icon: '👋', title: T('在這台裝置登出？', 'Sign out on this device?'), body: T('這台裝置上的資料會全部清除，都保留在 Orbit Pass。', 'Everything on this device is wiped; it all stays on your Orbit Pass.'), ok: T('登出', 'Sign out') }))) return;
           s.signOut();
-          location.reload();
+          startOver();
         },
         'q-row-btn danger'
       )
@@ -4283,6 +4303,15 @@ export async function mayLocate(key, { force = false } = {}) {
 // own storage, so Orbit's mark there is enough; elsewhere (Android, a
 // computer) apps of one site share storage, so only the window's own
 // sessionStorage says it (set by /app/, kept across the window's pages).
+// The page loaded again from the start; inside Orbit's window the window
+// itself (same site, its frame host's page), so every app in it starts over.
+function startOver() {
+  try {
+    const up = globalThis.parent;
+    if (up && up !== globalThis && up.ORBIT_HOST) return void up.location.reload();
+  } catch {}
+  location.reload();
+}
 export function inSuite() {
   try {
     if (globalThis.sessionStorage?.getItem('orbit.suite') === '1') return true;
