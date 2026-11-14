@@ -50,4 +50,5 @@ test('act: a team followed, a round of words', () => {
   assert.deepEqual(readAct('開始練習單字', { now }), { app: 'vocab', act: 'practice', size: null });
   assert.equal(readAct('考我五個單字', { now }).size, 5);
   assert.equal(readAct('abandon 是什麼意思', { now }), null);
+  assert.equal(readAct('add a Competition countdown on 12/1', { now }).name, 'Competition');
 });
