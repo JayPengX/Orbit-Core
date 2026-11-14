@@ -35,7 +35,7 @@ import { DEV, cleanDev } from './brand.mjs';
 import { encodeSetup, startOf, newId, mineSaved, mergeMine, MINE_KEY } from './orbit-mine.mjs';
 import { API, SITE as HOME, isApi } from './domain.mjs';
 import { passkeyHere, passkeyName, deviceName, makePasskey, usePasskey, forgetPasskey, cancelled } from './passkey.mjs';
-import { icons, tile, cell, pullToRefresh, setSheetDetent, toast, h as node } from './ui.mjs';
+import { icons, tile, cell, pullToRefresh, setSheetDetent, toast, sheet, h as node } from './ui.mjs';
 import { scrollBusy } from './hold-place.mjs';
 import { breakAfter, mergeHeard } from './family.mjs';
 // (A picture drawn again never flashes: steady-pics.mjs, on import.)
@@ -4281,7 +4281,13 @@ function linkRows(s) {
 export const PRIVACY_URL = `${HOME}/privacy/`;
 export const TERMS_URL = `${HOME}/terms/`;
 // (Over the app, never in its place: a Home Screen app has no back button.)
-const openPolicy = (url = PRIVACY_URL) => globalThis.open?.(url, '_blank', 'noopener');
+// (In a sheet over the app, never a new window: a home-screen app has no back button, Jay 11-14.)
+function openPolicy(s, url = PRIVACY_URL) {
+  const en = s?.lang === 'en';
+  const frame = node('iframe', { class: 'q-policy-frame', src: `${url}?lang=${en ? 'en' : 'zh'}`, title: en ? 'Privacy policy and terms' : '隱私權政策與使用條款' });
+  frame.style.cssText = 'display:block;width:100%;height:calc(100dvh - 140px);border:0;background:transparent';
+  sheet({ title: en ? 'Privacy and terms' : '隱私權與條款', body: [frame], detent: 'large', cls: 'q-policy-sheet', closeLabel: en ? 'Close' : '關閉' });
+}
 function usageRows(s) {
   const en = s.lang === 'en';
   const T = (zh, e) => (en ? e : zh);
@@ -4300,7 +4306,7 @@ function usageRows(s) {
             return true;
           })
     ].filter(Boolean)),
-    cell({ icon: icons.shield, tint: 'var(--q-green)', title: T('隱私權政策與使用條款', 'Privacy policy and terms'), chevron: true, onClick: () => openPolicy() })
+    cell({ icon: icons.shield, tint: 'var(--q-green)', title: T('隱私權政策與使用條款', 'Privacy policy and terms'), chevron: true, onClick: () => openPolicy(s) })
   ];
 }
 // Once on a device, a moment after an app opens: what's counted, the
@@ -4316,7 +4322,7 @@ export function usageNotice(s) {
     line: T('Orbit 只記哪些功能被打開、快不快、有沒有出錯，不知道你是誰。', 'Orbit counts which features open, how fast and what breaks, never who you are.'),
     go: T('隱私權政策', 'Privacy policy'),
     never: T('關閉統計', 'Turn off'),
-    onGo: () => openPolicy(),
+    onGo: () => openPolicy(s),
     onNever: () => {
       setUsageOn(false, s);
       toast(T('使用統計已關閉', 'Usage stats are off'));
