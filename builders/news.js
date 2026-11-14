@@ -173,9 +173,6 @@ export const FEEDS = {
   japantimes: [['https://www.japantimes.co.jp/feed/', 'rss']],
   diplomat: [['https://thediplomat.com/feed/', 'rss']],
   taipeitimes: [['https://www.taipeitimes.com/xml/index.rss', 'rss']],
-  globaltimes: [['https://www.globaltimes.cn/rss/outbrain.xml', 'rss']],
-  cgtn: [['https://www.cgtn.com/subscribe/rss/section/world.xml', 'rss']],
-  xinhua: [['https://english.news.cn/rss/worldrss.xml', 'rss']],
   cnn: [['https://www.cnn.com/sitemap/news.xml', 'map', S2]],
   msnow: [['https://www.ms.now/feed', 'rss', S2]],
   independent: [['https://www.independent.co.uk/news/world/rss', 'rss', S2]],
@@ -278,7 +275,6 @@ export const CHANNELS = {
   pbs: 'UC6ZFN9Tx6xh-skXCuRHCDpQ',
   dw: 'UCknLrEdhRCp1aegoMqRaCZg',
   f24: 'UCQfwfsi5VrQ8yKZ-UWmAEFg',
-  cgtn: 'UCgrNz-aDmcr2uuto8_DL2jg',
   guardian: 'UCIRYBXDze5krPDzAEOxFGVA',
   bloomberg: 'UCIALMKvObZNtJ6AmdCLP7Lg',
   ftv: 'UC2VmWn8dAqkzlQqvy02E1PA',
@@ -1186,7 +1182,8 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
   // (A kept headline read again takes the feed's picture as it is now: a
   // larger one, once the build asks for it.)
   const fresh = new Map(items.filter(it => it.img).map(it => [it.u, it.img]));
-  const live = recs.filter(r => now - r.last <= keepFor(r.peak || 0)).map(r => ({ ...r, items: r.items.map(it => (fresh.has(it.u) && fresh.get(it.u) !== it.img ? { ...it, img: fresh.get(it.u) } : it)) }));
+  // (An outlet no longer read, its headlines out of the kept stories too: China's state media, 11-14.)
+  const live = recs.filter(r => now - r.last <= keepFor(r.peak || 0)).map(r => ({ ...r, items: r.items.filter(it => OUTLETS[it.o]).map(it => (fresh.has(it.u) && fresh.get(it.u) !== it.img ? { ...it, img: fresh.get(it.u) } : it)) }));
   const every = new Map();
   for (const it of [...live.flatMap(r => r.items), ...items]) every.set(it.u, it);
   const same = sameOf(pages, [...every.values()]);

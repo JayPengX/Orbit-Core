@@ -197,7 +197,8 @@ test('outlets: every one has a place and a reason; only state media and the spor
   assert.equal(sideOf('chinatimes', 'tw'), 'b');
   assert.equal(sideOf('fox', 'intl'), 'r');
   assert.equal(sideOf('dw', 'intl'), 'c');
-  assert.equal(sideOf('xinhua', 'intl'), null);
+  // (No Chinese state media read, Jay 11-14.)
+  assert.ok(!Object.values(OUTLETS).some(o => o.kind === 'state' || /globaltimes|cgtn|news\.cn/.test(o.site || '')));
   assert.deepEqual(partiesIn('藍白合作 民進黨團回應'), ['g', 'b', 'w']);
   assert.deepEqual(partiesIn('KMT and DPP lawmakers clash'), ['g', 'b']);
 });

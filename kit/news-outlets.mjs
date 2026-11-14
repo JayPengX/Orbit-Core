@@ -8,9 +8,10 @@
 //   cs  統獨: −2 主張獨立, −1 偏獨, 0 不站邊, 1 偏統, 2 親北京
 //   lr  English outlets' left and right (AllSides): −2 Left … 2 Right;
 //       where AllSides has none, Media Bias/Fact Check's (`mbfc`); null
-//       for China's state media, counted apart as 官媒, and the sports
-//       outlets (SPORTS_OUTLETS), placed on no scale
-//   kind  private | public (公共媒體) | gov (政府出資) | nonprofit | state (中國官媒)
+//       for the sports outlets (SPORTS_OUTLETS), placed on no scale
+//   kind  private | public (公共媒體) | gov (政府出資) | nonprofit
+//   (No Chinese state media, Jay 11-14: "we don't need dictatorship to
+//   tell us what news is": 環球時報, CGTN and 新華社 aren't read.)
 //
 // No outlet is placed as 白 (民眾黨): no study rates one so. A story says
 // which parties its headlines name instead (partiesIn).
@@ -81,8 +82,7 @@ export const BASIS = {
     url: 'https://mediabiasfactcheck.com/'
   },
   rti: { zh: '中央廣播電臺設置條例：國家的對外廣播，政府捐助的財團法人。', en: 'The Radio Taiwan International Act: the national overseas broadcaster, a government-funded foundation.', url: 'https://zh.wikisource.org/wiki/%E4%B8%AD%E5%A4%AE%E5%BB%A3%E6%92%AD%E9%9B%BB%E8%87%BA%E8%A8%AD%E7%BD%AE%E6%A2%9D%E4%BE%8B' },
-  cts: { zh: '華視屬公廣集團：2006 年依無線電視事業公股處理條例，政府持有的股份捐給公視基金會（約七成）。', en: 'CTS belongs to the public broadcasting group: in 2006, under the act on government shares in terrestrial TV, the state’s shares (about 70%) went to the PTS Foundation.', url: 'https://info-material.pts.org.tw/annual/2025annual06cts.pdf' },
-  state: { zh: '中國共產黨與政府所有、所管的媒體。', en: 'Owned and run by the Chinese Communist Party and state.', url: '' }
+  cts: { zh: '華視屬公廣集團：2006 年依無線電視事業公股處理條例，政府持有的股份捐給公視基金會（約七成）。', en: 'CTS belongs to the public broadcasting group: in 2006, under the act on government shares in terrestrial TV, the state’s shares (about 70%) went to the PTS Foundation.', url: 'https://info-material.pts.org.tw/annual/2025annual06cts.pdf' }
 };
 
 // [id, 中文名, English name, site, kind, tw, cs, lr, owner zh, owner en, basis, weak]
@@ -166,9 +166,6 @@ const ROWS = [
   ['japantimes', '日本時報', 'The Japan Times', 'japantimes.co.jp', 'private', null, null, 0, 'News2u', 'News2u Holdings', ['allsides'], false],
   ['diplomat', '外交家', 'The Diplomat', 'thediplomat.com', 'private', null, null, 0, 'Diplomat Media', 'Diplomat Media', ['mbfc'], false],
   ['taipeitimes', '台北時報', 'Taipei Times', 'taipeitimes.com', 'private', -2, -2, 0, '自由時報集團', 'Liberty Times group', ['allsides', 'group', 'xiao2006'], false],
-  ['globaltimes', '環球時報', 'Global Times', 'globaltimes.cn', 'state', null, 2, null, '人民日報社', 'People’s Daily (CCP)', ['state'], false],
-  ['cgtn', 'CGTN', 'CGTN', 'cgtn.com', 'state', null, 2, null, '中央廣播電視總台', 'China Media Group (state)', ['state'], false],
-  ['xinhua', '新華社', 'Xinhua', 'news.cn', 'state', null, 2, null, '中國國務院', 'China’s State Council', ['state'], false],
   // (11-10, Jay: the big ones missing. Places from AllSides, as of 2025–26.)
   ['cnn', 'CNN', 'CNN', 'cnn.com', 'private', null, null, -1, '華納兄弟探索', 'Warner Bros. Discovery', ['allsides'], false],
   ['reuters', '路透社', 'Reuters', 'reuters.com', 'private', null, null, 0, '湯森路透', 'Thomson Reuters', ['allsides'], false],
@@ -257,7 +254,7 @@ export const outletIcon = (id, size = 64) => {
 
 // The side an outlet counts for in a story's bar: Taiwan's g (綠) c b (藍),
 // the English l c r; null when it has no place on that axis (unrated, or
-// state media: they're counted apart).
+// a sports outlet).
 export function sideOf(outlet, region) {
   const o = typeof outlet === 'string' ? OUTLETS[outlet] : outlet;
   if (!o) return null;
