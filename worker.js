@@ -1541,10 +1541,15 @@ async function route(request, env, ctx, headers, origin) {
     }
     // Every Gemini call of the last ?days= (30 at most) by day, feature, model and status.
     if (check === 'gemini-use') {
-      const days = Math.min(30, Math.max(1, Number(new URL(request.url).searchParams.get('days')) || 7));
-      const calls = await callsSince(env, Date.now() - days * 86_400_000);
-      // (&tokens=1: each feature's calls and tokens by model over those days: what cost cuts are measured by.)
-      return json(new URL(request.url).searchParams.get('tokens') ? spendOf(calls) : reliability(calls), 200, headers);
+      const sp = new URL(request.url).searchParams;
+      const days = Math.min(30, Math.max(1, Number(sp.get('days')) || 7));
+      // (&mins=: only the last minutes, how a change is timed.)
+      const mins = Math.min(1440, Number(sp.get('mins')) || 0);
+      const calls = await callsSince(env, Date.now() - (mins ? mins * 60_000 : days * 86_400_000));
+      // (&tokens=1: each feature's calls and tokens by model over those days: what cost cuts are measured by;
+      // &rows=1: each call, newest last.)
+      if (sp.get('rows')) return json(calls.slice(-200).map(c => [new Date(c.at).toISOString().slice(11, 19), c.feature, c.model, c.status, c.tin, c.tout, c.ms]), 200, headers);
+      return json(sp.get('tokens') ? spendOf(calls) : reliability(calls), 200, headers);
     }
     // CPU by route from the Workers Logs (guard.js cpuByRoute): what passes the
     // Free plan's 10 ms a request. ?group= a logs key, ?keys=1 the keys, ?script=, ?hours=, ?where=.
