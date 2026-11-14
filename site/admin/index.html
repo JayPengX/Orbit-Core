@@ -284,7 +284,7 @@
   .hit:hover, .hit.on { background: var(--q-fill-3); }
   .omni-out .empty { padding: 14px 10px; color: var(--q-muted); }
   /* A phone: the views in a tab bar at the bottom, icon over name. */
-  .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 6px 4px calc(env(safe-area-inset-bottom) + 6px); background: color-mix(in srgb, var(--q-page) 88%, transparent); -webkit-backdrop-filter: saturate(1.8) blur(20px); backdrop-filter: saturate(1.8) blur(20px); border-top: 0.5px solid var(--q-divider); }
+  .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); padding: 6px 4px calc(env(safe-area-inset-bottom) + 6px); background: color-mix(in srgb, var(--q-page) 88%, transparent); -webkit-backdrop-filter: saturate(1.8) blur(20px); backdrop-filter: saturate(1.8) blur(20px); border-top: 0.5px solid var(--q-divider); }
   .tabs button { position: relative; display: grid; justify-items: center; gap: 3px; padding: 4px 0; border-radius: 10px; background: none; color: var(--q-muted); font-size: 10.5px; font-weight: 600; }
   .tabs button i { display: block; width: 24px; height: 24px; }
   .tabs button i svg { width: 24px; height: 24px; }
@@ -470,6 +470,23 @@
   .tool-head i { --t: var(--q-accent); display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(160deg, color-mix(in srgb, var(--t) 82%, #fff), var(--t) 60%); color: #fff; }
   .tool-head i svg { width: 22px; height: 22px; }
   .tool-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+  .use-dims { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  @media (min-width: 700px) { .use-dims { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .use-dim { padding: 12px 14px; border-radius: 18px; background: var(--q-surface); min-width: 0; }
+  .use-dim h3 { margin: 0 0 6px; font-size: 13px; color: var(--q-muted); font-weight: 600; }
+  .use-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; font-size: 13px; margin-top: 6px; }
+  .use-bar span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .use-bar b { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .use-bar i { grid-column: 1 / -1; display: block; height: 4px; border-radius: 2px; background: var(--q-accent); }
+  .use-ret { overflow-x: auto; }
+  .use-ret table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .use-ret th, .use-ret td { padding: 4px 5px; text-align: right; white-space: nowrap; }
+  .use-ret th:first-child, .use-ret td:first-child { text-align: left; color: var(--q-muted); }
+  .use-ret td.c { background: color-mix(in srgb, var(--q-accent) calc(var(--p) * 1%), transparent); border-radius: 6px; }
+  .use-line { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 14px; border-bottom: 0.5px solid var(--q-divider); }
+  .use-line:last-child { border-bottom: 0; }
+  .use-line span { min-width: 0; overflow-wrap: anywhere; }
+  .use-line b { flex: none; font-variant-numeric: tabular-nums; }
   [hidden] { display: none !important; }
   /* A part a link scrolls to (data-to, 工具's shortcuts, 健康's chips) lands under the sticky top bar, not behind it. */
   main [id] { scroll-margin-top: calc(env(safe-area-inset-top) + 76px); }
@@ -498,6 +515,7 @@
     <nav class="tabs" id="tabs">
       <button data-view="overview" aria-pressed="true"><i data-ic="grid"></i><span>總覽</span></button>
       <button data-view="accounts" aria-pressed="false"><i data-ic="user"></i><span>帳戶</span></button>
+      <button data-view="use" aria-pressed="false"><i data-ic="bars"></i><span>使用</span></button>
       <button data-view="health" aria-pressed="false"><i data-ic="live"></i><span>健康</span><b class="badge" id="health-badge" hidden></b></button>
       <button data-view="usage" aria-pressed="false"><i data-ic="chart"></i><span>額度</span></button>
       <button data-view="dev" aria-pressed="false"><i data-ic="target"></i><span>設定</span></button>
@@ -553,6 +571,25 @@
       <p id="wallets-error" class="error"></p>
       <div id="wallets" class="acct-list"></div>
       <div class="row foot-row"><button id="csv" class="small">下載 CSV</button></div>
+    </section>
+
+    <!-- 使用: how the apps are used, counts with no id (usage.js) -->
+    <section data-pane="use" hidden>
+      <div class="pane-head"><div><h2>使用情形</h2><p class="muted">裝置數是匿名的「今天第一次打開」加總，同一個人在 Orbit 和單獨的 App 會各算一次。關掉統計的人不算。</p></div></div>
+      <p id="use-error" class="error"></p>
+      <div class="kpis" id="use-kpis"></div>
+      <div class="sec-head"><h2>最近 30 天</h2><span class="legend"><span><i style="background:var(--q-accent)"></i>裝置</span><span><i style="background:var(--q-good)"></i>新裝置</span></span></div>
+      <div class="card"><svg id="use-chart" class="chart" viewBox="0 0 700 180" role="img" aria-label="最近 30 天每天的裝置和新裝置"></svg></div>
+      <div class="sec-head"><h2>各 App・7 天</h2></div>
+      <div id="use-apps" class="q-rowcard"></div>
+      <div class="sec-head"><h2>用什麼打開・30 天</h2></div>
+      <div id="use-dims" class="use-dims"></div>
+      <div class="sec-head"><h2>回來的比例</h2></div>
+      <div class="card"><p class="muted" style="margin:0 0 8px">每一列是第一次打開 Orbit 的那一週，往右每一格是之後的一週（+1、+2…），還有多少裝置回來。</p><div id="use-ret" class="use-ret"></div></div>
+      <div class="sec-head"><h2>步驟・30 天</h2></div>
+      <div id="use-steps" class="card"></div>
+      <div class="sec-head"><h2>錯誤・7 天</h2></div>
+      <div id="use-errs" class="card"></div>
     </section>
 
     <!-- 健康 -->
@@ -961,6 +998,7 @@ $('forget').onclick = () => {
 const VIEWS = {
   overview: () => loadOverview(),
   accounts: () => Promise.all([loadWallets(), loadDoor()]),
+  use: () => loadUse(),
   health: () => Promise.all([loadSystem(), loadSources(), loadErrors(), loadBugs()]),
   usage: () => Promise.all([loadCapacity(), loadSystem(), loadUsage(), loadAiMoney()]),
   dev: () => loadDev(),
@@ -1324,6 +1362,7 @@ const PLACES = [
   ['帳戶', 'accounts', 'user', '#2563eb', '使用者 accounts users'],
   ['證券的錢', 'money', 'coin', '#d97706', '金流 錢 經濟 對帳 稅 money economy'],
   ['健康', 'health', 'live', '#16a34a', '系統 排程 資料來源 部署 金鑰 r2 d1 錯誤 health cron'],
+  ['使用', 'use', 'bars', '#0ea5e9', '使用 統計 裝置 打開 分頁 錯誤 回訪 留存 analytics usage stats'],
   ['額度', 'usage', 'chart', '#7c3aed', '容量 人數 帳單 cloudflare google gemini ai tdx 節流 quota usage billing'],
   ['現在在用', 'accounts', 'user', '#16a34a', '入場 排隊 同時 優先 door', 'door'],
   ['設定', 'dev', 'target', '#64748b', '速度 開發 ai 上限 dev config'],
@@ -2357,6 +2396,121 @@ function sourceRow(o, now) {
   ]);
 }
 const every = ms => (ms >= 86_400_000 ? `${Math.round(ms / 86_400_000)} 天` : ms >= 3_600_000 ? `${Math.round(ms / 3_600_000)} 小時` : `${Math.round(ms / 60_000)} 分鐘`);
+// 使用: the counts usage.js keeps ([day, app, kind, key, n]: no id in them), drawn.
+const USE_DIM = { where: ['從哪裡', { orbit: 'Orbit 裡', home: '單獨的 App', web: '瀏覽器' }], dev: ['裝置', { phone: '手機', tablet: '平板', computer: '電腦' }], os: ['系統', { ios: 'iOS', android: 'Android', mac: 'Mac', windows: 'Windows', other: '其他' }], lang: ['語言', { zh: '中文', en: 'English' }], theme: ['外觀', { dark: '深色', light: '淺色' }], signed: ['登入', { yes: '已登入', no: '沒登入' }] };
+const USE_OTHER = { suite: 'Orbit', pass: 'Orbit Pass 網頁', key: '公開領取', legal: '隱私權與條款' };
+const useName = a => BRANDS[a]?.short || USE_OTHER[a] || a;
+const twToday = () => new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
+const dayBack = (day, n) => new Date(Date.parse(`${day}T00:00:00Z`) - n * 86_400_000).toISOString().slice(0, 10);
+// A load time's middle (and 9 in 10) from its buckets (kit/usage.mjs LOAD_EDGES): the bucket's upper edge.
+function loadMid(b, q = 0.5) {
+  const order = Object.keys(b).sort((x, y) => (x === 'more' ? 1 : y === 'more' ? -1 : x - y));
+  const all = order.reduce((t, k) => t + b[k], 0);
+  let run = 0;
+  for (const k of order) if ((run += b[k]) >= all * q) return k === 'more' ? '15 秒以上' : `${(k / 1000).toLocaleString()} 秒內`;
+  return '—';
+}
+async function loadUse() {
+  $('use-error').textContent = '';
+  let d;
+  try {
+    d = await admin('use', { days: 35 });
+  } catch (e) {
+    return void ($('use-error').textContent = e.message);
+  }
+  const today = d.to || twToday();
+  const since = n => dayBack(today, n - 1);
+  const sum = (f, from = '0000') => d.rows.reduce((t, r) => (r[0] >= from && f(r) ? t + r[4] : t), 0);
+  const any = kind => r => r[1] === '*' && r[2] === kind;
+  const monday = dayBack(today, (new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7);
+  const opensToday = sum(r => r[1] !== '*' && r[2] === 'open', today);
+  $('use-kpis').innerHTML = [
+    kpi({ icon: 'live', color: '#16a34a', label: '今天的裝置', value: sum(any('day'), today).toLocaleString(), sub: `打開 ${opensToday.toLocaleString()} 次` }),
+    kpi({ icon: 'calendar', color: '#2563eb', label: '這週的裝置', value: sum(r => any('week')(r) && r[0] >= monday).toLocaleString(), sub: `這個月 ${sum(r => any('month')(r) && r[0] >= today.slice(0, 7)).toLocaleString()}` }),
+    kpi({ icon: 'plus', color: '#7c3aed', label: '新裝置・7 天', value: sum(any('new'), since(7)).toLocaleString(), sub: `30 天 ${sum(any('new'), since(30)).toLocaleString()}` }),
+    kpi({ icon: 'flag', color: '#dc2626', label: '錯誤・7 天', value: sum(r => r[1] !== '*' && r[2] === 'err', since(7)).toLocaleString(), sub: '去掉內容的錯誤訊息' })
+  ].join('');
+  // The last 30 days: devices and new ones a day.
+  const days = Array.from({ length: 30 }, (_, i) => since(30 - i));
+  const per = kind => days.map(day => sum(r => r[0] === day && any(kind)(r)));
+  const dev = per('day'), fresh = per('new');
+  const top = Math.max(1, ...dev);
+  const w = 700 / 30;
+  $('use-chart').innerHTML =
+    days.map((day, i) => `<rect x="${i * w + 3}" y="${160 - (dev[i] / top) * 140}" width="${w - 6}" height="${(dev[i] / top) * 140}" rx="3" fill="var(--q-accent)" opacity=".85"><title>${day}：${dev[i]} 台裝置、${fresh[i]} 台新的</title></rect><rect x="${i * w + 3}" y="${160 - (fresh[i] / top) * 140}" width="${w - 6}" height="${(fresh[i] / top) * 140}" rx="3" fill="var(--q-good)"/>`).join('') +
+    `<text x="0" y="176" font-size="12" fill="var(--q-muted)">${days[0].slice(5)}</text><text x="700" y="176" font-size="12" text-anchor="end" fill="var(--q-muted)">${today.slice(5)}</text><text x="0" y="14" font-size="12" fill="var(--q-muted)">最多 ${top}</text>`;
+  // Each app, the last 7 days.
+  const week = d.rows.filter(r => r[0] >= since(7) && r[1] !== '*');
+  const apps = {};
+  for (const [, app, kind, key, n] of week) {
+    const a = (apps[app] ||= { day: 0, open: 0, sec: 0, err: 0, tabs: {}, load: {} });
+    if (kind === 'day') a.day += n;
+    else if (kind === 'open') a.open += n;
+    else if (kind === 'sec') a.sec += n;
+    else if (kind === 'err') a.err += n;
+    else if (kind === 'tab') a.tabs[key] = (a.tabs[key] || 0) + n;
+    else if (kind === 'load') a.load[key] = (a.load[key] || 0) + n;
+  }
+  const order = Object.keys(apps).sort((x, y) => apps[y].open - apps[x].open);
+  $('use-apps').innerHTML = order.length
+    ? order
+        .map(id => {
+          const a = apps[id];
+          const tabs = Object.entries(a.tabs).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([t, n]) => `${t} ${n}`).join('・');
+          const mins = Math.round(a.sec / 60);
+          const sub = [`${a.day} 台・${mins.toLocaleString()} 分鐘`, Object.keys(a.load).length ? `載入 ${loadMid(a.load)}，9 成 ${loadMid(a.load, 0.9)}` : '', a.err ? `${a.err} 個錯誤` : '', tabs].filter(Boolean).join(' · ');
+          return `<div class="q-ritem">${appIc(id) || tileHtml(ic('grid'), '#64748b', 'sm')}<span class="q-ritem-text"><span class="q-ritem-title">${escHtml(useName(id))}</span><small>${escHtml(sub)}</small></span><span class="q-ritem-value">${a.open.toLocaleString()} 次</span></div>`;
+        })
+        .join('')
+    : emptyCard('bars', '這 7 天還沒有統計。');
+  // What it's opened with, the last 30 days (once a device a day).
+  const dims = {};
+  for (const [day, app, kind, key, n] of d.rows) if (app === '*' && kind === 'dim' && day >= since(30)) dims[key] = (dims[key] || 0) + n;
+  $('use-dims').innerHTML = Object.entries(USE_DIM)
+    .map(([k, [name, words]]) => {
+      const vals = Object.keys(words).map(v => [words[v], dims[`${k}:${v}`] || 0]);
+      const all = vals.reduce((t, [, n]) => t + n, 0) || 1;
+      return `<div class="use-dim"><h3>${escHtml(name)}</h3>${vals
+        .filter(([, n]) => n)
+        .sort((x, y) => y[1] - x[1])
+        .map(([label, n]) => `<div class="use-bar"><span>${escHtml(label)}</span><b>${Math.round((n / all) * 100)}%</b><i style="width:${Math.max(2, (n / all) * 100)}%"></i></div>`)
+        .join('') || '<p class="muted" style="margin:0">—</p>'}</div>`;
+    })
+    .join('');
+  // Coming back: each first week (cohort), the devices back each week after.
+  const ret = {};
+  for (const [wk, app, kind, coh, n] of d.rows) if (app === '*' && kind === 'ret') (ret[coh] ||= {})[wk] = n;
+  const cohorts = Object.keys(ret).sort().slice(-6);
+  const span = c => Math.round((Date.parse(today) - Date.parse(c)) / (7 * 86_400_000));
+  const weekAfter = (c, k) => new Date(Date.parse(`${c}T00:00:00Z`) + k * 7 * 86_400_000).toISOString().slice(0, 10);
+  $('use-ret').innerHTML = cohorts.length
+    ? `<table><tr><th>第一週</th>${Array.from({ length: 6 }, (_, k) => `<th>${k ? `+${k}` : '當週'}</th>`).join('')}</tr>${cohorts
+        .map(c => {
+          const base = ret[c][c] || 0;
+          return `<tr><td>${c.slice(5)}</td>${Array.from({ length: 6 }, (_, k) => {
+            if (k > span(c)) return '<td></td>';
+            const n = ret[c][weekAfter(c, k)] || 0;
+            const p = base ? Math.round((n / base) * 100) : 0;
+            return k ? `<td class="c" style="--p:${Math.min(p, 100) / 2}" title="${n} 台">${base ? `${p}%` : n}</td>` : `<td>${n}</td>`;
+          }).join('')}</tr>`;
+        })
+        .join('')}</table>`
+    : '<p class="muted" style="margin:0">還沒有資料：第一週過完才會出現。</p>';
+  // Steps (sign-in, sign-up, setup) and errors.
+  // (Steps add up across the apps: one sign-in is the same wherever; errors stay by app.)
+  const lines = (kind, from, empty) => {
+    const m = {};
+    for (const [day, app, k, key, n] of d.rows) {
+      if (k !== kind || app === '*' || day < from) continue;
+      const name = kind === 'step' ? key : `${useName(app)}｜${key}`;
+      m[name] = (m[name] || 0) + n;
+    }
+    const list = Object.entries(m).sort((x, y) => y[1] - x[1]).slice(0, 30);
+    return list.length ? list.map(([k, n]) => `<div class="use-line"><span>${escHtml(k)}</span><b>${n.toLocaleString()}</b></div>`).join('') : `<p class="muted" style="margin:0">${escHtml(empty)}</p>`;
+  };
+  $('use-steps').innerHTML = lines('step', since(30), '還沒有步驟的統計。');
+  $('use-errs').innerHTML = lines('err', since(7), '這 7 天沒有錯誤。');
+}
 async function loadSources() {
   $('health-error').textContent = '';
   if (!$('sources').childElementCount) $('sources').replaceChildren(el('p', { class: 'muted', text: '讀取中…' }));

@@ -32,6 +32,8 @@ To remove a feature on purpose, delete its line here in the same commit and say 
 - Anyone makes a pass on the sign-in screen, at the 基本 level (no AI); AI taps hidden for it — `kit/orbit.mjs`, `kit/orbit.css`: `q-gate-make`, `export function passLevel`, `data-pass-level`
 - Orbit's sign-in page (apps circling its mark) and the passkey nudge banner — `site/app/index.html`, `kit/orbit.mjs`: `const orbitRing`, `export async function signInScreen`, `export function quietTip`
 - Pass recovery email: linked by a mailed code, a lost pass recovered by one (then a new pass), a quiet tip to add one — `pass-mail.js`, `kit/pass-mail.mjs`, `kit/orbit.mjs`: `export async function mailRecover`, `export function recoverPanel`, `export function mailRows`, `export function mailTip`, `s.mailBegin`
+- Anonymous usage counts (no id, no content; GPC respected), a one-time note, Pass › 隱私 › 使用統計 off switch, admin 使用 — `kit/usage.mjs`, `usage.js`, `kit/orbit.mjs`, `site/admin/index.html`: `export function cleanBeacon`, `export function takeUsage`, `export function usageNotice`, `function usageRows`, `async function loadUse`
+- Privacy policy and terms of use, Chinese and English — `site/privacy/index.html`, `site/terms/index.html`: `privacy@jaypengx.com`, `Terms of Use`
 - A typhoon day off acts like a holiday — `kit/dayoff.mjs`: `dayOffOn`, `loadDayOff`
 - Law's 代表會 recordings play on iPhone — `law-audio.js`: `handleLawAudio`, `audioType`
 - Law's live feed keeps its last good read — `law-live.js`: `KEY_LAST`

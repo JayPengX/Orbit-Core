@@ -33,6 +33,8 @@
 
 // (First: the outside calls counted, sources.js, before anything keeps a fetch of its own.)
 import { watchRelay, flushSources, asSourceCall, pruneSources, takeBeacon, readSources } from './sources.js';
+import { takeUsage, flushUsage, pruneUsage } from './usage.js';
+import { pruneReports } from './rec-weekly.js';
 import { SOURCES, freshAt, sourceState } from './kit/sources.mjs';
 import { handleLawAsk, useLawSite, addOne, countOf, twDay } from './law.js';
 import { handleLawChat, lawChatTimes, lawCompare, COMPARE_QS } from './law-chat.js';
@@ -1444,6 +1446,19 @@ async function route(request, env, ctx, headers, origin) {
     flushSources(env, ctx, { soon: true });
     return new Response(null, { status: 204, headers });
   }
+  // How the apps are used, as counts with no id (kit/usage.mjs → usage.js): a
+  // beacon from our own pages only, a few a minute an address (never kept).
+  if (path === '/usage') {
+    if (request.method !== 'POST' || !isAllowedOrigin(origin) || LOCAL_ORIGIN.test(origin)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
+    if (sessionLimited(`use:${ipBucket(ip)}`, 12)) return new Response(null, { status: 204, headers });
+    const text = await bodyText(request, 8_192).catch(() => '');
+    let body = null;
+    try {
+      body = JSON.parse(text);
+    } catch {}
+    if (takeUsage(body)) flushUsage(env, ctx, { soon: true });
+    return new Response(null, { status: 204, headers });
+  }
   // Orbit Class's 加到行事曆 (cal.js): the calendar its phone made, kept and handed to the Calendar app.
   if (path === '/cal' || path.startsWith('/cal/')) return handleCal(request, env, headers, path === '/cal' ? await sessionOf(request, env) : null, path);
   // …and its 讀圖: a picture of purchases read by Gemini, on a tap only (money-read.js).
@@ -1831,6 +1846,7 @@ async function handle(request, env, ctx) {
       return timed(errorJson('WORKER_FAILED', 500, headers, request), t0);
     } finally {
       flushSources(env, ctx);
+      flushUsage(env, ctx);
     }
 }
 
@@ -1885,7 +1901,7 @@ async function cronTick(event, env, ctx, part) {
     // thinned (doc-store.js), then the whole store copied to R2 (store-backup.js).
     // The giveaway's (gift.js): passes never replaced back to the pool, and its empty accounts cleared if the owner turned that on, 03:50 Taiwan.
     if (min === 50 && tick.getUTCHours() === 19) run('gift-clean', () => giftNight(env, ECO_DEPS), r => (r.back || r.cleared ? r : null));
-    if (min === 30 && tick.getUTCHours() === 20) run('store-backup', async () => ({ pruned: await DOCS.prune(env), sources: await pruneSources(env, tick.getTime()).catch(e => ({ failed: String(e?.message || e).slice(0, 80) })), ...(await backupStore(env, DOCS, tick.getTime())) }));
+    if (min === 30 && tick.getUTCHours() === 20) run('store-backup', async () => ({ pruned: await DOCS.prune(env), sources: await pruneSources(env, tick.getTime()).catch(e => ({ failed: String(e?.message || e).slice(0, 80) })), usage: await pruneUsage(env, tick.getTime()).catch(e => ({ failed: String(e?.message || e).slice(0, 80) })), bugs: await pruneReports(env, tick.getTime()).catch(e => ({ failed: String(e?.message || e).slice(0, 80) })), ...(await backupStore(env, DOCS, tick.getTime())) }));
     // The live refreshes by how many people there are (capacity.js), every 6 hours.
     if (min === 20 && tick.getUTCHours() % 6 === 0) run('capacity', () => capacityCron(env, ECO_DEPS));
     // R2's folders for the panel's 健康 (ops.js countFolders), every 6 hours (and on the first run after a deploy).

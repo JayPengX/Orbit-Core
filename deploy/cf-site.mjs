@@ -13,6 +13,7 @@
 //                                 /key/ (the public giveaway, gift.js),
 //                                 /admin/ (the owner's panel, there alone),
 //                                 /app/ (Orbit, every app in one: kit/suite.mjs),
+//                                 /privacy/, /terms/ (the policy and terms),
 //                                 /Orbit-Core/ (and the old /Shared-Proxy/);
 //                                 <d>/Orbit-Core/ → orbit-pass
 //   Orbit-Showcase                <d>/… (Jay's homepage at /, /showcase/) → orbit-home
@@ -39,7 +40,7 @@ export function siteFor(repo, domain = DOMAIN) {
     const kitRoots = ['Orbit-Core', 'Shared-Proxy'];
     return {
       name: 'orbit-pass',
-      put: [['', '/pass'], ['index.html', '/index.html'], ...kitRoots.map(r => ['', `/${r}`]), ['key', '/key'], ['app', '/app'], ['admin', '/admin'], ['favicon.ico', '/favicon.ico'], ['icons/apple-touch-icon.png', '/apple-touch-icon.png'], ['icons/apple-touch-icon.png', '/apple-touch-icon-precomposed.png']],
+      put: [['', '/pass'], ['index.html', '/index.html'], ...kitRoots.map(r => ['', `/${r}`]), ['key', '/key'], ['app', '/app'], ['admin', '/admin'], ['privacy', '/privacy'], ['terms', '/terms'], ['favicon.ico', '/favicon.ico'], ['icons/apple-touch-icon.png', '/apple-touch-icon.png'], ['icons/apple-touch-icon.png', '/apple-touch-icon-precomposed.png']],
       // (The owner's panel at /admin/ alone, Jay 2026-11-14: not also under /pass/ and the kit's
       // paths, where it was until then; nothing forwards from there, Jay: no legacy forwards.)
       skip: ['admin'],

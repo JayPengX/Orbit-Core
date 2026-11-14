@@ -37,6 +37,7 @@ import { MAIL_COLLECTION, MAIL_CODES, mailSummary, mailIndexId } from './pass-ma
 import { tokenSecret, readToken, signToken } from './orbit-token.js';
 import { GIFT_TOOLS, mintPass } from './gift.js';
 import { readSources } from './sources.js';
+import { readUsage } from './usage.js';
 import { SOURCES } from './kit/sources.mjs';
 import { lawFetch, DATA as LAW_DATA } from './law.js';
 import { mailSettings, setMailSettings, sendMail, sentCounts, mailLog, addressesOf, isAddress, MAX_TO, RESEND_DAY, RESEND_MONTH } from './mail.js';
@@ -969,6 +970,10 @@ export const ADMIN_TOOLS = {
     const job = String(body.job || '');
     if (!['watch', 'watch-full', 'cutouts', 'buses', 'asia', 'cpbl', 'sports', 'photos', 'winprob', 'ai-weekly', 'news'].includes(job)) return { error: 'ECO_UNKNOWN_OP', status: 400 };
     return deps.build(env, job);
+  },
+  // 使用: how the apps are used, the last 35 days' counts (usage.js; no id in them).
+  async use({ env, deps, body }) {
+    return readUsage(env, { days: Number(body.days) || 35, now: deps.now() });
   },
   // 外部來源: each outside source's last 7 days as the proxy and phones
   // counted them (sources.js), with the ages of what's built from them: the
