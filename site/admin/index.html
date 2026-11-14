@@ -482,7 +482,7 @@
 </head>
 <body>
 <main>
-  <section id="gate" class="card gate">
+  <section id="gate" class="card gate" hidden>
     <span class="gate-mark" id="gate-mark"></span>
     <h2>Orbit 管理</h2>
     <p class="muted">貼上「Orbit 管理金鑰.txt」裡的那一行。這台裝置會記住它。</p>
@@ -2957,17 +2957,22 @@ async function loadAllow() {
 }
 $('alw-load').onclick = () => busy($('alw-load'), loadAllow);
 
-// A saved key is checked again as a new one is (it may have been changed
-// since): a key turned away shows the gate, any other failure opens anyway.
-if (token)
+// A saved sign-in opens the panel at once (Jay 11-14: the key screen
+// flashed first on every open), checked behind it: a key turned away then
+// shows the gate. Nothing saved: the gate.
+if (token) {
+  open();
   (held() ? Promise.resolve() : keep(token))
     .then(() => admin('wallets'))
-    .then(open, e => {
-      if (e.code !== 'FORBIDDEN') return open();
+    .catch(e => {
+      if (e.code !== 'FORBIDDEN') return;
       store.set('');
       token = '';
+      $('panel').hidden = true;
+      $('gate').hidden = false;
       $('gate-error').textContent = e.message;
     });
+} else $('gate').hidden = false;
 </script>
 </body>
 </html>
