@@ -16,7 +16,7 @@ import { fail, twDay, passOf, passKey, countOf, addOne } from './law.js';
 import { sessionLimited } from './orbit-token.js';
 import { twOnly, viaTaiwan, buildKeyOk, buildHost, judicialData } from './law-hosts.js';
 
-export const PAGE_LIMITS = { perPass: 500, perMinute: 60, buildPerMinute: 720, hops: 5, timeoutMs: 20_000, maxHtml: 2 * 1024 * 1024, maxBytes: 6 * 1024 * 1024, fileBytes: 40 * 1024 * 1024 };
+export const PAGE_LIMITS = { perPass: 500, perMinute: 60, buildPerMinute: 720, hops: 5, timeoutMs: 20_000, maxHtml: 2 * 1024 * 1024, maxBytes: 6 * 1024 * 1024, fileBytes: 40 * 1024 * 1024, audioBytes: 600 * 1024 * 1024 };
 const LONG = new Set(['judgment.judicial.gov.tw', 'cons.judicial.gov.tw']);
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 
@@ -71,10 +71,13 @@ export function cleanHtml(html, max = PAGE_LIMITS.maxHtml) {
 
 // The page, redirects followed while they stay on government hosts.
 // → { url, res } or { error, status }.
-async function fetchPage(url, fetchFn) {
+// A file's read (the build's) is timed to its answer only: a recording's bytes take minutes to stream.
+async function fetchPage(url, fetchFn, { file = false } = {}) {
   let at = url;
   for (let hop = 0; hop <= PAGE_LIMITS.hops; hop++) {
-    const res = await fetchFn(at, { redirect: 'manual', headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml,application/pdf,*/*;q=0.8', 'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.5' }, signal: AbortSignal.timeout(PAGE_LIMITS.timeoutMs) });
+    const stop = file && new AbortController();
+    const timer = file && setTimeout(() => stop.abort(), PAGE_LIMITS.timeoutMs);
+    const res = await fetchFn(at, { redirect: 'manual', headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml,application/pdf,*/*;q=0.8', 'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.5' }, signal: file ? stop.signal : AbortSignal.timeout(PAGE_LIMITS.timeoutMs) }).finally(() => file && clearTimeout(timer));
     if (res.status < 300 || res.status >= 400) return { url: at, res };
     const next = pageUrl(new URL(res.headers.get('Location') || '', at).toString());
     if (!next) return { error: 'host', status: res.status };
@@ -114,7 +117,7 @@ async function bytesOf(res) {
 // or encoded here (its text is read at build: a 代表會's 決議案 on a site that serves only Taiwan); any other
 // answer as it came too (臺北市議會's video lists, its JSON and pages).
 export async function readPage(url, fetchFn = fetch, { file = false } = {}) {
-  const got = await fetchPage(url, fetchFn);
+  const got = await fetchPage(url, fetchFn, { file });
   if (got.error) return got;
   const { res } = got;
   if (!res.ok) {
@@ -125,7 +128,9 @@ export async function readPage(url, fetchFn = fetch, { file = false } = {}) {
   // The build's file read takes any answer as it came (a Taiwan-only site's own JSON or page, scripts and all), up to a file's size.
   if (file && !/pdf/i.test(type) && !/\.pdf$/i.test(new URL(got.url).pathname)) {
     const size = Number(res.headers.get('Content-Length')) || null;
-    if (!size || size <= PAGE_LIMITS.fileBytes) return { url: got.url, type: 'file', size, body: res.body, ctype: type || 'application/octet-stream' };
+    // A 代表會's meeting recording (heard at build on a GitHub runner) runs to hundreds of MB: streamed, never held.
+    const audio = /^audio\//i.test(type) || /\.(mp3|m4a|wav|aac)$/i.test(new URL(got.url).pathname);
+    if (!size || size <= (audio ? PAGE_LIMITS.audioBytes : PAGE_LIMITS.fileBytes)) return { url: got.url, type: 'file', size, body: res.body, ctype: type || 'application/octet-stream' };
   }
   if (!/text\/html|application\/xhtml|text\/plain/i.test(type) && type) {
     const size = Number(res.headers.get('Content-Length')) || null;
