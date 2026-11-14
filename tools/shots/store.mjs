@@ -166,7 +166,7 @@ export const STORE = {
     app: 'law', brand: 'law', show: 'law', prefix: 'law',
     shots: [
       { zh: '法律、判決、法案，一個 App 全包', en: 'Laws, rulings and bills, all in one app', wait: 8000 },
-      { zh: '每部法律，連到修法、判決和釋憲', en: 'Every law linked to its bills and rulings', device: 'computer', hash: 'law=N0030001', wait: 9000 },
+      { zh: '每部法律，連到修法、判決和釋憲', en: 'Every law linked to its bills and rulings', device: 'computer', hash: 'law=T0020001', wait: 9000 },
       { zh: '4.7 萬則判決，憲法法庭到各級法院', en: '47,000 rulings, from the top court down', hash: 'tab=rulings', wait: 9000 },
       { zh: '白話問，答案附上條文', en: 'Ask in plain words, every point cited', hash: { zh: 'tab=ask&q=網購的東西不想要了，七天內可以退嗎？', en: 'tab=ask&q=Can I return something I bought online within seven days?' }, ai: [['law-chat', 'law-return']], wait: 9000 },
       { zh: '立法院近 8 千案，走到哪一步', en: 'Nearly 8,000 bills, each one’s stage', device: 'tablet', hash: 'tab=bills', wait: 8000 },
