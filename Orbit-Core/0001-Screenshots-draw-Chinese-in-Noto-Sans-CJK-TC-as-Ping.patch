@@ -1,0 +1,280 @@
+From 35b8cb341abb439238d483507c80e1fa83269c19 Mon Sep 17 00:00:00 2001
+From: orbit-agent <actions@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 16:32:28 +0000
+Subject: [PATCH] Screenshots draw Chinese in Noto Sans CJK TC (as PingFang TC
+ on iPhone): tools/fonts.mjs for every screenshot tool, Noto Sans CJK TC in
+ the font stacks, fonts-noto-cjk in the workflows
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ .github/workflows/agent.yml |  3 ++
+ brand/generate.mjs          |  4 ++-
+ brand/marks.mjs             |  6 ++--
+ kit/orbit.css               |  6 ++--
+ tools/README.md             |  8 +++++
+ tools/fonts.mjs             | 62 +++++++++++++++++++++++++++++++++++++
+ tools/help-shots.mjs        |  2 ++
+ tools/live-scroll.mjs       |  2 ++
+ tools/preview.mjs           |  2 ++
+ tools/shots.mjs             |  2 ++
+ tools/store-shots.mjs       |  4 ++-
+ 11 files changed, 93 insertions(+), 8 deletions(-)
+ create mode 100644 tools/fonts.mjs
+
+diff --git a/.github/workflows/agent.yml b/.github/workflows/agent.yml
+index d561a1e..0f2bd95 100644
+--- a/.github/workflows/agent.yml
++++ b/.github/workflows/agent.yml
+@@ -40,6 +40,9 @@ jobs:
+       - uses: actions/setup-node@v4
+         with:
+           node-version: 22
++      - name: Traditional Chinese font, for any screenshot the task takes
++        # (tools/fonts.mjs: without it Chinese draws as boxes or Japanese forms)
++        run: sudo apt-get install -y -qq fonts-noto-cjk fontconfig || echo "::warning::No Chinese font"
+       - name: The other repos, side by side
+         run: |
+           for r in Orbit-Sports Orbit-Transit Orbit-Weather Orbit-Class Orbit-Money Orbit-News Orbit-Words Orbit-Beats Orbit-Law Orbit-Securities Orbit-Showcase; do
+diff --git a/brand/generate.mjs b/brand/generate.mjs
+index 18b35da..89db388 100644
+--- a/brand/generate.mjs
++++ b/brand/generate.mjs
+@@ -12,6 +12,8 @@ import { execSync } from 'node:child_process';
+ import { createHash } from 'node:crypto';
+ import { BRANDS, FAMILY, PASS, SITE_URL, LOOKS, ORBIT_PALETTES, appIcon, familyMark, homeOf, lookApp, orbitIcon, shortPathOf } from '../kit/brand.mjs';
+ import { FORMATS, shareCard } from './marks.mjs';
++import { chineseFonts } from '../tools/fonts.mjs';
++chineseFonts();
+ 
+ // The global one, or a Mac's in ~/.local/opt/playwright (as tools/preview.mjs).
+ const require = createRequire(`${execSync('npm root -g').toString().trim()}/`);
+@@ -298,7 +300,7 @@ ${og('type', 'website')}${og('site_name', 'Orbit')}${og('title', 'Orbit')}${og('
+ :root{color-scheme:light dark;--page:#f2f2f7;--glow:rgba(99,102,241,.16);--cell:#fff;--label:#000;--label-2:rgba(60,60,67,.6);--sep:rgba(60,60,67,.18);--press:rgba(0,0,0,.04);--btn:#4f46e5;--btn-ink:#fff;--ring:#f2f2f7}
+ @media (prefers-color-scheme:dark){:root{--page:#05051a;--glow:rgba(99,102,241,.32);--cell:rgba(255,255,255,.06);--label:#fff;--label-2:rgba(235,235,245,.6);--sep:rgba(255,255,255,.09);--press:rgba(255,255,255,.06);--btn:#eef0ff;--btn-ink:#1e1b4b;--ring:#0b0b26}}
+ *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+-body{margin:0;min-height:100vh;background:radial-gradient(120% 60% at 50% -10%,var(--glow),transparent 70%) no-repeat,var(--page);color:var(--label);font:17px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
++body{margin:0;min-height:100vh;background:radial-gradient(120% 60% at 50% -10%,var(--glow),transparent 70%) no-repeat,var(--page);color:var(--label);font:17px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang TC","Noto Sans TC", "Noto Sans CJK TC","Microsoft JhengHei",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+ main{max-width:1120px;margin:0 auto;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(40px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+ .hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:48px 0 48px}
+ .mark{width:96px;height:96px;border-radius:22px;box-shadow:0 12px 32px rgba(30,27,75,.28)}
+diff --git a/brand/marks.mjs b/brand/marks.mjs
+index 28d38d0..6216b4e 100644
+--- a/brand/marks.mjs
++++ b/brand/marks.mjs
+@@ -78,10 +78,10 @@ export function shareCard(id, format = 'og') {
+   const side = Math.round((r * 512) / 200);
+   const motifCss = `width:${side}px;left:${cx - side / 2}px;top:${cy - side / 2}px`;
+   const name = stacked ? 150 : 168;
+-  return `<!doctype html><html><head><meta charset="utf-8">
++  return `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
+ <style>${fontCss(`${s.short}${s.pitch.zh}${s.brand}`)}
+ *{box-sizing:border-box;margin:0}
+-body{width:${w}px;height:${h}px;overflow:hidden;position:relative;color:#fff;font-family:Inter,'Noto Sans TC',system-ui,sans-serif;
++body{width:${w}px;height:${h}px;overflow:hidden;position:relative;color:#fff;font-family:Inter,'Noto Sans TC', 'Noto Sans CJK TC',system-ui,sans-serif;
+   background:radial-gradient(${Math.round(w * 0.8)}px ${Math.round(h * 0.8)}px at 0% 0%, ${hi}, transparent 75%),linear-gradient(${stacked ? 170 : 120}deg, ${mid} 0%, ${lo} 100%)}
+ .motif{position:absolute;${motifCss}}
+ .wrap{position:absolute;inset:0;display:flex;${stacked ? 'flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 80px;gap:56px' : 'align-items:center;padding:0 90px;gap:72px'}}
+@@ -89,7 +89,7 @@ body{width:${w}px;height:${h}px;overflow:hidden;position:relative;color:#fff;fon
+ .text{min-width:0;flex:${stacked ? 'none;width:100%' : 1}}
+ .brand{font-weight:800;font-size:${stacked ? 44 : 42}px;letter-spacing:.3em;opacity:.8}
+ h1{font-weight:900;font-size:${name}px;line-height:1;letter-spacing:-.035em;margin-top:10px;white-space:nowrap}
+-.pitch{font-family:'Noto Sans TC',sans-serif;font-weight:900;font-size:${stacked ? 72 : 62}px;line-height:1.2;margin-top:26px;white-space:nowrap;text-shadow:0 2px 12px rgba(0,0,0,.25)}
++.pitch{font-family:'Noto Sans TC', 'Noto Sans CJK TC',sans-serif;font-weight:900;font-size:${stacked ? 72 : 62}px;line-height:1.2;margin-top:26px;white-space:nowrap;text-shadow:0 2px 12px rgba(0,0,0,.25)}
+ </style></head><body>${motif}
+ <div class="wrap"><img class="icon" src="${b64(s.icon)}"><div class="text">${s.brand ? `<div class="brand">${s.brand}</div>` : ''}<h1>${esc(s.short)}</h1><p class="pitch">${esc(s.pitch.zh)}</p></div></div>
+ <script>window.fitted = document.fonts.ready.then(() => { for (const el of document.querySelectorAll('h1,.pitch')) { let f = parseFloat(getComputedStyle(el).fontSize); while (el.scrollWidth > el.parentNode.clientWidth && f > 20) el.style.fontSize = (f -= 2) + 'px'; } });</script>
+diff --git a/kit/orbit.css b/kit/orbit.css
+index 1ee3b75..8a38fa7 100644
+--- a/kit/orbit.css
++++ b/kit/orbit.css
+@@ -16,7 +16,7 @@
+    --q-font-rounded; where no listed font is there it is skipped. */
+ @font-face {
+   font-family: 'Q Han';
+-  src: local('PingFangTC-Regular'), local('PingFang TC'), local('Noto Sans TC'), local('Noto Sans CJK TC');
++  src: local('PingFangTC-Regular'), local('PingFang TC'), local('Noto Sans TC'), local('Noto Sans CJK TC'), local('NotoSansCJKtc-Regular');
+   font-weight: 100 549;
+   unicode-range: U+2E80-2FFF, U+3000-303F, U+3100-31FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF;
+ }
+@@ -29,7 +29,7 @@
+ :root {
+   /* San Francisco (and PingFang for Chinese) on Apple's devices; the
+      nearest system face elsewhere. Rounded for big numbers. */
+-  --q-font: -apple-system, BlinkMacSystemFont, system-ui, 'SF Pro Text', 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', 'Segoe UI', sans-serif;
++  --q-font: -apple-system, BlinkMacSystemFont, system-ui, 'SF Pro Text', 'PingFang TC', 'Noto Sans TC', 'Noto Sans CJK TC', 'Microsoft JhengHei', 'Segoe UI', sans-serif;
+   --q-font-rounded: 'Q Han', ui-rounded, 'SF Pro Rounded', var(--q-font);
+   --q-font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+ 
+@@ -394,7 +394,7 @@
+    edge, what a band's colour deepens to, the tinted glyph's wash.
+    Dark: graphite, not black and grey. */
+ html[data-look='native'][data-look='native'] {
+-  --nv-display: -apple-system, 'SF Pro Display', BlinkMacSystemFont, system-ui, 'PingFang TC', 'Noto Sans TC', sans-serif;
++  --nv-display: -apple-system, 'SF Pro Display', BlinkMacSystemFont, system-ui, 'PingFang TC', 'Noto Sans TC', 'Noto Sans CJK TC', sans-serif;
+   --nv-rounded: ui-rounded, 'SF Pro Rounded', -apple-system, system-ui, 'PingFang TC', sans-serif;
+   --q-r-card: 20px;
+   --nv-edge: rgba(0, 0, 0, 0.06);
+diff --git a/tools/README.md b/tools/README.md
+index cf85e52..c06447f 100644
+--- a/tools/README.md
++++ b/tools/README.md
+@@ -3,6 +3,14 @@
+ On the owner's Mac: Node 22 in `~/.local/opt/node`, Playwright (WebKit and
+ Chromium) in `~/.local/opt/playwright`; `preview.mjs` finds them itself.
+ 
++**Chinese in screenshots on Linux.** The cloud's Chromium has no PingFang, and
++the page's font stack ('PingFang TC', 'Noto Sans TC') named nothing installed
++there, so Chinese fell to `sans-serif`: boxes, or the Japanese forms of a
++generic Noto CJK (2026-11-14). Install `fonts-noto-cjk` (the screenshot
++workflows do); every tool here calls `tools/fonts.mjs`, which prefers
++Noto Sans CJK TC for Traditional Chinese and warns when it isn't installed.
++Pages carry `lang="zh-Hant"`, browsers `zh-TW`.
++
+ ## `node tools/shots.mjs <app> [page…]`: every screenshot a change needs
+ 
+ The one way to take screenshots. Each page on every screen (320 and 390
+diff --git a/tools/fonts.mjs b/tools/fonts.mjs
+new file mode 100644
+index 0000000..eebaa01
+--- /dev/null
++++ b/tools/fonts.mjs
+@@ -0,0 +1,62 @@
++// Chinese in a screenshot, as an iPhone shows it (PingFang TC): Traditional
++// Chinese glyphs, never Japanese ones.
++//
++// Why it went wrong: on Linux the page's font stack names 'PingFang TC' and
++// 'Noto Sans TC', and neither is installed there (the Debian/Ubuntu package
++// fonts-noto-cjk holds "Noto Sans CJK TC"). The stack fell through to
++// `sans-serif`, which fontconfig answers with the first CJK font it has:
++// Noto Sans CJK JP (Japanese forms of 直, 骨, 角, 令…), or none at all (empty
++// boxes) when no CJK font was installed.
++//
++// What fixes it: (1) the font installed (`sudo apt-get install -y
++// fonts-noto-cjk`; the workflows that take screenshots do it), (2) this file,
++// called by every screenshot tool before it opens a browser: a fontconfig
++// preference that makes Traditional Chinese (and any unmarked Han text) draw
++// in Noto Sans CJK TC, and the names the page asks for ('PingFang TC',
++// 'Noto Sans TC') answer with it, and (3) the pages carry lang="zh-Hant" and
++// the browser's locale is zh-TW.
++// A warning, never a stop, when the font is missing.
++import { execFileSync } from 'node:child_process';
++import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
++import { homedir } from 'node:os';
++import { join } from 'node:path';
++
++const TC = 'Noto Sans CJK TC';
++const CONF = `<?xml version="1.0"?>
++<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
++<fontconfig>
++  <!-- Orbit screenshots: Traditional Chinese as an iPhone shows it (tools/fonts.mjs) -->
++  <alias binding="same"><family>PingFang TC</family><prefer><family>${TC}</family></prefer></alias>
++  <alias binding="same"><family>Noto Sans TC</family><prefer><family>${TC}</family></prefer></alias>
++  <match target="pattern">
++    <test name="lang" compare="contains"><string>zh-tw</string></test>
++    <edit name="family" mode="prepend" binding="strong"><string>${TC}</string></edit>
++  </match>
++  <match target="pattern">
++    <test name="family"><string>sans-serif</string></test>
++    <edit name="family" mode="append" binding="same"><string>${TC}</string></edit>
++  </match>
++  <match target="pattern">
++    <test name="family"><string>system-ui</string></test>
++    <edit name="family" mode="append" binding="same"><string>${TC}</string></edit>
++  </match>
++</fontconfig>
++`;
++
++export function chineseFonts() {
++  if (process.platform !== 'linux') return true;
++  try {
++    const dir = join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'fontconfig/conf.d');
++    const file = join(dir, '60-orbit-zh-hant.conf');
++    if (!existsSync(file) || readFileSync(file, 'utf8') !== CONF) (mkdirSync(dir, { recursive: true }), writeFileSync(file, CONF));
++    const have = execFileSync('fc-list', [`:lang=zh-tw`, 'family'], { encoding: 'utf8' });
++    if (!/CJK TC|Noto Sans TC/.test(have)) {
++      console.warn('warning: no Traditional Chinese font (Noto Sans CJK TC): Chinese will draw as boxes or Japanese forms. Install it: sudo apt-get install -y fonts-noto-cjk');
++      return false;
++    }
++  } catch (e) {
++    console.warn(`warning: could not check the Chinese font (${e.code || e.message})`);
++    return false;
++  }
++  return true;
++}
+diff --git a/tools/help-shots.mjs b/tools/help-shots.mjs
+index 501462b..29581f4 100644
+--- a/tools/help-shots.mjs
++++ b/tools/help-shots.mjs
+@@ -18,6 +18,8 @@ import { tmpdir } from 'node:os';
+ import { createRequire } from 'node:module';
+ import { PAGES, tap, wait } from './shots/pages.mjs';
+ import { TOURS } from '../kit/help.mjs';
++import { chineseFonts } from './fonts.mjs';
++chineseFonts();
+ 
+ const HERE = dirname(fileURLToPath(import.meta.url));
+ const CORE = resolve(HERE, '..');
+diff --git a/tools/live-scroll.mjs b/tools/live-scroll.mjs
+index 8db46aa..b5c18fc 100644
+--- a/tools/live-scroll.mjs
++++ b/tools/live-scroll.mjs
+@@ -52,6 +52,8 @@ import { fileURLToPath } from 'node:url';
+ import { readdirSync, existsSync } from 'node:fs';
+ import { execFileSync } from 'node:child_process';
+ import { join } from 'node:path';
++import { chineseFonts } from './fonts.mjs';
++chineseFonts();
+ 
+ const args = process.argv.slice(2);
+ const opt = k => (args.includes(`--${k}`) ? args[args.indexOf(`--${k}`) + 1] : null);
+diff --git a/tools/preview.mjs b/tools/preview.mjs
+index 4bc642c..e8def1e 100644
+--- a/tools/preview.mjs
++++ b/tools/preview.mjs
+@@ -87,6 +87,8 @@ import { request as httpsRequest } from 'node:https';
+ import { constants as cryptoConstants } from 'node:crypto';
+ import { upstream as transitFixtures } from '../tests/fixtures/transit/upstream.mjs';
+ import { liveKeep } from './live-keep.mjs';
++import { chineseFonts } from './fonts.mjs';
++chineseFonts();
+ 
+ const require = createRequire(import.meta.url);
+ // The container's global one, or a Mac's in ~/.local/opt/playwright.
+diff --git a/tools/shots.mjs b/tools/shots.mjs
+index df0f1c4..3784d34 100644
+--- a/tools/shots.mjs
++++ b/tools/shots.mjs
+@@ -41,6 +41,8 @@ import { join, resolve, relative, basename } from 'node:path';
+ import { createRequire } from 'node:module';
+ import { PAGES } from './shots/pages.mjs';
+ import { makeKeep, SHARED_KEEP } from './live-keep.mjs';
++import { chineseFonts } from './fonts.mjs';
++chineseFonts();
+ 
+ const HERE = new URL('.', import.meta.url).pathname;
+ const ROOT = resolve(HERE, '../..');
+diff --git a/tools/store-shots.mjs b/tools/store-shots.mjs
+index bb6d686..ceb4c71 100644
+--- a/tools/store-shots.mjs
++++ b/tools/store-shots.mjs
+@@ -21,6 +21,8 @@ import { createRequire } from 'node:module';
+ import { STORE } from './shots/store.mjs';
+ import { PAGES } from './shots/pages.mjs';
+ import { BRANDS, FAMILY } from '../kit/brand.mjs';
++import { chineseFonts } from './fonts.mjs';
++chineseFonts();
+ 
+ const HERE = dirname(new URL(import.meta.url).pathname);
+ const ROOT = join(HERE, '..', '..');
+@@ -126,7 +128,7 @@ const encode = async (src, dest, w, h, frame) => {
+   const [hi, mid, lo] = [brand.from, brand.ink, brand.to];
+   await p.setContent(frame
+     ? `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;width:${w}px;height:${h}px;overflow:hidden}
+-      body{background:radial-gradient(120% 70% at 20% 0%,${hi}66 0%,transparent 60%),linear-gradient(165deg,${mid} 0%,${lo} 100%);font-family:'Inter Display','Inter','PingFang TC','Noto Sans TC','WenQuanYi Zen Hei',sans-serif;-webkit-font-smoothing:antialiased}
++      body{background:radial-gradient(120% 70% at 20% 0%,${hi}66 0%,transparent 60%),linear-gradient(165deg,${mid} 0%,${lo} 100%);font-family:'Inter Display','Inter','PingFang TC','Noto Sans TC', 'Noto Sans CJK TC','WenQuanYi Zen Hei',sans-serif;-webkit-font-smoothing:antialiased}
+       .hd{position:absolute;top:0;left:66px;right:66px;height:370px;display:flex;align-items:center;justify-content:center}
+       h1{margin:0;text-align:center;color:#fff;font-weight:700;font-size:${frame.zh ? 64 : 68}px;line-height:1.12;letter-spacing:${frame.zh ? '0.02em' : '-0.025em'};text-wrap:balance;word-break:keep-all;overflow-wrap:anywhere}
+       .ph{position:absolute;top:330px;left:50%;transform:translateX(-50%);width:600px;padding:18px;border-radius:92px;background:#0b0b0f;box-shadow:0 45px 120px rgba(0,0,0,.35),0 0 0 3px rgba(255,255,255,.14)}
+-- 
+2.56.1
+
