@@ -3712,46 +3712,23 @@ function orbitTip(s) {
   if (document.visibilityState === 'hidden' || document.querySelector('dialog[open]') || bannerEl?.isConnected) return;
   writeStore(TIP_AT, String(Date.now()));
   const T = (zh, e) => (s.lang === 'en' ? e : zh);
-  const el = node('div', { class: 'q-banner q-banner-ask q-orbit-tip', role: 'dialog', 'aria-label': 'Orbit', style: `--q-accent:${APPS[s.app].color}` }, [
-    node('img', { src: `data:image/svg+xml,${encodeURIComponent(familyMark())}`, alt: '' }),
-    node('div', {}, [
-      node('strong', { text: T('建議用 Orbit 打開', 'Try Orbit instead') }),
-      node('span', { text: T('所有 App 合一，登入一次。', 'Every app in one, signed in once.') }),
-      node('p', { class: 'q-orbit-tip-acts' }, [
-        node('button', { class: 'q-banner-go', type: 'button', text: T('打開 Orbit', 'Open Orbit') }),
-        node('button', { class: 'q-orbit-tip-never', type: 'button', text: T('不再顯示', 'Don’t show again') })
-      ])
-    ])
-  ]);
-  let timer = 0;
-  const gone = () => {
-    clearTimeout(timer);
-    off();
-    el.classList.add('out');
-    setTimeout(() => el.remove(), 250);
-  };
-  el.querySelector('.q-orbit-tip-never').addEventListener('click', () => {
-    writeStore(TIP_NEVER, '1');
-    // (The older offer at a hop to another app, kit suite.mjs offer: asked no more either.)
-    writeStore('orbit.suite.ask.v1', JSON.stringify({ n: 3, t: Date.now(), never: true }));
-    gone();
+  // (Brief, never in the way, so 不再顯示 isn't the only way out: quietTip.
+  // Jay 2026-11-14: "don't just hang there so long".)
+  quietTip({
+    accent: APPS[s.app].color,
+    mark: node('img', { src: `data:image/svg+xml,${encodeURIComponent(familyMark())}`, alt: '' }),
+    label: 'Orbit',
+    title: T('建議用 Orbit 打開', 'Try Orbit instead'),
+    line: T('所有 App 合一，登入一次。', 'Every app in one, signed in once.'),
+    go: T('打開 Orbit', 'Open Orbit'),
+    never: T('不再顯示', 'Don’t show again'),
+    onGo: () => globalThis.location.assign(orbitTarget(`${location.pathname}${location.hash}`, { install: isPhoneOrTablet(), iosApp: isIOS() && isStandalone(), origin: location.origin })),
+    onNever: () => {
+      writeStore(TIP_NEVER, '1');
+      // (The older offer at a hop to another app, kit suite.mjs offer: asked no more either.)
+      writeStore('orbit.suite.ask.v1', JSON.stringify({ n: 3, t: Date.now(), never: true }));
+    }
   });
-  el.querySelector('.q-banner-go').addEventListener('click', () => {
-    gone();
-    globalThis.location.assign(orbitTarget(`${location.pathname}${location.hash}`, { install: isPhoneOrTablet(), iosApp: isIOS() && isStandalone(), origin: location.origin }));
-  });
-  // (Brief, never in the way, so 不再顯示 isn't the only way out: gone after
-  // 5 s, at once when the page is scrolled or touched elsewhere; touching it
-  // gives 5 s more. Jay 2026-11-14: "don't just hang there so long".)
-  const later = () => (clearTimeout(timer), (timer = setTimeout(gone, TIP_FOR)));
-  const away = e => !el.contains(e.target) && (off(), gone());
-  const off = () => (removeEventListener('scroll', away, true), removeEventListener('pointerdown', away, true));
-  el.addEventListener('pointerdown', later);
-  addEventListener('scroll', away, { capture: true, passive: true });
-  addEventListener('pointerdown', away, true);
-  later();
-  document.body.append(el);
-  bannerEl = el;
 }
 
 // A quiet banner that asks for one thing (Orbit recommended, a passkey):
@@ -3759,7 +3736,7 @@ function orbitTip(s) {
 // 2026-11-14: one that hangs on pushes people to 不再顯示): gone by itself
 // after TIP_FOR, at once on a scroll or a tap elsewhere; a touch on it gives
 // it TIP_FOR more. Answers the banner, or nothing when another is up.
-export const QUIET_TIP_FOR = 5_000;
+export const QUIET_TIP_FOR = TIP_FOR;
 export function quietTip({ accent = '', mark = null, label = '', title, line, go, never, onGo = () => {}, onNever = () => {}, cls = '' }) {
   if (typeof document === 'undefined' || !document.body || bannerEl?.isConnected) return null;
   const el = node('div', { class: `q-banner q-banner-ask q-orbit-tip ${cls}`.trim(), role: 'dialog', 'aria-label': label || title, style: accent ? `--q-accent:${accent}` : '' }, [
