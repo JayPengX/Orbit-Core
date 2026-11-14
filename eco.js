@@ -64,6 +64,7 @@ import { admit, seenNow, limitOf, fullBody } from './door.js';
 import { handleAdmin, readDev } from './eco-admin.js';
 import { passkeyBegin, passkeyLogin, passkeyAddBegin, passkeyAdd, passkeyRemove, passkeySummary, pointPasskeys, dropIndex, passkeyIds } from './passkey.js';
 import { mailBegin, mailConfirm, mailRemove, mailRecoverBegin, mailRecover, mailSummary, mailOf, pointMail, dropMailIndex, mailReady } from './pass-mail.js';
+import { privacyDo } from './privacy-mail.js';
 import { PAY_WEEK, weekStart, mondayId, reliefCheck, reliefEntry } from './kit/pay.mjs';
 
 export const ECO_PASSCODE_LENGTH = 10;
@@ -503,6 +504,8 @@ const OPS = {
   past: ecoPast,
   now: ecoNow,
   bug: ecoBug,
+  // A data request's confirm page (privacy-mail.js: the link privacy@ mailed back).
+  privacy: ctx => privacyDo(ctx),
   admin: ctx => handleAdmin(ctx),
   'passkey-begin': passkeyBegin,
   'passkey-login': passkeyLogin,

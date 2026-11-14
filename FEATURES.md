@@ -34,6 +34,7 @@ To remove a feature on purpose, delete its line here in the same commit and say 
 - Pass recovery email: linked by a mailed code, a lost pass recovered by one (then a new pass), a quiet tip to add one — `pass-mail.js`, `kit/pass-mail.mjs`, `kit/orbit.mjs`: `export async function mailRecover`, `export function recoverPanel`, `export function mailRows`, `export function mailTip`, `s.mailBegin`
 - Anonymous usage counts (no id, no content; GPC respected), a one-time note, Pass › 隱私 › 使用統計 off switch, admin 使用 — `kit/usage.mjs`, `usage.js`, `kit/orbit.mjs`, `site/admin/index.html`: `export function cleanBeacon`, `export function takeUsage`, `export function usageNotice`, `function usageRows`, `async function loadUse`
 - Privacy policy and terms of use, Chinese and English — `site/privacy/index.html`, `site/terms/index.html`: `privacy@jaypengx.com`, `Terms of Use`
+- Data requests by mail to privacy@ answered by code: a 24-hour link to download a copy (once in 30 days), delete the Pass or stop stats; the recovery email proves it, else the pass — `privacy-mail.js`, `site/privacy/request/index.html`: `export async function privacyMail`, `export async function privacyDo`, `PRIVACY_EXPORT_WAIT`
 - A typhoon day off acts like a holiday — `kit/dayoff.mjs`: `dayOffOn`, `loadDayOff`
 - Law's 代表會 recordings play on iPhone — `law-audio.js`: `handleLawAudio`, `audioType`
 - Law's live feed keeps its last good read — `law-live.js`: `KEY_LAST`
