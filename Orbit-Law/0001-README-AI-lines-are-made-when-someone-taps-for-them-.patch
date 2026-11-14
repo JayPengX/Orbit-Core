@@ -1,0 +1,27 @@
+From 8052ed7486940212aa09b750b59c2166aac10799 Mon Sep 17 00:00:00 2001
+From: orbit-agent <actions@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 15:29:57 +0000
+Subject: [PATCH] README: AI lines are made when someone taps for them, not
+ ahead
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ README.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/README.md b/README.md
+index 7fe89f0..a952abd 100644
+--- a/README.md
++++ b/README.md
+@@ -48,7 +48,7 @@ Taiwan's law from three linked sides: the laws to read, the courts' rulings on t
+ 
+ ## Features
+ 
+-- **Also AI:** 拍合約幫你看 checks a contract clause by clause, every flag cited; 會議紀錄變表格 reads a council's minutes into rows; 這一週 sums up the bills and laws you follow that moved. Explanations of thousands of everyday articles are made ahead, so they open without a wait.
++- **Also AI:** 拍合約幫你看 checks a contract clause by clause, every flag cited; 會議紀錄變表格 reads a council's minutes into rows; 這一週 sums up the bills and laws you follow that moved. Explanations of everyday articles are made when you tap for them.
+ - **法規 Laws:** every law and regulation from 全國法規資料庫, in Chinese and English, with every reference a link (第X條之Y, ranges, 前條, 前項, another law's name; about 99% of 28k references land on a real article).
+ - **修法追蹤:** what each amendment added, amended and removed, article by article.
+ - **裁判 Rulings:** every 大法官解釋 and 憲判字, the top courts' judgments by article and month, and the other courts' judgments by law, cause and court, three years back; a judgment opens with its outcome first, and AI explains any top ruling in plain words, each point citing its own paragraphs.
+-- 
+2.56.1
+

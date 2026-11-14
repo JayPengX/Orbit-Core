@@ -1,0 +1,27 @@
+From 4ef3264eebb34753029a6205c933c08eea9a7a2d Mon Sep 17 00:00:00 2001
+From: orbit-agent <actions@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 15:29:56 +0000
+Subject: [PATCH] README: AI lines are made when someone taps for them, not
+ ahead
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ README.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/README.md b/README.md
+index 2da022e..df83786 100644
+--- a/README.md
++++ b/README.md
+@@ -48,7 +48,7 @@ Scores, schedules and stats for the leagues you can watch in Taiwan, with a plan
+ 
+ ## Features
+ 
+-- **Orbit AI** (its mark on everything smart): 問比賽 asks about the teams you follow and answers as tables the app read (places, next and last games, today) with each team's logo and one AI line; a finished game's 賽後三句話 says only what the card doesn't (comebacks, runs, the period that broke it open), players as face chips and teams as logo chips; each F1 race's 勝負關鍵 as rows, a lap and a driver's face each; 看點 says why a game to come matters. Lines everyone reads are made once ahead, never per reader.
++- **Orbit AI** (its mark on everything smart): 問比賽 asks about the teams you follow and answers as tables the app read (places, next and last games, today) with each team's logo and one AI line; a finished game's 賽後三句話 says only what the card doesn't (comebacks, runs, the period that broke it open), players as face chips and teams as logo chips; each F1 race's 勝負關鍵 as rows, a lap and a driver's face each; 看點 says why a game to come matters. Lines everyone reads are made when someone taps for them, then kept for everyone.
+ - **With the family:** a CPBL game near at hand opens Orbit Transit's trip to the park with the park's weather (去球場); a live NBA game counts each side's timeouts left.
+ - **Today:** a sticky date strip, what's on now, a no-clash plan of the day's best games, your own teams' games, and what already finished (推薦給你 apart from 其他比賽). Each hour's pick stays as it stood before its games.
+ - **Only what you can watch here:** MLB and CPBL, the NBA, the Premier League, Serie A, Bundesliga, Ligue 1, the UEFA cups, MLS on Apple TV, and every F1 session. A league out of season hides itself.
+-- 
+2.56.1
+
