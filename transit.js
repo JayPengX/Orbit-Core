@@ -45,7 +45,9 @@
 import { SHOWCASE_ORIGINS } from './showcase.js';
 import { cleanDev } from './kit/devconfig.mjs';
 import { twDay } from './kit/format.mjs';
-import { kvJson, kvPut } from './weather.js';
+import { kvJson, kvPut, googleToday, GOOGLE_MONTH_CALLS } from './weather.js';
+import { readMeter, TR_MONTH } from './translate.js';
+import { r2Store } from './builders/store.js';
 import { keptText, keptPut } from './kept-store.js';
 import { freeTdx, freeEta, freeGps } from './transit-free.js';
 
@@ -178,6 +180,14 @@ async function meterAdd(env, adds, now, ctx, countOnly) {
 // as `dev:<sku>`, …, so the admin panel's 容量 counts people's use without
 // ours (capacity.js). Our tools yield to people: none past half of a free
 // month (DEV_SHARE), the rest is theirs.
+// Google's free month beside the Maps SKUs: Translation's characters
+// (translate.js, cap TR_MONTH) and Weather's calls (weather.js), each with its cap.
+async function googleMonth(env, now) {
+  const tr = env.DATA ? await readMeter(r2Store(env.DATA), now) : null;
+  const w = await googleToday(env, now);
+  const today = Number(await kvJson(env, `weather:google:${twDay(now)}`)) || 0;
+  return { translate: { used: tr?.chars || 0, cap: TR_MONTH }, weather: { used: w.before + today, cap: GOOGLE_MONTH_CALLS } };
+}
 export const DEV_SHARE = 0.5;
 export async function spend(env, sku, n = 1, now = Date.now(), ctx = null, { countOnly = false, by = '' } = {}) {
   const used = await usage(env, now);
@@ -2056,7 +2066,9 @@ async function transitRoute(request, env, headers, path, { session = null, limit
   const deps = { fetchFn, ctx, now, cache, by, free: free && !session?.build };
   if (path === '/transit/status') {
     const sample = q.get('sample');
-    if (!sample) return send({ month: billingMonth(now), used: await usage(env, now), caps: CAPS, keys: { tdx: Boolean(env.TDX_CLIENT_ID && env.TDX_CLIENT_SECRET), mapsBrowser: Boolean(env.GOOGLE_MAPS_BROWSER_KEY), google: Boolean(googleKey(env)) }, tdxPerMin: Number(env.TDX_PER_MIN) || 5 });
+    // (?google=1: Google's other counts beside, Translation's characters and Weather's calls this month: free-watch.)
+    const google = q.get('google') === '1' ? await googleMonth(env, now).catch(e => ({ error: String(e?.message || e).slice(0, 120) })) : undefined;
+    if (!sample) return send({ month: billingMonth(now), used: await usage(env, now), caps: CAPS, google, keys: { tdx: Boolean(env.TDX_CLIENT_ID && env.TDX_CLIENT_SECRET), mapsBrowser: Boolean(env.GOOGLE_MAPS_BROWSER_KEY), google: Boolean(googleKey(env)) }, tdxPerMin: Number(env.TDX_PER_MIN) || 5 });
   }
   if (path === '/transit/showcase-map') {
     // The showcase's Transit demo draws Google's map like the real app: one

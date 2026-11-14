@@ -47,7 +47,7 @@ async function smoke() {
     [`${API}/data/where.json`, '/data (transit)', { json: true }],
     [`${API}/sports-today?day=${new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10)}`, '/sports-today', { origin: true, json: true }],
     [`${API}/law-live`, '/law-live', { origin: true, json: true }],
-    [`${API}/transit/status`, '/transit/status', { json: true }],
+    [`${API}/transit/status?google=1`, '/transit/status', { json: true }],
     [`${SITE}/law/data/index.json`, 'Law data', { json: true }],
     [`${SITE}/law/data/_packs.json`, 'Law data packs', { json: true }]
   ];
@@ -81,8 +81,12 @@ async function allowances(transitStatus) {
   const t = transitStatus?.body;
   if (t?.used && t?.caps) {
     const rows = Object.entries(t.caps).map(([k, cap]) => [k, (t.used[k] || 0) / cap]).sort((a, b) => b[1] - a[1]);
+    // (Translation's characters and Weather's calls, each against its own cap under the free month.)
+    for (const [k, g] of Object.entries(t.google || {})) if (g?.cap) rows.push([k, (g.used || 0) / g.cap]);
+    if (t.google?.error) bad(`Google counts: ${t.google.error}`);
+    rows.sort((a, b) => b[1] - a[1]);
     for (const [k, v] of rows) if (v >= WARN) bad(`Google ${k}: ${Math.round(v * 100)}% of this month's cap`);
-    notes.push(`Google (this month, of each cap): ${rows.slice(0, 5).map(([k, v]) => `${k} ${(v * 100).toFixed(0)}%`).join(', ')}`);
+    notes.push(`Google (this month, of each cap under the free amount): ${rows.slice(0, 6).map(([k, v]) => `${k} ${(v * 100).toFixed(0)}%`).join(', ')}`);
   }
 }
 
