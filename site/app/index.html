@@ -69,6 +69,24 @@
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:image" content="https://orbit.jaypengx.com/app/share/x.jpg?v=f2a8bd47" />
 <!-- /cards -->
+<script>
+// (An Orbit of one app, or wearing an app's icon: that app's share card and
+// name, not Orbit's, Jay 11-14 "what's the point of a sport only". Safari's
+// share sheet reads them from the page; the link's own place is the app's.)
+!function () {
+  try {
+    var t = window.ORBIT_TAG, x = t ? JSON.parse(decodeURIComponent(escape(atob(t.replace(/-/g, '+').replace(/_/g, '/'))))) : null;
+    var one = x && typeof x.a === 'string' && /^[a-z]+$/.test(x.a) ? x.a : x && /^app-([a-z]+)$/.exec(x.l || '') ? x.l.slice(4) : '';
+    if (!one) return;
+    var slug = { match: 'sports', orbit: 'class', vocab: 'words', stock: 'securities' }[one] || one, at = 'https://' + location.host + '/' + slug + '/', n = 0;
+    var set = function (q, v) { var e = document.querySelectorAll(q); for (var i = 0; i < e.length; i++) e[i].setAttribute('content', typeof v === 'function' ? v(i) : v); };
+    set('meta[property="og:title"]', document.title);
+    set('meta[property="og:url"]', at);
+    set('meta[property="og:image"]', function (i) { return at + 'share/' + (i ? 'square' : 'og') + '.jpg'; });
+    set('meta[name="twitter:image"]', at + 'share/x.jpg');
+  } catch (e) {}
+}();
+</script>
 <!-- Orbit: every app in one home-screen app (Orbit-Core kit/suite.mjs). This
      page is Orbit's window: each app opened is held in a frame of its own
      (kit suite.mjs host), kept running while another is shown. Opened from
