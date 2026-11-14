@@ -56,7 +56,11 @@ function accountFile(name) {
   return made;
 }
 
-// One shot in one language: preview.mjs at 375×812 (750×1624 at 2×).
+// The screens a shot can be taken on (`device`; Jay 11-14: a few iPad and computer shots in
+// every set, so it's plain every device is supported). A phone's is the default.
+const DEVICES = { phone: [375, 812], tablet: [820, 1180], computer: [1440, 900] };
+
+// One shot in one language: preview.mjs at 375×812 (750×1624 at 2×), an iPad's or a computer's size.
 async function shoot(n, lang) {
   const s = set.shots[n - 1];
   const page = s.page ? PAGES[set.app][s.page] : {};
@@ -70,8 +74,9 @@ async function shoot(n, lang) {
     const f = ['ndjson', 'json'].map(x => join(HERE, 'shots', 'ai', `${name}.${lang}.${x}`)).find(existsSync);
     return f ? ['--fixture', `${text}=${f}`] : [];
   });
-  const args = [join(HERE, 'preview.mjs'), set.app, ...(hash ? [hash] : []), '--live', '--lang', lang, '--width', '375', '--height', '812', '--wait', String(s.wait ?? 6000), '--out', tmp, ...(clock ? ['--clock', clock] : []),
-    ...(s.dark ? ['--dark'] : []), ...payload, ...ai, ...(set.args || []), ...(page.args || []), ...((a => (Array.isArray(a) ? a : a?.[lang]))(s.args) || [])];
+  const args = [join(HERE, 'preview.mjs'), set.app, ...(hash ? [hash] : []), '--live', '--lang', lang, ...(s.device && s.device !== 'phone' ? ['--device', { tablet: 'ipad', computer: 'pc' }[s.device]] : ['--width', '375', '--height', '812']), '--wait', String(s.wait ?? 6000), '--out', tmp, ...(clock ? ['--clock', clock] : []),
+    // (every set in the app's own dark look, Jay 11-14: light shots beside a dark app read as another app)
+    ...((s.dark ?? set.dark ?? true) ? ['--dark'] : []), ...payload, ...ai, ...(set.args || []), ...(page.args || []), ...((a => (Array.isArray(a) ? a : a?.[lang]))(s.args) || [])];
   const r = await run(process.execPath, args, { cwd: join(HERE, '..') });
   const png = existsSync(tmp) && readdirSync(tmp).find(f => f.endsWith('.png'));
   const file = join(dir, `${n}.${lang}.png`);
@@ -117,8 +122,11 @@ const encode = async (src, dest, w, h, frame) => {
       .hd{position:absolute;top:0;left:66px;right:66px;height:370px;display:flex;align-items:center;justify-content:center}
       h1{margin:0;text-align:center;color:#fff;font-weight:700;font-size:${frame.zh ? 64 : 68}px;line-height:1.12;letter-spacing:${frame.zh ? '0.02em' : '-0.025em'};text-wrap:balance;word-break:keep-all;overflow-wrap:anywhere}
       .ph{position:absolute;top:390px;left:50%;transform:translateX(-50%);width:645px;padding:18px;border-radius:96px;background:#0b0b0f;box-shadow:0 45px 120px rgba(0,0,0,.35),0 0 0 3px rgba(255,255,255,.14)}
-      .ph img{display:block;width:645px;border-radius:78px}</style>
-      <div class="hd"><h1>${frame.title}</h1></div><div class="ph"><img src="${pic}"></div>`
+      .ph img{display:block;width:645px;border-radius:78px}
+      .ph.tablet{top:400px;width:724px;padding:20px;border-radius:56px}.ph.tablet img{width:724px;border-radius:36px}
+      .ph.computer{top:auto;bottom:451px;width:800px;padding:14px;border-radius:30px}.ph.computer img{width:800px;border-radius:16px}
+      .stand{position:absolute;left:50%;transform:translateX(-50%);bottom:401px;width:880px;height:50px;border-radius:0 0 40px 40px;background:linear-gradient(#2a2a30,#0b0b0f);box-shadow:0 30px 60px rgba(0,0,0,.35)}</style>
+      <div class="hd"><h1>${frame.title}</h1></div>${frame.device === 'computer' ? '<div class="stand"></div>' : ''}<div class="ph ${frame.device || ''}"><img src="${pic}"></div>`
     : `<!doctype html><style>html,body{margin:0}img{display:block;width:${w}px;height:${h}px}</style><img src="${pic}">`);
   await p.waitForTimeout(150);
   const shot = await p.screenshot({ type: 'png' }); await p.close();
@@ -140,8 +148,10 @@ for (const [i, s] of set.shots.entries()) {
   const n = i + 1;
   for (const l of langs) {
     const suf = l === 'zh' ? '.zh' : '';
-    await encode(join(dir, `${n}.${l}.png`), join(shotsDir, `${n}${suf}.webp`), 750, 1624);
-    await encode(join(dir, `${n}.${l}.png`), join(docs, `${set.prefix}-${n}${suf}.webp`), 900, 1770, { title: l === 'zh' ? s.zh : s.en, zh: l === 'zh' });
+    const [w, h] = DEVICES[s.device || 'phone'];
+    const across = { phone: 750, tablet: 1100, computer: 1600 }[s.device || 'phone'];
+    await encode(join(dir, `${n}.${l}.png`), join(shotsDir, `${n}${suf}.webp`), across, Math.round((across * h) / w));
+    await encode(join(dir, `${n}.${l}.png`), join(docs, `${set.prefix}-${n}${suf}.webp`), 900, 1770, { title: l === 'zh' ? s.zh : s.en, zh: l === 'zh', device: s.device });
   }
   console.log(`${key} ${n}: ${s.zh} / ${s.en}`);
 }
@@ -151,7 +161,7 @@ await b.close();
 const appsFile = join(show, 'lib', 'apps.mjs');
 const apps = readFileSync(appsFile, 'utf8');
 const q = t => `'${t.replace(/'/g, '’')}'`;
-const list = `shots: [\n${set.shots.map((s, i) => `      ['${set.show}/${i + 1}', [${q(s.zh)}, ${q(s.en)}]]`).join(',\n')}\n    ]`;
+const list = `shots: [\n${set.shots.map((s, i) => `      ['${set.show}/${i + 1}', [${q(s.zh)}, ${q(s.en)}]${s.device && s.device !== 'phone' ? `, '${s.device}'` : ''}]`).join(',\n')}\n    ]`;
 const re = new RegExp(`(id: '${set.show}'[\\s\\S]*?)shots: \\[[\\s\\S]*?\\n    \\]`);
 if (!re.test(apps)) throw new Error(`no shots list for ${set.show} in apps.mjs`);
 writeFileSync(appsFile, apps.replace(re, (_, head) => head + list));
