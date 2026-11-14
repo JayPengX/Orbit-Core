@@ -19,6 +19,7 @@ To remove a feature on purpose, delete its line here in the same commit and say 
 - Orbit keeps every app opened running in its window (a frame each): back shows it as left, an app playing sound (Beats) never closed, at most 3 quiet ones kept — `kit/suite.mjs`: `export function host`, `export function toClose`
 - Orbit opens on an app with something live, else the last app within an hour (an Orbit the phone kept), else the app list (last app on top; always after Orbit was closed, every app at its start); signed in to the Pass first — `kit/suite.mjs`, `site/app/index.html`: `export function launchTarget`, `export function setLive`, `door-sign`
 - Orbit shows the apps open as tabs at the foot (a trip or timer first, marked 進行中), each closable with ✕ in the switcher, and slides between apps with no white flash — `kit/suite.mjs`, `kit/orbit.css`: `function drawTabs`, `q-suite-tab`, `q-suite-x`
+- Orbit's home: the app to go on with as one card (something under way first, 進行中), the apps used lately, then the rest as slim rows — `site/app/index.html`: `door-hero`, `door-row`
 - Orbit's own loading screen when opened from its icon (its mark, name and indigo, not the app's) — `kit/boot.js`, `site/app/index.html`: `orbit.launch`, `q-boot-orbit`
 - Updates swap only once every file is on the phone — `kit/orbit.mjs`: `updateReady`
 - Pass: 里程碑 medals, passkeys, 除錯紀錄 — `kit/pass.mjs`, `kit/help.mjs`, `kit/orbit.mjs`: `里程碑`, `passkey`, `除錯紀錄`
