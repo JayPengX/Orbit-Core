@@ -117,7 +117,9 @@ export const trPath = id => `news/tr/${String(id).replace(/[^a-z0-9_-]/gi, '')}.
 export function storyTexts(s) {
   return new Set([s.title, s.sum, ...(s.items || []).map(it => it[1]), ...(s.clips || []).map(c => c[3]), ...(s.tw?.items || []).map(it => it[1])].filter(Boolean).map(t => String(t).trim()));
 }
-export async function storyTr({ store, env, id, to, texts, now = Date.now(), fetchImpl = fetch, find }) {
+// (`make`: new ones, which Google bills, only for a 完整 pass's session (worker.js);
+// anyone else gets what's kept, the builder's and earlier readers'.)
+export async function storyTr({ store, env, id, to, texts, now = Date.now(), fetchImpl = fetch, find, make = true }) {
   if (!['zh-TW', 'en'].includes(to)) return { error: 'to' };
   const s = await find(id);
   if (!s) return { error: 'story' };
@@ -126,7 +128,7 @@ export async function storyTr({ store, env, id, to, texts, now = Date.now(), fet
   const path = trPath(s.id);
   const kept = (k => (k?.v === TR_V ? k : {}))(await store.json(path).catch(() => null));
   const mine = { ...(kept[to] || {}) };
-  const need = want.filter(t => !mine[t]);
+  const need = make ? want.filter(t => !mine[t]) : [];
   if (need.length) {
     const people = to === 'zh-TW' ? peopleIn([s.sum, ...(s.items || []).map(it => it[1])]) : [];
     const got = await translate(env, store, need, to, { people, now, fetchImpl, max: STORY_MAX, prep: t => (to === 'en' ? withMonth(t, s.at || now) : t) });

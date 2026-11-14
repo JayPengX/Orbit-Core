@@ -1329,7 +1329,7 @@ async function sessionOf(request, env, grace = 0) {
 // language (Google's free month, translate.js; each kept in news/tr/<id>.json).
 // The stories read from R2 a minute at a time per isolate.
 let newsPages = null;
-async function handleNewsTr(request, env, headers) {
+async function handleNewsTr(request, env, headers, make = false) {
   if (!env.DATA) return json({ error: 'off' }, 503, headers);
   let body = {};
   try {
@@ -1346,7 +1346,7 @@ async function handleNewsTr(request, env, headers) {
     newsPages.past ||= store.json('news/past.json').then(d => [...(d?.intl || []), ...(d?.tw || [])]).catch(() => []);
     return look(await newsPages.past);
   };
-  const out = await storyTr({ store, env, id: String(body.id || ''), to: String(body.to || ''), texts: body.texts, now, find });
+  const out = await storyTr({ store, env, id: String(body.id || ''), to: String(body.to || ''), texts: body.texts, now, find, make });
   return json(out, out.error ? 400 : 200, headers);
 }
 
@@ -1464,13 +1464,20 @@ async function route(request, env, ctx, headers, origin) {
   }
   // Orbit Class's 學校公告摘要 (class-news.js): a school's list read by code, worded once an hour by the AI, kept in R2.
   // Orbit News in one language: a story's own headlines and summary in the reader's, as it's opened (builders/news-tr.js).
-  if (path === '/news-tr' && request.method === 'POST') return handleNewsTr(request, env, headers);
+  // (Kept ones to anyone; a new one, which Google bills, only for a 完整 pass's session.)
+  if (path === '/news-tr' && request.method === 'POST') {
+    const live = await sessionOf(request, env);
+    return handleNewsTr(request, env, headers, Boolean(live) && (await maySpend(live)));
+  }
   // Any app's own words in the reader's language (translate.js handleTr): a Pass's, short, each kept a month.
   // (A Pass session, or the dev door as Transit's, a few a minute: a localhost preview sees the English it will get.)
   if (path === '/tr') {
     const signed = await sessionOf(request, env, READ_GRACE_MS);
     const dev = !signed && LOCAL_ORIGIN.test(origin) && !sessionLimited(`tr:dev:${ip}`, 20);
-    return handleTr(request, env, headers, signed || (dev ? { s: 'dev' } : null));
+    // (Kept ones to any Pass and the dev door, whose Origin anyone can send; a new one, which
+    // Google bills, only for a 完整 pass's live session.)
+    const live = signed && (await sessionOf(request, env));
+    return handleTr(request, env, headers, signed || (dev ? { s: 'dev' } : null), { make: Boolean(live) && (await maySpend(live)) });
   }
   if (path === '/class-news') {
     const session = await sessionOf(request, env);
