@@ -2624,6 +2624,7 @@ const ERR = {
   ECO_MAIL_TOO_MANY: ['今天寄給這個信箱的驗證碼太多了，請明天再試。', 'Too many codes to this address today. Try again tomorrow.'],
   ECO_MAIL_TAKEN: ['這個信箱已是另一個 Orbit Pass 的救援信箱。', 'This address is already another Orbit Pass’s recovery email.'],
   ECO_MAIL_SAME: ['這個信箱已經是你的救援信箱。', 'This is already your recovery email.'],
+  ECO_MAIL_BUSY: ['今天能寄的信已經寄完了，請明天再試。', 'Orbit has sent all the mail it can today. Please try again tomorrow.'],
   ECO_MAIL_OFF: ['現在無法寄信，請稍後再試。', 'Email can’t be sent right now. Please try again later.'],
   INVALID_PASSCODE: ['請輸入 10 碼通行碼（例如 ABCDE-23456）或 8 碼裝置代碼。', 'Enter your 10-character pass (like ABCDE-23456) or an 8-character device code.'],
   ECO_DATA_CHANGED: ['另一台裝置剛改過，請再試一次。', 'Another device just changed this. Please try again.'],

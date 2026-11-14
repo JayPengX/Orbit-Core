@@ -1239,8 +1239,10 @@ const ECO_DEPS = {
   sha256Hex,
   generateCode,
   now: () => Date.now(),
-  // A count a Taiwan day in D1, everyone together (new passes a day, eco.js ecoCreate).
-  dayCount: (env, k) => addOne(env, k, twDay()),
+  // A count a Taiwan day in D1, everyone together (new passes a day, eco.js
+  // ecoCreate; the Pass's mails, pass-mail.js), with the AI caps' counts.
+  dayCount: (env, k, day = twDay(), by = 1) => addOne(env, k, day, by),
+  mailBudget: async env => (await readDev(env, ECO_DEPS)).mailDay,
   // The admin panel's 系統 (ops.js): the store's collections, a Gemini check, a builder by hand.
   count: DOCS.count,
   geminiCheck: env => geminiCheck(env),
