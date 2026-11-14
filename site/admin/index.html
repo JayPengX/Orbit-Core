@@ -408,6 +408,44 @@
   details.note summary { color: var(--q-muted); font-size: 14px; cursor: pointer; }
   /* 工具 */
   .tool { margin-top: 12px; }
+  /* 郵件 (mail.js): the alert mails' switches, and 寫信 with its preview beside it (under it on a phone). */
+  .mail-sw { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--q-divider); }
+  .mail-sw > div { min-width: 0; }
+  .mail-sw .q-switch { flex: none; }
+  .mail-sw p { margin: 2px 0 0; }
+  .mail-open { display: grid; gap: 6px; margin: 4px 0 0; padding: 0; list-style: none; }
+  .mail-open li { display: flex; align-items: baseline; gap: 8px; font-size: 14px; }
+  .mail-open li i { flex: none; width: 8px; height: 8px; border-radius: 4px; background: #d97706; transform: translateY(-1px); }
+  .mail-open li.bad i { background: var(--q-bad); }
+  .mail-open li span { flex: 1 1 0; min-width: 0; }
+  .mail-open li small { flex: none; color: var(--q-muted); }
+  .compose { display: grid; gap: 18px; }
+  @media (min-width: 900px) { .compose { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); align-items: start; } .compose-view { position: sticky; top: 64px; } }
+  .compose-form { display: grid; gap: 12px; }
+  .compose-form label { display: grid; gap: 5px; min-width: 0; font-size: 13px; color: var(--q-muted); }
+  .compose-form input, .compose-form textarea { width: 100%; box-sizing: border-box; }
+  .compose-form textarea { font: inherit; font-size: 16px; padding: 11px 13px; border-radius: var(--q-r-cell); border: 0; background: var(--q-fill-3); color: var(--q-text); resize: vertical; line-height: 1.55; }
+  .compose-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 10px; }
+  .looks { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+  .looks button { display: grid; justify-items: center; gap: 6px; padding: 10px 4px 9px; border-radius: 14px; background: var(--q-fill-3); color: var(--q-text); font-size: 13px; font-weight: 600; border: 2px solid transparent; }
+  .looks button[aria-pressed='true'] { border-color: var(--q-accent); background: color-mix(in srgb, var(--q-accent) 10%, var(--q-fill-3)); }
+  .looks .look-pic { width: 100%; max-width: 54px; height: 38px; border-radius: 7px; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08); overflow: hidden; display: grid; grid-template-rows: auto 1fr; }
+  .looks .look-pic b { display: block; height: 14px; background: var(--c); }
+  .looks .look-pic.note b { height: 3px; }
+  .looks .look-pic.thanks b { height: 8px; }
+  .looks .look-pic u { display: block; margin: 5px 6px 0; height: 3px; border-radius: 2px; background: #cbd5e1; text-decoration: none; box-shadow: 0 6px 0 #e2e8f0, 0 12px 0 #e2e8f0; }
+  .looks .look-pic.thanks u { margin-inline: 12px; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+  .swatches button { width: 30px; height: 30px; padding: 0; border-radius: 50%; background: var(--c); border: 3px solid var(--q-page); box-shadow: 0 0 0 1px var(--q-divider); }
+  .swatches button[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--c); }
+  .compose-view { display: grid; gap: 8px; }
+  .inbox-head { display: grid; gap: 2px; padding: 12px 14px; border-radius: 14px; background: var(--q-fill-3); font-size: 13.5px; }
+  .inbox-head b { font-size: 15px; overflow-wrap: anywhere; }
+  .inbox-head span { color: var(--q-muted); overflow-wrap: anywhere; }
+  .compose-view iframe { width: 100%; height: 620px; border: 0; border-radius: 16px; background: #eef0f7; }
+  @media (max-width: 899px) { .compose-view iframe { height: 520px; } }
+  .compose-acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; position: sticky; bottom: 0; padding: 10px 0 2px; background: var(--q-page); }
+  @media (max-width: 420px) { .looks { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; } .looks button { font-size: 12px; padding-inline: 2px; } .compose-two { grid-template-columns: 1fr; } }
   .gift-when { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
   .gift-when label, .gift-more label { display: grid; gap: 4px; min-width: 0; font-size: 13px; color: var(--q-muted); }
   .gift-when input, .gift-more input { width: 100%; box-sizing: border-box; }
@@ -610,6 +648,16 @@
     <!-- 工具 -->
     <section data-pane="tools" hidden>
       <div class="tool-grid" id="tool-grid"></div>
+      <div class="card tool" id="tool-mail">
+        <div class="tool-head"><i data-ic="mail" style="--t:#db2777"></i><div><h3>郵件</h3><p class="muted">從 jaypengx.com 寄信：出事時寄給你，也能寫信給別人。</p></div><button id="mail-write" class="primary small">寫信</button></div>
+        <div class="row"><input id="mail-to" class="grow" type="email" inputmode="email" autocomplete="email" placeholder="警示寄到哪個信箱" /><button id="mail-save" class="small">儲存</button><button id="mail-test" class="small">寄測試信</button></div>
+        <p id="mail-error" class="error"></p>
+        <p id="mail-ok" class="ok"></p>
+        <div class="mail-sw" style="margin-top:10px"><div><strong>寄警示信</strong><p class="muted" id="mail-on-note">代理停了、免費額度暴衝、排程一直失敗、外部來源壞了、錯誤變多、AI 上限用完或餘額快沒了。同一件事一天最多一封。</p></div><button class="q-switch" type="button" role="switch" aria-checked="true" aria-label="寄警示信" id="mail-on"></button></div>
+        <div class="mail-sw"><div><strong>半夜不寄</strong><p class="muted">00:00 到 07:00 的先存著，早上 7 點一起寄；代理停了照樣馬上寄。</p></div><button class="q-switch" type="button" role="switch" aria-checked="true" aria-label="半夜不寄" id="mail-quiet"></button></div>
+        <div class="mail-sw"><div style="flex:1 1 0"><strong>現在的狀況</strong><p class="muted" id="mail-state">載入中…</p><ul class="mail-open" id="mail-open"></ul></div><button id="mail-check" class="small" style="flex:none">現在檢查</button></div>
+        <details class="note"><summary id="mail-log-sum">最近寄出</summary><div class="tablewrap"><table id="mail-log"><thead><tr><th>時間</th><th>主旨</th><th class="wide">寄給</th><th class="right">經由</th></tr></thead><tbody></tbody></table></div><p class="muted" id="mail-room" style="margin:8px 0 0"></p></details>
+      </div>
       <div class="card tool" id="tool-gift">
         <div class="tool-head"><i data-ic="send" style="--t:#4f46e5"></i><div><h3>公開領取</h3><p class="muted">一台裝置一組，沒換通行碼的到時收回。</p></div><button class="q-switch" type="button" role="switch" aria-checked="false" aria-label="開放領取" id="gift-on"></button></div>
         <div class="tiles" id="gift-tiles"></div>
@@ -713,6 +761,33 @@
   </div>
 </dialog>
 
+<!-- 寫信 (mail.js mail-send): a look, the words, the preview beside it; mail-look.mjs draws both. -->
+<dialog id="compose" class="sheet wide" aria-labelledby="compose-title">
+  <div class="sheet-head"><h2 id="compose-title">寫信</h2><button id="compose-close" class="icon-btn" aria-label="關閉"></button></div>
+  <div class="sheet-body">
+    <div class="compose">
+      <div class="compose-form">
+        <div class="looks" id="cm-looks" role="group" aria-label="樣式"></div>
+        <div class="row spread"><div class="swatches" id="cm-colors" role="group" aria-label="顏色"></div><div class="chips" id="cm-lang"><button type="button" data-lang="zh" aria-pressed="true">中文</button><button type="button" data-lang="en" aria-pressed="false">English</button></div></div>
+        <label>收件人<textarea id="cm-to" rows="2" placeholder="a@example.com, b@example.com" autocomplete="off" spellcheck="false"></textarea></label>
+        <div class="compose-two"><label>寄件人<input id="cm-name" maxlength="60" placeholder="Orbit" /></label><label>主旨<input id="cm-subject" maxlength="200" placeholder="信的主旨" /></label></div>
+        <label data-f="headline">標題<input id="cm-headline" maxlength="120" /></label>
+        <label>內容<textarea id="cm-body" rows="8"></textarea><span class="muted" style="font-size:12.5px">空一行分段，「- 」開頭是一點，**粗體**，https 網址會變成連結。<span id="cm-digest-hint" hidden>更新：每一點「標題：說明」是一張卡片。</span></span></label>
+        <label data-f="code">Orbit Pass（選填）<input id="cm-code" maxlength="40" autocomplete="off" spellcheck="false" placeholder="XXXXX-XXXXX" /></label>
+        <div class="compose-two" data-f="button"><label>按鈕<input id="cm-button" maxlength="40" /></label><label>連結<input id="cm-link" type="url" inputmode="url" placeholder="https://" /></label></div>
+        <label data-f="sign">署名<input id="cm-sign" maxlength="60" /></label>
+        <p id="cm-error" class="error"></p>
+        <p id="cm-ok" class="ok"></p>
+        <div class="compose-acts"><button id="cm-sample" class="small">放範例</button><button id="cm-try" class="small">寄給我看看</button><button id="cm-send" class="primary">寄出</button></div>
+      </div>
+      <div class="compose-view">
+        <div class="inbox-head"><b id="cm-v-subject"></b><span id="cm-v-from"></span></div>
+        <iframe id="cm-frame" title="預覽" sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>
+      </div>
+    </div>
+  </div>
+</dialog>
+
 <!-- The built kit's modules import each other as #kit/… (kit/stamp.mjs). -->
 <script type="importmap">{"imports":{"#kit/":"../kit/"}}</script>
 <script type="module">
@@ -721,6 +796,8 @@ import { icons, tileHtml, heroCardHtml, escHtml, toast } from '../kit/ui.mjs';
 import { API, DOMAIN } from '../kit/domain.mjs';
 import { passkeyName } from '../kit/passkey.mjs';
 import { SOURCES, SOURCE_BY_ID, GROUPS as SOURCE_GROUPS, freshAt, sourceState } from '../kit/sources.mjs';
+import { JOBS, restsToday, isLate, errTone, aiTone } from './ops-watch.mjs';
+import { MAIL_LOOKS, MAIL_ACCENTS, mailRender } from './mail-look.mjs';
 const ECO_URL = `${API}/eco`;
 const KEY = 'orbit.admin';
 const $ = id => document.getElementById(id);
@@ -762,6 +839,10 @@ const WHY = {
   ADMIN_NO_APP: '選一個 App。',
   ADMIN_BAD_NOTICE: '通知要有標題和內容。',
   ECO_BUSY: '帳戶正在被寫入，再試一次。',
+  MAIL_BAD_ADDRESS: '信箱格式不對。',
+  MAIL_NO_TO: '先填收件人（寄給我看看：先在 郵件 存好你的信箱）。',
+  MAIL_TOO_MANY: '一次最多寄給 20 個信箱。',
+  MAIL_NO_SUBJECT: '信要有主旨。',
   ADMIN_FAILED: '伺服器出錯了，再試一次。',
   ADMIN_NO_SESSION: '伺服器還沒設定登入用的密鑰。'
 };
@@ -841,7 +922,7 @@ for (const i of document.querySelectorAll('i[data-ic]')) i.innerHTML = ic(i.data
 $('mark').innerHTML = $('gate-mark').innerHTML = `<img src="${svgUrl(familyMark())}" alt="">`;
 $('omni-ic').innerHTML = $('search-ic').innerHTML = ic('search');
 $('refresh').innerHTML = ic('history');
-$('acct-close').innerHTML = $('money-close').innerHTML = ic('x');
+$('acct-close').innerHTML = $('money-close').innerHTML = $('compose-close').innerHTML = ic('x');
 // A line of values as a small chart (its area under it), for a figure's trend.
 function spark(values, color = 'var(--q-accent)') {
   const v = values.length ? values : [0];
@@ -883,7 +964,7 @@ const VIEWS = {
   health: () => Promise.all([loadSystem(), loadSources(), loadErrors(), loadBugs()]),
   usage: () => Promise.all([loadCapacity(), loadSystem(), loadUsage(), loadAiMoney()]),
   dev: () => loadDev(),
-  tools: () => Promise.all([loadGift(), loadPushes(), loadBackups()])
+  tools: () => Promise.all([loadMail(), loadGift(), loadPushes(), loadBackups()])
 };
 const loaded = new Set();
 let view = 'overview';
@@ -1240,6 +1321,8 @@ const PLACES = [
   ['額度', 'usage', 'chart', '#7c3aed', '容量 人數 帳單 cloudflare google gemini ai tdx 節流 quota usage billing'],
   ['現在在用', 'accounts', 'user', '#16a34a', '入場 排隊 同時 優先 door', 'door'],
   ['設定', 'dev', 'target', '#64748b', '速度 開發 ai 上限 dev config'],
+  // (郵件 is 工具's first card, right under the shortcuts: no tile of its own, the six stay two even rows.)
+  ['郵件', 'tools', 'mail', '#db2777', '寄信 寫信 email mail 警示信 信箱 公告 resend'],
   ['公開領取', 'tools', 'send', '#4f46e5', '領取 發送 公開 學校 qr giveaway key', 'tool-gift'],
   ['發放 Orbit Pass', 'tools', 'ticket', '#2563eb', '發 pass 新帳戶 issue', 'tool-issue'],
   ['找回帳戶', 'tools', 'lock', '#0d9488', '裝置代碼 遺失 recover', 'tool-recover'],
@@ -1825,6 +1908,159 @@ function drawGift(g, empty) {
   $('gift-state').textContent = giftSay(g);
   $('gift-url').textContent = GIFT_URL.replace('https://', '');
 }
+// ---- 郵件 (mail.js, mail-alerts.js): where the alert mails go, their switches, what's open; 寫信 ----
+let mailNow = null;
+const VIA = { cloudflare: 'Cloudflare', resend: 'Resend' };
+const KIND = { alert: '警示', test: '測試', try: '試寄', compose: '寫信' };
+function drawMail(m) {
+  mailNow = m;
+  const s = m.settings;
+  if (document.activeElement !== $('mail-to')) $('mail-to').value = s.to || '';
+  $('mail-on').setAttribute('aria-checked', String(s.on));
+  $('mail-quiet').setAttribute('aria-checked', String(s.quiet));
+  const a = m.alerts || {};
+  const today = a.day === new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10) ? a.n : 0;
+  $('mail-state').textContent = !s.to ? '還沒設定信箱：輸入你的信箱，按「寄測試信」看看收不收得到。' : !s.on ? '警示信關了。' : [a.open?.length ? `${a.open.length} 件事在看著` : '沒有要處理的事', `今天寄了 ${today} 封（最多 6 封）`, a.last ? `上次 ${ago(a.last)}` : '', a.failAt ? `上次沒寄出（${ago(a.failAt)}），6 小時後再試` : ''].filter(Boolean).join(' · ');
+  $('mail-open').replaceChildren(...(a.open || []).map(o => el('li', { class: o.tone }, [el('i'), el('span', { text: o.title }), el('small', { text: o.sent ? `寄過 ${ago(o.sent)}` : '確認中' })])));
+  const log = m.log || [];
+  $('mail-log-sum').textContent = `最近寄出（${log.length}）`;
+  $('mail-log').tBodies[0].replaceChildren(...(log.length ? log.map(r => el('tr', {}, [el('td', { text: fmtShort(r.at) }), el('td', { text: `${KIND[r.kind] ? `${KIND[r.kind]}・` : ''}${r.subject}` }), el('td', { class: 'wide mono', text: r.to }), el('td', { class: 'right', text: VIA[r.via] || r.via })])) : [el('tr', {}, [el('td', { colspan: '4', class: 'muted', text: '還沒寄過' })])]));
+  const c = m.counts;
+  $('mail-room').textContent = `寄給自己（Cloudflare 驗證過的信箱）免費、不限封數。寄給別人走 Resend：${m.resend ? `今天還能寄 ${Math.max(0, c.dayMax - c.dayN)} 封、這個月 ${Math.max(0, c.monthMax - c.monthN).toLocaleString()} 封（免費方案）` : '還沒設定，只能寄給驗證過的信箱'}。`;
+}
+async function loadMail() {
+  try {
+    drawMail(await admin('mail'));
+  } catch (e) {
+    $('mail-error').textContent = e.message;
+  }
+}
+async function mailSet(extra) {
+  $('mail-error').textContent = $('mail-ok').textContent = '';
+  try {
+    await admin('mail-set', extra);
+    await loadMail();
+    return true;
+  } catch (e) {
+    $('mail-error').textContent = e.message;
+  }
+}
+$('mail-save').onclick = () => busy($('mail-save'), async () => (await mailSet({ to: $('mail-to').value.trim() })) && ($('mail-ok').textContent = $('mail-to').value.trim() ? '已儲存' : '已清掉信箱：不寄警示信'));
+for (const id of ['mail-on', 'mail-quiet'])
+  $(id).onclick = () => {
+    const on = $(id).getAttribute('aria-checked') !== 'true';
+    $(id).setAttribute('aria-checked', String(on));
+    mailSet({ [id === 'mail-on' ? 'on' : 'quiet']: on });
+  };
+const NEEDS_VERIFY = '先到 Cloudflare 驗證這個信箱：jaypengx.com › Email › Email Routing › 目的地地址 › 新增，再按信裡的連結。';
+$('mail-test').onclick = () =>
+  busy($('mail-test'), async () => {
+    $('mail-error').textContent = $('mail-ok').textContent = '';
+    try {
+      const to = $('mail-to').value.trim();
+      if (to && to !== mailNow?.settings?.to && !(await mailSet({ to }))) return;
+      const r = await admin('mail-test');
+      if (r.sent) $('mail-ok').textContent = `已寄出（${VIA[r.sent.via]}）：看看 ${r.to} 的收件匣，沒看到的話也看看垃圾郵件。`;
+      else $('mail-error').textContent = `沒寄出：${r.failed}${r.needsResend ? `。${NEEDS_VERIFY}` : ''}`;
+      loadMail();
+    } catch (e) {
+      $('mail-error').textContent = e.message;
+    }
+  });
+$('mail-check').onclick = () =>
+  busy($('mail-check'), async () => {
+    $('mail-error').textContent = $('mail-ok').textContent = '';
+    try {
+      const r = await admin('mail-check');
+      $('mail-ok').textContent = r.issues.length ? `現在會寄的：${r.issues.map(i => i.title).join('、')}（同一件事看到兩次才寄）` : '現在沒有要寄的事。';
+    } catch (e) {
+      $('mail-error').textContent = e.message;
+    }
+  });
+
+// 寫信: the form is the mail; mail-look.mjs draws the preview exactly as mail.js will send it.
+const compose = $('compose');
+const CM = ['to', 'name', 'subject', 'headline', 'body', 'code', 'button', 'link', 'sign'];
+const DRAFT = 'orbit.admin.mail-draft.v1';
+let cm = { look: 'announce', accent: 'orbit', lang: 'zh' };
+try {
+  Object.assign(cm, JSON.parse(localStorage.getItem(DRAFT) || '{}'));
+} catch {}
+const cmFields = () => ({ ...cm, ...Object.fromEntries(CM.map(k => [k, $(`cm-${k}`).value])) });
+$('cm-looks').innerHTML = Object.entries(MAIL_LOOKS).map(([k, l]) => `<button type="button" data-look="${k}" title="${escHtml(l.about.zh)}"><span class="look-pic ${k}" style="--c:#4f46e5"><b></b><u></u></span>${escHtml(l.zh)}</button>`).join('');
+$('cm-colors').innerHTML = MAIL_ACCENTS.map(a => `<button type="button" data-accent="${a.id}" style="--c:${a.color}" title="${escHtml(a.zh)}" aria-label="${escHtml(a.zh)}"></button>`).join('');
+let cmTimer = 0;
+function cmDraw() {
+  const f = cmFields();
+  const look = MAIL_LOOKS[f.look] || MAIL_LOOKS.announce;
+  const color = (MAIL_ACCENTS.find(a => a.id === f.accent) || MAIL_ACCENTS[0]).color;
+  for (const b of $('cm-looks').children) (b.setAttribute('aria-pressed', String(b.dataset.look === f.look)), b.querySelector('.look-pic').style.setProperty('--c', color));
+  for (const b of $('cm-colors').children) b.setAttribute('aria-pressed', String(b.dataset.accent === f.accent));
+  for (const b of $('cm-lang').children) b.setAttribute('aria-pressed', String(b.dataset.lang === f.lang));
+  for (const n of compose.querySelectorAll('[data-f]')) n.hidden = !look.fields.includes(n.dataset.f);
+  $('cm-digest-hint').hidden = f.look !== 'digest';
+  const m = mailRender(f);
+  $('cm-v-subject').textContent = m.subject || '（沒有主旨）';
+  $('cm-v-from').textContent = `${f.name || mailNow?.settings?.name || 'Orbit'} <hello@${DOMAIN}>${mailNow?.settings?.to ? ` · 回信寄到 ${mailNow.settings.to}` : ''}`;
+  $('cm-frame').srcdoc = m.html.replace('<head>', '<head><base target="_blank">');
+  try {
+    localStorage.setItem(DRAFT, JSON.stringify(f));
+  } catch {}
+}
+const cmSoon = () => (clearTimeout(cmTimer), (cmTimer = setTimeout(cmDraw, 150)));
+function cmSample(force) {
+  const s = MAIL_LOOKS[cm.look].sample[cm.lang];
+  for (const k of ['subject', 'headline', 'body', 'button', 'link', 'code', 'sign']) if (force || !$(`cm-${k}`).value.trim()) $(`cm-${k}`).value = s[k] || '';
+  cmDraw();
+}
+$('cm-looks').onclick = e => {
+  const b = e.target.closest('[data-look]');
+  if (!b) return;
+  // (Words still the last look's sample follow the new look; words typed stay.)
+  const was = MAIL_LOOKS[cm.look].sample[cm.lang];
+  const same = ['subject', 'headline', 'body', 'button', 'link', 'sign'].every(k => !$(`cm-${k}`).value.trim() || $(`cm-${k}`).value === (was[k] || ''));
+  cm = { ...cmFields(), look: b.dataset.look };
+  cmSample(same);
+};
+$('cm-colors').onclick = e => {
+  const b = e.target.closest('[data-accent]');
+  if (b) ((cm = { ...cmFields(), accent: b.dataset.accent }), cmDraw());
+};
+$('cm-lang').onclick = e => {
+  const b = e.target.closest('[data-lang]');
+  if (b) ((cm = { ...cmFields(), lang: b.dataset.lang }), cmDraw());
+};
+compose.addEventListener('input', cmSoon);
+$('cm-sample').onclick = () => cmSample(true);
+$('compose-close').onclick = () => compose.close();
+$('mail-write').onclick = () => {
+  for (const k of CM) $(`cm-${k}`).value = cm[k] ?? '';
+  if (!$('cm-name').value) $('cm-name').value = mailNow?.settings?.name || 'Orbit';
+  $('cm-error').textContent = $('cm-ok').textContent = '';
+  if (!$('cm-body').value.trim()) cmSample(false);
+  else cmDraw();
+  compose.showModal();
+};
+// (As mail.js addressesOf reads them: `Name <a@b>` is its address.)
+const toList = raw => [...new Set(String(raw).replace(/[^,;\n，；<]*<([^>]+)>/g, ' $1 ').split(/[\s,;，；]+/).map(a => a.trim().toLowerCase()).filter(Boolean))];
+async function cmSend(test) {
+  $('cm-error').textContent = $('cm-ok').textContent = '';
+  const f = cmFields();
+  const to = test ? [] : toList(f.to);
+  if (test && !mailNow?.settings?.to) throw new Error('先在 郵件 存好你的信箱，才能寄給自己看看。');
+  if (!test && !to.length) throw new Error(WHY.MAIL_NO_TO);
+  if (!test && to.length > (mailNow?.maxTo || 20)) throw new Error(WHY.MAIL_TOO_MANY);
+  if (!test && !(await sure(`寄給 ${to.length} 個人？`, { body: `「${mailRender(f).subject}」，一人一封，寄出就收不回來。${to.slice(0, 5).join('、')}${to.length > 5 ? ` 等 ${to.length} 個` : ''}`, ok: '寄出' }))) return;
+  const r = await admin('mail-send', { ...f, to: to.join(','), test });
+  const ok = r.sent.length, bad = r.failed;
+  $('cm-ok').textContent = ok ? (test ? `已寄到 ${mailNow.settings.to}，看看收件匣。` : `已寄出 ${ok} 封。`) : '';
+  $('cm-error').textContent = bad.length ? `${bad.length} 封沒寄出：${bad.map(b => `${b.to}（${b.why}）`).join('、')}${bad.some(b => /驗證/.test(b.why)) ? '。寄給別人要用 Resend（免費）：在 resend.com 加入 jaypengx.com，把 API 金鑰放進 GitHub 的 RESEND_API_KEY。' : ''}` : '';
+  if (ok) toast(test ? '已寄給自己' : `已寄出 ${ok} 封`);
+  loadMail();
+}
+$('cm-try').onclick = () => busy($('cm-try'), () => cmSend(true).catch(e => ($('cm-error').textContent = e.message)));
+$('cm-send').onclick = () => busy($('cm-send'), () => cmSend(false).catch(e => ($('cm-error').textContent = e.message)));
+
 async function loadGift() {
   try {
     const out = await admin('gift');
@@ -1930,7 +2166,6 @@ async function loadUsage() {
   }
 }
 // Each app's AI today against its cap (0: paused).
-const aiTone = a => (!a.cap ? 'off' : a.days[6] >= a.cap ? 'bad' : a.days[6] >= a.cap * 0.8 ? 'slow' : '');
 const twTime = ms => new Date(ms + 8 * 3_600_000).toISOString().slice(5, 16).replace('-', '/').replace('T', ' ');
 // TDX's points: this month's against the plan, where the month ends at this rate, each day.
 function drawTdx(t, now) {
@@ -2440,8 +2675,6 @@ const PACE_WORD = ['照設定', '放慢 ×2，可以等的建置暫停', '放慢
 // ---- 錯誤 (eco-admin.js errors): each Worker's in 24 hours, the proxy's by route ----
 const STATUS_ZH = { scriptThrewException: '程式出錯', exceededResources: '超過資源上限', exceededCpu: '超過 CPU', exceededMemory: '超過記憶體', internalError: 'Cloudflare 內部錯誤', responseStreamDisconnected: '回應中斷' };
 const WORKER_ZH = { 'orbit-workers-proxy': '代理（api）', 'orbit-site': '網站（jaypengx.com）' };
-const errRate = w => (w.requests ? w.errors / w.requests : 0);
-const errTone = w => (errRate(w) > 0.05 ? 'bad' : errRate(w) > 0.005 ? 'slow' : '');
 // The worst of it, for the 錯誤 cell: [tone, words].
 function errSum(r) {
   const ws = Object.values(r.workers?.workers || {});
@@ -2506,11 +2739,6 @@ $('bugs-now').onclick = () =>
       $('bugs-error').textContent = e.message;
     }
   });
-// Each job: its name, and how long between runs before it's late.
-const JOBS = { notices: ['通知', 10], alerts: ['帳單警示', 30], f1: ['F1 圈速（週四到週一）', 10], 'weather-skill': ['天氣評分（每小時）', 120], capacity: ['容量（每 6 小時）', 420], 'build:watch': ['建置：精華連結（每小時）', 120], 'build:cutouts': ['建置：去背照片（每小時）', 120], 'build:buses': ['建置：公車（每小時）', 120], 'build:daily': ['建置：每日（賽程、CPBL、照片、勝率）', 120], bikes: ['YouBike 保溫（每 2 分鐘）', 10], 'store-backup': ['每晚備份（04:30）', 26 * 60], 'build:f1kept': ['建置：F1 過去的賽段', 26 * 60], 'build:news': ['建置：新聞（每 10 分鐘）', 30], 'data-folders': ['R2 資料的檔案數（每 6 小時）', 7 * 60], 'gift-clean': ['公開領取的夜間整理（03:50）', 26 * 60], radar: ['降雨雷達（每 10 分鐘）', 30], meter: ['用量計數（每 2 分鐘）', 10] };
-// F1's laps run Thursday to Monday, UTC (worker.js's F1_DAYS): the other days it rests, never late.
-const restsToday = (b, now) => b.job === 'f1' && ![0, 1, 4, 5, 6].includes(new Date(now).getUTCDay());
-const isLate = (b, now) => !restsToday(b, now) && now - b.at > (JOBS[b.job]?.[1] || 120) * 60_000;
 const SECRET_GROUPS = [
   ['登入與管理', ['ECO_TOKEN_SECRET', 'ECO_ADMIN_TOKEN', 'DATA_PUSH_SECRET']],
   ['AI（預付）', ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY']],
@@ -2519,7 +2747,7 @@ const SECRET_GROUPS = [
   ['GitHub（部署的重跑）', ['GH_ACTIONS_TOKEN']],
   ['退場中（12/6 自動移除）', ['FIREBASE_PRIVATE_KEY']]
 ];
-const BIND_WORD = { STORE: 'D1 資料庫（Pass、設定）', DATA: 'R2 資料（orbit-data）', RATE_LIMIT_KV: 'KV（通知、帳單狀態、快取）', F1_LOG: 'F1 圈速紀錄（Durable Object）', GEMINI_RELAY: 'AI 與台灣網頁的中繼（台灣）', GUARD: '帳單保護（quota-guard）' };
+const BIND_WORD = { STORE: 'D1 資料庫（Pass、設定）', DATA: 'R2 資料（orbit-data）', RATE_LIMIT_KV: 'KV（通知、帳單狀態、快取）', F1_LOG: 'F1 圈速紀錄（Durable Object）', GEMINI_RELAY: 'AI 與台灣網頁的中繼（台灣）', GUARD: '帳單保護（quota-guard）', MAIL: '寄信（Cloudflare Email）' };
 // A job's note (its result, JSON) as words: "watched 0 · sent 2"; an error as it is.
 const noteText = note => {
   try {

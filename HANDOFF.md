@@ -74,7 +74,8 @@ carried, kept here so a new one can copy them:
 | **TDX** (運輸資料流通服務) | `TDX_CLIENT_ID`, `TDX_CLIENT_SECRET`: buses, trains, bikes (free tier from 2026-12-01) | Transit |
 | **司法院 open data** | `JDOC_USER`, `JDOC_PASS` (Orbit-Law's secrets): court rulings | Law's 裁判 |
 | **Firebase** (old) | `FIREBASE_PRIVATE_KEY`, kept only until 2026-12-05 for sign-ins older than 2026-10-05 | Nothing after 12-05: then delete the key and the Firebase project |
-| **A mail sender** (if set up) | `RESEND_API_KEY` turns on the Pass's recovery email (`pass-mail.js`); off until it exists | Recovery email stays off |
+| **Cloudflare Email Routing** (in the Cloudflare account) | Mail from the domain (`mail.js`, binding `MAIL`): the admin alert mails and 寫信 to the owner's own inbox, which must be a verified destination address there; free | No alert mails |
+| **Resend** (if set up) | `RESEND_API_KEY`: mail to anyone else (the Pass's recovery email `pass-mail.js`, 寫信 to others); free plan, 90 a day kept | Recovery email and 寫信 to others stay off |
 | **Jay's inbox** | Where GitHub's failed-run mails and the admin alerts go | Missed alerts |
 | **Jay's Apple devices** | The admin pass and passkeys (iCloud Keychain) | Sign in with the admin pass, add passkeys again |
 

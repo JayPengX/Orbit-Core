@@ -397,8 +397,9 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   family grows (`capacity.js`).
 - **AI**: caps a day (`DEV ai*`, D1 `law_day`, 0 pauses); a row a call in `gemini_call` (tokens, ms); admin AI 錢包: balances typed less calls since (`moneyLeft`)
 - **Outside sources** (admin 外部來源): real calls, a D1 upsert an isolate per 5 min; beats, R2 ages, Law's `data/status.json`.
-- **Errors**: each route's 5xx tallied (`err:<route>:<day>`), the guard's
-  `/errors`; 部署 runs workflows (`GH_ACTIONS_TOKEN`).
+- **Errors**: each route's 5xx (`err:<route>:<day>`), the guard's `/errors`;
+  部署 runs workflows (`GH_ACTIONS_TOKEN`).
+- **Mail** (`mail.js`, `MAIL`): admin's red, `mail-alerts.js`; 寫信, `site/admin/mail-look.mjs`.
 - **容量** (`capacity.js` `quotas`): people each quota holds (this week's × room ÷ people's use; under `FEW`: `TYPICAL_DAY`); people's share: what pages called (`pageShare`).
 - **`quota-guard`** (`guard.js`, every 5 minutes) reads the use against
   `PLAN`, paces on real use only (`paceFor`: past 60/75/85% at a rate
@@ -432,7 +433,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   `SHORT` in `kit/brand.mjs`; one origin, so one Pass sign-in), `orbit-pass`
   for `/`, `/pass/`, `/key/`, `/app/` (Orbit, `kit/suite.mjs`), `/Orbit-Core/` and the old `/Shared-Proxy/`,
   `orbit-home` for `<DOMAIN>/`, `/showcase/` (Orbit-Showcase).
-  Mail is refused. `deploy.yml`
+  Mail in is refused. `deploy.yml`
   attaches the hostnames (its token needs the zone and D1 Edit); the guard
   takes them off with the proxy.
 - **Moving Orbit** (another account, host, team or agent): `HANDOFF.md`
@@ -441,7 +442,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
 ## 11. Tools and tests
 
 Every tool and its flags: `tools/README.md`. `npm test` in each repo; the
-everyday commands are in `CLAUDE.md`.
+everyday ones: `CLAUDE.md`.
 
 ## 12. If you change…
 

@@ -1482,6 +1482,8 @@ export const icons = {
   chart: g('<path d="M4 19h16M7 15l4-4 3 3 5-6"/>'),
   bars: g('<path d="M6 20V11M12 20V5M18 20v-6"/>'),
   bell: g('<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20.5h4"/>'),
+  // An envelope: mail (the admin panel's 郵件).
+  mail: g('<rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="m4.5 7.5 7.5 5.5 7.5-5.5"/>'),
   // A compass: a link out to the web (the Pass sheet's 打開連結).
   compass: g('<circle cx="12" cy="12" r="8.5"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>'),
   bus: g('<rect x="5" y="3.5" width="14" height="14" rx="3"/><path d="M5 11h14M8.5 20.5v-3M15.5 20.5v-3"/><circle cx="8.5" cy="14.5" r=".6"/><circle cx="15.5" cy="14.5" r=".6"/>'),
