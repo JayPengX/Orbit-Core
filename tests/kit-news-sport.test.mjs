@@ -143,9 +143,20 @@ test("a story the AI has read is about whom it says and its own words name, neve
   const SAS = T('nba', 'San Antonio Spurs', 'Spurs', 'basketball');
   assert.equal(newsAbout(pack, { teams: [GSW, SAS], kinds: ['injury'], now }).length, 0);
   assert.equal(newsAbout(pack, { teams: [T('nba', 'Los Angeles Lakers', 'Lakers', 'basketball')], now }).length, 1);
-  // (Not read yet: its links still count, as before.)
+  // (Not read yet, the AI's reading paused 11-14: its own words still, never its links:
+  // "Predicted Bundesliga lineups" stood under Warriors v Spurs, Jay 11-14.)
   const unread = cleanSport({ intl: [{ ...luka, who: null }] });
-  assert.equal(newsAbout(unread, { teams: [SAS], now }).length, 1);
+  assert.equal(newsAbout(unread, { teams: [SAS], now }).length, 0);
+  assert.equal(newsAbout(unread, { teams: [T('nba', 'Los Angeles Lakers', 'Lakers', 'basketball')], now }).length, 1);
+});
+
+test("a game's news leaves out another game's report and Taiwan's own 勇士 (Jay 11-14: Rockets–Warriors and PLG under Warriors v Spurs)", () => {
+  const now = Date.parse('2026-11-14T08:00Z');
+  const s = (id, title, k = '') => ({ id, title, items: [['x', title, `https://www.espn.com/nba/story/${id}`]], at: now - 3_600_000, k });
+  const pack = cleanSport({ intl: [s('a', "Rockets halt Warriors' 8-game winning streak; Stephen Curry injured", 'injury'), s('b', 'Spurs ambush Warriors in first quarter of first game since Steph Curry injury', 'injury')], tw: [{ ...s('c', 'PLG車侑城首秀砍18分率勇士奪勝'), region: 'tw' }] });
+  const SAS = T('nba', 'San Antonio Spurs', 'Spurs', 'basketball');
+  assert.deepEqual(newsAbout(pack, { teams: [GSW, SAS], game: true, kinds: ['injury'], now }).map(x => x.id), ['b']);
+  assert.deepEqual(newsAbout(pack, { teams: [GSW], now }).map(x => x.id).sort(), ['a', 'b']);
 });
 
 test("a story's kind is its headline's: a trade is a move whatever injury led to it, a summary's injury never tags it (Jay 11-13)", () => {
