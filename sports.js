@@ -1518,27 +1518,27 @@ async function resolveOne(upstreamUrl, trim, ctx, { mirror = true, within } = {}
     const result = await fetchUpstream(upstreamUrl, trim);
     // (The body is read once: the edge's copy and R2's from the same bytes;
     // a shared read's, a failure's too, for each waiting on it.)
-    if ((result.status === 200 || keepKey) && result.body && typeof result.body !== 'string' && !(result.body instanceof ArrayBuffer) && !ArrayBuffer.isView(result.body)) result.body = await new Response(result.body).arrayBuffer();
+    if (result.body && typeof result.body !== 'string' && !(result.body instanceof ArrayBuffer) && !ArrayBuffer.isView(result.body)) result.body = await new Response(result.body).arrayBuffer();
     if (result.status === 200) {
       ctx.waitUntil(cache.put(cacheKey, cacheEntry(result, policy)));
       if (keepKey && result.final) ctx.waitUntil(keep(keepKey, upstreamUrl, result.body));
     }
     return result;
   };
-  let reading = keepKey ? firstReads.get(cacheKey.url) : null;
+  // (Every first read shared, not only those kept for good: a crowd opening one live game at once
+  // is one ask of its source, never one each; the Runner is one object, so one ask in all. 11-14.)
+  let reading = firstReads.get(cacheKey.url);
   if (!reading) {
     reading = first();
-    if (keepKey) {
-      firstReads.set(cacheKey.url, reading);
-      ctx.waitUntil(reading.catch(() => {}).finally(() => firstReads.delete(cacheKey.url)));
-    }
+    firstReads.set(cacheKey.url, reading);
+    ctx.waitUntil(reading.catch(() => {}).finally(() => firstReads.delete(cacheKey.url)));
   }
   const result = await reading;
   // (Shared: each its own copy of the body.)
   const body = result.body instanceof ArrayBuffer ? result.body.slice(0) : result.body;
   return { ...result, body, cache: 'MISS', age: 0, policy: result.final ? CACHE_FINAL : policy };
 }
-// First reads of what's kept for good, under way in this isolate (by cache key).
+// First reads under way in this isolate (by cache key), shared by all who ask meanwhile.
 const firstReads = new Map();
 
 // How long the browser may keep an answer itself (its own copy, by the
