@@ -216,10 +216,10 @@ export const DEV = {
   // Orbit Transit (TDX, measured 2026-10-11 by its own update times): bus
   // arrivals and the metro's board change every 30 s, trains' every 20-30,
   // YouBike every 60. Kept a third of that on the Worker, read as often.
-  tdxLive: { def: 10, min: 5, max: 60, unit: 's', group: 'transit', zh: 'Worker 保留即時交通資料', en: 'Worker keeps live TDX', note: '公車到站、捷運與台鐵看板（TDX 每 30 秒更新）' },
+  tdxLive: { def: 15, min: 5, max: 60, unit: 's', group: 'transit', zh: 'Worker 保留即時交通資料', en: 'Worker keeps live TDX', note: '公車到站、捷運與台鐵看板（TDX 每 30 秒更新）' },
   tdxBike: { def: 30, min: 10, max: 120, unit: 's', group: 'transit', zh: 'Worker 保留 YouBike', en: 'Worker keeps YouBike', note: 'TDX 每 60 秒更新' },
-  transitLive: { def: 10, min: 5, max: 120, unit: 's', group: 'transit', zh: '交通卡片重新讀取', en: 'Transit cards refresh', note: '公車、捷運、台鐵、行程中' },
-  transitBike: { def: 30, min: 15, max: 300, unit: 's', group: 'transit', zh: 'YouBike 重新讀取', en: 'YouBike refresh', note: '地圖上附近的車位' },
+  transitLive: { def: 20, min: 5, max: 120, unit: 's', group: 'transit', zh: '交通卡片重新讀取', en: 'Transit cards refresh', note: '公車、捷運、台鐵、行程中（資料每 30 秒更新）' },
+  transitBike: { def: 60, min: 15, max: 300, unit: 's', group: 'transit', zh: 'YouBike 重新讀取', en: 'YouBike refresh', note: '地圖上附近的車位（資料每 60 秒更新）' },
   // capacity.js: the live refreshes above slowed together when the people
   // expected in 30 days would run past Cloudflare's $5 plan (checked every
   // 6 hours); the numbers above stay the owner's own, the floor.
