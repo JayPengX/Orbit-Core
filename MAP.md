@@ -425,10 +425,10 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   - `pages.yml`: the kit and `site/`, to Cloudflare (tests first);
   - `news-site.yml`: News's site (this repo's token), started by `newsSite`;
   - `news-clips.yml`: the clips in Taiwan's articles, started by `newsClips`;
-  - every app repo's deploy workflow: its own site, to Cloudflare.
-- Every 3 hours: `free-watch.yml` (`tools/free-watch.mjs`, started by the cron's `startFreeWatch`): pages, routes, cron jobs, free amounts; a failure mails Jay.
-- By hand: `build.yml` (a builder now, a check), `tail.yml` (logs),
-  `audit.yml` (secret names, store counts), `zone-speed.yml` (zone speed), `credit.yml` (`tools/credit/`).
+  - every app repo's deploy workflow: its site, to Cloudflare.
+- Every 3 hours: `free-watch.yml` (`tools/free-watch.mjs`, started by the cron's `startFreeWatch`): pages, routes, crons, free amounts; a failure mails Jay.
+- By hand: `build.yml` (a builder, a check), `tail.yml` (logs),
+  `audit.yml` (secrets, store counts), `zone-speed.yml` (speed), `credit.yml` (`tools/credit/`), `agent.yml` (a task).
 - Never a cancelling `concurrency:` (a cancel mails Jay): copy the `queue`
   job; builds check out main's tip.
 - **Only what must stay secret is a secret** (the rest: code, tomls). Every
