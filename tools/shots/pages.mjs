@@ -480,5 +480,13 @@ export const PAGES = {
     orders: { args: click('#tab-history', "js:document.querySelector('[data-action=hview][data-view=orders]')?.click()", wait(2500)) },
     stats: { args: click('#tab-history', "js:document.querySelector('[data-action=hview][data-view=stats]')?.click()", wait(2500)) }
   },
+  news: {
+    default: ['tabs'],
+    check: ['video'],
+    // 影音 (台灣's tab of clips, views/video.mjs), 國際's, and one playing in place.
+    video: { hash: 'tw', args: click(wait(2500), tap('影音|Video'), wait(1500)) },
+    'video-intl': { hash: 'intl', args: click(wait(2500), tap('影音|Video'), wait(1500)) },
+    'video-play': { hash: 'tw', args: click(wait(2500), tap('影音|Video'), wait(1500), "js:document.querySelectorAll('.nw-v-clip')[1]?.click()", wait(1200)) }
+  },
   admin: { default: ['overview', 'accounts', 'money', 'health'], overview: { hash: 'overview' }, accounts: { hash: 'accounts' }, money: { hash: 'money' }, health: { hash: 'health' }, dev: { hash: 'dev' }, account: { hash: 'accounts', args: click(wait(1500), card('beedc1a9'), wait(1500), "js:[...document.querySelectorAll('[data-act]')].find(b=>/優先/.test(b.textContent))?.click()", wait(800)) } }
 };
