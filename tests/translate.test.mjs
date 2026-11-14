@@ -142,3 +142,43 @@ test('paid translation is off unless TR_PAID is on (Google bills every character
   assert.deepEqual(got, {});
   assert.equal(asked, 0);
 });
+
+test('spending holds when the meter is lost or callers race: an unreadable meter spends nothing; a D1 day caps every caller at once', async () => {
+  const { reserveDay } = await import('../translate.js');
+  const { fakeD1 } = await import('./fake-d1.mjs');
+  let asked = 0;
+  const fetchImpl = async (u, init) => (asked++, new Response(JSON.stringify({ data: { translations: JSON.parse(init.body).q.map(q => ({ translatedText: `T${q}` })) } })));
+  // (A meter that can't be read is no fresh month.)
+  const broken = { json: async () => Promise.reject(new Error('R2 refused')), put: async () => true };
+  assert.deepEqual(await translate(env, broken, ['Hello'], 'zh-TW', { fetchImpl }), {});
+  assert.equal(asked, 0);
+  // (One day's row: what's over is given back, never half spent.)
+  const d1 = { ...env, STORE: fakeD1() };
+  assert.equal(await reserveDay(d1, '2026-11-14', 30, 50), true);
+  assert.equal(await reserveDay(d1, '2026-11-14', 30, 50), false);
+  assert.equal(await reserveDay(d1, '2026-11-14', 20, 50), true);
+  assert.equal(await reserveDay(d1, '2026-11-15', 50, 50), true);
+  // (Parallel callers each with a fresh meter of their own: the day still stops them.)
+  const many = await Promise.all(Array.from({ length: 8 }, (_, i) => translate({ ...d1 }, memStore(), ['x'.repeat(9_000) + i], 'en', { fetchImpl, now: Date.UTC(2026, 10, 20) })));
+  assert.ok(many.filter(o => Object.keys(o).length).length <= 4);
+});
+
+test('a new translation only for a 完整 pass: anyone else gets the kept ones, and Google is never asked', async () => {
+  const { handleTr } = await import('../translate.js');
+  const r2 = new Map();
+  const env2 = {
+    GOOGLE_WEATHER_KEY: 'k',
+    TR_PAID: 'on',
+    DATA: { get: async k => (r2.has(k) ? { arrayBuffer: async () => new TextEncoder().encode(r2.get(k)).buffer, customMetadata: {} } : null), head: async () => null, put: async (k, v) => void r2.set(k, new TextDecoder().decode(v)) }
+  };
+  let asks = 0;
+  const fetchImpl = async (u, init) => (asks++, new Response(JSON.stringify({ data: { translations: JSON.parse(init.body).q.map(q => ({ translatedText: `EN ${q.length}` })) } })));
+  const req = body => new Request('https://w/tr', { method: 'POST', body: JSON.stringify(body) });
+  const r = await (await handleTr(req({ to: 'en', texts: ['新公告'] }), env2, {}, { app: 'transit' }, { fetchImpl, make: false })).json();
+  assert.deepEqual(r.tr, {});
+  const store = memStore();
+  const s = { id: 'b', title: 'Storm', sum: 'Big storm', items: [], at: Date.now() };
+  const o = await storyTr({ store, env, id: 'b', to: 'zh-TW', texts: ['Big storm'], find: async () => s, fetchImpl: async (...a) => (asks++, googleFake()(...a)), make: false });
+  assert.deepEqual(o.tr, {});
+  assert.equal(asks, 0);
+});

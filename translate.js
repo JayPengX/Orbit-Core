@@ -43,8 +43,37 @@ export function dayLeft(m, now = Date.now(), cap = TR_MONTH) {
   const rest = Math.max(0, cap - (m.chars - (m.today || 0)));
   return Math.max(0, Math.min(cap - m.chars, Math.floor((2 * rest) / days) - (m.today || 0)));
 }
-export async function readMeter(store, now = Date.now()) {
-  return freshMeter(await store.json(TR_METER).catch(() => null), now);
+// (`strict`: a meter that can't be read throws, so translate() spends nothing
+// rather than starting the month again from 0.)
+export async function readMeter(store, now = Date.now(), { strict = false } = {}) {
+  return freshMeter(await (strict ? store.json(TR_METER) : store.json(TR_METER).catch(() => null)), now);
+}
+
+// ---- The hard day: Google's characters a Taiwan day, one row in D1 ----
+// The meter above is a file each caller reads and writes back, so callers at
+// once can each spend the same room. This is the backstop it can't lose:
+// each batch's characters added in one statement before Google is asked
+// (and given back if it's over, or the call fails). Unreadable: nothing.
+export const TR_DAY_MAX = 40_000;
+const trReady = new WeakSet();
+export async function reserveDay(env, day, n, max = TR_DAY_MAX) {
+  if (!env?.STORE) return true;
+  try {
+    if (!trReady.has(env.STORE)) {
+      await env.STORE.prepare('CREATE TABLE IF NOT EXISTS tr_day (day TEXT PRIMARY KEY, n INTEGER NOT NULL)').run();
+      await env.STORE.prepare('DELETE FROM tr_day WHERE day < ?1').bind(day).run();
+      trReady.add(env.STORE);
+    }
+    const row = await env.STORE.prepare('INSERT INTO tr_day (day, n) VALUES (?1, ?2) ON CONFLICT (day) DO UPDATE SET n = n + ?2 RETURNING n').bind(day, n).first();
+    if (Number(row?.n) <= max) return true;
+    await giveBack(env, day, n);
+    return false;
+  } catch {
+    return false;
+  }
+}
+async function giveBack(env, day, n) {
+  if (env?.STORE) await env.STORE.prepare('UPDATE tr_day SET n = n - ?2 WHERE day = ?1').bind(day, n).run().catch(() => {});
 }
 
 // ---- Names ----
@@ -228,7 +257,8 @@ export async function translate(env, store, texts, to, { people = [], now = Date
   // applied (the bill: NT$67 for this month's 102,517). What's translated stays kept; the rest
   // shows the outlet's own words.)
   if (!want.length || !googleKey(env) || env?.TR_PAID !== 'on') return {};
-  const meter = await readMeter(store, now);
+  const meter = await readMeter(store, now, { strict: true }).catch(() => null);
+  if (!meter) return {};
   // (`force`: a run by hand asks at once, a key just turned on.)
   if (meter.off && meter.off > now && !force) return {};
   let left = Math.min(dayLeft(meter, now, cap), max);
@@ -246,8 +276,13 @@ export async function translate(env, store, texts, to, { people = [], now = Date
     for (let i = 0; i < pick.length; i += 100) {
       const part = pick.slice(i, i + 100);
       const asked = part.map(t => (zh ? shielded(prep(t), typeof people === 'function' ? people(t) : people) : shieldedEn(prep(t))));
-      const got = await google(env, asked, to, { fetchImpl, html: true });
-      spent += part.reduce((n, t, k) => n + asked[k].length, 0);
+      const size = asked.reduce((n, a) => n + a.length, 0);
+      if (!(await reserveDay(env, twDayOf(now), size))) break;
+      const got = await google(env, asked, to, { fetchImpl, html: true }).catch(async e => {
+        await giveBack(env, twDayOf(now), size);
+        throw e;
+      });
+      spent += size;
       part.forEach((t, k) => {
         let v = unshield(got[k], to);
         // (A headline with no stop of its own gets none: 談判。 → 談判; Nothing. → Nothing.)
@@ -275,7 +310,9 @@ export async function translate(env, store, texts, to, { people = [], now = Date
 export const TR_ONE = 200;
 export const TR_CALL = 3_000;
 const TR_KEEP_S = 30 * 86_400;
-export async function handleTr(request, env, headers, session, { fetchImpl = fetch, now = Date.now() } = {}) {
+// (`make`: a new translation, which Google bills, only for a 完整 pass's live
+// session (worker.js); any other Pass gets the kept ones.)
+export async function handleTr(request, env, headers, session, { fetchImpl = fetch, now = Date.now(), make = true } = {}) {
   const out = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json' } });
   if (request.method !== 'POST') return out({ error: 'method' }, 405);
   if (!session) return out({ error: 'pass' }, 401);
@@ -295,7 +332,7 @@ export async function handleTr(request, env, headers, session, { fetchImpl = fet
     if (hit) tr[t] = hit;
     else need.push(t);
   }
-  if (need.length && env.DATA) {
+  if (need.length && env.DATA && make) {
     const got = await translate(env, r2Store(env.DATA), need, to, { now, fetchImpl, max: TR_CALL, prep: t => (to === 'en' ? withMonth(t, now) : t) });
     for (const [t, v] of Object.entries(got)) {
       tr[t] = v;
