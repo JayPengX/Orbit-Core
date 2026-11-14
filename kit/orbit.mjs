@@ -1753,6 +1753,7 @@ export function orbitSession(app, { lang = detectLang(), heartbeat = 120_000 } =
   if (help && typeof document !== 'undefined') setTimeout(() => !document.querySelector('dialog[open]') && openHelp(made, help[1], help[2] || null), 800);
   made.app ??= app;
   made.on('wallet', () => msTick(made));
+  if (typeof document !== 'undefined') setTimeout(() => orbitTip(made), 3500);
   dataSession = made;
   return made;
 }
@@ -3555,6 +3556,74 @@ function offerNotices(s) {
   bannerEl = el;
 }
 
+// A separate app (its own page or home-screen icon, not Orbit's window):
+// a quiet banner recommends Orbit, every app in one (Jay 2026-11-14: "push
+// orbit as the main way ... they can turn it off in a one time action").
+// At most once a day on a device, gone by itself after 12 s; 打開 Orbit
+// opens this same screen in Orbit (an iPhone's home-screen app: Orbit's page
+// in Safari, to be added); 不再顯示 is one tap, kept for good. Never inside
+// Orbit, a frame, a gated page, a tool's browser, or over a dialog or banner.
+export const TIP_NEVER = 'orbit.tip.never';
+export const TIP_AT = 'orbit.tip.at';
+export const TIP_EVERY = 86_400_000;
+export function tipDue({ never = null, at = null, now = Date.now() } = {}) {
+  if (never) return false;
+  return !(Number(at) > 0) || now - Number(at) >= TIP_EVERY;
+}
+// (On a phone Orbit is to be added to the home screen: its plain page, so
+// the icon added doesn't open this app every time; an iPhone's home-screen
+// app sends it to Safari, where it can be added. Elsewhere this screen in Orbit.)
+export function orbitTarget(path = '/', { install = false, iosApp = false, origin = '' } = {}) {
+  if (iosApp) return `x-safari-${origin}/app/`;
+  return install ? '/app/' : `/app/?open=${encodeURIComponent(path || '/')}`;
+}
+function orbitTip(s) {
+  if (typeof document === 'undefined' || !document.body || !APPS[s.app]) return;
+  if (inSuite() || installCovered || globalThis.navigator?.webdriver) return;
+  try {
+    if (globalThis.top !== globalThis.self) return;
+  } catch {
+    return;
+  }
+  if (/^\/app\//.test(location.pathname) || /^\/pass\//.test(location.pathname)) return;
+  if (!tipDue({ never: readStore(TIP_NEVER), at: readStore(TIP_AT) })) return;
+  if (document.visibilityState === 'hidden' || document.querySelector('dialog[open]') || bannerEl?.isConnected) return;
+  writeStore(TIP_AT, String(Date.now()));
+  const T = (zh, e) => (s.lang === 'en' ? e : zh);
+  const el = node('div', { class: 'q-banner q-banner-ask q-orbit-tip', role: 'dialog', 'aria-label': 'Orbit', style: `--q-accent:${APPS[s.app].color}` }, [
+    node('img', { src: `data:image/svg+xml,${encodeURIComponent(familyMark())}`, alt: '' }),
+    node('div', {}, [
+      node('strong', { text: T('建議用 Orbit 打開', 'Try Orbit instead') }),
+      node('span', { text: T('所有 App 合一，登入一次。', 'Every app in one, signed in once.') }),
+      node('p', { class: 'q-orbit-tip-acts' }, [
+        node('button', { class: 'q-banner-go', type: 'button', text: T('打開 Orbit', 'Open Orbit') }),
+        node('button', { class: 'q-orbit-tip-never', type: 'button', text: T('不再顯示', 'Don’t show again') })
+      ])
+    ])
+  ]);
+  let timer = 0;
+  const gone = () => {
+    clearTimeout(timer);
+    el.classList.add('out');
+    setTimeout(() => el.remove(), 250);
+  };
+  el.querySelector('.q-orbit-tip-never').addEventListener('click', () => {
+    writeStore(TIP_NEVER, '1');
+    // (The older offer at a hop to another app, kit suite.mjs offer: asked no more either.)
+    writeStore('orbit.suite.ask.v1', JSON.stringify({ n: 3, t: Date.now(), never: true }));
+    gone();
+  });
+  el.querySelector('.q-banner-go').addEventListener('click', () => {
+    gone();
+    globalThis.location.assign(orbitTarget(`${location.pathname}${location.hash}`, { install: isPhoneOrTablet(), iosApp: isIOS() && isStandalone(), origin: location.origin }));
+  });
+  // (Touched, it waits for an answer.)
+  el.addEventListener('pointerdown', () => clearTimeout(timer), { once: true });
+  timer = setTimeout(gone, 12_000);
+  document.body.append(el);
+  bannerEl = el;
+}
+
 // A switch: role=switch, aria-checked.
 function toggle(on, label, onchange) {
   const b = node('button', { class: 'q-switch', type: 'button', role: 'switch', 'aria-checked': String(on), 'aria-label': label });
@@ -4092,6 +4161,8 @@ export function installGate(app, lang = detectLang(), as = null) {
       node('p', { class: 'q-gate-brand', text: 'ORBIT' }),
       node('h1', { class: 'q-gate-title', text: en ? `Add ${name} to your home screen` : `把 ${name} 加入主畫面` }),
       lede ? node('p', { class: 'q-gate-lede', text: lede }) : null,
+      // (A separate app: Orbit, every app in one, recommended first; Jay 2026-11-14.)
+      as ? null : node('a', { class: 'q-gate-orbit', href: orbitTarget('', { install: true }), text: en ? `Recommended: add Orbit instead, every app in one ›` : `推薦：改加入 Orbit，所有 App 合一 ›` }),
       action,
       spot ? tapPicture(spot, tap) : null,
       node('ol', { class: 'q-steps q-install-steps' }, steps.map(stepItem)),
