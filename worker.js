@@ -1638,6 +1638,22 @@ async function route(request, env, ctx, headers, origin) {
       }
       return json(out, 200, headers);
     }
+    // How long one D1 read, one KV read and one R2 head take from where this runs (the Runner, near
+    // the family): a Durable Object's request is billed for its whole wait.
+    if (check === 'store-time') {
+      const time = async f => {
+        const t0 = Date.now();
+        await f().catch(() => null);
+        return Date.now() - t0;
+      };
+      const d1 = [], kv = [], r2 = [];
+      for (let i = 0; i < 3; i++) {
+        d1.push(await time(() => env.STORE.prepare('SELECT 1').first()));
+        kv.push(await time(() => env.RATE_LIMIT_KV.get(`time-probe-${i}`)));
+        r2.push(await time(() => env.DATA.head('news/index.json')));
+      }
+      return json({ colo: request.cf?.colo || null, d1, kv, r2 }, 200, headers);
+    }
     if (check === 'sources') {
       const want = (new URL(request.url).searchParams.get('src') || '').split(',').filter(Boolean).slice(0, 20);
       const all = await readSources(env);
