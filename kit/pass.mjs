@@ -223,7 +223,7 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
       close();
       location.hash = hash;
     };
-    const apps = Object.fromEntries(Object.entries(APPS).map(([id, a]) => [id, { name: a.short || a.name, icon: el('img', { src: svgUrl(appIcon(id)), alt: '', width: 29, height: 29 }) }]));
+    const apps = Object.fromEntries(Object.entries(APPS).map(([id, a]) => [id, { name: a.short || a.name, icon: el('img', { src: svgUrl(appIcon(id, { crisp: true })), alt: '', width: 29, height: 29 }) }]));
     return askOrbitCard({ go: goTo, apps });
   }
   // 今天 (today.mjs): what each app told the phone's family notebook for
@@ -240,7 +240,7 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
       if (r.hash) location.hash = r.hash;
     };
     return list(
-      rows.map(r => cell({ icon: el('img', { src: svgUrl(appIcon(r.app)), alt: '', width: 29, height: 29 }), title: r.title, sub: r.sub, chevron: true, onClick: goTo(r) })),
+      rows.map(r => cell({ icon: el('img', { src: svgUrl(appIcon(r.app, { crisp: true })), alt: '', width: 29, height: 29 }), title: r.title, sub: r.sub, chevron: true, onClick: goTo(r) })),
       { head: t('today'), ai: true }
     );
   }
@@ -250,7 +250,7 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
   paint();
   // The kit's one sheet (ui.mjs): ✕, Escape, a tap outside and a swipe all close it the same way.
   const sh = sheet({
-    title: el('span', { class: 'q-pass-title' }, [el('img', { src: svgUrl(appIcon('pass')), alt: '', width: 28, height: 28 }), document.createTextNode('Orbit Pass')]),
+    title: el('span', { class: 'q-pass-title' }, [el('img', { src: svgUrl(appIcon('pass', { crisp: true })), alt: '', width: 28, height: 28 }), document.createTextNode('Orbit Pass')]),
     label: 'Orbit Pass',
     cls: 'q-pass',
     closeLabel: t('close'),
@@ -290,7 +290,7 @@ function renderHelp(box, { q, t, locale }, { app, topic }) {
   const en = locale === 'en';
   const name = a => (a === 'pass' ? 'Pass' : APPS[a]?.short || a);
   const full = a => (a === 'pass' ? 'Orbit Pass' : APPS[a]?.name || a);
-  const mark = (a, size) => el('img', { class: 'hp-mark', src: svgUrl(appIcon(a)), alt: '', width: size, height: size });
+  const mark = (a, size) => el('img', { class: 'hp-mark', src: svgUrl(appIcon(a, { crisp: true })), alt: '', width: size, height: size });
   const again = a => () => (renderHelp(box, { q, t, locale }, { app: a, topic: null }), box.closest('dialog')?.scrollTo?.({ top: 0 }));
   // Which guide: every app's mark and short name, one row that scrolls; the chosen on a soft plate.
   const picker = el(
@@ -409,7 +409,7 @@ function looksSection({ q, t, locale, wornOf, wear, wearPair }) {
     const on = avatar === id && frame === id;
     const line = st.max ? t('msMax') : goalText(m, st.goal);
     return el('button', { class: `q-cell ms-row${st.done ? ' got' : ''}${on ? ' on' : ''}`, type: 'button', 'aria-pressed': String(on), 'aria-disabled': String(!st.done), 'aria-label': `${m[locale]}, ${st.done ? tierName(st.tier) : ''}${st.max ? '' : ` ${t('msHow', { tier: tierName(st.tier + 1), goal: line })}`}`, onclick: () => st.done && wearPair(on ? null : id) }, [
-      st.done ? el('span', { class: 'ms-look' }, [face(`${id}.${st.tier}`)]) : el('img', { class: 'ms-look icon', src: svgUrl(appIcon(m.id)), alt: '' }),
+      st.done ? el('span', { class: 'ms-look' }, [face(`${id}.${st.tier}`)]) : el('img', { class: 'ms-look icon', src: svgUrl(appIcon(m.id, { crisp: true })), alt: '' }),
       el('span', { class: 'q-cell-text' }, [el('span', { class: 'ms-name' }, [document.createTextNode(m[locale]), on ? el('em', { text: `✓ ${t('lookOn')}` }) : st.done ? el('span', { class: 'ms-wear', text: t('wear') }) : null]), el('small', { class: 'num', text: line })]),
       el('span', { class: 'ms-side' }, [st.max ? null : el('small', { class: 'num', text: `${count(m, st.n)}/${count(m, st.goal)}` }), pips(st)])
     ]);
@@ -445,7 +445,7 @@ function renderApps(box, { q, t, locale, state, openHelp }) {
     const last = w.apps?.[id]?.last;
     const here = id === q.app;
     return el('div', { class: `q-card pad app-card${here ? ' here' : ''}` }, [
-      el('div', { class: 'app-top' }, [el('img', { class: 'app-logo', src: svgUrl(appIcon(id)), alt: '', width: 48, height: 48 }), el('div', { class: 'app-name' }, [el('strong', { text: a.name }), el('small', { class: 'muted', text: a.role[locale === 'en' ? 'en' : 'zh'] })]), el('small', { class: 'muted app-last', text: here ? t('here') : last ? ago(t, last) : t('neverUsed') })]),
+      el('div', { class: 'app-top' }, [el('img', { class: 'app-logo', src: svgUrl(appIcon(id, { crisp: true })), alt: '', width: 48, height: 48 }), el('div', { class: 'app-name' }, [el('strong', { text: a.name }), el('small', { class: 'muted', text: a.role[locale === 'en' ? 'en' : 'zh'] })]), el('small', { class: 'muted app-last', text: here ? t('here') : last ? ago(t, last) : t('neverUsed') })]),
       el('div', { class: 'two-btn' }, [
         el('button', { class: 'q-btn', type: 'button', text: t('guide'), onclick: () => openHelp(id) }),
         el('button', { class: 'q-btn', type: 'button', text: t('share'), onclick: () => shareApp(id) }),

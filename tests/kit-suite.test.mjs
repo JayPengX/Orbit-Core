@@ -150,7 +150,7 @@ test("Orbit's window closes only the oldest quiet apps: never the one shown, nev
   assert.deepEqual(toClose([f('beats', 1, true), f('a', 2), f('b', 3), f('c', 4), f('d', 5)], 'beats', 3), ['a']);
 });
 
-test('Orbit opens on something live, else the last app within an hour, else the list', async () => {
+test('Orbit opens, with something live, on the app looked at last (the live one a tab), else the last app within an hour, else the list', async () => {
   const { launchTarget, liveNow, AWAY_MS } = await import('../kit/suite.mjs');
   const now = 1_800_000_000_000;
   const saved = { apps: { match: { url: '/Orbit-Sports/#g', y: 40, t: now - 10 * 60_000, home: '/Orbit-Sports/' }, law: { url: '/Orbit-Law/', y: 0, t: now - 3 * 3_600_000, home: '/Orbit-Law/' } } };
@@ -165,10 +165,13 @@ test('Orbit opens on something live, else the last app within an hour, else the 
   // Something live wins however long away; the one started last of two; a timer that ran out is not live.
   const live = { transit: { t: now - 5 * 3_600_000, url: '/Orbit-Transit/#trip' }, orbit: { t: now - 3_600_000, until: now + 60_000 }, money: { t: now - 60_000, until: now - 1 } };
   assert.deepEqual(liveNow(live, now).map(x => x.app), ['orbit', 'transit']);
-  assert.equal(launchTarget(saved, live, now + 2 * AWAY_MS).app, 'transit');
-  // (At its start, as on its own: the app shows what's under way itself, never the screen it was minimized on.)
+  // (However long away: the app looked at last, as it was left; Jay 2026-11-14, not the live one's.)
+  assert.equal(launchTarget(saved, live, now + 2 * AWAY_MS).app, 'match');
+  assert.equal(launchTarget({ ...saved, last: 'law', left: now - 9 * AWAY_MS }, live, now).app, 'law');
+  // (The live one looked at last, or nothing else: at its start, as on its own, never the screen it was minimized on.)
   const { pathOf } = await import('../kit/brand.mjs');
-  assert.deepEqual(launchTarget(saved, { transit: live.transit }, now + 2 * AWAY_MS), { app: 'transit', url: pathOf('transit'), y: 0 });
+  assert.deepEqual(launchTarget({ ...saved, last: 'transit' }, { transit: live.transit }, now + 2 * AWAY_MS), { app: 'transit', url: pathOf('transit'), y: 0 });
+  assert.deepEqual(launchTarget({ apps: {} }, { transit: live.transit }, now), { app: 'transit', url: pathOf('transit'), y: 0 });
   assert.equal(launchTarget({ apps: {} }, {}, now), null);
 });
 
@@ -191,4 +194,18 @@ test("a held app's page stops at its ends: a drag past either is held, never a b
   assert.equal(pastEnd(1200, 2000, 800, 30), false);
   // (A page shorter than the screen: nowhere to go either way.)
   assert.equal(pastEnd(0, 600, 800, -30), true);
+});
+
+test("the 進行中 tab asks its app, once, for what's under way in full", async () => {
+  const store = new Map();
+  globalThis.sessionStorage = { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
+  const { takeFull, FULL_KEY } = await import('../kit/suite.mjs');
+  assert.equal(takeFull('transit'), false);
+  store.set(FULL_KEY, JSON.stringify({ app: 'transit', t: Date.now() }));
+  assert.equal(takeFull('orbit'), false);
+  assert.equal(takeFull('transit'), true);
+  assert.equal(takeFull('transit'), false);
+  store.set(FULL_KEY, JSON.stringify({ app: 'transit', t: Date.now() - 120_000 }));
+  assert.equal(takeFull('transit'), false);
+  delete globalThis.sessionStorage;
 });

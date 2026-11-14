@@ -86,15 +86,20 @@ const bg = (id, a, { shape }) => {
 // The family's sign behind every symbol: a tilted orbit and its moon. The
 // symbol itself big and white, so it reads at a home screen's size. Inside
 // `s` (1 full size, less for a maskable icon's safe zone), centred on 256.
-const orbitFace = (id, a, s) => `<g transform="translate(${256 - 256 * s} ${256 - 256 * s}) scale(${s})"><ellipse cx="256" cy="256" rx="236" ry="92" transform="rotate(-24 256 256)" fill="none" stroke="#fff" stroke-opacity="0.3" stroke-width="14"/><circle cx="424" cy="131" r="20" fill="#fff"/><g filter="url(#${id}-sh)"><g transform="translate(${256 - 64 * 2.3} ${256 - 64 * 2.3}) scale(2.3)">${GLYPHS[id]('#fff', a.spot, a.paint?.[1])}</g></g></g>`;
+// (crisp: the glyph's shadow drawn as a dark copy under it, not an SVG filter:
+// Safari draws a filtered part of an <img>'s SVG at one pixel a point, the
+// glyph blurred on an iPhone at every size in a page. Jay 2026-11-14.)
+const glyphAt = g => `<g transform="translate(${256 - 64 * 2.3} ${256 - 64 * 2.3}) scale(2.3)">${g}</g>`;
+const orbitFace = (id, a, s, crisp = false) => `<g transform="translate(${256 - 256 * s} ${256 - 256 * s}) scale(${s})"><ellipse cx="256" cy="256" rx="236" ry="92" transform="rotate(-24 256 256)" fill="none" stroke="#fff" stroke-opacity="0.3" stroke-width="14"/><circle cx="424" cy="131" r="20" fill="#fff"/>${crisp ? `<g transform="translate(0 7)" opacity="0.2">${glyphAt(GLYPHS[id]('#000', '#000', '#000'))}</g>${glyphAt(GLYPHS[id]('#fff', a.spot, a.paint?.[1]))}` : `<g filter="url(#${id}-sh)">${glyphAt(GLYPHS[id]('#fff', a.spot, a.paint?.[1]))}</g>`}</g>`;
 
 // An app's icon (512×512). shape: 'rounded' (a favicon, a picture in a
 // page), 'square' (a home-screen icon: the phone rounds it) or 'maskable'
 // (Android's adaptive icon: the sign inside the middle 80%).
-export function appIcon(id, { shape = 'rounded' } = {}) {
+// crisp: for an icon drawn in a page (no SVG filter; see orbitFace).
+export function appIcon(id, { shape = 'rounded', crisp = false } = {}) {
   const a = of(id);
   const s = shape === 'maskable' ? 0.8 : 1;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">${bg(id, a, { shape })}${orbitFace(id, a, s)}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">${bg(id, a, { shape })}${orbitFace(id, a, s, crisp)}</svg>`;
 }
 
 // The family's own mark: a planet, its ring and a moon.

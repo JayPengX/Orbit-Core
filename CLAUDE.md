@@ -17,6 +17,7 @@ the tools and the family's docs. Every repo is checked out side by side
 | A visible change | `docs/DESIGN.md`, and `MAP.md` §3.3 (the kit's components) |
 | The kit, a Worker, a route, data or sync | `MAP.md` (this repo's: §3 kit, §4 routes, §5 data, §10 deploy) |
 | A refactor or removal | the repo's `FEATURES.md` (every feature; its test fails when one goes) |
+| Orbit, the all-in-one app (`/app/`) | `docs/ORBIT.md` (what the person sees in every case) |
 | A tool (screenshots, preview, speed) | `tools/README.md` |
 
 Each fact has one home: family rules in `docs/RULEBOOK.md`, an app's rules in

@@ -818,7 +818,7 @@ const busy = async (btn, fn) => {
 const ic = name => icons[name] || '';
 // (As pictures: an inline icon's gradients go blank wherever another copy sits in a hidden view.)
 const svgUrl = svg => `data:image/svg+xml,${encodeURIComponent(svg)}`;
-const APP_SRC = Object.fromEntries(Object.keys(BRANDS).map(id => [id, svgUrl(appIcon(id))]));
+const APP_SRC = Object.fromEntries(Object.keys(BRANDS).map(id => [id, svgUrl(appIcon(id, { crisp: true }))]));
 const appIc = id => (BRANDS[id] ? `<img class="app-ic" src="${APP_SRC[id]}" alt="${escHtml(appName(id))}" title="${escHtml(appName(id))}">` : '');
 const refColor = ref => `hsl(${parseInt(String(ref).slice(0, 4), 16) % 360} 52% 46%)`;
 for (const i of document.querySelectorAll('i[data-ic]')) i.innerHTML = ic(i.dataset.ic);
