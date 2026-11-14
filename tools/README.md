@@ -133,8 +133,8 @@ README's framed copies and picture rows (English, then 中文畫面 in a fold).
 
 Every stop of each app's tour in 說明 (`TOURS` in `kit/help.mjs`: its tabs and
 the few screens worth knowing), at 390 wide, light and dark, Chinese and English,
-on live data (the demo account where the app has one), cropped to the screen's
-top (a sheet's stop from the sheet's top) and saved as WebP in `kit/img/help/<app>/`,
+on live data (the demo account where the app has one), the whole screen
+(360 × 779; a stop's top alone read as cut off) saved as WebP in `kit/img/help/<app>/`,
 each stop's hash in the block at the end of `kit/help.mjs`. How each stop is reached is in the tool.
 Retake an app's after its screens change (a tab redrawn, a tab added); Orbit Class
 needs `npm run build` first.
