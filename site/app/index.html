@@ -28,11 +28,21 @@
 !function () {
   try {
     var ss = sessionStorage, m = /[?&]o=([A-Za-z0-9_-]+)/.exec(location.search), tag = m ? m[1] : /[?&]o=/.test(location.search) ? '' : ss.getItem('orbit.which') || '';
+    // (A phone's browser on the add page (kit isPhoneOrTablet) with no tag yet: this Orbit's own id, minted
+    // now, in the address the phone takes at Add to Home Screen: kit
+    // orbit-mine.mjs newId. The plain Orbit opened from a home screen stays.)
+    var ua = navigator.userAgent, phone = /iPhone|iPad|iPod|Android/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    if (!tag && phone && !/[?&]open=/.test(location.search) && !(navigator.standalone || matchMedia('(display-mode: standalone)').matches)) {
+      var id = '', r = crypto.getRandomValues(new Uint8Array(8));
+      for (var k = 0; k < 8; k++) id += '0123456789abcdefghijklmnopqrstuvwxyz'[r[k] % 36];
+      tag = btoa('{"i":"' + id + '"}').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      history.replaceState(history.state, '', location.pathname + '?o=' + tag + location.hash);
+    }
     if (tag) ss.setItem('orbit.which', tag); else ss.removeItem('orbit.which');
     window.ORBIT_TAG = tag;
     if (!tag) return;
     var x = JSON.parse(decodeURIComponent(escape(atob(tag.replace(/-/g, '+').replace(/_/g, '/')))));
-    var name = String(x.n || 'Orbit').slice(0, 20), look = /^[a-z-]+$/.test(x.l || '') ? x.l : 'night';
+    var name = String(x.n || 'Orbit').slice(0, 20), look = /^[a-z-]+$/.test(x.l || '') ? x.l : 'space';
     // (An app's own look is its icon: kit/brand.mjs slugs.)
     var slug = { match: 'sports', orbit: 'class', vocab: 'words', stock: 'securities' }, app = /^app-([a-z]+)$/.exec(look);
     var apple = app ? '/' + (slug[app[1]] || app[1]) + '/icons/apple-touch-icon.png' : '/app/looks/' + look + '/apple.png';
@@ -203,7 +213,7 @@
   // This Orbit (kit/orbit-mine.mjs): its name, look and apps. (An older kit without it: every app, as before.)
   const mine = await import('#kit/orbit-mine.mjs').catch(() => null);
   const tag = window.ORBIT_TAG || '';
-  const setup = mine?.setupOf ? mine.setupOf(tag) : { name: 'Orbit', apps: [...APP_ORDER], look: 'night' };
+  const setup = mine?.setupOf ? mine.setupOf(tag) : { name: 'Orbit', apps: [...APP_ORDER], look: 'space' };
   const myApps = () => (mine?.appsOf ? mine.appsOf(tag) : [...APP_ORDER]);
   const lookSrc = look => `data:image/svg+xml,${encodeURIComponent(brand.orbitIcon ? brand.orbitIcon(look) : brand.familyMark())}`;
   const myIcon = lookSrc(setup.look);
@@ -225,7 +235,7 @@
     try {
       sessionStorage.setItem('orbit.launch', String(Date.now()));
     } catch {}
-    held = suite.host(document.getElementById('frames'), { first: { ...first, app }, list: () => (myApps().length === 1 ? openApp(myApps()[0]) : showList()), onShow: id => addressOf(id), mine: myApps });
+    held = suite.host(document.getElementById('frames'), { first: { ...first, app }, list: () => (myApps().length === 1 ? openApp(myApps()[0]) : showList()), onShow: id => addressOf(id), mine: myApps, edit: () => editApps() });
   };
   // The list of apps, the one used last on top (over the apps held, on a return).
   const icon = id => Object.assign(document.createElement('img'), { className: 'door-icon', src: `data:image/svg+xml,${encodeURIComponent(appIcon(id, { crisp: true }))}`, alt: '' });
@@ -373,7 +383,10 @@
     done.onclick = () => {
       mine.setApps(tag, [...chosen]);
       s.close?.();
-      showList();
+      // (Home when it's showing; in an app, that app stays unless it was taken
+      // out: then home, or the one app left.)
+      const now = held?.shown?.();
+      if (!door.hidden || !now || !myApps().includes(now)) myApps().length === 1 ? openApp(myApps()[0]) : showList();
     };
   }
   // (Changed on another device, through the Pass: drawn again.)
@@ -420,7 +433,8 @@
     const LOOKS = brand.LOOKS || [];
     looks.append(...lookGroup(W('彩色衛星', 'Coloured moons'), LOOKS.filter(l => !brand.lookApp(l) && !/-white$/.test(l))), ...lookGroup(W('白色衛星', 'White moons'), LOOKS.filter(l => /-white$/.test(l))), ...lookGroup(W('App 的圖示', 'An app’s icon'), LOOKS.filter(l => brand.lookApp(l))));
     const finish = () => {
-      const next = mine.encodeSetup({ name: name.value.trim() || plainName(chosen), apps: [...chosen], look });
+      // (The same Orbit, set up anew: its id kept, so it's still this one.)
+      const next = mine.encodeSetup({ name: name.value.trim() || plainName(chosen), apps: [...chosen], look, id: setup.id || mine.newId?.() });
       try {
         if (!next) sessionStorage.removeItem('orbit.which');
       } catch {}
@@ -446,11 +460,12 @@
 
   if (!window.ORBIT_FIRST && isPhoneOrTablet() && !isStandalone()) {
     // (Set up already: what was picked, and a way back to it.)
-    const picked = tag ? `${setup.apps.length === APP_ORDER.length ? W('全部 App', 'Every app') : setup.apps.map(id => BRANDS[id].short).join('、')}` : '';
+    const plain = !mine?.isPlain || mine.isPlain(setup);
+    const picked = !plain ? `${setup.apps.length === APP_ORDER.length ? W('全部 App', 'Every app') : setup.apps.map(id => BRANDS[id].short).join('、')}` : '';
     // (A one-app Orbit a separate app sent here, as it came: nothing chosen yet.)
-    const asIs = !!tag && !!mine?.cleanSetup && JSON.stringify(mine.cleanSetup({ apps: setup.apps })) === JSON.stringify(setup);
+    const asIs = !plain && !!mine?.cleanSetup && JSON.stringify(mine.cleanSetup({ apps: setup.apps, id: setup.id })) === JSON.stringify(setup);
     const more = mine?.encodeSetup && brand.LOOKS
-      ? ui.h('button', { class: 'o-custom', type: 'button' }, [ui.h('span', { class: 'o-custom-text' }, [ui.h('strong', { text: tag && !asIs ? W('已自訂', 'Customized') : W('自訂名稱、App 和圖示', 'Choose its name, apps and icon') }), ui.h('small', { text: tag ? picked : W('可以不用，直接加入就是全部 App', 'Optional: added as it is, it holds every app') })]), ui.h('span', { class: 'o-custom-go', 'aria-hidden': 'true' })])
+      ? ui.h('button', { class: 'o-custom', type: 'button' }, [ui.h('span', { class: 'o-custom-text' }, [ui.h('strong', { text: !plain && !asIs ? W('已自訂', 'Customized') : W('自訂名稱、App 和圖示', 'Choose its name, apps and icon') }), ui.h('small', { text: !plain ? picked : W('可以不用，直接加入就是全部 App', 'Optional: added as it is, it holds every app') })]), ui.h('span', { class: 'o-custom-go', 'aria-hidden': 'true' })])
       : null;
     installGate('suite', lang, { name: setup.name, color: brand.lookApp?.(setup.look) ? brand.lookColor(setup.look) : '#5e5ce6', icon: myIcon, more });
     if (more) {
