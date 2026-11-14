@@ -38,8 +38,8 @@
 //   { id, title, sum, img, alts: [[picture, outlet]] (others, should img
 //     not load), at, first, n (outlets), m (headlines), days:
 //     [['MM-DD', headlines]], sides: { g, c, b } (or l, c, r), blind: 'g' |
-//     'b' | 'l' | 'r' | '' (the side that carries none of a story the other
-//     side carries widely; only a topic sides take: TOPICS' spectrum),
+//     'b' | 'l' | 'r' | '' (單邊: the side that left out, or all but left
+//     out, an important story the other side carries widely; oneSidedOf),
 //     parties: ['g','b','w'], topics: ['pol'…], imp, live (快訊: outlets
 //     on it in the last 2 hours, only while it's breaking),
 //     clips: [[outlet, youtubeId, url, title, picture]] (a YouTube clip, or
@@ -961,11 +961,10 @@ export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, i
   const named = parties.length ? items.filter(it => partiesIn(it.t).length).length / items.length : 0;
   if (parties.length && !topics.includes('pol') && (!topics.length || named >= SECOND)) topics = [...topics, 'pol'].slice(0, 3);
   const kinds = topics.map(id => TOPIC[id]).filter(Boolean);
-  // 單邊 (one side): a story of a topic sides take, carried by 3 outlets or
-  // more for 2 hours or more, 2 or more of them on one side and none on the
-  // other: `blind`, the side that missed it.
-  const many = n >= 3 && now - first >= 2 * HOUR && kinds.some(t => t.spectrum !== false);
-  const blind = many && sides[left] >= 2 && !sides[right] ? right : many && sides[right] >= 2 && !sides[left] ? left : '';
+  // 單邊 (one side), as the story alone tells it: `blind`, the side that
+  // left it out or all but (blindOf); the region's pass (oneSidedOf) weighs
+  // it against the day's coverage and keeps only the important.
+  const blind = oneSidedKind(kinds) && now - first >= ONE_AGE ? blindOf(sides, region, 1, 0) : '';
   // Light: a share of its headlines clickbait, tips, promos (softOf).
   const light = items.filter(it => softOf(it.t, lang)).length / m;
   // Importance: how many outlets carry it, how much they wrote, for how many
@@ -1356,6 +1355,9 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
     }
     out.sport[region] = sportDesk(out.sport[region], SPORT_TOP[region], { only: region === 'intl' });
     out[region] = frontOf(out[region], TOP[region]).map(({ score, light, ...s }) => s);
+    // (單邊 weighed against the front's coverage, the past's by the same.)
+    const one = oneSidedOf(out[region], region);
+    oneSidedOf(out.past[region], region, one);
     // (The past lighter: each outlet's newest headline only.)
     out.past[region] = out.past[region]
       .sort((a, b) => b.imp - a.imp)
@@ -1392,6 +1394,56 @@ export function sportDesk(stories, top, { only = false } = {}) {
     .sort((a, b) => b.s.at - a.s.at)
     .slice(0, top)
     .map(({ s: { score, light, alts, ...s }, text }) => ({ ...s, clips: (s.clips || []).slice(0, 2), k: storyKind(s) }));
+}
+
+// 單邊 (Jay 11-14: "most news there is just less notable news"; "if just
+// one of the other side report it it's not in 單邊?"): no more a story the
+// other side carries none of (one outlet put it back, and only small ones
+// were left: 11-14's 19 all past the front's 100th), but an important one
+// it all but leaves out. A story of a topic sides take, 2 hours old or more,
+// carried by ONE_MIN outlets or more, ONE_HEAVY or more of them on one end
+// and on the other at most ONE_FEW (a token one or two; one in 8 of a big
+// story's), the heavy end ahead ONE_SKEW times or more past how far it is
+// ahead on the day's whole front (the world's left outlets wrote 1.5 times
+// the right's: a story 3 to 2 is not one-sided), and as important as the
+// front's middle story or more. 11-14's front: 19 became 7, the Gaza
+// hospital strike (偏左 20 · 偏右 2), Trump on toppling Cuba's government
+// (偏右 8 · 偏左 2), 沈伯洋's and 蔣萬安's pay given away (偏綠 5 · 偏藍 0).
+// (By outlets, not readers: no published figures place each outlet's reach.)
+export const ONE_AGE = 2 * HOUR;
+export const ONE_MIN = 8;
+export const ONE_HEAVY = 4;
+export const ONE_FEW = 2;
+export const ONE_SKEW = 4;
+const ENDS_OF = { tw: ['g', 'b'], intl: ['l', 'r'] };
+const oneSidedKind = kinds => kinds.some(t => t.spectrum !== false);
+// The end that left it out ('' none), `base` how far the left end is ahead
+// on the day's whole front (its outlets' count over the right's).
+// (`skew` 0: the story alone, before the day's front is known.)
+export function blindOf(sides, region, base = 1, skew = ONE_SKEW) {
+  const [left, right] = ENDS_OF[region];
+  const n = Object.values(sides).reduce((a, b) => a + b, 0);
+  if (n < ONE_MIN) return '';
+  for (const [heavy, light, ahead] of [[left, right, base], [right, left, 1 / base]]) {
+    const H = sides[heavy] || 0;
+    const L = sides[light] || 0;
+    if (H >= ONE_HEAVY && L <= Math.max(ONE_FEW, Math.floor(H / 8)) && (H + 0.5) / (L + 0.5) / ahead >= skew) return light;
+  }
+  return '';
+}
+// The region's stories' `blind` weighed against the day's front: each end's
+// share of its outlets, the importance of its middle story (`was`: the
+// front's, for the past). → { base, mid }.
+export function oneSidedOf(stories, region, was = null) {
+  const [left, right] = ENDS_OF[region];
+  let a = 0;
+  let b = 0;
+  for (const s of stories) (a += s.sides?.[left] || 0), (b += s.sides?.[right] || 0);
+  const imps = stories.map(s => s.imp).sort((x, y) => x - y);
+  const base = was?.base ?? (a && b ? a / b : 1);
+  const mid = was?.mid ?? (imps.length ? imps[Math.floor((imps.length - 1) / 2)] : 0);
+  for (const s of stories) if (s.blind) s.blind = s.imp >= mid ? blindOf(s.sides, region, base) : '';
+  return { base, mid };
 }
 
 // The front: the TOP stories by score, then each topic's best past them

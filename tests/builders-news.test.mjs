@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { teamsOf, otherGame, gameOf, unboiled, ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN } from '../builders/news.js';
+import { teamsOf, otherGame, gameOf, unboiled, ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN, blindOf, oneSidedOf } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS, SPORTS_OUTLETS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -109,27 +109,55 @@ test('English: forms of a word meet (impeach, impeachment), summaries help', () 
   assert.ok(groups.includes('bbc,fox'), groups.join(' | '));
 });
 
-test("a story counts outlets by side; one-sided names the side that carries none of a story the other side carries", () => {
-  const blue = ['chinatimes', 'ctinews', 'udn'].map((o, i) => ({ ...item(o, `公督盟辱柯志恩「聽話的狗」${i}`, NOW - 4 * H + i), near: 0.5 }));
-  const s = storyOf([...blue, { ...item('cna', '公督盟辱柯志恩', NOW - 3 * H), near: 0.6 }], 'tw', NOW);
-  assert.deepEqual(s.sides, { g: 0, c: 1, b: 3 });
+test("a story counts outlets by side; 單邊 names the end that left out, or all but, a story the other end carries widely", () => {
+  const blueOuts = ['chinatimes', 'ctinews', 'udn', 'tvbs', 'ebc'];
+  const blue = blueOuts.map((o, i) => ({ ...item(o, `公督盟辱柯志恩「聽話的狗」${i}`, NOW - 4 * H + i), near: 0.5 }));
+  const mid = ['cna', 'pts', 'storm'].map((o, i) => ({ ...item(o, `公督盟辱柯志恩${i}`, NOW - 3 * H + i), near: 0.6 }));
+  const s = storyOf([...blue, ...mid], 'tw', NOW);
+  assert.deepEqual(s.sides, { g: 0, c: 3, b: 5 });
   assert.equal(s.blind, 'g');
-  assert.equal(s.n, 4);
-  // (The wire leads: plain words, credited.)
-  assert.equal(s.title, '公督盟辱柯志恩');
-  assert.equal(s.by, 'cna');
+  assert.equal(s.n, 8);
+  // A token one of the other side's doesn't put it back (Jay 11-14: "if just one of the other side report it it's not in 單邊?").
+  assert.equal(storyOf([...blue, ...mid, { ...item('ltn', '柯志恩', NOW - 3 * H), near: 0.4 }], 'tw', NOW).blind, 'g');
   // Not one-sided while it's new (the other side may still come).
-  assert.equal(storyOf(blue.map(x => ({ ...x, at: NOW - H })), 'tw', NOW).blind, '');
-  // Carried by both sides: not one-sided.
-  assert.equal(storyOf([...blue, { ...item('ltn', '柯志恩', NOW - 3 * H), near: 0.4 }], 'tw', NOW).blind, '');
-  // A story keeps its id as headlines join it: its first headline's.
+  assert.equal(storyOf([...blue, ...mid].map(x => ({ ...x, at: NOW - H })), 'tw', NOW).blind, '');
+  // Carried by a few only: not 單邊 (11-14's were mostly 3 and 4 outlets' small news).
+  assert.equal(storyOf(blue.slice(0, 3), 'tw', NOW).blind, '');
+  // A story's first headline's id stays its id as headlines join it.
   assert.equal(s.id, idOf(blue[0].u));
   // A kind sides don't take (a game): never one-sided, and ranked lighter.
-  const game = ['chinatimes', 'ctinews', 'udn'].map((o, i) => ({ ...item(o, `中華隊經典賽奪冠${i}`, NOW - 4 * H + i), near: 0.5 }));
+  const game = blueOuts.concat(['cna', 'pts', 'storm']).map((o, i) => ({ ...item(o, `中華隊經典賽奪冠${i}`, NOW - 4 * H + i), near: 0.5 }));
   const g = storyOf(game, 'tw', NOW);
   assert.deepEqual(g.topics, ['sport']);
   assert.equal(g.blind, '');
-  assert.ok(g.imp < storyOf(blue, 'tw', NOW).imp);
+  assert.ok(g.imp < s.imp);
+});
+
+test('單邊 by proportion: a token one or two of the other end, its lead past the day\'s, important stories only', () => {
+  // (11-14's front: the Gaza hospital strike 20 to 2, Trump on Cuba 2 to 8.)
+  assert.equal(blindOf({ l: 20, c: 5, r: 2 }, 'intl', 1.54), 'r');
+  assert.equal(blindOf({ l: 2, c: 4, r: 8 }, 'intl', 1.54), 'l');
+  assert.equal(blindOf({ g: 5, c: 5, b: 0 }, 'tw', 0.92), 'b');
+  // Three of the other end: both sides carry it.
+  assert.equal(blindOf({ l: 9, c: 2, r: 3 }, 'intl', 1), '');
+  // One in 8 of a big story's is still a token: 30 to 3.
+  assert.equal(blindOf({ l: 30, c: 4, r: 3 }, 'intl', 1), 'r');
+  // A lead not far past the day's: the world's left wrote 1.5 times the right's, 5 to 1 is not one-sided there; where the right wrote more, it is.
+  assert.equal(blindOf({ l: 5, c: 4, r: 1 }, 'intl', 1.54), '');
+  assert.equal(blindOf({ l: 5, c: 4, r: 1 }, 'intl', 0.8), 'r');
+  // Fewer than 8 outlets on the ends: too small to say.
+  assert.equal(blindOf({ g: 4, c: 2, b: 0 }, 'tw', 1), '');
+  // The region's pass: weighed against the front (here the right well ahead), the less important let go.
+  const st = (imp, sides) => ({ imp, sides, blind: blindOf(sides, 'intl', 1, 0) });
+  const front = [st(40, { l: 2, c: 4, r: 8 }), st(10, { l: 6, c: 2, r: 0 }), st(30, { l: 0, c: 3, r: 9 }), st(25, { l: 3, c: 5, r: 9 }), st(20, { l: 3, c: 3, r: 8 })];
+  const was = oneSidedOf(front, 'intl');
+  assert.ok(was.base < 0.5);
+  assert.equal(was.mid, 25);
+  assert.deepEqual(front.map(s => s.blind), ['', '', 'l', '', '']);
+  // The past by the front's measure.
+  const past = [st(30, { l: 0, c: 3, r: 9 })];
+  oneSidedOf(past, 'intl', was);
+  assert.equal(past[0].blind, 'l');
 });
 
 test('快訊: a story many outlets carried in the last 2 hours is live and ranked up; a quiet or old one, or a game, is not', () => {
