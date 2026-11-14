@@ -216,7 +216,9 @@ export async function aiOnce(env, ctx, name, input, cap) {
 }
 
 // POST /ai: a tap from an app.
-export async function handleAi(request, env, ctx, headers, session, { cap = 0, gemini = null } = {}) {
+// (`full`: the session's pass may spend (eco.js fullSession; the showcase's
+// own pass too). A shared answer already kept is anyone's; nothing else is asked for a 'free' pass.)
+export async function handleAi(request, env, ctx, headers, session, { cap = 0, gemini = null, full = false } = {}) {
   if (request.method !== 'POST') return json({ error: 'method' }, 405, headers);
   if (!isAllowedOrigin(request.headers.get('Origin') || '')) return json({ error: 'origin' }, 403, headers);
   const text = await bodyText(request, 6_000_000);
@@ -237,6 +239,7 @@ export async function handleAi(request, env, ctx, headers, session, { cap = 0, g
   const keptKey = f.shared && (env.RATE_LIMIT_KV || env.DATA) ? `ai:kept:${name}:${(await sha256Hex(JSON.stringify(input))).slice(0, 32)}` : '';
   const kept = keptKey ? await keptRead(env, keptKey) : null;
   if (kept?.out) return json({ out: kept.out, ask: null, left: f.perPass, model: kept.model || null, kept: true }, 200, headers);
+  if (!full) return json({ error: 'level' }, 403, headers);
   // Spent before the call: the Pass's count first (a capped one adds nothing to the day's).
   const day = twDay();
   const who = `ai:${name}:${(await sha256Hex(`ai|${day}|${pass}`)).slice(0, 24)}`;

@@ -7,6 +7,8 @@
 export default {
   POST_ONLY: 'POST only',
   RATE_LIMITED: 'Too many requests. Please try again later.',
+  PASS_LEVEL: 'This Orbit Pass doesn’t include Orbit AI.',
+  ECO_CREATE_FULL: 'No more new passes today. Try again tomorrow.',
   DAILY_QUOTA_EXCEEDED: "Today's quota has been used up. Please try again tomorrow.",
   INVALID_JSON: 'Invalid JSON body',
   UNSUPPORTED_MODEL: 'Unsupported model',

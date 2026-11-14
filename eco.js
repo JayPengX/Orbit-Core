@@ -24,7 +24,8 @@
 //                 Safari beside the home-screen app) at a time
 //       sec       the token generation (bumped to sign every device out);
 //                 `fresh`: a pass someone handed over, not yet replaced
-//                 (freshPass below)
+//                 (freshPass below); `level`: what the pass may spend
+//                 (levelOf below)
 //   - each app's own data (ECO_APPS[app].collection), under the same id;
 //   - inbox documents (`eco-inbox`), device codes (`eco-pairs`) and Orbit
 //     Class share keys (`eco-shares`).
@@ -57,12 +58,12 @@
 
 import { cleanReport, REC_PREFIX } from './rec-weekly.js';
 import { retire } from './money.js';
-import { storeReady } from './doc-store.js';
+import { storeReady, stamp } from './doc-store.js';
 import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './orbit-token.js';
 import { admit, seenNow, limitOf, fullBody } from './door.js';
-import { handleAdmin } from './eco-admin.js';
+import { handleAdmin, readDev } from './eco-admin.js';
 import { passkeyBegin, passkeyLogin, passkeyAddBegin, passkeyAdd, passkeyRemove, passkeySummary, pointPasskeys, dropIndex, passkeyIds } from './passkey.js';
-import { mailBegin, mailConfirm, mailRemove, mailRecoverBegin, mailRecover, mailSummary, mailOf, pointMail, dropMailIndex } from './pass-mail.js';
+import { mailBegin, mailConfirm, mailRemove, mailRecoverBegin, mailRecover, mailSummary, mailOf, pointMail, dropMailIndex, mailReady } from './pass-mail.js';
 import { PAY_WEEK, weekStart, mondayId, reliefCheck, reliefEntry } from './kit/pay.mjs';
 
 export const ECO_PASSCODE_LENGTH = 10;
@@ -697,6 +698,49 @@ async function readInbox(env, deps, wallet, app) {
 // (`p`: a priority pass, door.js: no per-session limits, never turned away.)
 const sessionToken = (secret, c, now) => signToken(secret, { k: c.f ? 'new' : 'ses', d: c.d, a: c.a, s: c.s, g: c.g, e: now + SESSION_MS, ...(c.p ? { p: 1 } : {}) });
 export const priorityPass = w => Boolean(w?.sec?.priority);
+
+// ---- Levels: what a pass may spend (Jay 2026-11-14) -------------------------------
+//
+// 'free' (基本): a pass someone made for themselves (`create`, the giveaway
+// at /key/): every app, but nothing that costs money: no AI is ever asked
+// for it. 'full' (完整): a pass the owner issued in the admin panel, or set
+// there by hand: Orbit AI too. Kept in the wallet's `sec`, which only this
+// Worker writes (a patch, a merge or a restore from a phone never carries
+// it); anything without it is 'free'. Read from the account itself at each
+// AI ask (fullSession), never from the phone or a token, so a change in
+// the panel holds at once and nothing a phone sends can lift it.
+export const LEVELS = ['free', 'full'];
+export const levelOf = w => (w?.sec?.level === 'full' ? 'full' : 'free');
+const higher = (a, b) => (a === 'full' || b === 'full' ? 'full' : 'free');
+// Levels began 2026-11-14 with every account then standing made 'full' (they
+// were all the owner's, handed out one by one) except the giveaway's: one
+// pass of SQL (worker.js /ops?check=levels, build.yml job `levels`), each a
+// new version so a write that read the old one reads again. Again it changes
+// nothing (only accounts with no level are touched). `dry`: the count alone.
+export async function stampLevels(env, { dry = false } = {}) {
+  if (!env.STORE?.prepare) return { error: 'no store' };
+  const which = "coll = ?1 AND json_extract(payload, '$.sec.level') IS NULL AND json_extract(payload, '$.gift') IS NULL";
+  const row = await env.STORE.prepare(`SELECT COUNT(*) AS n FROM docs WHERE ${which}`).bind(WALLET_COLLECTION).first();
+  const gifts = await env.STORE.prepare("SELECT COUNT(*) AS n FROM docs WHERE coll = ?1 AND json_extract(payload, '$.sec.level') IS NULL AND json_extract(payload, '$.gift') IS NOT NULL").bind(WALLET_COLLECTION).first();
+  if (dry) return { full: Number(row?.n) || 0, giveawayFree: Number(gifts?.n) || 0, dry: true };
+  const res = await env.STORE.prepare(`UPDATE docs SET payload = json_set(payload, '$.sec', json_set(COALESCE(json_extract(payload, '$.sec'), '{}'), '$.level', 'full')), updated = ?2 WHERE ${which}`)
+    .bind(WALLET_COLLECTION, stamp())
+    .run();
+  return { full: res?.meta?.changes ?? 0, giveawayFree: Number(gifts?.n) || 0 };
+}
+// The Worker's own sessions for the owner's tools (worker.js /ops as-phone,
+// behind its secret): the only ones with no account behind them that may ask.
+const OWNER_SESSIONS = new Set(['ops-shots']);
+// May session `c` (a 'ses' token, already checked) start an AI call or
+// anything else that costs money? Only when its account stands at the
+// token's generation (not signed out) and is 'full'.
+export async function fullSession(env, deps, c) {
+  if (!c || typeof c.d !== 'string' || !c.d) return false;
+  if (OWNER_SESSIONS.has(c.d) && c.s === c.d) return true;
+  const doc = await deps.fsGet(env, WALLET_COLLECTION, c.d).catch(() => null);
+  const wallet = doc?.exists ? parseWallet(doc.payload) : null;
+  return Boolean(wallet && gen(wallet) === (c.g || 0) && levelOf(wallet) === 'full');
+}
 // Through the door (door.js) before a session is handed out: { ok: true },
 // or the 503 to send with the place in line.
 async function doorFor(ctx, id, wallet) {
@@ -770,6 +814,7 @@ async function sessionReply(env, deps, secret, result, c, now, { app, inbox = fa
     wallet: publicWallet(result.wallet),
     walletTime: result.updateTime,
     pool: poolBalance(result.wallet),
+    level: levelOf(result.wallet),
     payload: '',
     updateTime: ''
   };
@@ -786,18 +831,22 @@ async function limited(ctx, feature) {
   return ctx.deps.rateLimitResponse(ctx.env, ctx.ip, `eco:${feature}`, ECO_LIMITS[feature], ctx.headers, ctx.request);
 }
 
-// Passes are handed out by the owner (eco-admin.js, `issue`), not made by
-// anyone who opens an app: a new pass here only where ECO_OPEN_SIGNUP is on
-// (the tests).
+// Anyone can make a pass for themselves from an app's sign-in screen (Jay
+// 2026-11-14), at the 'free' level: nothing it does costs money. As many a
+// Taiwan day as the admin panel's 設定 › Orbit Pass says, everyone together
+// (`passNewDay`, 0 closes it; counted in D1, so it holds on every Worker),
+// and ECO_LIMITS.create an hour from one network.
 async function ecoCreate(ctx) {
   const { env, deps, headers, request, app } = ctx;
-  if (env.ECO_OPEN_SIGNUP !== 'on') return deps.errorJson('ECO_CREATE_CLOSED', 403, headers, request);
   const hit = await limited(ctx, 'create');
   if (hit) return hit;
   if (!ECO_APPS[app]) return deps.errorJson('ECO_UNKNOWN_APP', 400, headers, request);
+  const most = (await readDev(env, deps).catch(() => null))?.passNewDay ?? 0;
+  if (!(most > 0) || !mailReady(env)) return deps.errorJson('ECO_CREATE_CLOSED', 403, headers, request);
+  if (deps.dayCount && (await deps.dayCount(env, 'pass-new')) > most) return deps.errorJson('ECO_CREATE_FULL', 429, headers, request);
   const now = deps.now();
   const { passcode, docId } = await newPasscode(env, deps);
-  await updateWallet(env, deps, docId, w => ({ ...w, v2: now }), { create: true });
+  await updateWallet(env, deps, docId, w => ({ ...w, v2: now, sec: { level: 'free' } }), { create: true });
   return signIn(ctx, docId, { passcode });
 }
 
@@ -830,7 +879,7 @@ async function ecoRefresh(ctx) {
   const claims = { d: c.d, s: c.s, a: app, g: c.g, f: freshPass(wallet), p: priorityPass(wallet) };
   const live = isActive(wallet, claims);
   const w = str(body.w, 100);
-  if (!live && !body.claim) return json(sameWallet({ active: false, live: liveOf(wallet, app), wallet: publicWallet(wallet), walletTime: doc.updateTime, pool: poolBalance(wallet) }, w), 200, headers);
+  if (!live && !body.claim) return json(sameWallet({ active: false, live: liveOf(wallet, app), wallet: publicWallet(wallet), walletTime: doc.updateTime, pool: poolBalance(wallet), level: levelOf(wallet) }, w), 200, headers);
   const turned = await doorFor(ctx, c.d, wallet);
   if (turned) return turned;
   let result = { wallet, updateTime: doc.updateTime };
@@ -1034,7 +1083,9 @@ async function ecoRotate(ctx) {
       await deps.fsWrite(env, INBOX_COLLECTION, next, d.payload);
       (inbox[app] ||= []).push(next);
     }
-  await deps.fsWrite(env, WALLET_COLLECTION, docId, JSON.stringify({ ...wallet, inbox, sec: { gen: gen(wallet) }, live: null }), { exists: false });
+  // (What the owner set goes along: its level and priority; `fresh` and `taken` stay behind.)
+  const kept = { ...(wallet.sec?.level ? { level: wallet.sec.level } : {}), ...(wallet.sec?.priority ? { priority: true } : {}) };
+  await deps.fsWrite(env, WALLET_COLLECTION, docId, JSON.stringify({ ...wallet, inbox, sec: { gen: gen(wallet), ...kept }, live: null }), { exists: false });
   // (The passkeys and the recovery email come along: they sign in to the new pass.)
   await pointPasskeys(env, deps, docId, wallet);
   await pointMail(env, deps, ctx.secret, docId, wallet);
@@ -1280,11 +1331,14 @@ async function ecoMerge(ctx) {
   // The sources' passkeys sign in to this pass from now on.
   const keys = found.flatMap(src => src.wallet.passkeys?.keys || []);
   const withKeys = w => (keys.length ? { ...w, passkeys: { user: w.passkeys?.user || found.find(src => src.wallet.passkeys?.user)?.wallet.passkeys.user, keys: [...(w.passkeys?.keys || []), ...keys.filter(k => !(w.passkeys?.keys || []).some(x => x.id === k.id))] } } : w);
+  // (Its level: the highest of the passes brought together, all the same person's.)
+  const level = found.reduce((l, src) => higher(l, levelOf(src.wallet)), 'free');
+  const withLevel = w => (higher(levelOf(w), level) === levelOf(w) ? w : { ...w, sec: { ...(w.sec || {}), level } });
   // (A source's recovery email too, where this pass has none.)
   const mail = found.map(src => src.wallet.mail).find(m => m?.addr);
   let tookMail = false;
   const withMail = w => (w.mail || !mail ? w : ((tookMail = true), { ...w, mail }));
-  let result = await updateWallet(env, deps, targetId, w => ((ours = gen(w) === c.g) ? withMail(withKeys({ ...mergeWallet(w, { entries: carried, settings, inbox: inboxAdd }), merged: { t: now, apps: mergedApps } })) : w));
+  let result = await updateWallet(env, deps, targetId, w => ((ours = gen(w) === c.g) ? withLevel(withMail(withKeys({ ...mergeWallet(w, { entries: carried, settings, inbox: inboxAdd }), merged: { t: now, apps: mergedApps } }))) : w));
   if (!result || !ours) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
   if (keys.length) await pointPasskeys(env, deps, targetId, { passkeys: { keys } });
   if (tookMail) await pointMail(env, deps, ctx.secret, targetId, result.wallet);

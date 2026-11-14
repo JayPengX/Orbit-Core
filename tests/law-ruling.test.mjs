@@ -45,7 +45,7 @@ function fakeKV() {
   const m = new Map();
   return { get: async (k, o) => (m.has(k) ? (o?.type === 'json' ? JSON.parse(m.get(k)) : m.get(k)) : null), put: async (k, v) => void m.set(k, v) };
 }
-const envOf = () => ({ GEMINI_API_KEY: 'k', ECO_TOKEN_SECRET: 'test-secret', STORE: fakeD1(), RATE_LIMIT_KV: fakeKV(), GEMINI_RELAY: relay });
+const envOf = () => ({ GEMINI_API_KEY: 'k', ECO_TOKEN_SECRET: 'test-secret', STORE: fakeD1('', { fullPasses: true }), RATE_LIMIT_KV: fakeKV(), GEMINI_RELAY: relay });
 let n = 0;
 const ask = async (body, env = envOf()) => {
   const qt = await signToken('test-secret', { k: 'ses', d: `r${++n}`, s: `s${n}`, a: 'law', e: Date.now() + 600_000 });

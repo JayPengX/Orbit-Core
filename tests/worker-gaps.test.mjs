@@ -4,11 +4,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../worker.js';
 import { signToken } from '../orbit-token.js';
+import { fakeD1 } from './fake-d1.mjs';
 import { runsInRunner, partOf } from '../runner.js';
 
-const env = { ECO_TOKEN_SECRET: 'gaps-secret', GEMINI_API_KEY: '' };
+const env = { ECO_TOKEN_SECRET: 'gaps-secret', GEMINI_API_KEY: '', STORE: fakeD1('', { fullPasses: true }) };
 const ctx = { waitUntil: () => {}, passThroughOnException: () => {} };
-const session = async (a = 'orbit') => signToken(env.ECO_TOKEN_SECRET, { k: 'ses', d: 'doc1', a, s: `s-${Math.random()}`, g: 1, e: Date.now() + 600_000 });
+const session = async (a = 'orbit') => signToken(env.ECO_TOKEN_SECRET, { k: 'ses', d: 'doc1', a, s: `s-${Math.random()}`, e: Date.now() + 600_000 });
 const ask = async (path, body, qt) =>
   worker.fetch(new Request(`https://api.jaypengx.com${path}${qt ? `?qt=${encodeURIComponent(qt)}` : ''}`, { method: 'POST', headers: { Origin: 'https://orbit.jaypengx.com', 'Content-Type': 'application/json', 'CF-Connecting-IP': '9.9.9.9' }, body: JSON.stringify(body) }), env, ctx).then(async r => ({ status: r.status, j: await r.json() }));
 const file = { mime_type: 'image/png', data: 'iVBORw0KGgo=' };

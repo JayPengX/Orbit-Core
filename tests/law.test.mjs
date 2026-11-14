@@ -64,7 +64,7 @@ function fakeKV() {
   const m = new Map();
   return { m, get: async (k, o) => (m.has(k) ? (o?.type === 'json' ? JSON.parse(m.get(k)) : m.get(k)) : null), put: async (k, v) => void m.set(k, v) };
 }
-const envOf = () => ({ GEMINI_API_KEY: 'k', ECO_TOKEN_SECRET: 'test-secret', STORE: fakeD1(), RATE_LIMIT_KV: fakeKV() });
+const envOf = () => ({ GEMINI_API_KEY: 'k', ECO_TOKEN_SECRET: 'test-secret', STORE: fakeD1('', { fullPasses: true }), RATE_LIMIT_KV: fakeKV() });
 // A session of the Pass `pass` in the app `a`, as the kit sends it (`qt=`).
 const qtOf = (pass, { a = 'law', e = Date.now() + 600_000 } = {}) => signToken('test-secret', { k: 'ses', d: pass, s: `s-${pass}`, a, e });
 let passN = 0;
@@ -202,7 +202,8 @@ test('the count is spent only on a real call; a store that fails turns the ask a
   for (let i = 0; i < 3; i++) assert.equal((await (await ask(OK, { env, pass })).json()).left, LAW_LIMITS.perPass - 1);
   const broken = { ...envOf(), STORE: { prepare: () => ({ bind: () => ({ first: async () => { throw new Error('d1'); }, run: async () => { throw new Error('d1'); } }), run: async () => { throw new Error('d1'); } }) } };
   const before = gemini.length;
-  assert.equal((await ask(OK, { env: broken })).status, 429);
+  // (Its account unreadable, its level is too: turned away before the count, eco.js fullSession.)
+  assert.equal((await ask(OK, { env: broken })).status, 403);
   assert.equal(gemini.length, before);
 });
 

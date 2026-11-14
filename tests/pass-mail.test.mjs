@@ -50,7 +50,7 @@ function setup() {
     mailReady: () => true,
     now: () => (clock += 1000)
   };
-  const env = { STORE: {}, ECO_TOKEN_SECRET: 'test-secret', ECO_OPEN_SIGNUP: 'on' };
+  const env = { STORE: {}, ECO_TOKEN_SECRET: 'test-secret', PASS_MAIL: 'on' };
   const waits = [];
   const post = body => handleEcoRequest({ method: 'POST', url: 'https://w/eco', body }, env, {}, '1.1.1.1', deps, p => waits.push(p));
   const settle = () => Promise.all(waits.splice(0));

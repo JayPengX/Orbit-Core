@@ -145,6 +145,8 @@ export const DEV = {
   // Set by the Worker, never in 設定 (no group shown there): whether the Pass's
   // recovery email can mail anyone (pass-mail.js; worker.js devBody).
   passMail: { def: false, group: 'worker', zh: '救援信箱能寄信', en: 'Recovery email can send' },
+  // Orbit Passes anyone makes for themselves in an app (eco.js ecoCreate), everyone together a Taiwan day; 0 closes it.
+  passNewDay: { def: 200, min: 0, max: 5000, unit: '個', group: 'pass', zh: '每天可自己建立的 Orbit Pass', en: 'Orbit Passes people can make a day', note: '在 App 的登入畫面自己建立，是基本等級（沒有 AI）；0 = 不開放' },
   mirror: { def: true, group: 'data', zh: '使用每晚的資料副本', en: 'Use the nightly copies', note: '關掉：所有 App 都直接問代理（除錯用）' },
   // Each paid AI feature's calls a day, everyone together (the proxy's
   // routes named in `ai`; 0 pauses it, the app then says today's AI is used up).
@@ -165,7 +167,7 @@ export const DEV = {
   aiBeats: { def: 200, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['beats-say'], zh: '節奏 AI（Beats）', en: 'Beats AI', note: '用說的做節奏（程式讀不懂時）；0 = 暫停' },
   aiFamily: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['orbit-ask', 'showcase-ask', 'rec-weekly'], zh: '全家 AI', en: 'Family AI', note: 'Orbit 助理、Showcase 問答、除錯週報；0 = 暫停' }
 };
-export const DEV_GROUPS = { proxy: '代理（sports-proxy）', sports: 'Orbit Sports', f1: 'F1', transit: 'Orbit Transit（TDX）', scale: '容量', data: '資料', orbit: 'Orbit（全部 App 合一）', ai: 'AI 每天上限（全部人一起）' };
+export const DEV_GROUPS = { proxy: '代理（sports-proxy）', sports: 'Orbit Sports', f1: 'F1', transit: 'Orbit Transit（TDX）', scale: '容量', data: '資料', orbit: 'Orbit（全部 App 合一）', pass: 'Orbit Pass', ai: 'AI 每天上限（全部人一起）' };
 // The setting that caps a Gemini feature ('law-chat' → 'aiLaw').
 export const aiSettingOf = feature => Object.keys(DEV).find(k => DEV[k].ai?.includes(feature)) || null;
 

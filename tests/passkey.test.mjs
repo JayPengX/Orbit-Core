@@ -47,7 +47,7 @@ function setup() {
     },
     now: () => (clock += 1000)
   };
-  const env = { STORE: {}, ECO_TOKEN_SECRET: 'test-secret', ECO_OPEN_SIGNUP: 'on', ECO_ADMIN_TOKEN: 'o'.repeat(40) };
+  const env = { STORE: {}, ECO_TOKEN_SECRET: 'test-secret', PASS_MAIL: 'on', ECO_ADMIN_TOKEN: 'o'.repeat(40) };
   const post = body => handleEcoRequest({ method: 'POST', url: 'https://w/eco', body }, env, {}, '1.1.1.1', deps);
   return { store, deps, env, post, advance: ms => (clock += ms) };
 }

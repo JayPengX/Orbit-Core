@@ -376,7 +376,7 @@ if (typeof document !== 'undefined') {
   document.addEventListener('pointerdown', () => root.removeAttribute('data-q-keys'), true);
 }
 
-const KEY = { refresh: 'orbit.refresh', account: 'orbit.account', wallet: 'orbit.wallet', aff: 'orbit.aff', dismiss: 'orbit.dismiss' };
+const KEY = { refresh: 'orbit.refresh', account: 'orbit.account', wallet: 'orbit.wallet', level: 'orbit.level', aff: 'orbit.aff', dismiss: 'orbit.dismiss' };
 // This device's localStorage, never throwing (a private window, storage
 // full or blocked): a string, or a value as JSON (`fallback` when there's
 // none or it can't be read); null (or undefined) removes the key.
@@ -426,6 +426,21 @@ export function cachedWallet(account = storedAccount()) {
 }
 function cacheWallet(account, wallet) {
   if (account && wallet) writeStore(KEY.wallet, JSON.stringify({ account, wallet }));
+}
+// The pass's level (Orbit-Core eco.js levelOf), as the Worker last said:
+// 'full' (Orbit AI), 'free' (a pass made in an app: nothing that costs
+// money), '' not known yet. The Worker refuses a 'free' pass's AI whatever
+// the phone does; here it's only shown calmly: <html data-pass-level>, the
+// AI taps hidden (orbit.css), aiSays('level') for an ask turned away.
+export function passLevel(account = storedAccount()) {
+  const saved = readJson(KEY.level, null);
+  return saved && account && saved.account === account && ['free', 'full'].includes(saved.level) ? saved.level : '';
+}
+function markLevel(level = passLevel()) {
+  const root = globalThis.document?.documentElement;
+  if (!root) return;
+  if (level) root.dataset.passLevel = level;
+  else delete root.dataset.passLevel;
 }
 // The app's own data as last read or written on this device (under the
 // account), so a cold start paints at once, before the Worker answers.
@@ -1897,6 +1912,7 @@ function makeSession(app, { lang, heartbeat }) {
   let active = false;
   let live = null;
   let wallet = cachedWallet();
+  markLevel();
   // When the Worker's copy of the wallet held here was made: a read sends it,
   // and an unchanged wallet doesn't come back (`same`).
   let walletAt = '';
@@ -1944,6 +1960,9 @@ function makeSession(app, { lang, heartbeat }) {
     },
     get wallet() {
       return wallet;
+    },
+    get level() {
+      return passLevel();
     },
     get pool() {
       return poolBalance(wallet);
@@ -2002,6 +2021,11 @@ function makeSession(app, { lang, heartbeat }) {
     if (data.wallet) {
       walletAt = data.walletTime || '';
       setWallet(data.wallet);
+    }
+    if ((data.level === 'free' || data.level === 'full') && data.level !== passLevel()) {
+      writeStore(KEY.level, JSON.stringify({ account: storedAccount(), level: data.level }));
+      markLevel(data.level);
+      emit('level', data.level);
     }
     if (typeof data.payload === 'string') cachePayload(app, storedAccount(), data.payload);
     if (data.active != null) setActive(Boolean(data.active), data.live || null);
@@ -2134,7 +2158,8 @@ function makeSession(app, { lang, heartbeat }) {
     // An account was signed in here: everything of it goes. (Never signed
     // in, a token asked for by a data fetch: nothing to wipe.)
     if (had) wipeDevice();
-    else for (const k of [KEY.refresh, KEY.account, KEY.wallet, payloadKey(app), tokenKey]) writeStore(k, null);
+    else for (const k of [KEY.refresh, KEY.account, KEY.wallet, KEY.level, payloadKey(app), tokenKey]) writeStore(k, null);
+    markLevel('');
     token = '';
     keptRead = ['', 0];
     dataAt = null;
@@ -2579,7 +2604,8 @@ function passField(input, lang) {
 }
 const ERR = {
   SYNC_PASSCODE_NOT_FOUND: ['找不到這組通行碼。', 'No Orbit Pass has this code.'],
-  ECO_CREATE_CLOSED: ['Orbit Pass 由擁有者發放，請向分享給你的人索取。', 'Orbit Passes are handed out by their owner: ask the person who shared Orbit with you.'],
+  ECO_CREATE_CLOSED: ['現在不開放自己建立，請向分享 Orbit 給你的人索取。', 'Making a pass is closed for now: ask the person who shared Orbit with you.'],
+  ECO_CREATE_FULL: ['今天能建立的 Orbit Pass 已經滿了，明天再試。', 'No more new passes today. Try again tomorrow.'],
   ECO_PAIR_NOT_FOUND: ['這組裝置代碼無效或已過期（10 分鐘內、只能用一次）。', 'That device code isn’t valid or has expired (10 minutes, once).'],
   RATE_LIMITED: ['嘗試太多次，請稍後再試。', 'Too many tries. Please wait a little.'],
   ORBIT_FULL: ['現在人有點多，請過一兩分鐘再試。', 'Orbit is busy. Try again in a minute or two.'],
@@ -2670,7 +2696,8 @@ function signInGate(s, look = null) {
     const error = node('p', { class: 'q-gate-error', role: 'alert' });
     const enter = node('button', { class: 'q-btn primary block', type: 'submit', text: en ? 'Sign in' : '登入' });
     const keys = passkeyHere() ? passkeyGate(s, error, res => finish(res), on => busy(on)) : null;
-    const busy = on => [enter, input, keys?.button].forEach(b => b && (b.disabled = on));
+    const make = node('button', { class: 'q-btn block q-gate-make', type: 'button', text: en ? 'Make a new Orbit Pass' : '建立新的 Orbit Pass', onclick: () => done(makePass) });
+    const busy = on => [enter, input, keys?.button, make].forEach(b => b && (b.disabled = on));
     let over = false;
     const finish = res => {
       if (over) return;
@@ -2679,6 +2706,11 @@ function signInGate(s, look = null) {
       dropFromTop(gate);
       document.documentElement.classList.remove('q-signing-in');
       resolve(res);
+    };
+    const makePass = async () => {
+      const res = await s.create();
+      if (res?.passcode) await showNewPass(s, res.passcode);
+      return res;
     };
     const done = async task => {
       busy(true);
@@ -2742,11 +2774,17 @@ function signInGate(s, look = null) {
       }
     });
     if (forgot.hidden) setTimeout(() => (forgot.hidden = !dev('passMail')), 2500);
+    // 建立新的 Orbit Pass: only where a new pass can be made (a day's count
+    // in 設定) and its email proved (Jay 11-14: one account a person).
+    const canMake = () => dev('passMail') && dev('passNewDay') > 0;
+    make.hidden = !canMake();
+    if (make.hidden) setTimeout(() => (make.hidden = !canMake()), 2500);
     const rest = [
       form,
       ...(keys ? [keys.row] : []),
       forgot,
-      node('p', { class: 'q-gate-note', text: en ? 'No Orbit Pass yet? Ask the person who shared Orbit with you for one.' : '還沒有 Orbit Pass？請向分享 Orbit 給你的人索取。' }),
+      // (A pass made here is the 'free' level, Orbit-Core eco.js levelOf: everything but Orbit AI.)
+      make,
       node('p', { class: 'q-gate-note', text: en ? 'Signed in on another device? There, Orbit Pass › Devices gives a code for this one.' : '已在其他裝置登入？在那裡的 Orbit Pass › 裝置取得裝置代碼，就能在這裡登入。' })
     ];
     const box = look?.hero ? node('div', { class: 'q-gate-box q-gate-split' }, [node('div', { class: 'q-gate-side' }, top), node('div', { class: 'q-gate-main' }, rest)]) : node('div', { class: 'q-gate-box' }, [...top, ...rest]);
