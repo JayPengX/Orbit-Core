@@ -10,7 +10,7 @@
 // (today.mjs `dayFacts`), and one AI call (`orbit-ask`) picks the facts that
 // answer and says it in a line, drawn as an AI answer whose rows open their
 // apps. Only those facts and the question are sent; failing, the taps.
-import { h } from './ui.mjs';
+import { h, evenGrid } from './ui.mjs';
 import { aiBar, aiCall, aiAnswer, aiAnswerWait } from './ai.mjs';
 import { W, en } from './lang.mjs';
 import { dayFacts } from './today.mjs';
@@ -93,10 +93,13 @@ export function askOrbitCard({ go, apps = {} } = {}) {
   const taps = text =>
     h('div', { class: 'q-ask-orbit-taps' }, [
       h('p', { class: 'q-ask-orbit-q', text: W('要問哪個 App？', 'Which app should answer?') }),
-      h(
-        'div',
-        { class: 'q-ask-orbit-apps' },
-        ASK_APPS.filter(a => apps[a]).map(a => h('button', { type: 'button', class: 'q-ask-orbit-app q-press', onclick: () => send(a, text) }, [apps[a].icon, h('span', { text: apps[a].name })]))
+      evenGrid(
+        h(
+          'div',
+          { class: 'q-ask-orbit-apps' },
+          ASK_APPS.filter(a => apps[a]).map(a => h('button', { type: 'button', class: 'q-ask-orbit-app q-press', onclick: () => send(a, text) }, [apps[a].icon, h('span', { text: apps[a].name })]))
+        ),
+        { min: 68, max: 5 }
       )
     ]);
   let asked = 0;
