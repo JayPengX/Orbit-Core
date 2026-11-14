@@ -68,7 +68,7 @@ const envOf = () => ({ GEMINI_API_KEY: 'k', ECO_TOKEN_SECRET: 'test-secret', STO
 // A session of the Pass `pass` in the app `a`, as the kit sends it (`qt=`).
 const qtOf = (pass, { a = 'law', e = Date.now() + 600_000 } = {}) => signToken('test-secret', { k: 'ses', d: pass, s: `s-${pass}`, a, e });
 let passN = 0;
-const ask = async (body, { origin = 'https://jaypengx.github.io', pass = `acct${++passN}`, qt, ip = '198.51.100.1', env = envOf() } = {}) => {
+const ask = async (body, { origin = 'https://orbit.jaypengx.com', pass = `acct${++passN}`, qt, ip = '198.51.100.1', env = envOf() } = {}) => {
   const token = qt === undefined ? await qtOf(pass) : qt;
   const url = `https://proxy.test/law-ask?v=1${token ? `&qt=${encodeURIComponent(token)}` : ''}`;
   return worker.fetch(new Request(url, { method: 'POST', headers: { Origin: origin, 'CF-Connecting-IP': ip, 'Content-Type': 'text/plain' }, body: typeof body === 'string' ? body : JSON.stringify(body) }), env, ctx);
@@ -96,7 +96,7 @@ test('the ask is checked before anything is read', async () => {
   const before = laws.length;
   const r = await ask({ ...OK, p: 'nope' });
   assert.equal(r.status, 400);
-  assert.equal(r.headers.get('Access-Control-Allow-Origin'), 'https://jaypengx.github.io');
+  assert.equal(r.headers.get('Access-Control-Allow-Origin'), 'https://orbit.jaypengx.com');
   assert.equal((await ask('{not json')).status, 400);
   assert.equal((await ask({ ...OK, q: 'x'.repeat(5000) })).status, 413);
   assert.equal((await ask(OK, { origin: 'https://evil.example' })).status, 403);
@@ -179,7 +179,7 @@ test('a Pass past 40 calls a day, or the day past 300, is a 429 {error:"cap", le
   const capped = await ask({ ...OK, q: 'another' }, { env, pass });
   assert.equal(capped.status, 429);
   assert.deepEqual(await capped.json(), { error: 'cap', left: 0 });
-  assert.equal(capped.headers.get('Access-Control-Allow-Origin'), 'https://jaypengx.github.io');
+  assert.equal(capped.headers.get('Access-Control-Allow-Origin'), 'https://orbit.jaypengx.com');
   const hit = await ask(OK, { env, pass });
   assert.equal(hit.status, 200);
   assert.deepEqual([(await hit.clone().json()).cached, (await hit.json()).left], [true, 0]);

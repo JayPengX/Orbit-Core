@@ -40,6 +40,6 @@ test('every static site: nosniff and framed only by its own pages; the admin pan
   assert.ok(block, '/admin/*');
   assert.match(block, /frame-ancestors 'none'/);
   assert.match(block, /X-Frame-Options: DENY/);
-  // (Only there: no copy of it under /pass/ or the kit's paths.)
+  // (Only there: no copy of it under the kit's path.)
   assert.deepEqual(blocks.filter(b => /^\/[^/\s]+\/admin\//.test(b)), []);
 });

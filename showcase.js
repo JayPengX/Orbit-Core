@@ -19,7 +19,7 @@ import { signToken, readToken, tokenSecret, sessionLimited } from './orbit-token
 import { ipBucket } from './http.js';
 
 // Where the showcase runs (an Origin is only text: the caps below are the real bound).
-export const SHOWCASE_ORIGINS = new Set(['https://jaypengx.com', 'https://jaypengx.github.io']);
+export const SHOWCASE_ORIGINS = new Set(['https://jaypengx.com']);
 export const SHOW_KIND = 'show';
 export const SHOW_MS = 30 * 60_000;
 // Passes an address may take an hour (a /24 can be a carrier's many phones).

@@ -49,7 +49,7 @@ const envOf = () => ({ GEMINI_API_KEY: 'k', ECO_TOKEN_SECRET: 'test-secret', STO
 let n = 0;
 const ask = async (body, env = envOf()) => {
   const qt = await signToken('test-secret', { k: 'ses', d: `r${++n}`, s: `s${n}`, a: 'law', e: Date.now() + 600_000 });
-  return worker.fetch(new Request(`https://proxy.test/law-ask?v=1&qt=${encodeURIComponent(qt)}`, { method: 'POST', headers: { Origin: 'https://jaypengx.github.io', 'Content-Type': 'text/plain' }, body: JSON.stringify(body) }), env, ctx);
+  return worker.fetch(new Request(`https://proxy.test/law-ask?v=1&qt=${encodeURIComponent(qt)}`, { method: 'POST', headers: { Origin: 'https://orbit.jaypengx.com', 'Content-Type': 'text/plain' }, body: JSON.stringify(body) }), env, ctx);
 };
 
 test('a ruling id is checked before anything is read', () => {

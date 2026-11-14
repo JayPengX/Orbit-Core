@@ -32,7 +32,7 @@
 //
 // Secrets: TDX_CLIENT_ID, TDX_CLIENT_SECRET (tdx.transportdata.tw → 會員中心 →
 // API 金鑰); GOOGLE_MAPS_BROWSER_KEY (Maps JavaScript API only, restricted to
-// https://jaypengx.github.io/*); GOOGLE_MAPS_KEY (Places API (New) and Routes
+// https://orbit.jaypengx.com/*); GOOGLE_MAPS_KEY (Places API (New) and Routes
 // API; GOOGLE_WEATHER_KEY is used when it isn't set). Optional var
 // TDX_PER_MIN: TDX calls a minute this Worker allows itself (TDX's free
 // tier allows 5, 銅級 300).

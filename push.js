@@ -96,7 +96,7 @@ export async function vapidKeys(env) {
 async function vapidHeader(env, endpoint) {
   const { pub, key } = await vapidKeys(env);
   const head = b64u(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })));
-  const body = b64u(enc.encode(JSON.stringify({ aud: new URL(endpoint).origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: 'mailto:orbit@jaypengx.github.io' })));
+  const body = b64u(enc.encode(JSON.stringify({ aud: new URL(endpoint).origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: 'mailto:orbit@jaypengx.com' })));
   const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, enc.encode(`${head}.${body}`));
   return `vapid t=${head}.${body}.${b64u(sig)}, k=${pub}`;
 }
@@ -165,8 +165,7 @@ const BUS_EVERY = 60_000;
 // Runs are 2 minutes apart: told up to a minute early rather than late.
 const BUS_EARLY = 60;
 const cleanText = (x, n) => String(x ?? '').slice(0, n);
-// (The apps' own domain since 2026-10-27; the old Pages address still opens.)
-const okUrl = u => (typeof u === 'string' && /^https:\/\/(orbit\.jaypengx\.com|jaypengx\.github\.io)\//.test(u) ? u : '');
+const okUrl = u => (typeof u === 'string' && /^https:\/\/orbit\.jaypengx\.com\//.test(u) ? u : '');
 
 export function cleanItems(items, now = Date.now()) {
   return (Array.isArray(items) ? items : [])
@@ -296,19 +295,6 @@ export async function dueLists(kv) {
   }
   return out;
 }
-// (Lists kept before the due time moved into their own keys: given it once, from the old shared key.)
-const moved = new WeakSet(); // the KV namespaces checked
-async function moveOldDue(kv) {
-  if (moved.has(kv) || !kv.list || kv.prepare) return;
-  const old = await kv.get('push:due', 'json').catch(() => null);
-  for (const key of Object.keys(old || {})) {
-    const record = await kv.get(key, 'json').catch(() => null);
-    if (record) await putRecord(kv, key, record);
-  }
-  if (old) await kv.delete('push:due');
-  moved.add(kv);
-}
-
 export async function handlePush(request, env, headers, session, path) {
   const kv = pushStore(env);
   const reply = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...headers, 'Content-Type': 'application/json' } });
@@ -461,7 +447,6 @@ export function overNow(comp, espn) {
 export async function sendDue(env, now = Date.now()) {
   const kv = pushStore(env);
   if (!kv?.list) return { sent: 0 };
-  await moveOldDue(kv);
   let sent = 0;
   const prefsOf = {};
   // One ask a run for the same check (a game many follow is asked once).

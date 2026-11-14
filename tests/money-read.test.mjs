@@ -42,7 +42,7 @@ test('the lists the app sends are kept short and plain', () => {
   assert.deepEqual(cleanList('nope', 10), []);
 });
 
-const ORIGIN = 'https://jaypengx.github.io';
+const ORIGIN = 'https://orbit.jaypengx.com';
 const ask = (body, { origin = ORIGIN, session = { a: 'money', d: 'pass1' }, gemini } = {}) =>
   handleMoneyRead(new Request('https://w/money-read', { method: 'POST', headers: { Origin: origin }, body: JSON.stringify(body) }), { GEMINI_API_KEY: 'k' }, {}, session, gemini).then(async r => ({ status: r.status, ...(await r.json()) }));
 const reply = buys => async () => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ buys }) }] } }] }));

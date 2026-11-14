@@ -697,7 +697,7 @@ test('a read or a wake claim that says which data it holds (since) gets { unchan
   assert.equal(same.data.unchanged, true);
   assert.equal(same.data.updateTime, held);
   assert.equal(same.data.payload, undefined);
-  // No since (an older kit): the data, as before.
+  // No since (nothing held yet): the data.
   const plain = await t.call('GET', `${t.qt(same.data.token)}&app=vocab`);
   assert.equal(plain.data.payload, 'v:1');
   assert.equal(plain.data.unchanged, undefined);

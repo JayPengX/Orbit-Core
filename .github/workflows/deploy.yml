@@ -102,23 +102,6 @@ jobs:
           # so a future change to that default can't silently break this
           # again the same way.
           wranglerVersion: '4'
-      # The old address (sports-proxy.pengzjay.workers.dev, a forwarder to the
-      # proxy since the move on 2026-10-13): no code calls it, and a phone on
-      # an older kit takes the new one at its next opening; 10 minutes of its
-      # logs on 2026-10-14 had no request. Its code is gone from the repo; the
-      # Worker itself goes after a quiet week, from 2026-10-20 (the workflow
-      # also runs that day). guard.js treats it gone as nothing to stop.
-      - name: The old sports-proxy Worker deleted
-        continue-on-error: true
-        run: |
-          [ "$(date -u +%Y%m%d)" -ge 20261020 ] || { echo "kept until 2026-10-20"; exit 0; }
-          code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/sports-proxy/settings")
-          [ "$code" = "200" ] || { echo "already gone ($code)"; exit 0; }
-          # (The name is wrangler delete's argument; run outside the checkout so
-          # no wrangler.toml can stand in for it.)
-          cd "$RUNNER_TEMP" && npx --yes wrangler@4 delete sports-proxy --force && echo "sports-proxy deleted"
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       # The Orbit Pass token secret (see orbit-token.js): /eco signs
       # session tokens with it and every route checks them. Only when the repo has the secret
       # ECO_TOKEN_SECRET (any long random string); until then the proxy's
@@ -176,20 +159,15 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           ECO_ADMIN_TOKEN: ${{ secrets.ECO_ADMIN_TOKEN }}
-      # Retired secrets taken off the proxy: Firebase's (the store is D1,
-      # doc-store.js) and MATCH_FIND_DISPATCH_TOKEN (a GitHub token for the
-      # /match-dispatch route, removed long ago). FIREBASE_PRIVATE_KEY stays
-      # until 2026-12-05: sign-ins made before ECO_TOKEN_SECRET (2026-10-05,
-      # 60 days) were signed with a key made from it (orbit-token.js).
-      - name: Retired secrets off the proxy
+      # FIREBASE_PRIVATE_KEY off the proxy from 2026-12-06: sign-ins made
+      # before ECO_TOKEN_SECRET (2026-10-05, 60 days) were signed with a key
+      # made from it (orbit-token.js), and the last ran out on 2026-12-05.
+      - name: The Firebase key off the proxy
         continue-on-error: true
         run: |
           have=$(npx --yes wrangler@4 secret list --name orbit-workers-proxy 2>/dev/null || true)
-          gone="FIREBASE_CLIENT_EMAIL FIREBASE_PROJECT_ID MATCH_FIND_DISPATCH_TOKEN"
-          [ "$(date -u +%Y%m%d)" -ge 20261206 ] && gone="$gone FIREBASE_PRIVATE_KEY"
-          for s in $gone; do
-            if printf '%s' "$have" | grep -q "\"$s\""; then echo y | npx --yes wrangler@4 secret delete "$s" --name orbit-workers-proxy && echo "$s removed"; fi
-          done
+          [ "$(date -u +%Y%m%d)" -ge 20261206 ] || exit 0
+          if printf '%s' "$have" | grep -q '"FIREBASE_PRIVATE_KEY"'; then echo y | npx --yes wrangler@4 secret delete FIREBASE_PRIVATE_KEY --name orbit-workers-proxy && echo "FIREBASE_PRIVATE_KEY removed"; fi
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       # A deploy turns a Worker's workers.dev address and crons back on: while
@@ -208,8 +186,7 @@ jobs:
           echo "GUARD_STOPPED=$stopped" >> "$GITHUB_ENV"
           [ "$stopped" = "yes" ] || exit 0
           api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts"
-          for w in orbit-workers-proxy sports-proxy; do
-            # (sports-proxy deleted from 2026-10-20: its calls fail, nothing to stop.)
+          for w in orbit-workers-proxy; do
             curl -fsS --max-time 30 -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$api/$w/subdomain" >/dev/null && echo "$w address off"
             curl -fsS --max-time 30 -X PUT -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H 'Content-Type: application/json' -d '[]' "$api/$w/schedules" >/dev/null && echo "$w crons off"
           done

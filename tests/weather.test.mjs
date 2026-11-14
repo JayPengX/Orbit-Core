@@ -748,7 +748,7 @@ test("Weather's dev door: a page on this computer without a pass, as Transit's; 
   const ctx = { waitUntil: () => {} };
   const ask = (origin, e = {}) => worker.fetch(new Request('https://orbit-workers-proxy.test/weather?lat=x&lon=121', { headers: { Origin: origin, 'CF-Connecting-IP': '203.0.113.7' } }), e, ctx);
   assert.equal((await ask('http://localhost:8123')).status, 400, 'let in: the place is checked next');
-  assert.equal((await ask('https://jaypengx.github.io')).status, 401);
+  assert.equal((await ask('https://orbit.jaypengx.com')).status, 401);
   assert.equal((await ask('https://localhost.evil.com')).status, 401);
   assert.equal((await ask('http://localhost:8123', { WEATHER_DEV: 'off' })).status, 401);
 });

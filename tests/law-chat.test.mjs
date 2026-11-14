@@ -146,7 +146,7 @@ function fakeKV() {
 const envOf = () => ({ GEMINI_API_KEY: 'k', ANTHROPIC_API_KEY: 'a', OPENAI_API_KEY: 'o', ECO_TOKEN_SECRET: 'test-secret', STORE: fakeD1('', { fullPasses: true }), RATE_LIMIT_KV: fakeKV() });
 const qtOf = (d, { a = 'law', e = Date.now() + 600_000 } = {}) => signToken('test-secret', { k: 'ses', d, s: `s-${d}`, a, e });
 let passN = 0;
-const chat = async (body, { origin = 'https://jaypengx.github.io', pass = `acct${++passN}`, qt, ip = '198.51.100.1', env = envOf() } = {}) => {
+const chat = async (body, { origin = 'https://orbit.jaypengx.com', pass = `acct${++passN}`, qt, ip = '198.51.100.1', env = envOf() } = {}) => {
   const token = qt === undefined ? await qtOf(pass) : qt;
   const url = `https://proxy.test/law-chat?v=1${token ? `&qt=${encodeURIComponent(token)}` : ''}`;
   return worker.fetch(new Request(url, { method: 'POST', headers: { Origin: origin, 'CF-Connecting-IP': ip, 'Content-Type': 'text/plain' }, body: typeof body === 'string' ? body : JSON.stringify(body) }), env, ctx);
@@ -160,7 +160,7 @@ test('no Pass of Orbit Law\'s is a 401 {error:"pass"}, before anything is read o
     const r = await chat(Q, { qt });
     assert.equal(r.status, 401);
     assert.deepEqual(await r.json(), { error: 'pass' });
-    assert.equal(r.headers.get('Access-Control-Allow-Origin'), 'https://jaypengx.github.io');
+    assert.equal(r.headers.get('Access-Control-Allow-Origin'), 'https://orbit.jaypengx.com');
   }
   assert.equal((await chat(Q, { origin: 'https://evil.example' })).status, 403);
   assert.deepEqual([reads.length, gemini.length], before);

@@ -33,7 +33,7 @@ const DAY = 86_400_000;
 const today = twDay(Date.now());
 const dayOf = n => twDay(Date.now() + n * DAY);
 let who = 0;
-const ask = (day, { origin = 'https://jaypengx.github.io', env = {}, ip } = {}) =>
+const ask = (day, { origin = 'https://orbit.jaypengx.com', env = {}, ip } = {}) =>
   worker.fetch(new Request(`https://proxy.test/sports-today${day === undefined ? '' : `?day=${day}`}`, { headers: { ...(origin ? { Origin: origin } : {}), 'CF-Connecting-IP': ip || `10.1.0.${++who}` } }), env, ctx);
 const fresh = () => {
   store.clear();
@@ -180,7 +180,7 @@ test('the origin: a page of ours or a local one; any other, or none, is refused;
   assert.equal((await ask('2026-13-40')).status, 400);
   assert.equal((await ask(undefined)).status, 400);
   assert.equal((await ask('2019-01-01')).status, 400);
-  assert.equal((await worker.fetch(new Request(`https://proxy.test/sports-today?day=${today}`, { method: 'POST', headers: { Origin: 'https://jaypengx.github.io' } }), {}, ctx)).status, 405);
+  assert.equal((await worker.fetch(new Request(`https://proxy.test/sports-today?day=${today}`, { method: 'POST', headers: { Origin: 'https://orbit.jaypengx.com' } }), {}, ctx)).status, 405);
   const ip = '10.9.9.9';
   const statuses = [];
   for (let i = 0; i < 32; i++) statuses.push((await ask(today, { ip })).status);

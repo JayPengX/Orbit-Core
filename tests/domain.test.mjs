@@ -1,18 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { homes, DOMAIN, API, SITE, ORIGINS, WORKERS_DEV, PAGES } from '../kit/domain.mjs';
+import { homes, WORKERS_DEV } from '../kit/domain.mjs';
 import { isAllowedOrigin } from '../http.js';
 
-test('domain: none set, everything where it always was', () => {
-  if (DOMAIN) return;
-  assert.equal(API, WORKERS_DEV);
-  assert.equal(SITE, PAGES);
-  assert.deepEqual(ORIGINS, [PAGES]);
-  assert.ok(isAllowedOrigin('https://jaypengx.github.io'));
-  assert.ok(!isAllowedOrigin('https://example.tw'));
+test('domain: one is always set; the old GitHub Pages address may not call', () => {
+  assert.throws(() => homes('', 'orbit.example.tw'));
+  assert.ok(!isAllowedOrigin('https://jaypengx.github.io'));
+  assert.ok(isAllowedOrigin('https://orbit.jaypengx.com'));
 });
 
-test('domain: set, a page on it reaches the proxy at its own /api; GitHub Pages still workers.dev; both may call', () => {
+test('domain: a page on it reaches the proxy at its own /api; anywhere else, workers.dev', () => {
   const on = homes('Example.TW', 'orbit.example.tw');
   assert.ok(on.on);
   assert.equal(on.api, 'https://orbit.example.tw/api');
@@ -21,7 +18,7 @@ test('domain: set, a page on it reaches the proxy at its own /api; GitHub Pages 
   assert.ok(!on.isApi('https://orbit.example.tw/law/'));
   assert.equal(on.site, 'https://orbit.example.tw');
   assert.equal(on.home, 'https://example.tw');
-  assert.deepEqual(on.origins, ['https://jaypengx.github.io', 'https://orbit.example.tw', 'https://example.tw']);
+  assert.deepEqual(on.origins, ['https://orbit.example.tw', 'https://example.tw']);
   assert.ok(homes('example.tw', 'example.tw').on, 'the bare domain (the showcase)');
   assert.ok(!homes('example.tw', 'longshot.example.tw').on, 'another subdomain is not the family');
   assert.ok(on.isApi('https://api.example.tw/law-chat'));

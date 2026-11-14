@@ -1063,17 +1063,14 @@ export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, 
 // night and through the day): what doesn't change in a day (a league's
 // season, sports/<league>/<year>.json), read from there, never through the
 // data proxy's sources. Kept and failed like proxyJson's; a pack not there
-// (not built yet) is a failure (404) the app reads another way. Saved on the
-// device under the address the packs had on GitHub Pages (PACKS_KEY), so
-// what a phone kept before the move is still its copy.
+// (not built yet) is a failure (404) the app reads another way.
 export const PACKS_URL = `${API}/data/`;
-const PACKS_KEY = 'https://jaypengx.github.io/Shared-Data/';
 // A pack's last copy on the device, of any age ({ at, data } or null): to
 // paint at once while packJson reads it again (as peekJson for proxyJson).
-export const peekPack = path => persistedSoon(dataKey(`${PACKS_KEY}${path}`, ''));
+export const peekPack = path => persistedSoon(dataKey(`${PACKS_URL}${path}`, ''));
 export function packJson(path, { ttl = 3 * 3_600_000, timeout = 30_000 } = {}) {
   const url = `${PACKS_URL}${path}`;
-  return keptJson(url, dataKey(`${PACKS_KEY}${path}`, ''), { ttl, keep: true }, async () => {
+  return keptJson(url, dataKey(url, ''), { ttl, keep: true }, async () => {
     const wait = patient(timeout);
     // (Asked of the server each time: the domain hands a browser 4 hours
     // (Cloudflare's Browser Cache TTL) where a pack says 2 minutes, so the

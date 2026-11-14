@@ -9,13 +9,14 @@
 // over orbit-site's custom domains on the same hosts (site.js), which hold
 // the hosts' DNS and certificates.
 //   an app (kit/brand.mjs SHORT)  orbit.<d>/<slug>…  → orbit-<slug>
-//   Orbit-Core                    orbit.<d>/… bar the apps: / (the family's home), /pass/ (→ /),
+//   Orbit-Core                    orbit.<d>/… bar the apps: / (the family's home),
 //                                 /key/ (the public giveaway, gift.js),
-//                                 /admin/ (the owner's panel, there alone),
+//                                 /admin/ (the owner's panel),
 //                                 /app/ (Orbit, every app in one: kit/suite.mjs),
 //                                 /privacy/, /terms/ (the policy and terms),
-//                                 /Orbit-Core/ (and the old /Shared-Proxy/);
+//                                 /Orbit-Core/ (the kit and the pictures);
 //                                 <d>/Orbit-Core/ → orbit-pass
+// Each page at one address, nothing forwarded (Jay 11-14: no legacy forwards).
 //   Orbit-Showcase                <d>/… (Jay's homepage at /, /showcase/) → orbit-home
 //
 // Paths work as they did on GitHub Pages: /law/ is /law/index.html, /law
@@ -31,35 +32,30 @@ const MAX_FILES = 100_000; // the paid plan's limit per Worker
 const MAX_BYTES = 25 * 1024 * 1024; // one file's limit
 
 // What a repo publishes: its Worker, [built path ('' = the build), path on
-// the site], its routes, its own redirects.
+// the site], what of the build stays out of its '' place, its routes.
 export function siteFor(repo, domain = DOMAIN) {
   const d = String(domain || '').trim().toLowerCase();
   if (!d) throw new Error('no domain (kit/domain.mjs)');
   const orbit = `orbit.${d}`;
   if (repo === 'Orbit-Core') {
-    const kitRoots = ['Orbit-Core', 'Shared-Proxy'];
     return {
       name: 'orbit-pass',
-      put: [['', '/pass'], ['index.html', '/index.html'], ...kitRoots.map(r => ['', `/${r}`]), ['key', '/key'], ['app', '/app'], ['admin', '/admin'], ['privacy', '/privacy'], ['terms', '/terms'], ['favicon.ico', '/favicon.ico'], ['icons/apple-touch-icon.png', '/apple-touch-icon.png'], ['icons/apple-touch-icon.png', '/apple-touch-icon-precomposed.png']],
-      // (The owner's panel at /admin/ alone, Jay 2026-11-14: not also under /pass/ and the kit's
-      // paths, where it was until then; nothing forwards from there, Jay: no legacy forwards.)
-      skip: ['admin'],
+      put: [['', '/Orbit-Core'], ['index.html', '/index.html'], ['key', '/key'], ['app', '/app'], ['admin', '/admin'], ['privacy', '/privacy'], ['terms', '/terms'], ['favicon.ico', '/favicon.ico'], ['icons/apple-touch-icon.png', '/apple-touch-icon.png'], ['icons/apple-touch-icon.png', '/apple-touch-icon-precomposed.png']],
+      // (The root's pages only at the root: not a second copy under /Orbit-Core/.)
+      skip: ['index.html', 'key', 'app', 'admin', 'privacy', 'terms'],
       // The whole orbit. host bar the apps' paths (theirs are more
       // specific, so they win): the root, the family page, the kit, the root
       // icons, and a 404 for anything else. The kit on the bare host too
       // (the showcase loads it).
-      routes: [`${orbit}/*`, ...kitRoots.map(r => `${d}/${r}*`)],
-      // (The family's home is the root since 2026-11-14, Jay: "orbit.jaypengx.com is the home for
-      // all those apps"; its pictures stay under /pass/.)
-      redirects: ['/pass/ / 301', '/pass/index.html / 301']
+      routes: [`${orbit}/*`, `${d}/Orbit-Core*`]
     };
   }
   if (repo === 'Orbit-Showcase') {
-    return { name: 'orbit-home', put: [['', '/showcase'], ['home', '/']], routes: [`${d}/*`], redirects: [] };
+    return { name: 'orbit-home', put: [['', '/showcase'], ['home', '/']], routes: [`${d}/*`] };
   }
-  const slug = Object.keys(SHORT).find(s => SHORT[s] === repo && s !== 'pass');
+  const slug = Object.keys(SHORT).find(s => SHORT[s] === repo);
   if (!slug) throw new Error(`${repo} has no short name (kit/brand.mjs)`);
-  return { name: `orbit-${slug}`, put: [['', `/${slug}`]], routes: [`${orbit}/${slug}*`], redirects: [] };
+  return { name: `orbit-${slug}`, put: [['', `/${slug}`]], routes: [`${orbit}/${slug}*`] };
 }
 
 // Pages' folders: /a/ is /a/index.html, /a goes to /a/.
@@ -130,10 +126,7 @@ async function main() {
   const files = await walk(out);
   if (files.length > MAX_FILES) throw new Error(`${files.length} files: over ${MAX_FILES}`);
   for (const f of files) if ((await stat(join(out, f))).size > MAX_BYTES) throw new Error(`${f} is over 25 MB`);
-  // (A path the site sends elsewhere keeps only that rule: Cloudflare refuses a
-  // second one for the same path, as /pass/ → / and /pass/index.html did, 11-14.)
-  const taken = new Set(site.redirects.map(r => r.split(/\s+/)[0]));
-  const redirects = [...site.redirects, ...folderRules(files).filter(r => !taken.has(r.split(' ')[0]))];
+  const redirects = folderRules(files);
   await writeFile(join(out, '_redirects'), redirects.join('\n') + '\n');
   await writeFile(join(out, '_headers'), ownHeaders(own, site.put, site.skip) + SITE_HEADERS);
   const zone = DOMAIN.trim().toLowerCase();

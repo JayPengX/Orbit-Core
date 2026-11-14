@@ -37,13 +37,11 @@ jobs:
           accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config wrangler.guard.toml
           wranglerVersion: '4'
-      # The guard's token; its account is the token's own (guard.js asks once),
-      # so the old CF_ACCOUNT_ID secret is taken off.
+      # The guard's token; its account is the token's own (guard.js asks once).
       - name: The guard's token
         if: ${{ env.HAS_GUARD_TOKEN == 'true' }}
         run: |
           printf '%s' "$CF_GUARD_TOKEN" | npx --yes wrangler@4 secret put CF_GUARD_TOKEN --config wrangler.guard.toml
-          if npx --yes wrangler@4 secret list --config wrangler.guard.toml 2>/dev/null | grep -q '"CF_ACCOUNT_ID"'; then npx --yes wrangler@4 secret delete CF_ACCOUNT_ID --config wrangler.guard.toml && echo "CF_ACCOUNT_ID removed"; fi
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_GUARD_TOKEN: ${{ secrets.CF_GUARD_TOKEN }}

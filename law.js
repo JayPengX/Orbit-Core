@@ -1,5 +1,5 @@
 // ---- law.js: POST /law-ask, Orbit Law's questions on a law's articles ----
-// Orbit Law (jaypengx.github.io/Orbit-Law) asks about one to eight articles
+// Orbit Law (orbit.jaypengx.com/law/) asks about one to eight articles
 // of one law: { p: MOJ pcode, arts: ['15', '15-1'], q: a question (empty:
 // explain them plainly), lang: 'zh' | 'en' }. The law's text is read here
 // from Orbit Law's own data (a day at the edge), never taken from the page,

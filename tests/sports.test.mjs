@@ -14,7 +14,7 @@ globalThis.fetch = async url => {
 };
 const worker = (await import('../worker.js')).default;
 const ctx = { waitUntil: p => p };
-const get = url => worker.fetch(new Request(url, { headers: { Origin: 'https://jaypengx.github.io' } }), {}, ctx);
+const get = url => worker.fetch(new Request(url, { headers: { Origin: 'https://orbit.jaypengx.com' } }), {}, ctx);
 
 test('a batch answers every URL in order, in one response', async () => {
   const a = 'https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/standings';
@@ -163,7 +163,7 @@ test("each app's asks are counted apart: one app's busy minute never stops anoth
   const { signToken } = await import('../orbit-token.js');
   const env = { ECO_TOKEN_SECRET: 'test-secret' };
   const qt = await signToken('test-secret', { k: 'ses', d: 'd1', s: 'apps-test', e: Date.now() + 3_600_000 });
-  const ask = app => worker.fetch(new Request(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent('https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/standings')}&app=${app}&qt=${qt}`, { headers: { Origin: 'https://jaypengx.github.io' } }), env, ctx);
+  const ask = app => worker.fetch(new Request(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent('https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/standings')}&app=${app}&qt=${qt}`, { headers: { Origin: 'https://orbit.jaypengx.com' } }), env, ctx);
   let last;
   await clearOfMinuteEdge();
   for (let i = 0; i < 601 && (last = await ask('odds')).status === 200; i++);
@@ -172,7 +172,7 @@ test("each app's asks are counted apart: one app's busy minute never stops anoth
 });
 
 test("without a pass to check, each app at an address has a session's minute (never an hour's count shared by every app)", async () => {
-  const ask = app => worker.fetch(new Request(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent('https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/standings')}&app=${app}`, { headers: { Origin: 'https://jaypengx.github.io', 'CF-Connecting-IP': '203.0.113.9' } }), {}, ctx);
+  const ask = app => worker.fetch(new Request(`https://proxy.test/sports-proxy?batch=1&u=${encodeURIComponent('https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/standings')}&app=${app}`, { headers: { Origin: 'https://orbit.jaypengx.com', 'CF-Connecting-IP': '203.0.113.9' } }), {}, ctx);
   let last;
   await clearOfMinuteEdge();
   for (let i = 0; i < 601 && (last = await ask('stock')).status === 200; i++);
@@ -294,21 +294,21 @@ test("YouTube: a search and a video's page only, trimmed; a page without its dat
 });
 
 test('one proxy: /sports-proxy answers with the Worker\'s CORS (its cache headers readable) and refuses a host off the list', async () => {
-  const res = await worker.fetch(new Request(`https://orbit-workers-proxy.test/sports-proxy?url=${encodeURIComponent('https://evil.example/x')}&app=match`, { headers: { Origin: 'https://jaypengx.github.io' } }), {}, ctx);
+  const res = await worker.fetch(new Request(`https://orbit-workers-proxy.test/sports-proxy?url=${encodeURIComponent('https://evil.example/x')}&app=match`, { headers: { Origin: 'https://orbit.jaypengx.com' } }), {}, ctx);
   assert.ok(res.status >= 400 && res.status < 500);
   assert.match(res.headers.get('Access-Control-Expose-Headers') || '', /X-Sports-Proxy-Cache/);
-  assert.equal(res.headers.get('Access-Control-Allow-Origin'), 'https://jaypengx.github.io');
+  assert.equal(res.headers.get('Access-Control-Allow-Origin'), 'https://orbit.jaypengx.com');
 });
 
 test('a game over is kept in R2 the first time anyone reads it; after that it comes from there, the source never asked again; a game on is never kept', async () => {
   const { memoryBucket } = await import('./fixtures/bucket.mjs');
   const bucket = memoryBucket();
   const env = { DATA: bucket };
-  const ask = url => worker.fetch(new Request(url, { headers: { Origin: 'https://jaypengx.github.io' } }), env, ctx);
+  const ask = url => worker.fetch(new Request(url, { headers: { Origin: 'https://orbit.jaypengx.com' } }), env, ctx);
   const real = globalThis.fetch;
   const asked = [];
   globalThis.fetch = async url => {
-    if (String(url).startsWith('https://jaypengx.github.io/')) return new Response('', { status: 404 });
+    if (String(url).startsWith('https://orbit.jaypengx.com/')) return new Response('', { status: 404 });
     asked.push(String(url));
     const done = String(url).includes('event=900');
     return new Response(JSON.stringify({ header: { competitions: [{ status: { type: { completed: done } } }] }, news: ['dropped'], boxscore: { teams: [] } }), { status: 200 });
@@ -357,7 +357,7 @@ test('Yahoo: a host that turns the proxy away (429) is asked of its twin', async
   try {
     store.clear();
     const u = 'https://query1.finance.yahoo.com/v7/finance/spark?symbols=ZZZZ&range=1d&interval=5m';
-    const res = await worker.fetch(new Request(`https://proxy.test/sports-proxy?url=${encodeURIComponent(u)}&app=stock`, { headers: { Origin: 'https://jaypengx.github.io' } }), {}, ctx);
+    const res = await worker.fetch(new Request(`https://proxy.test/sports-proxy?url=${encodeURIComponent(u)}&app=stock`, { headers: { Origin: 'https://orbit.jaypengx.com' } }), {}, ctx);
     assert.equal(res.status, 200);
     assert.deepEqual(asked, ['query1.finance.yahoo.com', 'query2.finance.yahoo.com']);
   } finally {
@@ -381,11 +381,11 @@ test('Yahoo: refused by both hosts, a chart is asked as a signed-in visitor; ref
   try {
     store.clear();
     const chart = s => `https://proxy.test/sports-proxy?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${s}?range=1d&interval=5m`)}&app=stock`;
-    const ok = await worker.fetch(new Request(chart('YYYY'), { headers: { Origin: 'https://jaypengx.github.io' } }), {}, ctx);
+    const ok = await worker.fetch(new Request(chart('YYYY'), { headers: { Origin: 'https://orbit.jaypengx.com' } }), {}, ctx);
     assert.equal(ok.status, 200);
     assert.deepEqual(asked, ['query1.finance.yahoo.com', 'query2.finance.yahoo.com', 'fc.yahoo.com', 'query2.finance.yahoo.com', 'query2.finance.yahoo.com+crumb']);
     refuseAll = true;
-    const no = await worker.fetch(new Request(chart('XXXX'), { headers: { Origin: 'https://jaypengx.github.io' } }), {}, ctx);
+    const no = await worker.fetch(new Request(chart('XXXX'), { headers: { Origin: 'https://orbit.jaypengx.com' } }), {}, ctx);
     assert.equal(no.status, 503);
   } finally {
     globalThis.fetch = real;
@@ -403,7 +403,7 @@ test('a batch answers up to 24 reads (a first paint, about 28, in two requests),
 test('the dev doors let in a page from this computer, http or https (the preview over --h2), and nothing else', async () => {
   const { isAllowedOrigin, LOCAL_ORIGIN } = await import('../http.js');
   for (const o of ['http://localhost:8123', 'https://localhost:39789', 'http://127.0.0.1:5173']) assert.ok(isAllowedOrigin(o) && LOCAL_ORIGIN.test(o), o);
-  for (const o of ['https://localhost.evil.com', 'https://evil.com', 'http://localhost', 'https://jaypengx.github.io.evil.com']) assert.ok(!LOCAL_ORIGIN.test(o), o);
+  for (const o of ['https://localhost.evil.com', 'https://evil.com', 'http://localhost', 'https://orbit.jaypengx.com.evil.com']) assert.ok(!LOCAL_ORIGIN.test(o), o);
   assert.ok(!isAllowedOrigin('https://evil.com'));
 });
 
