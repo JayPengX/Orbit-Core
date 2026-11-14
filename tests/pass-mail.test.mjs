@@ -349,3 +349,12 @@ test('the mail’s page: its title, its lines escaped, the code large', async ()
   assert.match(html, /123456/);
   assert.match(html, /a &lt;b&gt;/);
 });
+
+test('the day’s count read through law.js’s counts (as worker.js wires it): an empty day is open', async () => {
+  const { addOne, countOf, forgetLawCounts } = await import('../law.js');
+  forgetLawCounts();
+  const t = setup();
+  t.deps.dayCount = (env, k, day, by = 1) => (by === 0 ? countOf({}, k, day) : addOne({}, k, day, by));
+  const res = await t.post({ op: 'mail-recover-begin', addr: 'nobody@example.com' });
+  assert.equal(res.status, 200, JSON.stringify(res.data));
+});
