@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { piecesOf, teamsOf, otherGame, placesOf, gameOf, unboiled, ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, TOPIC_MIN_OF, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN, blindOf, oneSidedOf } from '../builders/news.js';
+import { piecesOf, teamsOf, otherGame, placesOf, placeHints, marksAll, gameOf, unboiled, ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, TOPIC_MIN_OF, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN, blindOf, oneSidedOf } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS, SPORTS_OUTLETS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -959,4 +959,27 @@ test('one event told in each outlet\'s own words is one story (11-14: 8 outlets\
   assert.ok(groups.some(g => g.length === 1 && /易遊網/.test(g[0])), 'a headline sharing nothing still stands as its own story');
   assert.deepEqual([...placesOf('臺北市長政見會 北市府回應', 'zh')], ['p:台北']);
   assert.equal(placesOf('新北市長政見會', 'zh').has('p:台北'), false);
+});
+
+test('a headline naming no city is of the city its names are seen with (11-14: 基隆\'s poll by 戴立安 joined 新北\'s); a story is of the city it names most', () => {
+  const at = h => NOW - h * H;
+  const items = [
+    item('ltn', '基隆藍綠巷戰 謝國樑、童子瑋掃街', at(30)),
+    item('udn', '基隆市長辯論 童子瑋批謝國樑施政', at(29)),
+    item('setn', '童子瑋推「基隆新國門」 謝國樑回應', at(28)),
+    item('udn', '新竹縣長最新民調 徐欣瑩領先鄭朝方', at(8)),
+    item('tvbs', '台中市長最新民調出爐 江啟臣領先何欣純', at(7)),
+    item('ltn', '新北最新民調 蘇巧慧領先8.4％ 李四川守住永和', at(6)),
+    item('ettoday', '新北市長最新民調 蘇巧慧領先李四川差距8.4個百分點', at(5.8)),
+    item('ctinews', '新北選戰倒數15天！最新民調蘇巧慧領先李四川8.4個百分點', at(5.6)),
+    item('newtalk', '(影)戴立安最新民調 童子瑋反超謝國樑3.3% 一定投票差距達9個百分點', at(5))
+  ];
+  const hint = placeHints(items, 'zh');
+  assert.deepEqual([...hint('(影)戴立安最新民調 童子瑋反超謝國樑3.3% 一定投票差距達9個百分點')], ['p:基隆']);
+  assert.equal(hint('黃仁勳請辭 輝達董事會回應'), null);
+  const groups = groupStories(items, 'zh').map(g => g.map(x => x.t));
+  assert.ok(!groups.some(g => g.some(t => /童子瑋/.test(t)) && g.some(t => /蘇巧慧/.test(t))), groups.join(' | '));
+  // (Fifteen 新北 reports and one 台北 one: the story is 新北's.)
+  assert.deepEqual([...marksAll([...Array(15)].map(() => new Set(['p:新北'])).concat([new Set(['p:台北'])]))], ['p:新北']);
+  assert.equal(otherGame(marksAll([new Set(['p:新北']), new Set(['p:新北']), new Set(['p:新北']), new Set(['p:台北'])]), new Set(['p:台北'])), true);
 });

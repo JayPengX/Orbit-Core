@@ -821,13 +821,16 @@ export function gameOf(title, lang) {
 // 基隆's, 台北's 政見會 and 新北's, the same words but never one story.)
 export const otherGame = (a, b) => {
   if (!a || !b) return false;
-  for (const placed of [false, true]) {
-    const as = [...a].filter(x => x.startsWith(PLACE) === placed).map(plainTeam);
-    const bs = new Set([...b].filter(x => x.startsWith(PLACE) === placed).map(plainTeam));
+  // (Teams and cities apart: a city named beside a team says nothing of
+  // which game.)
+  for (const k of ['', PLACE]) {
+    const as = [...a].filter(x => kindOf(x) === k).map(plainTeam);
+    const bs = new Set([...b].filter(x => kindOf(x) === k).map(plainTeam));
     if (as.length && bs.size && !as.some(x => bs.has(x))) return true;
   }
   return false;
 };
+const kindOf = x => (x.startsWith(PLACE) ? PLACE : '');
 // Taiwan's cities and counties a headline names (as p:台北…), null none.
 const PLACE = 'p:';
 const PLACES_ZH = /新北|(?<!新)北市|台北|臺北|桃園|台中|臺中|台南|臺南|高雄|基隆|新竹|苗栗|彰化|南投|雲林|嘉義|屏東|宜蘭|花蓮|台東|臺東|澎湖|金門|連江|馬祖/g;
@@ -837,12 +840,58 @@ export function placesOf(title, lang) {
   const found = String(title || '').match(PLACES_ZH);
   return found ? new Set(found.map(x => PLACE + (PLACE_SAME[x] || x))) : null;
 }
-const marksOf = (t, lang) => withTeams(teamsOf(t, lang), placesOf(t, lang));
+const marksOf = (t, lang, hint) => withTeams(teamsOf(t, lang), placesOf(t, lang) || hint?.(t) || null);
+// The city a headline that names none is of, by the names it shares with
+// those that do (11-14: 「戴立安最新民調 童子瑋反超謝國樑3.3%」 says no 基隆,
+// and joined 新北's poll story; 童子瑋 is with 基隆 in every headline naming
+// a city): its pieces each seen with a city in 3+ headlines, nine in ten
+// of them one city's, two or more for one city and twice any other's.
+export const HINT_SHARE = 0.2;
+export function placeHints(items, lang) {
+  if (lang !== 'zh') return null;
+  const df = new Map();
+  const at = new Map();
+  for (const it of items) {
+    const ps = new Set(piecesOf(it.t, lang));
+    const places = placesOf(it.t, lang);
+    for (const p of ps) {
+      df.set(p, (df.get(p) || 0) + 1);
+      if (places?.size === 1) {
+        const m = at.get(p) || at.set(p, new Map()).get(p);
+        const [x] = places;
+        m.set(x, (m.get(x) || 0) + 1);
+      }
+    }
+  }
+  const of = new Map();
+  for (const [p, m] of at) {
+    const n = [...m.values()].reduce((a, x) => a + x, 0);
+    const [x, top] = [...m].sort((a, b) => b[1] - a[1])[0];
+    if (n >= 3 && top >= 0.9 * n && n >= HINT_SHARE * df.get(p)) of.set(p, x);
+  }
+  return t => {
+    const votes = new Map();
+    for (const p of new Set(piecesOf(t, lang))) if (of.has(p)) votes.set(of.get(p), (votes.get(of.get(p)) || 0) + 1);
+    const [[x, top] = [], [, next = 0] = []] = [...votes].sort((a, b) => b[1] - a[1]);
+    return top >= 2 && top >= 2 * next ? new Set([x]) : null;
+  };
+}
+// A story's marks: every team it names, and the cities it names most (a
+// story of 新北's polls that one 台北 report slipped into is still 新北's,
+// and the next 台北 report is kept out).
+export function marksAll(sets) {
+  const count = new Map();
+  for (const m of sets) for (const x of m || []) count.set(x, (count.get(x) || 0) + 1);
+  if (!count.size) return null;
+  const top = { [PLACE]: 0 };
+  for (const [x, n] of count) if (kindOf(x)) top[kindOf(x)] = Math.max(top[kindOf(x)], n);
+  return new Set([...count.keys()].filter(x => !kindOf(x) || count.get(x) * 2 >= top[kindOf(x)]));
+}
 const withTeams = (into, more) => (more ? new Set([...(into || []), ...more]) : into);
 
-export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lang], loose } = {}) {
+export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lang], loose, hint = placeHints(items, lang) } = {}) {
   const vecOf = weigh(items, lang, { loose });
-  const docs = items.map(it => ({ it, v: vecOf(it), teams: marksOf(it.t, lang) })).filter(d => d.v.size);
+  const docs = items.map(it => ({ it, v: vecOf(it), teams: marksOf(it.t, lang, hint) })).filter(d => d.v.size);
   for (const d of docs) d.n = norm(d.v);
   docs.sort((a, b) => (a.it.at || 0) - (b.it.at || 0));
   let groups = [];
@@ -874,7 +923,7 @@ export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lan
         add(best.v, k, x);
       }
       best.n = null;
-      best.teams = withTeams(best.teams, d.teams);
+      best.teams = marksAll(best.docs.map(x => x.teams));
       best.last = Math.max(best.last, d.it.at || 0);
       best.first = Math.min(best.first, d.it.at || 0);
     } else {
@@ -903,7 +952,7 @@ export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lan
     for (const [h, dot] of dots) {
       const a = root(g);
       const b = root(h);
-      if (a !== b && !otherGame(a.teams, b.teams) && dot / (g.n * h.n) >= merge) into.set(b, a), (a.teams = withTeams(a.teams, b.teams));
+      if (a !== b && !otherGame(a.teams, b.teams) && dot / (g.n * h.n) >= merge) into.set(b, a), (a.teams = marksAll([a.teams, b.teams]));
     }
   }
   const whole = new Map();
@@ -1091,10 +1140,10 @@ const sumOf = vs => {
 // ones of a region, emptied as they join (their ids let go).
 export const FRAGMENT = 6;
 export const FRAGMENT_NEAR = 0.45;
-function mergeFragments(recs, vecOf, lang, owner) {
+function mergeFragments(recs, vecOf, lang, owner, hint) {
   const info = recs.map(r => {
     const v = sumOf(r.items.filter(it => it.at >= (r.last || 0) - 24 * HOUR).map(vecOf));
-    return { r, v, n: norm(v), first: Math.min(...r.items.map(it => it.at || 0)), last: Math.max(...r.items.map(it => it.at || 0)), teams: r.items.reduce((t, it) => withTeams(t, marksOf(it.t, lang)), null), whose: lang === 'zh' ? reportsOwner(r.items.map(it => it.t)).owner : '' };
+    return { r, v, n: norm(v), first: Math.min(...r.items.map(it => it.at || 0)), last: Math.max(...r.items.map(it => it.at || 0)), teams: marksAll(r.items.map(it => marksOf(it.t, lang, hint))), whose: lang === 'zh' ? reportsOwner(r.items.map(it => it.t)).owner : '' };
   });
   const by = new Map();
   for (const x of info) for (const k of x.v.keys()) (by.get(k) || by.set(k, []).get(k)).push(x);
@@ -1122,7 +1171,7 @@ function mergeFragments(recs, vecOf, lang, owner) {
     best.n = norm(best.v);
     best.first = Math.min(best.first, x.first);
     best.last = Math.max(best.last, x.last);
-    best.teams = withTeams(best.teams, x.teams);
+    best.teams = marksAll(best.r.items.map(it => marksOf(it.t, lang, hint)));
     x.r.items = [];
   }
 }
@@ -1296,7 +1345,8 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
       return v;
     };
     const vecOf = weigh(mine, lang, { loose: sporty });
-    const twoDesks = list => [...groupStories(list.filter(sporty), lang, { loose: () => true }).map(g => Object.assign(g, { sp: true })), ...groupStories(list.filter(it => !sporty(it)), lang).map(g => Object.assign(g, { sp: false }))];
+    const hint = placeHints(mine, lang);
+    const twoDesks = list => [...groupStories(list.filter(sporty), lang, { loose: () => true, hint: null }).map(g => Object.assign(g, { sp: true })), ...groupStories(list.filter(it => !sporty(it)), lang, { hint }).map(g => Object.assign(g, { sp: false }))];
     // Each kept story back to its core first: what drifted from it is let go
     // before today's groups are placed, so it can join or start the story
     // it's really about (11-13: Pence's 2028 run out of Trump's Iran deal).
@@ -1362,14 +1412,14 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
         // (Another company's reports never join a company's story.)
         const gReports = lang === 'zh' ? g.map(it => it.t).filter(reportOf) : [];
         // (A game never joins another game's story.)
-        const gTeams = g.reduce((t, it) => withTeams(t, marksOf(it.t, lang)), null);
+        const gTeams = marksAll(g.map(it => marksOf(it.t, lang, hint)));
         const dots = new Map();
         for (const [k, x] of gv) for (const d of daysBy.get(k) || []) dots.set(d, (dots.get(d) || 0) + x * d.v.get(k));
         for (const d of lastDays) {
           const { r, n, whose } = d;
           if (!dots.has(d) || r.last < gFirst - GAP || r.sp !== g.sp) continue;
           if (whose && gReports.length && gReports.every(t => otherReport(t, whose))) continue;
-          if (gTeams && otherGame(gTeams, (d.teams ??= r.items.reduce((t, it) => withTeams(t, marksOf(it.t, lang)), null)))) continue;
+          if (gTeams && otherGame(gTeams, (d.teams ??= marksAll(r.items.map(it => marksOf(it.t, lang, hint)))))) continue;
           const sim = dots.get(d) / (gn * n);
           if (sim > bestSim) (bestSim = sim), (best = r);
         }
@@ -1394,7 +1444,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
     // nearer than MERGE but under it also took 台北's 政見會 into 新北's), in the
     // same days, never another company's; news only (sports' small stories
     // are a day's many games and moves).
-    mergeFragments(recsHere.filter(r => r.items.length && open(r)), vecOf, lang, owner);
+    mergeFragments(recsHere.filter(r => r.items.length && open(r)), vecOf, lang, owner, hint);
     for (const r of recsHere) for (const it of r.items) owner.set(it.u, r);
     const freed = [];
     const sizeOf = r => {
