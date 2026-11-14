@@ -1,9 +1,9 @@
 // The Orbit Pass sheet, the same in every app (accountSheet in orbit.mjs
 // opens it; loaded the first time it's opened). The Pass is the account and
 // the family, never money (money lives in Securities). Four tabs:
-//   Pass   this account: devices, notices, security
+//   Pass   this account: sign-in and security, notices, general
 //   外觀   an avatar and a frame, free for everyone
-//   App    every app, Orbit's and Orbit's, when it was last used, a way in
+//   App    問 Orbit, 今天, every app: when it was last used, a way in
 //   說明   every app's guide (help.mjs)
 import { APPS, AVATARS, FRAMES, MILESTONES, TIERS, DEFAULT_AVATAR, milestoneOf, avatarSrc, settingPatch, passAccount, appIcon, closeSheet, el as node } from '#kit/orbit.mjs';
 // The guides (80 KB) only for the 說明 tab: fetched after the sheet's own
@@ -11,7 +11,7 @@ import { APPS, AVATARS, FRAMES, MILESTONES, TIERS, DEFAULT_AVATAR, milestoneOf, 
 let helpMod = null;
 let helpLoad = null;
 export const loadHelp = () => (helpLoad ||= import('./help.mjs').then(m => (helpMod = m)).catch(e => ((helpLoad = null), Promise.reject(e))));
-import { sheet, section, list, cell, toast } from './ui.mjs';
+import { sheet, section, list, cell, toast, icons } from './ui.mjs';
 import { todayRows } from './today.mjs';
 import { askOrbitCard } from './ask-orbit.mjs';
 import { homeOf } from './brand.mjs';
@@ -70,7 +70,7 @@ export const STRINGS = {
     tab_help: '說明',
     here: '這裡',
     share: '分享',
-    appsSub: '每天用得到的 App，用同一個 Orbit Pass。',
+    allApps: '所有 App',
     today: '今天'
   },
   en: {
@@ -126,7 +126,7 @@ export const STRINGS = {
     tab_help: 'Help',
     here: 'Here',
     share: 'Share',
-    appsSub: 'Everyday apps, on the same Orbit Pass.',
+    allApps: 'Every app',
     today: 'Today'
   }
 };
@@ -210,10 +210,11 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
     account = null;
     if (state.tab === 'pass') {
       account = passAccount(s, { extra: state.extra, close, looks: () => show('looks') });
-      return put(body, ...[askCard(), todayCard(), ...account.nodes].filter(Boolean));
+      return put(body, ...account.nodes);
     }
     if (state.tab === 'looks') return put(body, looksSection(ctx));
-    if (state.tab === 'apps') return renderApps(body, ctx);
+    // (問 Orbit and 今天 open another app: they sit over every app, not over the account.)
+    if (state.tab === 'apps') return renderApps(body, ctx, [askCard(), todayCard()]);
     renderHelp(body, ctx, state.help);
   }
   // 問 Orbit (ask-orbit.mjs): a question opens the app that answers it, with the question in its ask.
@@ -431,27 +432,30 @@ const ago = (t, then) => {
   const days = Math.floor((Date.now() - then) / 86_400_000);
   return days <= 0 ? t('usedToday') : t('usedDaysAgo', { n: days });
 };
-// Every app, Orbit's then Orbit's: what it's for, when it was last used,
-// its guide and a way in.
-function renderApps(box, { q, t, locale, state, openHelp }) {
+// Every app, a row each (as the Pass tab's): its icon, what it's for and
+// when it was last used; a tap opens it, its share button its link and QR
+// code. (Its guide: the 說明 tab.) `top`: 問 Orbit and 今天, over the list.
+function renderApps(box, { q, t, locale, state }, top = []) {
   const w = state.wallet;
+  const en = locale === 'en';
   // Its link and QR code (share.mjs), over this sheet, which closes.
   const shareApp = async id => {
     const { shareSheet } = await import('./share.mjs');
     if (open) closeSheet(open.dialog);
     shareSheet({ url: homeOf(id), title: APPS[id].name, app: id, lang: locale });
   };
-  const card = ([id, a]) => {
+  const row = ([id, a]) => {
     const last = w.apps?.[id]?.last;
     const here = id === q.app;
-    return el('div', { class: `q-card pad app-card${here ? ' here' : ''}` }, [
-      el('div', { class: 'app-top' }, [el('img', { class: 'app-logo', src: svgUrl(appIcon(id, { crisp: true })), alt: '', width: 48, height: 48 }), el('div', { class: 'app-name' }, [el('strong', { text: a.name }), el('small', { class: 'muted', text: a.role[locale === 'en' ? 'en' : 'zh'] })]), el('small', { class: 'muted app-last', text: here ? t('here') : last ? ago(t, last) : t('neverUsed') })]),
-      el('div', { class: 'two-btn' }, [
-        el('button', { class: 'q-btn', type: 'button', text: t('guide'), onclick: () => openHelp(id) }),
-        el('button', { class: 'q-btn', type: 'button', text: t('share'), onclick: () => shareApp(id) }),
-        here ? null : el('button', { class: 'q-btn primary', type: 'button', text: t('open'), onclick: () => q.go(id) })
-      ])
+    return el('div', { class: 'q-cell q-app-row' }, [
+      el('button', { class: 'q-app-open', type: 'button', disabled: here, 'aria-label': here ? a.name : t('openApp', { app: a.name }), onclick: here ? null : () => q.go(id) }, [
+        el('span', { class: 'q-cell-icon' }, [el('img', { src: svgUrl(appIcon(id, { crisp: true })), alt: '', width: 30, height: 30 })]),
+        el('span', { class: 'q-cell-text' }, [el('span', { text: a.name }), el('small', { text: [a.role[en ? 'en' : 'zh'], here ? t('here') : last ? ago(t, last) : t('neverUsed')].join(' · ') })])
+      ]),
+      el('button', { class: 'q-cell-act q-app-share', type: 'button', 'aria-label': `${t('share')} ${a.name}`, html: icons.share })
     ]);
   };
-  put(box, section('Orbit', el('div', { class: 'app-list' }, Object.entries(APPS).map(card)), { sub: t('appsSub') }), el('button', { class: 'q-btn block ghost pass-guide', type: 'button', text: t('passGuide'), onclick: () => openHelp('pass') }));
+  const rows = Object.entries(APPS).map(row);
+  rows.forEach((r, i) => r.querySelector('.q-app-share').addEventListener('click', () => shareApp(Object.keys(APPS)[i])));
+  put(box, ...top.filter(Boolean), el('h3', { class: 'q-sheet-h', text: t('allApps') }), el('div', { class: 'q-rows q-pass-group q-app-rows' }, rows));
 }

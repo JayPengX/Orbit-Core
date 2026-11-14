@@ -127,8 +127,8 @@ export function mailRows(s, note, { head, box, sub, open = false }) {
     const m = mailOf(s);
     const cell = m
       ? node('div', { class: 'q-cell' }, [
-          node('span', { class: 'q-cell-icon', style: '--q-cell-tint:#30b0c7', html: icons.mail || '' }),
-          node('span', { class: 'q-cell-text' }, [node('span', { class: 'q-mail-addr', text: m.shown }), node('small', { text: T('已驗證', 'Verified') })]),
+          node('span', { class: 'q-cell-icon', style: '--q-cell-tint:var(--q-teal)', html: icons.mail || '' }),
+          node('span', { class: 'q-cell-text' }, [node('span', { class: 'q-mail-addr', text: m.shown }), node('small', { text: T('救援信箱 · 已驗證', 'Recovery email · verified') })]),
           ...(form
             ? []
             : [
@@ -153,7 +153,14 @@ export function mailRows(s, note, { head, box, sub, open = false }) {
               ])
         ])
       : null;
-    const add = !m && !form ? node('button', { class: 'q-row-btn', type: 'button', text: T('加入救援信箱', 'Add a recovery email'), onclick: openForm }) : null;
+    // None yet: one row that says what it's for and adds one.
+    const add = !m
+      ? node('div', { class: 'q-cell' }, [
+          node('span', { class: 'q-cell-icon', style: '--q-cell-tint:var(--q-teal)', html: icons.mail || '' }),
+          node('span', { class: 'q-cell-text' }, [node('span', { text: T('救援信箱', 'Recovery email') }), node('small', { text: T('忘記通行碼時用來找回', 'If you forget your pass') })]),
+          form ? null : node('button', { class: 'q-cell-act', type: 'button', text: T('加入', 'Add'), onclick: openForm })
+        ].filter(Boolean))
+      : null;
     const cancel = form ? node('button', { class: 'q-mail-link', type: 'button', text: T('取消', 'Cancel'), onclick: close }) : null;
     box.replaceChildren(...[cell, add, form?.el, cancel].filter(Boolean));
     sub.hidden = Boolean(m);
@@ -162,7 +169,7 @@ export function mailRows(s, note, { head, box, sub, open = false }) {
   s.on('wallet', () => box.isConnected && !form && paint());
   if (open) {
     openForm();
-    setTimeout(() => head.scrollIntoView?.({ block: 'center', behavior: 'smooth' }), 300);
+    setTimeout(() => (head.isConnected ? head : box).scrollIntoView?.({ block: 'center', behavior: 'smooth' }), 300);
   }
 }
 

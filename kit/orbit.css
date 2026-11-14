@@ -3908,17 +3908,65 @@ dialog {
 /* The Pass tab's section labels and notes keep the sheet's spacing (the reset above took it: a label sat 4 px under the card before it, 11-12). */
 .q-pass-body > .q-sheet-h { margin: 20px 16px 3px; }
 .q-pass-body > .q-sheet-sub, .q-pass-body > .q-notice-note { margin: 4px 16px 0; }
+/* The Pass tab's groups (orbit.mjs passAccount), as iOS's Settings: one card
+   of rows each, every row its icon, a hairline between rows from the text's
+   edge, whatever block (passkeys, the recovery email, a fold) holds them. */
+.q-pass-group { --q-sep-left: 58px; }
+.q-pass-group > * { position: relative; }
+.q-pass-group [hidden] { display: none; }
+.q-pass-group > :not([hidden]) ~ :not([hidden])::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: var(--q-sep-left);
+  right: 0;
+  height: var(--q-hairline);
+  background: var(--q-sep);
+}
+.q-pass-group :is(.q-cell, .q-row-btn) { width: 100%; }
+.q-pass-group .q-cell > .q-switch { flex: none; }
+.q-pass-group .q-cell:has(> .q-cell-act) { padding-right: 12px; }
+.q-pass-group .q-cell-text small { font: var(--q-t-footnote); }
+.q-pass-group .q-row-add { padding-left: 58px; }
+/* The head: the avatar worn, Orbit Pass with its level, the number and milestones. */
+.q-pass-head { gap: 14px; min-height: 76px; padding-block: 10px; }
+.q-pass-head .q-pc-face { width: 56px; height: 56px; }
+.q-ph-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.q-ph-name strong { font: 600 19px/24px var(--q-font); letter-spacing: -0.02em; white-space: nowrap; }
+.q-ph-name .q-tag { flex: none; }
+.q-pass-me { --q-sep-left: 16px; }
+/* A device code under its row, set in from the card's sides. */
+.q-pass-group .q-device { margin: 0 12px 12px; padding: 10px 12px; gap: 2px; }
+/* 每個 App 的通知, folded under its row: its chevron turns down when open. */
+.q-fold.chevron::after { transition: transform 0.2s; }
+.q-fold[aria-expanded='true'].chevron::after { transform: rotate(135deg); }
+.q-pass-group .q-notice-kinds { margin: 0; }
+.q-pass-group .q-notice-app { display: flex; align-items: center; gap: 8px; padding-left: 58px; }
+.q-pass-group .q-notice-app img { border-radius: 5px; }
+.q-pass-group .q-notice-row { padding-left: 58px; }
+/* 除錯紀錄's buttons, set in at the text's edge. */
+.q-pass-group .q-rec-acts { padding: 0 12px 12px 58px; }
+/* 登出, alone at the foot. */
+.q-pass-out { margin-top: 20px; }
+.q-pass-out .q-row-btn { justify-content: center; }
+.q-pass-out + .q-sheet-note { text-align: center; }
+/* The App tab: a row an app, its open button the whole row but its share button. */
+.q-app-row { padding: 0 12px 0 0; }
+.q-app-open { display: flex; flex: 1 1 auto; align-items: center; gap: 12px; min-width: 0; min-height: var(--q-row); padding: 8px 0 8px 16px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.q-app-open:disabled { cursor: default; }
+.q-app-open:is(:active, [data-q-press]):not(:disabled) { opacity: 0.6; }
+.q-app-share svg { width: 20px; height: 20px; display: block; }
+.q-app-share { color: var(--q-label-2); }
 .q-pass .muted { color: var(--q-muted); }
 .q-pass .num { font-variant-numeric: tabular-nums; }
 .q-pass .pad { padding: 14px; }
 .q-pass .q-card + .q-card { margin-top: 12px; }
 .q-pass .q-card.list { padding: 0; overflow: hidden; }
 .q-pass .section-sub { color: var(--q-muted); font-size: 13px; margin: -6px 0 10px; }
-.q-pass .two-btn { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; margin-top: 12px; }
 .q-pass .q-btn.ghost { background: none; border-color: transparent; }
 .q-pass .q-btn.block { width: 100%; }
 .q-pass .q-chips.small .q-chip { min-height: 30px; padding: 0 12px; font-size: 13px; }
-.q-pass .app-card.here { border-color: var(--accent); }
 /* 說明 (pass.mjs renderHelp, help.mjs): which app's guide (a row of marks),
    the app's head, what it is, a tour of its screens (each its real
    screenshot, help-shots.mjs, held at its size so nothing moves in), then
@@ -4018,15 +4066,6 @@ dialog {
 .q-pass .av-tile.on small { color: var(--accent); font-weight: 700; }
 .q-pass .fr-preview { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; overflow: hidden; }
 /* ---- Apps ---- */
-.q-pass .app-list { display: grid; gap: 12px; }
-.q-pass .app-card { display: grid; gap: 10px; }
-.q-pass .app-card .two-btn { margin-top: 0; }
-.q-pass .app-top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; }
-.q-pass .app-logo { width: 48px; height: 48px; border-radius: 13px; display: block; }
-.q-pass .app-name { display: grid; min-width: 0; }
-.q-pass .app-name small, .q-pass .app-last { font-size: 12px; }
-.q-pass .app-last { white-space: nowrap; }
-.q-pass .pass-guide { margin-top: 18px; }
 
 /* 除錯紀錄: its buttons under the switch, and a small red dot at the top while recording. */
 .q-rec-acts {

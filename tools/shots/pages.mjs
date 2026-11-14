@@ -223,8 +223,8 @@ export const PAGES = {
     )
   },
   transit: {
-    // The Pass sheet scrolled to 連結 (a Home Screen app: links in the quick view or the Safari app, Jay 2026-11-10).
-    'pass-links': { hash: '', args: click(wait(2500), "js:document.querySelector('.q-account')?.click()", wait(1500), "js:[...document.querySelectorAll('.q-sheet-h')].find(h=>/連結|Links/.test(h.textContent))?.scrollIntoView({block:'start'})", wait(600)) },
+    // The Pass sheet scrolled to 一般, its first row 用 Safari 開連結 (a Home Screen app: links in the quick view or the Safari app, Jay 2026-11-10).
+    'pass-links': { hash: '', args: click(wait(2500), "js:document.querySelector('.q-account')?.click()", wait(1500), "js:[...document.querySelectorAll('.q-sheet-h')].find(h=>/一般|General/.test(h.textContent))?.scrollIntoView({block:'start'})", wait(600)) },
     default: ['tabs', 'trip'],
     // (What tools/layout-check.mjs looks at beside every tab: the sheets that matter.)
     check: ['plans', 'place', 'search', 'ticket'],
