@@ -7714,6 +7714,61 @@ html.q-tabrail .q-suite-dot {
 .q-sw-sec {
   margin: 0 16px 18px;
 }
+/* The Orbit Pass atop the switcher: its face, its number, its sheet. */
+.q-sw-pass {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  width: calc(100% - 32px);
+  margin: 0 16px 18px;
+  padding: 10px 14px 10px 10px;
+  border: 0;
+  border-radius: var(--q-r-card, 22px);
+  background: var(--q-surface);
+  color: var(--q-label);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.q-sw-pass:active {
+  background: var(--q-fill-4);
+}
+.q-sw-face {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--q-fill-4);
+  color: var(--q-label-2);
+  object-fit: cover;
+}
+.q-sw-face svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.q-sw-who {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.q-sw-who strong {
+  font: 600 16px/21px var(--q-font);
+}
+.q-sw-who small {
+  overflow: hidden;
+  color: var(--q-label-2);
+  font: 400 13px/18px var(--q-font);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .q-sw-head {
   margin: 0 4px 8px;
   color: var(--q-label-2);

@@ -326,6 +326,7 @@ const svg = d => `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
 const DOWN = 'M7 10l5 5 5-5';
 const LEFT = 'M15 5l-7 7 7 7';
 const RIGHT = 'M9 5l7 7-7 7';
+const PERSON = 'M12 12.5a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20.5c1.2-4 4.2-6 7.5-6s6.3 2 7.5 6';
 function el(tag, props = {}, kids = []) {
   const n = document.createElement(tag);
   for (const [k, v] of Object.entries(props)) {
@@ -476,7 +477,20 @@ async function switcher() {
         el('div', { class: 'q-sw-grid' }, rest.map(id => tile(id, { now: id === app, onClick: () => (close(), id === app ? null : go(id)) })))
       ])
     : null;
-  const s = ui.sheet({ title: setupOf().name || 'Orbit', cls: 'q-suite-sheet', body: [hops, open, all].filter(Boolean), onClose: () => (sheetOpen = null) });
+  // (The Orbit Pass first, Jay 11-14: its settings and signing out one tap
+  // away, not only through an app; the face worn, the account's number.)
+  const me = (await import('./orbit.mjs').catch(() => null))?.passNow?.();
+  const pass = me
+    ? el('button', { class: 'q-sw-pass', type: 'button', onclick: () => (close(), me.open()) }, [
+        me.face ? el('img', { class: 'q-sw-face', src: me.face, alt: '' }) : el('span', { class: 'q-sw-face', html: svg(PERSON) }),
+        el('span', { class: 'q-sw-who' }, [
+          el('strong', { text: 'Orbit Pass' }),
+          el('small', { text: me.signedIn ? (me.no ? W(`${me.no} · 帳戶、設定、登出`, `${me.no} · Account, settings, sign out`) : W('帳戶、設定、登出', 'Account, settings, sign out')) : W('登入', 'Sign in') })
+        ]),
+        el('span', { class: 'q-suite-chev', html: svg(RIGHT) })
+      ])
+    : null;
+  const s = ui.sheet({ title: setupOf().name || 'Orbit', cls: 'q-suite-sheet', body: [pass, hops, open, all].filter(Boolean), onClose: () => (sheetOpen = null) });
   sheetOpen = s;
   function close() {
     s.close?.();
