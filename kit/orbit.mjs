@@ -35,7 +35,7 @@ import { DEV, cleanDev } from './brand.mjs';
 import { encodeSetup, startOf, mineSaved, mergeMine, MINE_KEY } from './orbit-mine.mjs';
 import { API, SITE as HOME, isApi } from './domain.mjs';
 import { passkeyHere, passkeyName, deviceName, makePasskey, usePasskey, forgetPasskey, cancelled } from './passkey.mjs';
-import { icons, tile, pullToRefresh, setSheetDetent, toast, h as node } from './ui.mjs';
+import { icons, tile, cell, pullToRefresh, setSheetDetent, toast, h as node } from './ui.mjs';
 import { scrollBusy } from './hold-place.mjs';
 import { breakAfter, mergeHeard } from './family.mjs';
 // (A picture drawn again never flashes: steady-pics.mjs, on import.)
@@ -3220,42 +3220,46 @@ export async function shareSheet(opts = {}) {
 // an older pass's id is its plain SHA-256, and the 12 shown before were
 // enough to guess the pass from a screenshot.
 const accountNumber = id => (id ? id.slice(0, 6).toUpperCase() : '');
-// The card atop the Pass tab: who you are here (the avatar and frame worn)
-// and how far along the milestones are; a tap opens 外觀.
+// The head of the Pass tab: who you are here (the avatar and frame worn),
+// the pass's level and number, how far along the milestones are; a tap
+// opens 外觀. Plain, as iOS's own account row: the medals live in 外觀.
+const LEVEL_NAME = { full: ['完整', 'Full'], free: ['基本', 'Basic'] };
 function accountCard(s, onLooks) {
   const en = s.lang === 'en';
   const w = s.wallet || {};
   const a = avatarOf(w);
   const f = frameOf(w);
-  const tiers = MILESTONES.map(m => milestoneOf(w, m).tier);
-  const got = tiers.reduce((a, b) => a + b, 0);
+  const got = MILESTONES.reduce((n, m) => n + milestoneOf(w, m).tier, 0);
   const all = MILESTONES.length * TIERS.length;
-  return node('button', { class: 'q-pass-card', type: 'button', onclick: onLooks, 'aria-label': en ? `Milestones ${got} of ${all}` : `里程碑 ${got} / ${all}` }, [
-    node('span', { class: 'q-pc-top' }, [
-      node('span', { class: `q-pc-face ${frameClass(f)}` }, [node('img', { alt: '', src: avatarSrc(a?.id || DEFAULT_AVATAR) })]),
-      node('span', { class: 'q-pc-id' }, [
-        node('span', { class: 'q-pc-brand', text: BRAND.pass }),
-        node('strong', { class: 'q-pc-big' }, [document.createTextNode(en ? 'Milestones ' : '里程碑 '), node('span', { class: 'num', text: `${got}/${all}` })]),
-        node('span', { class: 'q-pc-no num', text: accountNumber(s.pass) })
-      ])
-    ]),
-    // One medal per milestone, in its tier's metal, on one row however many.
-    node('span', { class: 'q-pc-ms', 'aria-hidden': 'true' }, MILESTONES.map((m, i) => node('img', { class: tiers[i] ? '' : 'dim', alt: '', src: avatarSrc(`ms-${m.id}.${tiers[i]}`) })))
+  const level = LEVEL_NAME[passLevel()];
+  return node('button', { class: 'q-cell chevron q-pass-head', type: 'button', onclick: onLooks, 'aria-label': en ? `Orbit Pass, looks and milestones ${got} of ${all}` : `Orbit Pass，外觀與里程碑 ${got} / ${all}` }, [
+    node('span', { class: `q-pc-face ${frameClass(f)}` }, [node('img', { alt: '', src: avatarSrc(a?.id || DEFAULT_AVATAR) })]),
+    node('span', { class: 'q-cell-text' }, [
+      node('span', { class: 'q-ph-name' }, [node('strong', { text: BRAND.pass }), level ? node('span', { class: 'q-tag', text: level[en ? 1 : 0] }) : null]),
+      node('small', { class: 'num', text: [en ? `No. ${accountNumber(s.pass)}` : `帳號 ${accountNumber(s.pass)}`, en ? `${got}/${all} milestones` : `里程碑 ${got}/${all}`].join(' · ') })
+    ])
   ]);
 }
 
-// The Pass tab: the account, its devices, notices and security. close()
-// closes the sheet (before a new pass is shown over everything).
+// The Pass tab: the account, then its settings in groups, as iOS's own
+// Settings: 登入與安全 (another device, passkeys, the recovery email, a new
+// pass, everyone else out), 通知, 隱私 (使用統計, the policy), 一般 (links,
+// 除錯紀錄), and 登出 alone at the foot. Every row an icon, a name and at
+// most a few words; no notes under the cards (Jay 2026-11-14: "super messy and ugly"). close() closes
+// the sheet (before a new pass is shown over everything).
 export function passAccount(s, { extra = null, close = () => {}, looks = () => {} } = {}) {
   const en = s.lang === 'en';
   const T = (zh, e) => (en ? e : zh);
   const note = node('p', { class: 'q-sheet-note', role: 'status' });
-  const act = (label, fn, cls = 'q-row-btn') =>
-    node('button', {
-      class: cls,
-      type: 'button',
-      text: label,
-      onclick: async event => {
+  // A row that does one thing: its icon, its name (a few words under), a tap.
+  const act = (icon, tint, title, fn, { sub = '', danger = false } = {}) =>
+    cell({
+      icon: icons[icon],
+      tint,
+      title,
+      sub,
+      danger,
+      onClick: async event => {
         const b = event.currentTarget;
         b.disabled = true;
         try {
@@ -3267,7 +3271,7 @@ export function passAccount(s, { extra = null, close = () => {}, looks = () => {
         }
       }
     });
-  // A device code, shown with its countdown.
+  // A device code, shown with its countdown, under its row.
   const device = node('div', { class: 'q-device', hidden: true });
   let tick = 0;
   const showCode = ({ code, exp }) => {
@@ -3280,64 +3284,62 @@ export function passAccount(s, { extra = null, close = () => {}, looks = () => {
         device.hidden = true;
         return;
       }
-      left.textContent = T(`${Math.ceil(ms / 60_000)} 分鐘內有效，只能用一次`, `Valid ${Math.ceil(ms / 60_000)} more min, once`);
+      left.textContent = T(`在另一台裝置輸入，${Math.ceil(ms / 60_000)} 分鐘內有效`, `Enter it on the other device · ${Math.ceil(ms / 60_000)} min left`);
     };
-    device.replaceChildren(node('span', { class: 'q-device-label', text: T('裝置代碼', 'Device code') }), node('strong', { class: 'q-device-code num', text: formatPass(code) }), left, node('span', { class: 'q-device-how', text: T('在另一台裝置輸入這組代碼登入', 'Enter it on the other device to sign in') }));
+    device.replaceChildren(node('strong', { class: 'q-device-code num', text: formatPass(code) }), left);
     device.hidden = false;
     paint();
     tick = setInterval(paint, 15_000);
   };
+  const group = (label, rows, head = null) => [head || node('h3', { class: 'q-sheet-h', text: label }), node('div', { class: 'q-rows q-pass-group' }, rows.filter(Boolean))];
   const nodes = [
-    accountCard(s, looks),
+    // (The head's own card: the account, and what Orbit AI it has left.)
+    node('div', { class: 'q-rows q-pass-group q-pass-me' }, [accountCard(s, looks), ...aiRows(s)]),
     ...(extra ? [extra] : []),
-    node('h3', { class: 'q-sheet-h', text: T('裝置', 'Devices') }),
-    node('div', { class: 'q-rows' }, [act(T('新增裝置（取得裝置代碼）', 'Add a device (get a device code)'), async () => showCode(await s.deviceCode())), device]),
-    ...passkeyRows(s, note),
-    ...mailSlot(s, note),
-    node('h3', { class: 'q-sheet-h', text: T('通知', 'Notifications') }),
-    ...notifyRows(s, note),
-    ...(inHomeApp() ? [node('h3', { class: 'q-sheet-h', text: T('連結', 'Links') }), linkRows(s)] : []),
-    node('h3', { class: 'q-sheet-h', text: T('隱私', 'Privacy') }),
-    usageRows(s),
-    testerHead(s, T('除錯紀錄', 'Debug log'), close),
-    recRows(s, note),
-    ...(testerOn() ? [node('div', { class: 'q-rows' }, [act(T('測試工具', 'Tester tools'), () => (close(), openTester(s)))])] : []),
-    node('h3', { class: 'q-sheet-h', text: T('帳戶安全', 'Security') }),
-    node('div', { class: 'q-rows' }, [
-      act(T('登出其他所有裝置', 'Sign out every other device'), async () => {
-        if (!(await ask({ lang: s.lang, icon: '🔒', title: T('登出其他所有裝置？', 'Sign out every other device?'), body: T('除了這台，所有裝置都會登出。', 'Every device but this one is signed out.'), ok: T('全部登出', 'Sign them out'), danger: true }))) return;
-        await s.signOutEverywhere();
-        note.textContent = T('其他裝置都已登出。', 'Every other device is signed out.');
-      }),
-      act(T('更換通行碼', 'Change my pass'), async () => {
-        if (!(await ask({ lang: s.lang, icon: '🔑', title: T('換一組新的通行碼？', 'Get a new pass?'), body: T('舊通行碼立即失效，其他裝置會登出。新通行碼只顯示一次。', 'The old pass stops working and other devices sign out. The new one is shown once.'), ok: T('換新通行碼', 'Get a new pass'), danger: true }))) return;
+    ...group(T('登入與安全', 'Sign-in & security'), [
+      node('div', {}, [act('phone', 'var(--q-blue)', T('登入另一台裝置', 'Sign in on another device'), async () => showCode(await s.deviceCode()), { sub: T('取得一次性代碼', 'Get a one-time code') }), device]),
+      passkeyRows(s, note),
+      mailSlot(s, note),
+      act('lock', 'var(--q-gray)', T('更換通行碼', 'Change my pass'), async () => {
+        if (!(await ask({ lang: s.lang, icon: 'lock', tint: 'var(--q-gray)', title: T('換一組新的通行碼？', 'Get a new pass?'), body: T('舊通行碼立即失效，其他裝置會登出。新通行碼只顯示一次。', 'The old pass stops working and other devices sign out. The new one is shown once.'), ok: T('換新通行碼', 'Get a new pass'), danger: true }))) return;
         const passcode = await s.rotate();
         // The sheet closes first: a modal sheet stays above everything else,
         // so the new pass would open behind it.
         close();
         await showNewPass(s, passcode);
       }),
-      act(
-        T('在這台裝置登出', 'Sign out on this device'),
-        async () => {
-          if (!(await ask({ lang: s.lang, icon: '👋', title: T('在這台裝置登出？', 'Sign out on this device?'), body: T('這台裝置上的資料會全部清除，都保留在 Orbit Pass。', 'Everything on this device is wiped; it all stays on your Orbit Pass.'), ok: T('登出', 'Sign out') }))) return;
+      act('signout', 'var(--q-orange)', T('登出其他所有裝置', 'Sign out other devices'), async () => {
+        if (!(await ask({ lang: s.lang, icon: 'signout', tint: 'var(--q-orange)', title: T('登出其他所有裝置？', 'Sign out every other device?'), body: T('除了這台，所有裝置都會登出。', 'Every device but this one is signed out.'), ok: T('全部登出', 'Sign them out'), danger: true }))) return;
+        await s.signOutEverywhere();
+        note.textContent = T('其他裝置都已登出。', 'Every other device is signed out.');
+      })
+    ]),
+    ...group(T('通知', 'Notifications'), notifyRows(s, note)),
+    ...group(T('隱私', 'Privacy'), usageRows(s)),
+    // (一般's label is 測試工具's door: seven taps, as 除錯紀錄's was.)
+    ...group('', [inHomeApp() ? linkRows(s) : null, recRows(s, note), testerOn() ? act('wrench', 'var(--q-gray)', T('測試工具', 'Tester tools'), () => (close(), openTester(s))) : null], testerHead(s, T('一般', 'General'), close)),
+    node('div', { class: 'q-rows q-pass-group q-pass-out' }, [
+      node('button', {
+        class: 'q-row-btn danger',
+        type: 'button',
+        text: T('登出', 'Sign out'),
+        onclick: async () => {
+          if (!(await ask({ lang: s.lang, icon: 'signout', tint: 'var(--q-red)', title: T('在這台裝置登出？', 'Sign out on this device?'), body: T('這台裝置上的資料會清除，都還留在 Orbit Pass。', 'This device is wiped; everything stays on your Orbit Pass.'), ok: T('登出', 'Sign out') }))) return;
           s.signOut();
           startOver();
-        },
-        'q-row-btn danger'
-      )
+        }
+      })
     ]),
-    node('p', { class: 'q-sheet-sub', text: T('忘記通行碼？用救援信箱找回，或在已登入的裝置按「更換通行碼」。', 'Forgot your pass? Get back in with your recovery email, or choose “Change my pass” on a signed-in device.') }),
     note
   ];
-  // card(): the card drawn again alone (a milestone or a look changed while
+  // card(): the head drawn again alone (a milestone or a look changed while
   // the tab is open), the rest (a device code counting down, a note) left as it is.
-  const card = () => {
-    const fresh = accountCard(s, looks);
-    nodes[0].replaceWith(fresh);
-    nodes[0] = fresh;
-  };
+  const card = () => nodes[0].firstChild.replaceWith(accountCard(s, looks));
   return { nodes, card, stop: () => clearInterval(tick) };
+}
+// Orbit AI's allowance, a row under the account (none while there's none to show).
+function aiRows(s) {
+  return [];
 }
 // ---- The recovery email (pass-mail.mjs, loaded when first needed) -----------------------
 
@@ -3345,20 +3347,18 @@ let mailing = null;
 export const mailKit = () => (mailing ||= import('./pass-mail.mjs').catch(e => ((mailing = null), Promise.reject(e))));
 // The Pass tab's 救援信箱, drawn once its module is in (`mailOpen`: the
 // tip's 加入, the form shown at once). Only where mail can be sent
-// (dev passMail, the Worker's), or to remove one linked before.
+// (dev passMail, the Worker's), or to remove one linked before. One block of
+// rows in 登入與安全 (pass-mail.mjs's head and sub: never shown here).
 let mailOpen = false;
 function mailSlot(s, note) {
-  const T = (zh, e) => (s.lang === 'en' ? e : zh);
-  const head = node('h3', { class: 'q-sheet-h', id: 'q-mail', text: T('救援信箱', 'Recovery email'), hidden: true });
-  const box = node('div', { class: 'q-rows q-mail', hidden: true });
-  const sub = node('p', { class: 'q-sheet-sub', text: T('忘記通行碼時，用這個信箱收驗證碼找回帳戶。', 'Forgot your pass? A code sent here gets you back in.'), hidden: true });
+  const box = node('div', { class: 'q-mail', id: 'q-mail', hidden: true });
   const open = mailOpen;
   mailOpen = false;
   if (dev('passMail') || s.wallet?.mail)
     mailKit()
-      .then(m => m.mailRows(s, note, { head, box, sub, open }))
+      .then(m => m.mailRows(s, note, { head: node('span'), box, sub: node('span'), open }))
       .catch(() => {});
-  return [head, box, sub];
+  return box;
 }
 export function openMail(s) {
   mailOpen = true;
@@ -3403,31 +3403,47 @@ const dayOf = (t, en) => new Date(t).toLocaleDateString(en ? 'en-US' : 'zh-TW', 
 const passkeysOf = s => (Array.isArray(s.wallet?.passkeys) ? s.wallet.passkeys : []);
 
 // The Pass tab's 通行密鑰: every passkey of the account (named by who keeps
-// it, when added and last used), each removable, and a button to add one
-// where this browser can. Shown also where it can't, once there are some.
+// it, when added and last used), each removable, and a row to add one where
+// this browser can. Shown also where it can't, once there are some. One
+// block of rows in 登入與安全.
 function passkeyRows(s, note) {
   const en = s.lang === 'en';
   const T = (zh, e) => (en ? e : zh);
   const here = passkeyHere();
   const ch = here ? addChallenge(s) : null;
-  const box = node('div', { class: 'q-rows q-passkeys' });
-  const head = node('h3', { class: 'q-sheet-h', text: T('通行密鑰', 'Passkeys') });
-  const sub = node('p', { class: 'q-sheet-sub', text: T('用 Face ID、Touch ID 或 Windows Hello 登入，不必輸入通行碼；通行碼照樣能用。', 'Sign in with Face ID, Touch ID or Windows Hello instead of typing your pass. Your pass still works.') });
+  const box = node('div', { class: 'q-passkeys' });
+  const keyIcon = () => node('span', { class: 'q-cell-icon', style: '--q-cell-tint:var(--q-blue)', html: icons.key });
+  const add = async event => {
+    const b = event.currentTarget;
+    b.disabled = true;
+    note.textContent = '';
+    try {
+      const done = await addPasskey(s, ch);
+      if (done === true) note.textContent = T('已加入通行密鑰，下次可以直接用它登入。', 'Passkey added: next time, sign in with it.');
+      if (done === 'here') note.textContent = T('這台裝置已經有這個 Orbit Pass 的通行密鑰。', 'This device already has a passkey for this Orbit Pass.');
+    } catch (e) {
+      note.textContent = errorText(e, s.lang);
+    } finally {
+      b.disabled = false;
+    }
+  };
   const paint = () => {
     const keys = passkeysOf(s);
-    head.hidden = box.hidden = sub.hidden = !here && !keys.length;
+    box.hidden = !here && !keys.length;
     box.replaceChildren(
+      // None yet: one row that says what it is and adds one.
+      ...(!keys.length && here ? [node('div', { class: 'q-cell' }, [keyIcon(), node('span', { class: 'q-cell-text' }, [node('span', { text: T('通行密鑰', 'Passkey') }), node('small', { text: T('用 Face ID 或指紋登入', 'Face ID or a fingerprint') })]), node('button', { class: 'q-cell-act', type: 'button', text: T('加入', 'Add'), onclick: add })])] : []),
       ...keys.map(k =>
         node('div', { class: 'q-cell' }, [
-          node('span', { class: 'q-cell-icon', style: '--q-cell-tint:#0a84ff', html: icons.key || '' }),
-          node('span', { class: 'q-cell-text' }, [node('span', { text: passkeyName(k, s.lang) }), node('small', { text: [T(`${dayOf(k.t, en)} 加入`, `Added ${dayOf(k.t, en)}`), k.used ? T(`上次使用 ${dayOf(k.used, en)}`, `last used ${dayOf(k.used, en)}`) : T('還沒用過', 'not used yet')].join(' · ') })]),
+          keyIcon(),
+          node('span', { class: 'q-cell-text' }, [node('span', { text: passkeyName(k, s.lang) }), node('small', { text: [T(`${dayOf(k.t, en)} 加入`, `Added ${dayOf(k.t, en)}`), k.used ? T(`${dayOf(k.used, en)} 用過`, `used ${dayOf(k.used, en)}`) : T('還沒用過', 'not used yet')].join(' · ') })]),
           node('button', {
             class: 'q-cell-act danger',
             type: 'button',
             text: T('移除', 'Remove'),
             onclick: async event => {
               const b = event.currentTarget;
-              if (!(await ask({ lang: s.lang, icon: '🔑', title: T('移除這個通行密鑰？', 'Remove this passkey?'), body: T(`「${passkeyName(k, s.lang)}」就不能再登入這個 Orbit Pass。通行碼和其他通行密鑰照常可用。`, `“${passkeyName(k, s.lang)}” will no longer sign in to this Orbit Pass. Your pass and other passkeys still work.`), ok: T('移除', 'Remove'), danger: true }))) return;
+              if (!(await ask({ lang: s.lang, icon: 'key', tint: 'var(--q-blue)', title: T('移除這個通行密鑰？', 'Remove this passkey?'), body: T(`「${passkeyName(k, s.lang)}」就不能再登入這個 Orbit Pass。`, `“${passkeyName(k, s.lang)}” will no longer sign in to this Orbit Pass.`), ok: T('移除', 'Remove'), danger: true }))) return;
               b.disabled = true;
               try {
                 await s.passkeyRemove(k.id);
@@ -3442,36 +3458,13 @@ function passkeyRows(s, note) {
           })
         ])
       ),
-      ...(here
-        ? [
-            node('button', {
-              class: 'q-row-btn',
-              type: 'button',
-              text: keys.length ? T('再加一個通行密鑰', 'Add another passkey') : T('加入通行密鑰', 'Add a passkey'),
-              disabled: keys.length >= 10,
-              onclick: async event => {
-                const b = event.currentTarget;
-                b.disabled = true;
-                note.textContent = '';
-                try {
-                  const done = await addPasskey(s, ch);
-                  if (done === true) note.textContent = T('已加入通行密鑰，下次可以直接用它登入。', 'Passkey added: next time, sign in with it.');
-                  if (done === 'here') note.textContent = T('這台裝置已經有這個 Orbit Pass 的通行密鑰。', 'This device already has a passkey for this Orbit Pass.');
-                } catch (e) {
-                  note.textContent = errorText(e, s.lang);
-                } finally {
-                  b.disabled = false;
-                }
-              }
-            })
-          ]
-        : [])
+      ...(keys.length && here && keys.length < 10 ? [node('button', { class: 'q-row-btn q-row-add', type: 'button', text: T('再加一個通行密鑰', 'Add another passkey'), onclick: add })] : [])
     );
   };
   paint();
   if (here) ch.get().catch(() => {});
   s.on('wallet', () => box.isConnected && paint());
-  return [head, box, sub];
+  return box;
 }
 
 // A while after an app opens signed in, where this browser can make a
@@ -3971,24 +3964,25 @@ function toggle(on, label, onchange) {
 }
 
 // The account sheet's notices: system notices for the pass (on, off, or
-// not allowed yet by this phone), then every kind of notice with what it is
-// and its own switch. All of them follow the pass to every app and device.
+// not allowed yet by this phone), then 每個 App 的通知, folded: every kind
+// of notice with what it is and its own switch, this app's first. All of
+// them follow the pass to every app and device. Rows for the 通知 group.
 function notifyRows(s, note) {
   const en = s.lang === 'en';
   const T = (zh, e) => (en ? e : zh);
   const supported = 'Notification' in globalThis;
   const state = () => {
     if (!supported) return notifyPrefs().on ? T('已開啟；這個瀏覽器收不到', 'On; this browser can’t show them') : T('這個瀏覽器不支援', 'Not supported here');
-    if (Notification.permission === 'denied') return T('已封鎖，到設定打開', 'Blocked: allow in Settings');
-    if (notifyOn()) return T('開啟：每個 App、每台裝置', 'On: every app, every device');
-    if (notifyPrefs().on) return T('還沒允許：點開關', 'Not allowed here yet: tap');
+    if (Notification.permission === 'denied') return T('已封鎖，到設定打開', 'Blocked in Settings');
+    if (notifyOn()) return T('每個 App、每台裝置', 'Every app, every device');
+    if (notifyPrefs().on) return T('這台還沒允許：點開關', 'Not allowed here yet: tap');
     return T('關閉', 'Off');
   };
-  const sub = node('small', { class: 'q-notice-sub', text: state() });
-  const master = node('div', { class: 'q-notice-row master' }, [
+  const sub = node('small', { text: state() });
+  const master = node('div', { class: 'q-cell' }, [
     // Notifications' own red tile, as iOS's Settings draws it (no emoji).
-    tile(icons.bell, 'var(--q-red)'),
-    node('div', { class: 'q-notice-text' }, [node('strong', { text: T('系統通知', 'System notices') }), sub]),
+    node('span', { class: 'q-cell-icon', style: '--q-cell-tint:var(--q-red)', html: icons.bell }),
+    node('span', { class: 'q-cell-text' }, [node('span', { text: T('系統通知', 'System notices') }), sub]),
     supported
       ? toggle(notifyOn(), T('系統通知', 'System notices'), async on => {
           if (!on) {
@@ -4009,22 +4003,35 @@ function notifyRows(s, note) {
   ]);
   // This app's kinds first, then the rest.
   const order = [s.app, ...Object.keys(NOTICE_KINDS).filter(a => a !== s.app)].filter(a => NOTICE_KINDS[a] && APPS[a]);
-  const groups = order.map(app =>
-    node('div', { class: 'q-notice-group' }, [
-      node('p', { class: 'q-notice-app', text: APPS[app].short }),
-      ...NOTICE_KINDS[app].map(([kind, zh, e, dzh, de]) =>
-        node('div', { class: 'q-notice-row' }, [
-          node('div', { class: 'q-notice-text' }, [node('strong', { text: T(zh, e) }), node('small', { class: 'q-notice-sub', text: T(dzh, de) })]),
-          toggle(kindOn(app, kind), T(zh, e), on => void setKind(app, kind, on, s))
-        ])
-      )
-    ])
+  const all = order.flatMap(app => NOTICE_KINDS[app].map(([kind]) => [app, kind]));
+  const count = node('span', { class: 'q-cell-value num' });
+  const paintCount = () => {
+    const on = all.filter(([a, k]) => kindOn(a, k)).length;
+    count.textContent = on === all.length ? T('全部開啟', 'All on') : T(`${on} 項開啟`, `${on} on`);
+  };
+  paintCount();
+  const appMark = app => node('img', { src: `data:image/svg+xml,${encodeURIComponent(appIcon(app, { crisp: true }))}`, alt: '', width: 20, height: 20 });
+  const kinds = node(
+    'div',
+    { class: 'q-notice-kinds', hidden: true },
+    order.map(app =>
+      node('div', { class: 'q-notice-group' }, [
+        node('p', { class: 'q-notice-app' }, [appMark(app), document.createTextNode(APPS[app].short)]),
+        ...NOTICE_KINDS[app].map(([kind, zh, e, dzh, de]) =>
+          node('div', { class: 'q-notice-row' }, [
+            node('div', { class: 'q-notice-text' }, [node('strong', { text: T(zh, e) }), node('small', { class: 'q-notice-sub', text: T(dzh, de) })]),
+            toggle(kindOn(app, kind), T(zh, e), on => void (setKind(app, kind, on, s), paintCount()))
+          ])
+        )
+      ])
+    )
   );
-  return [
-    node('div', { class: 'q-rows' }, [master]),
-    node('p', { class: 'q-notice-note', text: T('通知設定跟著 Orbit Pass：在每個 App、每台裝置都一樣。', 'Notice settings follow your Orbit Pass: the same in every app, on every device.') }),
-    node('div', { class: 'q-rows q-notice-kinds' }, groups)
-  ];
+  const fold = node('button', { class: 'q-cell chevron q-fold', type: 'button', 'aria-expanded': 'false' }, [node('span', { class: 'q-cell-icon', style: '--q-cell-tint:var(--q-red)', html: icons.list }), node('span', { class: 'q-cell-text' }, [node('span', { text: T('App 通知', 'App notices') })]), count]);
+  fold.addEventListener('click', () => {
+    kinds.hidden = !kinds.hidden;
+    fold.setAttribute('aria-expanded', String(!kinds.hidden));
+  });
+  return [master, fold, kinds];
 }
 
 // ---- Links out of Orbit ---------------------------------------------------------------------
@@ -4122,18 +4129,16 @@ if (typeof document !== 'undefined' && !document.__orbitLinks) {
 function linkRows(s) {
   const en = s.lang === 'en';
   const T = (zh, e) => (en ? e : zh);
-  const say = () => (linkWay() === 'safari' ? T('連結在 Safari 打開，有你的延伸功能', 'Links open in Safari, with your extensions') : T('連結在 App 裡快速檢視', 'Links open in a quick view in the app'));
-  const sub = node('small', { class: 'q-notice-sub', text: say() });
-  return node('div', { class: 'q-rows' }, [
-    node('div', { class: 'q-notice-row master' }, [
-      tile(icons.compass, 'var(--q-blue)'),
-      node('div', { class: 'q-notice-text' }, [node('strong', { text: 'Safari App' }), sub]),
-      toggle(linkWay() === 'safari', T('連結用 Safari App 打開', 'Open links in the Safari app'), on => {
-        setLinkWay(on ? 'safari' : 'quick', s);
-        sub.textContent = say();
-        return true;
-      })
-    ])
+  const say = () => (linkWay() === 'safari' ? T('在 Safari App 打開', 'Open in the Safari app') : T('在 App 裡快速檢視', 'A quick view in the app'));
+  const sub = node('small', { text: say() });
+  return node('div', { class: 'q-cell' }, [
+    node('span', { class: 'q-cell-icon', style: '--q-cell-tint:var(--q-blue)', html: icons.compass }),
+    node('span', { class: 'q-cell-text' }, [node('span', { text: T('用 Safari 開連結', 'Links in Safari') }), sub]),
+    toggle(linkWay() === 'safari', T('連結用 Safari App 打開', 'Open links in the Safari app'), on => {
+      setLinkWay(on ? 'safari' : 'quick', s);
+      sub.textContent = say();
+      return true;
+    })
   ]);
 }
 
@@ -4148,23 +4153,22 @@ function usageRows(s) {
   const en = s.lang === 'en';
   const T = (zh, e) => (en ? e : zh);
   const gpc = globalThis.navigator?.globalPrivacyControl === true;
-  const say = () => (gpc ? T('瀏覽器要求不追蹤：不傳送', 'Your browser asks not to be tracked: nothing sent') : usageOn() ? T('只有匿名的次數，不知道你是誰', 'Anonymous counts only, never who you are') : T('關閉：什麼都不傳送', 'Off: nothing is sent'));
-  const sub = node('small', { class: 'q-notice-sub', text: say() });
-  const policy = node('button', { class: 'q-row-btn', type: 'button', text: T('隱私權政策與使用條款', 'Privacy policy and terms'), onclick: () => openPolicy() });
-  return node('div', { class: 'q-rows' }, [
-    node('div', { class: 'q-notice-row master' }, [
-      tile(icons.chart || icons.ai || '', 'var(--q-gray, #8e8e93)'),
-      node('div', { class: 'q-notice-text' }, [node('strong', { text: T('使用統計', 'Usage stats') }), sub]),
+  const say = () => (gpc ? T('瀏覽器要求不追蹤：不傳送', 'Your browser asks not to: none sent') : usageOn() ? T('匿名的次數，不知道你是誰', 'Anonymous, never who you are') : T('關閉', 'Off'));
+  const sub = node('small', { text: say() });
+  return [
+    node('div', { class: 'q-cell' }, [
+      node('span', { class: 'q-cell-icon', style: '--q-cell-tint:var(--q-gray)', html: icons.chart }),
+      node('span', { class: 'q-cell-text' }, [node('span', { text: T('使用統計', 'Usage stats') }), sub]),
       gpc
-        ? node('span')
+        ? null
         : toggle(usageOn(), T('使用統計', 'Usage stats'), on => {
             setUsageOn(on, s);
             sub.textContent = say();
             return true;
           })
-    ]),
-    policy
-  ]);
+    ].filter(Boolean)),
+    cell({ icon: icons.shield, tint: 'var(--q-green)', title: T('隱私權政策與使用條款', 'Privacy policy and terms'), chevron: true, onClick: () => openPolicy() })
+  ];
 }
 // Once on a device, a moment after an app opens: what's counted, the
 // policy, and off in one tap (a quiet banner, as Orbit's others).
@@ -6648,8 +6652,13 @@ if (typeof window !== 'undefined') {
 function recRows(s, note) {
   const en = s.lang === 'en';
   const T = (zh, e) => (en ? e : zh);
-  const sub = node('small', { class: 'q-notice-sub' });
-  const paint = () => (sub.textContent = recOn() ? T(`記錄中・${recRead().length} 筆`, `Recording · ${recRead().length}`) : T('關閉：只留每件事的最後一次', 'Off: only the last of each kept'));
+  const sub = node('small');
+  // (Its buttons only while recording: off, the row is one line.)
+  const acts = node('div', { class: 'q-rec-acts' });
+  const paint = () => {
+    sub.textContent = recOn() ? T(`記錄中・${recRead().length} 筆`, `Recording · ${recRead().length}`) : T('關閉', 'Off');
+    acts.hidden = !recOn();
+  };
   paint();
   const send = async how => {
     const text = recDump(s.app);
@@ -6661,17 +6670,8 @@ function recRows(s, note) {
     note.textContent = T(`已複製（${Math.round(text.length / 1024)} KB）`, `Copied (${Math.round(text.length / 1024)} KB)`);
   };
   const btn = (label, fn) => node('button', { class: 'q-chip', type: 'button', text: label, onclick: () => fn().catch(() => (note.textContent = T('沒辦法複製', 'Couldn’t copy'))) });
-  return node('div', { class: 'q-rows' }, [
-    node('div', { class: 'q-notice-row master' }, [
-      // (The kit's tile, as Safari App's row above: the 🐞 emoji was the sheet's only one, 11-12.)
-      tile(icons.history, 'var(--q-red)'),
-      node('div', { class: 'q-notice-text' }, [node('strong', { text: T('記錄操作過程', 'Record what the app does') }), sub]),
-      toggle(recOn(), T('記錄操作過程', 'Record'), on => {
-        setRecOn(on);
-        paint();
-      })
-    ]),
-    node('div', { class: 'q-rec-acts' }, [
+  acts.replaceChildren(
+    ...[
       // (傳給 Orbit: only what went wrong, on this tap, for the owner's weekly report; rec-weekly.js.)
       s.op
         ? node('button', {
@@ -6700,7 +6700,19 @@ function recRows(s, note) {
         paint();
         note.textContent = T('已清除', 'Cleared');
       })
-    ])
+    ].filter(Boolean)
+  );
+  return node('div', { class: 'q-rec' }, [
+    node('div', { class: 'q-cell' }, [
+      // (The kit's icon, as Safari's row above: the 🐞 emoji was the sheet's only one, 11-12.)
+      node('span', { class: 'q-cell-icon', style: '--q-cell-tint:var(--q-gray)', html: icons.history }),
+      node('span', { class: 'q-cell-text' }, [node('span', { text: T('除錯紀錄', 'Debug log') }), sub]),
+      toggle(recOn(), T('記錄操作過程', 'Record what the app does'), on => {
+        setRecOn(on);
+        paint();
+      })
+    ]),
+    acts
   ]);
 }
 

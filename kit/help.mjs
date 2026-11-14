@@ -35,10 +35,10 @@ export const HELP = {
         '里程碑每個 App 一個，分銅、銀、金三級，拿到就永久保留。拿到第一級就能戴上它的頭像和頭像框（一起戴上），升級後會換成銀色、金色。最上面是最接近的下一枚：要做什麼、還差多少。'
       ]],
       ['devices', '登入與裝置', [
-        '新裝置：輸入通行碼，或在已登入的裝置按「新增裝置」拿 8 碼裝置代碼（10 分鐘內、只能用一次）。',
+        '新裝置：輸入通行碼，或在已登入的裝置按「登入另一台裝置」拿 8 碼代碼（10 分鐘內、只能用一次）。',
         '第一次用別人給你的通行碼登入時，會先請你換掉它，之後只有你知道。',
         '通行密鑰：在 Pass 分頁加入後，新裝置按「用通行密鑰登入」，用 Face ID、Touch ID 或 Windows Hello 就能登入；通行碼照樣能用。',
-        '「在這台裝置登出」只清掉這台裝置的資料；都還在 Orbit Pass，登入就回來。'
+        '「登出」只清掉這台裝置的資料；都還在 Orbit Pass，登入就回來。'
       ]],
       ['one', '一個 App 一個地方', [
         '所有 App 可以同時開。同一個 App 在另一台裝置（或 Safari 和主畫面 App 之間）打開時，原本那個會暫停，按「在這裡繼續」拿回來，資料不會互相蓋掉。'
@@ -47,12 +47,12 @@ export const HELP = {
         'Sports、Transit、Securities 是即時的，沒網路時只顯示「沒有網路連線」，連上就回來。其他 App 沒網路也能打開上次的資料，連上後再同步。網路慢時先用手機上的資料，新的到了再換上。'
       ]],
       ['notify', '通知與除錯紀錄', [
-        '「系統通知」一個開關管全部，下面每個 App 的每種通知各自開關。設定跟著 Orbit Pass，每台裝置都一樣。',
-        '除錯紀錄：打開「記錄操作過程」，出問題時按「傳給 Orbit」（只傳出錯的地方，每週一整理給開發者），或「複製紀錄」「分享檔案」自己傳。紀錄裡沒有通行碼。'
+        '「系統通知」一個開關管全部，「App 通知」裡每種通知各自開關。設定跟著 Orbit Pass，每台裝置都一樣。',
+        '除錯紀錄：在「一般」打開「除錯紀錄」，出問題時按「傳給 Orbit」（只傳出錯的地方，每週一整理給開發者），或「複製紀錄」「分享檔案」自己傳。紀錄裡沒有通行碼。'
       ]],
       ['safe', '安全', [
         '伺服器只存通行碼的雜湊值，裝置上只有會過期、可撤銷的登入。',
-        '「帳戶安全」可以登出其他所有裝置，或更換通行碼（舊的立刻失效，新的只顯示一次）。忘了通行碼：在登入畫面用救援信箱收驗證碼找回，或在還登入的裝置換一組。'
+        '「登入與安全」可以登出其他所有裝置，或更換通行碼（舊的立刻失效，新的只顯示一次）。忘了通行碼：在登入畫面用救援信箱收驗證碼找回，或在還登入的裝置換一組。'
       ]],
       ['money', '錢在哪裡', [
         'Orbit Pass 不放錢。餘額、每週薪水、紓困、財富等級和明細都在 Orbit Securities 的「資金」分頁。'
@@ -76,10 +76,10 @@ export const HELP = {
         'One milestone per app, in bronze, silver and gold, each kept for good once reached. The first earns its avatar and frame (worn together), which turn silver and gold as you go. On top: the nearest next medal, what it asks and how far along you are.'
       ]],
       ['devices', 'Signing in and devices', [
-        'On a new device, enter the pass, or choose “Add a device” on a signed-in one for an 8-character device code (10 minutes, once).',
+        'On a new device, enter the pass, or choose “Sign in on another device” on a signed-in one for an 8-character code (10 minutes, once).',
         'The first time you sign in with a pass someone gave you, you’re asked to replace it, so only you know it.',
         'Passkeys: add one in the Pass tab, then on a new device choose “Sign in with a passkey” and use Face ID, Touch ID or Windows Hello. Your pass still works.',
-        '“Sign out on this device” wipes only this device; it all stays on your Orbit Pass.'
+        '“Sign out” wipes only this device; it all stays on your Orbit Pass.'
       ]],
       ['one', 'Each app in one place', [
         'Every app can be open at once. Opening the same app somewhere else (another device, or Safari beside the home-screen app) pauses the first; “Continue here” takes it back, and nothing is overwritten.'
@@ -88,12 +88,12 @@ export const HELP = {
         'Sports, Transit and Securities are live, so offline they show only “No internet connection” and come back by themselves. The others open on what they kept and sync once you’re back. On a slow connection an app opens on what the phone has, then swaps in the new.'
       ]],
       ['notify', 'Notifications and the debug log', [
-        'One switch, System notices, turns them all on or off; below it each app’s kinds have their own. They follow your Orbit Pass to every device.',
-        'Debug log: turn on “Record what the app does”, then Copy or Share file when something goes wrong. It never holds your pass.'
+        'One switch, System notices, turns them all on or off; App notices holds a switch for each kind. They follow your Orbit Pass to every device.',
+        'Debug log: turn it on under General, then Send to Orbit, Copy or Share file when something goes wrong. It never holds your pass.'
       ]],
       ['safe', 'Security', [
         'The server keeps only a hash of the pass; devices keep only sign-ins that expire and can be revoked.',
-        'Security can sign out every other device or change the pass (the old one stops at once, the new one is shown once). Forgot it? Get back in with a code sent to your recovery email, or change it on a device that’s still signed in.'
+        'Sign-in & security can sign out every other device or change the pass (the old one stops at once, the new one is shown once). Forgot it? Get back in with a code sent to your recovery email, or change it on a device that’s still signed in.'
       ]],
       ['money', 'Where the money is', [
         'The Orbit Pass holds no money. Balance, weekly pay, relief, wealth levels and every entry are in Orbit Securities’ Money tab.'
@@ -621,15 +621,15 @@ export const TOURS = {
   pass: {
     zh: [
       ['first', '第一次登入', ['別人給你的通行碼，第一次登入時要先換成你自己的一組新通行碼（換好才打開 App）；接著可以加入通行密鑰（建議，用 Face ID 登入），也可以以後再說。']],
-      ['pass', 'Pass', ['你的卡片（頭像、里程碑、帳號），點它換外觀；下面是這個 App 的設定、新增裝置、通知、除錯紀錄和帳戶安全。']],
+      ['pass', 'Pass', ['你的帳號（頭像、等級、里程碑），點它換外觀；下面是這個 App 的設定、登入與安全、通知和一般。']],
       ['looks', '外觀', ['里程碑，和免費的頭像、頭像框。最上面是最接近的下一枚。']],
-      ['apps', 'App', ['每個 Orbit App，上次什麼時候用，一點就打開。']]
+      ['apps', 'App', ['問 Orbit、今天，和每個 Orbit App：上次什麼時候用，一點就打開。']]
     ],
     en: [
       ['first', 'First sign-in', ['A pass someone gave you is replaced with a new one of your own at its first sign-in (then the app opens); after that you can add a passkey (recommended: sign in with Face ID), or leave it for later.']],
-      ['pass', 'Pass', ['Your card (avatar, milestones, account); tap it for your look. Below: this app’s settings, adding a device, notifications, the debug log and security.']],
+      ['pass', 'Pass', ['Your account (avatar, level, milestones); tap it for your look. Below: this app’s settings, sign-in and security, notifications and general.']],
       ['looks', 'Looks', ['Milestones, and the free avatars and frames. On top, the nearest next medal.']],
-      ['apps', 'Apps', ['Every Orbit app, when you last used it, a tap to open it.']]
+      ['apps', 'Apps', ['Ask Orbit, Today, and every Orbit app: when you last used it, a tap to open it.']]
     ]
   },
   match: {
@@ -832,10 +832,10 @@ export const SHOTS = {
   'orbit/today': 'eb03e10bd666 e11dc83d50c7 d7c711fcaabc 13878b631a8c',
   'orbit/tools': '869cf9706a80 44f390d028b0 7e76f177e6e3 babced64aebc',
   'orbit/week': '9503d54f11cd b7cfe26ec4e2 51e5b7180d61 f6ec46deac7d',
-  'pass/apps': '61f3596e815d 3e1217b80394 26490bfc3fb8 7728ad086c0e',
+  'pass/apps': '6904464a5657 23f65170983f bfbaf74af212 56b13f5052fd',
   'pass/first': '6b11106b7c13 be8aa99d2b12 6d92dc715bdb 688e28227574',
   'pass/looks': 'f3ba5f25b23f 594a414fc1f3 0088a1537ce7 4fa19c463511',
-  'pass/pass': '9af02493e863 135072f076d9 6e9f1030d159 481841cb8f8c',
+  'pass/pass': '53a3f2ae6ec7 7f888f311bde 56197db932c8 ed0d1ac0998b',
   'stock/fx': '3e3179802cd2 44788dfc33da 3cf30c7b4b2b 15580f84ed1f',
   'stock/history': '7e241ed5be6b 97fe5d4c0186 7aa6115f9f5d 652ba12dcf54',
   'stock/home': '5504e39051f9 642c81f03939 8b0d4088ede1 33c12f7a2775',
