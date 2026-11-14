@@ -3559,13 +3559,14 @@ function offerNotices(s) {
 // A separate app (its own page or home-screen icon, not Orbit's window):
 // a quiet banner recommends Orbit, every app in one (Jay 2026-11-14: "push
 // orbit as the main way ... they can turn it off in a one time action").
-// At most once a day on a device, gone by itself after 12 s; 打開 Orbit
+// At most once a day on a device, gone by itself after 5 s; 打開 Orbit
 // opens this same screen in Orbit (an iPhone's home-screen app: Orbit's page
 // in Safari, to be added); 不再顯示 is one tap, kept for good. Never inside
 // Orbit, a frame, a gated page, a tool's browser, or over a dialog or banner.
 export const TIP_NEVER = 'orbit.tip.never';
 export const TIP_AT = 'orbit.tip.at';
 export const TIP_EVERY = 86_400_000;
+export const TIP_FOR = 5_000;
 export function tipDue({ never = null, at = null, now = Date.now() } = {}) {
   if (never) return false;
   return !(Number(at) > 0) || now - Number(at) >= TIP_EVERY;
@@ -3604,6 +3605,7 @@ function orbitTip(s) {
   let timer = 0;
   const gone = () => {
     clearTimeout(timer);
+    off();
     el.classList.add('out');
     setTimeout(() => el.remove(), 250);
   };
@@ -3617,9 +3619,16 @@ function orbitTip(s) {
     gone();
     globalThis.location.assign(orbitTarget(`${location.pathname}${location.hash}`, { install: isPhoneOrTablet(), iosApp: isIOS() && isStandalone(), origin: location.origin }));
   });
-  // (Touched, it waits for an answer.)
-  el.addEventListener('pointerdown', () => clearTimeout(timer), { once: true });
-  timer = setTimeout(gone, 12_000);
+  // (Brief, never in the way, so 不再顯示 isn't the only way out: gone after
+  // 5 s, at once when the page is scrolled or touched elsewhere; touching it
+  // gives 5 s more. Jay 2026-11-14: "don't just hang there so long".)
+  const later = () => (clearTimeout(timer), (timer = setTimeout(gone, TIP_FOR)));
+  const away = e => !el.contains(e.target) && (off(), gone());
+  const off = () => (removeEventListener('scroll', away, true), removeEventListener('pointerdown', away, true));
+  el.addEventListener('pointerdown', later);
+  addEventListener('scroll', away, { capture: true, passive: true });
+  addEventListener('pointerdown', away, true);
+  later();
   document.body.append(el);
   bannerEl = el;
 }
