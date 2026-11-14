@@ -41,7 +41,7 @@ export function siteFor(repo, domain = DOMAIN) {
       name: 'orbit-pass',
       put: [['', '/pass'], ['index.html', '/index.html'], ...kitRoots.map(r => ['', `/${r}`]), ['key', '/key'], ['app', '/app'], ['admin', '/admin'], ['favicon.ico', '/favicon.ico'], ['icons/apple-touch-icon.png', '/apple-touch-icon.png'], ['icons/apple-touch-icon.png', '/apple-touch-icon-precomposed.png']],
       // (The owner's panel at /admin/ alone, Jay 2026-11-14: not also under /pass/ and the kit's
-      // paths, where it was until then; those addresses go to it.)
+      // paths, where it was until then; nothing forwards from there, Jay: no legacy forwards.)
       skip: ['admin'],
       // The whole orbit. host bar the apps' paths (theirs are more
       // specific, so they win): the root, the family page, the kit, the root
@@ -50,7 +50,7 @@ export function siteFor(repo, domain = DOMAIN) {
       routes: [`${orbit}/*`, ...kitRoots.map(r => `${d}/${r}*`)],
       // (The family's home is the root since 2026-11-14, Jay: "orbit.jaypengx.com is the home for
       // all those apps"; its pictures stay under /pass/.)
-      redirects: ['/pass/ / 301', '/pass/index.html / 301', ...['/pass', ...kitRoots.map(r => `/${r}`)].flatMap(at => [`${at}/admin https://${orbit}/admin/ 301`, `${at}/admin/ https://${orbit}/admin/ 301`, `${at}/admin/* https://${orbit}/admin/:splat 301`])]
+      redirects: ['/pass/ / 301', '/pass/index.html / 301']
     };
   }
   if (repo === 'Orbit-Showcase') {
