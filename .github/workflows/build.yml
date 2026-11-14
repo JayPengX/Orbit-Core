@@ -33,6 +33,7 @@ jobs:
             ai-models) url="$base/ops?check=ai-models" ;;
             ai-compare) url="$base/ops?check=ai-compare&$TRY" ;;
             ai-try) url="$base/ops?check=ai-try&$TRY" ;;
+            store-time) url="$base/ops?check=store-time" ;;
             as-phone) url="$base/ops?check=as-phone&$TRY" ;;
             system) url="$base/ops?check=system" ;;
             levels) url="$base/ops?check=levels&$TRY" ;;
