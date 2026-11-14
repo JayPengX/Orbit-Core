@@ -1,7 +1,7 @@
 // The 說明 guides' screenshots (kit/help.mjs's tours): every stop of every
 // app's tour, at 390 wide, light and dark, in Chinese and English, with real
-// live data (signed in to the demo account where the app has one), cropped to
-// the screen's top and saved as WebP in kit/img/help/<kit id>/, then each
+// live data (signed in to the demo account where the app has one), the whole
+// screen (Jay 2026-11-14: the screen's top alone read as cut off), saved as WebP in kit/img/help/<kit id>/, then each
 // picture's hash written into kit/help.mjs (the guide asks `?v=<hash>`).
 //
 //   node tools/help-shots.mjs [kit id…] [--stops a,b] [--jobs 4] [--keep dir [--reuse]]
@@ -29,19 +29,18 @@ for (const p of ['playwright', '/opt/node22/lib/node_modules/playwright', `${pro
 }
 
 // Each app: preview.mjs's name, its demo account, how long live data takes,
-// the stops that aren't just a tab (a tab's id is clicked by itself), and
-// where a stop that is a sheet starts (`top`, CSS px: the crop starts there).
+// and the stops that aren't just a tab (a tab's id is clicked by itself).
 const click = (...a) => a.flatMap(s => ['--click', s]);
 const tabClick = id => click(`js:document.getElementById('tab-${id}')?.click()`);
 const page = (app, name) => PAGES[app][name].args || [];
 const passTab = n => click('.q-account', wait(1500), `js:document.querySelectorAll('.q-pass-tabs [role=tab]')[${n}]?.click()`, wait(1200), "js:[...document.querySelectorAll('dialog[open]')].pop().scrollTop=0");
 const APPS = {
-  pass: { app: 'weather', account: 'shots/accounts/weather-pins.txt', wait: 6000, stops: { first: ['--fresh', ...click(wait(1500))], pass: passTab(0), looks: passTab(1), apps: passTab(2) }, top: { first: 200 } },
+  pass: { app: 'weather', account: 'shots/accounts/weather-pins.txt', wait: 6000, stops: { first: ['--fresh', ...click(wait(1500))], pass: passTab(0), looks: passTab(1), apps: passTab(2) } },
   match: { app: 'sports', account: 'shots/accounts/sports-fan.txt', wait: 25000, stops: {} },
   transit: { app: 'transit', account: 'shots/accounts/transit-rides.txt', wait: 10000, args: ['--google-map'], stops: { times: page('transit', 'board') } },
-  weather: { app: 'weather', account: 'shots/accounts/weather-pins.txt', wait: 9000, stops: { day: page('weather', 'day'), rain: page('weather', 'rain') }, top: { rain: 374 } },
-  orbit: { app: 'orbit', account: 'shots/accounts/orbit-week.txt', args: ['--clock', '2026-11-04T10:30'], wait: 6000, stops: { class: page('orbit', 'class') }, top: { class: 374 } },
-  money: { app: 'money', account: 'money-demo', wait: 6000, stops: { entry: page('money', 'entry') }, top: { entry: 168 } },
+  weather: { app: 'weather', account: 'shots/accounts/weather-pins.txt', wait: 9000, stops: { day: page('weather', 'day'), rain: page('weather', 'rain') } },
+  orbit: { app: 'orbit', account: 'shots/accounts/orbit-week.txt', args: ['--clock', '2026-11-04T10:30'], wait: 6000, stops: { class: page('orbit', 'class') } },
+  money: { app: 'money', account: 'money-demo', wait: 6000, stops: { entry: page('money', 'entry') } },
   vocab: { app: 'words', account: 'shots/accounts/words-demo.txt', wait: 7000, stops: { quiz: page('words', 'answered') } },
   beats: { app: 'beats', wait: 6000, stops: { game: [...page('beats', 'game'), ...click(wait(10000))] }, hash: { game: 'create' } },
   news: { app: 'news', wait: 9000, stops: {} },
@@ -87,7 +86,7 @@ for (const id of apps) {
         const hash = a.hash?.[stop] || '';
         const how = a.stops[stop] ?? tabClick(stop);
         const acc = accountFile(a);
-        tasks.push({ id, stop, lang, theme, dir, top: a.top?.[stop] || 0, argv: [join(HERE, 'preview.mjs'), a.app, ...(hash ? [hash] : []), '--live', '--width', '390', '--height', '844', '--lang', lang, '--wait', String(a.wait), '--out', dir, ...(theme === 'dark' ? ['--dark'] : []), ...(acc ? ['--payload', acc] : []), ...(a.args || []), ...how] });
+        tasks.push({ id, stop, lang, theme, dir, argv: [join(HERE, 'preview.mjs'), a.app, ...(hash ? [hash] : []), '--live', '--width', '390', '--height', '844', '--lang', lang, '--wait', String(a.wait), '--out', dir, ...(theme === 'dark' ? ['--dark'] : []), ...(acc ? ['--payload', acc] : []), ...(a.args || []), ...how] });
       }
 }
 console.log(`${tasks.length} shots → ${work}`);
@@ -105,15 +104,15 @@ await Promise.all(Array.from({ length: jobs }, async () => {
   }
 }));
 
-// Cropped to the screen's top (390 × 470) and made WebP in Chromium itself: no image library.
-const W = 480, H = Math.round((470 / 390) * W);
+// The whole 390 × 844 screen at 360 wide, made WebP in Chromium itself: no image library.
+const W = 360, H = Math.round((844 / 390) * W);
 const browser = await playwright.chromium.launch();
 const tab = await browser.newPage();
 await tab.setContent('<canvas></canvas>');
 const outDir = id => join(CORE, 'kit/img/help', id);
 for (const t of tasks.filter(t => t.png)) {
   const b64 = readFileSync(t.png).toString('base64');
-  const webp = await tab.evaluate(async ({ b64, W, H, top }) => {
+  const webp = await tab.evaluate(async ({ b64, W, H }) => {
     const img = new Image();
     img.src = `data:image/png;base64,${b64}`;
     await img.decode();
@@ -121,11 +120,10 @@ for (const t of tasks.filter(t => t.png)) {
     c.width = W; c.height = H;
     const x = c.getContext('2d');
     x.imageSmoothingQuality = 'high';
-    // (A sheet's stop starts at the sheet: `top` in CSS pixels of the 390-wide screen.)
-    const sw = img.naturalWidth, sh = Math.round((sw * H) / W), sy = Math.min(Math.round((top * sw) / 390), img.naturalHeight - sh);
-    x.drawImage(img, 0, sy, sw, sh, 0, 0, W, H);
+    const sw = img.naturalWidth, sh = Math.min(img.naturalHeight, Math.round((sw * H) / W));
+    x.drawImage(img, 0, 0, sw, sh, 0, 0, W, H);
     return c.toDataURL('image/webp', 0.8).split(',')[1];
-  }, { b64, W, H, top: t.top });
+  }, { b64, W, H });
   mkdirSync(outDir(t.id), { recursive: true });
   writeFileSync(join(outDir(t.id), `${t.stop}.${t.lang}.${t.theme}.webp`), Buffer.from(webp, 'base64'));
 }
