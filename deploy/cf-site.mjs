@@ -67,6 +67,12 @@ export function folderRules(files) {
   return rules;
 }
 
+// Every file of every site: readable by any page (the showcase loads the kit
+// from the bare domain); never taken for another type than it's sent as; and
+// shown in a frame only by a page of its own site (Orbit's /app/ holds each
+// app in one), never under someone else's page made to catch a tap.
+export const SITE_HEADERS = "/*\n  Access-Control-Allow-Origin: *\n  X-Content-Type-Options: nosniff\n  Content-Security-Policy: frame-ancestors 'self'\n";
+
 // A repo's own _headers (its paths as on its own site, e.g. /samples/*),
 // moved under each place the build is put (/beats/samples/*).
 export function ownHeaders(text, put) {
@@ -117,7 +123,7 @@ async function main() {
   for (const f of files) if ((await stat(join(out, f))).size > MAX_BYTES) throw new Error(`${f} is over 25 MB`);
   const redirects = [...site.redirects, ...folderRules(files)];
   await writeFile(join(out, '_redirects'), redirects.join('\n') + '\n');
-  await writeFile(join(out, '_headers'), ownHeaders(own, site.put) + '/*\n  Access-Control-Allow-Origin: *\n');
+  await writeFile(join(out, '_headers'), ownHeaders(own, site.put) + SITE_HEADERS);
   const zone = DOMAIN.trim().toLowerCase();
   const config = {
     name: site.name,

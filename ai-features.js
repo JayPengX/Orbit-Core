@@ -1018,6 +1018,9 @@ export const FEATURES = {
     effort: { luna: 'low' },
     perPass: 20,
     perMinute: 6,
+    // (Its own day, under the family's cap: a showcase pass is anyone's for the asking, so a script
+    // minting them never uses up the Claude calls a day the Pass holders' features run on.)
+    dayCap: 40,
     maxIn: 8000,
     input(raw) {
       const q = str(raw?.q, 200);

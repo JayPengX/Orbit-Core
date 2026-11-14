@@ -1,0 +1,5 @@
+# Cloudflare (deploy/cf-site.mjs moves these under /pass/, /Orbit-Core/ and /Shared-Proxy/).
+# The owner's panel: never in a frame at all, not even one of the site's own.
+/admin/*
+  Content-Security-Policy: frame-ancestors 'none'
+  X-Frame-Options: DENY

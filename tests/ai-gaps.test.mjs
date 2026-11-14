@@ -103,3 +103,21 @@ test('the guard at pace 2 or more: every tap answers paused, nothing asked', asy
 test('the showcase\'s 問 Orbit is shared: the same question over the same cards is one answer for every visitor', () => {
   assert.equal(FEATURES['showcase-ask'].shared, true);
 });
+
+test('a feature\'s own day (dayCap) holds under the family\'s cap: the showcase\'s, which anyone can mint a pass for', async () => {
+  assert.ok(FEATURES['showcase-ask'].dayCap > 0 && FEATURES['showcase-ask'].dayCap <= 60);
+  forgetPace();
+  forgetLawCounts();
+  const f = FEATURES['sec-filing'];
+  f.dayCap = 1;
+  try {
+    const env = envWith(good, []);
+    const input = i => ({ ...filing, title: `${filing.title} own day ${i}` });
+    assert.equal((await call(env, { a: 'stock', d: 'dayA' }, 'sec-filing', input(1), 100)).status, 200);
+    const r = await call(env, { a: 'stock', d: 'dayB' }, 'sec-filing', input(2), 100);
+    assert.equal(r.status, 429);
+    assert.equal(r.error, 'cap');
+  } finally {
+    delete f.dayCap;
+  }
+});

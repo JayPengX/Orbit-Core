@@ -166,7 +166,7 @@ the `q-` components; they don't restyle them.
 `worker.js` routes (`route()`, heavy ones in the Runner); each route's work in its own file;
 `http.js` is what every route answers with (who may call, CORS, JSON;
 `lineAnswer`: lines gzipped, each flushed). Every answer carries `Server-Timing:
-w;dur=`, noted by the 除錯紀錄 when slow.
+w;dur=`, noted by the 除錯紀錄 when slow, and `LOCKED` (never runs as a page).
 
 | Route | File | What |
 | --- | --- | --- |
@@ -433,7 +433,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   - The proxy: Google's keys, `CWA_KEY`, `MOENV_KEY`, `TDX_CLIENT_*`.
 - **The domain:** `kit/domain.mjs` `DOMAIN` (jaypengx.com), the one place
   it is set. Each repo publishes its built site with `deploy/cf-site.mjs`
-  (§4.2): `orbit.<DOMAIN>/<slug>/` every app (`slug`,
+  (§4.2; `SITE_HEADERS`, `site/_headers`: no other site's frame): `orbit.<DOMAIN>/<slug>/` every app (`slug`,
   `SHORT` in `kit/brand.mjs`; one origin, so one Pass sign-in), `orbit-pass`
   for `/`, `/pass/`, `/key/`, `/app/` (Orbit, `kit/suite.mjs`), `/Orbit-Core/` and the old `/Shared-Proxy/`,
   `orbit-home` for `<DOMAIN>/`, `/showcase/` (Orbit-Showcase).
@@ -446,8 +446,6 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   Durable Objects; the whole store is copied to R2 `private/store/` nightly),
   the domain's DNS zone, each repo's `CLOUDFLARE_API_TOKEN`, and the AI and
   data providers' accounts (Anthropic, OpenAI, Google, CWA, MOENV, TDX).
-  Nothing in the project's shared folder or Claude's memory is needed to
-  build or run it.
 
 ## 11. Tools and tests
 
