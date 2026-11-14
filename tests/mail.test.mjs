@@ -89,18 +89,22 @@ test('mail: addresses from what was typed, each once; a bad one refused', () => 
   assert.equal(isAddress('a@b.co'), true);
 });
 
-test('mail: Cloudflare first; Resend only for an address Cloudflare refuses, inside its free day', async () => {
+test('mail: Resend first, to anyone; Cloudflare (verified addresses) when Resend fails or its free day is spent', async () => {
   const kept = {};
-  const env = { MAIL: { send: async m => (m.to === 'me@x.com' ? { messageId: 'cf1' } : Promise.reject(Object.assign(new Error('nope'), { code: 'E_RECIPIENT_NOT_ALLOWED' }))) }, RATE_LIMIT_KV: { get: async k => kept[k] ?? null, put: async (k, v) => void (kept[k] = v) } };
+  const kv = { get: async k => kept[k] ?? null, put: async (k, v) => void (kept[k] = v) };
+  const cf = { send: async m => (m.to === 'me@x.com' ? { messageId: 'cf1' } : Promise.reject(Object.assign(new Error('nope'), { code: 'E_RECIPIENT_NOT_ALLOWED' }))) };
   const m = { subject: 's', html: '<p>h</p>', text: 't' };
-  assert.deepEqual(await sendMail(env, { to: 'me@x.com', ...m }), { via: 'cloudflare', id: 'cf1' });
-  await assert.rejects(sendMail(env, { to: 'you@x.com', ...m }), e => /驗證/.test(e.why) && e.needsResend);
   let asked = null;
-  const r = await sendMail({ ...env, RESEND_API_KEY: 'k' }, { to: 'you@x.com', ...m, replyTo: 'me@x.com' }, { fetchImpl: async (url, o) => ((asked = JSON.parse(o.body)), new Response(JSON.stringify({ id: 'rs1' }), { status: 200 })) });
-  assert.deepEqual(r, { via: 'resend', id: 'rs1' });
+  const ok = async (url, o) => ((asked = JSON.parse(o.body)), new Response(JSON.stringify({ id: 'rs1' }), { status: 200 }));
+  const down = async () => new Response(JSON.stringify({ message: 'down' }), { status: 500 });
+  const env = { MAIL: cf, RATE_LIMIT_KV: kv, RESEND_API_KEY: 'k' };
+  assert.deepEqual(await sendMail(env, { to: 'you@x.com', ...m, replyTo: 'me@x.com' }, { fetchImpl: ok }), { via: 'resend', id: 'rs1' });
   assert.deepEqual(asked.to, ['you@x.com']);
   assert.equal(asked.reply_to, 'me@x.com');
   assert.match(asked.from, /@jaypengx\.com>$/);
+  assert.deepEqual(await sendMail(env, { to: 'me@x.com', ...m }, { fetchImpl: down }), { via: 'cloudflare', id: 'cf1' });
+  await assert.rejects(sendMail(env, { to: 'you@x.com', ...m }, { fetchImpl: down }), e => /Resend：down/.test(e.why) && /驗證/.test(e.why));
+  await assert.rejects(sendMail({ MAIL: cf, RATE_LIMIT_KV: kv }, { to: 'you@x.com', ...m }), e => e.needsResend);
 });
 
 test('looks: words are escaped, points and paragraphs kept, a link only for https', () => {

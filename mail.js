@@ -7,10 +7,10 @@
 //     verified destination address of the account's Email Routing (the
 //     owner's own inbox), free on Workers Free and never counted. The
 //     domain's SPF, DKIM (cf2024-1) and DMARC are Email Routing's.
-//   - Resend (RESEND_API_KEY, a GitHub secret deploy.yml copies): to anyone,
-//     once the owner added the domain there. Its free plan: 100 a day,
-//     3,000 a month; we stop at RESEND_DAY and RESEND_MONTH.
-// Cloudflare first; Resend only for an address Cloudflare refuses.
+//   - Resend (RESEND_API_KEY, the proxy's secret; the domain verified
+//     there 2026-11-14): to anyone. Its free plan: 100 a day, 3,000 a
+//     month; we stop at RESEND_DAY and RESEND_MONTH.
+// Resend first; Cloudflare when Resend fails or its free amount is spent.
 //
 // The settings (the panel's 工具 › 郵件): D1 `orbit-config/mail`
 // { to, on, quiet, name } — the owner's address lives there, never in git.
@@ -90,32 +90,41 @@ export const whyOf = e => WHY[e?.code] || (/destination address|not verified|rec
 export async function sendMail(env, { to, subject, html, text, from = {}, replyTo = '', kind = 'mail' }, { fetchImpl = fetch, now = Date.now() } = {}) {
   if (!isAddress(to)) throw Object.assign(new Error('bad address'), { why: '信箱格式不對' });
   const sender = { email: `${from.user || 'hello'}@${DOMAIN}`, name: from.name || 'Orbit' };
-  let cfWhy = '';
+  // Resend first (any address, nothing to verify), while its free day and month last.
+  let why = '';
+  if (env.RESEND_API_KEY) {
+    const c = await sentCounts(env, now);
+    if (c.dayN >= RESEND_DAY || c.monthN >= RESEND_MONTH) why = c.dayN >= RESEND_DAY ? `Resend 今天免費的 ${RESEND_DAY} 封用完了` : `Resend 這個月免費的 ${RESEND_MONTH} 封用完了`;
+    else
+      try {
+        const res = await fetchImpl('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from: `${sender.name.replace(/[<>"]/g, '')} <${sender.email}>`, to: [to], subject, html, text, ...(replyTo ? { reply_to: replyTo } : {}) }),
+          signal: AbortSignal.timeout(15_000)
+        });
+        const body = await res.json().catch(() => ({}));
+        if (res.ok) {
+          await countResend(env, now).catch(() => {});
+          await logSent(env, { at: now, to, subject, via: 'resend', kind }).catch(() => {});
+          return { via: 'resend', id: body?.id || '' };
+        }
+        why = `Resend：${String(body?.message || `HTTP ${res.status}`).slice(0, 160)}`;
+      } catch (e) {
+        why = `Resend：${String(e?.message || e).slice(0, 160)}`;
+      }
+  }
+  // Then Cloudflare's own: only to the account's verified Email Routing addresses.
   if (env.MAIL?.send) {
     try {
       const r = await env.MAIL.send({ to, from: sender, subject, html, text, ...(replyTo ? { replyTo } : {}) });
       await logSent(env, { at: now, to, subject, via: 'cloudflare', kind }).catch(() => {});
       return { via: 'cloudflare', id: r?.messageId || '' };
     } catch (e) {
-      cfWhy = whyOf(e);
+      const cf = whyOf(e);
       console.log('mail: cloudflare refused', e?.code || '', String(e?.message || e).slice(0, 160));
+      why = why ? `${why}；Cloudflare：${cf}` : cf;
     }
-  } else cfWhy = '代理沒有 MAIL 綁定（還沒部署）';
-  if (!env.RESEND_API_KEY) throw Object.assign(new Error(cfWhy), { why: cfWhy, needsResend: /驗證/.test(cfWhy) });
-  const c = await sentCounts(env, now);
-  if (c.dayN >= RESEND_DAY || c.monthN >= RESEND_MONTH) throw Object.assign(new Error('resend full'), { why: c.dayN >= RESEND_DAY ? `Resend 今天免費的 ${RESEND_DAY} 封用完了，明天再寄` : `Resend 這個月免費的 ${RESEND_MONTH} 封用完了` });
-  const res = await fetchImpl('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: `${sender.name.replace(/[<>"]/g, '')} <${sender.email}>`, to: [to], subject, html, text, ...(replyTo ? { reply_to: replyTo } : {}) }),
-    signal: AbortSignal.timeout(15_000)
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const why = `Resend：${String(body?.message || `HTTP ${res.status}`).slice(0, 160)}`;
-    throw Object.assign(new Error(why), { why });
-  }
-  await countResend(env, now).catch(() => {});
-  await logSent(env, { at: now, to, subject, via: 'resend', kind }).catch(() => {});
-  return { via: 'resend', id: body?.id || '' };
+  } else if (!why) why = '沒有可用的寄信方式（Resend 金鑰或 MAIL 綁定）';
+  throw Object.assign(new Error(why), { why, needsResend: !env.RESEND_API_KEY && /驗證/.test(why) });
 }
