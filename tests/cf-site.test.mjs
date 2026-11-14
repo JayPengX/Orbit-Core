@@ -27,18 +27,11 @@ test("a repo's own _headers move under where it's put", () => {
   assert.equal(ownHeaders('', [['', '/beats']]), '');
 });
 
-test("the owner's panel is at /admin/ alone; where it was goes there", () => {
+test("the owner's panel is at /admin/ alone, nothing forwarding to it from where it was", () => {
   const core = siteFor('Orbit-Core', 'example.tw');
   assert.ok(core.put.some(([from, to]) => from === 'admin' && to === '/admin'));
   assert.deepEqual(core.skip, ['admin']);
-  for (const at of ['/pass', '/Orbit-Core', '/Shared-Proxy']) {
-    assert.ok(core.redirects.includes(`${at}/admin/ https://orbit.example.tw/admin/ 301`), at);
-    assert.ok(core.redirects.includes(`${at}/admin/* https://orbit.example.tw/admin/:splat 301`), at);
-  }
-  // (Cloudflare refuses a _redirects with one path twice.)
-  const from = core.redirects.map(r => r.split(' ')[0]);
-  assert.equal(new Set(from).size, from.length);
-  assert.ok(!from.some(f => f.startsWith('/admin')));
+  assert.ok(!core.redirects.some(r => /admin/.test(r)));
   // Its own _headers block moves with it, not under the shared copies.
   assert.equal(ownHeaders('/admin/*\n  X-Frame-Options: DENY\n', core.put, core.skip), '/admin/*\n  X-Frame-Options: DENY\n');
 });
