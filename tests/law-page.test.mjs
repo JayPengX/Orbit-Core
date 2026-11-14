@@ -5,7 +5,7 @@ import { pageUrl, cleanHtml, charsetOf, decode, handleLawPage, PAGE_LIMITS } fro
 import { forgetLawCounts } from '../law.js';
 
 const PASS = { a: 'law', d: 'acct-page', s: 's' };
-const req = (u, origin = 'https://jaypengx.github.io') => new Request(`https://proxy.test/law-page?v=1&u=${encodeURIComponent(u)}`, { headers: { Origin: origin } });
+const req = (u, origin = 'https://orbit.jaypengx.com') => new Request(`https://proxy.test/law-page?v=1&u=${encodeURIComponent(u)}`, { headers: { Origin: origin } });
 const html = (body, type = 'text/html; charset=utf-8', status = 200, extra = {}) => new Response(body, { status, headers: { 'Content-Type': type, ...extra } });
 
 test('only government hosts, on https', () => {

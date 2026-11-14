@@ -28,7 +28,7 @@ test('notice lists keep only sane items, in time order', () => {
   const list = cleanItems(
     [
       { at: now + 3_600_000, title: 'later', url: 'https://evil.example/' },
-      { at: now + 60_000, title: 'soon', url: 'https://jaypengx.github.io/Orbit-Sports/#home' },
+      { at: now + 60_000, title: 'soon', url: 'https://orbit.jaypengx.com/Orbit-Sports/#home' },
       { at: now - 86_400_000, title: 'old' },
       { at: now + 120_000, check: { espn: 'football/nfl', event: '401' } },
       { at: now + 120_000, check: { yahoo: '2330.TW', op: 'above', price: 1200 }, title: '台積電' },
@@ -252,7 +252,7 @@ test('a pick starting is sent once, even when the open app sends its list again 
   }
 });
 
-test("each list's due time is its own: two phones scheduling at once both keep theirs, and a list kept the old way is moved over once", async () => {
+test("each list's due time is its own: two phones scheduling at once both keep theirs", async () => {
   const kv = memoryKv();
   const env = { RATE_LIMIT_KV: kv };
   const keys = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
@@ -262,19 +262,15 @@ test("each list's due time is its own: two phones scheduling at once both keep t
   const b = { d: 'b2', a: 'orbit' };
   await Promise.all([post(a, '/push/subscribe', { sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/a', keys } }), post(b, '/push/subscribe', { sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/b', keys } })]);
   await Promise.all([post(a, '/push/schedule', { items: [{ at: now + 10_000, title: 'a' }] }), post(b, '/push/schedule', { items: [{ at: now + 20_000, title: 'b' }] })]);
-  // One list from before, its time only in the old shared key.
-  kv.m.set('push:c3:vocab', JSON.stringify({ sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/c', keys }, items: [{ at: now + 30_000, title: 'c' }] }));
-  kv.m.set('push:due', JSON.stringify({ 'push:c3:vocab': now + 30_000 }));
   const sent = [];
   const realFetch = globalThis.fetch;
   globalThis.fetch = async url => (sent.push(String(url)), new Response(null, { status: 201 }));
   try {
-    assert.equal((await sendDue(env, now + 60_000)).sent, 3);
+    assert.equal((await sendDue(env, now + 60_000)).sent, 2);
   } finally {
     globalThis.fetch = realFetch;
   }
-  assert.deepEqual(sent.sort(), ['https://fcm.googleapis.com/fcm/send/a', 'https://fcm.googleapis.com/fcm/send/b', 'https://fcm.googleapis.com/fcm/send/c']);
-  assert.equal(kv.m.has('push:due'), false);
+  assert.deepEqual(sent.sort(), ['https://fcm.googleapis.com/fcm/send/a', 'https://fcm.googleapis.com/fcm/send/b']);
 });
 
 test("a bus alert is told once: its list sent again by the app (opened from the notice) isn't told again", async () => {

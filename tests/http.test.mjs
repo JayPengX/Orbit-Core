@@ -5,7 +5,7 @@ import { bodyText } from '../http.js';
 
 const worker = (await import('../worker.js')).default;
 const ctx = { waitUntil() {}, passThroughOnException() {} };
-const ORIGIN = 'https://jaypengx.github.io';
+const ORIGIN = 'https://orbit.jaypengx.com';
 
 test('bodyText: the body up to its limit; past it null, read no further', async () => {
   const post = (body, headers = {}) => new Request('https://w/x', { method: 'POST', body, headers });

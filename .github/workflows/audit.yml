@@ -19,7 +19,7 @@ jobs:
       - name: Secret names per Worker
         run: |
           cd "$RUNNER_TEMP"
-          for w in orbit-workers-proxy gemini-relay quota-guard sports-proxy; do
+          for w in orbit-workers-proxy gemini-relay quota-guard; do
             echo "== $w"
             npx --yes wrangler@4 secret list --name "$w" 2>&1 | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s.slice(s.indexOf("["))).map(x=>x.name).join(" ")||"(none)")}catch{console.log(s.split("\n").filter(l=>/ERROR|not found|Authentication/i.test(l)).join(" ").slice(0,200)||"(unreadable)")}})'
           done

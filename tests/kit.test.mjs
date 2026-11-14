@@ -569,11 +569,11 @@ test('pressSelector: every :active a press the kit sets, not one iOS puts on a s
   assert.equal(kit.pressSelector('.a:hover'), '.a:hover');
 });
 
-test('a pack a phone kept before the move (under the Pages address) is still its copy: opened at once, nothing asked', async () => {
+test('a pack the phone kept is its copy: opened at once, nothing asked', async () => {
   const had = globalThis.caches;
   const kept = new Map();
-  const oldKey = `https://orbit.data/${encodeURIComponent('https://jaypengx.github.io/Shared-Data/sports/mlb/2026.json')}`;
-  kept.set(oldKey, new Response('{"events":["kept"]}', { headers: { 'x-at': String(Date.now()) } }));
+  const key = `https://orbit.data/${encodeURIComponent(`${kit.PACKS_URL}sports/mlb/2026.json`)}`;
+  kept.set(key, new Response('{"events":["kept"]}', { headers: { 'x-at': String(Date.now()) } }));
   globalThis.caches = { open: async () => ({ match: async k => kept.get(typeof k === 'string' ? k : k.url)?.clone() || null, put: async () => {}, keys: async () => [], delete: async () => true }) };
   const asked = [];
   globalThis.fetch = async url => (asked.push(String(url)), new Response('{"events":["fresh"]}'));

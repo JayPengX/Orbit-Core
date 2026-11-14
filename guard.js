@@ -137,9 +137,7 @@ export const PACES = [
   { at: 0.85, slow: 8, reads: 0.25, newcomers: false }
 ];
 export const ALERTS = [0.5, 0.75, 0.9];
-// orbit-site mirrors the apps onto the family's own domain (site.js; none
-// until kit/domain.mjs has one: a 404 here is nothing to stop or start).
-// (The old sports-proxy forwarder was deleted 2026-10-20: no longer watched.)
+// orbit-site holds the family's hosts (site.js).
 export const WORKERS = ['orbit-workers-proxy', 'orbit-site'];
 export const STATE_KEY = 'guard:state';
 // Unreadable this long while armed: stopped too (a bill can't be watched blind).

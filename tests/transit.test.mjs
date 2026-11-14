@@ -855,7 +855,7 @@ test("a sample spends a real ask: none without a session or past the limit (a st
 test('anything a transit ask throws is its failure in JSON with the CORS headers, never the Worker crashing: a time no Date holds, a place Google drops or answers in HTML', async () => {
   fresh();
   const env = { GOOGLE_MAPS_KEY: 'GK', TDX_CLIENT_ID: 'id', TDX_CLIENT_SECRET: 's', RATE_LIMIT_KV: memKv() };
-  const headers = { 'Access-Control-Allow-Origin': 'https://jaypengx.github.io' };
+  const headers = { 'Access-Control-Allow-Origin': 'https://orbit.jaypengx.com' };
   const ok = async url => (url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : json({}));
   const route = await handleTransit(new Request('https://w/transit/route?from=24.8,120.97&to=25.04,121.5&at=1e17'), env, headers, '/transit/route', { session: { s: 'u' }, fetchFn: ok, cache: memCache(), now: NOW });
   assert.equal(route.status, 200);

@@ -26,7 +26,7 @@ function fakeR2() {
     }
   };
 }
-const ask = (path, init = {}, env = {}) => worker.fetch(new Request(`https://orbit-workers-proxy.test${path}`, { headers: { Origin: 'https://jaypengx.github.io', ...(init.headers || {}) }, ...init }), env, ctx);
+const ask = (path, init = {}, env = {}) => worker.fetch(new Request(`https://orbit-workers-proxy.test${path}`, { headers: { Origin: 'https://orbit.jaypengx.com', ...(init.headers || {}) }, ...init }), env, ctx);
 const streamOf = parts => new Blob(parts).stream();
 
 test('frames: written and read back, a deletion among them, split across chunks', async () => {
@@ -67,7 +67,7 @@ test('push: only with the secret; files written and deleted; then read, with the
   const res = await ask('/data/sports/index.json', {}, env);
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), { built: 1 });
-  assert.equal(res.headers.get('Access-Control-Allow-Origin'), 'https://jaypengx.github.io');
+  assert.equal(res.headers.get('Access-Control-Allow-Origin'), 'https://orbit.jaypengx.com');
   assert.equal(res.headers.get('Content-Type'), 'application/json');
   const tag = res.headers.get('ETag');
   assert.ok(tag);
@@ -92,7 +92,7 @@ test('a file R2 doesn\'t hold: 404, noted at the edge so the next ask (an app tr
     let gets = 0;
     const get = DATA.get;
     DATA.get = k => (gets++, get(k));
-    const read = () => worker.fetch(new Request('https://orbit-workers-proxy.test/data/bus/Nowhere.json', { headers: { Origin: 'https://jaypengx.github.io' } }), { DATA }, local);
+    const read = () => worker.fetch(new Request('https://orbit-workers-proxy.test/data/bus/Nowhere.json', { headers: { Origin: 'https://orbit.jaypengx.com' } }), { DATA }, local);
     assert.equal((await read()).status, 404);
     await Promise.all(waits);
     assert.equal((await read()).status, 404);

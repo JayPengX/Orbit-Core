@@ -21,5 +21,5 @@ test("site: nothing else is read here (each repo's site is on Cloudflare's route
 
 test('every app has a short name', () => {
   for (const b of Object.values(BRANDS)) assert.equal(SHORT[b.slug], b.repo, b.repo);
-  assert.deepEqual(['money', 'news', 'sports', 'weather', 'transit', 'law', 'class', 'words', 'beats', 'securities', 'pass'].filter(k => !SHORT[k]), []);
+  assert.deepEqual(['money', 'news', 'sports', 'weather', 'transit', 'law', 'class', 'words', 'beats', 'securities'].filter(k => !SHORT[k]), []);
 });
