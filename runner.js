@@ -29,7 +29,10 @@ export const RELAY_MARK = 'x-orbit-relay';
 // (What a relayed call was made for, so the relay counts it as its caller would: sources.js.)
 const SOURCE_MARK = 'x-orbit-source-call';
 const CF_HEADER = 'x-orbit-cf';
-export const SHARDS = 4;
+// (One: an object is billed for the time it has any request in hand, so requests waiting on the
+// same sources together are billed once; four objects billed each its own wait, 11-14, when the
+// routes' time was 58% of the free day's 13,000 GB-s. Their CPU is a few ms each: one keeps up.)
+export const SHARDS = 1;
 export const RELAYS = 16;
 export const DIRECT = 40;
 const HINT = 'apac';
