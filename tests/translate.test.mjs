@@ -136,9 +136,9 @@ test('POST /tr: a Pass’s short texts only, each kept so the next phone asks Go
   assert.equal(asks, 1);
 });
 
-test('paid translation is off unless TR_PAID is on (Google bills every character, 11-14)', async () => {
+test('paid translation stops when TR_PAID is off (11-14)', async () => {
   let asked = 0;
-  const got = await translate({ GOOGLE_WEATHER_KEY: 'k' }, { json: async () => null, put: async () => true }, ['Hello'], 'zh-TW', { fetchImpl: async () => (asked++, new Response('{}')) });
+  const got = await translate({ GOOGLE_WEATHER_KEY: 'k', TR_PAID: 'off' }, { json: async () => null, put: async () => true }, ['Hello'], 'zh-TW', { fetchImpl: async () => (asked++, new Response('{}')) });
   assert.deepEqual(got, {});
   assert.equal(asked, 0);
 });
