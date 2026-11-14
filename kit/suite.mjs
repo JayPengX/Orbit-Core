@@ -413,6 +413,8 @@ function fit(foot) {
 }
 
 let sheetOpen = null;
+// (An app's own button for it, where the top line is hidden: Transit's trip bar while navigating.)
+export const openSwitcher = () => switcher();
 async function switcher() {
   if (sheetOpen) return;
   const ui = await import('./ui.mjs');
