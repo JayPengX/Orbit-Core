@@ -211,7 +211,7 @@ node tools/preview.mjs sports --live --width 375
 
 | Flag | What |
 | --- | --- |
-| `--live` | Real data through the Workers' dev doors; prints the busiest minute |
+| `--live` | Real data through the Workers' dev doors; prints the busiest minute. Live data refreshes a third as often on localhost (kit `dev`; add `?beat=real` to the page for the phones' pace) |
 | `--width`, `--height`, `--full`, `--dark`, `--lang en` | The screen |
 | `--click "<selector>"` or `--click "js:…"` | Act before the shot (repeatable) |
 | `--eval "<js>"`, `--wait ms` | Read something out; wait first |

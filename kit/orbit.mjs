@@ -65,8 +65,22 @@ let devNow = (() => {
 let devReadAt = 0;
 // The Worker's read under way, settled (true: read now) when it lands or fails.
 let devRead = Promise.resolve(false);
-export const dev = key => devNow[key] ?? DEV[key]?.def;
 export const devFresh = () => devRead;
+// (A page on localhost, our tools' previews reading the real Worker through its dev door, reads
+// live data a third as often: they were two thirds of the server's day, 11-14. ?beat=real for
+// the phones' pace.)
+const LIVE_BEATS = new Set(['sportsList', 'sportsGame', 'f1Board', 'f1Feed', 'transitLive', 'transitBike']);
+const beatHere = (() => {
+  try {
+    return /^(localhost|127\.0\.0\.1)$/.test(globalThis.location?.hostname || '') && !/[?&]beat=real\b/.test(globalThis.location?.search || '') ? 3 : 1;
+  } catch {
+    return 1;
+  }
+})();
+export const dev = key => {
+  const v = devNow[key] ?? DEV[key]?.def;
+  return beatHere > 1 && LIVE_BEATS.has(key) && typeof v === 'number' ? v * beatHere : v;
+};
 export function readDev() {
   if (typeof window === 'undefined' || Date.now() - devReadAt < 5 * 60_000) return;
   devReadAt = Date.now();
