@@ -179,7 +179,7 @@ w;dur=`, noted by the 除錯紀錄 when slow.
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
 | `/ai` | `ai.js`, `ai-features.js`, `law-ai.js`, `ai-util.js`, `ai-fixtures.js` | Every app's AI by name: fixed prompt, models in turn, lean input (`maxIn`), caps, asks back (`clarify`, `pick`); builders' `aiOnce`; ops `ai-try` (`site/ai-try/`) |
-| `/ai/build`, `/ai/open` | `ai.js`, `ai-open.js` | A build's `build:` features (Law's key); News' 重點整理, 各方怎麼說, Sports' 賽後/賽前 lines made on first open, kept |
+| `/ai/build`, `/ai/open` | `ai.js`, `ai-open.js` | A build's `build:` features (Law's key); News' 重點整理, 各方怎麼說, Sports' 賽後/賽前 lines made on first open (頭條's leads ahead), kept |
 | `/law-ask` | `law.js`, `law-ruling.js`, `law-town.js`, `law-ground.js` | Law's questions on 1–8 articles, each point cited, checked, kept in KV (or Law's `data/ai/`); modes `bill`, `diff`, `ruling`, `town`, `paper`; 40 Gemini calls a day a Pass, 300 in all with `/law-chat`'s (D1 `law_day`) |
 | `/law-chat` | `law-chat.js`, `ai-other.js` | 問法律: a plan (Flash-Lite), up to 14 articles (and delegated ones) from Law's index, answered from those by Sonnet (failing: Sol), cites checked; grounded by `law-ground.js`, `law-more.js`, `law-local.js` (councils); 16 turns back; 30 a day a Pass |
 | `/law-page` | `law-page.js`, `law-hosts.js` | A gov.tw/edu.tw page in Law, cleaned, edge-cached, via Taiwan (build key: any gov.tw, `file=1` raw, `/law-judicial` 司法院's API); 500 a day a Pass |

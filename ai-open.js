@@ -10,6 +10,11 @@
 //   sports-recap            a finished game's why line (id: '<league>:<espn id>'), from ESPN's summary
 //   sports-preview          a game to come's 看點 (same id), again within 6 hours of the start
 //
+// Made ahead, the one exception (11-14, Jay: "kept fast enough"): the front page's lead
+// stories (頭條: Taiwan's first 8, the world's first 4), their 重點整理 and 各方怎麼說, on
+// each 'ai' run (newsOpenAhead), only when not kept already: what nearly every reader opens,
+// on Haiku without thinking (about NT$0.01 a call), AHEAD_DAY a day each at most.
+//
 //   GET /ai/open?f=<feature>&id=<id>
 //     → { out, kept? } | { error: 'origin' | 'feature' | 'story' | 'busy' | 'cap' | 'upstream' }
 import { json, isAllowedOrigin } from './http.js';
@@ -27,6 +32,7 @@ const step = m => Math.floor(Math.log(Math.max(1, m)) / Math.log(1.5));
 
 // Each news part file read once a few minutes an isolate.
 const parts = new Map();
+export const forgetParts = () => parts.clear();
 async function storyOf(env, id, now) {
   const i = openPart(id);
   const had = parts.get(i);
@@ -99,25 +105,22 @@ export const OPEN = {
 // Two people opening the same thing at once: one call.
 const making = new Map();
 
-export async function handleAiOpen(request, env, ctx, headers, { ip = '', cap = 0, gemini = null, now = Date.now(), fetchImpl = globalThis.fetch } = {}) {
-  if (request.method !== 'GET') return json({ error: 'method' }, 405, headers);
-  if (!isAllowedOrigin(request.headers.get('Origin') || '')) return json({ error: 'origin' }, 403, headers);
-  const q = new URL(request.url).searchParams;
-  const name = q.get('f') || '';
-  const id = String(q.get('id') || '').slice(0, 80);
+// One part: kept, or made now. → { out, kept? } | { error, status }. allow(): may this one be
+// made (the asker's limit, the day's cap), asked only when it isn't kept.
+export async function openMake(env, ctx, name, id, { allow = async () => true, gemini = null, now = Date.now(), fetchImpl = globalThis.fetch } = {}) {
   const o = OPEN[name];
-  if (!o || !id || !env?.DATA) return json({ error: 'feature' }, 400, headers);
+  if (!o || !id || !env?.DATA) return { error: 'feature', status: 400 };
   const f = await o.facts(env, id, now, fetchImpl).catch(() => null);
-  if (!f) return json({ error: 'story' }, 404, headers);
+  if (!f) return { error: 'story', status: 404 };
   const key = `ai:open:${name}:${id}:${f.key}`;
   const kept = await keptRead(env, key);
-  if (kept?.out) return json({ out: kept.out, kept: true }, 200, headers);
+  if (kept?.out) return { out: kept.out, kept: true };
   if (making.has(key)) {
     const out = await making.get(key).catch(() => null);
-    return out ? json({ out }, 200, headers) : json({ error: 'upstream' }, 502, headers);
+    return out ? { out } : { error: 'upstream', status: 502 };
   }
-  if (sessionLimited(`ai-open:${ip}`, 20)) return json({ error: 'busy' }, 429, headers);
-  if (!(await spendDay(env, name, cap, twDay(now)))) return json({ error: 'cap' }, 429, headers);
+  const no = await allow();
+  if (no !== true) return { error: no, status: 429 };
   const job = (async () => {
     const { out } = await runFeature(env, ctx, name, f.input, { gemini, open: true, need: x => !!o.out(x, id, f) });
     const made = o.out(out, id, f);
@@ -129,10 +132,41 @@ export async function handleAiOpen(request, env, ctx, headers, { ip = '', cap = 
   })();
   making.set(key, job);
   try {
-    return json({ out: await job }, 200, headers);
+    return { out: await job };
   } catch {
-    return json({ error: 'upstream' }, 502, headers);
+    return { error: 'upstream', status: 502 };
   } finally {
     making.delete(key);
   }
+}
+
+export async function handleAiOpen(request, env, ctx, headers, { ip = '', cap = 0, gemini = null, now = Date.now(), fetchImpl = globalThis.fetch } = {}) {
+  if (request.method !== 'GET') return json({ error: 'method' }, 405, headers);
+  if (!isAllowedOrigin(request.headers.get('Origin') || '')) return json({ error: 'origin' }, 403, headers);
+  const q = new URL(request.url).searchParams;
+  const name = q.get('f') || '';
+  const id = String(q.get('id') || '').slice(0, 80);
+  const allow = async () => (sessionLimited(`ai-open:${ip}`, 20) ? 'busy' : (await spendDay(env, name, cap, twDay(now))) ? true : 'cap');
+  const r = await openMake(env, ctx, name, id, { allow, gemini, now, fetchImpl });
+  return r.error ? json({ error: r.error }, r.status, headers) : json(r.kept ? { out: r.out, kept: true } : { out: r.out }, 200, headers);
+}
+
+// The front page's lead stories, made ahead (above): Taiwan's first AHEAD_TW, the world's first
+// AHEAD_INTL in the builder's order, three at a time. → { made, kept, failed, capped }.
+export const AHEAD_TW = 8;
+export const AHEAD_INTL = 4;
+export const AHEAD_DAY = 120;
+export async function newsOpenAhead({ store, env, ctx = null, until = Infinity, now = Date.now() }) {
+  const index = await store.json('news/index.json');
+  if (!index) return { skipped: 'no index' };
+  forgetParts();
+  const jobs = [];
+  for (const s of [...(index.tw || []).slice(0, AHEAD_TW), ...(index.intl || []).slice(0, AHEAD_INTL)]) for (const name of ['news-brief', 'news-sides']) jobs.push([name, s.id]);
+  const out = { made: 0, kept: 0, failed: 0, capped: 0, none: 0 };
+  for (let i = 0; i < jobs.length && Date.now() < until; i += 3)
+    for (const r of await Promise.all(
+      jobs.slice(i, i + 3).map(([name, id]) => openMake(env, ctx, name, id, { now, allow: async () => ((await spendDay(env, `${name}-ahead`, AHEAD_DAY, twDay(now))) ? true : 'cap') }))
+    ))
+      out[r.kept ? 'kept' : r.out ? 'made' : r.error === 'cap' ? 'capped' : r.error === 'story' ? 'none' : 'failed']++;
+  return out;
 }
