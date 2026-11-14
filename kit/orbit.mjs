@@ -3972,16 +3972,12 @@ function offerNotices(s) {
     node('button', { class: 'q-banner-x', type: 'button', 'aria-label': T('關閉', 'Close'), text: '×' })
   ]);
   writeStore('orbit.notify.offered', String(Date.now()));
-  const gone = (quiet = false) => {
-    if (quiet) savePrefs({ ...notifyPrefs(), quiet: true }, s);
-    el.classList.add('out');
-    setTimeout(() => el.remove(), 250);
-  };
-  el.querySelector('.q-banner-x').addEventListener('click', () => gone(true));
+  const gone = noticeLife(el);
+  el.querySelector('.q-banner-x').addEventListener('click', () => (savePrefs({ ...notifyPrefs(), quiet: true }, s), gone()));
   el.querySelector('.q-banner-go').addEventListener('click', async () => {
+    gone();
     const p = await Notification.requestPermission().catch(() => 'denied');
     if (p === 'granted') enablePush(s, true);
-    gone();
   });
   document.body.append(el);
   bannerEl = el;
@@ -4047,41 +4043,94 @@ function orbitTip(s) {
 // after TIP_FOR, at once on a scroll or a tap elsewhere; a touch on it gives
 // it TIP_FOR more. Answers the banner, or nothing when another is up.
 export const QUIET_TIP_FOR = TIP_FOR;
-export function quietTip({ accent = '', mark = null, label = '', title, line, go, never, onGo = () => {}, onNever = () => {}, cls = '' }) {
+export function quietTip({ accent = '', mark = null, label = '', title, line, go, never = '', onGo = () => {}, onNever = () => {}, cls = '' }) {
   if (typeof document === 'undefined' || !document.body || bannerEl?.isConnected) return null;
+  const acts = [node('button', { class: 'q-banner-go', type: 'button', text: go }), never ? node('button', { class: 'q-orbit-tip-never', type: 'button', text: never }) : null];
   const el = node('div', { class: `q-banner q-banner-ask q-orbit-tip ${cls}`.trim(), role: 'dialog', 'aria-label': label || title, style: accent ? `--q-accent:${accent}` : '' }, [
     mark,
-    node('div', {}, [
-      node('strong', { text: title }),
-      node('span', { text: line }),
-      node('p', { class: 'q-orbit-tip-acts' }, [node('button', { class: 'q-banner-go', type: 'button', text: go }), node('button', { class: 'q-orbit-tip-never', type: 'button', text: never })])
-    ])
+    node('div', {}, [node('strong', { text: title }), node('span', { text: line }), node('p', { class: 'q-orbit-tip-acts' }, acts.filter(Boolean))])
   ]);
-  let timer = 0;
-  const outside = event => !el.contains(event.target) && gone();
-  const off = () => {
-    removeEventListener('scroll', gone, true);
-    removeEventListener('pointerdown', outside, true);
-  };
-  function gone() {
-    clearTimeout(timer);
-    off();
-    el.classList.add('out');
-    setTimeout(() => el.remove(), 250);
-  }
-  const wait = () => {
-    clearTimeout(timer);
-    timer = setTimeout(gone, QUIET_TIP_FOR);
-  };
-  el.querySelector('.q-orbit-tip-never').addEventListener('click', () => (gone(), onNever()));
+  const gone = noticeLife(el);
+  el.querySelector('.q-orbit-tip-never')?.addEventListener('click', () => (gone(), onNever()));
   el.querySelector('.q-banner-go').addEventListener('click', () => (gone(), onGo()));
-  el.addEventListener('pointerdown', wait);
-  addEventListener('scroll', gone, { capture: true, passive: true });
-  addEventListener('pointerdown', outside, true);
-  wait();
   document.body.append(el);
   bannerEl = el;
   return el;
+}
+
+// Every notice's life, the same for all (Jay 2026-11-14: "unify… all can be
+// swiped off, all stay the same amount of time"): TIP_FOR on screen, a touch
+// on it gives it TIP_FOR more; a swipe up or to a side takes it away, as does
+// a scroll or a tap elsewhere. Answers its gone(); `onGone(how)` after
+// ('swipe', 'time', 'away' or 'tap').
+export function noticeLife(el, { onGone = () => {} } = {}) {
+  let timer = 0;
+  let done = false;
+  let start = null;
+  el.dataset.qSwiped = '';
+  const outside = event => !el.contains(event.target) && gone('away');
+  const off = () => {
+    clearTimeout(timer);
+    removeEventListener('scroll', away, true);
+    removeEventListener('pointerdown', outside, true);
+  };
+  function gone(how = 'tap') {
+    if (done) return;
+    done = true;
+    off();
+    el.classList.add('out');
+    setTimeout(() => el.remove(), 250);
+    onGone(how);
+  }
+  const away = () => gone('away');
+  const wait = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => gone('time'), TIP_FOR);
+  };
+  const move = (dx, dy) => {
+    el.style.setProperty('--q-dx', `${dx}px`);
+    el.style.setProperty('--q-dy', `${dy}px`);
+  };
+  el.addEventListener('pointerdown', e => {
+    wait();
+    start = { x: e.clientX, y: e.clientY, id: e.pointerId };
+  });
+  el.addEventListener('pointermove', e => {
+    if (!start || e.pointerId !== start.id) return;
+    const dx = e.clientX - start.x;
+    const dy = Math.min(0, e.clientY - start.y);
+    if (Math.abs(dx) < 6 && dy > -6) return;
+    el.classList.add('q-drag');
+    move(dx, dy);
+  });
+  const end = e => {
+    if (!start || (e && e.pointerId !== start.id)) return;
+    const dx = parseFloat(el.style.getPropertyValue('--q-dx')) || 0;
+    const dy = parseFloat(el.style.getPropertyValue('--q-dy')) || 0;
+    start = null;
+    el.classList.remove('q-drag');
+    if (Math.abs(dx) > 60 || dy < -30) {
+      // (A swipe isn't a tap: the click that follows it is let go.)
+      el.dataset.qSwiped = '1';
+      move(Math.abs(dx) > 60 ? Math.sign(dx) * 480 : dx, Math.abs(dx) > 60 ? dy : -160);
+      gone('swipe');
+      return;
+    }
+    if (dx || dy) el.dataset.qSwiped = '1';
+    move(0, 0);
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+  el.addEventListener('click', e => {
+    if (el.dataset.qSwiped !== '1') return;
+    el.dataset.qSwiped = '';
+    e.stopImmediatePropagation();
+    e.preventDefault();
+  }, true);
+  addEventListener('scroll', away, { capture: true, passive: true });
+  addEventListener('pointerdown', outside, true);
+  wait();
+  return gone;
 }
 
 // A switch: role=switch, aria-checked.
@@ -4309,8 +4358,9 @@ function usageRows(s) {
     cell({ icon: icons.shield, tint: 'var(--q-green)', title: T('隱私權政策與使用條款', 'Privacy policy and terms'), chevron: true, onClick: () => openPolicy(s) })
   ];
 }
-// Once on a device, a moment after an app opens: what's counted, the
-// policy, and off in one tap (a quiet banner, as Orbit's others).
+// Once on a device, a moment after an app opens: what's counted and the
+// policy (a quiet banner, as Orbit's others). Off is in Orbit Pass › 隱私,
+// not on the banner (Jay 2026-11-14).
 export function usageNotice(s) {
   if (typeof document === 'undefined' || usageNoticeSeen() || !usageOn() || globalThis.navigator?.webdriver || installCovered) return;
   if (document.querySelector('dialog[open]') || document.visibilityState === 'hidden' || bannerEl?.isConnected) return;
@@ -4321,12 +4371,7 @@ export function usageNotice(s) {
     title: T('匿名使用統計', 'Anonymous usage stats'),
     line: T('Orbit 只記哪些功能被打開、快不快、有沒有出錯，不知道你是誰。', 'Orbit counts which features open, how fast and what breaks, never who you are.'),
     go: T('隱私權政策', 'Privacy policy'),
-    never: T('關閉統計', 'Turn off'),
-    onGo: () => openPolicy(s),
-    onNever: () => {
-      setUsageOn(false, s);
-      toast(T('使用統計已關閉', 'Usage stats are off'));
-    }
+    onGo: () => openPolicy(s)
   });
   if (shown) markUsageNotice();
 }
@@ -4397,10 +4442,7 @@ function banner(s, { title, body, hash, more = [] }) {
     node('img', { src: './favicon.svg', alt: '' }),
     node('div', {}, [node('strong', { text: title }), body ? node('span', { text: body }) : null])
   ]);
-  const gone = () => {
-    el.classList.add('out');
-    setTimeout(() => el.remove(), 250);
-  };
+  const gone = noticeLife(el);
   let open = false;
   el.addEventListener('click', () => {
     // A grouped banner: the first tap lists them all, the next closes it.
@@ -4415,7 +4457,6 @@ function banner(s, { title, body, hash, more = [] }) {
   });
   document.body.append(el);
   bannerEl = el;
-  setTimeout(() => !open && gone(), more.length ? 7000 : 5000);
 }
 
 // ---- Shell: installed-only on phones, and always the newest version ------------------------

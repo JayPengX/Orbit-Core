@@ -24,6 +24,8 @@ import { DOMAIN } from './kit/domain.mjs';
 import { accountOfMail, cleanAddr, mailIndexId, mailOf } from './pass-mail.js';
 import { WALLET_COLLECTION, INBOX_COLLECTION, NOW_COLLECTION, FAMILY_SHELF, ECO_APPS, ECO_PASSCODE_PATTERN, shelfId, parseWallet, publicWallet, deleteAccount, updateWallet, mergeWallet, passAccount, ECO_LIMITS } from './eco.js';
 import { signToken, readToken, tokenSecret } from './orbit-token.js';
+import { BRANDS } from './kit/brand.mjs';
+import * as look from './site/admin/mail-look.mjs';
 
 export const PRIVACY_USER = 'privacy';
 export const PRIVACY_COLLECTION = 'eco-privacy';
@@ -38,58 +40,104 @@ const site = () => `https://orbit.${DOMAIN}`;
 // ---- The mail and its reply ----
 
 // The links a reply carries, one a kind (`d`: the account, when the address is its recovery email).
-export async function requestLinks(secret, docId, now = Date.now()) {
+// (`lang`: the page opens in the reply's language.)
+export async function requestLinks(secret, docId, now = Date.now(), lang = 'zh') {
   const out = {};
   for (const w of KINDS) {
     const t = await signToken(secret, { k: 'priv', w, ...(docId ? { d: docId } : {}), e: now + LINK_MS });
-    out[w] = `${site()}/privacy/request/#t=${t}`;
+    out[w] = `${site()}/privacy/request/#t=${t}&l=${lang === 'en' ? 'en' : 'zh'}`;
   }
   return out;
 }
 
-// The reply's words, both languages (we don't know theirs).
-export function replyText(links) {
-  const zh = `你好，我們收到了你寄到 ${PRIVACY_USER}@${DOMAIN} 的信。請選一個（連結 24 小時內有效）：
+// The reply's one language (Jay 11-14: two stacked looked odd): the mail's
+// own (its Content-Language, else Chinese characters in its subject), else
+// English for a subject in Latin letters, else Chinese (Orbit is Taiwan's).
+const words = v => String(v || '').replace(/=\?utf-8\?([bq])\?([^?]*)\?=/gi, (m, enc, x) => {
+  try {
+    if (enc.toLowerCase() === 'q') return decodeURIComponent(x.replace(/_/g, ' ').replace(/=([0-9a-f]{2})/gi, '%$1'));
+    return new TextDecoder().decode(Uint8Array.from(atob(x), c => c.charCodeAt(0)));
+  } catch {
+    return '';
+  }
+});
+export function mailLang(headers) {
+  const said = String(headers?.get?.('Content-Language') || '').toLowerCase();
+  if (/^zh/.test(said)) return 'zh';
+  if (/^en/.test(said)) return 'en';
+  const subject = words(headers?.get?.('Subject'));
+  if (/[\u3400-\u9fff]/.test(subject)) return 'zh';
+  return /[a-z]{2}/i.test(subject) ? 'en' : 'zh';
+}
+export const replySubject = lang => (lang === 'en' ? 'Your Orbit data request' : '你的 Orbit 資料請求');
 
-下載我的資料副本：
+// The reply's words, in one language: the plain-text copy.
+const WORDS = {
+  zh: {
+    head: '你的資料請求',
+    lead: `我們收到了你寄到 ${PRIVACY_USER}@${DOMAIN} 的信。請選一項，連結 24 小時內有效。`,
+    export: '下載我的資料副本',
+    delete: '刪除我的帳戶',
+    stop: '停止使用統計',
+    how: '如果這個信箱是你 Orbit Pass 的救援信箱，點連結就能完成；否則會請你輸入通行碼。刪除後無法復原。資料副本每個帳戶 30 天一次。',
+    notYou: '不是你寄的信？不用理會這封，什麼都不會改變。',
+    policy: '隱私權政策'
+  },
+  en: {
+    head: 'Your data request',
+    lead: `We got your email to ${PRIVACY_USER}@${DOMAIN}. Pick one; the links work for 24 hours.`,
+    export: 'Download a copy of my data',
+    delete: 'Delete my account',
+    stop: 'Stop usage stats',
+    how: 'If this is your Orbit Pass’s recovery email, the link alone does it; otherwise it asks for your pass. Deleting can’t be undone. A copy can be downloaded once every 30 days per account.',
+    notYou: 'Didn’t write to us? Ignore this email; nothing changes.',
+    policy: 'Privacy policy'
+  }
+};
+const wordsOf = lang => WORDS[lang === 'en' ? 'en' : 'zh'];
+const policyUrl = lang => `${site()}/privacy/?lang=${lang === 'en' ? 'en' : 'zh'}`;
+export function replyText(links, lang = 'zh') {
+  const w = wordsOf(lang);
+  return `${w.lead}
+
+${w.export}:
 ${links.export}
 
-刪除我的 Orbit Pass 帳戶（無法復原）：
+${w.delete}:
 ${links.delete}
 
-停止使用統計：
+${w.stop}:
 ${links.stop}
 
-如果這個信箱是你 Orbit Pass 的救援信箱，點連結就能完成；否則點連結後要輸入你的通行碼。
-資料副本每個帳戶 30 天一次。不是你寄的信？不用理會這封。
+${w.how}
+${w.notYou}
 
-隱私權政策：${site()}/privacy/`;
-  const en = `Hi, we got your email to ${PRIVACY_USER}@${DOMAIN}. Pick one (links work for 24 hours):
-
-Download a copy of my data:
-${links.export}
-
-Delete my Orbit Pass account (can't be undone):
-${links.delete}
-
-Stop usage stats:
-${links.stop}
-
-If this address is your Orbit Pass's recovery email, the link alone does it; otherwise the link asks for your pass.
-A copy can be downloaded once every 30 days per account. Didn't write to us? Ignore this email.
-
-Privacy policy: ${site()}/privacy/?lang=en`;
-  return `${zh}\n\n— — —\n\n${en}\n`;
+${w.policy}: ${policyUrl(lang)}
+`.replace(/^(.+):\n/gm, lang === 'en' ? '$1:\n' : '$1：\n');
 }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-export function replyHtml(links) {
-  const btn = (href, label) => `<p style="margin:8px 0"><a href="${esc(href)}" style="display:inline-block;padding:10px 18px;border-radius:999px;background:#4f46e5;color:#fff;text-decoration:none;font-weight:600">${esc(label)}</a></p>`;
-  const part = (lead, a, b, c, note) => `<p>${esc(lead)}</p>${btn(links.export, a)}${btn(links.delete, b)}${btn(links.stop, c)}<p style="color:#666;font-size:14px">${esc(note)}</p>`;
-  return `<!doctype html><html><body style="font:16px/1.5 -apple-system,'PingFang TC','Noto Sans TC',sans-serif;color:#111;max-width:560px;margin:0 auto;padding:16px">
-${part(`你好，我們收到了你寄到 ${PRIVACY_USER}@${DOMAIN} 的信。請選一個（連結 24 小時內有效）：`, '下載我的資料副本', '刪除我的帳戶（無法復原）', '停止使用統計', '如果這個信箱是你 Orbit Pass 的救援信箱，點連結就能完成；否則點連結後要輸入通行碼。資料副本每個帳戶 30 天一次。不是你寄的信？不用理會這封。')}
-<hr style="border:0;border-top:1px solid #ddd;margin:24px 0">
-${part(`Hi, we got your email to ${PRIVACY_USER}@${DOMAIN}. Pick one (links work for 24 hours):`, 'Download a copy of my data', "Delete my account (can't be undone)", 'Stop usage stats', "If this address is your Orbit Pass's recovery email, the link alone does it; otherwise the link asks for your pass. A copy once every 30 days per account. Didn't write to us? Ignore this email.")}
-<p style="color:#666;font-size:14px"><a href="${site()}/privacy/">隱私權政策 · Privacy policy</a></p></body></html>`;
+// The HTML: the family's mail card (site/admin/mail-look.mjs), its buttons the three asks.
+export function replyHtml(links, lang = 'zh') {
+  const w = wordsOf(lang);
+  // (Until the family's card is on main, a plain one in the same words.)
+  if (typeof look.cardMailHtml !== 'function') {
+    const btn = (href, label, danger) => `<p style="margin:10px 0"><a href="${esc(href)}" style="display:inline-block;padding:11px 20px;border-radius:999px;text-decoration:none;font-weight:600;${danger ? 'border:1.5px solid #dc2626;color:#dc2626' : 'background:#4f46e5;color:#fff'}">${esc(label)}</a></p>`;
+    return `<!doctype html><html lang="${lang === 'en' ? 'en' : 'zh-Hant'}"><body style="font:16px/1.55 -apple-system,'PingFang TC','Noto Sans TC',sans-serif;color:#111;max-width:520px;margin:0 auto;padding:20px"><p style="font-size:13px;color:#6b7280;margin:0">Orbit Pass</p><h1 style="font-size:22px;margin:4px 0 12px">${esc(w.head)}</h1><p>${esc(w.lead)}</p>${btn(links.export, w.export)}${btn(links.stop, w.stop)}${btn(links.delete, w.delete, true)}<hr style="border:0;border-top:1px solid #e5e7eb;margin:20px 0"><p style="color:#6b7280;font-size:14px">${esc(w.how)} ${esc(w.notYou)}</p><p style="font-size:14px"><a href="${esc(policyUrl(lang))}">${esc(w.policy)}</a></p></body></html>`;
+  }
+  return look.cardMailHtml({
+    lang: lang === 'en' ? 'en' : 'zh',
+    eyebrow: 'Orbit Pass',
+    headline: w.head,
+    preheader: w.lead,
+    paras: [w.lead],
+    buttons: [
+      { label: w.export, link: links.export },
+      { label: w.stop, link: links.stop },
+      { label: w.delete, link: links.delete, danger: true }
+    ],
+    note: `${w.how} ${w.notYou}`,
+    foot: `<a href="${esc(policyUrl(lang))}">${esc(w.policy)}</a>`
+  });
 }
 
 // A reply as raw MIME (Email Routing's reply takes the whole message).
@@ -154,25 +202,85 @@ export async function privacyMail(message, env, deps, { now = Date.now(), reply 
   if (!from || !secret || auto) return;
   if (!(await replyRoom(env, deps, secret, from, now))) return;
   const docId = await accountOfMail(env, deps, from).catch(() => '');
-  const links = await requestLinks(secret, docId, now);
-  const raw = replyMime({ from: `${PRIVACY_USER}@${DOMAIN}`, to: from, inReplyTo: message.headers?.get?.('Message-ID') || '', subject: 'Orbit 資料請求 · Your Orbit data request', text: replyText(links), html: replyHtml(links), now });
-  if (reply) return reply(raw, { from, docId, links });
+  const lang = mailLang(message.headers);
+  const links = await requestLinks(secret, docId, now, lang);
+  const raw = replyMime({ from: `${PRIVACY_USER}@${DOMAIN}`, to: from, inReplyTo: message.headers?.get?.('Message-ID') || '', subject: replySubject(lang), text: replyText(links, lang), html: replyHtml(links, lang), now });
+  if (reply) return reply(raw, { from, docId, links, lang });
   const { EmailMessage } = await import('cloudflare:email');
   await message.reply(new EmailMessage(`${PRIVACY_USER}@${DOMAIN}`, message.from, raw));
 }
 
 // ---- The confirm page's ask (POST /eco { op: 'privacy', token, passcode? }) ----
 
+// ---- The copy ----
+// What each app keeps, as it reads: the apps save packed (gzip in base64
+// after a mark like 'm1:', Class's '[ORBIT]' base91 + deflate, JSON after
+// 'w1:'); the copy holds it unpacked, each app under its name, and times as
+// dates (Jay 11-14: "see if the downloaded copy is even good").
+const inflate = async (bytes, kind) => JSON.parse(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream(kind))).text());
+const B91 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+,-./:;<=>?@[]^_`{|}~';
+function base91(str) {
+  const bytes = [];
+  let b = 0;
+  let n = 0;
+  let v = -1;
+  for (const ch of str) {
+    const c = B91.indexOf(ch);
+    if (c < 0) continue;
+    if (v < 0) {
+      v = c;
+      continue;
+    }
+    v += c * 91;
+    b |= v << n;
+    n += (v & 8191) > 88 ? 13 : 14;
+    while (n >= 8) {
+      bytes.push(b & 255);
+      b >>= 8;
+      n -= 8;
+    }
+    v = -1;
+  }
+  if (v >= 0) bytes.push((b | (v << n)) & 255);
+  return Uint8Array.from(bytes);
+}
+export async function unpack(v) {
+  if (typeof v !== 'string') return v;
+  try {
+    const orbit = v.match(/^\[ORBIT\]([\s\S]*)\[\/ORBIT\]$/);
+    if (orbit) return await inflate(base91(orbit[1].trim()), 'deflate-raw');
+    const gz = v.match(/^[a-z]+\d*:(H4sI[A-Za-z0-9+/=\s]+)$/);
+    if (gz) return await inflate(Uint8Array.from(atob(gz[1].replace(/\s/g, '')), c => c.charCodeAt(0)), 'gzip');
+    const json = v.match(/^(?:[a-z]+\d*:)?([[{][\s\S]*)$/);
+    if (json) return JSON.parse(json[1]);
+  } catch {}
+  return v;
+}
+// (A number that is a moment, by its name and size: 2017 to 2049.)
+const WHEN = /^(t|at|ts|time|created|updated|used|lastUsed|first|last|since|until|added|saved|v2|e|exp|when|start|end|[a-z]+(At|Time|T))$/;
+function dated(v, key = '') {
+  if (Array.isArray(v)) return v.map(x => dated(x));
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, dated(x, k)]));
+  if (typeof v === 'number' && v > 1.5e12 && v < 2.5e12 && WHEN.test(key)) return new Date(v).toISOString();
+  return v;
+}
+const appName = id => BRANDS[id]?.name || id;
+// What a copy says it is, in the language of the page that asked.
+const ABOUT = {
+  zh: '你的 Orbit Pass 帳戶在下載這一刻存的所有資料。「apps」是每個 App 存的內容（Orbit 存的樣子，已解開成可讀的 JSON）；「account」是帳戶本身；「betweenApps」是 App 之間共用的。使用統計不含帳號，所以不在這裡。',
+  en: 'Everything your Orbit Pass account held when this was downloaded. "apps" is what each app keeps (unpacked from how Orbit stores it into readable JSON); "account" is the account itself; "betweenApps" is what the apps share. Usage stats have no account in them, so there are none here.'
+};
+
 // Everything the account holds, as one file.
-export async function exportOf(env, deps, docId, now = Date.now()) {
+export async function exportOf(env, deps, docId, now = Date.now(), lang = 'zh') {
   const read = async (coll, id) => {
     const doc = await deps.fsGet(env, coll, id).catch(() => ({ exists: false }));
     if (!doc.exists) return null;
+    let v = doc.payload;
     try {
-      return JSON.parse(doc.payload);
-    } catch {
-      return doc.payload;
-    }
+      v = JSON.parse(v);
+    } catch {}
+    return unpack(v);
   };
   const wDoc = await deps.fsGet(env, WALLET_COLLECTION, docId);
   const wallet = wDoc.exists ? parseWallet(wDoc.payload) : null;
@@ -180,26 +288,31 @@ export async function exportOf(env, deps, docId, now = Date.now()) {
   const apps = {};
   for (const [app, { collection }] of Object.entries(ECO_APPS)) {
     const v = await read(collection, docId);
-    if (v != null) apps[app] = v;
+    if (v != null) apps[appName(app)] = v;
   }
-  const now_ = {};
+  const between = {};
   for (const name of [...Object.keys(ECO_APPS), FAMILY_SHELF]) {
     const v = await read(NOW_COLLECTION, shelfId(docId, name));
-    if (v != null) now_[name] = v;
+    if (v != null) between[ECO_APPS[name] ? appName(name) : name] = v;
   }
   const inbox = {};
-  for (const [app, ids] of Object.entries(wallet.inbox || {})) for (const id of ids) inbox[id] = await read(INBOX_COLLECTION, id);
-  const { live, ...pub } = publicWallet(wallet);
-  return {
-    about: 'Orbit Pass: everything this account holds, as of the date below. Usage stats have no account in them, so there are none here. 這個帳戶的所有資料；使用統計不含帳號，所以不在這裡。',
-    at: new Date(now).toISOString(),
-    account: docId.slice(0, 6),
+  for (const ids of Object.values(wallet.inbox || {})) for (const id of ids) inbox[id] = await read(INBOX_COLLECTION, id);
+  const { live, inbox: _, apps: opened, passkeys, mail, ...rest } = publicWallet(wallet);
+  const account = {
+    id: docId.slice(0, 6),
     recoveryEmail: mailOf(wallet) || null,
-    wallet: pub,
-    apps,
-    underWay: now_,
-    inbox
+    appsOpened: Object.fromEntries(Object.entries(opened || {}).map(([k, v]) => [appName(k), v])),
+    passkeys: (passkeys || []).map(({ on, via, t, used }) => ({ device: on || '', via: via || '', added: t, lastUsed: used })),
+    ...rest
   };
+  return dated({
+    about: ABOUT[lang === 'en' ? 'en' : 'zh'],
+    downloadedAt: now,
+    account,
+    apps,
+    betweenApps: between,
+    inbox
+  });
 }
 
 // The ask: { file } (a copy), { deleted }, { stopped }, or an error with a code.
@@ -231,7 +344,7 @@ export async function privacyDo(ctx) {
       last = doc.exists ? Number(JSON.parse(doc.payload).export) || 0 : 0;
     } catch {}
     if (last && now - last < EXPORT_EVERY_MS) return bad('PRIVACY_EXPORT_WAIT', 429, { next: last + EXPORT_EVERY_MS });
-    const file = await exportOf(env, deps, docId, now);
+    const file = await exportOf(env, deps, docId, now, body.lang);
     if (!file) return bad('PRIVACY_NO_ACCOUNT', 404);
     await deps.fsWrite(env, PRIVACY_COLLECTION, `a-${docId}`, JSON.stringify({ export: now }));
     return deps.json({ file }, 200, headers);

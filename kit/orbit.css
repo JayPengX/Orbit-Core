@@ -2702,7 +2702,10 @@ input[type='checkbox'][switch] {
   z-index: 2147483000;
   left: var(--q-mid, 50%);
   top: calc(var(--q-top) + 8px);
-  transform: translateX(-50%);
+  /* (--q-dx, --q-dy: where a finger has it, kit noticeLife: swiped up or to a side, it goes.) */
+  transform: translate(calc(-50% + var(--q-dx, 0px)), var(--q-dy, 0px));
+  transition: transform var(--q-dur-snappy) var(--q-spring-snappy);
+  touch-action: none;
   width: min(420px, calc(var(--q-vw) - 16px));
   box-sizing: border-box;
   display: flex;
@@ -2719,9 +2722,12 @@ input[type='checkbox'][switch] {
   cursor: pointer;
   animation: q-banner-in var(--q-dur-bouncy) var(--q-spring-bouncy);
 }
+.q-banner.q-drag {
+  transition: none;
+}
 .q-banner.out {
   opacity: 0;
-  transform: translate(-50%, -24px) scale(0.96);
+  transform: translate(calc(-50% + var(--q-dx, 0px)), calc(var(--q-dy, 0px) - 24px)) scale(0.96);
   transition: opacity 0.25s ease, transform var(--q-dur-snappy) var(--q-spring-snappy);
 }
 .q-banner img {

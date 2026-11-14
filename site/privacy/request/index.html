@@ -16,6 +16,7 @@ button{font:inherit;font-weight:600;padding:13px 20px;border:0;border-radius:999
 @media (prefers-color-scheme:dark){button{background:#eef0ff;color:#1e1b4b}}
 button.danger{background:#dc2626;color:#fff}
 button:disabled{opacity:.5}
+.got{margin:12px 0;padding-left:20px;color:var(--label-2)}.got+button{margin-top:4px}
 .say{margin:12px 0 0;color:var(--label-2)}.say.bad{color:#dc2626}.say.ok{color:#16a34a}
 </style>
 </head><body><main>
@@ -33,14 +34,17 @@ button:disabled{opacity:.5}
 </main>
 <script>
 (() => {
+  const hash = new URLSearchParams(location.hash.slice(1));
   const n = navigator.languages?.length ? navigator.languages : [navigator.language || 'zh-TW'];
   let en = !n.some(x => /^zh/i.test(x));
   try { const l = localStorage.getItem('orbit.lang'); if (l === 'en' || l === 'zh') en = l === 'en'; } catch {}
+  // (The mail's own language, which the link carries.)
+  if (hash.get('l') === 'en' || hash.get('l') === 'zh') en = hash.get('l') === 'en';
   if (en) document.documentElement.lang = 'en';
   const T = (zh, e) => (en ? e : zh);
   const $ = id => document.getElementById(id);
   if (en) for (const a of document.querySelectorAll('.top [data-en]')) a.textContent = a.dataset.en;
-  const token = new URLSearchParams(location.hash.slice(1)).get('t') || '';
+  const token = hash.get('t') || '';
   // (The link's address taken off the page: it isn't left in the history.)
   if (token) history.replaceState(null, '', location.pathname);
   let c = null;
@@ -72,6 +76,58 @@ button:disabled{opacity:.5}
     PRIVACY_NO_ACCOUNT: T('找不到這個帳戶，可能已經刪除了。', 'No such account: it may already be deleted.'),
     RATE_LIMITED: T('試太多次了，請一小時後再試。', 'Too many tries. Try again in an hour.')
   };
+  const day = new Date().toISOString().slice(0, 10);
+  const save = (text, type, ext) => {
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([text], { type })), download: `orbit-pass-${day}.${ext}` });
+    document.body.append(a);
+    a.click();
+    a.remove();
+  };
+  // The same copy as a page anyone can read (no script in it: it opens anywhere, even in Files).
+  const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const ISO = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z$/;
+  const plain = v => (typeof v === 'string' && ISO.test(v) ? new Date(v).toLocaleString(en ? 'en' : 'zh-TW', { dateStyle: 'medium', timeStyle: 'short' }) : typeof v === 'boolean' ? (v ? T('是', 'yes') : T('否', 'no')) : v === null || v === '' ? '—' : String(v));
+  const html = v => {
+    if (Array.isArray(v)) {
+      if (!v.length) return '—';
+      if (v.every(x => x === null || typeof x !== 'object')) return esc(v.map(plain).join(', '));
+      return `<ol>${v.map(x => `<li>${html(x)}</li>`).join('')}</ol>`;
+    }
+    if (v && typeof v === 'object') {
+      const e = Object.entries(v);
+      return e.length ? `<dl>${e.map(([k, x]) => `<dt>${esc(k)}</dt><dd>${html(x)}</dd>`).join('')}</dl>` : '—';
+    }
+    return esc(plain(v));
+  };
+  const size = v => { const n = new Blob([JSON.stringify(v)]).size; return n < 1024 ? `${n} B` : `${Math.round(n / 1024)} KB`; };
+  const PARTS = [['account', T('帳戶', 'Account')], ['apps', T('各 App 存的資料', 'What each app keeps')], ['betweenApps', T('App 之間共用的', 'Shared between apps')], ['inbox', T('收件匣', 'Inbox')]];
+  const readable = f => {
+    const part = ([k, name]) => {
+      const v = f[k];
+      if (!v || (typeof v === 'object' && !Object.keys(v).length)) return '';
+      // (The account's own lines in the open; anything bigger, and each app, folded.)
+      const fold = ([name, x]) => `<details><summary>${esc(name)} <small>${size(x)}</small></summary>${html(x)}</details>`;
+      const big = x => x && typeof x === 'object' && Object.keys(x).length > 0;
+      const inner = k === 'account' ? html(Object.fromEntries(Object.entries(v).filter(([, x]) => !big(x)))) + Object.entries(v).filter(([, x]) => big(x)).map(fold).join('') : Object.entries(v).map(fold).join('');
+      return `<h2>${esc(name)}</h2>${inner}`;
+    };
+    return `<!doctype html><html lang="${en ? 'en' : 'zh-Hant'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(T('我的 Orbit Pass 資料', 'My Orbit Pass data'))}</title><style>
+:root{color-scheme:light dark}body{font:15px/1.5 -apple-system,"PingFang TC","Noto Sans TC",system-ui,sans-serif;max-width:760px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:26px;margin:0 0 4px}h2{font-size:19px;margin:28px 0 8px}p{color:#6b7280;margin:0 0 4px}
+details{border:1px solid #8883;border-radius:12px;padding:10px 14px;margin:8px 0}summary{font-weight:600;cursor:pointer}summary small{color:#6b7280;font-weight:400;margin-left:6px}
+dl{margin:4px 0 4px 2px;padding-left:10px;border-left:2px solid #8882}dt{font-weight:600;font-size:13px;color:#4f46e5;margin-top:6px;overflow-wrap:anywhere}dd{margin:0 0 2px;overflow-wrap:anywhere}ol{margin:4px 0;padding-left:22px}
+@media (prefers-color-scheme:dark){body{background:#05051a;color:#eee}dt{color:#a5b4fc}}
+</style></head><body><h1>${esc(T('我的 Orbit Pass 資料', 'My Orbit Pass data'))}</h1><p>${esc(plain(f.downloadedAt))} · ${esc(T('帳戶', 'Account'))} ${esc(f.account?.id || '')}</p><p>${esc(f.about || '')}</p>${PARTS.map(part).join('')}</body></html>`;
+  };
+  // After the download: what's in it, and the readable page.
+  const shown = f => {
+    const list = document.createElement('ul');
+    list.className = 'got';
+    for (const [app, v] of Object.entries(f.apps || {})) list.append(Object.assign(document.createElement('li'), { textContent: `${app} · ${size(v)}` }));
+    const b = Object.assign(document.createElement('button'), { type: 'button', textContent: T('下載易讀版（網頁）', 'Download a readable copy (web page)') });
+    b.onclick = () => save(readable(f), 'text/html', 'html');
+    $('say').after(list, b);
+  };
   let sure = c.w !== 'delete';
   $('form').onsubmit = async e => {
     e.preventDefault();
@@ -83,7 +139,7 @@ button:disabled{opacity:.5}
     $('go').disabled = true;
     say(T('處理中…', 'Working…'));
     try {
-      const res = await fetch('/api/eco', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ op: 'privacy', token, passcode: $('pass').value }) });
+      const res = await fetch('/api/eco', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ op: 'privacy', token, passcode: $('pass').value, lang: en ? 'en' : 'zh' }) });
       const d = await res.json().catch(() => ({}));
       const code = d?.error?.code || d?.code || (res.ok ? '' : `HTTP ${res.status}`);
       if (code === 'PRIVACY_EXPORT_WAIT') return say(T(`這個帳戶 30 天內下載過了，${new Date(d.error.next).toLocaleDateString('zh-TW')} 之後可以再下載。`, `This account downloaded a copy in the last 30 days; the next one is possible after ${new Date(d.error.next).toLocaleDateString('en')}.`), 'bad');
@@ -93,11 +149,10 @@ button:disabled{opacity:.5}
       }
       $('form').hidden = true;
       if (d.file) {
-        const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([JSON.stringify(d.file, null, 1)], { type: 'application/json' })), download: `orbit-pass-${new Date().toISOString().slice(0, 10)}.json` });
-        document.body.append(a);
-        a.click();
-        a.remove();
-        return say(T('已下載你的資料副本。', 'Your copy has been downloaded.'), 'ok');
+        save(JSON.stringify(d.file, null, 1), 'application/json', 'json');
+        say(T('已下載你的資料副本（JSON，給其他程式讀）。', 'Your copy is downloaded (JSON, for other software).'), 'ok');
+        shown(d.file);
+        return;
       }
       if (d.deleted) return say(T('帳戶已刪除。在其他裝置上會自動登出。', 'Your account is deleted. Other devices sign out by themselves.'), 'ok');
       if (d.stopped) return say(T('使用統計已關閉，你的裝置下次打開 App 時會跟著關掉。', 'Usage stats are off; your devices follow the next time an app opens.'), 'ok');
