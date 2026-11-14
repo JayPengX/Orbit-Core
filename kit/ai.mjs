@@ -89,7 +89,9 @@ export const aiThinking = (text = W('想一下…', 'Thinking…')) => h('div', 
 
 // The box to type or dictate into (the keyboard's own mic dictates): grows
 // with what's written, Enter or the arrow sends (Shift+Enter: a new line).
-export function aiBar({ placeholder = '', onSend = () => {}, value = '', label = placeholder, max = 400 } = {}) {
+// `code`: the app's own code answers first (AI only for what it can't), so the
+// bar stays open with no Orbit AI on the account.
+export function aiBar({ placeholder = '', onSend = () => {}, value = '', label = placeholder, max = 400, code = false } = {}) {
   const input = h('textarea', { rows: '1', placeholder, 'aria-label': label, maxlength: String(max), enterkeyhint: 'send', autocomplete: 'off' });
   input.value = value;
   const send = h('button', { type: 'button', class: 'q-ai-send', 'aria-label': W('送出', 'Send'), html: icons.send });
@@ -112,7 +114,8 @@ export function aiBar({ placeholder = '', onSend = () => {}, value = '', label =
     }
   });
   send.addEventListener('click', go);
-  const box = h('div', { class: 'q-ai-bar' }, [mark(), input, send]);
+  // (data-ai-tap: shown locked with no Orbit AI on this account, a tap says why: orbit.mjs aiLock.)
+  const box = h('div', { class: 'q-ai-bar', ...(code ? {} : { 'data-ai-tap': '' }) }, [mark(), input, send]);
   send.disabled = !input.value.trim();
   requestAnimationFrame(fit);
   return Object.assign(box, {
