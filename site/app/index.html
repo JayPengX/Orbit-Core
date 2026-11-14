@@ -6,24 +6,22 @@
      this page's own files are kept at its own folder all the same.) -->
 <script>document.write('<base href="' + location.pathname.replace(/[^/]*$/, '') + '">')</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<title>Orbit</title>
 <meta name="description" content="Orbit 的每個 App 都在一個圖示裡：登入一次，App 之間切換、返回都在原地。" />
-<meta name="application-name" content="Orbit" />
-<meta name="apple-mobile-web-app-title" content="Orbit" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="color-scheme" content="light dark" />
 <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)" />
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
-<link rel="manifest" href="./manifest.webmanifest" />
 <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
-<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
 <!-- Which Orbit this is (kit/orbit-mine.mjs): the tag in the address the
      home-screen icon opens (/app/?o=<tag>), kept for this window. Its name
      and icon go into the page before anything else reads it, so Add to Home
      Screen (and Chrome's install) take that Orbit's: its manifest is the
-     proxy's, read from the tag (orbit-manifest.js). -->
+     proxy's, read from the tag (orbit-manifest.js). Written here, never
+     changed after: a phone that read the page's first manifest link took
+     "Orbit" and plain /app/ for every Orbit (Jay 11-14: "still called orbit
+     everytime", "open... my old stuff"). -->
 <script>
 !function () {
   try {
@@ -40,19 +38,20 @@
     }
     if (tag) ss.setItem('orbit.which', tag); else ss.removeItem('orbit.which');
     window.ORBIT_TAG = tag;
-    if (!tag) return;
-    var x = JSON.parse(decodeURIComponent(escape(atob(tag.replace(/-/g, '+').replace(/_/g, '/')))));
-    var name = String(x.n || 'Orbit').slice(0, 20), look = /^[a-z-]+$/.test(x.l || '') ? x.l : 'space';
-    // (An app's own look is its icon: kit/brand.mjs slugs.)
-    var slug = { match: 'sports', orbit: 'class', vocab: 'words', stock: 'securities' }, app = /^app-([a-z]+)$/.exec(look);
-    var apple = app ? '/' + (slug[app[1]] || app[1]) + '/icons/apple-touch-icon.png' : '/app/looks/' + look + '/apple.png';
-    var set = function (sel, attr, v) { var el = document.querySelector(sel); if (el) el.setAttribute(attr, v); };
-    set('link[rel="manifest"]', 'href', '/api/orbit-manifest?o=' + tag);
-    set('link[rel="apple-touch-icon"]', 'href', apple);
-    set('meta[name="apple-mobile-web-app-title"]', 'content', name);
-    set('meta[name="application-name"]', 'content', name);
-    document.title = name;
-  } catch (e) {}
+    var name = 'Orbit', look = '', manifest = '/app/manifest.webmanifest', apple = '/app/icons/apple-touch-icon.png';
+    if (tag) {
+      var x = JSON.parse(decodeURIComponent(escape(atob(tag.replace(/-/g, '+').replace(/_/g, '/')))));
+      name = String(x.n || 'Orbit').replace(/[<>"&]/g, '').slice(0, 20) || 'Orbit';
+      look = /^[a-z-]+$/.test(x.l || '') ? x.l : 'space';
+      // (An app's own look is its icon: kit/brand.mjs slugs.)
+      var slug = { match: 'sports', orbit: 'class', vocab: 'words', stock: 'securities' }, app = /^app-([a-z]+)$/.exec(look);
+      apple = app ? '/' + (slug[app[1]] || app[1]) + '/icons/apple-touch-icon.png' : '/app/looks/' + look + '/apple.png';
+      manifest = '/api/orbit-manifest?o=' + tag;
+    }
+    document.write('<title>' + name + '</title><meta name="application-name" content="' + name + '"><meta name="apple-mobile-web-app-title" content="' + name + '"><link rel="manifest" href="' + manifest + '"><link rel="apple-touch-icon" href="' + apple + '">');
+  } catch (e) {
+    document.write('<title>Orbit</title><link rel="manifest" href="/app/manifest.webmanifest"><link rel="apple-touch-icon" href="/app/icons/apple-touch-icon.png">');
+  }
 }();
 </script>
 <meta property="og:type" content="website" />
