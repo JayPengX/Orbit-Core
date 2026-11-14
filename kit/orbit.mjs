@@ -1847,6 +1847,10 @@ function watchScreen() {
   };
   globalThis.addEventListener?.('resize', again);
   globalThis.screen?.orientation?.addEventListener?.('change', again);
+  // (Shown again: an app in Orbit's window hidden as a tab, or the phone's
+  // screen back on. A size change while hidden went unmeasured on an iPad,
+  // the app laid out for the old one, its tab bar gone; Jay 11-14.)
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && measureScreen());
   // (A mouse plugged into a tablet, or taken away.)
   globalThis.matchMedia?.('(hover: hover) and (pointer: fine)').addEventListener?.('change', again);
   // (A page that grows a scroll bar on a computer: the width it leaves.)
