@@ -1,5 +1,5 @@
 # The shared kit (kit/) and the family's page (site/) on Cloudflare, at
-# orbit.<domain>/Orbit-Core/ and /pass/ (deploy/cf-site.mjs): every app loads
+# orbit.<domain>/Orbit-Core/ and the root (deploy/cf-site.mjs): every app loads
 # the kit from there (kit/loader.html), so a change to the kit is this one push.
 name: Kit to Cloudflare
 

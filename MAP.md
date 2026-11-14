@@ -435,7 +435,8 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   it is set. Each repo publishes its built site with `deploy/cf-site.mjs`
   (§4.2; `SITE_HEADERS`, `site/_headers`: no other site's frame): `orbit.<DOMAIN>/<slug>/` every app (`slug`,
   `SHORT` in `kit/brand.mjs`; one origin, so one Pass sign-in), `orbit-pass`
-  for `/`, `/pass/`, `/key/`, `/app/` (Orbit, `kit/suite.mjs`), `/admin/`, `/Orbit-Core/` and the old `/Shared-Proxy/`,
+  for `/`, `/key/`, `/app/` (Orbit, `kit/suite.mjs`), `/admin/` and `/Orbit-Core/` (the kit and the pictures),
+  each at one address, nothing forwarded,
   `orbit-home` for `<DOMAIN>/`, `/showcase/` (Orbit-Showcase).
   Mail in: privacy@ only, to the proxy (Email Routing rule). `deploy.yml`
   attaches the hostnames (its token needs the zone and D1 Edit); the guard

@@ -1214,8 +1214,7 @@ export function haptic() {
     label.remove();
   } catch {}
 }
-// Also as a global: an app that calls it this way still opens on a device
-// whose kit is an older one (an import of a name the old kit lacks would not).
+// Also as a global, for ui.mjs's tick (which doesn't import this file).
 if (typeof globalThis !== 'undefined') globalThis.orbitHaptic = haptic;
 
 // A sheet closing slides to the foot as its dimming fades, as iOS's (its ✕,
@@ -6046,7 +6045,7 @@ export function keepOffline(path = './sw.js') {
   const tell = reg => {
     // (Not from a page leaving for its update: its files are the old
     // version's, and the worker downloaded each again over the new one's it
-    // had just kept. kit/sw.js leaves those alone too, for a page on an older kit.)
+    // had just kept. kit/sw.js leaves those alone too.)
     if (globalThis.__bootUpdating) return;
     // (The app's own files only: never its reads through /api/, which the worker would download again for nothing.)
     const urls = [...page, ...performance.getEntriesByType('resource').map(e => e.name)].filter(u => u.startsWith(location.origin) && !u.startsWith(`${location.origin}/api/`) && !/version\.json/.test(u));

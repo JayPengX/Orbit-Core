@@ -49,7 +49,7 @@ const ownLists = {};
 function ownList(league) {
   if (!ownLists[league]) {
     ownLists[league] = { map: null, ready: null };
-    ownLists[league].ready = (kit.packJson?.(`sports/${league}/photos.json`, { ttl: 12 * 3_600_000 }) || Promise.resolve(null))
+    ownLists[league].ready = (kit.packJson(`sports/${league}/photos.json`, { ttl: 12 * 3_600_000 }) || Promise.resolve(null))
       .then(d => (ownLists[league].map = new Map((d?.players || []).map(([n, id, where]) => [plain(n), /^https:/.test(String(id)) ? String(id) : OWN_PHOTO[league]?.(id, where === 'o')]).filter(([, url]) => url))))
       // A failed read: asked again when a player is next drawn.
       .catch(() => void delete ownLists[league]);
@@ -88,7 +88,7 @@ function faceList(league) {
   if (sportOf(league) !== 'soccer') return null;
   if (!faceLists[league]) {
     faceLists[league] = { map: null, ready: null };
-    faceLists[league].ready = (kit.packJson?.(`sports/${league}/faces.json`, { ttl: 12 * 3_600_000 }) || Promise.resolve(null))
+    faceLists[league].ready = (kit.packJson(`sports/${league}/faces.json`, { ttl: 12 * 3_600_000 }) || Promise.resolve(null))
       .then(d => (faceLists[league].map = new Map((d?.players || []).map(([n, id]) => [plain(n), id]))))
       // A failed read isn't "no faces": read again when a player is next drawn.
       .catch(() => void delete faceLists[league]);

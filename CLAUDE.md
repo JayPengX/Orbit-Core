@@ -33,7 +33,8 @@ or run Orbit.
 - **Look before you write:** `node tools/kit-find.mjs <word…>` (the kit's
   exports and CSS classes; `--apps` finds copies). Anything two apps use goes
   into `kit/`, never a second copy. A new kit export is read with a fallback
-  (`kitUI.newThing?.(…)`): phones may run an older kit.
+  (`kitUI.newThing?.(…)`) for its first week only: phones may run an older kit.
+  No legacy forwards or back-compat (RULEBOOK §1).
 - **Push** with `sh ../Orbit-Core/tools/push.sh` (here `sh tools/push.sh`):
   `main` only, never a branch or a PR. It rebases, runs what the deploy runs
   (and every app's tests on a kit change) and pushes only if they pass.

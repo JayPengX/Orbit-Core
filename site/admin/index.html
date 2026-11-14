@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="robots" content="noindex,nofollow" />
 <title>Orbit 管理</title>
-<link rel="icon" href="/pass/brand/pass.svg?v=2" type="image/svg+xml" />
-<link rel="icon" href="/pass/icons/favicon-32.png?v=2" sizes="32x32" type="image/png" />
-<link rel="apple-touch-icon" href="/pass/icons/apple-touch-icon.png?v=2" />
+<link rel="icon" href="/Orbit-Core/brand/pass.svg?v=2" type="image/svg+xml" />
+<link rel="icon" href="/Orbit-Core/icons/favicon-32.png?v=2" sizes="32x32" type="image/png" />
+<link rel="apple-touch-icon" href="/Orbit-Core/icons/apple-touch-icon.png?v=2" />
 <link rel="stylesheet" href="/Orbit-Core/kit/orbit.css" />
 <style>
   /* The panel is the family's one desktop page besides the showcase (Jay 2026-10-27): the kit's phone column lifted. */
@@ -3041,7 +3041,7 @@ $('sys-actions').replaceChildren(
 );
 const LINKS = [
   // Each at its address on the page's own home (a repo's name isn't one on the domain).
-  ...Object.entries(BRANDS).map(([id, b]) => [b.name, pathOf(id)]), ['Orbit Showcase', DOMAIN ? `https://${DOMAIN}/showcase/` : '/Orbit-Showcase/'],
+  ...Object.entries(BRANDS).map(([id, b]) => [b.name, pathOf(id)]), ['Orbit Showcase', `https://${DOMAIN}/showcase/`],
   ['Orbit-Core Actions', 'https://github.com/JayPengX/Orbit-Core/actions'],
   ['Cloudflare Workers', 'https://dash.cloudflare.com/?to=/:account/workers-and-pages'], ['Cloudflare D1', 'https://dash.cloudflare.com/?to=/:account/workers/d1'], ['Cloudflare R2', 'https://dash.cloudflare.com/?to=/:account/r2/overview'], ['Cloudflare 帳單', 'https://dash.cloudflare.com/?to=/:account/billing'], ['Cloudflare 通知', 'https://dash.cloudflare.com/?to=/:account/notifications'], ['GitHub', 'https://github.com/JayPengX?tab=repositories']
 ];

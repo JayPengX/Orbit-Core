@@ -7,9 +7,6 @@
 // game: the apps take each playoff game's time, 待定 and 如需 from it, and
 // a game MLB no longer lists (its series over) is gone.
 //
-// Loaded by the apps with import('#kit/postseason.mjs').catch(() => null):
-// an older kit without this file leaves them as before.
-//
 //   mlbPostseasonUrl(year)      the read (through the proxy, minutes fresh)
 //   mlbPostseason(data)         → [{ pk, day, start (the listed hour), firstPitch, timeTbd, round, game, of, maybe, home, away, state }]
 //   listedTime(iso)             MLB's first pitch (17:08) as the hour it's listed at (17:00)

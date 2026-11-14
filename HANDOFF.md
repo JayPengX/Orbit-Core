@@ -114,7 +114,7 @@ with a new key from its provider.
 `gemini-relay` (pinned to Taiwan; Gemini and the Taiwan-only sites),
 `quota-guard` (reads the bill, paces), `orbit-site` (the hostnames), and one
 assets Worker per site: `orbit-<slug>` for each app, `orbit-pass` (the kit,
-`/pass/`, `/app/`), `orbit-home` (Showcase and the homepage). All on the
+the home page, `/app/`, `/admin/`), `orbit-home` (Showcase and the homepage). All on the
 Free plan. Every one is rebuilt by its repo's deploy; nothing in them is
 hand-made except the hand-typed secrets above. Details: `MAP.md` §1, §4.2, §10.
 
