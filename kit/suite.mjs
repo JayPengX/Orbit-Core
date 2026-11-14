@@ -326,6 +326,8 @@ const img = id => el('img', { src: iconOf(id), alt: '', width: '24', height: '24
 let bar = null;
 function draw() {
   if (!app) return;
+  const H = hostOf();
+  if (H?.tabs) return drawTabs(H);
   const t = readTrail();
   const b = backOf(t);
   const f = forwardOf(t);
@@ -336,6 +338,26 @@ function draw() {
     b ? el('button', { class: 'q-suite-btn q-suite-back', type: 'button', 'aria-label': W(`回到 ${short(b.app)}`, `Back to ${short(b.app)}`), onclick: back }, [el('span', { class: 'q-suite-chev', html: svg(LEFT) }), img(b.app)]) : null,
     f ? el('button', { class: 'q-suite-btn q-suite-fwd', type: 'button', 'aria-label': W(`前往 ${short(f.app)}`, `Forward to ${short(f.app)}`), onclick: forward }, [img(f.app), el('span', { class: 'q-suite-chev', html: svg(RIGHT) })]) : null
     ].filter(Boolean)
+  );
+  place();
+}
+// Held in Orbit's window: this app (⌄ every app), then the other apps open
+// in it as tabs, the latest first (Jay 2026-11-14: "tabs rather than backward
+// forward"): a tap shows that one as it was left; one with something under
+// way (a trip, a focus, a song) wears a green dot.
+const TABS_MAX = 3;
+function drawTabs(H) {
+  // (Something under way first, as a small pill that says so: a minimized trip
+  // or focus in sight from any app, a tap back to it. Jay 2026-11-14.)
+  const all = H.tabs().filter(x => x.app !== app);
+  const tabs = [...all.filter(x => x.live), ...all.filter(x => !x.live)];
+  const max = tabs.some(x => x.live) ? TABS_MAX - 1 : TABS_MAX;
+  bar ||= el('div', { class: 'q-suite', role: 'group', 'aria-label': 'Orbit' });
+  bar.replaceChildren(
+    el('button', { class: 'q-suite-btn q-suite-switch', type: 'button', 'aria-label': W(`切換 App（現在：${short(app)}）`, `Switch apps (now ${short(app)})`), onclick: () => switcher() }, [img(app), el('span', { class: 'q-suite-chev', html: svg(DOWN) })]),
+    ...tabs.slice(0, max).map(x =>
+      el('button', { class: `q-suite-btn q-suite-tab${x.live ? ' q-suite-on' : ''}`, type: 'button', 'aria-label': W(`${short(x.app)}${x.live ? '（進行中）' : ''}`, `${short(x.app)}${x.live ? ' (under way)' : ''}`), onclick: () => (remember(), H.go(x.app)) }, [img(x.app), x.live ? el('span', { class: 'q-suite-dot', 'aria-hidden': 'true' }) : null, x.live ? el('span', { class: 'q-suite-live', text: W('進行中', 'Live') }) : null])
+    )
   );
   place();
 }
@@ -378,9 +400,10 @@ let sheetOpen = null;
 async function switcher() {
   if (sheetOpen) return;
   const ui = await import('./ui.mjs');
+  const H = hostOf();
   const t = readTrail();
-  const b = backOf(t);
-  const f = forwardOf(t);
+  const b = H?.tabs ? null : backOf(t);
+  const f = H?.tabs ? null : forwardOf(t);
   const hops = b || f ? el('div', { class: 'q-suite-hops' }, [b ? el('button', { class: 'q-btn', type: 'button', onclick: () => (close(), back()) }, [el('span', { class: 'q-suite-chev', html: svg(LEFT) }), img(b.app), el('span', { text: W(`回到 ${short(b.app)}`, `Back to ${short(b.app)}`) })]) : null, f ? el('button', { class: 'q-btn', type: 'button', onclick: () => (close(), forward()) }, [img(f.app), el('span', { text: W(`前往 ${short(f.app)}`, `Forward to ${short(f.app)}`) }), el('span', { class: 'q-suite-chev', html: svg(RIGHT) })]) : null]) : null;
   const rows = APP_ORDER.map(id =>
     ui.cell({
@@ -391,7 +414,30 @@ async function switcher() {
       onClick: () => (close(), id === app ? null : go(id))
     })
   );
-  const s = ui.sheet({ title: 'Orbit', cls: 'q-suite-sheet', body: [hops, ui.list(rows)], onClose: () => (sheetOpen = null) });
+  // (Orbit's window: the apps open in it, each closed with ✕, then every app.)
+  let open = null;
+  if (H?.tabs) {
+    const shut = id => {
+      H.close(id);
+      row.get(id)?.remove();
+      if (!row.size || ![...row.keys()].some(k => H.tabs().some(x => x.app === k))) open.hidden = true;
+    };
+    const row = new Map();
+    const items = H.tabs().map(x => {
+      const r = ui.cell({
+        icon: img(x.app),
+        title: short(x.app),
+        sub: x.live ? W('進行中', 'Under way') : x.app === app ? W('目前', 'Open') : BRANDS[x.app].role?.[en() ? 'en' : 'zh'] || '',
+        trailing: el('button', { class: 'q-suite-x', type: 'button', 'aria-label': W(`關閉 ${short(x.app)}`, `Close ${short(x.app)}`), html: svg('M7 7l10 10M17 7L7 17'), onclick: e => (e.stopPropagation(), shut(x.app)) }),
+        onClick: () => (close(), x.app === app ? null : H.go(x.app))
+      });
+      row.set(x.app, r);
+      return r;
+    });
+    open = el('div', { class: 'q-suite-open' }, [ui.list(items, { head: W('開著的 App', 'Open apps') })]);
+  }
+  const all = ui.list(rows, H?.tabs ? { head: W('全部 App', 'All apps') } : {});
+  const s = ui.sheet({ title: 'Orbit', cls: 'q-suite-sheet', body: [hops, open, all].filter(Boolean), onClose: () => (sheetOpen = null) });
   sheetOpen = s;
   function close() {
     s.close?.();
@@ -663,8 +709,16 @@ export function host(box, { first = null, list = null } = {}) {
     box.append(el);
     return f;
   };
+  const liveSet = () => new Set([...liveNow(liveSaved()).map(x => x.app), ...[...frames.values()].filter(f => playing(f.el.contentWindow)).map(f => f.app)]);
+  const redraw = () => {
+    try {
+      frames.get(shown)?.el.contentWindow?.__orbitSuite?.draw?.();
+    } catch {}
+  };
   const tidy = () => {
-    const list = [...frames.values()].map(f => ({ app: f.app, used: f.used, playing: playing(f.el.contentWindow) }));
+    const on = liveSet();
+    // (Something under way, a trip, a focus, a song, is kept like one playing.)
+    const list = [...frames.values()].map(f => ({ app: f.app, used: f.used, playing: on.has(f.app) }));
     for (const id of toClose(list, shown)) {
       const f = frames.get(id);
       try {
@@ -673,6 +727,15 @@ export function host(box, { first = null, list = null } = {}) {
       f.el.remove();
       frames.delete(id);
     }
+  };
+  const drop = id => {
+    const f = frames.get(id);
+    if (!f) return;
+    try {
+      f.el.contentWindow?.__orbitSuite?.remember?.();
+    } catch {}
+    f.el.remove();
+    frames.delete(id);
   };
   const show = (id, url = null, y = 0) => {
     if (!BRANDS[id]) return;
@@ -708,6 +771,7 @@ export function host(box, { first = null, list = null } = {}) {
     document.title = 'Orbit';
     writeJson('localStorage', SUITE_KEY, { ...savedSuite(), last: id, left: 0 });
     tidy();
+    redraw();
   };
   const api = {
     go(id, url = null) {
@@ -728,6 +792,22 @@ export function host(box, { first = null, list = null } = {}) {
       if (!to) return;
       writeTrail(step(t, 1));
       show(to.app, frames.has(to.app) ? null : to.url, to.y || 0);
+    },
+    // The apps open here, the latest first, and which have something under way.
+    tabs() {
+      const on = liveSet();
+      return [...frames.values()].sort((a, b) => b.used - a.used).map(f => ({ app: f.app, live: on.has(f.app) }));
+    },
+    // An app closed (✕): the one shown closed shows the latest other, or the list.
+    close(id) {
+      if (!frames.has(id)) return;
+      const was = shown === id;
+      drop(id);
+      if (!was) return redraw();
+      shown = null;
+      const next = [...frames.values()].sort((a, b) => b.used - a.used)[0];
+      if (next) show(next.app);
+      else list?.();
     },
     // An address (a notice's): its app shown there.
     open(url) {
@@ -766,6 +846,7 @@ export function host(box, { first = null, list = null } = {}) {
   setInterval(() => {
     for (const f of frames.values()) if (f.app !== shown) look(f, false);
     tidy();
+    redraw();
   }, 15000);
   if (first) {
     const t = readTrail();
