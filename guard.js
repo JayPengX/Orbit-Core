@@ -718,7 +718,10 @@ export async function cpuByRoute(env, { fetcher = fetch, now = Date.now(), hours
         { operator: 'median', key: '$workers.cpuTimeMs', keyType: 'number', alias: 'p50' },
         { operator: 'p90', key: '$workers.cpuTimeMs', keyType: 'number', alias: 'p90' },
         { operator: 'p99', key: '$workers.cpuTimeMs', keyType: 'number', alias: 'p99' },
-        { operator: 'max', key: '$workers.cpuTimeMs', keyType: 'number', alias: 'max' }
+        { operator: 'max', key: '$workers.cpuTimeMs', keyType: 'number', alias: 'max' },
+        // (Wall time, all of it: what a Durable Object's request is billed by, waiting included.)
+        { operator: 'sum', key: '$workers.wallTimeMs', keyType: 'number', alias: 'wall' },
+        { operator: 'median', key: '$workers.wallTimeMs', keyType: 'number', alias: 'wall50' }
       ],
       // ?where=key,operation,value;… more filters (e.g. $workers.entrypoint,neq,Runner).
       filters: [
