@@ -7825,6 +7825,7 @@ html.q-tabrail .q-suite-dot {
   font: 400 13px/18px var(--q-font);
   white-space: nowrap;
   text-overflow: ellipsis;
+}
 .q-sw-edit {
   display: block;
   margin: 10px auto 0;
