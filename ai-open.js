@@ -119,7 +119,7 @@ export async function handleAiOpen(request, env, ctx, headers, { ip = '', cap = 
   if (sessionLimited(`ai-open:${ip}`, 20)) return json({ error: 'busy' }, 429, headers);
   if (!(await spendDay(env, name, cap, twDay(now)))) return json({ error: 'cap' }, 429, headers);
   const job = (async () => {
-    const { out } = await runFeature(env, ctx, name, f.input, { gemini, open: true });
+    const { out } = await runFeature(env, ctx, name, f.input, { gemini, open: true, need: x => !!o.out(x, id, f) });
     const made = o.out(out, id, f);
     if (!made) throw new Error('nothing usable');
     const put = keptPut(env, key, { out: made }, o.keep);

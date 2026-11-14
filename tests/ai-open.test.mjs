@@ -83,3 +83,11 @@ test('a game’s line is asked only of a game over (its preview only of one to c
   assert.match(urls[0], /\/summary\?event=401700001$/);
   assert.equal(env.calls(), 0);
 });
+
+test('a first model whose answer the checks drop: the next model answers', async () => {
+  let n = 0;
+  const env = envWith({ s1: { m: 6, brief } }, () => (++n === 1 ? { items: [{ id: 's1', points: [{ k: 'why', zh: '背景', en: 'Background.' }] }] } : points));
+  const r = await (await handleAiOpen(ask('f=news-brief&id=s1'), env, null, {}, { ip: '1', cap: 10 })).json();
+  assert.equal(r.out.points.length, 2);
+  assert.equal(env.calls(), 2);
+});
