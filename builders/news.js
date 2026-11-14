@@ -49,7 +49,7 @@
 // pages read, and the stories kept (recs).
 // Read by Orbit News through /data/ (data.js; index.json: 2 minutes at the edge).
 
-import { OUTLETS, TOPICS, SECOND, sideOf, partiesIn, topicsOf } from '../kit/news-outlets.mjs';
+import { OUTLETS, TOPICS, SECOND, sideOf, partiesIn, topicsOf, SPORTS_OUTLETS } from '../kit/news-outlets.mjs';
 import { enOf, NAMES } from './news-words.js';
 import { SPORT_PATH, SPORT_VERSION, SPORT_MS, storyKind, sportText, sportsIn } from '../kit/news-sport.mjs';
 
@@ -489,6 +489,10 @@ export function cleanTitle(t) {
   return s.replace(/\s*[|｜]\s*[^|｜]{1,20}$/, '').replace(/\s+[-–—]\s+(?:BBC News|The Guardian|NBC News|CBS News|ABC News|Fox News|Al Jazeera|The New York Times)$/i, '').trim();
 }
 const cut = (s, n) => (s.length > n ? `${s.slice(0, n - 1).trim()}…` : s);
+// A feed's words that aren't the report's (Jay 11-14: AP's「Copyright 2026 The
+// Associated Press. All Rights Reserved.」 twice as a story's 摘要).
+const BOILER = /\s*(?:Copyright\s*(?:©\s*)?\d{4}[^.]{0,80}\.\s*All [Rr]ights [Rr]eserved\.?|All [Rr]ights [Rr]eserved\.?|Continue reading\.*|Read more at [^.]{1,60}\.|\(Source: [^)]{1,40}\)|The post .{1,200} appeared first on .{1,80}?\.?$|版權所有[^。]{0,40}。?)/g;
+export const unboiled = d => String(d || '').replace(BOILER, ' ').replace(/\s{2,}/g, ' ').trim();
 // A summary without its dateline: （中央社記者某某台南10日電）, (記者某某／台北報導).
 export const undated = s => s.replace(/^\s*[（(][^（()）]{2,40}?(?:電|報導)[)）]\s*/, '').trim();
 
@@ -510,6 +514,7 @@ const FILLER_SECTION = [
 // …or by the headline's own words (11-10, on that day's 4,900 headlines).
 const FILLER_WORDS = {
   zh: [
+    ['betting', /運彩|賠率|讓分盤|國際盤/],
     ['fortune', /星座|生肖|運勢|命理|風水|塔羅|紫微|算命|開運|招財|犯太歲|農民曆|桃花劫|財運|面相/],
     ['lottery', /威力彩|大樂透|今彩539|(?<!快)樂透|統一發票.{0,6}(?:號碼|中獎|開獎)|中獎號碼/],
     ['celebrity', /女星|男星|藝人|韓星|偶像|網紅|直播主|YouTuber|正妹|辣妹|女神|比基尼|身材|事業線|性感|緋聞|戀情|閃婚|劇組|新歌|新劇|主演|綜藝|選秀|男團|女團|粉絲見面|劇迷|演藝圈|《[^》]{1,12}》(?:劇|女主|男主)/i],
@@ -520,7 +525,11 @@ const FILLER_WORDS = {
     ['fortune', /\b(?:horoscopes?|zodiac|astrolog\w*|tarot)\b/i],
     ['lottery', /\b(?:Powerball|Mega Millions|lottery|jackpot)\b/i],
     ['games', /\b(?:Wordle|crossword|puzzle|quiz|Connections hints?|sudoku)\b/i],
-    ['promo', /\b(?:best .{0,30} to buy|gift guide|coupon|promo code|sponsored|partner content|recipe)\b/i]
+    ['promo', /\b(?:best .{0,30} to buy|gift guide|coupon|promo code|sponsored|partner content|recipe)\b/i],
+    // (Betting tips, fantasy advice and TV listings aren't news: the
+    // Telegraph's「Spain vs England predictions: … tips and odds」 held a
+    // whole Nations League round in one story, Jay 11-14.)
+    ['betting', /\b(?:tips and odds|odds,? (?:and )?(?:predictions?|picks)|predictions?(?:,| and| &)? (?:odds|picks|tips|lineups)|vs?\.? .{1,40}\bpredictions?\b|best bets?|betting (?:tips|odds|lines?|preview)|expert picks|picks against the spread|parlays?|prop bets?|player props|fantasy (?:football|basketball|baseball|hockey|value|points)|start(?:\/| or )sit|how to watch|live stream|TV channel)\b/i]
   ]
 };
 // Filler: why ('section', 'fortune', …), or '' for news.
@@ -626,6 +635,8 @@ export function sameOf(pages, items) {
 }
 // (Pictures a story carries past its own: other outlets', should its own not load.)
 export const ALTS = 3;
+// (Not a picture: a feed's tracking pixel, NPR's in every item, 11-14.)
+const NO_PIC = /\/tracking\/|[-_/]pixel\.(?:png|gif)|spacer\.gif|\b1x1\b/i;
 const SMALL_PIC = /[?&]width=(?:[1-3]\d\d)\b|\/(?:ace\/standard|news)\/240\//;
 const ytPicture = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 // A feed's small picture swapped for the outlet's own larger size of it.
@@ -688,6 +699,7 @@ export const JOIN = { zh: 0.27, en: 0.24 };
 export const MERGE = { zh: 0.36, en: 0.3 };
 // An English summary's words count for this much of a headline's.
 const SUM_WEIGHT = 0.4;
+const TEAM_WEIGHT = 0.6;
 const GAP = 24 * HOUR;
 // 快訊: outlets on a story in the last BURST, a new one's (LIVE_NEW) or an old one's new turn's (LIVE_TURN).
 export const BURST = 2 * HOUR;
@@ -699,7 +711,7 @@ const add = (v, k, x) => v.set(k, (v.get(k) || 0) + x);
 // A headline's weighed pieces, each by how rare it is among these items':
 // weigh(items, lang) → it => Map(piece → weight).
 export function weigh(items, lang) {
-  const docOf = it => ({ p: piecesOf(it.t, lang), s: lang === 'en' && it.d ? piecesOf(it.d, lang) : [] });
+  const docOf = it => ({ p: piecesOf(it.t, lang), s: lang === 'en' && it.d ? piecesOf(unboiled(it.d), lang) : [] });
   const df = new Map();
   for (const it of items) {
     const d = docOf(it);
@@ -720,6 +732,15 @@ export function weigh(items, lang) {
         if (n > common) continue;
         add(v, p, w * Math.log(N / n));
       }
+    // (The game a report names, as weighty as all its words: two reports of
+    // one game are near whatever words each chose, gameOf.)
+    const game = gameOf(it.t, lang);
+    const words = norm(v);
+    if (game && v.size) v.set(`#${game}`, words);
+    // (And each team a sports report names, a little: 「七六人逆轉奪第10勝」
+    // names one team of that game.)
+    const teams = !PREVIEW.test(it.t) && teamsOf(it.t, lang);
+    if (teams && v.size) for (const x of teams) v.set(`#t:${x}`, (TEAM_WEIGHT * words) / teams.size);
     return v;
   };
 }
@@ -736,13 +757,28 @@ const NICKS = ('Hawks|Celtics|Nets|Hornets|Bulls|Cavaliers|Cavs|Mavericks|Mavs|N
   'Falcons|Ravens|Bills|Panthers|Bears|Bengals|Browns|Cowboys|Broncos|Lions|Packers|Texans|Colts|Jaguars|Chiefs|Raiders|Chargers|Rams|Dolphins|Vikings|Patriots|Saints|Jets|Eagles|Steelers|49ers|Seahawks|Buccaneers|Bucs|Titans|Commanders|' +
   'Ducks|Bruins|Sabres|Flames|Hurricanes|Blackhawks|Avalanche|Blue Jackets|Stars|Red Wings|Oilers|Canadiens|Predators|Devils|Islanders|Senators|Flyers|Penguins|Sharks|Kraken|Blues|Lightning|Maple Leafs|Canucks|Golden Knights|Capitals|Wild|Mammoth');
 const TEAM_EN = new RegExp(`\\b(?:${NICKS})\\b`, 'g');
-const TEAM_ZH = /老鷹|塞爾提克|籃網|黃蜂|公牛|騎士|獨行俠|金塊|活塞|勇士|火箭|溜馬|快艇|湖人|灰熊|熱火|公鹿|灰狼|鵜鶘|尼克|雷霆|魔術|76人|太陽|拓荒者|國王|馬刺|暴龍|爵士|巫師|響尾蛇|金鶯|紅襪|小熊|白襪|紅人|守護者|落磯|老虎|太空人|皇家|天使|道奇|馬林魚|釀酒人|雙城|大都會|洋基|運動家|費城人|海盜|教士|巨人|水手|紅雀|光芒|遊騎兵|藍鳥|國民|兄弟|統一獅|桃猿|悍將|味全龍|台鋼雄鷹/g;
+const TEAM_ZH = /七六人|老鷹|塞爾提克|籃網|黃蜂|公牛|騎士|獨行俠|金塊|活塞|勇士|火箭|溜馬|快艇|湖人|灰熊|熱火|公鹿|灰狼|鵜鶘|尼克|雷霆|魔術|76人|太陽|拓荒者|國王|馬刺|暴龍|爵士|巫師|響尾蛇|金鶯|紅襪|小熊|白襪|紅人|守護者|落磯|老虎|太空人|皇家|天使|道奇|馬林魚|釀酒人|雙城|大都會|洋基|運動家|費城人|海盜|教士|巨人|水手|紅雀|光芒|遊騎兵|藍鳥|國民|兄弟|統一獅|桃猿|悍將|味全龍|台鋼雄鷹/g;
 const SPORT_TOPIC = TOPICS.find(t => t.id === 'sport');
+// (One team, many names: 七六人 and 76人 one, Sixers and 76ers.)
+const TEAM_SAME = { 七六人: '76人', sixers: '76ers', cavs: 'cavaliers', mavs: 'mavericks', blazers: 'trail blazers', 'd-backs': 'diamondbacks', bucs: 'buccaneers' };
+// (「Spain vs England」, 「Portugal v Denmark」: the sides of a game the
+// nicknames don't know, a national team's or a club's.)
+const VERSUS = /\b([A-Z][\w'.-]+)\s+(?:vs\.?|v\.?|versus)\s+([A-Z][\w'.-]+)/g;
 export function teamsOf(title, lang) {
   const t = String(title || '');
   if (!(lang === 'en' ? SPORT_TOPIC.en_ : [SPORT_TOPIC.zh_]).some(re => re.test(t))) return null;
-  const found = t.match(lang === 'en' ? TEAM_EN : TEAM_ZH);
-  return found ? new Set(found.map(x => x.toLowerCase())) : null;
+  const found = [...(t.match(lang === 'en' ? TEAM_EN : TEAM_ZH) || []), ...(lang === 'en' ? [...t.matchAll(VERSUS)].flatMap(m => [m[1], m[2]]) : [])];
+  return found.length ? new Set(found.map(x => TEAM_SAME[x.toLowerCase()] || x.toLowerCase())) : null;
+}
+// A game's report: a sports headline naming its two teams, not a preview.
+// Taiwan's six reports of 七六人 v 暴龍 had too few words in common to be
+// one story (Jay 11-14: "not even merge together, all independent"); the
+// game they name is: a piece of the headline's own, as weighty as its words.
+const PREVIEW = /預告|賽程|轉播|看點|前瞻|直播|出戰成疑|今日賽事|\bpreviews?\b|\bhow to watch\b|\bpredictions?\b|\bodds\b|\bpicks\b|\bwhat to know\b|\bthings to watch\b|\bkeys to\b|\blive updates\b|\bstarting lineups?\b/i;
+export function gameOf(title, lang) {
+  if (PREVIEW.test(title)) return '';
+  const teams = teamsOf(title, lang);
+  return teams?.size === 2 ? [...teams].sort().join('|') : '';
 }
 // (Both name teams, none the same: two games.)
 export const otherGame = (a, b) => Boolean(a && b && ![...a].some(x => b.has(x)));
@@ -854,11 +890,14 @@ export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, i
   // (In the headline's own language: a Chinese headline over an English
   // outlet's summary was seen on the iPhone, 11-12; none rather than that.)
   const han = x => /\p{Script=Han}/u.test(x || '');
-  const withSum = [lead, ...newest].find(it => it.d && han(it.d) === han(lead.t));
+  const withSum = [lead, ...newest].map(it => ({ ...it, d: unboiled(it.d) })).find(it => it.d.length >= 20 && han(it.d) === han(lead.t));
   // The picture: a feed's own, else the one the outlet set on its page.
-  const pics = [lead, ...newest].flatMap(it => {
+  // (Nearest the story's middle first: the FAA's ground stop led with a
+  // Texas football photo from a report on the games it held up, Jay 11-14.)
+  const central = [...items].sort((a, b) => (b.near ?? 0) - (a.near ?? 0));
+  const pics = [lead, ...central].flatMap(it => {
     const p = pages[it.u]?.i;
-    return [it.img && same.feedPic(it.o, it.img) && [bigPicture(it.img), it.o], p && same.pagePic(it.o, p) && [p, it.o]];
+    return [it.img && !NO_PIC.test(it.img) && same.feedPic(it.o, it.img) && [bigPicture(it.img), it.o], p && !NO_PIC.test(p) && same.pagePic(it.o, p) && [p, it.o]];
   });
   // The story's clips: each outlet's own YouTube clip on its page, then the
   // channels' clips matched to it (matchClips), newest first; the outlets'
@@ -1150,10 +1189,28 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
     const mine = items.filter(it => OUTLETS[it.o]?.region === region && now - (it.at || now) <= WINDOW[region] && !fillerOf(it, lang));
     const vecOf = weigh(mine, lang);
     const recsHere = live.filter(r => r.r === region);
+    // Sports and the rest are two desks (Jay 11-14: a story of Harry Kane's
+    // record held AP's Rubio and a Washington recruit, and the FAA's ground
+    // stop led with a Texas football photo): a sports report only ever joins
+    // a sports story, the rest only the rest's. A sports report: a sports
+    // outlet's, or a headline that is about sport first.
+    const deskOf_ = new Map();
+    const sporty = it => {
+      let v = deskOf_.get(it.u);
+      if (v === undefined) deskOf_.set(it.u, (v = SPORTS_OUTLETS.has(it.o) || topicsOf([it.t], lang)[0] === 'sport'));
+      return v;
+    };
+    const twoDesks = list => [...groupStories(list.filter(sporty), lang).map(g => Object.assign(g, { sp: true })), ...groupStories(list.filter(it => !sporty(it)), lang).map(g => Object.assign(g, { sp: false }))];
     // Each kept story back to its core first: what drifted from it is let go
     // before today's groups are placed, so it can join or start the story
     // it's really about (11-13: Pence's 2028 run out of Trump's Iran deal).
     for (const r of recsHere) {
+      // (Its desk by most of its headlines; the other desk's, and filler,
+      // let go: a story mixed before 11-14 is mended at the next build.)
+      r.sp = r.items.filter(sporty).length * 2 > r.items.length;
+      const own = r.items.filter(it => sporty(it) === r.sp && !fillerOf(it, lang));
+      if (own.length < r.items.length) r.items = enough(new Set(own.map(it => it.o)), region) || (r.sp && new Set(own.map(it => it.o)).size >= 2) ? own : [];
+      if (!r.items.length) continue;
       const keep = keptOf(r.items.map(vecOf), lang, region, r.items.map(it => it.o));
       if (keep.some(k => !k)) r.items = r.items.filter((_, i) => keep[i]);
     }
@@ -1174,6 +1231,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
     const loose = [];
     // A new story from a group, if it has a topic and enough outlets carry it.
     const startOf = g => {
+      const sp = g.sp;
       const texts = g.map(it => (lang === 'en' ? `${it.t} ${it.d || ''}` : it.t));
       const kinds = topicsOf(texts, lang);
       if (!kinds.length && !partiesIn(texts.join(' ')).length) return null;
@@ -1187,16 +1245,16 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
         return null;
       }
       const firstIt = g.reduce((a, b) => ((a.at || 0) <= (b.at || 0) ? a : b));
-      const rec = { id: freeId(firstIt.u, live), r: region, first: firstIt.at || now, last: firstIt.at || now, peak: 0, items: [] };
+      const rec = { id: freeId(firstIt.u, live), r: region, first: firstIt.at || now, last: firstIt.at || now, peak: 0, items: [], sp };
       live.push(rec);
       recsHere.push(rec);
       return rec;
     };
-    for (const g of groupStories(mine, lang)) {
+    for (const g of twoDesks(mine)) {
       const hits = new Map();
       for (const it of g) {
         const r = owner.get(it.u);
-        if (r && open(r)) hits.set(r, (hits.get(r) || 0) + 1);
+        if (r && open(r) && r.sp === g.sp) hits.set(r, (hits.get(r) || 0) + 1);
       }
       let rec = [...hits].sort((a, b) => b[1] - a[1])[0]?.[0];
       if (!rec) {
@@ -1213,7 +1271,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
         for (const [k, x] of gv) for (const d of daysBy.get(k) || []) dots.set(d, (dots.get(d) || 0) + x * d.v.get(k));
         for (const d of lastDays) {
           const { r, n, whose } = d;
-          if (!dots.has(d) || r.last < gFirst - GAP) continue;
+          if (!dots.has(d) || r.last < gFirst - GAP || r.sp !== g.sp) continue;
           if (whose && gReports.length && gReports.every(t => otherReport(t, whose))) continue;
           if (gTeams && otherGame(gTeams, (d.teams ??= r.items.reduce((t, it) => withTeams(t, teamsOf(it.t, lang)), null)))) continue;
           const sim = dots.get(d) / (gn * n);
@@ -1233,6 +1291,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
     }
     const freed = [];
     const sizeOf = r => {
+      if (!r.items.length) return null;
       r.items.sort((a, b) => a.at - b.at);
       // One company's report is never another's story (Jay 11-10): a story
       // holding several companies' keeps its owner's, a day's reports one
@@ -1264,7 +1323,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
     // headline it shares at every build and be let go again.
     const today = new Set(mine.map(it => it.u));
     for (const it of freed) owner.delete(it.u);
-    for (const g of groupStories(freed.filter(it => today.has(it.u)), lang)) {
+    for (const g of twoDesks(freed.filter(it => today.has(it.u)))) {
       const rec = startOf(g);
       if (!rec) continue;
       for (const it of g) rec.items.push(keepOf(it)), owner.set(it.u, rec);
@@ -1465,7 +1524,7 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
           // (A time ahead of now is a feed's wrong zone: taken as now.)
           const at = Math.min(it.at ?? now, now);
           if (now - at > KEEP_MS) continue;
-          byUrl.set(u, { o, t: it.t, u, d: cut(it.d, SUM_MAX[lang] * 2), at, img: it.img, ...(isVideo(u) ? { v: 1 } : {}) });
+          byUrl.set(u, { o, t: it.t, u, d: cut(unboiled(it.d), SUM_MAX[lang] * 2), at, img: it.img, ...(isVideo(u) ? { v: 1 } : {}) });
           fresh++;
         }
       } catch (e) {
