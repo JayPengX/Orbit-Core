@@ -1009,6 +1009,25 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
   globalThis.addEventListener('scroll', still, { passive: true });
   document.body?.addEventListener('scroll', still, { passive: true });
   globalThis.visualViewport?.addEventListener('scroll', still, { passive: true });
+  // The keyboard up: the frames as tall as what's left above it, where the
+  // phone shows the page (Jay 11-14, 問法律: the field under the keyboard,
+  // typing flashed as the phone moved the window to it and this put it back).
+  // The app inside lays itself out again to that height, its field over the keys.
+  const vv = globalThis.visualViewport;
+  if (vv) {
+    let was = '';
+    const fit = () => {
+      const kb = globalThis.innerHeight - vv.height > 80;
+      const now = kb ? `${Math.round(vv.offsetTop)}/${Math.round(vv.height)}` : '';
+      if (now === was) return;
+      was = now;
+      box.style.top = kb ? `${Math.round(vv.offsetTop)}px` : '';
+      box.style.height = kb ? `${Math.round(vv.height)}px` : '';
+      box.style.bottom = kb ? 'auto' : '';
+    };
+    vv.addEventListener('resize', fit, { passive: true });
+    vv.addEventListener('scroll', fit, { passive: true });
+  }
   // Off the phone's screen: which app, and when (where Orbit opens next). Back
   // on it: the rules of launchTarget again, with a playing app live too.
   let awayAt = 0;
