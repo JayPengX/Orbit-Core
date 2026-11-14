@@ -118,6 +118,7 @@ export const SOURCES = [
   { id: 'agency-rules', zh: '各部會行政規則', group: 'law', apps: ['law'], feeds: '部會的行政規則', hosts: ['edu.law.moe.gov.tw', 'law-out.mof.gov.tw', 'oaout.moenv.gov.tw'], where: ['worker', 'github'], fresh: { law: 'agency', every: 2 * DAY } },
   { id: 'judicial', zh: '司法院裁判書', group: 'law', apps: ['law'], feeds: '裁判、判決', hosts: ['judgment.judicial.gov.tw', 'opendata.judicial.gov.tw'], where: ['relay', 'github'], fresh: { law: 'rulings', every: 2 * DAY } },
   { id: 'cons-court', zh: '憲法法庭', group: 'law', apps: ['law'], feeds: '釋字、憲判字', hosts: ['cons.judicial.gov.tw'], where: ['github'], fresh: { law: 'cons', every: 3 * DAY } },
+  { id: 'town-drive', zh: '代表會錄音（Google 雲端硬碟）', group: 'law', apps: ['law'], feeds: '代表會的會議錄音，在 Orbit Law 裡播放', hosts: ['drive.usercontent.google.com'], where: ['worker'] },
   { id: 'gov-pages', zh: '政府網頁', group: 'law', apps: ['law'], feeds: '在 Orbit Law 裡讀的政府網頁', hosts: [], match: /(^|\.)gov\.tw$|\.edu\.tw$/, where: ['worker', 'relay'] },
 
   // ---- 新聞 ----
