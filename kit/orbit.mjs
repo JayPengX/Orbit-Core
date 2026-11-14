@@ -5370,7 +5370,9 @@ function watchKeyboard() {
     const el = document.activeElement;
     if (!up) held = null;
     else if (!held || held.el !== el || Math.abs(held.keys - keys) > 60) held = { el, keys, vvh: Math.round(vv.height), lift: true, backs: 0 };
+    if (held && held.foot == null) held.foot = keysFoot();
     root.style.setProperty('--q-kb', `${held ? held.keys : 0}px`);
+    root.style.setProperty('--q-kb-foot', `${held ? held.foot : 0}px`);
     root.style.setProperty('--q-vvh', `${held ? held.vvh : Math.round(vv.height)}px`);
     root.classList.toggle('q-kb', up);
     // The keys gone, the foot left behind: iOS 26 can keep the frame that
@@ -5402,6 +5404,8 @@ function watchKeyboard() {
       unslide();
     }
   };
+  // (How far the keys' top is above the page's own foot: iOS's slide of the page (offsetTop) counted, so a bar fixed at the foot lands on the keys, never above them or under.)
+  const keysFoot = () => Math.max(0, Math.round(globalThis.innerHeight - vv.height - vv.offsetTop));
   const unslide = () => globalThis.scrollTo?.(globalThis.scrollX, Math.max(0, globalThis.scrollY - vv.offsetTop));
   // (The screen's foot: what the visible part reaches.)
   const footGap = () => {
@@ -5474,6 +5478,8 @@ function watchKeyboard() {
       root.style.setProperty('--q-kb', `${keys}px`);
       root.style.setProperty('--q-vvh', `${held.vvh}px`);
     }
+    held.foot = keysFoot();
+    root.style.setProperty('--q-kb-foot', `${held.foot}px`);
     if (root.querySelector('.q-kb-docked')?.contains(el)) return;
     const r = el.getBoundingClientRect?.();
     if (r && r.height && (r.bottom > vv.offsetTop + vv.height - 4 || r.top < vv.offsetTop)) lift(el, held.keys);
@@ -6388,6 +6394,8 @@ export function tabBar({ tabs, onSelect, onShow = null, hash = id => `#${id}`, n
   nav.replaceChildren(...buttons.values());
   if (action) {
     nav.classList.add('q-tabbar-act');
+    // (An AI action's bar stretches over the room it leaves when no Orbit AI is on the account.)
+    if (action.ai) nav.classList.add('q-tabbar-ai');
     // (Its count where the button's place is worked out too.)
     document.documentElement.style.setProperty('--q-tabs', String(tabs.length));
     // (action.ai: an Orbit AI tab, gone with no Orbit AI on the account: aiLock.)

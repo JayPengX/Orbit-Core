@@ -1040,7 +1040,12 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
   // Orbit's window never moves: on an iPhone the scroll bar's handle, dragged,
   // scrolled the window itself, the app shown and its tab bar with it, black
   // under (Jay 2026-11-14, Law). Put back at once, whatever moved it.
+  // (Not while the keyboard is up: iOS slides the window to the field and the
+  // frame below follows it; put back at once, the field stayed under the keys
+  // and the screen flashed, Jay 11-14, 問法律.)
   const still = () => {
+    const keys = globalThis.visualViewport ? globalThis.innerHeight - globalThis.visualViewport.height > 80 : false;
+    if (keys) return;
     if (globalThis.scrollX || globalThis.scrollY) globalThis.scrollTo(0, 0);
     for (const el of [document.documentElement, document.body]) if (el && (el.scrollTop || el.scrollLeft)) (el.scrollTop = 0), (el.scrollLeft = 0);
   };

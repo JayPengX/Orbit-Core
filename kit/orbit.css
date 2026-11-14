@@ -1102,6 +1102,13 @@ button,
   width: var(--q-tb-w);
   transform: none;
 }
+/* No Orbit AI (aiLock 'level'): the AI action is gone, so its bar is the plain
+   one, across the room the button left (never an empty gap at its right). */
+:root[data-ai-lock='level']:not(.q-tabrail) .q-tabbar.q-tabbar.q-tabbar-ai {
+  left: var(--q-mid, 50%);
+  width: min(calc(var(--q-vw) - 32px), calc(var(--q-tabs, 4) * 92px));
+  transform: translateX(-50%);
+}
 .q-tab-action {
   box-sizing: border-box;
   position: fixed;
@@ -1772,6 +1779,22 @@ dialog.q-sheet.q-full {
 :root[data-ai-lock='used'] :is(.q-ai-tap, [data-ai-tap]):not([data-ai-free]) {
   opacity: 0.45;
   filter: grayscale(1);
+}
+/* Its words for the person with none: `.q-no-ai` shows only then, beside the
+   AI's own (marked [data-ai-tap]); `[data-ai-only]` is a box that holds
+   nothing else, gone with them, and a row of buttons left with one fills
+   its width (`.q-ai-row`, a grid of equal columns). */
+.q-no-ai {
+  display: none !important;
+}
+:root[data-ai-lock='level'] .q-no-ai {
+  display: revert !important;
+}
+:root[data-ai-lock='level'] [data-ai-only]:not([data-ai-free]) {
+  display: none !important;
+}
+:root[data-ai-lock='level'] .q-ai-row {
+  grid-template-columns: minmax(0, 1fr) !important;
 }
 /* (A locked box or form: a tap anywhere on it says why, never a keyboard.) */
 :root[data-ai-lock] [data-ai-tap] :is(textarea, input, button) {
@@ -5877,11 +5900,11 @@ html.q-foot-stuck :is(.q-tabbar, .q-accessory, .q-toast, .q-net, .q-foot) {
 }
 /* A bar that belongs on top of the keys (a composer, a search's results bar). */
 html.q-kb .q-kb-dock {
-  bottom: var(--q-kb) !important;
+  bottom: var(--q-kb-foot, var(--q-kb)) !important;
 }
 /* A bar fixed at the foot whose field is being typed in (a composer): on the keys. */
 html.q-kb .q-kb-docked {
-  bottom: calc(var(--q-kb) + 8px) !important;
+  bottom: calc(var(--q-kb-foot, var(--q-kb)) + 8px) !important;
 }
 
 /* A grid of like tiles that never ends on a part row (orbit.mjs fullRows): the tiles past its last full row. */
