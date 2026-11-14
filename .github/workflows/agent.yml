@@ -1,0 +1,87 @@
+# A coding task run by headless Claude Code on the Max plan's API credit
+# (Jay 2026-11-14: "run the remaining work on the free API credit"). By hand:
+# every Orbit repo is cloned side by side, Claude works on `prompt` with a
+# turn and dollar cap, and what it changed comes back as patches on the
+# branch agent/<task>-<run id> (with its report and cost) for a person or a
+# session to check and ship with tools/push.sh. It cannot push to main.
+# The key is ANTHROPIC_CREDIT_KEY only (the credit's own Console workspace);
+# never the proxy's ANTHROPIC_API_KEY, which is paid.
+name: Run a task on the API credit
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: A short name (letters, digits, dashes)
+        required: true
+      prompt:
+        description: What to do, self-contained
+        required: true
+      model:
+        description: Model alias or id
+        default: sonnet
+      budget:
+        description: Most US$ this run may spend
+        default: '5'
+      turns:
+        description: Most turns
+        default: '120'
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: Orbit-Core
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: The other repos, side by side
+        run: |
+          for r in Orbit-Sports Orbit-Transit Orbit-Weather Orbit-Class Orbit-Money Orbit-News Orbit-Words Orbit-Beats Orbit-Law Orbit-Securities Orbit-Showcase; do
+            git clone -q --depth 50 "https://github.com/JayPengX/$r.git" "$r" || echo "skip $r"
+          done
+          for r in Orbit-*; do git -C "$r" config user.name "orbit-agent"; git -C "$r" config user.email "actions@users.noreply.github.com"; done
+      - name: Claude does the task
+        working-directory: Orbit-Core
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_CREDIT_KEY }}
+          TASK: ${{ inputs.task }}
+          PROMPT: ${{ inputs.prompt }}
+          MODEL: ${{ inputs.model }}
+          BUDGET: ${{ inputs.budget }}
+          TURNS: ${{ inputs.turns }}
+          DISABLE_TELEMETRY: '1'
+        run: |
+          case "$TASK" in *[!A-Za-z0-9-]*|'') echo "bad task"; exit 1 ;; esac
+          npm i -g --no-audit --no-fund @anthropic-ai/claude-code >/dev/null
+          rules="You run unattended in GitHub Actions. Every Orbit repo is checked out beside this one (../Orbit-News, ../Orbit-Showcase, ...). Read CLAUDE.md and docs/RULEBOOK.md first, then only what the task needs. Commit your work in each repo you change (plain commit messages, no pushing: there are no push credentials, the patches are collected after you finish). Run the repo's npm test before each commit and do not commit red tests; skip the layout check and screenshots. Never print or use any secret. End with a short plain report: what you changed per repo, what you checked, and what is left."
+          claude -p "$rules
+
+          TASK:
+          $PROMPT" --model "$MODEL" --max-turns "$TURNS" --max-budget-usd "$BUDGET" \
+            --dangerously-skip-permissions --output-format json > ../result.json || echo "claude exited $?"
+          node -e 'const r=require("../result.json");console.log("cost US$",r.total_cost_usd,"turns",r.num_turns,"\n",r.result)' || cat ../result.json | tail -c 4000
+      - name: Bring back what changed
+        if: always()
+        env:
+          TOKEN: ${{ github.token }}
+          TASK: ${{ inputs.task }}
+        run: |
+          out="$RUNNER_TEMP/out"; mkdir -p "$out"
+          cp result.json "$out/" 2>/dev/null || true
+          for r in Orbit-*; do
+            [ -d "$r/.git" ] || continue
+            git -C "$r" add -A && git -C "$r" diff --cached --quiet || git -C "$r" commit -qm "Uncommitted work left by the agent"
+            n=$(git -C "$r" rev-list --count origin/main..HEAD)
+            [ "$n" -gt 0 ] && git -C "$r" format-patch -q origin/main -o "$out/$r"
+          done
+          ls -R "$out"
+          cd "$out" && git init -q && git checkout -q -b "agent/$TASK-$GITHUB_RUN_ID"
+          git config user.name "orbit-agent"; git config user.email "actions@users.noreply.github.com"
+          git add -A && git commit -qm "Agent: $TASK"
+          git push -q "https://x-access-token:$TOKEN@github.com/$GITHUB_REPOSITORY.git" "HEAD:refs/heads/agent/$TASK-$GITHUB_RUN_ID"
