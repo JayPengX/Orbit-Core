@@ -423,39 +423,52 @@ async function switcher() {
   const b = H?.tabs ? null : backOf(t);
   const f = H?.tabs ? null : forwardOf(t);
   const hops = b || f ? el('div', { class: 'q-suite-hops' }, [b ? el('button', { class: 'q-btn', type: 'button', onclick: () => (close(), back()) }, [el('span', { class: 'q-suite-chev', html: svg(LEFT) }), img(b.app), el('span', { text: W(`回到 ${short(b.app)}`, `Back to ${short(b.app)}`) })]) : null, f ? el('button', { class: 'q-btn', type: 'button', onclick: () => (close(), forward()) }, [img(f.app), el('span', { text: W(`前往 ${short(f.app)}`, `Forward to ${short(f.app)}`) }), el('span', { class: 'q-suite-chev', html: svg(RIGHT) })]) : null]) : null;
-  const rows = APP_ORDER.map(id =>
-    ui.cell({
-      icon: img(id),
-      title: short(id),
-      sub: BRANDS[id].role?.[en() ? 'en' : 'zh'] || '',
-      trailing: id === app ? el('span', { class: 'q-suite-now', text: W('目前', 'Open') }) : null,
-      onClick: () => (close(), id === app ? null : go(id))
-    })
-  );
-  // (Orbit's window: the apps open in it, each closed with ✕, then every app.)
+  // (Jay 11-14, "improve the look of this": a long list of rows, the open app
+  // twice. Now as a home screen: the open apps in a tray, each with its ✕,
+  // then the others as a grid of icons, each app once.)
+  const tile = (id, { sub = '', now = false, live = false, onClick, onClose = null }) =>
+    el('div', { class: `q-sw-tile${now ? ' now' : ''}${live ? ' live' : ''}` }, [
+      el('button', { class: 'q-sw-go', type: 'button', 'aria-label': `${short(id)}${sub ? ` · ${sub}` : ''}`, onclick: onClick }, [
+        el('span', { class: 'q-sw-icon' }, [img(id), live ? el('span', { class: 'q-suite-dot', 'aria-hidden': 'true' }) : null]),
+        el('span', { class: 'q-sw-name', text: short(id) }),
+        sub ? el('small', { class: 'q-sw-sub', text: sub }) : null
+      ]),
+      onClose ? el('button', { class: 'q-sw-x', type: 'button', 'aria-label': W(`關閉 ${short(id)}`, `Close ${short(id)}`), html: svg('M7 7l10 10M17 7L7 17'), onclick: e => (e.stopPropagation(), onClose()) }) : null
+    ]);
+  const head = text => el('h3', { class: 'q-sw-head', text });
+  // (Orbit's window: the apps open in it, each closed with ✕, then the rest.)
   let open = null;
+  let shown = new Set();
   if (H?.tabs) {
+    const grid = el('div', { class: 'q-sw-grid q-sw-tray' });
     const shut = id => {
       H.close(id);
-      row.get(id)?.remove();
-      if (!row.size || ![...row.keys()].some(k => H.tabs().some(x => x.app === k))) open.hidden = true;
+      grid.querySelector(`[data-sw="${id}"]`)?.remove();
+      if (!grid.children.length) open.hidden = true;
     };
-    const row = new Map();
-    const items = H.tabs().map(x => {
-      const r = ui.cell({
-        icon: img(x.app),
-        title: short(x.app),
-        sub: x.live ? W('進行中', 'Under way') : x.app === app ? W('目前', 'Open') : BRANDS[x.app].role?.[en() ? 'en' : 'zh'] || '',
+    for (const x of H.tabs()) {
+      shown.add(x.app);
+      const t = tile(x.app, {
+        // (The one in front is ringed; 目前 under it said it again.)
+        sub: x.live ? W('進行中', 'Live') : '',
+        now: x.app === app,
+        live: x.live,
         // (Something under way isn't closed from here: it's ended in its app.)
-        trailing: x.live ? null : el('button', { class: 'q-suite-x', type: 'button', 'aria-label': W(`關閉 ${short(x.app)}`, `Close ${short(x.app)}`), html: svg('M7 7l10 10M17 7L7 17'), onclick: e => (e.stopPropagation(), shut(x.app)) }),
+        onClose: x.live ? null : () => shut(x.app),
         onClick: () => (close(), x.live && H.full ? H.full(x.app) : x.app === app ? null : H.go(x.app))
       });
-      row.set(x.app, r);
-      return r;
-    });
-    open = el('div', { class: 'q-suite-open' }, [ui.list(items, { head: W('開著的 App', 'Open apps') })]);
-  }
-  const all = ui.list(rows, H?.tabs ? { head: W('全部 App', 'All apps') } : {});
+      t.dataset.sw = x.app;
+      grid.append(t);
+    }
+    open = grid.children.length ? el('div', { class: 'q-sw-sec' }, [head(W('開著的 App', 'Open apps')), grid]) : null;
+  } else shown = new Set();
+  const rest = APP_ORDER.filter(id => !shown.has(id));
+  const all = rest.length
+    ? el('div', { class: 'q-sw-sec' }, [
+        open ? head(W('其他 App', 'Other apps')) : null,
+        el('div', { class: 'q-sw-grid' }, rest.map(id => tile(id, { now: id === app, onClick: () => (close(), id === app ? null : go(id)) })))
+      ])
+    : null;
   const s = ui.sheet({ title: 'Orbit', cls: 'q-suite-sheet', body: [hops, open, all].filter(Boolean), onClose: () => (sheetOpen = null) });
   sheetOpen = s;
   function close() {
