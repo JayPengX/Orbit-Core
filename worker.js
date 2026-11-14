@@ -35,6 +35,7 @@
 import { watchRelay, flushSources, asSourceCall, pruneSources, takeBeacon, readSources } from './sources.js';
 import { takeUsage, flushUsage, pruneUsage } from './usage.js';
 import { pruneReports } from './rec-weekly.js';
+import { privacyMail } from './privacy-mail.js';
 import { SOURCES, freshAt, sourceState } from './kit/sources.mjs';
 import { handleLawAsk, useLawSite, addOne, countOf, twDay } from './law.js';
 import { handleLawChat, lawChatTimes, lawCompare, COMPARE_QS } from './law-chat.js';
@@ -1808,10 +1809,12 @@ export default {
   // The cron (wrangler.toml [triggers]): the notices that are due (push.js),
   // F1's laps, the builders and the guard, all run by the Runner's alarms
   // (runner.js: a cron run gets 10 ms on the Free plan); cronTick below.
-  // Mail to the domain (Email Routing's catch-all, if still on): nobody's
-  // mailbox since Orbit Money's mail-in was removed (2026-10-27).
-  async email(message) {
-    message.setReject('No mailbox here');
+  // Mail to the domain (Email Routing's catch-all): only privacy@ has a
+  // mailbox, a robot's (Orbit Money's mail-in was removed 2026-10-27).
+  // privacy@ is answered by code (privacy-mail.js: a reply with links to
+  // a copy, deletion, usage stats off); anything else refused.
+  async email(message, env) {
+    await privacyMail(message, env, ECO_DEPS).catch(e => console.log('privacy mail failed', String(e?.message || e).slice(0, 160)));
   },
 
   async scheduled(event, env, ctx) {

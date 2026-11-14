@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>資料請求 · Orbit</title>
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f2f7"><meta name="theme-color" media="(prefers-color-scheme: dark)" content="#05051a">
+<link rel="icon" href="../mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../legal.css">
+<style>
+.box{padding:20px;border-radius:22px;background:var(--cell)}
+.box h1{font-size:26px}
+form{display:grid;gap:12px;margin-top:16px}
+input{font:inherit;font-size:17px;padding:12px 14px;border-radius:12px;border:.5px solid var(--sep);background:var(--page);color:var(--label);letter-spacing:.08em;text-transform:uppercase;min-width:0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+button{font:inherit;font-weight:600;padding:13px 20px;border:0;border-radius:999px;background:var(--accent);color:#fff;cursor:pointer}
+@media (prefers-color-scheme:dark){button{background:#eef0ff;color:#1e1b4b}}
+button.danger{background:#dc2626;color:#fff}
+button:disabled{opacity:.5}
+.say{margin:12px 0 0;color:var(--label-2)}.say.bad{color:#dc2626}.say.ok{color:#16a34a}
+</style>
+</head><body><main>
+<header class="top"><img src="../mark.svg" alt=""><nav><a href="../" data-en="Privacy">隱私權</a></nav></header>
+<div class="box">
+<h1 id="title">資料請求</h1>
+<p id="line" class="say" style="margin-top:4px"></p>
+<form id="form" hidden>
+<input class="sr" type="text" name="username" autocomplete="username" value="Orbit Pass" readonly tabindex="-1" aria-hidden="true">
+<input id="pass" type="password" name="password" autocomplete="current-password" placeholder="通行碼" aria-label="通行碼" hidden>
+<button id="go" type="submit">確認</button>
+</form>
+<p id="say" class="say" role="status"></p>
+</div>
+</main>
+<script>
+(() => {
+  const n = navigator.languages?.length ? navigator.languages : [navigator.language || 'zh-TW'];
+  let en = !n.some(x => /^zh/i.test(x));
+  try { const l = localStorage.getItem('orbit.lang'); if (l === 'en' || l === 'zh') en = l === 'en'; } catch {}
+  if (en) document.documentElement.lang = 'en';
+  const T = (zh, e) => (en ? e : zh);
+  const $ = id => document.getElementById(id);
+  if (en) for (const a of document.querySelectorAll('.top [data-en]')) a.textContent = a.dataset.en;
+  const token = new URLSearchParams(location.hash.slice(1)).get('t') || '';
+  // (The link's address taken off the page: it isn't left in the history.)
+  if (token) history.replaceState(null, '', location.pathname);
+  let c = null;
+  try { c = JSON.parse(atob(token.split('.')[0].replace(/-/g, '+').replace(/_/g, '/'))); } catch {}
+  const say = (text, tone = '') => { $('say').textContent = text; $('say').className = `say ${tone}`; };
+  const WHAT = {
+    export: [T('下載我的資料副本', 'Download a copy of my data'), T('一個 JSON 檔，包含帳戶和每個 App 存的資料。每個帳戶 30 天一次。', 'One JSON file with your account and what every app keeps. Once every 30 days per account.'), T('下載', 'Download')],
+    delete: [T('刪除我的 Orbit Pass 帳戶', 'Delete my Orbit Pass account'), T('帳戶和每個 App 的資料都會刪除，無法復原。', 'Your account and every app’s data are deleted. This can’t be undone.'), T('永久刪除', 'Delete for good')],
+    stop: [T('停止使用統計', 'Stop usage stats'), T('這個帳戶的每台裝置都不再傳送使用統計。', 'Every device on this account stops sending usage stats.'), T('停止', 'Stop')]
+  };
+  if (!c || !WHAT[c.w] || !(c.e > Date.now())) {
+    $('title').textContent = T('連結已失效', 'This link has expired');
+    $('line').textContent = T('連結 24 小時內有效。請再寄一封信到 privacy@jaypengx.com。', 'Links work for 24 hours. Email privacy@jaypengx.com again.');
+    return;
+  }
+  const [title, line, go] = WHAT[c.w];
+  document.title = `${title} · Orbit`;
+  $('title').textContent = title;
+  $('line').textContent = line + (c.d ? '' : T(' 請輸入你的通行碼，證明是你本人。', ' Enter your pass to show it’s you.'));
+  $('form').hidden = false;
+  $('pass').hidden = Boolean(c.d);
+  $('pass').placeholder = T('通行碼', 'Your pass');
+  $('go').textContent = go;
+  if (c.w === 'delete') $('go').className = 'danger';
+  const WHY = {
+    PRIVACY_LINK_OLD: T('連結已失效，請再寄一次信。', 'This link has expired. Email us again.'),
+    PRIVACY_NEEDS_PASS: T('請輸入你的通行碼。', 'Enter your pass.'),
+    SYNC_PASSCODE_NOT_FOUND: T('通行碼不對。', 'That pass isn’t right.'),
+    PRIVACY_NO_ACCOUNT: T('找不到這個帳戶，可能已經刪除了。', 'No such account: it may already be deleted.'),
+    RATE_LIMITED: T('試太多次了，請一小時後再試。', 'Too many tries. Try again in an hour.')
+  };
+  let sure = c.w !== 'delete';
+  $('form').onsubmit = async e => {
+    e.preventDefault();
+    if (!sure) {
+      sure = true;
+      say(T('再按一次就會刪除，無法復原。', 'Tap again to delete. This can’t be undone.'), 'bad');
+      return;
+    }
+    $('go').disabled = true;
+    say(T('處理中…', 'Working…'));
+    try {
+      const res = await fetch('/api/eco', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ op: 'privacy', token, passcode: $('pass').value }) });
+      const d = await res.json().catch(() => ({}));
+      const code = d?.error?.code || d?.code || (res.ok ? '' : `HTTP ${res.status}`);
+      if (code === 'PRIVACY_EXPORT_WAIT') return say(T(`這個帳戶 30 天內下載過了，${new Date(d.error.next).toLocaleDateString('zh-TW')} 之後可以再下載。`, `This account downloaded a copy in the last 30 days; the next one is possible after ${new Date(d.error.next).toLocaleDateString('en')}.`), 'bad');
+      if (code) {
+        $('go').disabled = false;
+        return say(WHY[code] || T(`出錯了（${code}），請稍後再試。`, `Something went wrong (${code}). Try again later.`), 'bad');
+      }
+      $('form').hidden = true;
+      if (d.file) {
+        const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([JSON.stringify(d.file, null, 1)], { type: 'application/json' })), download: `orbit-pass-${new Date().toISOString().slice(0, 10)}.json` });
+        document.body.append(a);
+        a.click();
+        a.remove();
+        return say(T('已下載你的資料副本。', 'Your copy has been downloaded.'), 'ok');
+      }
+      if (d.deleted) return say(T('帳戶已刪除。在其他裝置上會自動登出。', 'Your account is deleted. Other devices sign out by themselves.'), 'ok');
+      if (d.stopped) return say(T('使用統計已關閉，你的裝置下次打開 App 時會跟著關掉。', 'Usage stats are off; your devices follow the next time an app opens.'), 'ok');
+    } catch {
+      $('go').disabled = false;
+      say(T('連不上，請稍後再試。', 'Couldn’t connect. Try again later.'), 'bad');
+    }
+  };
+})();
+</script>
+</body></html>
