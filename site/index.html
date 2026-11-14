@@ -14,10 +14,7 @@
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
 body{margin:0;min-height:100vh;background:radial-gradient(120% 60% at 50% -10%,var(--glow),transparent 70%) no-repeat,var(--page);color:var(--label);font:17px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 main{max-width:1120px;margin:0 auto;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(40px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
-.top{display:flex;justify-content:flex-end;min-height:44px;align-items:center}
-.lang{padding:6px 12px;border:0;border-radius:999px;background:var(--press);color:var(--label-2);font:500 13px/1.2 inherit;cursor:pointer}
-.lang:hover{color:var(--label)}
-.hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:24px 0 48px}
+.hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:48px 0 48px}
 .mark{width:96px;height:96px;border-radius:22px;box-shadow:0 12px 32px rgba(30,27,75,.28)}
 h1{margin:20px 0 0;font:700 44px/1.05 ui-rounded,-apple-system,BlinkMacSystemFont,"SF Pro Rounded",system-ui,sans-serif;letter-spacing:-.01em}
 .lead{margin:8px 0 0;font-size:17px;color:var(--label-2)}.lead span{display:inline-block}
@@ -35,16 +32,19 @@ h2{margin:0 16px 8px;font-size:15px;font-weight:600;line-height:1.3;color:var(--
 .app img{flex:none;width:48px;height:48px;border-radius:12px}
 .t{display:grid;flex:1;min-width:0}.t strong{font-weight:500}.t small{font-size:15px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chev{flex:none;width:8px;height:14px;fill:none;stroke:var(--label-2);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.6}
+.more{display:flex;align-items:center;gap:14px;margin-top:16px;padding:10px 16px;min-height:68px;border-radius:22px;background:var(--cell);color:inherit;text-decoration:none}.more:hover{background:var(--press)}
+.glyph{flex:none;display:grid;place-items:center;width:48px;height:48px;border-radius:12px;background:#4f46e5;color:#fff}.glyph svg{width:26px;height:26px}
 .pass{display:flex;align-items:center;gap:12px;margin:32px 16px 0;color:var(--label-2);font-size:15px}
 .pass img{flex:none;width:32px;height:32px;border-radius:8px}.nb{display:inline-block}.pass strong{color:var(--label);font-weight:500}
 a:focus-visible,button:focus-visible{outline:2px solid #6366f1;outline-offset:2px}
 @media (min-width:720px){
-  .hero{padding:48px 0 64px}.mark{width:112px;height:112px;border-radius:26px}h1{font-size:56px}.lead{font-size:19px}
+  .hero{padding:80px 0 64px}.mark{width:112px;height:112px;border-radius:26px}h1{font-size:56px}.lead{font-size:19px}
   .stack{grid-template-columns:repeat(10,48px);gap:10px}
   .apps{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;background:none;border-radius:0;overflow:visible}
   .app{background:var(--cell);border-radius:20px;padding:14px 16px}.app+.app::before{display:none}
   .app img{width:56px;height:56px;border-radius:14px}
   .pass{justify-content:center;margin-top:40px}
+  .more{max-width:420px;margin:24px auto 0}.glyph{width:56px;height:56px;border-radius:14px}
 }
 @media (min-width:1000px){
   .apps{grid-template-columns:repeat(5,1fr)}
@@ -53,7 +53,6 @@ a:focus-visible,button:focus-visible{outline:2px solid #6366f1;outline-offset:2p
 }
 @media (hover:hover) and (pointer:fine){.note{display:none}}
 </style></head><body><main>
-<div class="top"><button class="lang" type="button" data-en="中文">English</button></div>
 <section class="hero">
 <img class="mark" src="brand/family-orbit.svg" alt="">
 <h1>Orbit</h1>
@@ -63,7 +62,8 @@ a:focus-visible,button:focus-visible{outline:2px solid #6366f1;outline-offset:2p
 <p class="note" data-en="On a phone, add it to your Home Screen.">在手機上加到主畫面，就是一個 App。</p>
 </section>
 <section><h2 data-en="Or open one on its own">也可以單獨打開</h2><div class="apps"><a class="app" href="/sports/"><img src="brand/match.svg" alt="" width="48" height="48"><span class="t"><strong>Orbit Sports</strong><small data-en="Every game, live">每場比賽，即時比分</small></span><svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg></a><a class="app" href="/transit/"><img src="brand/transit.svg" alt="" width="48" height="48"><span class="t"><strong>Orbit Transit</strong><small data-en="Bus, train and bike">公車、火車、YouBike</small></span><svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg></a><a class="app" href="/weather/"><img src="brand/weather.svg" alt="" width="48" height="48"><span class="t"><strong>Orbit Weather</strong><small data-en="One clear forecast">一個答案的天氣</small></span><svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg></a><a class="app" href="/class/"><img src="brand/orbit.svg" alt="" width="48" height="48"><span class="t"><strong>Orbit Class</strong><small data-en="Today’s classes at a glance">今天的課，一眼看懂</small></span><svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg></a><a class="app" href="/money/"><img src="brand/money.svg" alt="" width="48" height="48"><span class="t"><strong>Orbit Money</strong><small data-en="Every dollar, in its place">每一筆，記得清楚</small></span><svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg></a><a class="app" href="/news/"><img src="brand/news.svg" alt="" width="48" height="48"><span class="t"><strong>Orbit News</strong><small data-en="One story, every side">同一則新聞，各家怎麼報</small></span><svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg></a><a class="app" href="/words/"><img src="brand/vocab.svg" alt="" width="48" height="48"><span class="t"><strong>Orbit Words</strong><small data-en="Words that stay">背得住的英文單字</small></span><svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg></a><a class="app" href="/beats/"><img src="brand/beats.svg" alt="" width="48" height="48"><span class="t"><strong>Orbit Beats</strong><small data-en="Make your own beats">做出你的節拍</small></span><svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg></a><a class="app" href="/law/"><img src="brand/law.svg" alt="" width="48" height="48"><span class="t"><strong>Orbit Law</strong><small data-en="Laws, rulings, bills">法規、裁判、立法</small></span><svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg></a><a class="app" href="/securities/"><img src="brand/stock.svg" alt="" width="48" height="48"><span class="t"><strong>Orbit Securities</strong><small data-en="Invest worldwide, risk-free">全球股市，模擬投資</small></span><svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg></a></div></section>
+<a class="more" href="https://jaypengx.com/showcase/"><span class="glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H4zM12 16v3M8 20h8M8 13v-3M12 13V8M16 13v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="t"><strong data-en="Showcase">展示</strong><small data-en="How Orbit is built">Orbit 怎麼做出來的</small></span><svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg></a>
 <p class="pass"><img src="brand/pass.svg" alt=""><span><strong>Orbit Pass</strong> · <span class="nb" data-en="One pass for every app">一組通行碼，所有 App 共用</span></span></p>
 </main>
-<script>(()=>{const zh=new Map(),show=l=>{document.documentElement.lang=l==='en'?'en':'zh-Hant';for(const el of document.querySelectorAll('[data-en]')){if(!zh.has(el))zh.set(el,el.textContent);el.textContent=l==='en'?el.dataset.en:zh.get(el)}};if(document.documentElement.lang==='en')show('en');document.querySelector('.lang').onclick=()=>{const l=document.documentElement.lang==='en'?'zh':'en';try{localStorage.setItem('orbit.lang',l)}catch{}show(l)}})()</script>
+<script>if(document.documentElement.lang==='en')for(const el of document.querySelectorAll('[data-en]'))el.textContent=el.dataset.en</script>
 </body></html>
