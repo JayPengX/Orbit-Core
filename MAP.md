@@ -424,13 +424,9 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   `audit.yml` (secret names, store counts), `zone-speed.yml` (zone speed), `credit.yml` (`tools/credit/`).
 - Never a cancelling `concurrency:` (a cancel mails Jay): copy the `queue`
   job; builds check out main's tip.
-- **Only what must stay secret is a secret** (the rest: code, tomls).
-  - GitHub: `CLOUDFLARE_API_TOKEN`, `CF_GUARD_TOKEN`, `DATA_PUSH_SECRET`,
-    `ECO_TOKEN_SECRET`, `ECO_ADMIN_TOKEN`, `LAW_BUILD_KEY`, and the AI keys
-    `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (copied into the proxy by
-    `deploy.yml`); `ANTHROPIC_CREDIT_KEY` (the plan's API credit, for batch
-    jobs: `credit.yml`, `tools/credit/`).
-  - The proxy: Google's keys, `CWA_KEY`, `MOENV_KEY`, `TDX_CLIENT_*`.
+- **Only what must stay secret is a secret** (the rest: code, tomls). Every
+  secret by where it lives (GitHub, copied into the Workers by `deploy.yml`
+  and `deploy-guard.yml`, or typed on the proxy by hand): `HANDOFF.md` §3.2.
 - **The domain:** `kit/domain.mjs` `DOMAIN` (jaypengx.com), the one place
   it is set. Each repo publishes its built site with `deploy/cf-site.mjs`
   (§4.2; `SITE_HEADERS`, `site/_headers`: no other site's frame): `orbit.<DOMAIN>/<slug>/` every app (`slug`,
@@ -440,12 +436,8 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   Mail is refused. `deploy.yml`
   attaches the hostnames (its token needs the zone and D1 Edit); the guard
   takes them off with the proxy.
-- **Moving Orbit** (another account, host or team): the repos hold all the
-  code and docs. What lives outside git: the secrets above (re-entered by
-  hand), Cloudflare's data (D1 `orbit-store`, R2 `orbit-data`, KV, the
-  Durable Objects; the whole store is copied to R2 `private/store/` nightly),
-  the domain's DNS zone, each repo's `CLOUDFLARE_API_TOKEN`, and the AI and
-  data providers' accounts (Anthropic, OpenAI, Google, CWA, MOENV, TDX).
+- **Moving Orbit** (another account, host, team or agent): `HANDOFF.md`
+  (every account, secret by place, the data and the schedules outside git).
 
 ## 11. Tools and tests
 

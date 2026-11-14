@@ -19,6 +19,7 @@ the tools and the family's docs. Every repo is checked out side by side
 | A refactor or removal | the repo's `FEATURES.md` (every feature; its test fails when one goes) |
 | Orbit, the all-in-one app (`/app/`) | `docs/ORBIT.md` (what the person sees in every case) |
 | A tool (screenshots, preview, speed) | `tools/README.md` |
+| A new workspace or agent, or what lives outside git | `HANDOFF.md` |
 
 Each fact has one home: family rules in `docs/RULEBOOK.md`, an app's rules in
 its `MAP.md`, the architecture in this repo's `MAP.md`, the look in
