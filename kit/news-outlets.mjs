@@ -311,7 +311,7 @@ export const TOPICS = [
   },
   {
     id: 'cs', zh: '兩岸', en: 'Cross-strait', zhAbroad: '中國', enAbroad: 'China', on: true,
-    zh_: rx('中國(?!信託|醫藥|醫大|附醫|時報|石油|鋼鐵|人壽|科大|科技大學|文化大學|國民黨|砂輪|化學)|中共|大陸|陸委會|國台辦|解放軍|共軍|共機|共艦|北京|習近平|統戰|兩岸|台海|海峽|港澳|香港|中方|一中|九二共識|武統|和統|台獨|陸配|陸生|陸客|陸企|滲透|中資|廈門|福建|上海|廣東|深圳|小三通|進博會',
+    zh_: rx('中國(?!信託|醫藥|醫大|附醫|時報|石油|鋼鐵|人壽|科大|科技大學|文化大學|國民黨|砂輪|化學)|中共|大陸|陸委會|國台辦|解放軍|共軍|共機|共艦|北京|習近平|統戰|兩岸|台海|海峽|港澳|香港|中方|一中|九二共識|武統|和統|台獨|陸配|陸生|陸客|陸企|滲透|中資|廈門|福建|上海|廣東|深圳|小三通|進博會|赴中|赴陸',
       '陸(?:新|外交部|官媒|國防部|海警|軍|方|媒|委會|稱|批|嗆|祭|宣布|海關|商務部|網|製)'),
     en_: [/\b(?:China|Chinese|Beijing|Xi|Taiwan\w*|Hong Kong|Taipei|PLA|CCP|Communist|Tibet\w*|Xinjiang|Uyghurs?|Macau|Shanghai|Shenzhen)\b/]
   },
@@ -329,7 +329,7 @@ export const TOPICS = [
   },
   {
     id: 'eco', zh: '經濟', en: 'Economy', on: true,
-    zh_: rx('經濟|GDP|景氣|出口|進口|關稅|貿易|匯率|央行|升息|降息|利率|通膨|物價|油價|電價|水價|薪資|加薪|基本工資|最低工資|勞保|年金|退休金|稅|預算|財政|普發|補助|補貼|振興|紓困|股市|台股|美股|股價|國安基金|護盤|房價|房市|打房|囤房|信用管制|失業|就業|缺工|產業|外資|投資|供應鏈|消費|零售|內需|營收|財報|經濟部|金管會|證交所|銀行|保險|壽險|台幣|美元|漲價|企業|台商|鴻海|侵權|337'),
+    zh_: rx('經濟|GDP|景氣|出口|進口|關稅|貿易|匯率|央行|升息|降息|利率|通膨|物價|油價|電價|水價|薪資|加薪|年終獎金|比特幣|加密貨幣|穩定幣|基本工資|最低工資|勞保|年金|退休金|稅|預算|財政|普發|補助|補貼|振興|紓困|股市|台股|美股|股價|國安基金|護盤|房價|房市|打房|囤房|信用管制|失業|就業|缺工|產業|外資|投資|供應鏈|消費|零售|內需|營收|財報|經濟部|金管會|證交所|銀行|保險|壽險|台幣|美元|漲價|企業|台商|鴻海|侵權|337'),
     en_: [rxi('econom\\w*|tariffs?|trade(?! deadline)|trading|inflation|prices?|pricing|Fed|Federal Reserve|interest rates?|rates|jobs|jobless|unemployment|wages?|budget\\w*|tax|taxes|taxpayers?|debt|deficit|stocks?|markets?|Wall Street|recession|GDP|banks?|banking|housing|rent|mortgages?|oil|SNAP|Medicaid|Medicare|Social Security|earnings|profits?|revenue|investors?|investment|billion|trillion|dollar|currency|exports?|imports?|layoffs?|retail|consumers?|spending|costs?|affordab\\w*|insurance|compan(?:y|ies)|business\\w*|industr\\w*|CEO|bonds?|crypto\\w*|bitcoin|auto\\w*|manufactur\\w*')],
     enAt: [rxi('plants?|factor(?:y|ies)')]
   },
@@ -345,12 +345,12 @@ export const TOPICS = [
   },
   {
     id: 'law', zh: '司法', en: 'Justice', on: true,
-    zh_: rx('法院|地院|高院|最高法院|憲法法庭|大法官|法官|起訴|判決|判刑|判處|宣判|無罪|有罪|定讞|上訴|羈押|收押|交保|聲押|檢察|檢方|地檢|北檢|偵辦|偵查|搜索|約談|調查局|廉政署|貪污|貪汙|收賄|行賄|賄選|圖利|洗錢|詐騙|詐團|詐欺|命案|死刑|極刑|速審|司法|法務部|律師|訴訟|提告|違憲|合憲|釋字|法案|條例|新制|修正'),
+    zh_: rx('法院|地院|高院|最高法院|憲法法庭|大法官|法官|起訴|判決|判刑|判處|宣判|無罪|有罪|定讞|上訴|羈押|收押|交保|聲押|檢察|檢方|地檢|北檢|偵辦|偵查|搜索|約談|調查局|廉政署|貪污|貪汙|收賄|行賄|賄選|圖利|洗錢|詐騙|詐團|詐欺|命案|槍擊|槍響|開槍|中彈|持槍|槍砲|嫌犯|兇嫌|落網|逮捕|通緝|持刀|砍人|刺傷|殺人|隨機傷人|毒駕|拒檢|死刑|極刑|速審|司法|法務部|律師|訴訟|提告|違憲|合憲|釋字|法案|條例|新制|修正'),
     en_: [rxi('courts?|judges?|justices?|Supreme Court|trials?|lawsuits?|sued|sues|suing|rulings?|ruled|indict\\w*|charged|charges|prosecut\\w*|DOJ|Justice Department|FBI|attorneys? general|police|arrest\\w*|convict\\w*|sentenc\\w*|prison|jail\\w*|crimes?|criminal|murder\\w*|shootings?|death penalty|execution|pardon\\w*|legal|laws?|lawyers?|investigat\\w*|probe|fraud|bribery|corruption')]
   },
   {
     id: 'soc', zh: '社會', en: 'Society', on: true,
-    zh_: rx('教育|課綱|學校|校園|少子化|生育|育兒|托育|長照|勞工|勞動部|移工|工時|過勞|罷工|工會|同婚|性別|性平|性騷|性侵|人權|原住民|新住民|移民|住宅|社宅|租屋|交通部|捷運|高鐵|台鐵|公車|交通安全|行人|酒駕|食安|消費者|動保|工安|公安|毒品|治安|警政|長者|身障|兒少|虐童|霸凌|自殺|貧窮|弱勢|社福|社會|人口|出生率|高齡|青年|婚姻|家暴'),
+    zh_: rx('教育|課綱|學校|校園|少子化|生育|育兒|托育|長照|勞工|勞動部|移工|工時|過勞|罷工|工會|同婚|性別|性平|性騷|性侵|人權|原住民|新住民|移民|住宅|社宅|租屋|交通部|捷運|北捷|機捷|輕軌|延伸線|高鐵|台鐵|公車|交通安全|行人|酒駕|食安|消費者|動保|工安|公安|毒品|治安|警政|長者|身障|兒少|虐童|霸凌|自殺|貧窮|弱勢|社福|社會|人口|出生率|高齡|青年|婚姻|家暴'),
     en_: [/\b(?:ICE|FAA|FEMA)\b/, rxi('immigra\\w*|migrants?|migration|deport\\w*|border|asylum|abortion|schools?|education|universit\\w*|colleges?|students?|teachers?|guns?|Glock|LGBTQ\\w*|transgender|gay|women|gender|race|racial|racism|civil rights|protest\\w*|strikes?|unions?|workers|labou?r|homeless\\w*|poverty|welfare|food|children|famil(?:y|ies)|religio\\w*|church\\w*|Muslims?|Jewish|antisemit\\w*|drugs?')],
   },
   // The kinds past the sides (Jay 11-10, 08:08: "expand to support more
@@ -358,7 +358,7 @@ export const TOPICS = [
   // where they'd crowd the front (`weight`), never counted as one-sided.
   {
     id: 'life', zh: '生活', en: 'Life', on: true, spectrum: false,
-    zh_: rx('天氣|氣象|颱風|豪雨|大雨|暴雨|寒流|冷氣團|東北季風|低溫|高溫|熱浪|乾旱|地震|海嘯|停班停課|塞車|車潮|國道|連假|疏運|返鄉|班機|航班|機場|觀光|旅遊|旅客|遊客|火災|火警|大火|惡火|起火|爆炸|氣爆|車禍|追撞|相撞|撞死|撞上|翻覆|墜機|墜落|溺水|失蹤|搜救|罹難|停水|垃圾|回收|寵物|流浪狗|流浪貓|動物|外送|菜價|蛋價|房租|超商|百貨|夜市|郵局|垃圾車|天然災害|災情'),
+    zh_: rx('天氣|氣象|颱風|豪雨|大雨|暴雨|寒流|冷氣團|東北季風|低溫|高溫|熱浪|乾旱|地震|海嘯|停班停課|塞車|車潮|國道|連假|疏運|返鄉|班機|航班|機場|觀光|旅遊|旅客|遊客|火災|火警|大火|惡火|起火|爆炸|氣爆|車禍|追撞|相撞|撞死|撞上|撞機車|撞擊|送醫不治|輾斃|墜樓|受困|翻覆|墜機|墜落|溺水|失蹤|搜救|罹難|停水|垃圾|回收|寵物|流浪狗|流浪貓|動物|外送|菜價|蛋價|房租|超商|百貨|夜市|郵局|垃圾車|天然災害|災情'),
     en_: [rxi('weather|storms?|hurricanes?|typhoons?|tornado\\w*|earthquakes?|tsunami|floods?|flooding|wildfires?|fires?|blaze|heat ?waves?|snow\\w*|blizzard|drought|disasters?|crash\\w*|collision|derail\\w*|accidents?|explosions?|rescue\\w*|travel\\w*|tourism|tourists?|airlines?|flights?|airports?|traffic|holiday\\w*|consumers?|shoppers?|recalls?|pets?|animals?|zoo')]
   },
   {

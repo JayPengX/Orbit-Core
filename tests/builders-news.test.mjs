@@ -282,6 +282,9 @@ test('topics: the sides\' own, and the kinds past them; a game of Pokémon has n
   // (11-14: Taiwan's 亞冠賽 reports named no sport word, 「亞冠賽不敵日本！韓國慘吞對戰12連敗」 had no topic.)
   assert.equal(topicsOf(['亞冠賽不敵日本！韓國慘吞對戰12連敗 韓媒絕望痛批'], 'zh')[0], 'sport');
   assert.ok(topicsOf(['台日職棒交流賽拍板 明年3／6連兩晚攻大巨蛋'], 'zh').includes('sport'));
+  // (11-14: 桃園's shooting, eight outlets, had no topic and wasn't shown.)
+  assert.deepEqual(topicsOf(['桃園驚傳槍響！男持鎮暴槍隨機掃射7旬翁 逃基隆落網'], 'zh'), ['law']);
+  assert.ok(topicsOf(['奪命瞬間！曳引車右轉撞機車 蘇澳68歲騎士捲輪下送醫不治'], 'zh').includes('life'));
   assert.deepEqual(topicsOf(['金馬獎入圍名單出爐'], 'zh'), ['culture']);
   assert.deepEqual(topicsOf(['NASA telescope spots water on an asteroid'], 'en'), ['sci']);
   assert.deepEqual(topicsOf(['賴清德出席國防論壇', '國軍漢光演習登場'], 'zh'), ['def', 'pol']);
@@ -895,4 +898,20 @@ test('a word sharing six letters with another thing stays whole: Starship isn\'t
   const a = new Set(piecesOf('SpaceX aborts attempt to catch Starship booster rocket', 'en'));
   assert.ok(!piecesOf('Zelenskiy says Starshield speed limited again', 'en').some(p => a.has(p)));
   assert.ok(piecesOf('Impeachment vote', 'en').includes('impeac'));
+});
+
+test('a national team\'s game is one story (11-14: 中華隊 6:4 Australia at the 亞冠賽 was some 30 stories); a youth side\'s game another; a country alone no pull', () => {
+  assert.equal(gameOf('亞冠賽／首局丟4分仍逆轉！中華隊6：4擊退澳洲 首勝入袋', 'zh'), gameOf('台灣打線大復活！亞冠賽6比4逆轉澳洲 保住爭冠希望', 'zh'));
+  assert.notEqual(gameOf('U23世界盃台灣打爆韓國！單局狂灌5分逆轉', 'zh'), gameOf('亞冠賽／中華隊6比1擊敗韓國', 'zh'));
+  // (A report not saying U23 may be either: never kept apart from it.)
+  assert.equal(otherGame(teamsOf('U23世界盃台灣打爆韓國！', 'zh'), teamsOf('中華隊6比1擊敗韓國 林佾葳奪第3勝', 'zh')), false);
+  assert.equal(otherGame(teamsOf('亞冠賽／日本16：1扣倒澳洲', 'zh'), teamsOf('亞冠賽／中華隊挑戰韓國', 'zh')), true);
+  // (A country named outside a national team's report is no team: 日本 in a club's news.)
+  assert.equal(teamsOf('道奇強投赴日本拍廣告', 'zh')?.size ?? 0, 1);
+  const items = [
+    { o: 'ettoday', t: '一生只有一次的青奧！台灣霹靂舞小將壓軸替中華隊奪下銀牌', u: 'https://x/1', at: 1 },
+    { o: 'ctinews', t: '中華隊何時公司化？蔡其昌點出「深水區」', u: 'https://x/2', at: 2 },
+    { o: 'nownews', t: '賀中華隊亞冠賽奪首勝！必勝客披薩買大送大', u: 'https://x/3', at: 3 }
+  ];
+  assert.equal(groupStories(items, 'zh').length, 3, 'three 中華隊 reports of three things stay three');
 });

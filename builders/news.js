@@ -744,7 +744,7 @@ export function weigh(items, lang) {
     // (And each team a sports report names, a little: 「七六人逆轉奪第10勝」
     // names one team of that game.)
     const teams = !PREVIEW.test(it.t) && teamsOf(it.t, lang);
-    if (teams && v.size) for (const x of teams) v.set(`#t:${x}`, (TEAM_WEIGHT * words) / teams.size);
+    if (teams && v.size) for (const x of teams) if (!x.startsWith(NAT)) v.set(`#t:${x}`, (TEAM_WEIGHT * words) / teams.size);
     return v;
   };
 }
@@ -768,10 +768,30 @@ const TEAM_SAME = { 七六人: '76人', sixers: '76ers', cavs: 'cavaliers', mavs
 // (「Spain vs England」, 「Portugal v Denmark」: the sides of a game the
 // nicknames don't know, a national team's or a club's.)
 const VERSUS = /\b([A-Z][\w'.-]+)\s+(?:vs\.?|v\.?|versus)\s+([A-Z][\w'.-]+)/g;
+// National teams in Taiwan's reports (11-14: 中華隊's 6:4 over Australia
+// at the 亞冠賽 was some 30 stories of one to five outlets): a country is a
+// team only where the headline is a national team's (NATIONAL), and a youth
+// side's (U23, 青棒…) another team from the senior one, so the U23 World
+// Cup's 台灣 v 日本 never joins the 亞冠賽's.
+export const NATIONAL = /中華隊|台灣隊|國家隊|武士隊|亞冠|經典賽|12強|世界盃|世錦賽|亞錦賽|亞運|奧運|U-?\d{2}|青棒|青少棒|少棒/;
+const COUNTRY_ZH = /中華隊|台灣隊|台灣|日本隊|武士隊|日本|南韓|韓國隊|韓國|澳洲隊|澳洲|美國隊|古巴|委內瑞拉|荷蘭|墨西哥|多明尼加|波多黎各|義大利|捷克|菲律賓|中國隊|香港/g;
+const COUNTRY_SAME = { 中華隊: '台灣', 台灣隊: '台灣', 日本隊: '日本', 武士隊: '日本', 南韓: '韓國', 韓國隊: '韓國', 澳洲隊: '澳洲', 美國隊: '美國', 中國隊: '中國' };
+const YOUTH = /U-?(\d{2})|(青少棒|青棒|少棒)/;
+// (A country's mark: its game a piece of the report's, but a country alone no
+// pull, else every 中華隊 report, 青奧's and 健力's, would be one story; a
+// youth side and the senior one the same country to otherGame, a report not
+// saying U23 being either.)
+const NAT = 'n:';
+const plainTeam = x => (x.startsWith(NAT) ? NAT + x.slice(NAT.length).replace(/^[^·]*·/, '') : x);
 export function teamsOf(title, lang) {
   const t = String(title || '');
   if (!(lang === 'en' ? SPORT_TOPIC.en_ : [SPORT_TOPIC.zh_]).some(re => re.test(t))) return null;
   const found = [...(t.match(lang === 'en' ? TEAM_EN : TEAM_ZH) || []), ...(lang === 'en' ? [...t.matchAll(VERSUS)].flatMap(m => [m[1], m[2]]) : [])];
+  if (lang !== 'en' && NATIONAL.test(t)) {
+    const y = YOUTH.exec(t);
+    const side = y ? `${y[1] ? `U${y[1]}` : y[2]}·` : '';
+    for (const c of t.match(COUNTRY_ZH) || []) found.push(`${NAT}${side}${COUNTRY_SAME[c] || c}`);
+  }
   return found.length ? new Set(found.map(x => TEAM_SAME[x.toLowerCase()] || x.toLowerCase())) : null;
 }
 // A game's report: a sports headline naming its two teams, not a preview.
@@ -785,7 +805,11 @@ export function gameOf(title, lang) {
   return teams?.size === 2 ? [...teams].sort().join('|') : '';
 }
 // (Both name teams, none the same: two games.)
-export const otherGame = (a, b) => Boolean(a && b && ![...a].some(x => b.has(x)));
+export const otherGame = (a, b) => {
+  if (!a || !b) return false;
+  const bs = new Set([...b].map(plainTeam));
+  return ![...a].some(x => bs.has(plainTeam(x)));
+};
 const withTeams = (into, more) => (more ? new Set([...(into || []), ...more]) : into);
 
 export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lang] } = {}) {
@@ -1201,7 +1225,8 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
     const deskOf_ = new Map();
     const sporty = it => {
       let v = deskOf_.get(it.u);
-      if (v === undefined) deskOf_.set(it.u, (v = SPORTS_OUTLETS.has(it.o) || topicsOf([it.t], lang)[0] === 'sport'));
+      // (A national team's game is sport's though it names countries: 「台日職棒交流賽」 is 國際 first.)
+      if (v === undefined) deskOf_.set(it.u, (v = SPORTS_OUTLETS.has(it.o) || ((k => k[0] === 'sport' || (k.includes('sport') && lang === 'zh' && NATIONAL.test(it.t)))(topicsOf([it.t], lang)))));
       return v;
     };
     const twoDesks = list => [...groupStories(list.filter(sporty), lang).map(g => Object.assign(g, { sp: true })), ...groupStories(list.filter(it => !sporty(it)), lang).map(g => Object.assign(g, { sp: false }))];
