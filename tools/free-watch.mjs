@@ -10,7 +10,7 @@ const DOMAIN = 'jaypengx.com';
 const SITE = `https://orbit.${DOMAIN}`;
 const API = `https://api.${DOMAIN}`;
 export const WARN = 0.75;
-const SLUGS = ['sports', 'transit', 'weather', 'class', 'money', 'news', 'words', 'beats', 'law', 'securities', 'pass'];
+const SLUGS = ['sports', 'transit', 'weather', 'class', 'money', 'news', 'words', 'beats', 'law', 'securities', 'app'];
 
 const problems = [];
 const notes = [];
@@ -38,6 +38,7 @@ async function get(url, { origin = false, json = false, secret = '' } = {}) {
 // Pages and routes, as a phone asks them.
 async function smoke() {
   const checks = [
+    [`${SITE}/`, 'home page'],
     ...SLUGS.map(s => [`${SITE}/${s}/`, `${s} page`]),
     [`https://${DOMAIN}/showcase/`, 'showcase page'],
     [`${SITE}/Orbit-Core/kit/version.json`, 'kit', { json: true }],
