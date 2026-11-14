@@ -459,4 +459,6 @@ test('errorText blames the connection only when Orbit gave no answer', () => {
   assert.doesNotMatch(refused, /網路|連線/);
   assert.match(refused, /ECO_PAYLOAD_INVALID/);
   assert.doesNotMatch(orbit.errorText({ code: 'HTTP_500', status: 500 }, 'en'), /connection/);
+  // (Busy, or the server's free day used up: a calm busy line, never a code, 11-14.)
+  for (const status of [429, 500, 503]) assert.equal(orbit.errorText({ code: `HTTP_${status}`, status }, 'zh'), 'Orbit 現在比較忙，請稍後再試。');
 });
