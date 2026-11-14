@@ -98,7 +98,11 @@ async function session(ctx) {
 const lang = v => (v === 'en' ? 'en' : 'zh');
 function codeMail(kind, code, l) {
   const en = l === 'en';
-  const what = kind === 'link' ? (en ? 'add this address to your Orbit Pass' : '把這個信箱加到你的 Orbit Pass') : en ? 'sign in to your Orbit Pass' : '登入你的 Orbit Pass';
+  const what = {
+    link: en ? 'add this address to your Orbit Pass' : '把這個信箱加到你的 Orbit Pass',
+    signup: en ? 'make your Orbit Pass' : '建立你的 Orbit Pass',
+    recover: en ? 'sign in to your Orbit Pass' : '登入你的 Orbit Pass'
+  }[kind];
   const subject = en ? `Orbit Pass code: ${code}` : `Orbit Pass 驗證碼：${code}`;
   const lines = en
     ? [`Your code to ${what} is ${code}.`, 'It works once, within 10 minutes.', 'Didn’t ask for it? Ignore this mail: nothing changes without the code.']
@@ -286,6 +290,45 @@ export async function mailRecover(ctx) {
   // A session that takes only `rotate`: the lost pass is replaced first.
   const res = await signIn(ctx, row.d, { fresh: true });
   return res || bad(ctx, 'ECO_MAIL_CODE_WRONG', 401);
+}
+
+// ---- Making a pass with an address (eco.js create: Jay 11-14, a new 基本 pass
+// needs a verified email, one account to an address) ----------------------------------
+
+// The code to the address that will be on the new pass: the op's whole reply.
+// Taken or not, the same answer and a code (an address's owner hears it is
+// taken only once the code proves it, signupMailProve).
+export async function signupMailBegin(ctx) {
+  const { env, deps, body, secret } = ctx;
+  if (!ready(ctx)) return bad(ctx, 'ECO_MAIL_OFF', 503);
+  const hit = await deps.rateLimitResponse(env, ctx.ip, 'eco:mail', ECO_LIMITS.mail, ctx.headers, ctx.request);
+  if (hit) return hit;
+  const addr = cleanAddr(body.addr ?? body.email);
+  if (!addr) return bad(ctx, 'ECO_MAIL_INVALID');
+  const id = `c-${await addrKey(secret, addr)}`;
+  const got = await newCode(ctx, id, { a: addr });
+  if (got.refused) return bad(ctx, got.refused, 429);
+  try {
+    await send(ctx, addr, codeMail('signup', got.code, lang(body.lang)));
+  } catch {
+    await deps.fsWrite(env, MAIL_CODES, id, JSON.stringify({ ...got.row, h: '', t: 0, s: got.row.s - 1 }));
+    return bad(ctx, 'ECO_MAIL_OFF', 503);
+  }
+  return deps.json({ sent: true, exp: got.row.e, shown: maskAddr(addr) }, 200, ctx.headers);
+}
+// The code typed for that address, spent → { addr, mail } (mail: the wallet's
+// field, `{ ...wallet, mail }` then pointMail once the wallet is written), or
+// { refused: Response } (a wrong or ended code, or the address already on a
+// Pass: ECO_MAIL_TAKEN, the kit offering 用救援信箱找回).
+export async function signupMailProve(ctx) {
+  const { env, deps, body, secret } = ctx;
+  const addr = cleanAddr(body.addr ?? body.email);
+  if (!addr) return { refused: bad(ctx, 'ECO_MAIL_CODE_WRONG', 401) };
+  const at = await addrKey(secret, addr);
+  const row = await useCode(ctx, `c-${at}`, cleanCodeIn(body.code));
+  if (!row || row.a !== addr) return { refused: bad(ctx, 'ECO_MAIL_CODE_WRONG', 401) };
+  if (await accountOfMail(env, deps, addr)) return { refused: bad(ctx, 'ECO_MAIL_TAKEN', 409) };
+  return { addr, mail: { addr, t: deps.now() } };
 }
 
 // The account whose verified recovery email `addr` is ('' for none): any
