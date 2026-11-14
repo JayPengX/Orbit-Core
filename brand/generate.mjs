@@ -217,7 +217,8 @@ await browser.close();
 // the Pass that signs into all of them last. In one language at a time
 // (Jay 2026-10-27: "mixed with two languages"): written in Chinese, each text
 // carries its English in data-en, swapped for a reader whose Orbit language
-// (orbit.lang, kit detectLang's rule) is English. Jay 2026-11-14: "look
+// (orbit.lang, kit detectLang's rule) is English. No switch on the page (Jay
+// 2026-11-14: the language is picked by itself). Jay 2026-11-14: "look
 // better", not more on it; the lines are the brand's short pitches.
 function homePage() {
   const home = `${SITE_URL}${DOMAIN ? '/pass/' : '/Orbit-Core/'}`;
@@ -246,10 +247,7 @@ ${og('type', 'website')}${og('site_name', 'Orbit')}${og('title', 'Orbit')}${og('
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
 body{margin:0;min-height:100vh;background:radial-gradient(120% 60% at 50% -10%,var(--glow),transparent 70%) no-repeat,var(--page);color:var(--label);font:17px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 main{max-width:1120px;margin:0 auto;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(40px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
-.top{display:flex;justify-content:flex-end;min-height:44px;align-items:center}
-.lang{padding:6px 12px;border:0;border-radius:999px;background:var(--press);color:var(--label-2);font:500 13px/1.2 inherit;cursor:pointer}
-.lang:hover{color:var(--label)}
-.hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:24px 0 48px}
+.hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:48px 0 48px}
 .mark{width:96px;height:96px;border-radius:22px;box-shadow:0 12px 32px rgba(30,27,75,.28)}
 h1{margin:20px 0 0;font:700 44px/1.05 ui-rounded,-apple-system,BlinkMacSystemFont,"SF Pro Rounded",system-ui,sans-serif;letter-spacing:-.01em}
 .lead{margin:8px 0 0;font-size:17px;color:var(--label-2)}.lead span{display:inline-block}
@@ -267,16 +265,19 @@ h2{margin:0 16px 8px;font-size:15px;font-weight:600;line-height:1.3;color:var(--
 .app img{flex:none;width:48px;height:48px;border-radius:12px}
 .t{display:grid;flex:1;min-width:0}.t strong{font-weight:500}.t small{font-size:15px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chev{flex:none;width:8px;height:14px;fill:none;stroke:var(--label-2);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.6}
+.more{display:flex;align-items:center;gap:14px;margin-top:16px;padding:10px 16px;min-height:68px;border-radius:22px;background:var(--cell);color:inherit;text-decoration:none}.more:hover{background:var(--press)}
+.glyph{flex:none;display:grid;place-items:center;width:48px;height:48px;border-radius:12px;background:#4f46e5;color:#fff}.glyph svg{width:26px;height:26px}
 .pass{display:flex;align-items:center;gap:12px;margin:32px 16px 0;color:var(--label-2);font-size:15px}
 .pass img{flex:none;width:32px;height:32px;border-radius:8px}.nb{display:inline-block}.pass strong{color:var(--label);font-weight:500}
 a:focus-visible,button:focus-visible{outline:2px solid #6366f1;outline-offset:2px}
 @media (min-width:720px){
-  .hero{padding:48px 0 64px}.mark{width:112px;height:112px;border-radius:26px}h1{font-size:56px}.lead{font-size:19px}
+  .hero{padding:80px 0 64px}.mark{width:112px;height:112px;border-radius:26px}h1{font-size:56px}.lead{font-size:19px}
   .stack{grid-template-columns:repeat(10,48px);gap:10px}
   .apps{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;background:none;border-radius:0;overflow:visible}
   .app{background:var(--cell);border-radius:20px;padding:14px 16px}.app+.app::before{display:none}
   .app img{width:56px;height:56px;border-radius:14px}
   .pass{justify-content:center;margin-top:40px}
+  .more{max-width:420px;margin:24px auto 0}.glyph{width:56px;height:56px;border-radius:14px}
 }
 @media (min-width:1000px){
   .apps{grid-template-columns:repeat(5,1fr)}
@@ -285,7 +286,6 @@ a:focus-visible,button:focus-visible{outline:2px solid #6366f1;outline-offset:2p
 }
 @media (hover:hover) and (pointer:fine){.note{display:none}}
 </style></head><body><main>
-<div class="top"><button class="lang" type="button" data-en="中文">English</button></div>
 <section class="hero">
 <img class="mark" src="brand/family-orbit.svg" alt="">
 <h1>${FAMILY.name}</h1>
@@ -295,9 +295,10 @@ a:focus-visible,button:focus-visible{outline:2px solid #6366f1;outline-offset:2p
 ${two('p', { zh: '在手機上加到主畫面，就是一個 App。', en: 'On a phone, add it to your Home Screen.' }, ' class="note"')}
 </section>
 <section>${two('h2', { zh: '也可以單獨打開', en: 'Or open one on its own' })}<div class="apps">${ids.map(card).join('')}</div></section>
+<a class="more" href="https://jaypengx.com/showcase/"><span class="glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H4zM12 16v3M8 20h8M8 13v-3M12 13V8M16 13v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="t"><strong data-en="Showcase">展示</strong><small data-en="How Orbit is built">Orbit 怎麼做出來的</small></span>${chev}</a>
 <p class="pass"><img src="brand/pass.svg" alt=""><span><strong>${esc(PASS.name)}</strong> · <span class="nb" data-en="${esc(PASS.tag.en)}">${esc(PASS.tag.zh)}</span></span></p>
 </main>
-<script>(()=>{const zh=new Map(),show=l=>{document.documentElement.lang=l==='en'?'en':'zh-Hant';for(const el of document.querySelectorAll('[data-en]')){if(!zh.has(el))zh.set(el,el.textContent);el.textContent=l==='en'?el.dataset.en:zh.get(el)}};if(document.documentElement.lang==='en')show('en');document.querySelector('.lang').onclick=()=>{const l=document.documentElement.lang==='en'?'zh':'en';try{localStorage.setItem('orbit.lang',l)}catch{}show(l)}})()</script>
+<script>if(document.documentElement.lang==='en')for(const el of document.querySelectorAll('[data-en]'))el.textContent=el.dataset.en</script>
 </body></html>
 `;
 }
