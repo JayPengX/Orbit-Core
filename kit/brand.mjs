@@ -83,14 +83,27 @@ const bg = (id, a, { shape }) => {
   const [hi, mid, lo] = a.paint || [a.from, a.ink, a.to];
   return `<defs><linearGradient id="${id}-bg" x1="0.15" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="${hi}"/><stop offset="0.5" stop-color="${mid}"/><stop offset="1" stop-color="${lo}"/></linearGradient><radialGradient id="${id}-hl" cx="0.2" cy="0.05" r="0.75"><stop offset="0" stop-color="#fff" stop-opacity="0.32"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient><filter id="${id}-sh" filterUnits="userSpaceOnUse" x="0" y="0" width="512" height="512"><feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000" flood-opacity="0.3"/></filter></defs><rect width="512" height="512" rx="${r}" fill="url(#${id}-bg)"/><rect width="512" height="512" rx="${r}" fill="url(#${id}-hl)"/>`;
 };
-// The family's sign behind every symbol: a tilted orbit and its moon. The
-// symbol itself big and white, so it reads at a home screen's size. Inside
-// `s` (1 full size, less for a maskable icon's safe zone), centred on 256.
+// The family's sign behind every symbol (Jay 2026-11-14, with Orbit's own
+// mark: ten moons): the ten apps as moons in a ring, this app's moon lit at
+// its place in the family's order, the others faint. The symbol itself big
+// and white inside it, so it reads at a home screen's size. Inside `s` (1
+// full size, less for a maskable icon's safe zone), centred on 256.
 // (crisp: the glyph's shadow drawn as a dark copy under it, not an SVG filter:
 // Safari draws a filtered part of an <img>'s SVG at one pixel a point, the
 // glyph blurred on an iPhone at every size in a page. Jay 2026-11-14.)
-const glyphAt = g => `<g transform="translate(${256 - 64 * 2.3} ${256 - 64 * 2.3}) scale(2.3)">${g}</g>`;
-const orbitFace = (id, a, s, crisp = false) => `<g transform="translate(${256 - 256 * s} ${256 - 256 * s}) scale(${s})"><ellipse cx="256" cy="256" rx="236" ry="92" transform="rotate(-24 256 256)" fill="none" stroke="#fff" stroke-opacity="0.3" stroke-width="14"/><circle cx="424" cy="131" r="20" fill="#fff"/>${crisp ? `<g transform="translate(0 7)" opacity="0.2">${glyphAt(GLYPHS[id]('#000', '#000', '#000'))}</g>${glyphAt(GLYPHS[id]('#fff', a.spot, a.paint?.[1]))}` : `<g filter="url(#${id}-sh)">${glyphAt(GLYPHS[id]('#fff', a.spot, a.paint?.[1]))}</g>`}</g>`;
+const ringArc = (r, a0, a1) => {
+  const p = d => [256 + r * Math.cos((d * Math.PI) / 180), 256 + r * Math.sin((d * Math.PI) / 180)].map(n => n.toFixed(2)).join(' ');
+  return `M${p(a0)} A${r} ${r} 0 0 1 ${p(a1)}`;
+};
+const GLYPH_SCALE = 2;
+const glyphAt = g => `<g transform="translate(${256 - 64 * GLYPH_SCALE} ${256 - 64 * GLYPH_SCALE}) scale(${GLYPH_SCALE})">${g}</g>`;
+const moonRing = id => {
+  const n = APP_ORDER.length;
+  const step = 360 / n;
+  const at = APP_ORDER.indexOf(id);
+  return APP_ORDER.map((_, j) => `<path d="${ringArc(196, -90 + j * step + 11, -90 + (j + 1) * step - 11)}" fill="none" stroke="#fff" stroke-opacity="${j === at ? 1 : 0.28}" stroke-width="26" stroke-linecap="round"/>`).join('');
+};
+const orbitFace = (id, a, s, crisp = false) => `<g transform="translate(${256 - 256 * s} ${256 - 256 * s}) scale(${s})">${moonRing(id)}${crisp ? `<g transform="translate(0 6)" opacity="0.18">${glyphAt(GLYPHS[id]('#000', '#000', '#000'))}</g>${glyphAt(GLYPHS[id]('#fff', a.spot, a.paint?.[1]))}` : `<g filter="url(#${id}-sh)">${glyphAt(GLYPHS[id]('#fff', a.spot, a.paint?.[1]))}</g>`}</g>`;
 
 // An app's icon (512×512). shape: 'rounded' (a favicon, a picture in a
 // page), 'square' (a home-screen icon: the phone rounds it) or 'maskable'
@@ -102,12 +115,83 @@ export function appIcon(id, { shape = 'rounded', crisp = false } = {}) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">${bg(id, a, { shape })}${orbitFace(id, a, s, crisp)}</svg>`;
 }
 
-// The family's own mark: a planet, its ring and a moon.
+// Orbit's own mark (2026-11-14; Jay picked it over three others, the old
+// pale planet being "ugly and weak"): every app as a moon in its own colour,
+// all ten around one white planet: every app in one. Every Orbit icon is
+// this mark in a look (LOOKS): a palette and a style, the moons in the apps'
+// colours or all white (the planet gold then). An Orbit can also wear an
+// app's own icon (look 'app-<id>', a one-app Orbit's default).
+//   bg     the tile, bright at the top to deep at the foot
+//   light  a pale tile (the planet and white moons drawn dark)
+export const ORBIT_PALETTES = [
+  { id: 'space', zh: '太空', en: 'Space', bg: ['#334155', '#0f172a', '#020617'] },
+  { id: 'night', zh: '夜空', en: 'Night', bg: ['#4f46e5', '#2e1f86', '#0c0a33'] },
+  { id: 'dusk', zh: '黃昏', en: 'Dusk', bg: ['#d946ef', '#6d28d9', '#1e1048'] },
+  { id: 'ocean', zh: '海洋', en: 'Ocean', bg: ['#38bdf8', '#1d4ed8', '#0b1e4f'] },
+  { id: 'aurora', zh: '極光', en: 'Aurora', bg: ['#2dd4bf', '#0f766e', '#082f3a'] },
+  { id: 'sunset', zh: '夕陽', en: 'Sunset', bg: ['#fb923c', '#e11d48', '#4c0519'] },
+  { id: 'forest', zh: '森林', en: 'Forest', bg: ['#4ade80', '#15803d', '#052e16'] },
+  { id: 'rose', zh: '玫瑰', en: 'Rose', bg: ['#f9a8d4', '#db2777', '#500724'] },
+  { id: 'gold', zh: '金色', en: 'Gold', bg: ['#fde047', '#ca8a04', '#422006'] },
+  { id: 'sky', zh: '晴空', en: 'Sky', bg: ['#bae6fd', '#3b82f6', '#1e3a8a'] },
+  { id: 'black', zh: '純黑', en: 'Black', bg: ['#27272a', '#0a0a0a', '#000000'] },
+  { id: 'light', zh: '純白', en: 'White', bg: ['#ffffff', '#f4f4f8', '#e4e4ee'], light: true }
+];
+const PAL = Object.fromEntries(ORBIT_PALETTES.map(p => [p.id, p]));
+// Every look an Orbit can wear, in the order setup shows them: coloured
+// moons in each palette, white moons in each, then each app's own icon.
+export const LOOKS = [...ORBIT_PALETTES.map(p => p.id), ...ORBIT_PALETTES.map(p => `${p.id}-white`), ...APP_ORDER.map(id => `app-${id}`)];
+export const DEFAULT_LOOK = 'space';
+export const isLook = look => LOOKS.includes(look);
+// A look's own app ('app-match' → 'match'), or null.
+export const lookApp = look => (/^app-/.test(look || '') && BRANDS[look.slice(4)] ? look.slice(4) : null);
+const palOf = look => PAL[String(look).replace(/-white$/, '')] || PAL[DEFAULT_LOOK];
+// What a look is called (setup's label for it).
+export function lookName(look, lang = 'zh') {
+  const app = lookApp(look);
+  if (app) return BRANDS[app].short;
+  return palOf(look)[lang === 'en' ? 'en' : 'zh'];
+}
+// The colour behind a look (an Orbit's loading screen, setup's preview).
+export const lookColor = look => (lookApp(look) ? BRANDS[lookApp(look)].color : palOf(look).bg[1]);
+
+const C0 = 256;
+const MOON = { r: 150, width: 46, gap: 10 };
+// The mark alone, inside 512×512 (scale s about the middle; ids prefixed `k`).
+function orbitMarkOf(p, white, k, s = 1) {
+  const n = APP_ORDER.length;
+  const step = 360 / n;
+  const ink = p.light ? '#1e1b4b' : '#fff';
+  const moons = APP_ORDER.map((id, i) => {
+    const c = white ? ink : BRANDS[id].paint?.[1] || BRANDS[id].color;
+    return `<path d="${ringArc(MOON.r, -90 + i * step + MOON.gap, -90 + (i + 1) * step - MOON.gap)}" fill="none" stroke="${c}" stroke-width="${MOON.width}" stroke-linecap="round"/>`;
+  }).join('');
+  // (The planet lit a little from the top left; gold among white moons.)
+  const [hi, lo] = white ? ['#fde68a', '#f5b83d'] : p.light ? ['#4338ca', '#1e1b4b'] : ['#ffffff', '#dfe3ee'];
+  const planet = `<defs><radialGradient id="${k}-pl" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="${hi}"/><stop offset="1" stop-color="${lo}"/></radialGradient></defs><circle cx="${C0}" cy="${C0}" r="72" fill="url(#${k}-pl)"/>`;
+  const body = moons + planet;
+  return s === 1 ? body : `<g transform="translate(${C0 - C0 * s} ${C0 - C0 * s}) scale(${s})">${body}</g>`;
+}
+// An Orbit's icon (512×512) in a look. shape: 'rounded' (in a page, a
+// favicon), 'square' (a home-screen icon: the phone rounds it) or 'maskable'
+// (Android's adaptive icon: the mark inside the middle 80%). plain: the mark
+// with no tile.
+export function orbitIcon(look = DEFAULT_LOOK, { shape = 'rounded', plain = false } = {}) {
+  const app = lookApp(look);
+  if (app) return appIcon(app, { shape, crisp: true });
+  const white = /-white$/.test(look);
+  const p = palOf(look);
+  const k = `ob-${p.id}${white ? '-w' : ''}-${shape[0]}`;
+  const r = shape === 'rounded' ? 116 : 0;
+  const tile = plain
+    ? ''
+    : `<defs><linearGradient id="${k}-bg" x1="0.1" y1="0" x2="0.7" y2="1"><stop offset="0" stop-color="${p.bg[0]}"/><stop offset="0.5" stop-color="${p.bg[1]}"/><stop offset="1" stop-color="${p.bg[2]}"/></linearGradient><radialGradient id="${k}-hl" cx="0.18" cy="0.04" r="0.8"><stop offset="0" stop-color="#fff" stop-opacity="${p.light ? 0 : 0.2}"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="512" height="512" rx="${r}" fill="url(#${k}-bg)"/><rect width="512" height="512" rx="${r}" fill="url(#${k}-hl)"/>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">${tile}${orbitMarkOf(p, white, k, shape === 'maskable' ? 0.8 : 1)}</svg>`;
+}
+
+// The family's own mark: Orbit's, in its first look.
 export function familyMark({ shape = 'rounded', plain = false } = {}) {
-  const back = plain ? '' : bg('fam-orbit', FAMILY, { shape });
-  // (Maskable: drawn inside the middle 80%, which every launcher's mask keeps.)
-  const [open, close] = shape === 'maskable' ? ['<g transform="translate(256 256) scale(0.78) translate(-256 -256)">', '</g>'] : ['', ''];
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">${back}${open}<defs><linearGradient id="orbit-planet" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0e7ff"/><stop offset="1" stop-color="#a5b4fc"/></linearGradient></defs><ellipse cx="256" cy="256" rx="220" ry="80" transform="rotate(-24 256 256)" fill="none" stroke="#fff" stroke-opacity="0.45" stroke-width="20"/><circle cx="256" cy="256" r="130" fill="url(#orbit-planet)"/><ellipse cx="256" cy="256" rx="220" ry="80" transform="rotate(-24 256 256)" fill="none" stroke="#fff" stroke-width="20" stroke-dasharray="0 330 420 2000" stroke-linecap="round"/><circle cx="440" cy="150" r="26" fill="#fff"/>${close}</svg>`;
+  return orbitIcon(DEFAULT_LOOK, { shape, plain });
 }
 
 // The developer settings (the admin panel's 開發): how fast live data is

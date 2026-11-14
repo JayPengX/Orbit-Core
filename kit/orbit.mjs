@@ -32,6 +32,7 @@
 
 import { BRANDS, APP_ORDER, FAMILY, pathOf, homeOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
+import { encodeSetup, startOf, mineSaved, mergeMine, MINE_KEY } from './orbit-mine.mjs';
 import { API, SITE as HOME, isApi } from './domain.mjs';
 import { passkeyHere, passkeyName, deviceName, makePasskey, usePasskey, forgetPasskey, cancelled } from './passkey.mjs';
 import { icons, tile, pullToRefresh, setSheetDetent, toast, h as node } from './ui.mjs';
@@ -1996,6 +1997,7 @@ function makeSession(app, { lang, heartbeat }) {
     adoptLinkWay(w);
     emit('wallet', w);
     setTimeout(() => syncPrefs(s), 0);
+    setTimeout(() => syncOrbits(s), 0);
   }
   function setActive(next, where = null) {
     // (Live for the Worker but another tab here has it: still quiet.)
@@ -3775,6 +3777,26 @@ export async function syncPrefs(s) {
   return syncingPrefs;
 }
 
+// Which apps each Orbit holds, changed inside it (kit/orbit-mine.mjs), and
+// the Pass's copy (setting 'orbits'), made one: the newer per Orbit wins; a
+// newer one here goes up when this app may write.
+let syncingOrbits = false;
+export async function syncOrbits(s) {
+  if (!s?.wallet || syncingOrbits) return;
+  syncingOrbits = true;
+  try {
+    const held = s.wallet.settings?.orbits?.value;
+    const { local, changed, up } = mergeMine(mineSaved(), held);
+    if (changed) {
+      writeStore(MINE_KEY, JSON.stringify(local));
+      globalThis.dispatchEvent?.(new CustomEvent('orbit-mine'));
+    }
+    if (up && s.active) await s.write({ wallet: { settings: { orbits: { value: up, t: Date.now() } } } }).catch(() => null);
+  } finally {
+    syncingOrbits = false;
+  }
+}
+
 // Notices were turned on for the pass (on another device or in another
 // app), but the phone hasn't been asked here yet: a banner offers it (the
 // phone asks only after a tap) once this app has a notice of the person's
@@ -4400,6 +4422,14 @@ export function installGate(app, lang = detectLang(), as = null) {
   }
   if (installCovered) return true;
   installCovered = true;
+  // A separate app's link in a phone's browser (Jay 2026-11-14): it's added
+  // as a one-app Orbit now (its own name and icon, setup to change them),
+  // never on its own. Apps already on a home screen on their own still open
+  // as they always did (isStandalone, above).
+  if (!as && APPS[app] && typeof location !== 'undefined') {
+    location.replace(startOf(encodeSetup({ apps: [app] })));
+    return true;
+  }
   // Installed from this page (Chrome moves the tab into the app's window
   // without loading it again): start for real.
   globalThis.matchMedia?.('(display-mode: standalone)').addEventListener?.('change', e => e.matches && location.reload());
@@ -4446,6 +4476,8 @@ export function installGate(app, lang = detectLang(), as = null) {
       // (A separate app: Orbit, every app in one, recommended first; Jay 2026-11-14.)
       as ? null : node('a', { class: 'q-gate-orbit', href: orbitTarget('', { install: true }), text: en ? `Recommended: add Orbit instead, every app in one ›` : `推薦：改加入 Orbit，所有 App 合一 ›` }),
       action,
+      // (Orbit's own: its setup, before it's added. Optional: the steps work as they are.)
+      as?.more || null,
       spot ? tapPicture(spot, tap) : null,
       node('ol', { class: 'q-steps q-install-steps' }, steps.map(stepItem)),
       node('p', { class: 'q-gate-note', text: already })

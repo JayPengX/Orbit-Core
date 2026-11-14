@@ -2,6 +2,9 @@
 <html lang="zh-Hant" data-look="native">
 <head>
 <meta charset="utf-8" />
+<!-- (Orbit puts the app in use in the address, /sports/ or /, docs/ORBIT.md:
+     this page's own files are kept at its own folder all the same.) -->
+<script>document.write('<base href="' + location.pathname.replace(/[^/]*$/, '') + '">')</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>Orbit</title>
 <meta name="description" content="Orbit 的每個 App 都在一個圖示裡：登入一次，App 之間切換、返回都在原地。" />
@@ -16,6 +19,32 @@
 <link rel="manifest" href="./manifest.webmanifest" />
 <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+<!-- Which Orbit this is (kit/orbit-mine.mjs): the tag in the address the
+     home-screen icon opens (/app/?o=<tag>), kept for this window. Its name
+     and icon go into the page before anything else reads it, so Add to Home
+     Screen (and Chrome's install) take that Orbit's: its manifest is the
+     proxy's, read from the tag (orbit-manifest.js). -->
+<script>
+!function () {
+  try {
+    var ss = sessionStorage, m = /[?&]o=([A-Za-z0-9_-]+)/.exec(location.search), tag = m ? m[1] : /[?&]o=/.test(location.search) ? '' : ss.getItem('orbit.which') || '';
+    if (tag) ss.setItem('orbit.which', tag); else ss.removeItem('orbit.which');
+    window.ORBIT_TAG = tag;
+    if (!tag) return;
+    var x = JSON.parse(decodeURIComponent(escape(atob(tag.replace(/-/g, '+').replace(/_/g, '/')))));
+    var name = String(x.n || 'Orbit').slice(0, 20), look = /^[a-z-]+$/.test(x.l || '') ? x.l : 'night';
+    // (An app's own look is its icon: kit/brand.mjs slugs.)
+    var slug = { match: 'sports', orbit: 'class', vocab: 'words', stock: 'securities' }, app = /^app-([a-z]+)$/.exec(look);
+    var apple = app ? '/' + (slug[app[1]] || app[1]) + '/icons/apple-touch-icon.png' : '/app/looks/' + look + '/apple.png';
+    var set = function (sel, attr, v) { var el = document.querySelector(sel); if (el) el.setAttribute(attr, v); };
+    set('link[rel="manifest"]', 'href', '/api/orbit-manifest?o=' + tag);
+    set('link[rel="apple-touch-icon"]', 'href', apple);
+    set('meta[name="apple-mobile-web-app-title"]', 'content', name);
+    set('meta[name="application-name"]', 'content', name);
+    document.title = name;
+  } catch (e) {}
+}();
+</script>
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="Orbit" />
 <meta property="og:title" content="Orbit" />
@@ -118,6 +147,48 @@
   /* (Drawn beneath the app shown till it has painted: kit suite.mjs raise.) */
   .q-suite-frame.q-suite-under { z-index: 0; visibility: visible; opacity: 1; transform: none; transition: none; }
   @media (prefers-reduced-motion: reduce) { .q-suite-frame, .q-suite-frame.q-suite-shown { transition: none; transform: none; } }
+  /* ---- Setup, before Orbit is added (optional): the gate's box swaps to it ---- */
+  .o-custom { display: flex; align-items: center; gap: 12px; width: 100%; margin: 4px 0 14px; padding: 12px 14px; border: 0; border-radius: 14px; background: var(--q-fill, rgba(120, 120, 128, 0.12)); color: var(--q-label); font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .o-custom:active { opacity: 0.6; }
+  .o-custom-text { display: grid; gap: 2px; flex: 1; min-width: 0; }
+  .o-custom-text strong { font: 600 16px/1.3 var(--q-font); }
+  .o-custom-text small { color: var(--q-label-2); font: 400 13px/1.35 var(--q-font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .o-custom-go { flex: none; width: 8px; height: 8px; margin-right: 4px; border: solid var(--q-label-3, #8e8e93); border-width: 2px 2px 0 0; transform: rotate(45deg); }
+  .q-gate-box.o-setting > :not(.o-setup) { display: none !important; }
+  .q-gate-box.o-setting { text-align: left; }
+  .o-setup { display: grid; gap: 0; width: 100%; }
+  .o-setup-bar { position: sticky; top: calc(-1 * max(28px, env(safe-area-inset-top))); z-index: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin: -4px -20px 8px; padding: max(28px, env(safe-area-inset-top)) 20px 6px; margin-top: calc(-1 * max(28px, env(safe-area-inset-top))); background: color-mix(in srgb, var(--q-page) 82%, transparent); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+  .o-setup-bar h2 { margin: 0; color: var(--q-label); font: 600 17px/1.3 var(--q-font); text-align: center; }
+  .o-setup-bar button { padding: 8px 4px; border: 0; background: none; color: var(--q-accent, #4f46e5); font: 400 17px/1.3 var(--q-font); cursor: pointer; }
+  .o-setup-bar .o-cancel { justify-self: start; }
+  .o-setup-bar .o-done { justify-self: end; font-weight: 600; }
+  /* (The icon as the home screen will show it, its name under it.) */
+  .o-preview { display: grid; justify-items: center; gap: 8px; margin: 4px 0 6px; padding: 22px 0 18px; border-radius: 20px; background: radial-gradient(120% 90% at 30% 0%, #6b6bd6 0%, #2b2a6b 55%, #14123a 100%); }
+  .o-preview-icon { width: 76px; height: 76px; border-radius: 17px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
+  .o-preview-name { max-width: 90%; color: #fff; font: 500 13px/1.2 var(--q-font); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .o-head { margin: 18px 2px 8px; color: var(--q-label); font: 600 17px/1.3 var(--q-font); }
+  .o-sub { margin: 12px 2px 8px; color: var(--q-label-2); font: 500 13px/1.3 var(--q-font); }
+  .o-note { margin: -4px 2px 10px; color: var(--q-label-2); font: 400 14px/1.4 var(--q-font); }
+  .o-name { box-sizing: border-box; width: 100%; padding: 12px 14px; border: 0; border-radius: 12px; background: var(--q-fill, rgba(120, 120, 128, 0.12)); color: var(--q-label); font: 400 17px/1.3 var(--q-font); }
+  .o-name:focus { outline: 2px solid var(--q-accent, #4f46e5); outline-offset: 0; }
+  .o-apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 8px 4px; }
+  .o-app { position: relative; display: grid; justify-items: center; gap: 5px; padding: 6px 0 4px; border: 0; border-radius: 14px; background: none; color: var(--q-label); font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .o-app img.o-app-icon { width: 52px; height: 52px; border-radius: 12px; transition: opacity 0.15s ease, filter 0.15s ease; }
+  .o-app-name { max-width: 100%; font: 400 12px/1.2 var(--q-font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .o-app[aria-pressed='false'] img.o-app-icon { opacity: 0.35; filter: grayscale(0.9); }
+  .o-app[aria-pressed='false'] .o-app-name { color: var(--q-label-3, #8e8e93); }
+  .o-check { position: absolute; top: 2px; left: calc(50% + 16px); width: 20px; height: 20px; border-radius: 50%; background: var(--q-accent, #4f46e5); box-shadow: 0 0 0 2px var(--q-surface, #fff); }
+  .o-check::after { content: ''; position: absolute; left: 7px; top: 4px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  .o-app[aria-pressed='false'] .o-check { display: none; }
+  .o-look-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 10px; }
+  .o-look { display: grid; place-items: center; aspect-ratio: 1; padding: 3px; border: 0; border-radius: 16px; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .o-look img { width: 100%; height: 100%; border-radius: 12px; }
+  .o-look[aria-checked='true'] { box-shadow: 0 0 0 2.5px var(--q-accent, #4f46e5); }
+  .o-finish { margin-top: 22px; }
+  .o-reset { margin: 10px auto 0; padding: 10px; border: 0; background: none; color: var(--q-label-2); font: 400 15px/1.3 var(--q-font); cursor: pointer; }
+  .door-edit { display: block; margin: 4px auto 0; padding: 12px; border: 0; background: none; color: var(--q-accent); font: 400 16px/1.3 var(--q-font); cursor: pointer; }
+  .o-sheet .o-apps { margin-bottom: 8px; }
+  .o-foot { padding: 0 16px calc(env(safe-area-inset-bottom) + 12px); }
   @media (prefers-color-scheme: dark) { .door { --q-accent: #6d66f0; } html.q-suite-host, html.q-suite-host body { background: var(--q-page, #000); } }
 </style>
 </head>
@@ -126,6 +197,14 @@
 <div class="q-suite-frames" id="frames"></div>
 <script type="module">
   const [{ installGate, isPhoneOrTablet, isStandalone, detectLang, storedAccount, orbitSession, accountSheet, signInScreen }, ui, { APP_ORDER, BRANDS, appIcon, pathOf }, suite] = await Promise.all([import('#kit/orbit.mjs'), import('#kit/ui.mjs'), import('#kit/brand.mjs'), import('#kit/suite.mjs')]);
+  const brand = await import('#kit/brand.mjs');
+  // This Orbit (kit/orbit-mine.mjs): its name, look and apps. (An older kit without it: every app, as before.)
+  const mine = await import('#kit/orbit-mine.mjs').catch(() => null);
+  const tag = window.ORBIT_TAG || '';
+  const setup = mine?.setupOf ? mine.setupOf(tag) : { name: 'Orbit', apps: [...APP_ORDER], look: 'night' };
+  const myApps = () => (mine?.appsOf ? mine.appsOf(tag) : [...APP_ORDER]);
+  const lookSrc = look => `data:image/svg+xml,${encodeURIComponent(brand.orbitIcon ? brand.orbitIcon(look) : brand.familyMark())}`;
+  const myIcon = lookSrc(setup.look);
   const lang = detectLang();
   const en = lang === 'en';
   if (en) document.documentElement.lang = 'en';
@@ -144,7 +223,7 @@
     try {
       sessionStorage.setItem('orbit.launch', String(Date.now()));
     } catch {}
-    held = suite.host(document.getElementById('frames'), { first: { ...first, app }, list: () => showList() });
+    held = suite.host(document.getElementById('frames'), { first: { ...first, app }, list: () => (myApps().length === 1 ? openApp(myApps()[0]) : showList()), onShow: id => addressOf(id), mine: myApps });
   };
   // The list of apps, the one used last on top (over the apps held, on a return).
   const icon = id => Object.assign(document.createElement('img'), { className: 'door-icon', src: `data:image/svg+xml,${encodeURIComponent(appIcon(id, { crisp: true }))}`, alt: '' });
@@ -156,10 +235,11 @@
   // circling its mark: what one Pass opens. No pass is made here: the owner
   // hands them out (eco.js ecoCreate), so the screen says where to get one.
   const orbitRing = () => {
-    const ring = ui.h('div', { class: 'door-ring', 'aria-hidden': 'true' }, [ui.h('img', { class: 'door-ring-core', src: './favicon.svg', alt: '' }), ui.h('div', { class: 'door-ring-path' })]);
+    const ring = ui.h('div', { class: 'door-ring', 'aria-hidden': 'true' }, [ui.h('img', { class: 'door-ring-core', src: myIcon, alt: '' }), ui.h('div', { class: 'door-ring-path' })]);
     const spin = ui.h('div', { class: 'door-ring-spin' });
-    APP_ORDER.forEach((id, i) => {
-      const at = ui.h('span', { class: 'door-ring-at', style: `--a:${(360 / APP_ORDER.length) * i}deg` });
+    const ringApps = myApps();
+    ringApps.forEach((id, i) => {
+      const at = ui.h('span', { class: 'door-ring-at', style: `--a:${(360 / ringApps.length) * i}deg` });
       at.append(Object.assign(icon(id), { className: 'door-ring-icon' }));
       spin.append(at);
     });
@@ -167,7 +247,7 @@
     return ring;
   };
   function showSignIn(then) {
-    session ||= orbitSession(suite.lastApp?.(suite.savedSuite()) || APP_ORDER[0], { lang });
+    session ||= orbitSession(suite.lastApp?.(suite.savedSuite()) || myApps()[0], { lang });
     let over = false;
     const go = () => {
       if (over) return;
@@ -180,7 +260,7 @@
     const wait = setInterval(() => signedIn() && go(), 500);
     if (signInScreen) {
       door.hidden = true;
-      signInScreen(session, { hero: orbitRing(), title: 'Orbit', lede: W('十個 App，一個 Orbit Pass。', 'Ten apps, one Orbit Pass.'), accent: '#5e5ce6' }).then(go, () => {});
+      signInScreen(session, { hero: orbitRing(), title: setup.name, lede: W('十個 App，一個 Orbit Pass。', 'Ten apps, one Orbit Pass.'), accent: '#5e5ce6' }).then(go, () => {});
       return;
     }
     // (An older kit, without the sign-in on its own: its Pass sheet, as before.)
@@ -221,10 +301,12 @@
       .filter(([id, v]) => BRANDS[id] && Number(v?.t) && now - Number(v.t) < 14 * 86_400_000)
       .sort((a, b) => Number(b[1].t) - Number(a[1].t))
       .map(([id]) => id);
-    const first = [...live].find(id => BRANDS[id]) || used[0] || null;
-    const recent = used.filter(id => id !== first).slice(0, 3);
-    const rest = APP_ORDER.filter(id => id !== first && !recent.includes(id));
-    const head = ui.h('header', { class: 'door-head' }, [ui.h('img', { src: './favicon.svg', alt: '' }), ui.h('div', {}, [ui.h('h1', { text: 'Orbit' }), ui.h('p', { text: dayLine() })])]);
+    // (This Orbit's apps only, and anything under way in another.)
+    const apps = myApps();
+    const first = [...live].find(id => BRANDS[id]) || used.find(id => apps.includes(id)) || null;
+    const recent = used.filter(id => id !== first && apps.includes(id)).slice(0, 3);
+    const rest = apps.filter(id => id !== first && !recent.includes(id));
+    const head = ui.h('header', { class: 'door-head' }, [ui.h('img', { src: myIcon, alt: '' }), ui.h('div', {}, [ui.h('h1', { text: setup.name }), ui.h('p', { text: dayLine() })])]);
     const row = id =>
       ui.h('button', { class: 'door-row', type: 'button', style: `--app:${BRANDS[id].color}`, onclick: () => (live.has(id) ? openLive(id) : openApp(id)) }, [
         icon(id),
@@ -243,16 +325,151 @@
           ui.h('span', { class: 'door-go', 'aria-hidden': 'true' }),
         ])
       : ui.h('p', { class: 'door-lead', text: W('選一個開始，下次打開會接著用。', 'Pick one to start; next time Orbit picks up there.') });
-    door.replaceChildren(...[head, hero, group(W('最近', 'Recent'), recent), group(first || recent.length ? W('其他 App', 'More apps') : '', rest)].filter(Boolean));
+    const edit = mine?.setApps ? ui.h('button', { class: 'door-edit', type: 'button', text: W('選擇這個 Orbit 裡的 App', 'Choose the apps in this Orbit'), onclick: () => editApps() }) : null;
+    door.replaceChildren(...[head, hero, group(W('最近', 'Recent'), recent), group(first || recent.length ? W('其他 App', 'More apps') : '', rest), edit].filter(Boolean));
+    if (held) addressOf(null);
     door.classList.toggle('over', !!held);
     door.hidden = false;
     door.scrollTop = 0;
   }
+  // The address says the app in use, or / for Orbit's home (Jay 2026-11-14:
+  // "can't an orbit just go /sports when they switch to sports"): this page
+  // stays, only its address changes. A reload there comes back into this
+  // Orbit (kit suite.mjs start, orbit.addr; the home page forwards an
+  // installed app's window here).
+  const onDomain = (await import('#kit/domain.mjs').catch(() => ({}))).onDomain;
+  function addressOf(id) {
+    if (!onDomain) return;
+    const to = id ? pathOf(id) : '/';
+    try {
+      sessionStorage.setItem('orbit.addr', to);
+      if (location.pathname !== to) history.replaceState(history.state, '', to);
+    } catch {}
+    document.title = setup.name;
+  }
+
+  // Which apps are in this Orbit, changed inside it (kit orbit-mine.mjs setApps; the Pass keeps it too).
+  function appTiles(chosen, onChange) {
+    const grid = ui.h('div', { class: 'o-apps', role: 'group', 'aria-label': W('App', 'Apps') });
+    for (const id of APP_ORDER) {
+      const b = ui.h('button', { class: 'o-app', type: 'button', 'aria-pressed': String(chosen.has(id)), style: `--app:${BRANDS[id].color}` }, [Object.assign(icon(id), { className: 'o-app-icon' }), ui.h('span', { class: 'o-app-name', text: BRANDS[id].short }), ui.h('span', { class: 'o-check', 'aria-hidden': 'true' })]);
+      b.onclick = () => {
+        // (At least one app: the last one stays.)
+        if (chosen.has(id) && chosen.size === 1) return;
+        chosen.has(id) ? chosen.delete(id) : chosen.add(id);
+        b.setAttribute('aria-pressed', String(chosen.has(id)));
+        onChange?.();
+      };
+      grid.append(b);
+    }
+    return grid;
+  }
+  function editApps() {
+    const chosen = new Set(myApps());
+    const done = ui.h('button', { class: 'q-btn primary block', type: 'button', text: W('完成', 'Done') });
+    const s = ui.sheet({ title: W('這個 Orbit 裡的 App', 'Apps in this Orbit'), cls: 'o-sheet', body: [ui.h('p', { class: 'o-note', text: W('選一個，打開就直接是那個 App。名稱和圖示在加入主畫面時就定好了。', 'Pick one and Orbit opens straight into it. The name and icon were set when it was added.') }), appTiles(chosen)], foot: ui.h('div', { class: 'o-foot' }, [done]) });
+    done.onclick = () => {
+      mine.setApps(tag, [...chosen]);
+      s.close?.();
+      showList();
+    };
+  }
+  // (Changed on another device, through the Pass: drawn again.)
+  addEventListener('orbit-mine', () => !door.hidden && showList());
+  addEventListener('storage', e => e.key === mine?.MINE_KEY && !door.hidden && showList());
+
+  // ---- Before it's added: the steps, and setup (optional) ----
+  // Jay 2026-11-14: decide which apps are in the Orbit and pick its icon
+  // before adding it, "plenty to choose from", but never required: the steps
+  // work at once for every app, the name Orbit, the first look. Setup swaps
+  // the gate's box for its own panel; 完成 opens this page again with the
+  // new tag, so the phone takes that name and icon (the head's script).
+  function setupPanel(box) {
+    const plainName = apps => (apps.size === 1 ? BRANDS[[...apps][0]].short : 'Orbit');
+    const chosen = new Set(setup.apps);
+    let look = setup.look;
+    let lookPicked = !!tag && look !== (mine.defaultLook?.([...chosen]) ?? look);
+    let named = !!tag && setup.name !== plainName(chosen);
+    const preview = ui.h('img', { class: 'o-preview-icon', alt: '' });
+    const label = ui.h('span', { class: 'o-preview-name' });
+    const name = ui.h('input', { class: 'o-name', type: 'text', maxlength: String(mine.NAME_MAX || 20), enterkeyhint: 'done', autocomplete: 'off', 'aria-label': W('名稱', 'Name') });
+    name.value = setup.name;
+    const looks = ui.h('div', { class: 'o-looks', role: 'radiogroup', 'aria-label': W('圖示', 'Icon') });
+    const lookButtons = new Map();
+    const draw = () => {
+      if (!named) name.value = plainName(chosen);
+      if (!lookPicked) look = mine.defaultLook([...chosen]);
+      preview.src = lookSrc(look);
+      label.textContent = name.value.trim() || plainName(chosen);
+      for (const [l, b] of lookButtons) b.setAttribute('aria-checked', String(l === look));
+    };
+    name.addEventListener('input', () => ((named = name.value.trim() !== ''), draw()));
+    name.addEventListener('keydown', e => e.key === 'Enter' && name.blur());
+    const lookGroup = (title, list) => {
+      const g = ui.h('div', { class: 'o-look-grid' });
+      for (const l of list) {
+        const b = ui.h('button', { class: 'o-look', type: 'button', role: 'radio', 'aria-label': brand.lookName(l, lang), title: brand.lookName(l, lang) }, [ui.h('img', { src: lookSrc(l), alt: '', loading: 'lazy' })]);
+        b.onclick = () => ((look = l), (lookPicked = true), draw());
+        lookButtons.set(l, b);
+        g.append(b);
+      }
+      return [ui.h('h4', { class: 'o-sub', text: title }), g];
+    };
+    const LOOKS = brand.LOOKS || [];
+    looks.append(...lookGroup(W('彩色衛星', 'Coloured moons'), LOOKS.filter(l => !brand.lookApp(l) && !/-white$/.test(l))), ...lookGroup(W('白色衛星', 'White moons'), LOOKS.filter(l => /-white$/.test(l))), ...lookGroup(W('App 的圖示', 'An app’s icon'), LOOKS.filter(l => brand.lookApp(l))));
+    const finish = () => {
+      const next = mine.encodeSetup({ name: name.value.trim() || plainName(chosen), apps: [...chosen], look });
+      try {
+        if (!next) sessionStorage.removeItem('orbit.which');
+      } catch {}
+      location.replace(mine.startOf(next) + (next ? '' : '?o='));
+    };
+    const reset = ui.h('button', { class: 'o-reset', type: 'button', text: W('還原成預設：全部 App', 'Back to the default: every app'), onclick: () => (chosen.clear(), APP_ORDER.forEach(id => chosen.add(id)), (named = false), (lookPicked = false), panel.querySelectorAll('.o-app').forEach(b => b.setAttribute('aria-pressed', 'true')), draw()) });
+    const panel = ui.h('div', { class: 'o-setup' }, [
+      ui.h('div', { class: 'o-setup-bar' }, [ui.h('button', { class: 'o-cancel', type: 'button', text: W('取消', 'Cancel'), onclick: () => box.classList.remove('o-setting') }), ui.h('h2', { text: W('自訂 Orbit', 'Customize Orbit') }), ui.h('button', { class: 'o-done', type: 'button', text: W('完成', 'Done'), onclick: finish })]),
+      ui.h('div', { class: 'o-preview' }, [preview, label]),
+      ui.h('h3', { class: 'o-head', text: W('名稱', 'Name') }),
+      name,
+      ui.h('h3', { class: 'o-head', text: W('App', 'Apps') }),
+      ui.h('p', { class: 'o-note', text: W('只選一個，就是只有那個 App 的 Orbit。主畫面可以放好幾個 Orbit。', 'Pick just one for an Orbit of that app alone. A home screen can hold several Orbits.') }),
+      appTiles(chosen, draw),
+      ui.h('h3', { class: 'o-head', text: W('圖示', 'Icon') }),
+      looks,
+      ui.h('button', { class: 'q-btn primary block o-finish', type: 'button', text: W('完成', 'Done'), onclick: finish }),
+      reset
+    ]);
+    draw();
+    return panel;
+  }
+
   if (!window.ORBIT_FIRST && isPhoneOrTablet() && !isStandalone()) {
-    installGate('suite', lang, { name: 'Orbit', color: '#4f46e5', icon: './favicon.svg' });
+    // (Set up already: what was picked, and a way back to it.)
+    const picked = tag ? `${setup.apps.length === APP_ORDER.length ? W('全部 App', 'Every app') : setup.apps.map(id => BRANDS[id].short).join('、')}` : '';
+    // (A one-app Orbit a separate app sent here, as it came: nothing chosen yet.)
+    const asIs = !!tag && !!mine?.cleanSetup && JSON.stringify(mine.cleanSetup({ apps: setup.apps })) === JSON.stringify(setup);
+    const more = mine?.encodeSetup && brand.LOOKS
+      ? ui.h('button', { class: 'o-custom', type: 'button' }, [ui.h('span', { class: 'o-custom-text' }, [ui.h('strong', { text: tag && !asIs ? W('已自訂', 'Customized') : W('自訂名稱、App 和圖示', 'Choose its name, apps and icon') }), ui.h('small', { text: tag ? picked : W('可以不用，直接加入就是全部 App', 'Optional: added as it is, it holds every app') })]), ui.h('span', { class: 'o-custom-go', 'aria-hidden': 'true' })])
+      : null;
+    installGate('suite', lang, { name: setup.name, color: brand.lookApp?.(setup.look) ? brand.lookColor(setup.look) : '#5e5ce6', icon: myIcon, more });
+    if (more) {
+      more.onclick = () => {
+        const box = more.closest('.q-gate-box');
+        if (!box) return;
+        box.querySelector('.o-setup')?.remove();
+        box.append(setupPanel(box));
+        box.classList.add('o-setting');
+        box.scrollTop = 0;
+        box.closest('dialog')?.scrollTo?.(0, 0);
+      };
+      if (/#setup\b/.test(location.hash)) more.onclick();
+    }
+    // (The address keeps its tag here, on the add page alone: a phone that
+    // takes the page's address rather than the manifest's start at Add to
+    // Home Screen still gets this Orbit, and a reload keeps the setup.)
   } else {
     suite.markSuite();
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+    document.title = setup.name;
     // Opened after it was closed (no trail in this window yet), as an app
     // opens: the list, every app at its start, unless something is live
     // (Jay 2026-11-13: "keep where I was even if I closed it? weird"). A
@@ -273,9 +490,14 @@
     }
     const go = () => {
       const pick = /[?&#]pick\b/.test(location.href);
-      const first = window.ORBIT_FIRST || (pick ? null : suite.launchTarget?.(suite.savedSuite(), suite.liveSaved?.() || {}, Date.now(), fresh ? 0 : undefined) || null);
+      const apps = myApps();
+      let first = window.ORBIT_FIRST || (pick ? null : suite.launchTarget?.(suite.savedSuite(), suite.liveSaved?.() || {}, Date.now(), fresh ? 0 : undefined) || null);
+      // (Another Orbit's app, on a phone whose Orbits share storage: this one's home instead, unless it's under way.)
+      if (first && !window.ORBIT_FIRST && !apps.includes(suite.appAt?.(new URL(first.url, location.href).pathname)) && !(suite.liveNow?.(suite.liveSaved?.() || {}) || []).some(x => first.url?.startsWith(pathOf(x.app)))) first = null;
+      // (A one-app Orbit: that app, always.)
+      if (!first && apps.length === 1) first = { url: suite.resumeOf(suite.savedSuite(), apps[0]).url, y: 0 };
       if (first) hold(first);
-      else showList();
+      else (showList(), addressOf(null));
     };
     if (signedIn()) go();
     else showSignIn(go);
