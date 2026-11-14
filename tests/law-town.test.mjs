@@ -35,6 +35,19 @@ test('town: one member’s turns, numbered; a point stays only on turns it was g
   assert.equal(out.covered, true);
 });
 
+test('town: a recording made into text (asr:<recording>) is asked the same way, the model told it may be misheard', () => {
+  const ok = { mode: 'town', tc: '10010050', file: 't22-8r', url: 'asr:1KMmP8scLCErpjxOg93hB40lexfhIGdFX', n: 0 };
+  assert.equal(townAsk(ok), true);
+  for (const url of ['asr:../x', 'asr:', 'asr:short', 'asr:1KMmP8scLCErpjxOg93hB40lexfhIGdFX.pdf']) assert.equal(townAsk({ ...ok, url }), false, url);
+  const heard = { ...paper, machine: 1, turns: [paper.turns[0], { w: '', r: '代表', t: '仁義市場整建期間' }, { w: '', r: '', t: '早上8點到晚上8點有管制' }], asks: [{ w: '', from: 1, to: 2 }] };
+  const got = townTurns(heard, 0);
+  const prompt = townPrompt('民雄鄉民代表會', got.ask, got.rows, 'zh', true);
+  assert.match(prompt, /machine transcript/);
+  assert.match(prompt, /one member, a member,/);
+  assert.match(prompt, /\[turn "2"\] （不確定是誰）/);
+  assert.doesNotMatch(townPrompt('竹北', townTurns(paper, 0).ask, townTurns(paper, 0).rows, 'zh'), /machine/);
+});
+
 // mode 'paper': one part of a paper (施政報告, an office's 工作報告), its characters from … to.
 import { paperAsk, checkPaper } from '../law-town.js';
 test('paper: the ask is a township, its session file, a government PDF and a range of its text', () => {
