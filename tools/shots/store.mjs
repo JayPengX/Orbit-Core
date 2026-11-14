@@ -14,7 +14,9 @@
 // confident and carrying a real number where one sells (counted from the data, rounded so it
 // stays true). Every shot shows different content (another story, game, stock, word); one shot
 // per feature; Orbit AI at most once, only where it is central; never a competitor's name.
-// One look per set (light; Beats dark), never light and dark mixed. Nothing half-empty, cut by
+// One look per set, the app's own dark (Jay 11-14; `dark: false` for a light one), never light and
+// dark mixed. Six a set, so the README's rows of three come out whole: four on a phone, one on an
+// iPad and one on a computer (`device`, Jay 11-14), the big two in the middle column. Nothing half-empty, cut by
 // the tab bar, loading, showing zeros or NT$0, or another language's headlines (Jay 11-13).
 import { tap, wait } from './pages.mjs';
 
@@ -67,11 +69,11 @@ export const STORE = {
     app: 'transit', brand: 'transit', show: 'transit', prefix: 'transit', args: ['--google-map'],
     shots: [
       { zh: '火車、公車、YouBike，一次排好', en: 'Train, bus and YouBike in one plan', args: [...MORNING, ...click(...trip('高雄車站'), toTop("[...document.querySelectorAll('h1,h2,h3,header *')].find(b=>b.offsetParent&&/^(路線|Directions)$/.test(b.textContent.trim()))", 20), wait(1000))] },
-      { zh: '每個車站的下一班，即時', en: 'Every station’s next train, live', args: click(search('板橋'), wait(8000), firstStation, wait(9000)) },
+      { zh: '每個車站的下一班，即時', en: 'Every station’s next train, live', device: 'computer', args: click(search('板橋'), wait(8000), firstStation, wait(9000)) },
       { zh: '兩站之間，每一班車', en: 'Every train between two stations', args: [...MORNING, ...TAIPEI, ...click('#tab-times', wait(3000), station('from', '臺北'), wait(1500), station('to', '花蓮'), wait(7000))] },
       { zh: '公車還要等幾分鐘', en: 'Minutes until your bus', args: [...TAIPEI, ...click('#tab-times', wait(2500), busRoute('307'), wait(6000))] },
-      { zh: 'YouBike 車位，即時', en: 'YouBike docks, live', args: ['--geo', '25.0330,121.5434', ...click(wait(6000), bikeDock, "js:(e=>{if(!e)return;for(const t of ['pointerdown','mousedown','pointerup','mouseup','click'])e.dispatchEvent(new MouseEvent(t,{bubbles:true}))})(document.getElementById('shot-target'))", wait(4000))] },
-      { zh: '全台捷運，照真的路線畫', en: 'Every metro, drawn true to its lines', page: 'metro-full', wait: 8000 }
+      { zh: '全台捷運，照真的路線畫', en: 'Every metro, drawn true to its lines', device: 'tablet', page: 'metro-full', wait: 8000 },
+      { zh: 'YouBike 車位，即時', en: 'YouBike docks, live', args: ['--geo', '25.0330,121.5434', ...click(wait(6000), bikeDock, "js:(e=>{if(!e)return;for(const t of ['pointerdown','mousedown','pointerup','mouseup','click'])e.dispatchEvent(new MouseEvent(t,{bubbles:true}))})(document.getElementById('shot-target'))", wait(4000))] }
     ]
   },
   // Everything you can watch in Taiwan, with where to watch it. No AI shot (Jay 11-12: not what Sports is for).
@@ -79,12 +81,11 @@ export const STORE = {
     app: 'sports', brand: 'match', show: 'sports', prefix: 'sports', account: 'fan',
     shots: [
       { zh: '你的比賽，一打開就看到', en: 'Your games, the moment you open it', wait: 14000 },
-      { zh: '台灣轉播的 15 項賽事，全在這', en: 'All 15 competitions on TV in Taiwan', args: click('#tab-matches', wait(5000), "js:[...document.querySelectorAll('[data-day]')].filter(e=>e.offsetParent&&/^(明天|Tmrw)/.test(e.textContent.trim())).forEach(e=>e.click())", wait(5000)), wait: 8000 },
+      { zh: '台灣轉播的 15 項賽事，全在這', en: 'All 15 competitions on TV in Taiwan', device: 'computer', args: click('#tab-matches', wait(5000), "js:[...document.querySelectorAll('[data-day]')].filter(e=>e.offsetParent&&/^(明天|Tmrw)/.test(e.textContent.trim())).forEach(e=>e.click())", wait(5000)), wait: 8000 },
       { zh: '每場比賽在哪一台播，一次看', en: 'Every game, and the channel it’s on', page: 'guide', args: click("js:[...document.querySelectorAll('dialog.q-sheet[open] button')].filter(e=>e.offsetParent&&/^(明天|Tmrw)/.test(e.textContent.trim())).pop()?.click()", wait(4000)) },
       { zh: '勝率走勢與關鍵時刻', en: 'How the game swung, and when', args: click('#tab-matches', '[data-league=nba]', wait(2500), yesterday, wait(3000), closeNba, wait(8000), sheetCard('勝率走勢|Win probability'), wait(1500)) },
-      { zh: '積分榜與爭冠形勢', en: 'The table and the title race', page: 'epl-table' },
-      { zh: '每位球員的數據，一頁看完', en: 'Every player’s numbers on one page', page: 'player-ohtani-overview', wait: 10000 },
-      { zh: 'F1 每一站，倒數到起跑', en: 'Every F1 weekend, counted down', page: 'f1-next', args: click("js:[...document.querySelectorAll('dialog.q-sheet[open]')].pop().scrollTop=0", wait(800)) }
+      { zh: '積分榜與爭冠形勢', en: 'The table and the title race', device: 'tablet', page: 'epl-table' },
+      { zh: '每位球員的數據，一頁看完', en: 'Every player’s numbers on one page', page: 'player-ohtani-overview', wait: 10000 }
     ]
   },
   // One forecast for your township, blended from several sources, rain in plain words.
@@ -92,9 +93,10 @@ export const STORE = {
     app: 'weather', brand: 'weather', show: 'weather', prefix: 'weather', account: 'pins',
     shots: [
       { zh: '你所在的鄉鎮，天氣一眼看完', en: 'Your township’s weather, in one look', wait: 16000 },
-      { zh: '未來十天，哪天會下雨', en: 'Which of the next ten days it rains', page: 'rain', wait: 9000 },
-      { zh: '每小時的溫度與降雨', en: 'Every hour’s temperature and rain', page: 'day', wait: 16000 },
+      { zh: '在電腦上，一整天一頁看完', en: 'On a computer, the whole day on one page', device: 'computer', wait: 16000 },
       { zh: '穿什麼、帶不帶傘，直接說', en: 'What to wear, umbrella or not', args: click(wait(2500), toTop("document.querySelector('.ot-advice')", 70), wait(1000)), wait: 9000 },
+      { zh: '未來十天，哪天會下雨', en: 'Which of the next ten days it rains', page: 'rain', wait: 9000 },
+      { zh: '每小時的溫度與降雨', en: 'Every hour’s temperature and rain', device: 'tablet', page: 'day', wait: 16000 },
       { zh: '空氣品質，每小時都看得到', en: 'Air quality, hour by hour', page: 'air', wait: 9000 }
     ]
   },
@@ -104,10 +106,11 @@ export const STORE = {
     // Mid-morning on a school day; the flight on the real clock (planes flying now).
     shots: [
       { zh: '現在上什麼、還剩幾分鐘', en: 'What’s on now, and how long is left', args: SCHOOL },
-      { zh: '整週課表，單雙週都對', en: 'Your whole week, odd and even weeks', hash: 'week', args: SCHOOL },
+      { zh: '整週課表，單雙週都對', en: 'Your whole week, odd and even weeks', device: 'computer', hash: 'week', args: SCHOOL },
       { zh: '考前讀書計畫，照範圍排好', en: 'A study plan for every exam', page: 'study', args: SCHOOL },
       { zh: '調課，幾秒完成', en: 'Swap a class in seconds', page: 'swap', args: SCHOOL },
-      { zh: '跟著一班真的飛機專注', en: 'Focus along a real flight', page: 'flight', args: click('.cx-fl-pick', wait(10000)), wait: 8000 }
+      { zh: '跟著一班真的飛機專注', en: 'Focus along a real flight', device: 'tablet', page: 'flight', args: click('.cx-fl-pick', wait(10000)), wait: 8000 },
+      { zh: '待辦和作業，跟課表放一起', en: 'To-dos and homework, beside your timetable', page: 'todos', args: SCHOOL }
     ]
   },
   // Logging takes seconds and learns your habits; Taiwan's cards and EasyCard built in.
@@ -115,22 +118,23 @@ export const STORE = {
     app: 'money', brand: 'money', show: 'money', prefix: 'money', account: 'demo',
     shots: [
       { zh: '一整個月，花多少一眼看', en: 'Your month, at a glance' },
+      { zh: '錢花到哪裡，一圈看懂', en: 'Where the money went', device: 'computer', page: 'stats' },
       { zh: '幾秒記一筆，分類自動猜好', en: 'Log in seconds, category guessed', page: 'entry-typed' },
-      { zh: '錢花到哪裡，一圈看懂', en: 'Where the money went', page: 'stats' },
       { zh: '銀行、信用卡、悠遊卡，全都管', en: 'Banks, cards and EasyCard, all in one', hash: 'accts' },
+      { zh: '一整年，每個月比一比', en: 'The whole year, month by month', device: 'tablet', page: 'stats-year' },
       { zh: '問你的帳，答案畫成圖', en: 'Ask your books, see the answer', hash: { zh: 'ask=這個月吃飯花了多少？', en: 'ask=How much did I spend on food this month?' }, ai: [['feature:money-ask', 'money-ask']], args: click(wait(1500), sheetTop, wait(600)), wait: 9000 }
     ]
   },
-  // Every story from all sides: 122 outlets placed by published research. Every shot another story.
+  // Every story from all sides: 118 outlets placed by published research. Every shot another story.
   news: {
     app: 'news', brand: 'news', show: 'news', prefix: 'news',
     shots: [
       { zh: '每則新聞，各家怎麼報一次看', en: 'Every story, as every outlet tells it', wait: 9000 },
-      { zh: '同一件事，偏綠、中間、偏藍怎麼下標', en: 'One story, each side’s headline', args: click("js:[...document.querySelectorAll('.nw-card')].filter(e=>e.offsetParent)[0]?.click()", wait(3000), toTop("[...document.querySelectorAll('dialog[open] .nw-spec')].pop()", 70), wait(1000)), wait: 9000 },
-      { zh: '只有一邊在報的新聞', en: 'The stories only one side carries', hash: 'side', wait: 9000 },
+      { zh: '同一件事，偏綠、中間、偏藍怎麼下標', en: 'One story, each side’s headline', device: 'computer', args: click("js:[...document.querySelectorAll('.nw-card')].filter(e=>e.offsetParent)[0]?.click()", wait(3000), toTop("[...document.querySelectorAll('dialog[open] .nw-spec')].pop()", 70), wait(1000)), wait: 9000 },
+      { zh: '各家的影音新聞，一頁看', en: 'Every outlet’s video news, in one place', hash: 'tw', args: click(wait(2500), tap('影音|Video'), wait(1500)), wait: 9000 },
       { zh: '國際大事，台灣媒體怎麼報', en: 'World news, and how Taiwan reports it', hash: 'intl', args: click(tap('能源|Energy'), wait(2500)), wait: 9000 },
-      { zh: '122 家媒體，立場都有出處', en: '122 outlets, each place sourced', hash: 'outlets', args: click(toTop("[...document.querySelectorAll('h2,h3,.q-section-head,header')].find(e=>e.offsetParent&&/^(台灣媒體|Taiwan’s outlets)/.test(e.textContent.trim()))", 40), wait(800)), wait: 9000 },
-      { zh: '14 個主題，照重要程度排', en: '14 topics, ranked by importance', hash: 'tw', args: click(tap('健康|Health'), wait(2500)), wait: 9000 }
+      { zh: '118 家媒體，立場都有出處', en: '118 outlets, each place sourced', device: 'tablet', hash: 'outlets', args: click(toTop("[...document.querySelectorAll('h2,h3,.q-section-head,header')].find(e=>e.offsetParent&&/^(台灣媒體|Taiwan’s outlets)/.test(e.textContent.trim()))", 40), wait(800)), wait: 9000 },
+      { zh: '14 個主題，照重要程度排', en: '14 topics, ranked by importance', hash: 'tw', args: click(tap('科學|Science'), wait(2500)), wait: 9000 }
     ]
   },
   // The 大考 list taught hard on purpose: your own mix-ups as the wrong options, a memory model decides.
@@ -138,9 +142,10 @@ export const STORE = {
     app: 'words', brand: 'vocab', show: 'words', prefix: 'words', account: 'demo',
     shots: [
       { zh: '今天該背的字，一打開就知道', en: 'Today’s words, the moment you open it', wait: 7000 },
-      { zh: '每題答完，整個字馬上看懂', en: 'Each answer shows you the whole word', page: 'answered', wait: 7000 },
-      { zh: '6,169 個大考單字，真人發音', en: '6,169 exam words, each in a real voice', page: 'word', wait: 7000 },
-      { zh: '8 種練習方式，記得更牢', en: '8 ways to practise', page: 'modes', wait: 7000 },
+      { zh: '6,169 個大考單字，真人發音', en: '6,169 exam words, each in a real voice', device: 'computer', page: 'word', wait: 7000 },
+      { zh: '新字一張一張背，真人唸給你聽', en: 'New words one card at a time, read aloud', page: 'study', wait: 7000 },
+      { zh: '句子填空，在句子裡記字', en: 'Fill in sentences: words in context', page: 'sentence', wait: 7000 },
+      { zh: '8 種練習方式，記得更牢', en: '8 ways to practise', device: 'tablet', page: 'modes', wait: 7000 },
       { zh: '搞混過的字，下次直接提醒你', en: 'Your mix-ups, shown to you next time', page: 'flash', wait: 7000 }
     ]
   },
@@ -148,12 +153,12 @@ export const STORE = {
   beats: {
     app: 'beats', brand: 'beats', show: 'beats', prefix: 'beats',
     shots: [
-      { zh: '手機現做的音樂，首首不重複', en: 'Endless music, made on your phone', dark: true, page: 'now-playing' },
-      { dark: true, zh: '49 種曲風，說想聽什麼就換', en: '49 styles: say what you want to hear', args: { zh: ask('讀書用的 lo-fi'), en: ask('lo-fi to study') } },
-      { dark: true, zh: '喜歡就收藏，首首都有封面', en: 'Keep favorites, each with its own cover', page: 'library-kept' },
-      { dark: true, zh: '在樂器室做節拍', en: 'Make beats in the studio', page: 'studio' },
-      { zh: '打擊墊，隨手即興', en: 'Jam on the pads', dark: true, page: 'jam' },
-      { dark: true, zh: '每首歌都能玩節奏遊戲', en: 'A rhythm game for any song', page: 'game', args: click(wait(14000)) }
+      { zh: '手機現做的音樂，首首不重複', en: 'Endless music, made on your phone', page: 'now-playing' },
+      { zh: '在樂器室做節拍', en: 'Make beats in the studio', device: 'computer', page: 'studio' },
+      { zh: '49 種曲風，說想聽什麼就換', en: '49 styles: say what you want to hear', args: { zh: ask('讀書用的 lo-fi'), en: ask('lo-fi to study') } },
+      { zh: '16 個打擊墊，隨手即興', en: '16 pads to jam on', page: 'jam' },
+      { zh: '喜歡就收藏，首首都有封面', en: 'Keep favorites, each with its own cover', device: 'tablet', page: 'library-kept' },
+      { zh: '每首歌都能玩節奏遊戲', en: 'A rhythm game for any song', page: 'game', args: click(wait(14000)) }
     ]
   },
   // Everything about Taiwan's law in one app, all linked; AI across all of it (Jay 11-12).
@@ -161,11 +166,10 @@ export const STORE = {
     app: 'law', brand: 'law', show: 'law', prefix: 'law',
     shots: [
       { zh: '法律、判決、法案，一個 App 全包', en: 'Laws, rulings and bills, all in one app', wait: 8000 },
-      { zh: '5.4 萬部法規，中央到地方', en: '54,000 laws and rules, national to local', hash: 'tab=laws', wait: 8000 },
-      { zh: '每部法律，連到修法、判決和釋憲', en: 'Every law linked to its bills and rulings', hash: 'law=N0030001', wait: 9000 },
+      { zh: '每部法律，連到修法、判決和釋憲', en: 'Every law linked to its bills and rulings', device: 'computer', hash: 'law=N0030001', wait: 9000 },
       { zh: '4.7 萬則判決，憲法法庭到各級法院', en: '47,000 rulings, from the top court down', hash: 'tab=rulings', wait: 9000 },
       { zh: '白話問，答案附上條文', en: 'Ask in plain words, every point cited', hash: { zh: 'tab=ask&q=網購的東西不想要了，七天內可以退嗎？', en: 'tab=ask&q=Can I return something I bought online within seven days?' }, ai: [['law-chat', 'law-return']], wait: 9000 },
-      { zh: '立法院近 8 千案，走到哪一步', en: 'Nearly 8,000 bills, each one’s stage', hash: 'tab=bills', wait: 8000 },
+      { zh: '立法院近 8 千案，走到哪一步', en: 'Nearly 8,000 bills, each one’s stage', device: 'tablet', hash: 'tab=bills', wait: 8000 },
       { zh: '22 縣市議會和代表會，影音都在', en: 'Every council, down to the townships', hash: 'tab=bills&f=council', args: council('hsq'), wait: 9000 }
     ]
   },
@@ -174,10 +178,11 @@ export const STORE = {
     app: 'securities', brand: 'stock', show: 'securities', prefix: 'securities', account: 'demo',
     shots: [
       { zh: '你的總資產，一眼看', en: 'Everything you own, at a glance', wait: 12000 },
-      { zh: '真實報價與 K 線', en: 'Real prices, real charts', page: 'stock', wait: 12000 },
+      { zh: '真實報價與 K 線', en: 'Real prices, real charts', device: 'computer', page: 'stock', wait: 12000 },
       { zh: '全世界的市場，一個帳戶買', en: 'Every market, one account', args: click('#tab-markets', wait(4000)), wait: 10000 },
       { zh: '市價、限價、停損，像真的券商', en: 'Market, limit and stop orders', args: click(wait(3000), "js:[...document.querySelectorAll('[data-action=open][data-symbol^=\"BTC\"]')].find(e => e.offsetParent)?.click()", wait(3000), '[data-action=trade][data-side=sell]', wait(1500), '[data-action=side][data-side=sell]', wait(800), press('限價|Limit'), wait(1200), press('一半|Half'), wait(1500)), wait: 12000 },
-      { zh: '換匯照銀行牌價', en: 'Exchange at the bank’s rates', page: 'rates', wait: 12000 }
+      { zh: '換匯照銀行牌價', en: 'Exchange at the bank’s rates', device: 'tablet', page: 'rates', wait: 12000 },
+      { zh: '今天誰漲誰跌，一頁看完', en: 'Today’s movers, on one page', page: 'home-lower', wait: 12000 }
     ]
   }
 };
