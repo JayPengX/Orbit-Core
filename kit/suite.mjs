@@ -549,14 +549,37 @@ async function warm() {
   }
 }
 
-// An app's page held in a frame: its own scroll stops at either end, the
-// browser's bounce held and one of our own drawn in its place. On an iPhone a frame's page that bounced past its foot took its
-// fixed tab bar up with it, the black of the frame under (Jay 2026-11-14,
-// Sports 賽事); overscroll-behavior alone isn't kept there. A drag that
-// would only pull the page past an end is held, unless something inside it
-// (a sheet, a list) still has room to scroll that way.
-// past(top, height, view, dy): dy > 0 the finger going down (to the top).
+// An app's page held in a frame on a phone scrolls in its <body>, not the
+// window: an iPhone bounced a framed window whole, its fixed tab bar with it,
+// off the foot with black under (Jay 2026-11-14, Sports, Law, Class; the
+// scroll bar's handle too). A body that scrolls bounces by itself, natively,
+// while what's fixed (the tab bar, the top bar) stays (Jay: "let it be
+// native"). The window's scroll as the apps and the kit read and set it
+// (scrollY, scrollTo, scrollingElement, its scroll event) is the body's.
+// (pastEnd: is a drag of dy (> 0 the finger going down) past an end.)
 export const pastEnd = (top, height, view, dy) => (dy > 0 && top <= 0) || (dy < 0 && top + view >= height - 1);
+function ownScroll(w = globalThis, d = document) {
+  const b = d.body;
+  if (!b || d.documentElement.classList.contains('q-own-scroll')) return;
+  d.documentElement.classList.add('q-own-scroll');
+  const define = (o, k, get) => {
+    try {
+      Object.defineProperty(o, k, { configurable: true, get });
+    } catch {}
+  };
+  define(w, 'scrollY', () => b.scrollTop);
+  define(w, 'pageYOffset', () => b.scrollTop);
+  define(w, 'scrollX', () => b.scrollLeft);
+  define(w, 'pageXOffset', () => b.scrollLeft);
+  define(d, 'scrollingElement', () => b);
+  const to = (x, y) => (typeof x === 'object' && x ? x : { left: x, top: y });
+  w.scrollTo = w.scroll = (x, y) => b.scrollTo(to(x, y));
+  w.scrollBy = (x, y) => b.scrollBy(to(x, y));
+  // (The body's scroll, told as the window's: it doesn't bubble by itself.)
+  b.addEventListener('scroll', e => e.target === b && d.dispatchEvent(new Event('scroll', { bubbles: true })), { passive: true });
+}
+// A sheet open over the page: a swipe in it scrolls the sheet or nothing,
+// never the page behind it (Jay 11-14, the switcher's).
 function roomIn(el, dy, root) {
   for (let n = el; n && n !== root.body && n !== root.documentElement; n = n.parentElement) {
     if (n.scrollHeight <= n.clientHeight + 1) continue;
@@ -565,82 +588,18 @@ function roomIn(el, dy, root) {
   }
   return false;
 }
-function noBounce(root = document) {
+function sheetHold(root = document) {
   let x = 0;
   let y = 0;
-  // The bounce, drawn here instead (Jay 2026-11-14: "find alternative way"):
-  // past an end the app's page (its <main>) follows the finger less and less,
-  // as iOS's rubber band does, and springs back on letting go; the tab bar
-  // and the top bar, outside it, stay where they are.
-  let from = null;
-  let dir = 0;
-  let pull = 0;
-  let page = null;
-  const rubber = d => {
-    const h = globalThis.innerHeight || 800;
-    return Math.sign(d) * (1 - 1 / ((Math.abs(d) * 0.55) / h + 1)) * h;
-  };
-  const set = v => {
-    page ||= root.querySelector('main');
-    if (page) page.style.transform = v ? `translate3d(0, ${Math.round(v * 10) / 10}px, 0)` : '';
-  };
-  const release = () => {
-    const el = page;
-    const was = pull;
-    from = null;
-    pull = 0;
-    if (!el || !was) return;
-    el.style.transform = '';
-    if (typeof el.animate === 'function') el.animate([{ transform: `translate3d(0, ${was}px, 0)` }, { transform: 'none' }], { duration: 480, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' });
-  };
-  root.addEventListener('touchstart', e => {
-    if (e.touches.length !== 1) return;
-    x = e.touches[0].clientX;
-    y = e.touches[0].clientY;
-    from = null;
-    pull = 0;
-    page = null;
-  }, { passive: true });
-  root.addEventListener('touchend', release, { passive: true });
-  root.addEventListener('touchcancel', release, { passive: true });
+  root.addEventListener('touchstart', e => e.touches.length === 1 && ((x = e.touches[0].clientX), (y = e.touches[0].clientY)), { passive: true });
   root.addEventListener(
     'touchmove',
     e => {
-      if (e.touches.length !== 1 || !e.cancelable) return;
-      const at = e.touches[0].clientY;
-      // (Already past an end: the page follows, until the finger goes back the other way.)
-      if (from != null) {
-        const d = at - from;
-        if (Math.sign(d) === dir) {
-          e.preventDefault();
-          pull = rubber(d);
-          return set(pull);
-        }
-        from = null;
-        pull = 0;
-        set(0);
-        return;
-      }
-      const dy = at - y;
-      // (A sheet open over the page: a swipe in it scrolls the sheet or
-      // nothing, never the page behind it, Jay 11-14 the switcher's.)
-      const sheet = e.target.closest?.('dialog[open]');
-      if (sheet) {
-        if (dy && Math.abs(e.touches[0].clientX - x) <= Math.abs(dy) && !roomIn(e.target, dy, root)) e.preventDefault();
-        return;
-      }
-      // (A sideways swipe, a carousel's or a row's, is never held.)
-      if (!dy || Math.abs(e.touches[0].clientX - x) > Math.abs(dy)) return;
-      // (A map, a drawing, a slider: their own drag.)
-      if (e.target.closest?.('.leaflet-container, .maplibregl-map, .gm-style, canvas, input[type=range], [data-own-drag]')) return;
-      const se = root.scrollingElement || root.documentElement;
-      if (!pastEnd(se.scrollTop, se.scrollHeight, globalThis.innerHeight || se.clientHeight, dy) || roomIn(e.target, dy, root)) return;
-      // (The pull-to-refresh at the top is the app's own, drawn by kit ui.mjs: it still runs.)
-      e.preventDefault();
-      from = at;
-      dir = Math.sign(dy);
+      if (e.touches.length !== 1 || !e.cancelable || !e.target.closest?.('dialog[open]')) return;
+      const dy = e.touches[0].clientY - y;
+      if (dy && Math.abs(e.touches[0].clientX - x) <= Math.abs(dy) && !roomIn(e.target, dy, root)) e.preventDefault();
     },
-    { passive: false },
+    { passive: false }
   );
 }
 
@@ -659,7 +618,8 @@ export function start() {
   // (Held by Orbit's window: it keeps the trail; asked to redraw when shown.)
   if (H) {
     globalThis.__orbitSuite = { draw: () => draw(), remember: () => remember(), app };
-    noBounce();
+    if (globalThis.matchMedia?.('(pointer: coarse)').matches) ownScroll();
+    sheetHold();
   }
   // An app page opened as the whole window on a phone (a notice, an old
   // trail): into Orbit's window, which holds it with the others.

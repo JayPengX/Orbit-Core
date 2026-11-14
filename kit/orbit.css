@@ -7443,17 +7443,20 @@ html[data-look='native'] :is(.q-reorder-lift, .q-reorder-land) {
   margin: var(--q-s-5) 0 var(--q-s-3);
 }
 
-/* An app held in Orbit's window: its scroll that runs past the end bounces
-   there, never carries on into Orbit's window (which moved, tabs and all:
-   Jay 2026-11-14, News at the foot of 媒體). */
-/* (On a touch screen only: Safari on a Mac wouldn't scroll a framed page
-   by mouse wheel or trackpad at all with it, Jay 2026-11-14 in Law. The
-   window itself never scrolls on a computer.) */
-@media (pointer: coarse) {
-  html.q-in-suite,
-  html.q-in-suite body {
-    overscroll-behavior-y: none;
-  }
+/* (kit suite.mjs ownScroll, a phone's only: the body scrolls, bouncing
+   natively; the window never moves. On a computer nothing changes: Safari
+   wouldn't scroll a framed page by wheel with overscroll-behavior on its root.) */
+html.q-own-scroll {
+  height: 100%;
+  overflow: hidden;
+}
+html.q-own-scroll body {
+  height: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
 }
 /* ---- Orbit's window (kit/suite.mjs): every app in one home-screen app ----
    Only there (html.q-in-suite): one slim glass capsule at the top line's

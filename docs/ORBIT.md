@@ -36,7 +36,7 @@ Words used below:
 | 12 | A tab closed with ✕ in the ⌄ switcher | It's gone. If it was showing: the latest other tab, or home if none. A live app has no ✕: it's ended in its own app. |
 | 13 | More than 3 quiet tabs | The one used longest ago closes quietly. Tapped later, it opens again where it was left (a short load). Live and playing apps are never closed. |
 | 14 | A notice, link or cross-app action (今天, 問 Orbit, 去球場 …) | That app opens as a tab, on that screen. The app it came from stays a tab. |
-| 15 | The page of an app scrolled to its top or foot | It bounces as iOS does (the page only, drawn by Orbit), and the app's tab bar never moves, nor does Orbit's window (not even by the scroll bar's handle). Pull-to-refresh at the top still works. |
+| 15 | The page of an app scrolled to its top or foot | It bounces natively (on a phone the app's page scrolls in its body, so the bounce moves the page only), and the app's tab bar never moves, nor does Orbit's window (not even by the scroll bar's handle). Pull-to-refresh at the top still works. |
 | 16 | An app's own home-screen icon (a separate app) | It never opens inside Orbit. At most once a day a quiet banner recommends Orbit: 打開 Orbit, or 不再顯示 (one tap, never again on that device). |
 | 17 | Loading (Orbit or an app) | Orbit's own loading screen: its mark and colour, with the app's name (Orbit at launch). An app switched to comes up over the one left only once it has painted, so never a white flash, in dark mode too. |
 
@@ -48,6 +48,6 @@ Words used below:
   on the window's `orbit-full` event.
 - 9: `openSwitcher`, from the `apps` button on Transit's trip bar (`nav.mjs`).
 - 10, 11: `setLive` (from the kit session's `putNow`) and the host's 15-second redraw.
-- 15: `noBounce` and `html.q-in-suite` in `orbit.css` (on touch screens only: on a Mac it stopped Safari's wheel scrolling a framed app).
+- 15: `ownScroll` (suite.mjs) and `html.q-own-scroll` in `orbit.css`, phones only (overscroll-behavior on a framed root stopped Safari's wheel on a Mac); the host's `still`.
 - 17: `kit/boot.js` (`framed`), the host's `raise` and `.q-suite-under`.
 - 16: `start()` only runs inside Orbit's window (`inSuite`); the banner is `orbitTip` in `orbit.mjs`.
