@@ -46,7 +46,7 @@ import { handleLawAudio } from './law-audio.js';
 import { handleLawLive } from './law-live.js';
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
-import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, stampLevels } from './eco.js';
+import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, stampLevels, fullSession } from './eco.js';
 import { aiSpend, aiMay } from './ai-allow.js';
 import { checkStock } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
@@ -1382,6 +1382,8 @@ async function route(request, env, ctx, headers, origin) {
   // An answer already kept for everyone is free; mayAsk only looks.)
   const spendFor = session => () => (session ? aiSpend(env, ECO_DEPS, session) : Promise.resolve('level'));
   const mayAsk = async session => Boolean(session) && (await aiMay(env, ECO_DEPS, session)) === true;
+  // (Google's translations, billed past the free month: only a 完整 pass's session makes new ones.)
+  const maySpend = session => fullSession(env, ECO_DEPS, session);
   const refused = why => json({ error: why }, why === 'used' ? 429 : 403, headers);
 
   // Orbit Class's AI features need a Orbit Pass session (`qt=`).
