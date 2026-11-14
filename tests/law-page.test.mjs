@@ -122,6 +122,18 @@ test('the build reads a Taiwan-only PDF\u2019s bytes (file=1), passed through, n
 });
 
 
+test('the build streams a 代表會 recording from Taiwan (file=1) past a file\u2019s 40 MB, timed only to its answer', async () => {
+  const KEY = 'k'.repeat(32);
+  const mp3 = 'https://subws.hsinchu.gov.tw/001/Upload/1/meeting.mp3';
+  const big = String(200 * 1024 * 1024);
+  const env = { LAW_BUILD_KEY: KEY, GEMINI_RELAY: { fetch: async (u, init) => new Response('ID3 x', { headers: { 'Content-Type': 'audio/mpeg', 'Content-Length': big } }) } };
+  const got = await handleLawPage(new Request(`https://proxy.test/law-page?v=1&file=1&u=${encodeURIComponent(mp3)}`, { headers: { 'X-Build-Key': KEY } }), env, null, {}, null, async () => new Response('direct'));
+  assert.equal(got.status, 200);
+  assert.equal(got.headers.get('Content-Type'), 'audio/mpeg');
+  assert.equal(got.headers.get('Content-Length'), big);
+  assert.ok(PAGE_LIMITS.audioBytes > PAGE_LIMITS.fileBytes);
+});
+
 test('the build reads a Taiwan-only site’s own JSON and raw page (file=1) as they came; without it, a page is cleaned', async () => {
   const KEY = 'k'.repeat(32);
   const env = { LAW_BUILD_KEY: KEY, GEMINI_RELAY: { fetch: async u => (/api/.test(u) ? new Response('[{"a":1}]', { headers: { 'Content-Type': 'application/json; charset=utf-8' } }) : new Response('<p>x</p><script>var api="/api/x"</script>', { headers: { 'Content-Type': 'text/html' } })) } };
