@@ -96,7 +96,7 @@ export function readAct(text, { now = new Date() } = {}) {
       .replace(d.said, ' ')
       .replace(/倒數(日|計時)?|countdown/gi, ' ')
       .replace(/^(?:幫我|請|我要|我想)?\s*(?:加入|新增|加上|增加|設定|建立|加|設|add|set)?\s*(?:一個|個|a|an)?/i, ' ')
-      .replace(/[：:，,、。!！（）()「」]|在|是|的|for|on/gi, ' ')
+      .replace(/[：:，,、。!！（）()「」]|在|是|的|\b(?:for|on)\b/gi, ' ')
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 20);
