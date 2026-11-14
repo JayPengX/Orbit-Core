@@ -20,7 +20,7 @@ import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
 import { STORE } from './shots/store.mjs';
 import { PAGES } from './shots/pages.mjs';
-import { BRANDS } from '../kit/brand.mjs';
+import { BRANDS, FAMILY } from '../kit/brand.mjs';
 
 const HERE = dirname(new URL(import.meta.url).pathname);
 const ROOT = join(HERE, '..', '..');
@@ -113,7 +113,8 @@ if (!apply) {
 }
 
 // ---- --apply: the Showcase's copies, the README's framed copies, the captions ----
-const brand = BRANDS[set.brand];
+// (Orbit itself: the family's colours, this repo, no Showcase app tab: `show: null`)
+const brand = set.brand === 'family' ? { ...FAMILY, repo: 'Orbit-Core' } : BRANDS[set.brand];
 const repo = join(ROOT, brand.repo);
 const show = join(ROOT, 'Orbit-Showcase', 'public');
 const missing = set.shots.flatMap((_, i) => langs.map(l => join(dir, `${i + 1}.${l}.png`))).filter(f => !existsSync(f));
@@ -147,9 +148,9 @@ const encode = async (src, dest, w, h, frame) => {
   await q.close();
   writeFileSync(dest, Buffer.from(data, 'base64'));
 };
-const shotsDir = join(show, 'shots', set.show); mkdirSync(shotsDir, { recursive: true });
+const shotsDir = set.show ? join(show, 'shots', set.show) : null; if (shotsDir) mkdirSync(shotsDir, { recursive: true });
 const docs = join(repo, 'docs', 'screenshots'); mkdirSync(docs, { recursive: true });
-for (const f of readdirSync(shotsDir)) if (/^\d+(\.zh)?\.webp$/.test(f) && Number(f.split('.')[0]) > set.shots.length) rmSync(join(shotsDir, f));
+if (shotsDir) for (const f of readdirSync(shotsDir)) if (/^\d+(\.zh)?\.webp$/.test(f) && Number(f.split('.')[0]) > set.shots.length) rmSync(join(shotsDir, f));
 for (const f of readdirSync(docs)) if (new RegExp(`^${set.prefix}-\\d+(\\.zh)?\\.webp$`).test(f) && Number(f.match(/-(\d+)/)[1]) > set.shots.length) rmSync(join(docs, f));
 for (const [i, s] of set.shots.entries()) {
   const n = i + 1;
@@ -160,6 +161,7 @@ for (const [i, s] of set.shots.entries()) {
     // (the README's poster is the Showcase's too, Jay 11-14: one set, the whole phone in it; the
     // first shot's bare screen, screen.webp, for the Showcase's own phone frames)
     await encode(join(dir, `${n}.${l}.png`), join(docs, `${set.prefix}-${n}${suf}.webp`), 900, 1770, { title: l === 'zh' ? s.zh : s.en, zh: l === 'zh', device: s.device });
+    if (!shotsDir) continue;
     copyFileSync(join(docs, `${set.prefix}-${n}${suf}.webp`), join(shotsDir, `${n}${suf}.webp`));
     if (n === 1) await encode(join(dir, `${n}.${l}.png`), join(shotsDir, `screen${suf}.webp`), across, Math.round((across * h) / w));
   }
@@ -169,12 +171,14 @@ await b.close();
 
 // The Showcase's captions (apps.mjs, the `shots` list of this app).
 const appsFile = join(show, 'lib', 'apps.mjs');
-const apps = readFileSync(appsFile, 'utf8');
+const apps = set.show ? readFileSync(appsFile, 'utf8') : '';
 const q = t => `'${t.replace(/'/g, '’')}'`;
 const list = `shots: [\n${set.shots.map((s, i) => `      ['${set.show}/${i + 1}', [${q(s.zh)}, ${q(s.en)}]${s.device && s.device !== 'phone' ? `, '${s.device}'` : ''}]`).join(',\n')}\n    ]`;
 const re = new RegExp(`(id: '${set.show}'[\\s\\S]*?)shots: \\[[\\s\\S]*?\\n    \\]`);
-if (!re.test(apps)) throw new Error(`no shots list for ${set.show} in apps.mjs`);
-writeFileSync(appsFile, apps.replace(re, (_, head) => head + list));
+if (set.show) {
+  if (!re.test(apps)) throw new Error(`no shots list for ${set.show} in apps.mjs`);
+  writeFileSync(appsFile, apps.replace(re, (_, head) => head + list));
+}
 
 // The README's picture rows: English in rows of three, then 中文 in a fold.
 const readme = join(repo, 'README.md');

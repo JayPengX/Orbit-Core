@@ -16,10 +16,33 @@
 The Orbit apps are static sites. Everything server-side, plus the kit and brand they all share, lives here: the proxy, the Orbit Pass account, notices, data builds, and the family's home page.
 
 <p align="center">
-  <img src="docs/screenshots/family-1.webp" width="30%" alt="One pass for every app">
-  <img src="docs/screenshots/family-2.webp" width="30%" alt="Milestones across the family">
-  <img src="docs/screenshots/family-3.webp" width="30%" alt="Settings that follow you">
+  <img src="docs/screenshots/orbit-1.webp" width="30%" alt="Ten apps, one Orbit">
+  <img src="docs/screenshots/orbit-2.webp" width="30%" alt="Switch apps, nothing reloads">
+  <img src="docs/screenshots/orbit-3.webp" width="30%" alt="One Orbit Pass signs in every app">
 </p>
+
+<p align="center">
+  <img src="docs/screenshots/orbit-4.webp" width="30%" alt="What's under way stays with you">
+  <img src="docs/screenshots/orbit-5.webp" width="30%" alt="Your own name, apps and icon">
+  <img src="docs/screenshots/orbit-6.webp" width="30%" alt="Add it in one tap, or just one app">
+</p>
+
+<details>
+<summary>中文畫面</summary>
+
+<p align="center">
+  <img src="docs/screenshots/orbit-1.zh.webp" width="30%" alt="十個 App，一個 Orbit">
+  <img src="docs/screenshots/orbit-2.zh.webp" width="30%" alt="切換 App，不重新載入">
+  <img src="docs/screenshots/orbit-3.zh.webp" width="30%" alt="一個 Orbit Pass，每個 App 都登入">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/orbit-4.zh.webp" width="30%" alt="正在播、正在走的，一直都在">
+  <img src="docs/screenshots/orbit-5.zh.webp" width="30%" alt="自己取名、挑 App 和圖示">
+  <img src="docs/screenshots/orbit-6.zh.webp" width="30%" alt="一次加好，或只放一個 App">
+</p>
+
+</details>
 
 ## Use Orbit
 
@@ -45,7 +68,7 @@ The family page is at [orbit.jaypengx.com](https://orbit.jaypengx.com/); how it'
 ## Features
 
 - **The proxy** (`api.jaypengx.com`): one Cloudflare Worker for every live read the apps make (sports, transit, weather, markets, law, Class's planes in the air, 立法院's live sittings), answering at each app's own address (`orbit.jaypengx.com/api`, so no cross-site calls), with the apps' AI features behind it, so no key ever reaches a phone.
-- **Orbit AI, one door for every app** (`/ai`): each feature named, its prompt fixed on the server, its input lean, its answer's shape checked, a cap a day; when something is missing it asks back with options. Code first: what code can read or add up, it does, and the AI gets a small digest and writes a line; answers are drawn (logos, faces, tiles, bars) under Orbit AI's mark, never a paragraph. Each model is backed by one of its class from another maker (Claude, GPT, Gemini), and what everyone reads (game recaps, F1's deciding moments, each side's angle on the news, word cards, Law's explanations) is made once ahead by the builders.
+- **Orbit AI, one door for every app** (`/ai`): each feature named, its prompt fixed on the server, its input lean, its answer's shape checked, a cap a day; when something is missing it asks back with options. Code first: what code can read or add up, it does, and the AI gets a small digest and writes a line; answers are drawn (logos, faces, tiles, bars) under Orbit AI's mark, never a paragraph. Each model is backed by one of its class from another maker (Claude, GPT, Gemini), and what everyone reads (a game's why-it-ended line, a story's brief and each side's angle) is made the first time someone opens it, then kept for everyone (`/ai/open`): nothing is spent on what nobody opens.
 - **The family notebook** (`kit/family.mjs`, on the phone only): apps tell each other what helps (Weather where rain is due, Class the next classes, Securities the names held, Words the words being learned), so Transit avoids rain, News leads with what you follow, and the Pass's 今天 sums up the day; 問 Orbit on the Pass opens the app that answers a question, asked there.
 - **The Orbit Pass:** one sign-in and one wallet for every app, with each app's saved data, kept in Cloudflare D1.
 - **Notices** that reach a phone while the app is closed: game starts, class reminders, bus arrivals, rain, price alerts.

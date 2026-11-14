@@ -219,6 +219,7 @@ node tools/preview.mjs sports --live --width 375
 | `--store key=value`, `--payload file.json` | Start with this localStorage or Pass payload |
 | `--keep-account file` | Save what the app writes to its account during the run (a demo account for `shots.mjs --account`) |
 | `--out dir` | Where shots go (default `/tmp/orbit-preview`) |
+| `--suite --door [--safari]` | Orbit's own page (`/app/`) with every app beside it; a `--script` gets the hash as its scene (`tools/shots/orbit-scenes.mjs`: Orbit's README shots, `store-shots.mjs core`) |
 | `--webkit` | Safari's engine instead of Chromium (cloud: once, `apt-get install -y libavif16 libenchant-2-2 libsecret-1-0 libwayland-server0 libmanette-0.2-0 libgles2 libgtk-4-1 libgraphene-1.0-0 libwoff1 libevent-2.1-7t64 libgstreamer-gl1.0-0 libgstreamer-plugins-bad1.0-0 gstreamer1.0-plugins-base`) |
 | `--reopen` | Open twice with storage kept (a returning phone) |
 | `--upgrade <date\|ref>` | The old version, then today's, in one storage |
