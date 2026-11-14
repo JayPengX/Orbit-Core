@@ -315,7 +315,7 @@ export async function planClean(env, deps) {
     }
     for (const ids of Object.values(wallet.inbox || {})) for (const id of ids) inboxIds.add(id);
     for (const k of wallet.passkeys?.keys || []) keyIds.add(`${w.id}:${k.id}`);
-    if (wallet.mail?.addr) mailIds.add(`${await mailIndexId(secret, wallet.mail.addr)}:${w.id}`);
+    if (secret && wallet.mail?.addr) mailIds.add(`${await mailIndexId(secret, wallet.mail.addr)}:${w.id}`);
     const { wallet: next, gone } = tidyWallet(wallet, now);
     if (JSON.stringify(next) === JSON.stringify(wallet)) continue;
     tidy.push({ id: w.id, wallet: next, updateTime: w.updateTime });
@@ -354,7 +354,8 @@ export async function planClean(env, deps) {
         try {
           v = JSON.parse(d.payload);
         } catch {}
-        const ok = name === MAIL_COLLECTION ? mailIds.has(`${d.id}:${v?.d}`) : v?.e > now - 86_400_000;
+        // (No secret to find them by: every finder kept, none taken for lost.)
+        const ok = name === MAIL_COLLECTION ? !secret || mailIds.has(`${d.id}:${v?.d}`) : v?.e > now - 86_400_000;
         if (!ok) deletes.push([name, d.id]);
       }
     } else if (name === SHARE_COLLECTION || name === PAIR_COLLECTION) {

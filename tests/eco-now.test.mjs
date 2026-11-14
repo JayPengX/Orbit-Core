@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { handleEcoRequest, mergeShelf, cleanShelf, NOW_COLLECTION, shelfId, SHELF_MAX } from '../eco.js';
 import { planClean } from '../eco-admin.js';
+import { newPass } from './new-pass.mjs';
 
 function setup() {
   const store = new Map();
@@ -51,7 +52,7 @@ const nowOp = (t, qt, body) => t.call('POST', '', { op: 'now', qt, ...body });
 
 test('a trip under way in one place is handed to the place that takes the app over, at the step it reached', async () => {
   const t = setup();
-  const orbit = (await t.call('POST', '', { op: 'create', app: 'transit' })).data;
+  const orbit = (await newPass(b => t.call('POST', '', b), t.deps, 'transit')).data;
   // Started in Orbit: saved on the Pass as it goes.
   const start = await nowOp(t, orbit.token, { set: { nav: { v: { plan: 'p1', i: 0 }, at: t.clock() } } });
   assert.equal(start.status, 200);
@@ -89,7 +90,7 @@ test('per key the newer one wins; a clock set ahead never wins for good; an end 
 
 test("the family's notebook: any of the account's apps tells it; every app hears it with its own claim", async () => {
   const t = setup();
-  const transit = (await t.call('POST', '', { op: 'create', app: 'transit' })).data;
+  const transit = (await newPass(b => t.call('POST', '', b), t.deps, 'transit')).data;
   const ride = { id: 'r1', fare: 30 };
   const told = await nowOp(t, transit.token, { family: { 'transit.ride': { v: ride, at: t.clock() } } });
   assert.ok(told.data.familyTime);
@@ -113,7 +114,7 @@ test("the family's notebook: any of the account's apps tells it; every app hears
 
 test('a shelf stays small, an empty or forged one is refused, and a signed-out session writes nothing', async () => {
   const t = setup();
-  const acct = (await t.call('POST', '', { op: 'create', app: 'transit' })).data;
+  const acct = (await newPass(b => t.call('POST', '', b), t.deps, 'transit')).data;
   assert.equal((await nowOp(t, acct.token, { set: { nav: { v: 'x'.repeat(SHELF_MAX), at: t.clock() } } })).status, 413);
   assert.equal((await nowOp(t, acct.token, {})).status, 400);
   assert.equal((await nowOp(t, 'nope.nope', { set: { nav: { v: 1, at: 1 } } })).status, 401);
@@ -123,7 +124,7 @@ test('a shelf stays small, an empty or forged one is refused, and a signed-out s
 
 test("deleting the account takes its shelves; the clean-up takes a gone account's", async () => {
   const t = setup();
-  const acct = (await t.call('POST', '', { op: 'create', app: 'transit' })).data;
+  const acct = (await newPass(b => t.call('POST', '', b), t.deps, 'transit')).data;
   await nowOp(t, acct.token, { set: { nav: { v: 1, at: t.clock() } }, family: { 'class.week': { v: {}, at: t.clock() } } });
   assert.equal([...t.store.keys()].filter(k => k.startsWith(`${NOW_COLLECTION}/`)).length, 2);
   t.store.set(`${NOW_COLLECTION}/${shelfId('gone0123', 'transit')}`, { payload: '{}', updateTime: 'u0' });

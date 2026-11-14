@@ -39,7 +39,8 @@
 //            { unchanged: true, updateTime } in place of `payload`
 //   PATCH  /eco?qt=T[&app=A]  { payload?, wallet? }   only while live
 //   DELETE /eco?qt=T[&app=A][&inbox=ID]   the account (or one app's data)
-//   POST   /eco { op: 'create', app }                 a new pass, signed in
+//   POST   /eco { op: 'create-start', addr, app, lang? }  a code to that address
+//   POST   /eco { op: 'create', addr, code, app }     a new 基本 pass with it, signed in
 //   POST   /eco { op: 'login', passcode, app }        sign in on this device
 //   POST   /eco { op: 'refresh', refresh, app, claim?, data?, inbox?, w?, since? }
 //   POST   /eco { op: 'pair-create', qt }             a device code (10 min)
@@ -63,7 +64,7 @@ import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSIO
 import { admit, seenNow, limitOf, fullBody } from './door.js';
 import { handleAdmin, readDev } from './eco-admin.js';
 import { passkeyBegin, passkeyLogin, passkeyAddBegin, passkeyAdd, passkeyRemove, passkeySummary, pointPasskeys, dropIndex, passkeyIds } from './passkey.js';
-import { mailBegin, mailConfirm, mailRemove, mailRecoverBegin, mailRecover, mailSummary, mailOf, pointMail, dropMailIndex, mailReady } from './pass-mail.js';
+import { mailBegin, mailConfirm, mailRemove, mailRecoverBegin, mailRecover, signupMailBegin, signupMailProve, mailSummary, mailOf, pointMail, dropMailIndex, mailReady, claimMail } from './pass-mail.js';
 import { privacyDo } from './privacy-mail.js';
 import { PAY_WEEK, weekStart, mondayId, reliefCheck, reliefEntry } from './kit/pay.mjs';
 
@@ -489,6 +490,7 @@ async function ecoNow(ctx) {
 
 const OPS = {
   create: ecoCreate,
+  'create-start': ecoCreateStart,
   login: ecoLogin,
   refresh: ecoRefresh,
   'pair-create': pairCreate,
@@ -839,17 +841,39 @@ async function limited(ctx, feature) {
 // Taiwan day as the admin panel's 設定 › Orbit Pass says, everyone together
 // (`passNewDay`, 0 closes it; counted in D1, so it holds on every Worker),
 // and ECO_LIMITS.create an hour from one network.
-async function ecoCreate(ctx) {
+// A new 基本 pass needs a verified email, one account to an address (Jay
+// 11-14): 'create-start' mails the address a code, 'create' takes it back.
+async function createOpen(ctx) {
   const { env, deps, headers, request, app } = ctx;
-  const hit = await limited(ctx, 'create');
-  if (hit) return hit;
   if (!ECO_APPS[app]) return deps.errorJson('ECO_UNKNOWN_APP', 400, headers, request);
   const most = (await readDev(env, deps).catch(() => null))?.passNewDay ?? 0;
   if (!(most > 0) || !mailReady(env)) return deps.errorJson('ECO_CREATE_CLOSED', 403, headers, request);
-  if (deps.dayCount && (await deps.dayCount(env, 'pass-new')) > most) return deps.errorJson('ECO_CREATE_FULL', 429, headers, request);
+  return { most };
+}
+async function ecoCreateStart(ctx) {
+  const open = await createOpen(ctx);
+  return open.most ? signupMailBegin(ctx) : open;
+}
+async function ecoCreate(ctx) {
+  const { env, deps, headers, request, secret } = ctx;
+  const hit = await limited(ctx, 'create');
+  if (hit) return hit;
+  const open = await createOpen(ctx);
+  if (!open.most) return open;
+  const proved = await signupMailProve(ctx);
+  if (proved.refused) return proved.refused;
+  if (deps.dayCount && (await deps.dayCount(env, 'pass-new')) > open.most) return deps.errorJson('ECO_CREATE_FULL', 429, headers, request);
   const now = deps.now();
   const { passcode, docId } = await newPasscode(env, deps);
-  await updateWallet(env, deps, docId, w => ({ ...w, v2: now, sec: { level: 'free' } }), { create: true });
+  // (The address claimed before the wallet is written: two sign-ups with one address, one gets it.)
+  if (!(await claimMail(env, deps, secret, proved.addr, docId))) return deps.errorJson('ECO_MAIL_TAKEN', 409, headers, request);
+  try {
+    await updateWallet(env, deps, docId, w => ({ ...w, v2: now, sec: { level: 'free' }, mail: proved.mail }), { create: true });
+  } catch (e) {
+    await dropMailIndex(env, deps, secret, docId, proved.addr).catch(() => {});
+    throw e;
+  }
+  await pointMail(env, deps, secret, docId, { mail: proved.mail });
   return signIn(ctx, docId, { passcode });
 }
 
