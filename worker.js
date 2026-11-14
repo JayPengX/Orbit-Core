@@ -67,7 +67,7 @@ import { mailSettings, sendMail } from './mail.js';
 import { sweepKept, keptText } from './kept-store.js';
 import { withDataFallback, sweepDataFiles } from './data-fallback.js';
 import { applyScale } from './capacity.js';
-import { handleSports, sportsCron, useDevSettings } from './sports.js';
+import { handleSports, sportsCron, f1Mark, F1_LIVE_KEY, useDevSettings } from './sports.js';
 import { handleToday } from './sports-today.js';
 import { isAllowedOrigin, corsHeaders, json, LOCAL_ORIGIN, bodyText, sha256Hex, ipBucket, LOCKED } from './http.js';
 import { handleData } from './data.js';
@@ -91,7 +91,7 @@ export { F1Log } from './f1-live.js';
 // The door's Durable Object (door.js), bound as DOOR: who gets in when too many come at once.
 export { Door } from './door.js';
 import { doorOf, doorSlow, limitOf, graceShut, fullBody } from './door.js';
-import { makeRunner, runsInRunner, toRunner, tickRunner, partOf, CRON_PARTS, SHARDS, RELAYS } from './runner.js';
+import { makeRunner, runsInRunner, toRunner, tickRunner, partOf, cronObject, CRON_PARTS, SHARDS, RELAYS } from './runner.js';
 import { handleOrbitManifest } from './orbit-manifest.js';
 
 // ---- Bilingual error responses ----------------------------------------
@@ -1627,7 +1627,7 @@ async function route(request, env, ctx, headers, origin) {
       if (!env.GUARD) return json({ error: 'no guard' }, 200, headers);
       const d = await (await env.GUARD.fetch('https://quota-guard/detail')).json().catch(e => ({ error: String(e?.message || e) }));
       if (Array.isArray(d.objects) && env.RUNNER) {
-        const names = [...CRON_PARTS.map(p => `cron:${p}`), ...Array.from({ length: SHARDS }, (_, i) => `route:${i}`), ...Array.from({ length: RELAYS }, (_, i) => `relay:${i}`)];
+        const names = [...new Set([...CRON_PARTS.map(cronObject), ...Array.from({ length: SHARDS }, (_, i) => `route:${i}`), ...Array.from({ length: RELAYS }, (_, i) => `relay:${i}`)])];
         const byId = Object.fromEntries(names.map(n => [env.RUNNER.idFromName(n).toString(), n]));
         for (const o of d.objects) o.name = byId[o.id] || '';
       }
@@ -1822,6 +1822,9 @@ export default {
     // Both Runner objects were woken every minute for it, 1,440 times a day for nothing, 11-14.)
     const odd = event.cron === ODD_CRON;
     if (odd && !F1_DAYS.has(new Date(event.scheduledTime || Date.now()).getUTCDay())) return;
+    // (…and on an F1 day only while a session runs, as the even minute's look found (f1Mark): the
+    // Runner was woken 720 times a day for an 'idle', each keeping it billed ten seconds more, 11-14.)
+    if (odd && env.RATE_LIMIT_KV && (await env.RATE_LIMIT_KV.get(F1_LIVE_KEY).catch(() => '1')) !== '1') return;
     if (env.RUNNER && env.RUNNER_CRONS === 'on') return tickRunner(event, env, ctx, odd ? [partOf('f1')] : undefined);
     return cronTick(event, env, ctx, null);
   }
@@ -1873,7 +1876,7 @@ async function cronTick(event, env, ctx, part) {
               .finally(() => flushSources(env, ctx))
           );
     // F1's laps while a session runs (sports.js, f1-live.js): every minute of an F1 weekend.
-    if (F1_DAYS.has(tick.getUTCDay())) run('f1', () => sportsCron(env, tick.getTime()), () => null);
+    if (F1_DAYS.has(tick.getUTCDay())) run('f1', async () => f1Mark(env, await sportsCron(env, tick.getTime())), () => null);
     // (The bill's pace, pace.js: what can wait waits.)
     const pace = (await paceOf(env)).pace;
     // The family's data (builders/), each job at its minute.

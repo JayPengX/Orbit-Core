@@ -219,7 +219,8 @@ w;dur=`, noted by the 除錯紀錄 when slow, and `LOCKED` (never runs as a page
   or curl with that Origin.
 
 - **Crons:** even minutes (notices, builders, weather scoring and radar,
-  capacity, the meter's copy), F1's laps on both, run by Runner alarms.
+  capacity, the meter's copy), F1's laps on odd ones too while a session
+  runs (`f1:live`), run by Runner alarms ('main' in the routes' object).
   Never new Cron Triggers (since 10-2026 they never ran).
 - **The proxy is the only one adding money:** `eco.js appEntries` takes only
   spending from apps, dated by the Worker; Securities' cash and cost are the

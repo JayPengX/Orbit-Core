@@ -54,14 +54,17 @@ export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[ne
   if (!env.DATA || (!job && !only)) return { off: env.DATA ? 'no job this minute' : 'no data bucket' };
   const store = r2Store(env.DATA);
   const hour = new Date(now).getUTCHours();
-  const done = {};
+  // (`ms`: each step's time when it took a second or more, first so the run's note shows it.)
+  const done = { ms: {} };
   const step = async (name, fn) => {
     if (!only && !builderAllowed(pace, name)) return void (done[name] = { paced: pace });
+    const t = Date.now();
     try {
       done[name] = await fn();
     } catch (e) {
       done[name] = { failed: String(e?.message || e).slice(0, 200) };
     }
+    if (Date.now() - t >= 1000) done.ms[name] = Date.now() - t;
   };
   if (job === 'watch') await step('watch', () => runWatch({ store, proxy, now, until: now + 8 * 60_000, full }));
   if (job === 'cutouts') await step('cutouts', () => runCutouts({ store, now }));

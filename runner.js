@@ -10,9 +10,10 @@
 //     objects placed near the family (`apac`), which answers it with the
 //     very same route(); cheap ones (R2's files, /config, TDX's copies)
 //     stay in the Worker. The Worker's request.cf goes along as a header.
-//   - crons: worker.js scheduled wakes two objects ('main' and 'slow', so a
-//     builder's minutes never hold the notices up); each keeps the tick and
-//     runs it from its alarm, the jobs exactly as before.
+//   - crons: worker.js scheduled wakes two parts ('main' and 'slow', so a
+//     builder's minutes never hold the notices up), 'main' in the routes'
+//     object (cronObject); each keeps the tick and runs it from its alarm,
+//     the jobs exactly as before.
 //   - outside calls: an invocation makes its first DIRECT itself; past
 //     them (a builder reads hundreds of pages) each goes through a relay
 //     object, an invocation of its own (one outside call of its own 50; a
@@ -115,6 +116,11 @@ export async function toRunner(request, env, fallback) {
 
 // The cron's side: each part woken with the tick.
 export const CRON_PARTS = ['main', 'slow'];
+// The object a part runs in: 'main' (light: notices, YouBike kept warm, the meter, F1's minute)
+// in the routes' own, already awake whenever anyone uses the apps, so its minutes aren't billed
+// twice; 'slow' (the builders' minutes of CPU) its own, never holding a route up.
+// (A Durable Object is billed while awake: a request or alarm, then about ten seconds more.)
+export const cronObject = part => (part === 'main' ? 'route:0' : `cron:${part}`);
 const SLOW_JOBS = new Set(['store-backup', 'capacity', 'data-folders', 'gift-clean', 'weather-skill', 'radar', 'mail-alerts']);
 export const partOf = job => (job.startsWith('build:') || SLOW_JOBS.has(job) ? 'slow' : 'main');
 export function tickRunner(event, env, ctx, parts = CRON_PARTS) {
@@ -125,7 +131,7 @@ export function tickRunner(event, env, ctx, parts = CRON_PARTS) {
       part
     });
     ctx.waitUntil(
-      env.RUNNER.get(env.RUNNER.idFromName(`cron:${part}`))
+      env.RUNNER.get(env.RUNNER.idFromName(cronObject(part)), { locationHint: HINT })
         .fetch('https://runner/__tick', { method: 'POST', body })
         .catch(e => console.log('runner tick failed', part, String(e?.message || e)))
     );

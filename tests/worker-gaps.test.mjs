@@ -58,3 +58,35 @@ test('the cron in two parts: builders and the slow jobs apart from notices and t
   assert.equal(partOf('notices'), 'main');
   for (const j of ['store-backup', 'capacity']) assert.equal(partOf(j), 'slow', j);
 });
+
+// F1's odd minutes wake the Runner only while a session runs (worker.js f1Mark), as the even minute's look found.
+test("odd minutes: the Runner woken for F1 only while the even minute's look found a session", async () => {
+  const { f1Mark, F1_LIVE_KEY } = await import('../sports.js');
+  const kv = new Map();
+  let puts = 0;
+  const RATE_LIMIT_KV = { get: async k => kv.get(k) ?? null, put: async (k, v) => (puts++, kv.set(k, v)) };
+  const woken = [];
+  const RUNNER = { idFromName: n => n, get: n => ({ fetch: async () => (woken.push(n), new Response('ok')) }) };
+  const e = { RATE_LIMIT_KV, RUNNER, RUNNER_CRONS: 'on' };
+  const waits = [];
+  const c = { waitUntil: p => waits.push(p), passThroughOnException() {} };
+  // A Saturday, an odd minute.
+  const odd = { cron: '1-59/2 * * * *', scheduledTime: Date.parse('2026-11-14T12:01:00Z') };
+  await worker.scheduled(odd, e, c);
+  await Promise.all(waits);
+  assert.deepEqual(woken, [], 'no look yet: nothing woken');
+  await f1Mark(e, 'idle');
+  await worker.scheduled(odd, e, c);
+  await Promise.all(waits);
+  assert.deepEqual(woken, []);
+  await f1Mark(e, 'Race: 20 cars');
+  await f1Mark(e, 'Race: 20 cars');
+  assert.equal(kv.get(F1_LIVE_KEY), '1');
+  assert.equal(puts, 2, 'written only when it changes');
+  await worker.scheduled(odd, e, c);
+  await Promise.all(waits);
+  assert.deepEqual(woken, ['route:0'], "F1's part runs in the routes' object");
+  // A failed look changes nothing.
+  await f1Mark(e, null);
+  assert.equal(kv.get(F1_LIVE_KEY), '1');
+});

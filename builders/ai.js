@@ -365,8 +365,16 @@ export async function wordsCards({ store, env, ctx, cap, until, fetchImpl = fetc
 // The 'ai' run: each step while there's time (5 minutes of the run's 8).
 export async function runAi({ store, env, proxy, now = Date.now(), cap = async () => 0, ctx = null, only = null }) {
   const until = now + 5 * 60_000;
-  const out = {};
-  const step = async (name, feature, fn) => {
+  // (`ms`: each part's time when it took a second or more, first so the run's note shows it.)
+  const out = { ms: {} };
+  const timed = async (name, fn) => {
+    const t = Date.now();
+    await fn();
+    const ms = Date.now() - t;
+    if (ms >= 1000) out.ms[name] = ms;
+  };
+  const step = (name, feature, fn) => timed(name, () => oneStep(name, feature, fn));
+  const oneStep = async (name, feature, fn) => {
     if (only && only !== name) return;
     if (Date.now() >= until) return void (out[name] = { later: true });
     // (Paused, ai.js BULK_PAUSED: not started. Each still read its sources first, every game's
@@ -381,18 +389,20 @@ export async function runAi({ store, env, proxy, now = Date.now(), cap = async (
   await step('news', 'news-lines', c => newsLines({ store, env, ctx, cap: c, until }));
   // (Not the AI: plain translation of what the AI didn't title, Google's free month (builders/news-tr.js).)
   if (!only || only === 'tr')
-    try {
-      out.tr = await newsTr({ store, env, now: Date.now(), force: only === 'tr' });
-    } catch (e) {
-      out.tr = { failed: String(e?.message || e).slice(0, 200) };
-    }
+    await timed('tr', async () => {
+      try {
+        out.tr = await newsTr({ store, env, now: Date.now(), force: only === 'tr' });
+      } catch (e) {
+        out.tr = { failed: String(e?.message || e).slice(0, 200) };
+      }
+    });
   await step('sides', 'news-sides', c => newsSides({ store, env, ctx, cap: c, until, now }));
   await step('brief', 'news-brief', c => newsBriefs({ store, env, ctx, cap: c, until, now }));
   if (!only || only === 'open')
     try {
-      out.open = await newsOpenFacts({ store });
+      await timed('open', async () => (out.open = await newsOpenFacts({ store })));
       // (The front page's lead stories made ahead: ai-open.js newsOpenAhead.)
-      if (env?.DATA && Date.now() < until) out.ahead = await newsOpenAhead({ store, env, ctx, until, now });
+      if (env?.DATA && Date.now() < until) await timed('ahead', async () => (out.ahead = await newsOpenAhead({ store, env, ctx, until, now })));
     } catch (e) {
       out.open = { failed: String(e?.message || e).slice(0, 200) };
     }
