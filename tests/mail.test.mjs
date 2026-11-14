@@ -117,3 +117,21 @@ test('looks: words are escaped, points and paragraphs kept, a link only for http
   for (const k of Object.keys(MAIL_LOOKS)) for (const lang of ['zh', 'en']) assert.ok(mailRender({ look: k, lang, ...MAIL_LOOKS[k].sample[lang] }).html.includes('</html>'), `${k} ${lang}`);
   assert.match(alertMail({ issues: [{ tone: 'bad', title: 'A' }, { tone: 'warn', title: 'B' }, { tone: 'warn', title: 'C' }] }).subject, /A、B 等 3 項/);
 });
+
+test('red means people feel it: a forecast is amber, a phone leaving early is no error, a job with no known rhythm is never late', async () => {
+  const { paceTone, isLate, errTone, routeTone } = await import('../site/admin/ops-watch.mjs');
+  // 2026-11-14: the forecast 99.5%, 44% really used: amber, not red.
+  assert.equal(paceTone({ paceTop: 0.9954, share: { doDuration: 0.439, requests: 0.3 } }), 'warn');
+  assert.equal(paceTone({ paceTop: 0.5, share: { doDuration: 0.82 } }), 'bad');
+  assert.equal(paceTone({ paceTop: 0.4, share: { requests: 0.2 } }), '');
+  assert.equal(paceTone({ paceTop: 0.4, share: {}, stopped: { at: 1 } }), 'bad');
+  const now = Date.parse('2026-11-14T11:00:00Z');
+  assert.equal(isLate({ job: 'build:buses', at: now - 4 * 86_400_000 }, now), false);
+  assert.equal(isLate({ job: 'kept-sweep', at: now - 5 * 3_600_000 }, now), false);
+  assert.equal(isLate({ job: 'notices', at: now - 20 * 60_000 }, now), true);
+  assert.equal(errTone({ requests: 1000, errors: 300, by: { clientDisconnected: 300 } }), '');
+  assert.equal(errTone({ requests: 1000, errors: 60, by: { scriptThrewException: 60 } }), 'bad');
+  assert.equal(routeTone({ today: 25, yesterday: 30 }), '');
+  assert.equal(routeTone({ today: 25, yesterday: 5 }), 'slow');
+  assert.equal(routeTone({ today: 150, yesterday: 20 }), 'bad');
+});

@@ -796,7 +796,7 @@ import { icons, tileHtml, heroCardHtml, escHtml, toast } from '/Orbit-Core/kit/u
 import { API, DOMAIN } from '/Orbit-Core/kit/domain.mjs';
 import { passkeyName } from '/Orbit-Core/kit/passkey.mjs';
 import { SOURCES, SOURCE_BY_ID, GROUPS as SOURCE_GROUPS, freshAt, sourceState } from '/Orbit-Core/kit/sources.mjs';
-import { JOBS, restsToday, isLate, errTone, aiTone } from './ops-watch.mjs';
+import { JOBS, restsToday, isLate, errTone, aiTone, realErrors, routeTone, paceTone, usedTop } from './ops-watch.mjs';
 import { MAIL_LOOKS, MAIL_ACCENTS, mailRender } from './mail-look.mjs';
 const ECO_URL = `${API}/eco`;
 const KEY = 'orbit.admin';
@@ -1097,7 +1097,7 @@ const HEALTH_AT = { guard: 'bill-guard', pace: 'bill-guard', jobs: 'beats', sour
 const healthIssues = () =>
   HEALTH_CELLS.map(([k, name]) => [k, name, health.cells[k]])
     .filter(([, , c]) => c && (c.tone === 'bad' || c.tone === 'warn'))
-    .map(([k, name, c]) => ({ tone: c.tone, text: c.issue || `${name}：${c.value}`, go: ['guard', 'pace', 'ai'].includes(k) ? 'usage' : 'health', to: HEALTH_AT[k] }));
+    .map(([k, name, c]) => ({ key: k, tone: c.tone, text: c.issue || `${name}：${c.value}`, go: ['guard', 'pace', 'ai'].includes(k) ? 'usage' : 'health', to: HEALTH_AT[k] }));
 const TONE = { ok: 'var(--q-good)', warn: '#d97706', bad: 'var(--q-bad)', wait: '#94a3b8' };
 function setHealth(k, tone, value, issue = '') {
   health.cells[k] = { tone, value, issue };
@@ -1121,7 +1121,11 @@ function drawHero() {
   const o = ovData;
   if (!o) return;
   const chips = [
-    ...healthIssues().map(c => [c.text, c.go, c.tone, c.to]),
+    // (The rest of 健康's amber, a late job, a flaky source with its cache, a few more errors,
+    // stays in 健康: amber on every sign-in taught Jay to look past it, 11-14.)
+    ...healthIssues()
+      .filter(c => c.tone === 'bad' || ['pace', 'ai', 'guard'].includes(c.key))
+      .map(c => [c.text, c.go, c.tone, c.to]),
     ...(o.attention.length ? [[`${o.attention.length} 個帳戶透支`, 'overview', 'warn', 'ov-attn']] : [])
   ];
   const tone = chips.some(c => c[2] === 'bad') ? 'bad' : chips.length ? 'warn' : 'ok';
@@ -1165,7 +1169,9 @@ function healthSummary() {
     const g = r.guard;
     setHealth('guard', !g ? 'warn' : g.stopped ? 'bad' : g.armed ? 'ok' : 'warn', !g ? '還沒跑過' : g.stopped ? '代理已停' : g.armed ? '運作中' : '沒啟動', !g ? '' : g.stopped ? '代理已停（帳單保護）' : g.armed ? '' : '帳單保護沒啟動');
     const p = g?.paceTop;
-    setHealth('pace', p == null ? 'wait' : p >= 0.9 ? 'bad' : p >= 0.6 || r.pace.pace ? 'warn' : 'ok', p == null ? '—' : `月底 ${pct(p)}${r.pace.pace ? ` · 節流 ${r.pace.pace} 級` : ''}`, p >= 0.6 || r.pace.pace ? `用量推估 ${pct(p || 0)}` : '');
+    // (Red only once people feel it; a forecast is amber: the guard slows things at 60% really used.)
+    const pt = paceTone(g, r.pace.pace), used = usedTop(g), end = g?.free ? '今天結束' : '月底';
+    setHealth('pace', p == null ? 'wait' : pt || 'ok', p == null ? '—' : `已用 ${pct(used)} · ${end}推估 ${pct(p)}${r.pace.pace ? ` · 節流 ${r.pace.pace} 級` : ''}`, pt === 'bad' ? `Cloudflare 已用 ${pct(used)}` : pt ? `${end}推估 ${pct(p || 0)}` : '');
     const beats = Array.isArray(r.beats) ? r.beats : [];
     const now = Date.now();
     const failed = beats.filter(b => !b.ok).length;
@@ -2678,9 +2684,11 @@ const WORKER_ZH = { 'orbit-workers-proxy': '代理（api）', 'orbit-site': '網
 // The worst of it, for the 錯誤 cell: [tone, words].
 function errSum(r) {
   const ws = Object.values(r.workers?.workers || {});
-  const errs = ws.reduce((n, w) => n + w.errors, 0);
+  const errs = ws.reduce((n, w) => n + realErrors(w), 0);
   const routes = Object.values(r.routes || {}).reduce((n, x) => n + x.today, 0);
-  const tone = ws.some(w => errTone(w) === 'bad') ? 'bad' : ws.some(w => errTone(w)) || routes >= 20 ? 'warn' : 'ok';
+  // (Against each one's normal: a phone leaving early isn't an error, a steady few a day isn't news.)
+  const rt = Object.values(r.routes || {}).map(routeTone);
+  const tone = ws.some(w => errTone(w) === 'bad') || rt.includes('bad') ? 'bad' : ws.some(w => errTone(w)) || rt.includes('slow') ? 'warn' : 'ok';
   return [tone, r.workers?.workers ? `24 小時 ${errs.toLocaleString()} 次` : `代理今天 ${routes} 次`];
 }
 async function loadErrors() {
@@ -2692,9 +2700,9 @@ async function loadErrors() {
     if (ws.off || ws.error) rows.push(checkRow('off', 'Cloudflare 的錯誤數', ws.off ? '帳單保護沒有金鑰' : `讀不到：${ws.error}`, ''));
     else
       for (const [name, w] of Object.entries(ws.workers || {}).sort((a, b) => b[1].errors - a[1].errors))
-        rows.push(checkRow(errTone(w), WORKER_ZH[name] || name, Object.entries(w.by).filter(([st]) => st !== 'clientDisconnected').map(([st, n]) => `${STATUS_ZH[st] || st} ${n.toLocaleString()}`).join(' · ') || '沒有錯誤', `${w.errors.toLocaleString()} / ${w.requests.toLocaleString()}`));
+        rows.push(checkRow(errTone(w), WORKER_ZH[name] || name, Object.entries(w.by).filter(([st]) => st !== 'clientDisconnected').map(([st, n]) => `${STATUS_ZH[st] || st} ${n.toLocaleString()}`).join(' · ') || '沒有錯誤', `${realErrors(w).toLocaleString()} / ${w.requests.toLocaleString()}`));
     const routes = Object.entries(r.routes || {}).sort((a, b) => b[1].today - a[1].today || b[1].yesterday - a[1].yesterday);
-    rows.push(...(routes.length ? routes.map(([route, n]) => checkRow(n.today >= 20 ? 'slow' : '', `代理 ${route}`, `伺服器錯誤 · 昨天 ${n.yesterday}`, `今天 ${n.today}`)) : [checkRow('', '代理的路徑', '今天和昨天都沒有伺服器錯誤', '')]));
+    rows.push(...(routes.length ? routes.map(([route, n]) => checkRow(routeTone(n), `代理 ${route}`, `伺服器錯誤 · 昨天 ${n.yesterday}`, `今天 ${n.today}`)) : [checkRow('', '代理的路徑', '今天和昨天都沒有伺服器錯誤', '')]));
     $('errs').replaceChildren(...rows);
   } catch (e) {
     $('errs').replaceChildren();
