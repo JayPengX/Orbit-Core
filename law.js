@@ -459,7 +459,9 @@ export async function addOne(env, k, day, by = 1) {
   try {
     await table(env, day);
     const row = await env.STORE.prepare('INSERT INTO law_day (k, day, n) VALUES (?1, ?2, ?3) ON CONFLICT (k) DO UPDATE SET n = n + ?3 RETURNING n').bind(`${day}|${k}`, day, by).first();
-    return Number(row?.n) || Infinity;
+    // (0 is a count, a read's `by` 0 on a quiet day: only no row at all is a failure.)
+    const n = Number(row?.n);
+    return row && Number.isFinite(n) ? n : Infinity;
   } catch {
     return Infinity;
   }
