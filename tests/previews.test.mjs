@@ -51,3 +51,12 @@ test("basketball's streak is the card's 連勝敗: never in the digest or a poin
   const facts = 'NBA (basketball)\nTeams: {t:24} = home (San Antonio Spurs); {t:9} = away (Golden State Warriors)\nPreview (AP):\nSan Antonio has won 10 straight.';
   assert.equal(clean({ points: [{ k: 'run', zh: '{t:24}豪取10連勝，近10場保持全勝', en: '{t:24} have won 10 straight' }] }, { facts }), null);
 });
+
+test('看點 never says the places or the gap between them alone (Jay 11-14: the table under it says them)', () => {
+  const f = FEATURES['sports-preview'];
+  const facts = 'Game: {t:1} = Spurs (San Antonio Spurs) v {t:2} = Warriors (Golden State Warriors) (basketball)\n2nd v 3rd, 2 games apart\nIf {t:1} win: up to 1st';
+  const got = f.clean({ points: [{ k: 'table', zh: '排名第2對第3，只差2場', en: '2nd v 3rd, 2 games apart' }] }, { facts });
+  assert.deepEqual(got?.points || [], []);
+  const kept = f.clean({ points: [{ k: 'table', zh: '{t:1}贏球就升上第1', en: 'A win lifts {t:1} to 1st' }] }, { facts });
+  assert.equal(kept.points.length, 1);
+});
