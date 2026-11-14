@@ -4,7 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { handleEcoRequest, WALLET_COLLECTION } from '../eco.js';
-import { MAIL_COLLECTION, MAIL_CODES, MAIL_TRIES, MAIL_PER_DAY, MAIL_WAIT_MS, cleanAddr, maskAddr, accountOfMail } from '../pass-mail.js';
+import { MAIL_COLLECTION, MAIL_CODES, MAIL_TRIES, MAIL_PER_DAY, MAIL_WAIT_MS, cleanAddr, maskAddr, accountOfMail, signupMailBegin, signupMailProve } from '../pass-mail.js';
+import { tokenSecret } from '../orbit-token.js';
 import { planClean } from '../eco-admin.js';
 
 // (Each its own minutes: the per-session limits are counted in memory, by minute.)
@@ -271,4 +272,27 @@ test('an account found by its verified recovery email, any spelling; none once r
   assert.equal(await accountOfMail(t.env, t.deps, 'other@example.com'), '');
   await t.post({ op: 'mail-remove', qt: a.token });
   assert.equal(await accountOfMail(t.env, t.deps, 'me@example.com'), '');
+});
+
+test('a new pass with an address: a code to it, spent once; an address on a Pass refused only after its code', async () => {
+  const t = setup();
+  const secret = await tokenSecret(t.env);
+  const ctx = body => ({ env: t.env, deps: t.deps, body, secret, ip: '1.1.1.1', headers: {}, request: {}, waitUntil: () => {} });
+  const begin = await signupMailBegin(ctx({ email: ' New@Example.com ' }));
+  assert.equal(begin.status, 200);
+  assert.equal(t.sent.at(-1).to, 'new@example.com');
+  assert.match(t.sent.at(-1).text, /建立你的 Orbit Pass/);
+  const code = t.codeIn(t.sent.at(-1));
+  assert.ok((await signupMailProve(ctx({ email: 'new@example.com', code: '000000' }))).refused);
+  const ok = await signupMailProve(ctx({ email: 'NEW@example.com', code }));
+  assert.equal(ok.addr, 'new@example.com');
+  assert.equal(ok.mail.addr, 'new@example.com');
+  assert.ok((await signupMailProve(ctx({ email: 'new@example.com', code }))).refused, 'spent');
+  // Already some Pass's address: the same answer and a code; refused once proven.
+  const a = await account(t);
+  await link(t, a.token, 'me@example.com');
+  t.advance(MAIL_WAIT_MS);
+  assert.equal((await signupMailBegin(ctx({ email: 'me@example.com' }))).status, 200);
+  const taken = await signupMailProve(ctx({ email: 'me@example.com', code: t.codeIn(t.sent.at(-1)) }));
+  assert.equal(taken.refused.data.error.code, 'ECO_MAIL_TAKEN');
 });
