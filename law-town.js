@@ -12,7 +12,7 @@ export const TOWN_LIMITS = { chars: 30_000, quote: 220, points: 5 };
 const TOWN_TTL_S = 365 * 86_400;
 
 // The ask's own fields, checked: a township's code, its session file, a paper's address, a question's number.
-export const townAsk = b => /^\d{8}$/.test(String(b?.tc)) && /^t\d{1,2}-\d{1,3}[re]$/.test(String(b?.file)) && typeof b?.url === 'string' && /^https:\/\/[\w.-]+\.gov\.tw\/[^\s"<>]{1,300}\.pdf$/i.test(b.url) && Number.isInteger(b?.n) && b.n >= 0 && b.n < 400;
+export const townAsk = b => /^\d{8}$/.test(String(b?.tc)) && /^t\d{1,2}-\d{1,3}[re]$/.test(String(b?.file)) && typeof b?.url === 'string' && (/^https:\/\/[\w.-]+\.gov\.tw\/[^\s"<>]{1,300}\.pdf$/i.test(b.url) || /^asr:[\w-]{12,80}$/.test(b.url)) && Number.isInteger(b?.n) && b.n >= 0 && b.n < 400;
 
 // The turns of one member's questions, numbered from 1, as many as the prompt holds.
 export function townTurns(paper, n, max = TOWN_LIMITS.chars) {
@@ -31,14 +31,17 @@ export function townTurns(paper, n, max = TOWN_LIMITS.chars) {
 
 const LANG = lang => (lang === 'en' ? 'plain English' : 'Traditional Chinese as used in Taiwan (繁體中文)');
 
-export function townPrompt(where, ask, rows, lang) {
-  const body = rows.map(t => `[turn "${t.key}"] ${t.w}（${t.r || '發言'}）: ${t.text}`).join('\n');
-  return `Below is part of a transcript of a Taiwanese township council's 總質詢 (${where}): one member, ${ask.w}, questioning the township office, and the answers. Each turn has a number. Return JSON matching the schema.
+// machine: the recording made into text by speech recognition (Law's scripts/town-hear.mjs): words may be misheard,
+// speakers read from the meeting's order and some left unnamed.
+export function townPrompt(where, ask, rows, lang, machine = false) {
+  const body = rows.map(t => `[turn "${t.key}"] ${t.w}（${t.r || (machine ? '不確定是誰' : '發言')}）: ${t.text}`).join('\n');
+  const who = ask.w || 'a member';
+  return `Below is part of a ${machine ? 'machine transcript (speech recognition of the recording: some words are misheard and there is little punctuation; speakers were worked out from the meeting\'s order and some are unnamed)' : 'transcript'} of a Taiwanese township council's 總質詢 (${where}): one member, ${who}, questioning the township office, and the answers. Each turn has a number. Return JSON matching the schema.
 
 Turns:
 ${body}
 
-answer: 2 to 3 plain sentences for a resident: what ${ask.w} raised and what the office answered.
+answer: 2 to 3 plain sentences for a resident: what ${who} raised and what the office answered.
 points: up to ${TOWN_LIMITS.points}, each one concrete thing asked or answered (a place, a figure, a date, a decision), in the order said.
 promised: one sentence on what the office or the chair said would be done, or "" if nothing was promised.
 
@@ -46,7 +49,7 @@ Rules:
 - Use only the turns above. Nothing from outside; don't fill gaps or guess motives.
 - points: each one short statement, and its cites lists the number of every turn it rests on, exactly as given in quotes (e.g. "3"). Never a point without a cite, never a number not listed above.
 - Leave out greetings, thanks and the chair's calls to speak. Keep names as the transcript gives them.
-- Neutral: report what was said, never judge who was right.
+- Neutral: report what was said, never judge who was right.${machine ? '\n- A misheard word: read it as the meeting most plainly meant, but never build a point on a word you can\'t make out; leave a name out rather than guess it.' : ''}
 - covered: true when the turns hold real questions and answers.
 - Write everything in ${LANG(lang)}.`;
 }
@@ -84,10 +87,10 @@ export async function townJob(ask, { fail }) {
   if (!got) return fail('town', 404);
   const where = [doc.n, paper.nth, paper.d].filter(Boolean).join(' ');
   return {
-    key: `law:town:v1:${await sha256Hex([ask.tc, ask.file, ask.url, ask.n, got.ask.from, got.ask.to, got.ask.w, ask.lang].join('|'))}`,
+    key: `law:town:v1:${await sha256Hex([ask.tc, ask.file, ask.url, ask.n, got.ask.from, got.ask.to, got.ask.w, ask.lang, ...(paper.machine ? [paper.built] : [])].join('|'))}`,
     ttl: TOWN_TTL_S,
     info: { town: { w: got.ask.w, d: paper.d || '' } },
-    prompt: townPrompt(where, got.ask, got.rows, ask.lang),
+    prompt: townPrompt(where, got.ask, got.rows, ask.lang, !!paper.machine),
     schema: TOWN_SCHEMA,
     check: raw => checkTown(raw, got.rows)
   };
