@@ -45,6 +45,13 @@ test('a run reads the sessions not kept, skips what’s kept, until its time is 
   assert.equal(shut.stopped, f1SessionUrl('2026-10-09T08:30Z'));
   // Counted only: nothing read.
   assert.deepEqual(await runF1Kept({ store: r2Store(bucket), proxy: async () => assert.fail(), now, per: 0 }), { sessions: 4, kept: 1, read: 0, again: 0 });
+  // What's found kept is listed and never looked for again (55 s of the Runner three times an hour, 11-14).
+  const heads = [];
+  const listed = r2Store(bucket);
+  const has = listed.has.bind(listed);
+  listed.has = async p => (heads.push(p), has(p));
+  await runF1Kept({ store: listed, proxy: async () => assert.fail(), now, per: 0 });
+  assert.equal(heads.length, 6, 'only the three not kept looked for');
   // Its time up: none read.
   assert.equal((await runF1Kept({ store: r2Store(bucket), proxy: async () => ({}), now, until: now, clock: () => now, sleep: async () => {} })).read, 0);
 });

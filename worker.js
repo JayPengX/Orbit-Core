@@ -1730,7 +1730,11 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    if (env.RUNNER && env.RUNNER_CRONS === 'on') return tickRunner(event, env, ctx);
+    // (Odd minutes are F1's alone: on a day with none, nothing woken; on one, only the part F1 runs in.
+    // Both Runner objects were woken every minute for it, 1,440 times a day for nothing, 11-14.)
+    const odd = event.cron === ODD_CRON;
+    if (odd && !F1_DAYS.has(new Date(event.scheduledTime || Date.now()).getUTCDay())) return;
+    if (env.RUNNER && env.RUNNER_CRONS === 'on') return tickRunner(event, env, ctx, odd ? [partOf('f1')] : undefined);
     return cronTick(event, env, ctx, null);
   }
 };
