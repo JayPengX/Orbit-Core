@@ -15,3 +15,9 @@ Class's `week` is a week of seven periods a day (國文, 英文, 數學… with 
 teachers and rooms), typed into the app's own store (`classFocusData`) and
 kept as the app synced it; shoot it with `-- --clock 2026-11-04T10:30` for a
 class in progress.
+
+An account in one language is `<app>-<name>.<lang>.txt`, picked before the
+plain one (Jay 11-14: an English shot shows English content). Class's
+`week.zh` and `week.en` are the same week, its subjects, teachers and rooms
+in each language, typed into `classFocusData` with `--store` and kept with
+`--keep-account`.
