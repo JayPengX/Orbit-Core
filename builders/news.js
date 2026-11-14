@@ -772,7 +772,7 @@ const NICKS = ('Hawks|Celtics|Nets|Hornets|Bulls|Cavaliers|Cavs|Mavericks|Mavs|N
   'Falcons|Ravens|Bills|Panthers|Bears|Bengals|Browns|Cowboys|Broncos|Lions|Packers|Texans|Colts|Jaguars|Chiefs|Raiders|Chargers|Rams|Dolphins|Vikings|Patriots|Saints|Jets|Eagles|Steelers|49ers|Seahawks|Buccaneers|Bucs|Titans|Commanders|' +
   'Ducks|Bruins|Sabres|Flames|Hurricanes|Blackhawks|Avalanche|Blue Jackets|Stars|Red Wings|Oilers|Canadiens|Predators|Devils|Islanders|Senators|Flyers|Penguins|Sharks|Kraken|Blues|Lightning|Maple Leafs|Canucks|Golden Knights|Capitals|Wild|Mammoth');
 const TEAM_EN = new RegExp(`\\b(?:${NICKS})\\b`, 'g');
-const TEAM_ZH = /七六人|老鷹|塞爾提克|籃網|黃蜂|公牛|騎士|獨行俠|金塊|活塞|勇士|火箭|溜馬|快艇|湖人|灰熊|熱火|公鹿|灰狼|鵜鶘|尼克|雷霆|魔術|76人|太陽|拓荒者|國王|馬刺|暴龍|爵士|巫師|響尾蛇|金鶯|紅襪|小熊|白襪|紅人|守護者|落磯|老虎|太空人|皇家|天使|道奇|馬林魚|釀酒人|雙城|大都會|洋基|運動家|費城人|海盜|教士|巨人|水手|紅雀|光芒|遊騎兵|藍鳥|國民|兄弟|統一獅|桃猿|悍將|味全龍|台鋼雄鷹/g;
+const TEAM_ZH = /七六人|老鷹|塞爾提克|籃網|黃蜂|公牛|騎士|獨行俠|金塊|活塞|勇士|火箭|溜馬|快艇|湖人|灰熊|熱火|公鹿|灰狼|鵜鶘|尼克|雷霆|魔術|76人|太陽|拓荒者|國王|馬刺|暴龍|爵士|巫師|響尾蛇|金鶯|紅襪|小熊|白襪|紅人|守護者|落磯|老虎|太空人|皇家|天使|道奇|馬林魚|釀酒人|雙城|大都會|洋基|運動家|費城人|海盜|教士|巨人|水手|紅雀|光芒|遊騎兵|藍鳥|國民|兄弟|統一獅|桃猿|悍將|味全龍|台鋼雄鷹|獵鷹|領航猿|攻城獅|夢想家|雲豹|海神|戰神|特攻/g;
 const SPORT_TOPIC = TOPICS.find(t => t.id === 'sport');
 // (One team, many names: 七六人 and 76人 one, Sixers and 76ers.)
 const TEAM_SAME = { 七六人: '76人', sixers: '76ers', cavs: 'cavaliers', mavs: 'mavericks', blazers: 'trail blazers', 'd-backs': 'diamondbacks', bucs: 'buccaneers' };
@@ -794,10 +794,16 @@ const YOUTH = /U-?(\d{2})|(青少棒|青棒|少棒)/;
 // saying U23 being either.)
 const NAT = 'n:';
 const plainTeam = x => (x.startsWith(NAT) ? NAT + x.slice(NAT.length).replace(/^[^·]*·/, '') : x);
+// Taiwan's own basketball (PLG, TPBL): its 勇士 and 國王 are 富邦's and
+// 新北's, never the NBA's (11-14: PLG 富邦勇士's opener and the NBA's
+// Warriors, 柯瑞's injury, were one story of 14 outlets).
+const TW_HOOPS = /PLG|TPBL|P\.?\s?LEAGUE|富邦|獵鷹|領航猿|攻城獅|夢想家|雲豹|海神|戰神|特攻|洋基工程|和平館/;
+const TW_SAME = { 勇士: 'tw:勇士', 國王: 'tw:國王' };
 export function teamsOf(title, lang) {
   const t = String(title || '');
   if (!(lang === 'en' ? SPORT_TOPIC.en_ : [SPORT_TOPIC.zh_]).some(re => re.test(t))) return null;
-  const found = [...(t.match(lang === 'en' ? TEAM_EN : TEAM_ZH) || []), ...(lang === 'en' ? [...t.matchAll(VERSUS)].flatMap(m => [m[1], m[2]]) : [])];
+  const home = lang !== 'en' && TW_HOOPS.test(t) && !/NBA/i.test(t);
+  const found = [...(t.match(lang === 'en' ? TEAM_EN : TEAM_ZH) || []).map(x => (home && TW_SAME[x]) || x), ...(lang === 'en' ? [...t.matchAll(VERSUS)].flatMap(m => [m[1], m[2]]) : [])];
   if (lang !== 'en' && NATIONAL.test(t)) {
     const y = YOUTH.exec(t);
     const side = y ? `${y[1] ? `U${y[1]}` : y[2]}·` : '';
@@ -1190,7 +1196,12 @@ const STRAY_MIN = 6;
 // as the best-joined headline); a headline is the story's if it is near
 // that core (CORE), else let go, grouped again at the next build.
 export const CORE = { zh: 0.2, en: 0.2 };
-export function coreKeep(vs, lang) {
+export function coreKeep(all, lang) {
+  // (Read by their words: a team two reports both name ties a club's
+  // different days, 11-14: 柯瑞's injury held Butler's G League stint,
+  // Marcus Smart's ban and a school's sports day「爭取勇士榮耀」; the team
+  // piece (weigh) only helps a new report find its game.)
+  const vs = all.map(v => new Map([...v].filter(([k]) => !k.startsWith('#t:'))));
   const ns = vs.map(norm);
   // (A wire's headline that ten outlets ran word for word counts once: its
   // copies near each other would make the core that one wording, 11-13: 中央社's
@@ -1216,8 +1227,13 @@ export function coreKeep(vs, lang) {
   if (top < 2) return vs.map(() => true);
   const core = sumOf(mine.filter(i => nb.get(i) * 2 >= top).map(i => vs[i]));
   const cn = norm(core);
-  return vs.map((v, i) => cosine(v, ns[i], core, cn) >= CORE[lang]);
+  // (And near one of the core's own headlines (PAIR): a word every headline
+  // shares fills the core's sum, so the sum alone kept any headline with it,
+  // 11-14: Cambodia's Francophonie summit kept an LG heir sent home from
+  // Cambodia, its 重點整理 then telling of him; each is far from every one.)
+  return vs.map((v, i) => cosine(v, ns[i], core, cn) >= CORE[lang] && mine.some(j => j === i || cosine(v, ns[i], vs[j], ns[j]) >= PAIR[lang]));
 }
+export const PAIR = { zh: 0.18, en: 0.17 };
 // Which of a story's headlines it keeps: those near its core (coreKeep) and
 // not sharing next to nothing with the rest (STRAY: a group joins the story
 // of any one headline it holds, 11-12: the Hegseth impeachment story held

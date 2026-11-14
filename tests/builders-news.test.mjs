@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { piecesOf, teamsOf, otherGame, placesOf, placeHints, marksAll, gameOf, unboiled, ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, TOPIC_MIN_OF, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN, blindOf, oneSidedOf } from '../builders/news.js';
+import { piecesOf, teamsOf, otherGame, placesOf, placeHints, marksAll, gameOf, unboiled, ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, TOPIC_MIN_OF, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN, blindOf, oneSidedOf, coreKeep } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS, SPORTS_OUTLETS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -982,4 +982,21 @@ test('a headline naming no city is of the city its names are seen with (11-14: �
   // (Fifteen 新北 reports and one 台北 one: the story is 新北's.)
   assert.deepEqual([...marksAll([...Array(15)].map(() => new Set(['p:新北'])).concat([new Set(['p:台北'])]))], ['p:新北']);
   assert.equal(otherGame(marksAll([new Set(['p:新北']), new Set(['p:新北']), new Set(['p:新北']), new Set(['p:台北'])]), new Set(['p:台北'])), true);
+});
+
+test('a story keeps only what is near one of its core headlines, not what shares one word with all (11-14: the Francophonie summit held an LG heir sent home from Cambodia)', () => {
+  // (The 11 headlines' weighed pieces as the build of 11-14 had them, `weigh`.)
+  const titles = ['French-speaking nations hold a summit in Cambodia…', 'French-speaking Nations Hold a Summit in Cambodia…', 'Exiled Cambodian politician denounces Francophonie summit, citing repression', 'Exiled Cambodian politician denounces Francophonie summit…', 'Francophonie summit must speak up on Mother Nature Cambodia 5', 'LG family scion repatriated from Cambodia after 8 years on the run', "Sam Rainsy urges Japan to be 'realistic' on Cambodia-China ties", "Cambodia's military recruitment drive tops target by 50%", 'LG family scion repatriated from Cambodia…', 'Exiled Cambodian opposition leader urges Japan to aid democracy', 'Rights Groups Links Cambodian Security Companies to Scam Compounds'];
+  const vs = [{"french":5.7,"nation":4,"hold":5.1,"summit":4.8,"cambod":5.8,"africa":5,"confli":6.1,"threat":3.5,"rift":7.2},{"french":5.7,"nation":4,"hold":5.1,"summit":4.8,"cambod":5.8,"africa":5,"confli":6.1,"threat":3.5,"rift":7.2},{"exiled":6.7,"cambod":5.8,"politi":5,"denoun":6.9,"franco":7.2,"summit":4.8,"citing":7.2,"repres":6.7},{"exiled":6.7,"cambod":5.8,"politi":5,"denoun":6.9,"franco":7.2,"summit":4.8,"citing":7.2,"repres":6.7},{"franco":7.2,"summit":4.8,"must":5.5,"speak":6.7,"mother":7.2,"nature":8.3,"cambod":5.8},{"family":4.8,"scion":7.6,"repatr":7.6,"cambod":5.8,"run":5.3},{"sam":7.2,"rainsy":8.3,"urges":5.3,"japan":5,"realis":7.6,"cambod":5.8,"ties":5.4},{"cambod":5.8,"milita":4.2,"recrui":7.6,"drive":6.7,"tops":5.9,"target":4.5},{"family":4.8,"scion":7.6,"repatr":7.6,"cambod":5.8,"run":5.3},{"exiled":6.7,"cambod":5.8,"opposi":6,"leader":3.2,"urges":5.3,"japan":5,"aid":5.9,"democr":2.9},{"rights":6.4,"groups":6.5,"links":7.2,"cambod":5.8,"securi":4.8,"compan":5.3,"scam":7.6,"compou":8.3}].map(o => new Map(Object.entries(o)));
+  const kept = titles.filter((_, i) => coreKeep(vs, 'en')[i]);
+  assert.ok(kept.some(t => /Francophonie/.test(t)));
+  assert.ok(!kept.some(t => /LG family|recruitment|Scam/.test(t)), kept.join(' | '));
+});
+
+test('Taiwan’s 富邦勇士 is never the NBA’s Warriors (11-14: PLG’s opener and 柯瑞’s injury were one story)', () => {
+  const plg = teamsOf('富邦勇士109：78痛宰台鋼獵鷹 車侑城狂砍18分打破PLG初登板紀錄', 'zh');
+  const nba = teamsOf('NBA/勇士戰力拉警報 柯瑞側腹斜肌撕裂、至少休2周', 'zh');
+  assert.ok(otherGame(plg, nba));
+  assert.ok(!otherGame(plg, teamsOf('車侑城18分+克羅馬24分 勇士久等的首戰狂勝獵鷹', 'zh')));
+  assert.ok(!otherGame(nba, teamsOf('柯瑞腹斜肌撕裂恐休近一個月！勇士陷考驗', 'zh')));
 });
