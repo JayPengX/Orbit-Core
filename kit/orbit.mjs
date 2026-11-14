@@ -465,7 +465,8 @@ export function passLevel(account = storedAccount()) {
 // or not known yet. The Worker refuses whatever the phone does; here it's
 // shown before a tap (Jay 11-14: "I have to try it then it reject me"):
 // <html data-ai-lock>, every AI tap (.q-ai-tap, [data-ai-tap]) shown locked,
-// a tap on one says why (aiLockText) and asks nothing.
+// a tap on one says why (aiLockText) and asks nothing; one marked
+// data-ai-free only shows an answer kept for everyone, so it stays open.
 export function aiLock(account = storedAccount()) {
   if (!account) return '';
   const saved = readJson(KEY.ai, null);
@@ -504,7 +505,8 @@ if (globalThis.document?.addEventListener)
     'click',
     e => {
       const lock = document.documentElement.dataset.aiLock;
-      if (!lock || !e.target?.closest?.('.q-ai-tap, [data-ai-tap]')) return;
+      // (data-ai-free: it only shows an answer kept for everyone, which costs nothing.)
+      if (!lock || !e.target?.closest?.('.q-ai-tap, [data-ai-tap]') || e.target.closest('[data-ai-free]')) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       toast(aiLockText(lock, detectLang()));
