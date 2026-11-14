@@ -1763,11 +1763,13 @@ dialog.q-sheet.q-full {
 /* No Orbit AI on this account (kit aiLock 'level': a 基本 pass): every AI
    tap gone, as if Orbit AI weren't there (Jay 11-14: "they should not even
    feel AI features existed"). Its allowance used up for now ('used'): shown
-   dimmed, a tap says when it's back (orbit.mjs) and asks nothing. */
-:root[data-ai-lock='level'] :is(.q-ai-tap, [data-ai-tap]) {
+   dimmed, a tap says when it's back (orbit.mjs) and asks nothing. One that
+   only shows an answer kept for everyone (data-ai-free) costs nothing, so
+   it stays as it is. */
+:root[data-ai-lock='level'] :is(.q-ai-tap, [data-ai-tap]):not([data-ai-free]) {
   display: none !important;
 }
-:root[data-ai-lock='used'] :is(.q-ai-tap, [data-ai-tap]) {
+:root[data-ai-lock='used'] :is(.q-ai-tap, [data-ai-tap]):not([data-ai-free]) {
   opacity: 0.45;
   filter: grayscale(1);
 }

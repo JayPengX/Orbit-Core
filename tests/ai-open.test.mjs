@@ -4,7 +4,7 @@
 // have, and past the day's cap. And the AI made ahead stays paused.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { handleAiOpen, newsOpenAhead, AHEAD_TW, forgetParts } from '../ai-open.js';
+import { handleAiOpen, forgetParts } from '../ai-open.js';
 import { newsOpenFacts, openPart, openPath, OPEN_PARTS } from '../builders/ai.js';
 import { aiOnce } from '../ai.js';
 
@@ -101,22 +101,6 @@ test('made on open, Claude answers without thinking first (13 s of thinking for 
   assert.deepEqual(b.thinking, { type: 'disabled' });
   assert.equal(b.output_config.effort, 'low');
   assert.equal(JSON.parse(requestOf('gpt-6-luna', [{ text: 'x' }], null, {}, 'none').init.body).reasoning_effort, 'low');
-});
-
-test('the front page’s lead stories are made ahead once, the rest only when opened', async () => {
-  const stories = {};
-  for (let i = 0; i < 12; i++) stories[`t${i}`] = { m: 6, brief: { ...brief, id: `t${i}` } };
-  const env = envWith(stories, b => ({ items: [{ id: JSON.parse(b.messages ? JSON.stringify(b.messages) : '[]').length ? (b.messages[0].content[0].text.match(/"id":"(t\d+)"/) || [])[1] : '', points: points.items[0].points }] }));
-  const index = { tw: Object.keys(stories).map(id => ({ id })), intl: [] };
-  const store = { json: async k => (k === 'news/index.json' ? index : null) };
-  const r = await newsOpenAhead({ store, env });
-  assert.equal(r.made, AHEAD_TW, 'Taiwan’s first ones, briefs (no sides facts: none)');
-  assert.equal(env.calls(), AHEAD_TW);
-  const again = await newsOpenAhead({ store, env });
-  assert.equal(again.kept, AHEAD_TW);
-  assert.equal(env.calls(), AHEAD_TW, 'kept: no second call');
-  const opened = await (await handleAiOpen(ask('f=news-brief&id=t0'), env, null, {}, { ip: '1', full: true, cap: 10 })).json();
-  assert.equal(opened.kept, true, 'opened after: instant');
 });
 
 test("a 'free' pass (eco.js levelOf) never has one made: refused without a call; what's kept is still anyone's", async () => {

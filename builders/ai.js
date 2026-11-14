@@ -28,7 +28,6 @@
 //            賽前看點: up to two points before each game of today and tomorrow (builders/previews.js).
 // Lean input (Jay 11-10): code picks and trims the facts before any call.
 import { aiOnce, BULK_PAUSED } from '../ai.js';
-import { newsOpenAhead } from '../ai-open.js';
 import { VAGUE } from '../ai-features.js';
 import { runRecaps } from './recaps.js';
 import { runPreviews } from './previews.js';
@@ -401,8 +400,6 @@ export async function runAi({ store, env, proxy, now = Date.now(), cap = async (
   if (!only || only === 'open')
     try {
       await timed('open', async () => (out.open = await newsOpenFacts({ store })));
-      // (The front page's lead stories made ahead: ai-open.js newsOpenAhead.)
-      if (env?.DATA && Date.now() < until) await timed('ahead', async () => (out.ahead = await newsOpenAhead({ store, env, ctx, until, now })));
     } catch (e) {
       out.open = { failed: String(e?.message || e).slice(0, 200) };
     }

@@ -1,6 +1,6 @@
 // AI made when someone opens it (Jay 11-14: "I don't want money spent on
 // things I don't open… only spend it as I use it but kept fast enough").
-// A part is made the first time anyone opens what it's about, from facts
+// A part is made the first time anyone taps for it, from facts
 // code picks here or at build, never from what a phone sends; kept for
 // everyone after that (kept-store.js). The phone shows the part's shape
 // while it's made (a few seconds), or nothing if it can't be.
@@ -10,10 +10,10 @@
 //   sports-recap            a finished game's why line (id: '<league>:<espn id>'), from ESPN's summary
 //   sports-preview          a game to come's 看點 (same id), again within 6 hours of the start
 //
-// Made ahead, the one exception (11-14, Jay: "kept fast enough"): the front page's lead
-// stories (頭條: Taiwan's first 8, the world's first 4), their 重點整理 and 各方怎麼說, on
-// each 'ai' run (newsOpenAhead), only when not kept already: what nearly every reader opens,
-// on Haiku without thinking (about NT$0.01 a call), AHEAD_DAY a day each at most.
+// Nothing made ahead (Jay 11-14: "never spend a penny on AI on things user
+// didn't interact with"): every part is asked by a person's tap on its AI
+// button, never by opening a story or a game; the front page's lead stories
+// were made ahead each 'ai' run until 11-14 evening, no more.
 //
 //   GET /ai/open?f=<feature>&id=<id>
 //     → { out, kept? } | { error: 'origin' | 'feature' | 'story' | 'busy' | 'cap' | 'level' | 'used' | 'upstream' }
@@ -158,24 +158,4 @@ export async function handleAiOpen(request, env, ctx, headers, { ip = '', cap = 
   };
   const r = await openMake(env, ctx, name, id, { allow, gemini, now, fetchImpl });
   return r.error ? json({ error: r.error }, r.status, headers) : json(r.kept ? { out: r.out, kept: true } : { out: r.out }, 200, headers);
-}
-
-// The front page's lead stories, made ahead (above): Taiwan's first AHEAD_TW, the world's first
-// AHEAD_INTL in the builder's order, three at a time. → { made, kept, failed, capped }.
-export const AHEAD_TW = 8;
-export const AHEAD_INTL = 4;
-export const AHEAD_DAY = 120;
-export async function newsOpenAhead({ store, env, ctx = null, until = Infinity, now = Date.now() }) {
-  const index = await store.json('news/index.json');
-  if (!index) return { skipped: 'no index' };
-  forgetParts();
-  const jobs = [];
-  for (const s of [...(index.tw || []).slice(0, AHEAD_TW), ...(index.intl || []).slice(0, AHEAD_INTL)]) for (const name of ['news-brief', 'news-sides']) jobs.push([name, s.id]);
-  const out = { made: 0, kept: 0, failed: 0, capped: 0, none: 0 };
-  for (let i = 0; i < jobs.length && Date.now() < until; i += 3)
-    for (const r of await Promise.all(
-      jobs.slice(i, i + 3).map(([name, id]) => openMake(env, ctx, name, id, { now, allow: async () => ((await spendDay(env, `${name}-ahead`, AHEAD_DAY, twDay(now))) ? true : 'cap') }))
-    ))
-      out[r.kept ? 'kept' : r.out ? 'made' : r.error === 'cap' ? 'capped' : r.error === 'story' ? 'none' : 'failed']++;
-  return out;
 }
