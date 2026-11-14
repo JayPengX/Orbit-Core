@@ -12,6 +12,7 @@
 //   POST  /law-chat              Orbit Law's 問法律, answered from the articles it finds (law-chat.js)
 //   GET   /law-page              A government page (gov.tw) read inside Orbit Law (law-page.js)
 //   POST  /law-judicial          司法院's open data for Law's rulings build, from Taiwan (its key only; law-page.js)
+//   GET   /law-audio             A 代表會's recording on Google Drive, its right type, for Safari (law-audio.js)
 //   GET   /law-live              What 立法院's IVOD streams now, for Orbit Law's 議程 (law-live.js)
 //   GET   /class-news            Orbit Class's 學校公告: a school's own list, worded once an hour (class-news.js)
 //   GET/POST /push/…             notices while an app is closed (push.js)
@@ -38,6 +39,7 @@ import { handleLawChat, lawChatTimes, lawCompare, COMPARE_QS } from './law-chat.
 import { otherAnswer, streamOther, makerOf, modelsOf } from './ai-other.js';
 import { DEV, aiSettingOf } from './kit/brand.mjs';
 import { handleLawPage, handleLawJudicial } from './law-page.js';
+import { handleLawAudio } from './law-audio.js';
 import { handleLawLive } from './law-live.js';
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
@@ -1396,6 +1398,8 @@ async function route(request, env, ctx, headers, origin) {
   // …and government pages read inside the app (law-page.js): the same Pass, gov.tw only, nothing stored.
   if (path === '/law-page') return handleLawPage(request, env, ctx, headers, await sessionOf(request, env));
   if (path === '/law-judicial') return handleLawJudicial(request, env, headers);
+  // …and a 代表會's recording on Drive, played in the app (law-audio.js): streamed, its type by its name.
+  if (path === '/law-audio') return handleLawAudio(request, headers);
   // …and what IVOD streams now (law-live.js): public, our pages only, 60 s at the edge.
   if (path === '/law-live') {
     if (request.method !== 'GET' || !isAllowedOrigin(origin)) return errorJson('FORBIDDEN_ORIGIN', 403, headers, request);
