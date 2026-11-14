@@ -24,3 +24,4 @@ To remove a feature on purpose, delete its line here in the same commit and say 
 - A typhoon day off acts like a holiday — `kit/dayoff.mjs`: `dayOffOn`, `loadDayOff`
 - Law's live feed keeps its last good read — `law-live.js`: `KEY_LAST`
 - One account, many places: what an app is in the middle of goes to the Pass from the place that runs it and is handed to the place that takes it over; the family's notebook follows the account, so separate home-screen apps hear each other — `kit/orbit.mjs`, `kit/family.mjs`, `eco.js`: `s.putNow = `, `emit('now', shelf)`, `mergeHeard`, `orbit-family`, `NOW_COLLECTION`, `mergeShelf`
+- AI spends only on what someone opens: a story's 重點整理 and 各方怎麼說 made on first open and kept for everyone; nothing made ahead for everyone; a maker whose last call failed skipped for its backup; each maker's day cap — `ai-open.js`, `ai.js`, `gemini-use.js`: `export async function handleAiOpen`, `BULK_PAUSED`, `SICK_MS`, `PROVIDER_DAY`

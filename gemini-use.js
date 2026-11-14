@@ -76,6 +76,44 @@ export async function lastFailed(env, model, withinMs, now = Date.now()) {
   }
 }
 
+// The day's safety net (Jay 11-14: "capping is the last step"): each
+// provider's calls since Taiwan's midnight, every feature's together; past
+// its cap no more that day (a call refused 429, a feature's backup from
+// another maker answering). Counts, not dollars: 11-14 Google billed far
+// more than its replies' own token counts. Sized 11-14 to the balances
+// (Gemini NT$67, Claude US$5, OpenAI US$3): taps use a few a day each, so
+// only a runaway meets them. Read once a minute an isolate.
+export const PROVIDER_DAY = { google: 40, anthropic: 200, openai: 200 };
+const PROVIDER_MODELS = { google: 'gemini-%', anthropic: 'claude-%', openai: 'gpt-%' };
+const provSeen = new Map();
+export async function providerCapped(env, prov, now = Date.now()) {
+  const cap = PROVIDER_DAY[prov];
+  if (!cap || !env?.STORE) return false;
+  const day = twDay(now);
+  const had = provSeen.get(prov);
+  if (had && had.day === day && now - had.at < 60_000) return had.n >= cap;
+  try {
+    await table(env);
+    const row = await env.STORE.prepare('SELECT COUNT(*) AS n FROM gemini_call WHERE at >= ?1 AND model LIKE ?2').bind(Date.parse(`${day}T00:00:00+08:00`), PROVIDER_MODELS[prov]).first();
+    const n = Number(row?.n) || 0;
+    provSeen.set(prov, { day, at: now, n });
+    return n >= cap;
+  } catch {
+    return false;
+  }
+}
+
+// Each provider's calls today against its cap (ops ai-money, the free-watch).
+export async function providerToday(env, now = Date.now()) {
+  const out = {};
+  for (const prov of Object.keys(PROVIDER_DAY)) {
+    provSeen.delete(prov);
+    await providerCapped(env, prov, now);
+    out[prov] = { n: provSeen.get(prov)?.n ?? null, cap: PROVIDER_DAY[prov] };
+  }
+  return out;
+}
+
 // The calls since `since` (ms), oldest first.
 export async function callsSince(env, since) {
   if (!env?.STORE) return [];

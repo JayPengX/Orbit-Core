@@ -19,7 +19,7 @@ import { sessionLimited } from './orbit-token.js';
 import { countOf, addOne } from './law.js';
 import { keptRead, keptPut } from './kept-store.js';
 import { streamOther, makerOf } from './ai-other.js';
-import { logCall } from './gemini-use.js';
+import { logCall, lastFailed } from './gemini-use.js';
 import { paceOf } from './pace.js';
 import { FEATURES } from './ai-features.js';
 import { EXAMPLES } from './ai-fixtures.js';
@@ -45,7 +45,7 @@ export const PRICES = {
 export const providerOf = model => makerOf(model) || (/^gemini-/.test(model) ? 'google' : null);
 export const priceOf = model => PRICES[model] || (providerOf(model) === 'google' ? PRICES['gemini-3.6-flash'] : providerOf(model) === 'anthropic' ? PRICES['claude-sonnet-5-5'] : PRICES['gpt-6.1-sol']);
 
-const twDay = (now = Date.now()) => new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
+export const twDay = (now = Date.now()) => new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
 
 // The Pass behind an app's session, or null.
 // ('*': any app's, Orbit 助理 on the Pass sheet; 'showcase': the showcase's
@@ -155,7 +155,8 @@ export const twChars = v =>
 
 // A feature's answer: each of its models in turn until one answers JSON
 // its check keeps (null from `clean`: nothing usable, the next model tried).
-export async function runFeature(env, ctx, name, input, { gemini = null, answers = [] } = {}) {
+const SICK_MS = 15 * 60_000;
+export async function runFeature(env, ctx, name, input, { gemini = null, answers = [], open = false } = {}) {
   const f = FEATURES[name];
   let parts = await f.parts(input, env);
   // (Lean input, Jay 11-10: code picks the facts; a feature's prompt past its size is a bug, never sent.)
@@ -164,13 +165,16 @@ export async function runFeature(env, ctx, name, input, { gemini = null, answers
   let schema = f.schema;
   if (f.clarify) ({ parts, schema } = withAsk(parts, schema, answers, !!input?.en, f.pick || []));
   let last = null;
-  for (const m of f.models) {
+  for (const [i, m] of f.models.entries()) {
     const model = MODELS[m] || m;
+    // (A maker whose last call in 15 minutes failed, its credit run out (11-14: Claude's US$5): its backup
+    // straight away, never a second's wait on a refusal first. The last model is always asked.)
+    if (i < f.models.length - 1 && makerOf(model) && (await lastFailed(env, model, SICK_MS))) continue;
     try {
       // (A tap gives up on a model silent for 20 s, a person waits; a build waits its whole time:
       // a long answer's thinking passed 20 s and every such call was paid for twice, 11-11's words cards 177 times.)
       const timeoutMs = f.timeoutMs || 30_000;
-      const raw = twChars(await askModel(env, ctx, name, model, parts, schema, { effort: effortFor(f, m), gemini, timeoutMs, firstMs: f.tap ? Math.min(timeoutMs, 20_000) : timeoutMs }));
+      const raw = twChars(await askModel(env, ctx, name, model, parts, schema, { effort: effortFor(f, m), gemini, timeoutMs, firstMs: f.tap || open ? Math.min(timeoutMs, 20_000) : timeoutMs }));
       const ask = f.clarify ? askOf(raw, answers, Object.fromEntries((f.pick || []).map(k => [k, input?.[`${k}s`] || []]))) : null;
       const out = await f.clean(raw, input);
       if (out != null || ask) return { out, ask, model };
@@ -184,7 +188,7 @@ export async function runFeature(env, ctx, name, input, { gemini = null, answers
 
 // The day's count for everyone, by the admin panel's setting for the
 // feature (DEV ai*: the caller reads it, worker.js aiCap).
-async function spendDay(env, name, cap, day) {
+export async function spendDay(env, name, cap, day) {
   if (!(cap > 0)) return false;
   return (await addOne(env, `${name}:g`, day)) <= cap;
 }

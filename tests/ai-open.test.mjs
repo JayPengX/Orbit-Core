@@ -1,0 +1,73 @@
+// AI made when someone opens it (ai-open.js, Jay 11-14: "only spend it as I
+// use it"): the facts are the build's (never the phone's), one call a story
+// for everyone, kept; refused off our pages, for a story the build doesn't
+// have, and past the day's cap. And the AI made ahead stays paused.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { handleAiOpen } from '../ai-open.js';
+import { newsOpenFacts, openPart, openPath, OPEN_PARTS } from '../builders/ai.js';
+import { aiOnce } from '../ai.js';
+
+const ev = o => `event: ${o.type}\ndata: ${JSON.stringify(o)}\n\n`;
+const ORIGIN = 'https://orbit.jaypengx.com';
+const ask = (q, origin = ORIGIN) => new Request(`https://api.jaypengx.com/ai/open?${q}`, { headers: { Origin: origin } });
+
+function envWith(stories, answer) {
+  const files = new Map();
+  for (const [id, s] of Object.entries(stories)) ((files.get(openPath(openPart(id))) || files.set(openPath(openPart(id)), {}).get(openPath(openPart(id))))[id] = s);
+  const kv = new Map();
+  let calls = 0;
+  return {
+    calls: () => calls,
+    ANTHROPIC_API_KEY: 'a',
+    OPENAI_API_KEY: 'o',
+    DATA: { get: async k => (files.has(k) ? { json: async () => ({ stories: files.get(k) }) } : null) },
+    RATE_LIMIT_KV: { get: async k => kv.get(k) ?? null, put: async (k, v) => void kv.set(k, v), getWithMetadata: async k => ({ value: kv.get(k) ?? null, metadata: null }) },
+    GEMINI_RELAY: {
+      fetch: async (u, init) => {
+        calls++;
+        const out = answer(JSON.parse(init.body));
+        if (String(u).includes('openai')) return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(out) } }], usage: {} }));
+        return new Response([{ type: 'message_start', message: { usage: { input_tokens: 10 } } }, { type: 'content_block_delta', delta: { type: 'text_delta', text: JSON.stringify(out) } }, { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 5 } }].map(ev).join(''));
+      }
+    }
+  };
+}
+
+const brief = { id: 's1', heads: ['颱風逼近', '颱風明天登陸'], sums: [] };
+const points = { items: [{ id: 's1', points: [{ k: 'what', zh: '颱風明天登陸台灣', en: 'A typhoon lands tomorrow.' }, { k: 'next', zh: '各地注意停班停課', en: 'Watch for closures.' }] }] };
+
+test('a story’s 重點整理 is made the first time anyone opens it, then kept for everyone', async () => {
+  const env = envWith({ s1: { m: 6, brief } }, () => points);
+  const r1 = await (await handleAiOpen(ask('f=news-brief&id=s1'), env, null, {}, { ip: '1', cap: 10 })).json();
+  assert.equal(r1.out.points.length, 2);
+  assert.equal(env.calls(), 1);
+  const r2 = await (await handleAiOpen(ask('f=news-brief&id=s1'), env, null, {}, { ip: '2', cap: 10 })).json();
+  assert.equal(r2.kept, true, 'the second reader gets the kept one');
+  assert.equal(env.calls(), 1, 'no second call');
+});
+
+test('refused: another site, a story the build doesn’t have, a feature not made on open, the day’s cap', async () => {
+  const env = envWith({ s1: { m: 6, brief } }, () => points);
+  assert.equal((await handleAiOpen(ask('f=news-brief&id=s1', 'https://evil.example'), env, null, {}, { ip: '1', cap: 10 })).status, 403);
+  assert.equal((await handleAiOpen(ask('f=news-brief&id=nope'), env, null, {}, { ip: '1', cap: 10 })).status, 404);
+  assert.equal((await handleAiOpen(ask('f=law-chat&id=s1'), env, null, {}, { ip: '1', cap: 10 })).status, 400);
+  assert.equal((await handleAiOpen(ask('f=news-brief&id=s1'), env, null, {}, { ip: '1', cap: 0 })).status, 429);
+  assert.equal(env.calls(), 0);
+});
+
+test('the build keeps each front story’s facts in parts, no AI', async () => {
+  const story = (id, n) => ({ id, n, m: n * 2, title: `T${id}`, topics: ['pol'], sides: { g: 2, b: 2 }, items: [['自由時報', `綠${id}`], ['聯合報', `藍${id}`], ['中央社', `中${id}`]] });
+  const m = new Map([['news/index.json', JSON.stringify({ tw: [story('a', 3), story('b', 1)], intl: [] })]]);
+  const store = { json: async k => (m.has(k) ? JSON.parse(m.get(k)) : null), put: async (k, v) => (m.set(k, JSON.stringify(v)), true) };
+  const r = await newsOpenFacts({ store });
+  assert.equal(r.stories, 2);
+  const a = JSON.parse(m.get(openPath(openPart('a')))).stories.a;
+  assert.ok(a.brief && a.sides, 'three outlets: a brief and the sides');
+  assert.ok(!JSON.parse(m.get(openPath(openPart('b')))).stories.b.brief, 'one outlet: no brief');
+  assert.equal([...m.keys()].filter(k => k.startsWith('private/news/open/')).length, OPEN_PARTS);
+});
+
+test('made ahead for everyone stays paused without AI_BULK', async () => {
+  assert.equal(await aiOnce({}, null, 'news-brief', { stories: [brief] }, 10), null);
+});
