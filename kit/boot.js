@@ -232,6 +232,17 @@
     title = 'Orbit';
     logo = '/app/favicon.svg';
   } else launch = 0;
+  // Any app opened inside Orbit's window: the same screen every time, Orbit's
+  // mark and colour with the app's name under it (Jay 2026-11-14: "unify
+  // loading screens for orbit"), never each app's own icon and colour.
+  var framed = false;
+  try {
+    framed = window.parent !== window && !!window.parent.ORBIT_HOST;
+  } catch (e) {}
+  if (framed && !launch) {
+    logo = '/app/favicon.svg';
+    launch = 1;
+  }
   box.className = launch ? 'loading q-boot q-boot-orbit' : 'loading q-boot';
   box.setAttribute('role', 'status');
   box.setAttribute('aria-live', 'polite');

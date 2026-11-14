@@ -102,6 +102,8 @@
   /* (A switch: the app shown fades and settles in over the one left, which
      stays as it is underneath until then: never a see-through moment.) */
   .q-suite-frame.q-suite-shown { z-index: 1; visibility: visible; pointer-events: auto; opacity: 1; transform: none; transition: opacity 0.24s ease, transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s; }
+  /* (Drawn beneath the app shown till it has painted: kit suite.mjs raise.) */
+  .q-suite-frame.q-suite-under { z-index: 0; visibility: visible; opacity: 1; transform: none; transition: none; }
   @media (prefers-reduced-motion: reduce) { .q-suite-frame, .q-suite-frame.q-suite-shown { transition: none; transform: none; } }
   @media (prefers-color-scheme: dark) { .door { --q-accent: #6d66f0; } html.q-suite-host, html.q-suite-host body { background: var(--q-page, #000); } }
 </style>

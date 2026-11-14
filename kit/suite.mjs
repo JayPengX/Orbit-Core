@@ -799,6 +799,49 @@ export function host(box, { first = null, list = null } = {}) {
     f.el.remove();
     frames.delete(id);
   };
+  // The app switched to comes up over the one left only once it has painted:
+  // till then it's drawn beneath it (a frame hidden had its picture let go,
+  // and one just made is a blank page till its styles come: Safari showed
+  // either as a white flash, Jay 2026-11-14). A new app waits for its first
+  // screen (its loading screen, Orbit's own) at most 0.8 s; one kept, two frames.
+  let raising = 0;
+  const raise = (f, moved) => {
+    const token = ++raising;
+    const up = () => {
+      if (token !== raising) return;
+      f.el.classList.remove('q-suite-under');
+      for (const g of frames.values()) {
+        const on = g === f;
+        g.el.classList.toggle('q-suite-shown', on);
+        g.el.toggleAttribute('inert', !on);
+        g.el.setAttribute('aria-hidden', on ? 'false' : 'true');
+        look(g, on);
+      }
+    };
+    if (!moved || f.el.classList.contains('q-suite-shown') || ![...frames.values()].some(g => g !== f && g.el.classList.contains('q-suite-shown'))) return up();
+    for (const g of frames.values()) if (g !== f) g.el.classList.remove('q-suite-under');
+    f.el.classList.add('q-suite-under');
+    const painted = () => {
+      try {
+        const d = f.el.contentDocument;
+        return Boolean(d && d.location.href !== 'about:blank' && d.readyState !== 'loading');
+      } catch {
+        return true;
+      }
+    };
+    // (Then it fades and settles in over the one left, as a switch always has.)
+    const glide = () => {
+      up();
+      if (token === raising && typeof f.el.animate === 'function' && !globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) f.el.animate([{ opacity: 0, transform: 'scale(0.97)' }, { opacity: 1, transform: 'none' }], { duration: 300, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+    };
+    const twoFrames = () => requestAnimationFrame(() => requestAnimationFrame(glide));
+    if (painted()) return twoFrames();
+    const t0 = Date.now();
+    const wait = setInterval(() => {
+      if (token !== raising) return clearInterval(wait);
+      if (painted() || Date.now() - t0 > 800) (clearInterval(wait), twoFrames());
+    }, 30);
+  };
   const show = (id, url = null, y = 0) => {
     if (!BRANDS[id]) return;
     let f = frames.get(id);
@@ -817,13 +860,7 @@ export function host(box, { first = null, list = null } = {}) {
     const was = shown;
     shown = id;
     f.used = Date.now();
-    for (const g of frames.values()) {
-      const on = g === f;
-      g.el.classList.toggle('q-suite-shown', on);
-      g.el.toggleAttribute('inert', !on);
-      g.el.setAttribute('aria-hidden', on ? 'false' : 'true');
-      look(g, on);
-    }
+    raise(f, was !== id);
     if (was !== id) {
       try {
         f.el.contentWindow?.__orbitSuite?.draw?.();
