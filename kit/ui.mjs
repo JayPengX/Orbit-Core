@@ -308,6 +308,45 @@ export function daySwipe(panel, step, { can = null, page = true } = {}) {
   panel.addEventListener('touchmove', ev => start?.src === 'panel' && move(ev), { passive: false });
   panel.addEventListener('touchend', ev => (!start || start.src === 'panel') && end(ev), { passive: true });
   panel.addEventListener('touchcancel', () => ((start = null), settle(true)), { passive: true });
+  // Two fingers sideways on a trackpad (a Mac's, a PC's precision one: a
+  // wheel going sideways) do what a finger's swipe does (Jay 2026-11-14:
+  // "let's support it"): the page follows, then the day or place beside, one
+  // step a gesture, its glide after it never a second step. Up and down stays
+  // the page's scroll; a row that scrolls sideways keeps its own; with
+  // nothing beside, the browser's own back swipe is left alone.
+  const W = { acc: 0, done: false, timer: 0 };
+  const wheelEnd = () => {
+    if (!W.done) settle(true);
+    W.acc = 0;
+    W.done = false;
+  };
+  panel.addEventListener(
+    'wheel',
+    ev => {
+      if (ev.ctrlKey || Math.abs(ev.deltaX) <= Math.abs(ev.deltaY) * 1.5) return;
+      const over = [...document.querySelectorAll('dialog[open]')].some(d => !d.contains(panel));
+      const box = over ? true : sideways(ev.target);
+      const dir = ev.deltaX > 0 ? 1 : -1;
+      if (box === true || (box && canScroll(box, -ev.deltaX)) || (can && !can(dir) && !W.acc)) return;
+      ev.preventDefault();
+      clearTimeout(W.timer);
+      W.timer = setTimeout(wheelEnd, 180);
+      if (W.done) return;
+      W.acc += ev.deltaX * (ev.deltaMode === 1 ? 16 : 1);
+      if (Math.abs(W.acc) >= 110) {
+        W.done = true;
+        const d = W.acc > 0 ? 1 : -1;
+        if (!step(d)) return settle(true);
+        settle();
+        return slideIn(panel, d);
+      }
+      if (!panel.classList.contains('swiping')) stopSlide(panel);
+      panel.classList.remove('swipe-back');
+      panel.classList.add('swiping');
+      panel.style.setProperty('--swipe', `${Math.round(-W.acc * 0.45)}px`);
+    },
+    { passive: false }
+  );
   // The page's empty space swipes too, not only what's drawn on it (Jay
   // 2026-11-06, Sports on an iPad: below a short day, nothing moved): a
   // finger on what holds the panel (the page, its main) while the panel

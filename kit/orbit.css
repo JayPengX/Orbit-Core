@@ -6104,7 +6104,7 @@ html.q-tabrail.q-desk .q-tabbar.q-tabbar {
   left: 0;
   width: var(--q-desk-w);
   max-height: none;
-  padding: var(--q-desk-top) 12px 84px;
+  padding: var(--q-desk-top) 12px var(--q-desk-foot, 84px);
   align-content: start;
   grid-auto-rows: var(--q-tabrail-tab);
   gap: 2px;
@@ -6117,6 +6117,10 @@ html.q-tabrail.q-desk .q-tabbar.q-tabbar {
   transition: none;
   overflow-y: auto;
   scrollbar-width: none;
+}
+/* (Safari before 18.2 doesn't know scrollbar-width: its bar hidden the old way.) */
+html.q-tabrail.q-desk .q-tabbar.q-tabbar::-webkit-scrollbar {
+  display: none;
 }
 html.q-tabrail.q-desk .q-tabbar.q-tabbar::before {
   left: 12px;
@@ -6227,7 +6231,10 @@ html.q-tabrail.q-desk .q-appbar .q-actions {
   background: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  box-shadow: inset 0 1px 0 var(--q-desk-edge);
+  /* (Its own ground, the bar's colour to its edges: a short window's tabs
+     scroll under it, never show through it. Jay 2026-11-14, News 單邊.) */
+  box-shadow: inset 0 1px 0 var(--q-desk-edge), 0 0 0 11px var(--q-desk-bg);
+  background: var(--q-desk-bg);
 }
 html.q-tabrail.q-desk .q-appbar .q-actions > :is(.q-icon-btn, .q-account:not(.q-framed)) {
   width: 44px;
@@ -7296,9 +7303,25 @@ html.q-tabrail:not(.q-desk) .q-appbar .q-actions.q-suite-rowed > :is(.q-suite, .
 html.q-tabrail:not(.q-desk) .q-appbar .q-actions.q-suite-rowed > .q-account.q-framed {
   margin: calc((var(--q-tabrail-foot, 44px) - var(--q-tabrail-face, 36px)) / 2);
 }
+/* In Orbit's window: the switcher and the apps open a row of their own
+   over the account and the buttons (one row ran past the bar's edge, the
+   account cut off: Jay 2026-11-14), the tabs' room under them kept. */
+html.q-in-suite.q-tabrail.q-desk {
+  --q-desk-foot: 142px;
+}
+html.q-tabrail.q-desk .q-appbar .q-actions:has(> .q-suite) {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
 html.q-tabrail.q-desk .q-appbar .q-actions > .q-suite {
+  order: -2;
+  flex: 1 0 100%;
   flex-direction: row;
+  justify-content: flex-start;
   width: auto;
+  min-width: 0;
+  height: 44px;
+  overflow: hidden;
 }
 html.q-tabrail.q-desk .q-appbar .q-actions > .q-suite .q-suite-btn {
   width: auto;
@@ -7339,6 +7362,13 @@ html.q-tabrail .q-suite-live {
 /* (Its word on a phone held upright; the dot where there's no room for it: a rail.) */
 html:not(.q-tabrail) .q-suite-on .q-suite-dot {
   display: none;
+}
+html.q-tabrail.q-desk .q-appbar .q-actions > .q-suite .q-suite-dot {
+  right: 3px;
+  bottom: 7px;
+  width: 8px;
+  height: 8px;
+  box-shadow: 0 0 0 2px var(--q-desk-bg);
 }
 .q-suite-dot {
   position: absolute;
