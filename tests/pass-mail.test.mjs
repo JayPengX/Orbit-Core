@@ -205,6 +205,29 @@ test('recovery: five wrong codes end it', async () => {
   assert.equal((await t.post({ op: 'mail-recover', addr: 'me@example.com', code: right, app: 'match' })).data.error.code, 'ECO_MAIL_CODE_WRONG');
 });
 
+test('guesses sent at once share no try: a code gets MAIL_TRIES looks at most, then even the right one is refused', async () => {
+  const t = setup();
+  const a = await account(t);
+  await link(t, a.token, 'me@example.com');
+  await t.post({ op: 'mail-recover-begin', addr: 'me@example.com' });
+  await t.settle();
+  const right = t.codeIn(t.sent.at(-1));
+  const guesses = Array.from({ length: 60 }, (_, i) => String((Number(right) + 1 + i) % 1_000_000).padStart(6, '0'));
+  const res = await Promise.all(guesses.map(code => t.post({ op: 'mail-recover', addr: 'me@example.com', code, app: 'match' })));
+  assert.ok(res.every(r => r.status !== 200));
+  assert.equal((await t.post({ op: 'mail-recover', addr: 'me@example.com', code: right, app: 'match' })).data.error.code, 'ECO_MAIL_CODE_WRONG');
+});
+
+test('one sign-up code sent twice at once makes one pass, never two', async () => {
+  const t = setup();
+  const secret = await tokenSecret(t.env);
+  const ctx = body => ({ env: t.env, deps: t.deps, body, secret, ip: '1.1.1.1', headers: {}, request: {}, waitUntil: () => {} });
+  await signupMailBegin(ctx({ email: 'twice@example.com' }));
+  const code = t.codeIn(t.sent.at(-1));
+  const both = await Promise.all([signupMailProve(ctx({ email: 'twice@example.com', code })), signupMailProve(ctx({ email: 'twice@example.com', code }))]);
+  assert.equal(both.filter(r => r.addr).length, 1);
+});
+
 test('removed or replaced: the old address is told, and no longer recovers the account', async () => {
   const t = setup();
   const a = await account(t);

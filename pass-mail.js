@@ -221,17 +221,28 @@ async function newCode(ctx, id, fields) {
 }
 // The code typed against the row: true once (the row's code is spent),
 // false for a wrong or ended one (five wrong and it's gone).
+// Each try is counted before the code is looked at, written only over the
+// row as read (its updateTime): guesses sent at once can't share one count,
+// so a code never has more than MAIL_TRIES looks (a recovery code is the
+// account). A try that lost that race is refused unlooked.
 async function useCode(ctx, id, code) {
   const { env, deps } = ctx;
-  const row = parse(await deps.fsGet(env, MAIL_CODES, id));
+  const doc = await deps.fsGet(env, MAIL_CODES, id);
+  const row = parse(doc);
   if (!row?.h || !(row.e > deps.now()) || row.n >= MAIL_TRIES) return null;
-  if (!/^\d{6}$/.test(code) || !same(await codeHash(ctx.secret, id, code), row.h)) {
-    await deps.fsWrite(env, MAIL_CODES, id, JSON.stringify({ ...row, n: row.n + 1, ...(row.n + 1 >= MAIL_TRIES ? { h: '' } : {}) }));
-    return null;
-  }
-  // (Spent, its day's count kept: the rate stays counted.)
-  await deps.fsWrite(env, MAIL_CODES, id, JSON.stringify({ ...row, h: '', n: MAIL_TRIES }));
-  return row;
+  const write = async (next, updateTime) => {
+    try {
+      return await deps.fsWrite(env, MAIL_CODES, id, JSON.stringify(next), { updateTime });
+    } catch (e) {
+      if (e?.precondition) return null;
+      throw e;
+    }
+  };
+  const tried = await write({ ...row, n: row.n + 1 }, doc.updateTime);
+  if (!tried) return null;
+  if (!/^\d{6}$/.test(code) || !same(await codeHash(ctx.secret, id, code), row.h)) return null;
+  // (Spent, its day's count kept: the rate stays counted; another's write meanwhile and it isn't ours.)
+  return (await write({ ...row, h: '', n: MAIL_TRIES }, tried.updateTime)) ? row : null;
 }
 const cleanCodeIn = v => (typeof v === 'string' ? v.replace(/\D/g, '').slice(0, 6) : '');
 
