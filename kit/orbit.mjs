@@ -63,9 +63,6 @@ let devNow = (() => {
   }
 })();
 let devReadAt = 0;
-// The Worker's read under way, settled (true: read now) when it lands or fails.
-let devRead = Promise.resolve(false);
-export const devFresh = () => devRead;
 // (A page on localhost, our tools' previews reading the real Worker through its dev door, reads
 // live data a third as often: they were two thirds of the server's day, 11-14. ?beat=real for
 // the phones' pace.)
@@ -84,17 +81,16 @@ export const dev = key => {
 export function readDev() {
   if (typeof window === 'undefined' || Date.now() - devReadAt < 5 * 60_000) return;
   devReadAt = Date.now();
-  devRead = fetch(DEV_URL, { signal: AbortSignal.timeout(8_000) })
+  fetch(DEV_URL, { signal: AbortSignal.timeout(8_000) })
     .then(r => (r.ok ? r.json() : null))
     .then(x => {
-      if (!x) return false;
+      if (!x) return;
       devNow = cleanDev(x);
       try {
         localStorage.setItem(DEV_KEY, JSON.stringify(devNow));
       } catch {}
-      return true;
     })
-    .catch(() => false);
+    .catch(() => {});
 }
 readDev();
 // fn again every dev(key) seconds, the setting read at each beat (a change
@@ -2238,7 +2234,15 @@ function makeSession(app, { lang, heartbeat }) {
       if (res.same) res.wallet = wallet;
       return res;
     } catch (error) {
-      if (error.code === 'ECO_SIGNED_OUT' || error.code === 'ECO_TOKEN_INVALID') return signedOut();
+      if (error.code === 'ECO_SIGNED_OUT' || error.code === 'ECO_TOKEN_INVALID') {
+        // (Replaced meanwhile, by a new pass or a sign-in in another app or
+        // frame on this device: that one asked, never a sign-out. Jay 11-14:
+        // recovered by email, a frame still on the old sign-in wiped the new
+        // one while he copied his new pass.)
+        const now = readStore(KEY.refresh);
+        if (now && now !== ref) return refreshCall({ claim, data, since });
+        return signedOut();
+      }
       throw error;
     }
   }
@@ -2870,7 +2874,6 @@ function signInGate(s, look = null) {
       panel = null;
       rest.forEach(n => n.style.removeProperty('display'));
       forgot.disabled = make.disabled = false;
-      input.focus();
     };
     const swap = async open => {
       forgot.disabled = make.disabled = true;
@@ -2886,22 +2889,10 @@ function signInGate(s, look = null) {
         forgot.disabled = make.disabled = false;
       }
     };
-    // 忘記通行碼 where mail can be sent; 建立新的 Orbit Pass only where a new
-    // pass can be made (a day's count in 設定) and its email proved (Jay 11-14:
-    // one account a person). Until the Worker's settings land (a device new
-    // to Orbit has none kept), each keeps its place unseen, so nothing on the
-    // screen moves when they appear (Jay 11-14: 建立 jumped in after seconds).
-    const canMake = () => dev('passMail') && dev('passNewDay') > 0;
-    const placeOf = (b, on, settled) => {
-      b.hidden = settled && !on;
-      b.style.visibility = on ? '' : 'hidden';
-    };
-    placeOf(forgot, dev('passMail'), false);
-    placeOf(make, canMake(), false);
-    const shown = devFresh().then(() => {
-      placeOf(forgot, dev('passMail'), true);
-      placeOf(make, canMake(), true);
-    });
+    // 忘記通行碼 and 建立新的 Orbit Pass: on the screen from its first frame,
+    // whatever the settings say (Jay 11-14: 建立 popping in late, or its place
+    // kept blank then filled, made him tap the wrong button). Mail that can't
+    // go, or sign-up closed (設定), is said in the panel a tap opens.
     const rest = [
       form,
       ...(keys ? [keys.row] : []),
@@ -2917,10 +2908,10 @@ function signInGate(s, look = null) {
     for (const d of document.querySelectorAll('dialog[open]')) if (!onTop.has(d)) d.close();
     keepOnTop(gate);
     keys?.start();
-    setTimeout(() => input.focus(), 50);
+    // (No keyboard on its own: the field is tapped when wanted. Jay 11-14.)
     // An invite (admin's 邀請 QR code, /app/?join):
     // 建立 opened at once, where a pass can be made. (A device signed in never sees this screen.)
-    if (/[?&]join(?:[=&]|$)/.test(globalThis.location?.search || '')) shown.then(() => setTimeout(() => !over && !make.hidden && !make.disabled && make.click(), 80));
+    if (/[?&]join(?:[=&]|$)/.test(globalThis.location?.search || '')) setTimeout(() => !over && !make.disabled && make.click(), 80);
   });
 }
 
@@ -3732,7 +3723,13 @@ const keyBytes = text => Uint8Array.from(atob(text.replace(/-/g, '+').replace(/_
 export async function enablePush(s, force = false) {
   if (!notifyOn() || !globalThis.navigator?.serviceWorker) return false;
   try {
-    const reg = await Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(r, 4000))]);
+    // In Orbit (every app framed in /app/): the home-screen app's own worker
+    // takes the pushes, never the framed app's (/sports/…): iOS delivers a
+    // push only to the installed web app, so a subscription from a frame's
+    // worker, or one left from a standalone app taken off the home screen,
+    // never showed (Jay 11-14: a test notice never came).
+    const own = inSuite() ? await navigator.serviceWorker.getRegistration('/app/').catch(() => null) : null;
+    const reg = own || (await Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(r, 4000))]));
     if (!reg?.pushManager) return false;
     // The Worker's key, asked once a day (it was asked at every list change).
     const day = new Date().toDateString();
@@ -3741,9 +3738,9 @@ export async function enablePush(s, force = false) {
     if (key && !(kept?.day === day && kept.key === key)) writeStore('orbit.push.key', JSON.stringify({ key, day }));
     let sub = await reg.pushManager.getSubscription();
     // One made with another key is replaced.
-    const own = sub?.options?.applicationServerKey ? btoa(String.fromCharCode(...new Uint8Array(sub.options.applicationServerKey))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') === key : true;
-    if (sub && !own) await sub.unsubscribe().catch(() => {});
-    if (!sub || !own) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) });
+    const keyed = sub?.options?.applicationServerKey ? btoa(String.fromCharCode(...new Uint8Array(sub.options.applicationServerKey))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') === key : true;
+    if (sub && !keyed) await sub.unsubscribe().catch(() => {});
+    if (!sub || !keyed) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) });
     const mark = `${sub.endpoint}|${new Date().toDateString()}`;
     const storeKey = `orbit.push.sub.${s.app}`;
     if (!force && readStore(storeKey) === mark) return true;
@@ -4060,7 +4057,7 @@ export function quietTip({ accent = '', mark = null, label = '', title, line, go
 
 // Every notice's life, the same for all (Jay 2026-11-14: "unify… all can be
 // swiped off, all stay the same amount of time"): TIP_FOR on screen, a touch
-// on it gives it TIP_FOR more; a swipe up or to a side takes it away, as does
+// on it gives it TIP_FOR more; a swipe up takes it away (11-14: up only), as does
 // a scroll or a tap elsewhere. Answers its gone(); `onGone(how)` after
 // ('swipe', 'time', 'away' or 'tap').
 export function noticeLife(el, { onGone = () => {} } = {}) {
@@ -4097,11 +4094,11 @@ export function noticeLife(el, { onGone = () => {} } = {}) {
   });
   el.addEventListener('pointermove', e => {
     if (!start || e.pointerId !== start.id) return;
-    const dx = e.clientX - start.x;
+    // (Up only, as a phone's own banners: never held and moved about. Jay 11-14.)
     const dy = Math.min(0, e.clientY - start.y);
-    if (Math.abs(dx) < 6 && dy > -6) return;
+    if (dy > -6) return;
     el.classList.add('q-drag');
-    move(dx, dy);
+    move(0, dy);
   });
   const end = e => {
     if (!start || (e && e.pointerId !== start.id)) return;
@@ -4109,10 +4106,10 @@ export function noticeLife(el, { onGone = () => {} } = {}) {
     const dy = parseFloat(el.style.getPropertyValue('--q-dy')) || 0;
     start = null;
     el.classList.remove('q-drag');
-    if (Math.abs(dx) > 60 || dy < -30) {
+    if (dy < -30) {
       // (A swipe isn't a tap: the click that follows it is let go.)
       el.dataset.qSwiped = '1';
-      move(Math.abs(dx) > 60 ? Math.sign(dx) * 480 : dx, Math.abs(dx) > 60 ? dy : -160);
+      move(0, -160);
       gone('swipe');
       return;
     }
@@ -4361,8 +4358,11 @@ function usageRows(s) {
 // Once on a device, a moment after an app opens: what's counted and the
 // policy (a quiet banner, as Orbit's others). Off is in Orbit Pass › 隱私,
 // not on the banner (Jay 2026-11-14).
+// Once for the account too (Jay 11-14: "only show once for a account"):
+// kept in its settings, so another device or a home-screen app with its own
+// storage doesn't show it again.
 export function usageNotice(s) {
-  if (typeof document === 'undefined' || usageNoticeSeen() || !usageOn() || globalThis.navigator?.webdriver || installCovered) return;
+  if (typeof document === 'undefined' || usageNoticeSeen() || s?.wallet?.settings?.usageSeen?.value || !usageOn() || globalThis.navigator?.webdriver || installCovered) return;
   if (document.querySelector('dialog[open]') || document.visibilityState === 'hidden' || bannerEl?.isConnected) return;
   const T = (zh, e) => (s?.lang === 'en' ? e : zh);
   const shown = quietTip({
@@ -4373,7 +4373,9 @@ export function usageNotice(s) {
     go: T('隱私權政策', 'Privacy policy'),
     onGo: () => openPolicy(s)
   });
-  if (shown) markUsageNotice();
+  if (!shown) return;
+  markUsageNotice();
+  if (s?.wallet) s.write?.({ wallet: settingPatch('usageSeen', 'yes') }).catch(() => {});
 }
 
 // Where a notice's tap points (its #hash), in the open page: a new hash as
@@ -4391,7 +4393,8 @@ export function goNotice(url) {
   // (Held in Orbit's window: the app it's for shown there, at that place.)
   let host = null;
   try {
-    host = globalThis.parent !== globalThis ? globalThis.parent.ORBIT_HOST : null;
+    // (A frame's host, or Orbit's window itself: its worker takes every app's pushes.)
+    host = (globalThis.parent !== globalThis ? globalThis.parent.ORBIT_HOST : null) || globalThis.ORBIT_HOST || null;
   } catch {}
   if (host?.open && to.origin === location.origin) return void host.open(`${to.pathname}${to.search}${to.hash}`);
   if (to.origin !== location.origin || to.pathname !== location.pathname) return void location.assign(to.href);
@@ -6348,7 +6351,8 @@ export function tabBar({ tabs, onSelect, onShow = null, hash = id => `#${id}`, n
     nav.classList.add('q-tabbar-act');
     // (Its count where the button's place is worked out too.)
     document.documentElement.style.setProperty('--q-tabs', String(tabs.length));
-    const act = node('button', { class: 'q-tab-action', type: 'button', 'aria-label': action.label });
+    // (action.ai: an Orbit AI tab, gone with no Orbit AI on the account: aiLock.)
+    const act = node('button', { class: 'q-tab-action', type: 'button', 'aria-label': action.label, ...(action.ai ? { 'data-ai-tap': '' } : {}) });
     // (A drawn icon as it is; a name from the bar's own set, + by default.)
     act.innerHTML = /^<svg/.test(action.icon || '') ? action.icon : icon(ICONS[action.icon] ? action.icon : '<path d="M12 5v14M5 12h14"/>');
     act.addEventListener('click', () => (haptic(), action.onTap?.()));
