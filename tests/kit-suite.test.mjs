@@ -217,6 +217,7 @@ test('a separate app recommends Orbit once a day at most, never after 不再顯�
   assert.equal(K.tipDue({ at: String(now - 3_600_000), now }), false);
   assert.equal(K.tipDue({ at: String(now - K.TIP_EVERY), now }), true);
   assert.equal(K.tipDue({ never: '1', at: null, now }), false);
+  assert.ok(K.TIP_FOR <= 5_000, 'brief, so 不再顯示 is not the only way out');
   assert.equal(K.orbitTarget('/sports/#game=1'), '/app/?open=%2Fsports%2F%23game%3D1');
   // (An iPhone's home-screen app: Orbit's page in Safari, where it can be added.)
   assert.equal(K.orbitTarget('/law/', { iosApp: true, origin: 'https://orbit.jaypengx.com' }), 'x-safari-https://orbit.jaypengx.com/app/');
