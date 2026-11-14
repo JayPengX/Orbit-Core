@@ -1741,8 +1741,18 @@ export async function readThrough(env, ctx, url, trim = null) {
 // while an F1 session runs, every car's last lap kept (f1-live.js
 // sampleLive), so a phone opened late still has every lap; otherwise one
 // look at the index, cached, and nothing more.
+// Whether an F1 session runs, as the even minute's look found it ('1' or '0'), for the odd
+// minutes' tick (scheduled): written only when it changes (KV's 1,000 writes a day).
+export const F1_LIVE_KEY = 'f1:live';
+export async function f1Mark(env, said) {
+  if (said == null || !env.RATE_LIMIT_KV) return;
+  const live = said === 'idle' || said === 'no log' ? '0' : '1';
+  if ((await env.RATE_LIMIT_KV.get(F1_LIVE_KEY).catch(() => null)) !== live) await env.RATE_LIMIT_KV.put(F1_LIVE_KEY, live).catch(() => {});
+}
+
+// → what sampleLive said ('idle': no session), null when it failed.
 export function sportsCron(env, at) {
   return sampleLive(doLog(env.F1_LOG), at)
-    .then(r => r !== 'idle' && console.log('f1 laps', r))
-    .catch(e => console.log('f1 laps failed', String(e?.message || e)));
+    .then(r => (r !== 'idle' && console.log('f1 laps', r), r))
+    .catch(e => (console.log('f1 laps failed', String(e?.message || e)), null));
 }
