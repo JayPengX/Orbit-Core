@@ -1,0 +1,356 @@
+From 8c77cc6aad6ad0447bb0cb05ff6a872e71b2b7d7 Mon Sep 17 00:00:00 2001
+From: orbit-agent <actions@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 15:25:29 +0000
+Subject: [PATCH] Headlines in the other language are translated only as a list
+ shows them, in one batch, kept on the phone
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ FEATURES.md            |  2 +-
+ MAP.md                 |  2 +-
+ public/app.mjs         | 24 +++--------
+ public/lib/lines.mjs   |  4 +-
+ public/lib/tr.mjs      | 90 ++++++++++++++++++++++++++++++------------
+ public/shell.mjs       |  2 -
+ public/views/parts.mjs | 11 ++++--
+ tests/tr.test.mjs      | 40 +++++++++++++++----
+ 8 files changed, 112 insertions(+), 63 deletions(-)
+
+diff --git a/FEATURES.md b/FEATURES.md
+index f97a866..ad75213 100644
+--- a/FEATURES.md
++++ b/FEATURES.md
+@@ -20,7 +20,7 @@ remove a feature on purpose, delete its line in the same commit.
+ - 看法案: a Taiwan story's 提到的法律, each opening its bill or the law in Orbit Law (`views/story.mjs`, Orbit-Core's `builders/news-laws.js`).
+ - 各方怎麼說: on a political or world story, each side's angle in a line and the difference that matters most, written by AI from each side's headlines, never who's right; behind the same AI button as 重點整理 (11-14), made by the first tap and kept for everyone, its shape shown meanwhile (`views/story.mjs` `sidesSay`, `lib/open-ai.mjs` `sidesAsked`, Orbit-Core's `ai-open.js`).
+ - 國際新聞中文標題: a world story's Chinese headline on a Chinese phone (a Taiwan story's English one on an English phone), the outlets' own under it in the sheet; no AI line under a headline (it only said the headline again, Jay 11-10) — `public/lib/lines.mjs`, `public/views/parts.mjs`: `shownTitle`, `public/views/story.mjs`: `storyTitle`
+-- One language at a time (Jay 11-13: a full Chinese and a full English News): every headline the AI didn't title and the top summaries translated ahead (Orbit-Core `builders/news-tr.js` → `news/tr.json`), a story's outlet headlines, summary, clips' and timeline's titles asked for as its sheet shows them (POST `/news-tr`), each by plain translation (Google), never the AI's; the outlet's own until it comes — `public/lib/tr.mjs`, `public/views/parts.mjs`, `public/views/story.mjs`, `public/app.mjs`: `export async function askTr`, `export function trPaint`, `export function said`, `export const shownSum`, `function translateIn`, `news/tr.json`
++- One language at a time (Jay 11-13: a full Chinese and a full English News; 11-14: only what's on screen, nothing translated ahead): the titles a list draws in the other language asked for in one batch (POST `/news-tr`), a story's outlet headlines, summary, clips' and timeline's titles as its sheet shows them, each by plain translation (Google), never the AI's, kept on the phone; the outlet's own until it comes, never a spinner — `public/lib/tr.mjs`, `public/views/parts.mjs`, `public/views/story.mjs`, `public/app.mjs`: `export async function askTitles`, `export function watchTitles`, `export async function askTr`, `export function trPaint`, `export function said`, `export const shownSum`, `function translateIn`
+ - A one-sided story says so wherever it's listed, words in the colour of the side that left it out (偏藍沒報, 偏右少報: never counts on a card), who carried it by name under it in 單邊, and the counts in its sheet — `public/views/parts.mjs`, `public/views/story.mjs`: `export function oneSideTag`, `export function oneSideLine`, `oneSideLine(story, { full: true })`
+ - The lead story with its picture, credited to its outlet — `public/views/parts.mjs`: `export function leadCard`, `圖：`
+ - Every story's picture beside it in a list, a play mark when it has a clip — `public/views/parts.mjs`: `nw-thumb`, `export const playMark`
+diff --git a/MAP.md b/MAP.md
+index a705b51..1a3ac86 100644
+--- a/MAP.md
++++ b/MAP.md
+@@ -115,7 +115,7 @@ Jay's, dated (Taiwan day; 11-10's by the hour), newest wins; the family's are in
+ | `lib/mine.mjs`, `brief.mjs`, `learn.mjs` | The family's links: 你關心的 (Securities' holdings, Sports' follows; `namesRe`); 今天五則 (code only, kit `feedback.mjs` as `news`); 新聞學單字 (Words' `vocab.learning`) |
+ | `lib/markets.mjs` | 預測市場: Polymarket's chances on a story's question (Orbit-Core `builders/news-markets.js` → `news/markets.json`, every 30 minutes; nothing shown past 3 hours old), drawn in the sheet's `oddsPart` |
+ | `lib/lines.mjs`, `sides.mjs` | The AI made once by Orbit-Core `builders/ai.js`: world stories' Chinese titles and Taiwan's English ones (`news/lines.json`); 各方怎麼說 (`news/sides.json`) |
+-| `lib/tr.mjs` | One language: plain translation (Orbit-Core `translate.js`, Google), never the AI's: titles and top summaries ahead (`news/tr.json`), a sheet's outlet words as it shows (POST `/news-tr`), the outlet's own till then |
++| `lib/tr.mjs` | One language: plain translation (Orbit-Core `translate.js`, Google), never the AI's: a list's waiting titles in one batch of 30 and a sheet's outlet words as they show (POST `/news-tr`), kept on the phone, the outlet's own till then; nothing ahead |
+ | `lib/search.mjs`, `views/search.mjs` | 搜尋, on the phone as each letter is typed (`findStories`, `fold`), recent searches |
+ | `lib/reading.mjs`, `pics.mjs` | 我的閱讀's log, the read marks (`markRead`, `readState`) and the follows (`setFollow`, keys `w:` words, `t:` topic, `o:` outlet), the Pass payload `{ v: 1, days, read, follow }`; an outlet's picture at the size shown (`sized`, `heavy`) |
+ | `lib/follows.mjs`, `views/follows.mjs` | What's followed (`followFinds`, `followedOf`, `lifted`: News' follows and the family's, `lib/mine.mjs`; `yourStories` the five most important), 你可能錯過 (`missedOf`); 我的追蹤's sheet (`openFollows`) and the follow pill (kit `followButton`) |
+diff --git a/public/app.mjs b/public/app.mjs
+index 2fe8f36..d6b890f 100644
+--- a/public/app.mjs
++++ b/public/app.mjs
+@@ -17,10 +17,10 @@ import * as kitUI from '#kit/ui.mjs';
+ import * as orbitKit from '#kit/orbit.mjs';
+ import { passSync } from '#kit/pass-sync.mjs';
+ import { orbitSession, tabBar, topActions, installGate, watchUpdates, keepOffline, storedAccount, cachedPayload, packJson } from '#kit/orbit.mjs';
+-import { state, hooks, lang, W, today } from './shell.mjs';
++import { state, hooks, lang, en, W, today } from './shell.mjs';
+ import { cleanPage } from './lib/stories.mjs';
+ import { cleanLines } from './lib/lines.mjs';
+-import { cleanTr } from './lib/tr.mjs';
++import { watchTitles } from './lib/tr.mjs';
+ import { cleanSides } from './lib/sides.mjs';
+ import { cleanMarkets } from './lib/markets.mjs';
+ import { cleanBriefs } from './lib/briefs.mjs';
+@@ -181,20 +181,6 @@ function loadLines(fresh) {
+     })
+     .catch(() => {});
+ }
+-// One language (lib/tr.mjs): every headline the AI didn't title, the top summaries, translated ahead.
+-const TR = 'news/tr.json';
+-let trBuilt = null;
+-function loadTr(fresh) {
+-  return packJson(TR, { ttl: fresh ? 0 : 120_000, timeout: 20_000 })
+-    .then(raw => {
+-      if (raw?.built === trBuilt) return;
+-      trBuilt = raw?.built ?? null;
+-      state.tr = cleanTr(raw);
+-      stamp++;
+-      quietRefresh();
+-    })
+-    .catch(() => {});
+-}
+ // 看法案: the laws Taiwan's stories name (Orbit-Core's builders/news-laws.js), read with the stories.
+ const LAWS = 'news/laws.json';
+ let lawsBuilt = null;
+@@ -263,7 +249,6 @@ function loadInterests() {
+ function load({ fresh = false } = {}) {
+   if (reading) return reading;
+   loadLines(fresh);
+-  loadTr(fresh);
+   loadInterests();
+   loadLaws(fresh);
+   loadSides(fresh);
+@@ -375,14 +360,15 @@ watchUpdates({ current: VERSION, key: 'orbitNews', cachePrefix: 'orbit-news-' })
+ topActions(q, { refresh: () => (state.held.clear(), load({ fresh: true })) });
+ 
+ async function boot() {
++  // (One language, lib/tr.mjs: the titles drawn in the other one asked for as they show.)
++  watchTitles(document.body, en);
+   const starting = q.start();
+   // The stories this phone kept, drawn at once; the fresh ones as they come.
+-  const [kept, keptLines, keptTr, keptMarkets] = await Promise.all([PAGE, LINES, TR, MARKETS].map(p => orbitKit.peekPack?.(p).catch(() => null)));
++  const [kept, keptLines, keptMarkets] = await Promise.all([PAGE, LINES, MARKETS].map(p => orbitKit.peekPack?.(p).catch(() => null)));
+   if (kept?.data && !testFlags().newsFail) state.page = testPage(cleanPage(kept.data));
+   // (The AI's titles, the translations and the markets kept with them, so the
+   // first draw is the whole one: the fresh ones redraw only if newer.)
+   if (keptLines?.data && linesBuilt === null) ((state.lines = cleanLines(keptLines.data)), (linesBuilt = keptLines.data.built ?? null));
+-  if (keptTr?.data && trBuilt === null) ((state.tr = cleanTr(keptTr.data)), (trBuilt = keptTr.data.built ?? null));
+   if (keptMarkets?.data && marketsBuilt === null) ((state.markets = cleanMarkets(keptMarkets.data)), (marketsBuilt = keptMarkets.data.built ?? null));
+   const mine = decodeLog(localCopy() || cachedPayload('news'));
+   if (mine) absorb(mine);
+diff --git a/public/lib/lines.mjs b/public/lib/lines.mjs
+index 9d276af..9209a01 100644
+--- a/public/lib/lines.mjs
++++ b/public/lib/lines.mjs
+@@ -20,13 +20,13 @@ export function cleanLines(raw) {
+ 
+ // The headline a reader sees: a world story's in Chinese on a Chinese phone,
+ // a Taiwan story's in English on an English one (the AI's, else the plain
+-// translation's, `t`: lib/tr.mjs); else the outlets' own.
++// translation, `t` (a string, lib/tr.mjs): when it's come); else the outlets' own.
+ // `ai`: whether it's the AI's (said so where it shows).
+ export function titleOf(story, l, en = false, t = null) {
+   const other = en ? story.region !== 'intl' : story.region === 'intl';
+   const k = en ? 'en' : 'zh';
+   const want = other && l?.[k];
+   if (want) return { text: want, ai: true, lang: en ? 'en' : 'zh-Hant' };
+-  if (other && t?.[k]) return { text: t[k], ai: false, lang: en ? 'en' : 'zh-Hant' };
++  if (t) return { text: t, ai: false, lang: en ? 'en' : 'zh-Hant' };
+   return { text: story.title, ai: false, lang: story.region === 'intl' ? 'en' : 'zh-Hant' };
+ }
+diff --git a/public/lib/tr.mjs b/public/lib/tr.mjs
+index 58359c4..8fdaf86 100644
+--- a/public/lib/tr.mjs
++++ b/public/lib/tr.mjs
+@@ -1,35 +1,35 @@
+-// One language at a time (Jay 11-13: "a full traditional Chinese experience
+-// and full English experience"): an outlet's own words in the reader's
+-// language, by plain translation (Orbit-Core's translate.js, Google's free
+-// month, never the AI's). Two ways in:
+-//   news/tr.json   every story's headline the AI didn't title, and the top
+-//                  stories' summaries, made ahead (builders/news-tr.js):
+-//                  { built, tr: { id: { zh | en, sum } } }
+-//   POST /news-tr  a story's own texts as it's opened (its outlets'
+-//                  headlines, its summary, its clips' titles), each made
+-//                  once and kept on the server; here, for the session.
+-// A text already in the reader's language is never asked for. What can't
+-// be had (none left this month, offline) shows the outlet's own.
++// One language at a time (Jay 11-13: "a full traditional Chinese
++// experience and full English experience"): an outlet's own words in the
++// reader's language, by plain translation (Orbit-Core's translate.js,
++// Google's free month, never the AI's), only for what's on screen, never
++// ahead (11-14: it cost too much). Two ways in, both POST /news-tr:
++//   a list's titles   the ones drawn waiting (`data-trid`), one batch of up
++//                     to BATCH, asked a moment after a list is drawn;
++//   a story's texts   its outlets' headlines, its summary, its clips'
++//                     titles, as its sheet shows them.
++// Each is made once on the server; here the answers are kept on the phone
++// (TR_KEY). The outlet's own words show till an answer comes, and stay if
++// none can be had (none left this month, offline).
+ import { API } from '#kit/domain.mjs';
+ 
+ const HAN = /[㐀-鿿]/;
+ // Whether a text is in the other language from the reader's.
+ export const foreign = (text, en) => Boolean(text) && HAN.test(text) === Boolean(en);
+ 
+-export function cleanTr(raw) {
+-  const out = new Map();
+-  const tr = raw && typeof raw === 'object' ? raw.tr : null;
+-  if (!tr || typeof tr !== 'object') return out;
+-  for (const [id, e] of Object.entries(tr)) {
+-    if (!e || typeof e !== 'object') continue;
+-    const s = k => (typeof e[k] === 'string' ? e[k].trim() : '');
+-    if (s('zh') || s('en') || s('sum')) out.set(id, { zh: s('zh'), en: s('en'), sum: s('sum'), s: s('s') });
+-  }
+-  return out;
+-}
+-
+-// The session's translations, by the text they're of.
++// The translations this phone has, by the text they're of (the newest KEEP kept on the phone).
++export const BATCH = 30;
++const KEEP = 400;
++export const TR_KEY = 'news.tr.v1';
+ export const trCache = new Map();
++try {
++  for (const [k, v] of JSON.parse(globalThis.localStorage?.getItem(TR_KEY) || '[]')) if (typeof k === 'string' && typeof v === 'string') trCache.set(k, v);
++} catch {}
++const keep = () => {
++  while (trCache.size > KEEP) trCache.delete(trCache.keys().next().value);
++  try {
++    globalThis.localStorage?.setItem(TR_KEY, JSON.stringify([...trCache]));
++  } catch {}
++};
+ const asked = new Set();
+ 
+ // Asks for a story's texts not had yet (each once a session); → how many came.
+@@ -43,6 +43,7 @@ export async function askTr(id, texts, en, { fetchImpl = globalThis.fetch } = {}
+     const j = await r.json();
+     let n = 0;
+     for (const [src, v] of Object.entries(j?.tr || {})) if (typeof v === 'string' && v.trim() && !foreign(v, en)) trCache.set(src, v.trim()), n++;
++    if (n) keep();
+     return n;
+   } catch {
+     // (Failed: asked again on the next opening.)
+@@ -60,9 +61,46 @@ export function trPaint(root, en) {
+     el.textContent = v;
+     el.lang = en ? 'en' : 'zh-Hant';
+     delete el.dataset.tr;
++    delete el.dataset.trid;
+     n++;
+   }
+   return n;
+ }
+ // The texts drawn waiting for theirs.
+-export const trWaiting = root => [...(root?.querySelectorAll?.('[data-tr]') || [])].map(el => el.dataset.tr);
++export const trWaiting = root => [...(root?.querySelectorAll?.('[data-tr]:not([data-trid])') || [])].map(el => el.dataset.tr);
++
++// A list's titles drawn waiting (`data-trid` the story, `data-tr` its title): asked in one batch,
++// each once a session (asked again only if the ask failed); → how many came.
++export async function askTitles(root, en, { fetchImpl = globalThis.fetch } = {}) {
++  const items = new Map();
++  for (const el of root?.querySelectorAll?.('[data-trid]') || []) {
++    const t = el.dataset.tr;
++    if (items.size >= BATCH) break;
++    if (t && el.dataset.trid && foreign(t, en) && !trCache.has(t) && !asked.has(`title\n${t}`)) items.set(t, el.dataset.trid);
++  }
++  if (!items.size || !fetchImpl) return 0;
++  for (const t of items.keys()) asked.add(`title\n${t}`);
++  try {
++    const r = await fetchImpl(`${API}/news-tr`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: en ? 'en' : 'zh-TW', items: [...items].map(([t, id]) => ({ id, texts: [t] })) }) });
++    if (!r.ok) return 0;
++    const j = await r.json();
++    let n = 0;
++    for (const [src, v] of Object.entries(j?.tr || {})) if (typeof v === 'string' && v.trim() && !foreign(v, en)) trCache.set(src, v.trim()), n++;
++    if (n) keep();
++    return n;
++  } catch {
++    for (const t of items.keys()) asked.delete(`title\n${t}`);
++    return 0;
++  }
++}
++
++// Titles waiting are asked for a moment after the page last changed, and swapped in place when they come.
++export function watchTitles(root, en) {
++  let t = 0;
++  const go = () => {
++    clearTimeout(t);
++    t = setTimeout(() => askTitles(root, en).then(n => n && trPaint(root, en)), 400);
++  };
++  new MutationObserver(go).observe(root, { childList: true, subtree: true });
++  go();
++}
+diff --git a/public/shell.mjs b/public/shell.mjs
+index eb0df1e..8baefb0 100644
+--- a/public/shell.mjs
++++ b/public/shell.mjs
+@@ -33,8 +33,6 @@ export const state = {
+   sport: null,
+   // The AI's one lines and titles by story (lib/lines.mjs), an empty Map until read.
+   lines: new Map(),
+-  // Plain translations of the titles and top summaries the AI didn't write (lib/tr.mjs).
+-  tr: new Map(),
+   // 你關心的: what Securities holds and Sports follows on this phone (lib/mine.mjs interestsOf).
+   interests: [],
+   // 新聞學單字: the words being learned in Orbit Words on this phone (lib/learn.mjs learnSet), null if none.
+diff --git a/public/views/parts.mjs b/public/views/parts.mjs
+index b0fd507..270266e 100644
+--- a/public/views/parts.mjs
++++ b/public/views/parts.mjs
+@@ -104,13 +104,13 @@ const tapStory = (story, onOpen, list) => e => {
+ // The headline as the reader sees it (a world story's in Chinese, by the
+ // AI, from the outlets' own) and the AI's neutral one line under it, its
+ // spark marking it the AI's (lib/lines.mjs).
+-export const shownTitle = story => titleOf(story, state.lines?.get?.(story.id), en, state.tr?.get?.(story.id));
++export const shownTitle = story => titleOf(story, state.lines?.get?.(story.id), en, foreign(story.title, en) ? trCache.get(story.title) : null);
+ // The outlet's summary as the reader sees it: in their language where it's
+ // been translated (lib/tr.mjs), else as the outlet wrote it.
+ export const shownSum = story => {
+-  const t = state.tr?.get?.(story.id);
+   const other = foreign(story.sum, en);
+-  return other && t?.sum && t.s === story.sum ? { text: t.sum, lang: en ? 'en' : 'zh-Hant' } : { text: story.sum || '', lang: story.region === 'intl' ? 'en' : 'zh-Hant', wait: other };
++  const v = other ? trCache.get(story.sum) : null;
++  return v ? { text: v, lang: en ? 'en' : 'zh-Hant' } : { text: story.sum || '', lang: story.region === 'intl' ? 'en' : 'zh-Hant', wait: other };
+ };
+ // An outlet's own words in the reader's language: its translation where
+ // it's had (lib/tr.mjs), else as written, marked to be swapped when the
+@@ -126,7 +126,10 @@ export function said(tag, attrs, src, parts = [src]) {
+ }
+ const titleSpan = (story, cls) => {
+   const t = shownTitle(story);
+-  return h('span', { class: cls, lang: t.lang, text: t.text });
++  const el = h('span', { class: cls, lang: t.lang, text: t.text });
++  // (The outlet's own till its translation comes, lib/tr.mjs askTitles.)
++  if (!t.ai && t.text === story.title && foreign(story.title, en)) Object.assign(el.dataset, { tr: story.title, trid: story.id });
++  return el;
+ };
+ 
+ // 快訊: a breaking story's mark before its kicker (a red dot that pulses).
+diff --git a/tests/tr.test.mjs b/tests/tr.test.mjs
+index a7948ce..762ee7c 100644
+--- a/tests/tr.test.mjs
++++ b/tests/tr.test.mjs
+@@ -2,21 +2,45 @@
+ // reader's, asked for once, only what isn't in theirs already.
+ import { test } from 'node:test';
+ import assert from 'node:assert/strict';
+-import { cleanTr, foreign, askTr, trCache } from '../public/lib/tr.mjs';
++import { foreign, askTr, askTitles, trPaint, trCache, BATCH } from '../public/lib/tr.mjs';
+ import { titleOf } from '../public/lib/lines.mjs';
+ 
+-test('which texts are the other language’s, and what news/tr.json gives', () => {
++test('which texts are the other language’s, and what a title shows', () => {
+   assert.equal(foreign('Storm hits coast', false), true);
+   assert.equal(foreign('颱風來襲', false), false);
+   assert.equal(foreign('颱風來襲', true), true);
+   assert.equal(foreign('', true), false);
+-  const tr = cleanTr({ tr: { a: { zh: '暴風襲擊海岸', sum: '摘要', s: 'A storm.' }, b: 'junk', c: {} } });
+-  assert.deepEqual([...tr.keys()], ['a']);
+-  // (The AI's title first, the plain translation's after it, the outlet's own last.)
++  // (The AI's title first, the translation after it, the outlet's own till it comes.)
+   const w = { region: 'intl', title: 'Storm hits coast' };
+-  assert.deepEqual(titleOf(w, { zh: 'AI 標題' }, false, tr.get('a')), { text: 'AI 標題', ai: true, lang: 'zh-Hant' });
+-  assert.deepEqual(titleOf(w, null, false, tr.get('a')), { text: '暴風襲擊海岸', ai: false, lang: 'zh-Hant' });
+-  assert.deepEqual(titleOf(w, null, true, tr.get('a')), { text: 'Storm hits coast', ai: false, lang: 'en' });
++  assert.deepEqual(titleOf(w, { zh: 'AI 標題' }, false, '暴風襲擊海岸'), { text: 'AI 標題', ai: true, lang: 'zh-Hant' });
++  assert.deepEqual(titleOf(w, null, false, '暴風襲擊海岸'), { text: '暴風襲擊海岸', ai: false, lang: 'zh-Hant' });
++  assert.deepEqual(titleOf(w, null, false, null), { text: 'Storm hits coast', ai: false, lang: 'en' });
++});
++
++test('a list’s waiting titles go in one capped batch, each once; the answers are painted in place', async () => {
++  const els = Array.from({ length: BATCH + 5 }, (_, i) => ({ dataset: { tr: `Headline ${i}`, trid: `s${i}` }, set textContent(v) { this.t = v; } }));
++  const root = { querySelectorAll: sel => (sel === '[data-trid]' ? els.filter(e => e.dataset.trid) : els.filter(e => e.dataset.tr)) };
++  const seen = [];
++  const fetchImpl = async (u, init) => {
++    const b = JSON.parse(init.body);
++    seen.push(b);
++    return new Response(JSON.stringify({ tr: Object.fromEntries(b.items.map(it => [it.texts[0], `譯 ${it.texts[0]}`])) }));
++  };
++  assert.equal(await askTitles(root, false, { fetchImpl }), BATCH);
++  assert.equal(seen.length, 1);
++  assert.equal(seen[0].items.length, BATCH);
++  assert.deepEqual(seen[0].items[0], { id: 's0', texts: ['Headline 0'] });
++  assert.equal(trPaint(root, false), BATCH);
++  assert.equal(els[0].t, '譯 Headline 0');
++  assert.equal(els[0].dataset.trid, undefined);
++  // (The rest in the next batch; none asked twice.)
++  assert.equal(await askTitles(root, false, { fetchImpl }), 5);
++  assert.equal(await askTitles(root, false, { fetchImpl }), 0);
++  assert.equal(seen.length, 2);
++  // (Down: the original stays, asked again later.)
++  const one = { querySelectorAll: () => [{ dataset: { tr: 'Later one', trid: 'z' } }] };
++  assert.equal(await askTitles(one, false, { fetchImpl: async () => { throw new Error('offline'); } }), 0);
++  assert.equal(await askTitles(one, false, { fetchImpl }), 1);
+ });
+ 
+ test('a story’s texts asked for once a session, only those in the other language', async () => {
+-- 
+2.56.1
+

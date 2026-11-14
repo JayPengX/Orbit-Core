@@ -1,0 +1,301 @@
+From 5644e456c032c3cd6e6ae837d80cc06e3076fea8 Mon Sep 17 00:00:00 2001
+From: orbit-agent <actions@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 15:24:47 +0000
+Subject: [PATCH] News translation no longer runs ahead: the bulk run and its
+ file are gone, /news-tr takes a list's titles in one batch
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ .github/workflows/build.yml |   2 +-
+ MAP.md                      |   2 +-
+ builders/ai.js              |  10 ---
+ builders/news-tr.js         | 123 ++++++------------------------------
+ tests/translate.test.mjs    |  40 +++++-------
+ worker.js                   |   6 +-
+ 6 files changed, 41 insertions(+), 142 deletions(-)
+
+diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
+index 7778943..39bb4f0 100644
+--- a/.github/workflows/build.yml
++++ b/.github/workflows/build.yml
+@@ -12,7 +12,7 @@ on:
+       job:
+         description: The job
+         type: choice
+-        options: [watch, watch-full, cutouts, buses, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, news, markets, gemini-check, gemini-use, ai-money, law-chat-time, ai-models, ai-compare, ai-try, as-phone, ai, ai-news, ai-sports, ai-preview, ai-f1, ai-sides, ai-words, ai-tr, system, levels, capacity, detail, cpu, sources, sources-state, store-time]
++        options: [watch, watch-full, cutouts, buses, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, news, markets, gemini-check, gemini-use, ai-money, law-chat-time, ai-models, ai-compare, ai-try, as-phone, ai, ai-news, ai-sports, ai-preview, ai-f1, ai-sides, ai-words, system, levels, capacity, detail, cpu, sources, sources-state, store-time]
+         default: watch
+       try:
+         description: "law-chat-time: settings to try, e.g. answer=minimal,plan=minimal,model=lite; gemini-check: a model name; ai-money: set=anthropic:5,openai:3 (balances, US$); ai-compare: models=a,b&from=0&n=3; cpu: query, e.g. hours=24&group=…&keys=1&script=…; as-phone: path=/ai&app=money&body=<base64 JSON>; sources: ids, e.g. tnn-bus,txg-bus; levels: dry=1 to count only"
+diff --git a/MAP.md b/MAP.md
+index dd47bc3..6b0dd85 100644
+--- a/MAP.md
++++ b/MAP.md
+@@ -186,7 +186,7 @@ w;dur=`, noted by the 除錯紀錄 when slow, and `LOCKED` (never runs as a page
+ | `/law-chat` | `law-chat.js`, `ai-other.js` | 問法律: a plan (Flash-Lite), up to 14 articles (and delegated ones) from Law's index, answered from those by Sonnet (failing: Sol), cites checked; grounded by `law-ground.js`, `law-more.js`, `law-local.js` (councils); 16 turns back; 30 a day a Pass |
+ | `/law-page` | `law-page.js`, `law-hosts.js` | A gov.tw/edu.tw page in Law, cleaned, edge-cached, via Taiwan (build key: any gov.tw, `file=1` raw, `/law-judicial` 司法院's API); 500 a day a Pass; `/law-audio` (`law-audio.js`): a 代表會's Drive recording, its true type |
+ | `/law-live` | `law-live.js` | 立法院's IVOD streams now, 60 s at the edge (last good read 30 min); ours only |
+-| `/news-tr`, `/tr` | `builders/news-tr.js`, `translate.js` | One language, Google (`TR_PAID`): `news/tr.json`, `tr/<id>.json`; kit `translateMarked`. New ones only for a 完整 pass; D1 `tr_day` caps a day |
++| `/news-tr`, `/tr` | `builders/news-tr.js`, `translate.js` | One language, Google (`TR_PAID`), only for what is on screen (a list's titles in one batch of 30, a story's words as it opens; nothing made ahead): `news/tr/<id>.json`, `tr/<id>.json`; kit `translateMarked`. New ones only for a 完整 pass; D1 `tr_day` caps a day |
+ | `/class-news` | `class-news.js` | Class's 學校公告: a school's boards read via the relay, kept 45 days, new titles worded once; R2 |
+ | `/money-read` | `money-read.js` | Money's 拍照記帳: a picture → `{ buys, left }`, read by Gemini, checked; on a tap; 30 a day a Pass, 300 in all |
+ | `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |
+diff --git a/builders/ai.js b/builders/ai.js
+index 4a2dfc7..14d4b59 100644
+--- a/builders/ai.js
++++ b/builders/ai.js
+@@ -38,7 +38,6 @@ import { sideOf } from '../kit/news-outlets.mjs';
+ import { SPORT_PATH } from '../kit/news-sport.mjs';
+ import { SPORT_WHO, piecesOf } from './news.js';
+ import { HOOKS } from './words-hooks.mjs';
+-import { newsTr } from './news-tr.js';
+ 
+ const NEWS_LINES = 'news/lines.json';
+ export const WORDS_CARDS = 'private/ai/words-cards.json';
+@@ -386,15 +385,6 @@ export async function runAi({ store, env, proxy, now = Date.now(), cap = async (
+     }
+   };
+   await step('news', 'news-lines', c => newsLines({ store, env, ctx, cap: c, until }));
+-  // (Not the AI: plain translation of what the AI didn't title, Google's free month (builders/news-tr.js).)
+-  if (!only || only === 'tr')
+-    await timed('tr', async () => {
+-      try {
+-        out.tr = await newsTr({ store, env, now: Date.now(), force: only === 'tr' });
+-      } catch (e) {
+-        out.tr = { failed: String(e?.message || e).slice(0, 200) };
+-      }
+-    });
+   await step('sides', 'news-sides', c => newsSides({ store, env, ctx, cap: c, until, now }));
+   await step('brief', 'news-brief', c => newsBriefs({ store, env, ctx, cap: c, until, now }));
+   if (!only || only === 'open')
+diff --git a/builders/news-tr.js b/builders/news-tr.js
+index 8b96192..869abaa 100644
+--- a/builders/news-tr.js
++++ b/builders/news-tr.js
+@@ -1,110 +1,12 @@
+ // Orbit News in one language (Jay 11-13: "a full traditional Chinese
+-// experience and full English experience"): every story's headline, and
+-// the summary of the stories at the top, in the other language, by plain
+-// translation (translate.js, Google's free month), never the AI's (its
+-// titles in news/lines.json win wherever it made one; it's never run
+-// through a translator). A world story's in Chinese, a Taiwan story's in
+-// English. Run with the AI's steps (builders/ai.js runAi).
+-//
+-//   news/tr.json  { built, tr: { id: { zh | en, t, sum?, s?, at } } }
+-//                 zh | en: the title in the other language, t the outlet's
+-//                 title it's from; sum the summary's, s the summary it's from.
+-//
+-// Each text once: a story's title made again only when its title has
+-// turned, an hour on at the soonest (a lead outlet changing its words
+-// every few minutes costs one translation an hour, not ten). The rest of a
+-// story (each outlet's headline, a summary lower down) is translated when
+-// a person opens it (worker.js /news-tr, handleNewsTr).
+-import { translate, peopleIn, readMeter, withMonth } from '../translate.js';
++// experience and full English experience"): the texts a person's phone asks
++// for, only as they're on screen (a list's titles in one batch, a story's
++// own words as it's opened), by plain translation (translate.js, Google's
++// free month), never the AI's. Nothing is translated ahead (11-14: it cost
++// too much). Each text once, kept in news/tr/<id>.json (worker.js /news-tr).
++import { translate, peopleIn, withMonth } from '../translate.js';
+ 
+-export const NEWS_TR = 'news/tr.json';
+-// (A new way of asking (2: a day's month put in, a headline's stop left off) asks every text again.)
+ export const TR_V = 2;
+-export const TR_AGAIN = 3_600_000;
+-// The summaries translated ahead: the stories at the top of each side.
+-export const SUM_TOP = 12;
+-const NEWS_LINES = 'news/lines.json';
+-
+-const toOf = region => (region === 'intl' ? 'zh-TW' : 'en');
+-const keyOf = region => (region === 'intl' ? 'zh' : 'en');
+-export const storyPeople = s => (s.region === 'intl' ? peopleIn([s.sum, ...(s.items || []).map(it => it[1])]) : []);
+-
+-// What a run asks for, best first: each side's stories in their order, a
+-// title its AI line doesn't cover, then the top stories' summaries.
+-export function wanted(index, lines, was, now = Date.now()) {
+-  const keep = {};
+-  const ask = [];
+-  const sides = ['intl', 'tw'].map(region => (index[region] || []).map((s, i) => ({ ...s, region, rank: i })));
+-  const order = [];
+-  for (let i = 0; i < Math.max(...sides.map(x => x.length)); i++) for (const side of sides) if (side[i]) order.push(side[i]);
+-  for (const s of order) {
+-    const k = keyOf(s.region);
+-    const old = was[s.id] || {};
+-    const e = { at: old.at || now };
+-    // (The AI's title covers it: none of ours.)
+-    const ai = lines[s.id]?.[k];
+-    const fresh = now - (old.at || 0) < TR_AGAIN;
+-    if (!ai && s.title) {
+-      if (old[k] && !old.old && (old.t === s.title || fresh)) Object.assign(e, { [k]: old[k], t: old.t });
+-      else {
+-        ask.push({ s, field: 'title', text: s.title });
+-        // (One made the old way shows till its new one comes.)
+-        if (old.old && old[k] && old.t === s.title) Object.assign(e, { [k]: old[k], t: old.t });
+-      }
+-    }
+-    if (s.sum && s.rank < SUM_TOP) {
+-      if (old.sum && !old.old && (old.s === s.sum || fresh)) Object.assign(e, { sum: old.sum, s: old.s });
+-      else {
+-        ask.push({ s, field: 'sum', text: s.sum });
+-        if (old.old && old.sum && old.s === s.sum) Object.assign(e, { sum: old.sum, s: old.s });
+-      }
+-    } else if (old.sum && old.s === s.sum) Object.assign(e, { sum: old.sum, s: old.s });
+-    keep[s.id] = e;
+-  }
+-  // (Titles before summaries: a list's every headline first.)
+-  ask.sort((a, b) => (a.field === b.field ? 0 : a.field === 'title' ? -1 : 1));
+-  return { keep, ask };
+-}
+-
+-export async function newsTr({ store, env, now = Date.now(), fetchImpl = fetch, force = false }) {
+-  const index = await store.json('news/index.json');
+-  if (!index) return { skipped: 'no index' };
+-  const lines = (await store.json(NEWS_LINES).catch(() => null))?.lines || {};
+-  const doc = await store.json(NEWS_TR).catch(() => null);
+-  // (Made the old way: kept till made again, but an English one whose source names a day alone (v1's 12日 → December).)
+-  const was = doc?.v === TR_V ? doc.tr || {} : Object.fromEntries(Object.entries(doc?.tr || {}).filter(([, e]) => !(e.en && /\d日/.test(`${e.t} ${e.s || ''}`))).map(([id, e]) => [id, { ...e, at: 0, old: 1 }]));
+-  const { keep, ask } = wanted(index, lines, was, now);
+-  let made = 0;
+-  for (const to of ['zh-TW', 'en']) {
+-    const mine = ask.filter(a => toOf(a.s.region) === to);
+-    if (!mine.length) continue;
+-    // (Each text its own story's people: one story's "York" is no other's New York.)
+-    const whose = new Map(mine.map(a => [a.text, a.s]));
+-    const seen = new Map();
+-    const people = t => {
+-      const s = whose.get(t);
+-      if (!seen.has(s.id)) seen.set(s.id, storyPeople(s));
+-      return seen.get(s.id);
+-    };
+-    const got = await translate(env, store, mine.map(a => a.text), to, { people, now, fetchImpl, force, prep: t => (to === 'en' ? withMonth(t, whose.get(t)?.at || now) : t) });
+-    for (const a of mine) {
+-      const v = got[a.text];
+-      if (!v) continue;
+-      const e = keep[a.s.id];
+-      if (a.field === 'title') Object.assign(e, { [keyOf(a.s.region)]: v, t: a.text, at: now });
+-      else Object.assign(e, { sum: v, s: a.text, at: now });
+-      made++;
+-    }
+-  }
+-  const tr = {};
+-  for (const [id, e] of Object.entries(keep)) if (e.zh || e.en || e.sum) tr[id] = e;
+-  // (The month so far beside them, for the admin panel and a look from outside: characters, and a failure's code.)
+-  const m = await readMeter(store, now).catch(() => null);
+-  const use = m ? { month: m.month, chars: m.chars, today: m.today || 0, ...(m.off > now ? { off: String(m.why || '').slice(0, 10) } : {}) } : null;
+-  await store.put(NEWS_TR, { built: now, v: TR_V, use, tr });
+-  // (The failure's whole reason to the run's log only, never the public file.)
+-  return { made, asked: ask.length, kept: Object.keys(tr).length, use, ...(m?.off > now ? { why: m.why } : {}) };
+-}
+ 
+ // ---- A story opened (worker.js /news-tr) ----
+ // The texts a person's phone asks for, only the story's own (its outlets'
+@@ -139,3 +41,16 @@ export async function storyTr({ store, env, id, to, texts, now = Date.now(), fet
+   }
+   return { tr: Object.fromEntries(want.filter(t => mine[t]).map(t => [t, mine[t]])) };
+ }
++
++// A list's titles in one batch: `items` [{ id, texts }], at most BATCH_MAX stories, each its own
++// story's texts as above; → every translation by its source text.
++export const BATCH_MAX = 30;
++export async function batchTr({ items, ...rest }) {
++  const tr = {};
++  for (const it of (Array.isArray(items) ? items : []).slice(0, BATCH_MAX)) {
++    const r = await storyTr({ ...rest, id: String(it?.id || ''), texts: Array.isArray(it?.texts) ? it.texts.slice(0, 2) : [] });
++    if (r.error === 'to') return r;
++    Object.assign(tr, r.tr);
++  }
++  return { tr };
++}
+diff --git a/tests/translate.test.mjs b/tests/translate.test.mjs
+index 0c3bb78..5d80f76 100644
+--- a/tests/translate.test.mjs
++++ b/tests/translate.test.mjs
+@@ -4,7 +4,7 @@
+ import { test } from 'node:test';
+ import assert from 'node:assert/strict';
+ import { translate, peopleIn, shielded, shieldedEn, unshield, dayLeft, freshMeter, withMonth, TR_METER, TR_MONTH } from '../translate.js';
+-import { newsTr, storyTr, wanted, NEWS_TR, trPath } from '../builders/news-tr.js';
++import { storyTr, batchTr, BATCH_MAX, trPath } from '../builders/news-tr.js';
+ 
+ const memStore = (seed = {}) => {
+   const m = new Map(Object.entries(seed).map(([k, v]) => [k, JSON.stringify(v)]));
+@@ -57,29 +57,23 @@ test('translate: once over the day’s share it stops; a refused key waits a whi
+   assert.deepEqual(await translate({}, memStore(), ['a b'], 'en', { fetchImpl: googleFake(seen) }), {});
+ });
+ 
+-test('news: every headline the AI didn’t title, the top summaries; a turned title made again an hour on', async () => {
+-  const now = Date.now();
+-  const w = (id, title) => ({ id, title, sum: `Summary of ${id}`, items: [['cnn', title]] });
+-  const t = (id, title) => ({ id, title, sum: `${id}的摘要`, items: [['cna', title]] });
+-  const index = { intl: [w('a', 'Storm hits coast'), w('b', 'Talks resume')], tw: [t('c', '颱風來襲')] };
+-  const store = memStore({ 'news/index.json': index, 'news/lines.json': { lines: { b: { zh: 'AI 標題' } } } });
+-  const r = await newsTr({ store, env, now, fetchImpl: googleFake() });
+-  const tr = JSON.parse(store.m.get(NEWS_TR)).tr;
+-  assert.equal(tr.a.zh, '譯16');
+-  assert.equal(tr.b.zh, undefined); // the AI's title wins
+-  assert.equal(tr.b.sum, '譯12');
+-  assert.equal(tr.c.en, 'EN(颱風來襲)');
+-  assert.equal(tr.c.sum, 'EN(c的摘要)');
+-  assert.ok(r.made >= 4);
+-  // (The same again asks nothing.)
++test('a list’s titles in one batch: each its own story’s, capped, kept like a story’s; nothing is made ahead', async () => {
++  const stories = { a: { id: 'a', title: 'Storm hits coast', items: [] }, b: { id: 'b', title: 'Talks resume', items: [] } };
++  const store = memStore();
+   const seen = [];
+-  await newsTr({ store, env, now: now + 60_000, fetchImpl: googleFake(seen) });
+-  assert.deepEqual(seen, []);
+-  // (A turned title within the hour keeps the last; past it, made again.)
+-  index.intl[0].title = 'Storm hits coast hard';
+-  store.m.set('news/index.json', JSON.stringify(index));
+-  assert.equal(wanted(index, { b: { zh: 'AI 標題' } }, JSON.parse(store.m.get(NEWS_TR)).tr, now + 60_000).ask.length, 0);
+-  assert.equal(wanted(index, { b: { zh: 'AI 標題' } }, JSON.parse(store.m.get(NEWS_TR)).tr, now + 2 * 3_600_000).ask.filter(a => a.field === 'title').length, 1);
++  const find = async id => stories[id] || null;
++  const items = [{ id: 'a', texts: ['Storm hits coast'] }, { id: 'b', texts: ['Talks resume', 'Not in the story'] }, { id: 'zz', texts: ['x'] }];
++  const r = await batchTr({ store, env, items, to: 'zh-TW', find, fetchImpl: googleFake(seen) });
++  assert.deepEqual(Object.keys(r.tr).sort(), ['Storm hits coast', 'Talks resume']);
++  assert.ok(store.m.has(trPath('a')) && store.m.has(trPath('b')));
++  const again = await batchTr({ store, env, items, to: 'zh-TW', find, fetchImpl: googleFake(seen) });
++  assert.deepEqual(again.tr, r.tr);
++  assert.equal(seen.length, 2);
++  assert.equal((await batchTr({ store, env, items, to: 'fr', find })).error, 'to');
++  const many = Array.from({ length: BATCH_MAX + 20 }, (_, i) => ({ id: 'a', texts: ['Storm hits coast'], i }));
++  let finds = 0;
++  await batchTr({ store, env, items: many, to: 'zh-TW', find: async id => (finds++, stories[id]), fetchImpl: googleFake([]) });
++  assert.equal(finds, BATCH_MAX);
+ });
+ 
+ test('a story opened: only its own texts, only those not in the reader’s language, each kept', async () => {
+diff --git a/worker.js b/worker.js
+index 89cf3c5..5c24779 100644
+--- a/worker.js
++++ b/worker.js
+@@ -79,7 +79,7 @@ import { handleCal } from './cal.js';
+ import { handleAiOpen, OPEN } from './ai-open.js';
+ import { logCall, callsSince, reliability, spendOf, lastFailed, providerCapped, providerToday } from './gemini-use.js';
+ import { handleAi, handleAiBuild, aiTry } from './ai.js';
+-import { storyTr } from './builders/news-tr.js';
++import { storyTr, batchTr } from './builders/news-tr.js';
+ import { handleTr } from './translate.js';
+ import { r2Store } from './builders/store.js';
+ import { handleClassNews, classNewsTry, classNewsPeek, classNewsRead } from './class-news.js';
+@@ -1337,7 +1337,7 @@ async function sessionOf(request, env, grace = 0) {
+   return qt ? readToken(await tokenSecret(env), qt, 'ses', Date.now() - grace) : null;
+ }
+ 
+-// POST /news-tr { id, to, texts }: a story's own texts in the reader's
++// POST /news-tr { id, to, texts } (a story's own texts) or { to, items: [{ id, texts }] } (a list's titles, one batch of up to 30): the reader's
+ // language (Google's free month, translate.js; each kept in news/tr/<id>.json).
+ // The stories read from R2 a minute at a time per isolate.
+ let newsPages = null;
+@@ -1358,7 +1358,7 @@ async function handleNewsTr(request, env, headers, make = false) {
+     newsPages.past ||= store.json('news/past.json').then(d => [...(d?.intl || []), ...(d?.tw || [])]).catch(() => []);
+     return look(await newsPages.past);
+   };
+-  const out = await storyTr({ store, env, id: String(body.id || ''), to: String(body.to || ''), texts: body.texts, now, find, make });
++  const out = Array.isArray(body.items) ? await batchTr({ store, env, items: body.items, to: String(body.to || ''), now, find, make }) : await storyTr({ store, env, id: String(body.id || ''), to: String(body.to || ''), texts: body.texts, now, find, make });
+   return json(out, out.error ? 400 : 200, headers);
+ }
+ 
+-- 
+2.56.1
+
