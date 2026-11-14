@@ -549,8 +549,8 @@ async function warm() {
   }
 }
 
-// An app's page held in a frame: its own scroll stops at either end, with no
-// bounce. On an iPhone a frame's page that bounced past its foot took its
+// An app's page held in a frame: its own scroll stops at either end, the
+// browser's bounce held and one of our own drawn in its place. On an iPhone a frame's page that bounced past its foot took its
 // fixed tab bar up with it, the black of the frame under (Jay 2026-11-14,
 // Sports 賽事); overscroll-behavior alone isn't kept there. A drag that
 // would only pull the page past an end is held, unless something inside it
@@ -568,12 +568,60 @@ function roomIn(el, dy, root) {
 function noBounce(root = document) {
   let x = 0;
   let y = 0;
-  root.addEventListener('touchstart', e => e.touches.length === 1 && ((x = e.touches[0].clientX), (y = e.touches[0].clientY)), { passive: true });
+  // The bounce, drawn here instead (Jay 2026-11-14: "find alternative way"):
+  // past an end the app's page (its <main>) follows the finger less and less,
+  // as iOS's rubber band does, and springs back on letting go; the tab bar
+  // and the top bar, outside it, stay where they are.
+  let from = null;
+  let dir = 0;
+  let pull = 0;
+  let page = null;
+  const rubber = d => {
+    const h = globalThis.innerHeight || 800;
+    return Math.sign(d) * (1 - 1 / ((Math.abs(d) * 0.55) / h + 1)) * h;
+  };
+  const set = v => {
+    page ||= root.querySelector('main');
+    if (page) page.style.transform = v ? `translate3d(0, ${Math.round(v * 10) / 10}px, 0)` : '';
+  };
+  const release = () => {
+    const el = page;
+    const was = pull;
+    from = null;
+    pull = 0;
+    if (!el || !was) return;
+    el.style.transform = '';
+    if (typeof el.animate === 'function') el.animate([{ transform: `translate3d(0, ${was}px, 0)` }, { transform: 'none' }], { duration: 480, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' });
+  };
+  root.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    x = e.touches[0].clientX;
+    y = e.touches[0].clientY;
+    from = null;
+    pull = 0;
+    page = null;
+  }, { passive: true });
+  root.addEventListener('touchend', release, { passive: true });
+  root.addEventListener('touchcancel', release, { passive: true });
   root.addEventListener(
     'touchmove',
     e => {
       if (e.touches.length !== 1 || !e.cancelable) return;
-      const dy = e.touches[0].clientY - y;
+      const at = e.touches[0].clientY;
+      // (Already past an end: the page follows, until the finger goes back the other way.)
+      if (from != null) {
+        const d = at - from;
+        if (Math.sign(d) === dir) {
+          e.preventDefault();
+          pull = rubber(d);
+          return set(pull);
+        }
+        from = null;
+        pull = 0;
+        set(0);
+        return;
+      }
+      const dy = at - y;
       // (A sideways swipe, a carousel's or a row's, is never held.)
       if (!dy || Math.abs(e.touches[0].clientX - x) > Math.abs(dy)) return;
       // (A map, a drawing, a slider: their own drag.)
@@ -582,6 +630,8 @@ function noBounce(root = document) {
       if (!pastEnd(se.scrollTop, se.scrollHeight, globalThis.innerHeight || se.clientHeight, dy) || roomIn(e.target, dy, root)) return;
       // (The pull-to-refresh at the top is the app's own, drawn by kit ui.mjs: it still runs.)
       e.preventDefault();
+      from = at;
+      dir = Math.sign(dy);
     },
     { passive: false },
   );
@@ -946,6 +996,16 @@ export function host(box, { first = null, list = null } = {}) {
     held: () => [...frames.keys()]
   };
   globalThis.ORBIT_HOST = api;
+  // Orbit's window never moves: on an iPhone the scroll bar's handle, dragged,
+  // scrolled the window itself, the app shown and its tab bar with it, black
+  // under (Jay 2026-11-14, Law). Put back at once, whatever moved it.
+  const still = () => {
+    if (globalThis.scrollX || globalThis.scrollY) globalThis.scrollTo(0, 0);
+    for (const el of [document.documentElement, document.body]) if (el && (el.scrollTop || el.scrollLeft)) (el.scrollTop = 0), (el.scrollLeft = 0);
+  };
+  globalThis.addEventListener('scroll', still, { passive: true });
+  document.body?.addEventListener('scroll', still, { passive: true });
+  globalThis.visualViewport?.addEventListener('scroll', still, { passive: true });
   // Off the phone's screen: which app, and when (where Orbit opens next). Back
   // on it: the rules of launchTarget again, with a playing app live too.
   let awayAt = 0;
