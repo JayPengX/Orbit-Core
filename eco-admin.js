@@ -33,6 +33,8 @@ import { STATE_KEY as GUARD_STATE } from './guard.js';
 import { govOf } from './kit/gov.mjs';
 import { listBackups, fromBackup } from './store-backup.js';
 import { PASSKEY_COLLECTION, passkeySummary, removePasskey } from './passkey.js';
+import { MAIL_COLLECTION, MAIL_CODES, mailSummary, mailIndexId } from './pass-mail.js';
+import { tokenSecret } from './orbit-token.js';
 import { GIFT_TOOLS, mintPass } from './gift.js';
 import { readSources } from './sources.js';
 import { SOURCES } from './kit/sources.mjs';
@@ -92,7 +94,7 @@ export async function capacityCron(env, deps) {
 // them for Longshot, 2026-10-22.)
 export const RETIRED_COLLECTIONS = ['orbit-schedules', 'eco-links', 'stock-study-leagues', 'odds-open', 'odds-settled', 'odds-tickets', 'kambi-results', 'odds-study-accounts', 'orbit-slip'];
 // (A function: eco.js and this file import each other.)
-const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, CONFIG_COLLECTION, PASSKEY_COLLECTION, NOW_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]);
+const keep = () => new Set([WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, CONFIG_COLLECTION, PASSKEY_COLLECTION, MAIL_COLLECTION, MAIL_CODES, NOW_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)]);
 // The store's batches go 500 at a time; a call stops after this many so it
 // stays inside the Worker's limits.
 const PER_CALL = 1500;
@@ -211,8 +213,9 @@ export async function handleAdmin({ env, deps, headers, request, ip, body }) {
       settings: Object.fromEntries(Object.entries(wallet.settings || {}).filter(([k]) => kept(k) || k === 'lang' || k === 'notify')),
       apps: Object.fromEntries(Object.entries(wallet.apps || {}).filter(([a]) => keep.has(a))),
       inbox: Object.fromEntries(Object.entries(wallet.inbox || {}).filter(([a]) => keep.has(a))),
-      // (Its passkeys stay, as the pass does: they're how its owner signs in.)
-      ...(wallet.passkeys ? { passkeys: wallet.passkeys } : {})
+      // (Its passkeys and recovery email stay, as the pass does: they're how its owner signs in.)
+      ...(wallet.passkeys ? { passkeys: wallet.passkeys } : {}),
+      ...(wallet.mail ? { mail: wallet.mail } : {})
     };
     const gone = [];
     for (const [app, { collection }] of Object.entries(ECO_APPS)) {
@@ -256,6 +259,7 @@ async function walletList(env, deps) {
       balance: wallet ? poolBalance(wallet) : null,
       gen: wallet ? gen(wallet) : null,
       passkeys: wallet?.passkeys?.keys?.length || 0,
+      mail: Boolean(wallet?.mail),
       priority: Boolean(wallet?.sec?.priority),
       ...creditOf(wallet),
       updateTime: w.updateTime
@@ -274,6 +278,8 @@ export async function planClean(env, deps) {
   const accounts = new Set(wallets.map(w => w.id));
   const inboxIds = new Set();
   const keyIds = new Set();
+  const mailIds = new Set();
+  const secret = await tokenSecret(env);
   const tidy = [];
   const retired = { entries: 0, money: 0, settings: 0, looks: 0, apps: 0 };
   for (const w of wallets) {
@@ -285,6 +291,7 @@ export async function planClean(env, deps) {
     }
     for (const ids of Object.values(wallet.inbox || {})) for (const id of ids) inboxIds.add(id);
     for (const k of wallet.passkeys?.keys || []) keyIds.add(`${w.id}:${k.id}`);
+    if (wallet.mail?.addr) mailIds.add(`${await mailIndexId(secret, wallet.mail.addr)}:${w.id}`);
     const { wallet: next, gone } = tidyWallet(wallet, now);
     if (JSON.stringify(next) === JSON.stringify(wallet)) continue;
     tidy.push({ id: w.id, wallet: next, updateTime: w.updateTime });
@@ -293,7 +300,7 @@ export async function planClean(env, deps) {
   }
   for (const name of collections) {
     if (name === WALLET_COLLECTION) continue;
-    const docs = await deps.fsList(env, name, 300, { idsOnly: ![SHARE_COLLECTION, PAIR_COLLECTION, PASSKEY_COLLECTION].includes(name) });
+    const docs = await deps.fsList(env, name, 300, { idsOnly: ![SHARE_COLLECTION, PAIR_COLLECTION, PASSKEY_COLLECTION, MAIL_COLLECTION, MAIL_CODES].includes(name) });
     counts[name] = docs.length;
     if (RETIRED_COLLECTIONS.includes(name)) {
       for (const d of docs) deletes.push([name, d.id]);
@@ -315,6 +322,16 @@ export async function planClean(env, deps) {
           v = JSON.parse(d.payload);
         } catch {}
         if (!keyIds.has(`${v?.d}:${v?.id}`)) deletes.push([name, d.id]);
+      }
+    } else if (name === MAIL_COLLECTION || name === MAIL_CODES) {
+      // An address's finder whose account no longer has it; a code ended over a day ago.
+      for (const d of docs) {
+        let v = null;
+        try {
+          v = JSON.parse(d.payload);
+        } catch {}
+        const ok = name === MAIL_COLLECTION ? mailIds.has(`${d.id}:${v?.d}`) : v?.e > now - 86_400_000;
+        if (!ok) deletes.push([name, d.id]);
       }
     } else if (name === SHARE_COLLECTION || name === PAIR_COLLECTION) {
       for (const d of docs) {
@@ -515,6 +532,7 @@ export const ADMIN_TOOLS = {
       inbox: Object.fromEntries(Object.entries(wallet.inbox || {}).map(([k, v]) => [k, v.length])),
       pushes,
       passkeys: passkeySummary(wallet),
+      mail: mailSummary(wallet),
       priority: Boolean(wallet.sec?.priority),
       ...creditOf(wallet),
       gov: govOf(wallet)

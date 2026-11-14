@@ -52,7 +52,7 @@ export const HELP = {
       ]],
       ['safe', '安全', [
         '伺服器只存通行碼的雜湊值，裝置上只有會過期、可撤銷的登入。',
-        '「帳戶安全」可以登出其他所有裝置，或更換通行碼（舊的立刻失效，新的只顯示一次）。忘了通行碼，就在還登入的裝置換一組。'
+        '「帳戶安全」可以登出其他所有裝置，或更換通行碼（舊的立刻失效，新的只顯示一次）。忘了通行碼：在登入畫面用救援信箱收驗證碼找回，或在還登入的裝置換一組。'
       ]],
       ['money', '錢在哪裡', [
         'Orbit Pass 不放錢。餘額、每週薪水、紓困、財富等級和明細都在 Orbit Securities 的「資金」分頁。'
@@ -93,7 +93,7 @@ export const HELP = {
       ]],
       ['safe', 'Security', [
         'The server keeps only a hash of the pass; devices keep only sign-ins that expire and can be revoked.',
-        'Security can sign out every other device or change the pass (the old one stops at once, the new one is shown once). Forgot it? Change it on a device that’s still signed in.'
+        'Security can sign out every other device or change the pass (the old one stops at once, the new one is shown once). Forgot it? Get back in with a code sent to your recovery email, or change it on a device that’s still signed in.'
       ]],
       ['money', 'Where the money is', [
         'The Orbit Pass holds no money. Balance, weekly pay, relief, wealth levels and every entry are in Orbit Securities’ Money tab.'

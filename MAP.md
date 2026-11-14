@@ -92,7 +92,7 @@ modules for modulepreload.
 | `loader.html` | The snippets every app's page carries (`kit:head`, `kit:boot`) |
 | `brand.mjs` | Families, names, colours, marks, repos, slugs, `APP_ORDER`, `DEV` (speeds, §9) |
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); each app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
-| `passkey.mjs` | Passkeys in the browser: made, used, named (`passkeyHere()` false where a browser can't) |
+| `passkey.mjs`, `pass-mail.mjs` | Passkeys in the browser (`passkeyHere()`); the recovery email's screens |
 | `news-outlets.mjs`, `news-sport.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); `TOPICS`; `sideOf`, `partiesIn`, `topicsOf`, `namesRe`; Sports' 相關新聞 matching |
 | `ai.mjs`, `family.mjs`, `today.mjs`, `ask-orbit.mjs` | AI (mark `icons.ai`, `--q-ai`; `.q-ai-ref` a name chip): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer`, `aiAnswerWait` (answers drawn); the family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天; 問 Orbit (`routeAsk`, an app's `#ask=` by `takeAsk`); `act.mjs` `readAct`: a command said (start a focus, add a countdown, follow a team, a round of words) read by code, no AI call |
 | `testtools.mjs` | 測試工具, hidden until unlocked (Orbit Pass › seven taps on 除錯紀錄 within 4 s): a moved clock (or a fast one: `rate`), a place, a trip's fixes played back (`playTrip({ from, fixes, rate })`, fed to `watchPosition`), the network off/slow/failing (`boot.js`, key `orbit.tester`; off: the app's files from its service worker), test notices (`pushTest`), each app's own switches (`globalThis.ORBIT_TEST_TOOLS`, read as `ORBIT_TEST?.flags?.x`), versions; a pill while anything is on |
@@ -170,7 +170,7 @@ w;dur=`, noted by the 除錯紀錄 when slow, and `LOCKED` (never runs as a page
 
 | Route | File | What |
 | --- | --- | --- |
-| `/eco` | `eco.js`, `eco-admin.js`, `money.js`, `passkey.js`, `webauthn.js`, `orbit-token.js`, `rec-weekly.js` | The Pass (§6); `op: 'admin'`: the owner's panel; `bug`: 除錯紀錄 sent (`private/bugs/`, weekly) |
+| `/eco` | `eco.js`, `eco-admin.js`, `money.js`, `passkey.js`, `pass-mail.js`, `webauthn.js`, `orbit-token.js`, `rec-weekly.js` | The Pass (§6); `op: 'admin'`: the owner's panel; `bug`: 除錯紀錄 sent (`private/bugs/`, weekly) |
 | `/stock` | `stock-fill.js`, `stock-check.js` | Securities' fills at the proxy's own quote; the account replayed on each save |
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
 | `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `weather-radar.js`, `typhoon.js` | The blend for a ~1 km cell (Google, CWA, MOENV, stations), scored (`/weather/skill`); `radar`: 2 hours' rain (radar); in a typhoon, `dayOff`: each county's 停班停課 or a fitted chance |
@@ -370,8 +370,8 @@ A season is kept until the next one's first game.
   never change**: passes since 2026-10-27 would lose their accounts. Sign-ins:
   30 an hour an address.
 - **Passkeys** (`passkey.js`, `webauthn.js`; `kit/passkey.mjs`): any number
-  per Pass, RP ID `jaypengx.com`; the pass signs in too. Sign-in, a new pass
-  and the admin key are forms password managers fill.
+  per Pass, RP ID `jaypengx.com`. Sign-in, a new pass and the admin key are
+  forms password managers fill. **Recovery email**: `pass-mail.js`.
 - **Devices never keep the pass:** a refresh token (60 days) and a short
   session token (`orbit-token.js`, HMAC under `ECO_TOKEN_SECRET`).
 - **Ops:** login, refresh, read/patch/delete, device codes (`eco-pairs`),
