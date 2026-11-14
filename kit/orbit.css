@@ -2735,6 +2735,22 @@ input[type='checkbox'][switch] {
   cursor: pointer;
 }
 
+/* A quiet ask's mark when it's an icon, not a picture (the passkey's key) */
+.q-banner .q-tip-mark {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--q-accent);
+  color: #fff;
+}
+.q-banner .q-tip-mark svg {
+  width: 22px;
+  height: 22px;
+}
+
 /* ---- A toast: a glass capsule over the tab bar, gone in a moment ---- */
 .q-toast {
   position: fixed;
@@ -3214,6 +3230,43 @@ dialog.q-moved::backdrop {
   justify-items: center;
   gap: 10px;
   text-align: center;
+}
+/* A page's own sign-in (Orbit's, site/app): its picture, name and line over
+   the form; on a wide screen, beside it. */
+.q-gate-split,
+.q-gate-side,
+.q-gate-main {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.q-gate-box.q-gate-split {
+  width: min(420px, 100%);
+  gap: 18px;
+}
+/* (A phone on its side: side by side too, a size down.) */
+@media (orientation: landscape) and (max-height: 520px) and (min-width: 640px) {
+  .q-gate-box.q-gate-split {
+    width: min(760px, 100%);
+    grid-template-columns: 1fr minmax(300px, 380px);
+    align-items: center;
+    gap: 32px;
+  }
+}
+@media (min-width: 860px) and (min-height: 560px) {
+  .q-gate-box.q-gate-split {
+    width: min(920px, 100%);
+    grid-template-columns: 1fr minmax(340px, 400px);
+    align-items: center;
+    gap: 56px;
+  }
+  .q-gate-split .q-gate-title {
+    font-size: 34px;
+  }
+  .q-gate-split .q-gate-lede {
+    font-size: 17px;
+  }
 }
 .q-gate-icon {
   border-radius: 18px;

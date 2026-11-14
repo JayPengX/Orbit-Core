@@ -87,6 +87,19 @@
   .door-sign h2 { margin: 0; color: var(--q-label); font: 700 22px/1.25 var(--q-font); }
   .door-sign p { margin: 0 0 10px; color: var(--q-label-2); font: 400 15px/1.4 var(--q-font); }
   .door-sign .q-btn { justify-self: stretch; }
+  /* Signed out: Orbit's mark with every app circling it (kit signInScreen's hero). */
+  .door-ring { --r: 92px; --i: 40px; position: relative; width: calc(var(--r) * 2 + var(--i)); aspect-ratio: 1; margin: 4px 0 6px; }
+  .door-ring-core { position: absolute; inset: 0; margin: auto; width: 76px; height: 76px; border-radius: 19px; box-shadow: 0 18px 40px -14px color-mix(in srgb, #5e5ce6 70%, transparent); }
+  .door-ring-path { position: absolute; inset: calc(var(--i) / 2); border-radius: 50%; border: 1px dashed color-mix(in srgb, var(--q-label-2, #8e8e93) 35%, transparent); }
+  .door-ring-spin { position: absolute; inset: 0; animation: door-spin 90s linear infinite; }
+  .door-ring-at { position: absolute; left: 50%; top: 50%; width: var(--i); height: var(--i); margin: calc(var(--i) / -2) 0 0 calc(var(--i) / -2); transform: rotate(var(--a)) translateY(calc(var(--r) * -1)) rotate(calc(var(--a) * -1)); }
+  .door img.door-ring-icon, img.door-ring-icon { display: block; width: 100%; height: 100%; border-radius: 22%; box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.35); animation: door-spin 90s linear infinite reverse; }
+  @keyframes door-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .door-ring-spin, img.door-ring-icon { animation: none; } }
+  @media (max-width: 359px) { .door-ring { --r: 78px; --i: 34px; } .door-ring-core { width: 64px; height: 64px; } }
+  @media (min-width: 700px) and (min-height: 700px) { .door-ring { --r: 124px; --i: 50px; } .door-ring-core { width: 96px; height: 96px; border-radius: 23px; } }
+  @media (min-width: 860px) and (min-height: 560px) { .door-ring { --r: 150px; --i: 56px; } .door-ring-core { width: 112px; height: 112px; border-radius: 26px; } }
+  @media (orientation: landscape) and (max-height: 520px) { .door-ring { --r: 62px; --i: 28px; } .door-ring-core { width: 48px; height: 48px; border-radius: 12px; } }
   .door.over { position: fixed; inset: 0; z-index: 5; max-width: none; overflow-y: auto; background: var(--q-page, #f2f2f7); }
   .door.over > * { max-width: 528px; margin-left: auto; margin-right: auto; }
   /* Orbit's window: each app's frame the whole screen, as the app on its own
@@ -112,7 +125,7 @@
 <main class="door" id="door" hidden></main>
 <div class="q-suite-frames" id="frames"></div>
 <script type="module">
-  const [{ installGate, isPhoneOrTablet, isStandalone, detectLang, storedAccount, orbitSession, accountSheet }, ui, { APP_ORDER, BRANDS, appIcon, pathOf }, suite] = await Promise.all([import('#kit/orbit.mjs'), import('#kit/ui.mjs'), import('#kit/brand.mjs'), import('#kit/suite.mjs')]);
+  const [{ installGate, isPhoneOrTablet, isStandalone, detectLang, storedAccount, orbitSession, accountSheet, signInScreen }, ui, { APP_ORDER, BRANDS, appIcon, pathOf }, suite] = await Promise.all([import('#kit/orbit.mjs'), import('#kit/ui.mjs'), import('#kit/brand.mjs'), import('#kit/suite.mjs')]);
   const lang = detectLang();
   const en = lang === 'en';
   if (en) document.documentElement.lang = 'en';
@@ -138,21 +151,44 @@
   // Signed in first (Jay 2026-11-13): Orbit is the Pass's, one sign-in for every app.
   const signedIn = () => !storedAccount || !!storedAccount();
   let session = null;
+  // Signed out (Jay 2026-11-14: 登入 opened the Pass's settings, and the page
+  // was "so plain and empty"): the sign-in itself, at once, with Orbit's apps
+  // circling its mark: what one Pass opens. No pass is made here: the owner
+  // hands them out (eco.js ecoCreate), so the screen says where to get one.
+  const orbitRing = () => {
+    const ring = ui.h('div', { class: 'door-ring', 'aria-hidden': 'true' }, [ui.h('img', { class: 'door-ring-core', src: './favicon.svg', alt: '' }), ui.h('div', { class: 'door-ring-path' })]);
+    const spin = ui.h('div', { class: 'door-ring-spin' });
+    APP_ORDER.forEach((id, i) => {
+      const at = ui.h('span', { class: 'door-ring-at', style: `--a:${(360 / APP_ORDER.length) * i}deg` });
+      at.append(Object.assign(icon(id), { className: 'door-ring-icon' }));
+      spin.append(at);
+    });
+    ring.append(spin);
+    return ring;
+  };
   function showSignIn(then) {
-    const head = ui.h('header', { class: 'door-head' }, [ui.h('img', { src: './favicon.svg', alt: '' }), ui.h('div', {}, [ui.h('h1', { text: 'Orbit' }), ui.h('p', { text: W('登入一次，每個 App 都一起登入', 'Sign in once, for every app') })])]);
-    const open = () => {
-      session ||= orbitSession(suite.lastApp?.(suite.savedSuite()) || APP_ORDER[0], { lang });
-      accountSheet(session);
+    session ||= orbitSession(suite.lastApp?.(suite.savedSuite()) || APP_ORDER[0], { lang });
+    let over = false;
+    const go = () => {
+      if (over) return;
+      over = true;
+      clearInterval(wait);
+      document.documentElement.classList.remove('q-signing-in');
+      then();
     };
-    const card = ui.h('div', { class: 'door-sign' }, [ui.h('h2', { text: W('登入 Orbit Pass', 'Sign in to Orbit Pass') }), ui.h('p', { text: W('用你的 Orbit Pass 登入，或建立一個新的。', 'Use your Orbit Pass, or make a new one.') }), ui.h('button', { class: 'q-btn primary block', type: 'button', text: W('登入', 'Sign in'), onclick: open })]);
+    // (Signed in in another tab, or here: on to the apps.)
+    const wait = setInterval(() => signedIn() && go(), 500);
+    if (signInScreen) {
+      door.hidden = true;
+      signInScreen(session, { hero: orbitRing(), title: 'Orbit', lede: W('十個 App，一個 Orbit Pass。', 'Ten apps, one Orbit Pass.'), accent: '#5e5ce6' }).then(go, () => {});
+      return;
+    }
+    // (An older kit, without the sign-in on its own: its Pass sheet, as before.)
+    const head = ui.h('header', { class: 'door-head' }, [ui.h('img', { src: './favicon.svg', alt: '' }), ui.h('div', {}, [ui.h('h1', { text: 'Orbit' }), ui.h('p', { text: W('登入一次，每個 App 都一起登入', 'Sign in once, for every app') })])]);
+    const card = ui.h('div', { class: 'door-sign' }, [ui.h('h2', { text: W('登入 Orbit Pass', 'Sign in to Orbit Pass') }), ui.h('button', { class: 'q-btn primary block', type: 'button', text: W('登入', 'Sign in'), onclick: () => accountSheet(session) })]);
     door.replaceChildren(head, card);
     door.classList.toggle('over', !!held);
     door.hidden = false;
-    const wait = setInterval(() => {
-      if (!signedIn()) return;
-      clearInterval(wait);
-      then();
-    }, 500);
   }
   // Orbit's home (Jay 2026-11-14: the settings-style list was "so ugly"): the
   // app to go on with as one card (something under way first, else the one
