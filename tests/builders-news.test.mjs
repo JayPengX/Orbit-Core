@@ -915,3 +915,18 @@ test('a national team\'s game is one story (11-14: 中華隊 6:4 Australia at th
   ];
   assert.equal(groupStories(items, 'zh').length, 3, 'three 中華隊 reports of three things stay three');
 });
+
+test('a breaking story told over several builds is one: small stories join the one they are (11-14: Trump–Xi–Putin sat in five stories)', () => {
+  const now = Date.UTC(2026, 10, 14, 8);
+  const H = 3_600_000;
+  const it = (o, t, h) => ({ o, t, u: `https://${o}.com/${encodeURIComponent(t).slice(0, 40)}`, at: now - h * H });
+  const rec = (id, items) => ({ id, r: 'intl', first: Math.min(...items.map(i => i.at)), last: Math.max(...items.map(i => i.at)), peak: items.length, items, sp: false });
+  const a = rec('a', [it('kyodo', 'Trump to hold unprecedented trilateral meeting with Xi, Putin in China', 8), it('bloomberg', 'Trump to Hold Trilateral Meeting With Xi, Putin in China', 7), it('cnn', 'Trump to meet with China’s Xi and Russia’s Putin at historic trilateral sit-down', 7)]);
+  const b = rec('b', [it('hill', 'Trump, Putin and Xi to meet in first trilateral meeting between leaders', 5), it('telegraph', 'Trump to meet Xi and Putin in China', 4)]);
+  const c = rec('c', [it('ap', 'Supreme Court takes up Trump asylum ban case', 6), it('npr', 'Supreme Court agrees to hear Trump asylum ban', 5)]);
+  const out = deskOf([], [a, b, c], now);
+  const tri = out.intl.find(s => s.items.some(x => /trilateral/i.test(x[1])));
+  assert.equal(tri.n, 5, 'one story of all five');
+  assert.equal(out.intl.filter(s => s.items.some(x => /Xi/.test(x[1]))).length, 1);
+  assert.ok(out.intl.some(s => /asylum/.test(s.title) && s.n === 2), 'another story stays its own');
+});
