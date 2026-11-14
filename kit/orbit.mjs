@@ -2409,6 +2409,9 @@ function makeSession(app, { lang, heartbeat }) {
       // wallet stands in until the next try.
       first = error?.code === 'ORBIT_FULL' ? await waitInLine(s, error, () => refresh({ claim: true, data })) : { offline: true, error };
     }
+    // (A separate app on its own home-screen icon, signed out: not signed in
+    // again there, Jay 11-14; it's in Orbit now. Signed in, it opens as ever.)
+    if (!first && typeof document !== 'undefined' && APPS[app] && isStandalone() && !inSuite()) return movedGate(app, lang);
     if (!first) first = await signInGate(s);
     // A pass someone handed over: replaced before the app opens (the
     // Worker opens nothing else with it; eco.js freshPass).
@@ -4764,6 +4767,31 @@ export function installGate(app, lang = detectLang(), as = null) {
   document.documentElement.classList.add('q-signing-in');
   document.getElementById('loading')?.setAttribute('hidden', '');
   return true;
+}
+// A separate app on its own icon, signed out (s.start): it isn't signed in
+// there again; Safari adds it as an Orbit of that app (installGate's
+// redirect), where the Pass brings everything back. Never resolves.
+function movedGate(app, lang) {
+  const en = lang === 'en';
+  const name = appName(app);
+  const url = homeOf(app);
+  const ios = isIOS();
+  const go = node('a', { class: 'q-btn primary block', href: ios ? `x-safari-${url}` : url, target: ios ? null : '_blank', rel: 'noopener', 'data-q-quick': '', text: en ? (ios ? 'Open in Safari' : 'Open in the browser') : ios ? '在 Safari 打開' : '用瀏覽器打開' });
+  const gate = node('dialog', { class: 'q-gate q-install', 'aria-modal': 'true', style: `--q-accent:${APPS[app].color}` }, [
+    node('div', { class: 'q-gate-box' }, [
+      node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
+      node('p', { class: 'q-gate-brand', text: 'ORBIT' }),
+      node('h1', { class: 'q-gate-title', text: en ? `${name} is in Orbit now` : `${name} 現在在 Orbit 裡` }),
+      node('p', { class: 'q-gate-lede', text: en ? `This icon no longer signs in. Add ${name} again from Safari: it comes as an Orbit of ${name} alone, and signing in there brings everything back.` : `這個圖示不能再登入。從 Safari 重新加入 ${name}，它會是只有 ${name} 的 Orbit，在那裡登入，資料都還在。` }),
+      go,
+      node('ol', { class: 'q-steps q-install-steps' }, (en ? [`Tap “${ios ? 'Open in Safari' : 'Open in the browser'}”.`, 'Follow the steps there to add it to your home screen.', 'Open it from the new icon and sign in.', 'This old icon can then be removed.'] : [`點「${ios ? '在 Safari 打開' : '用瀏覽器打開'}」。`, '照那裡的步驟加入主畫面。', '從新的圖示打開，登入。', '之後這個舊圖示可以刪掉。']).map(stepItem))
+    ])
+  ]);
+  for (const d of document.querySelectorAll('dialog[open]')) if (!onTop.has(d)) d.close();
+  keepOnTop(gate);
+  document.documentElement.classList.add('q-signing-in');
+  document.getElementById('loading')?.setAttribute('hidden', '');
+  return new Promise(() => {});
 }
 function copyButton(url, en, primary = true) {
   const copy = node('button', {
