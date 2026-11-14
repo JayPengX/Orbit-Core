@@ -1295,7 +1295,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
       const s = storyOf(g.map(it => ({ ...it, near: 0 })), region, now, { pages, same });
       if (s.topics.includes('sport') && s.light < 0.5 && now - s.at <= SPORT_MS) out.sport[region].push(s);
     }
-    out.sport[region] = sportDesk(out.sport[region], SPORT_TOP[region]);
+    out.sport[region] = sportDesk(out.sport[region], SPORT_TOP[region], { only: region === 'intl' });
     out[region] = frontOf(out[region], TOP[region]).map(({ score, light, ...s }) => s);
     // (The past lighter: each outlet's newest headline only.)
     out.past[region] = out.past[region]
@@ -1314,14 +1314,20 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
 // and those of a sport Sports never shows (the NFL, hockey, colleges) left
 // out. A story is News' own (News opens it from a link), lighter: no clips'
 // pictures past its first, no score.
-export const SPORT_TOP = { tw: 260, intl: 260 };
-export function sportDesk(stories, top) {
+// The world's (`only`): those plainly of a sport Sports shows (NBA, MLB,
+// football, F1) and nothing else: high-school football, golf and the NFL
+// from Yahoo Sports and SI had filled its 260 with nine hours, every NBA
+// game's page left to Taiwan's outlets (Jay 11-14).
+export const SPORT_TOP = { tw: 260, intl: 420 };
+const SHOWN = ['basketball', 'baseball', 'soccer', 'racing'];
+export function sportDesk(stories, top, { only = false } = {}) {
   const seen = new Set();
   return stories
     .filter(s => !seen.has(s.id) && seen.add(s.id))
     .map(s => ({ s, text: sportText(s) }))
     .filter(({ text }) => {
       const sp = sportsIn(text);
+      if (only) return SHOWN.some(k => sp.has(k));
       return !(sp.has('other') && sp.size === 1);
     })
     .sort((a, b) => b.s.at - a.s.at)

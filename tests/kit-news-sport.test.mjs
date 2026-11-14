@@ -92,9 +92,10 @@ test('a page\'s stories: a player\'s own first, then by kind, injury first, then
   assert.equal(pack.list.length, 5);
   assert.equal(pack.list.find(s => s.id === 'a2').who.p[0], 'Stephen Curry');
   const team = newsAbout(pack, { teams: [GSW], now: NOW });
-  assert.deepEqual(team.map(s => s.id), ['a2', 'a3', 'b1', 'a1']);
+  // (The world's outlets first, Jay 11-14.)
+  assert.deepEqual(team.map(s => s.id), ['b1', 'a2', 'a3', 'a1']);
   const player = newsAbout(pack, { players: [{ name: 'Stephen Curry', team: GSW }], teams: [GSW], now: NOW, most: 2 });
-  assert.deepEqual(player.map(s => s.id), ['a2', 'a3']);
+  assert.deepEqual(player.map(s => s.id), ['a2', 'b1']);
   // A game: both sides named.
   const game = newsAbout(pack, { teams: [GSW, T('nba', 'Houston Rockets', 'Rockets', 'basketball')], both: true, now: NOW });
   assert.deepEqual(game.map(s => s.id), ['b1', 'a1']);
@@ -170,4 +171,25 @@ test("the clubs a story is about are the AI's `a` where it gave them; an opponen
   assert.deepEqual(newsAbout(pack, { teams: [T('nba', 'Atlanta Hawks', 'Hawks', 'basketball')], now }).map(s => s.id), [], 'one of several the AI names, not in its title');
   assert.deepEqual(newsAbout(pack, { teams: [MIA], now }).map(s => s.id), [], 'the Heat only as a game he misses');
   assert.deepEqual(newsAbout(pack, { teams: [HOU], now }).map(s => s.id), ['s']);
+});
+
+test("a game's news: the world's sports outlets first, Taiwan's filling in; a guide to the day's games, a betting tip or a round-up with another event is none of it (Jay 11-14)", () => {
+  const now = Date.parse('2026-11-14T02:00Z');
+  const PHI = T('nba', 'Philadelphia 76ers', '76ers', 'basketball');
+  const TOR = T('nba', 'Toronto Raptors', 'Raptors', 'basketball');
+  const a = ['Philadelphia 76ers', 'Toronto Raptors'];
+  const st = (id, title, region, extra = {}) => ({ id, title, items: [['x', title, 'https://example.com/nba/x']], at: now - 20 * 3_600_000, region, who: { p: [], t: a, a }, ...extra });
+  const pack = cleanSport({
+    tw: [
+      st('guide', '詹皇領軍七六人對決暴龍 台灣亞冠賽戰澳洲搶勝 今日賽事預告與轉播', 'tw', { who: { p: [], t: [...a, 'Chinese Taipei'], a: [...a, 'Chinese Taipei'] } }),
+      st('bet', '運彩報報－七六人對暴龍 首推讓分', 'tw'),
+      st('tw1', 'NBA/七六人驚天逆轉 三巨頭合砍65分痛宰暴龍', 'tw'),
+      st('tw2', '詹皇再休兵沒差 七六人上演17分逆轉秀擊退暴龍', 'tw')
+    ],
+    // (Its last report a day and more after the game: still the game's, by its first.)
+    intl: [st('w1', 'Tyrese Maxey, reserves help 76ers pull away from Raptors', 'intl', { first: now - 30 * 3_600_000, at: now })]
+  });
+  const at = now - 26 * 3_600_000;
+  const got = newsAbout(pack, { teams: [PHI, TOR], both: true, from: at - 3 * 86_400_000, to: at + 86_400_000, now });
+  assert.deepEqual(got.map(s => s.id), ['w1', 'tw1']);
 });
