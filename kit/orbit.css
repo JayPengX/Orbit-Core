@@ -3337,8 +3337,8 @@ dialog.q-moved::backdrop {
   gap: 10px;
   text-align: center;
 }
-/* A page's own sign-in (Orbit's, site/app): its picture, name and line over
-   the form; on a wide screen, beside it. */
+/* The sign-in: Orbit's ring, name and line over the form; on a wide screen,
+   beside it. */
 .q-gate-split,
 .q-gate-side,
 .q-gate-main {
@@ -3374,6 +3374,20 @@ dialog.q-moved::backdrop {
     font-size: 17px;
   }
 }
+/* The sign-in's one look (Jay 11-14, every app and Orbit): Orbit's mark
+   with the apps circling it (orbit.mjs orbitRing). */
+.q-orbit-ring { --r: 92px; --i: 40px; position: relative; flex: none; width: calc(var(--r) * 2 + var(--i)); height: calc(var(--r) * 2 + var(--i)); margin: 4px 0 6px; }
+.q-orbit-ring-core { position: absolute; inset: 0; margin: auto; width: 76px; height: 76px; border-radius: 19px; box-shadow: 0 18px 40px -14px color-mix(in srgb, #5e5ce6 70%, transparent); }
+.q-orbit-ring-path { position: absolute; inset: calc(var(--i) / 2); border-radius: 50%; border: 1px dashed color-mix(in srgb, var(--q-label-2, #8e8e93) 35%, transparent); }
+.q-orbit-ring-spin { position: absolute; inset: 0; animation: q-orbit-ring-spin 90s linear infinite; }
+.q-orbit-ring-at { position: absolute; left: 50%; top: 50%; width: var(--i); height: var(--i); margin: calc(var(--i) / -2) 0 0 calc(var(--i) / -2); transform: rotate(var(--a)) translateY(calc(var(--r) * -1)) rotate(calc(var(--a) * -1)); }
+.q-orbit-ring-icon { display: block; width: 100%; height: 100%; border-radius: 22%; box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.35); animation: q-orbit-ring-spin 90s linear infinite reverse; }
+@keyframes q-orbit-ring-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .q-orbit-ring-spin, .q-orbit-ring-icon { animation: none; } }
+@media (max-width: 359px) { .q-orbit-ring { --r: 78px; --i: 34px; } .q-orbit-ring-core { width: 64px; height: 64px; } }
+@media (min-width: 700px) and (min-height: 700px) { .q-orbit-ring { --r: 124px; --i: 50px; } .q-orbit-ring-core { width: 96px; height: 96px; border-radius: 23px; } }
+@media (min-width: 860px) and (min-height: 560px) { .q-orbit-ring { --r: 150px; --i: 56px; } .q-orbit-ring-core { width: 112px; height: 112px; border-radius: 26px; } }
+@media (orientation: landscape) and (max-height: 520px) { .q-orbit-ring { --r: 62px; --i: 28px; } .q-orbit-ring-core { width: 48px; height: 48px; border-radius: 12px; } }
 .q-gate-icon {
   border-radius: 18px;
   box-shadow: 0 16px 36px -12px rgba(14, 17, 22, 0.4);
@@ -5825,7 +5839,7 @@ html.q-kb .q-gate:focus-within :is(.q-gate-brand, .q-gate-lede) {
   display: none;
 }
 @media (max-height: 740px) {
-  html.q-kb .q-gate:focus-within :is(.q-gate-icon, .q-gate-title) {
+  html.q-kb .q-gate:focus-within :is(.q-gate-icon, .q-gate-title, .q-orbit-ring) {
     display: none;
   }
 }
