@@ -27,6 +27,7 @@
 
 import { WALLET_COLLECTION, parseWallet, publicWallet, poolBalance, gen, updateWallet, signIn, ECO_LIMITS } from './eco.js';
 import { readToken, sessionLimited, tokenSecret } from './orbit-token.js';
+import { DEV } from './kit/brand.mjs';
 
 export const MAIL_COLLECTION = 'eco-mail';
 export const MAIL_CODES = 'eco-mail-codes';
@@ -132,6 +133,57 @@ function later(ctx, task) {
   return p;
 }
 const send = (ctx, to, mail) => ctx.deps.sendMail(ctx.env, { to, ...mail });
+
+// A notice to an address no longer the Pass's: after the reply, from recovery's share.
+const notice = (ctx, to, mail) =>
+  later(ctx, async () => {
+    const room = await take(ctx, 'recover');
+    if (!room.refused) await send(ctx, to, mail).catch(() => room.back());
+  });
+
+// ---- The day's mails, everyone's together ------------------------------------------
+//
+// The sender's day is small (Resend's free plan: 100), and the two ops anyone
+// can call could use it up from a script. So a count of Orbit's mails a
+// Taiwan day, in D1 (deps.dayCount: law.js addOne; a test's memory without
+// it), checked before each one: new addresses (a sign-up's, a link's) stop at
+// 60% of the day's budget (admin 設定 `mailDay`), recovery goes on to 95%. And
+// any one address gets at most MAIL_PER_DAY of the new-address mails a day,
+// whichever passes ask (counted by its HMAC, never the address itself).
+export const MAIL_SHARE = { fresh: 0.6, recover: 0.95 };
+const memoryCounts = new Map();
+async function dayCount(ctx, k, by = 1) {
+  if (ctx.deps.dayCount) return ctx.deps.dayCount(ctx.env, k, twDay(ctx.deps.now()), by);
+  const key = `${twDay(ctx.deps.now())}|${k}`;
+  memoryCounts.set(key, (memoryCounts.get(key) || 0) + by);
+  return memoryCounts.get(key);
+}
+export const forgetMailCounts = () => memoryCounts.clear();
+async function budget(ctx) {
+  const v = await Promise.resolve(ctx.deps.mailBudget?.(ctx.env)).catch(() => null);
+  return Number.isFinite(v) ? v : DEV.mailDay.def;
+}
+// One mail taken from the day's budget (and `at`'s, an address's key), or
+// the refusal's code; undone by `back` when the mail didn't go. (A count
+// that can't be read refuses: addOne's Infinity.)
+async function take(ctx, share, at = '') {
+  const cap = Math.floor((await budget(ctx)) * MAIL_SHARE[share]);
+  if ((await dayCount(ctx, 'mail:day')) > cap) {
+    await dayCount(ctx, 'mail:day', -1).catch(() => {});
+    return { refused: 'ECO_MAIL_BUSY' };
+  }
+  if (at && (await dayCount(ctx, `mail:to:${at}`)) > MAIL_PER_DAY) {
+    await Promise.all([dayCount(ctx, 'mail:day', -1), dayCount(ctx, `mail:to:${at}`, -1)]).catch(() => {});
+    return { refused: 'ECO_MAIL_TOO_MANY' };
+  }
+  return { back: () => Promise.all([dayCount(ctx, 'mail:day', -1), at && dayCount(ctx, `mail:to:${at}`, -1)]).catch(() => {}) };
+}
+// Recovery's door shut for every address alike once the day is nearly used
+// (so it never tells a linked address from another).
+async function recoveryFull(ctx) {
+  const n = await dayCount(ctx, 'mail:day', 0);
+  return !(n < Math.floor((await budget(ctx)) * MAIL_SHARE.recover));
+}
 // Mail can reach anyone's address (worker.js: the sender set up for that);
 // until then every op here says ECO_MAIL_OFF and the kit hides the feature.
 const ready = ctx => Boolean(ctx.deps.sendMail && ctx.deps.mailReady?.(ctx.env));
@@ -172,6 +224,25 @@ async function useCode(ctx, id, code) {
 }
 const cleanCodeIn = v => (typeof v === 'string' ? v.replace(/\D/g, '').slice(0, 6) : '');
 
+// A code to a new address (a link's, a sign-up's): taken from the day's
+// budget and the address's, then sent. Not sent: the row's code dropped, its
+// count and wait given back, → the refusal (else null).
+async function mailFresh(ctx, id, got, addr, mail) {
+  const drop = () => ctx.deps.fsWrite(ctx.env, MAIL_CODES, id, JSON.stringify({ ...got.row, h: '', t: 0, s: got.row.s - 1 }));
+  const room = await take(ctx, 'fresh', await addrKey(ctx.secret, addr));
+  if (room.refused) {
+    await drop();
+    return bad(ctx, room.refused, room.refused === 'ECO_MAIL_BUSY' ? 503 : 429);
+  }
+  try {
+    await send(ctx, addr, mail);
+    return null;
+  } catch {
+    await Promise.all([drop(), room.back()]);
+    return bad(ctx, 'ECO_MAIL_OFF', 503);
+  }
+}
+
 // ---- Linking -----------------------------------------------------------------------
 
 export async function mailBegin(ctx) {
@@ -186,13 +257,8 @@ export async function mailBegin(ctx) {
   const id = `l-${s.c.d}`;
   const got = await newCode(ctx, id, { a: addr, g: s.c.g });
   if (got.refused) return bad(ctx, got.refused, 429);
-  try {
-    await send(ctx, addr, codeMail('link', got.code, lang(body.lang)));
-  } catch {
-    // (Not sent: not counted, and no wait before trying again.)
-    await deps.fsWrite(ctx.env, MAIL_CODES, id, JSON.stringify({ ...got.row, h: '', t: 0, s: got.row.s - 1 }));
-    return bad(ctx, 'ECO_MAIL_OFF', 503);
-  }
+  const fail = await mailFresh(ctx, id, got, addr, codeMail('link', got.code, lang(body.lang)));
+  if (fail) return fail;
   return deps.json({ sent: true, exp: got.row.e, shown: maskAddr(addr) }, 200, ctx.headers);
 }
 
@@ -204,13 +270,10 @@ export async function mailConfirm(ctx) {
   const row = await useCode(ctx, `l-${s.c.d}`, cleanCodeIn(body.code));
   if (!row || row.g !== s.c.g) return bad(ctx, 'ECO_MAIL_CODE_WRONG', 401);
   const addr = row.a;
-  const at = await addrKey(secret, addr);
-  // The address on another Pass (said only now, to its proven owner).
-  const index = parse(await deps.fsGet(env, MAIL_COLLECTION, at));
-  if (index?.d && index.d !== s.c.d) {
-    const other = await deps.fsGet(env, WALLET_COLLECTION, index.d);
-    if (other.exists && mailOf(parseWallet(other.payload)) === addr) return bad(ctx, 'ECO_MAIL_TAKEN', 409);
-  }
+  // The address on another Pass (said only now, to its proven owner); its
+  // finder claimed first, so two passes at once can't both have it.
+  const claim = await claimMail(env, deps, secret, addr, s.c.d);
+  if (!claim) return bad(ctx, 'ECO_MAIL_TAKEN', 409);
   const now = deps.now();
   let before = '';
   let refused = false;
@@ -225,11 +288,13 @@ export async function mailConfirm(ctx) {
     },
     { skipIf: () => refused }
   );
-  if (!result || refused) return bad(ctx, 'ECO_SIGNED_OUT', 401);
-  await deps.fsWrite(env, MAIL_COLLECTION, at, JSON.stringify({ d: s.c.d }));
+  if (!result || refused) {
+    if (claim === 'new') await dropMailIndex(env, deps, secret, s.c.d, addr);
+    return bad(ctx, 'ECO_SIGNED_OUT', 401);
+  }
   if (before && before !== addr) {
     await dropMailIndex(env, deps, secret, s.c.d, before);
-    if (ready(ctx)) later(ctx, () => send(ctx, before, noticeMail('replaced', lang(body.lang))));
+    if (ready(ctx)) notice(ctx, before, noticeMail('replaced', lang(body.lang)));
   }
   return walletReply(ctx, result);
 }
@@ -248,7 +313,7 @@ export async function mailRemove(ctx) {
   if (!result) return bad(ctx, 'ECO_SIGNED_OUT', 401);
   if (before) {
     await dropMailIndex(env, deps, secret, s.c.d, before);
-    if (ready(ctx)) later(ctx, () => send(ctx, before, noticeMail('removed', lang(body.lang))));
+    if (ready(ctx)) notice(ctx, before, noticeMail('removed', lang(body.lang)));
   }
   return walletReply(ctx, result);
 }
@@ -262,6 +327,7 @@ export async function mailRecoverBegin(ctx) {
   if (hit) return hit;
   const addr = cleanAddr(body.addr);
   if (!addr) return bad(ctx, 'ECO_MAIL_INVALID');
+  if (await recoveryFull(ctx)) return bad(ctx, 'ECO_MAIL_BUSY', 503);
   const at = await addrKey(secret, addr);
   // Found or not, the same reads and the same row (its waits and day's
   // count hold for any address); only a linked one gets a mail.
@@ -270,7 +336,12 @@ export async function mailRecoverBegin(ctx) {
   const linked = doc.exists && mailOf(parseWallet(doc.payload)) === addr ? index.d : '';
   const got = await newCode(ctx, `r-${at}`, { d: linked });
   if (got.refused) return bad(ctx, got.refused, 429);
-  if (linked) later(ctx, () => send(ctx, addr, codeMail('recover', got.code, lang(body.lang))));
+  if (linked)
+    later(ctx, async () => {
+      const room = await take(ctx, 'recover');
+      if (room.refused) return;
+      await send(ctx, addr, codeMail('recover', got.code, lang(body.lang))).catch(() => room.back());
+    });
   return deps.json({ sent: true, exp: got.row.e }, 200, ctx.headers);
 }
 
@@ -308,16 +379,13 @@ export async function signupMailBegin(ctx) {
   const id = `c-${await addrKey(secret, addr)}`;
   const got = await newCode(ctx, id, { a: addr });
   if (got.refused) return bad(ctx, got.refused, 429);
-  try {
-    await send(ctx, addr, codeMail('signup', got.code, lang(body.lang)));
-  } catch {
-    await deps.fsWrite(env, MAIL_CODES, id, JSON.stringify({ ...got.row, h: '', t: 0, s: got.row.s - 1 }));
-    return bad(ctx, 'ECO_MAIL_OFF', 503);
-  }
+  const fail = await mailFresh(ctx, id, got, addr, codeMail('signup', got.code, lang(body.lang)));
+  if (fail) return fail;
   return deps.json({ sent: true, exp: got.row.e, shown: maskAddr(addr) }, 200, ctx.headers);
 }
 // The code typed for that address, spent → { addr, mail } (mail: the wallet's
-// field, `{ ...wallet, mail }` then pointMail once the wallet is written), or
+// field: claimMail for the new account first, '' = taken, then the wallet
+// written with `{ ...wallet, mail }`), or
 // { refused: Response } (a wrong or ended code, or the address already on a
 // Pass: ECO_MAIL_TAKEN, the kit offering 用救援信箱找回).
 export async function signupMailProve(ctx) {
@@ -332,8 +400,9 @@ export async function signupMailProve(ctx) {
 }
 
 // The account whose verified recovery email `addr` is ('' for none): any
-// spelling of it (cleanAddr), the wallet still holding it. (privacy@'s
-// requests by mail: worker.js email.)
+// spelling of it (cleanAddr), the wallet still holding it. Never enough
+// to act on by itself for a mail's From (easily faked): a request by mail
+// is answered with a code or link to that address first.
 export async function accountOfMail(env, deps, addr) {
   const a = cleanAddr(addr);
   const secret = await tokenSecret(env);
@@ -345,6 +414,32 @@ export async function accountOfMail(env, deps, addr) {
 }
 
 // ---- Kept pointing at the account (a new pass, a merge, a delete) ----------------------
+
+// The address's finder made to lead to `docId`, unless it leads to another
+// account still holding the address: written only if unchanged since read
+// (two at once: one wins). → 'new', 'had' (already this account's) or ''
+// (taken). A new pass's address (eco.js create): this, then the wallet
+// written with it (and if that fails, dropMailIndex).
+const CLAIM_MS = 60_000;
+export async function claimMail(env, deps, secret, addr, docId) {
+  const at = await addrKey(secret, addr);
+  const doc = await deps.fsGet(env, MAIL_COLLECTION, at);
+  const index = parse(doc);
+  if (index?.d === docId) return 'had';
+  if (index?.d) {
+    // (Another's claim still being written, its wallet not yet saved: theirs.)
+    if (index.c > deps.now() - CLAIM_MS) return '';
+    const other = await deps.fsGet(env, WALLET_COLLECTION, index.d);
+    if (other.exists && mailOf(parseWallet(other.payload)) === addr) return '';
+  }
+  try {
+    await deps.fsWrite(env, MAIL_COLLECTION, at, JSON.stringify({ d: docId, c: deps.now() }), doc.exists ? { updateTime: doc.updateTime } : { exists: false });
+    return 'new';
+  } catch (e) {
+    if (e?.precondition) return '';
+    throw e;
+  }
+}
 
 export async function pointMail(env, deps, secret, docId, wallet) {
   const addr = mailOf(wallet);

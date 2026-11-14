@@ -4,13 +4,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { handleEcoRequest, WALLET_COLLECTION } from '../eco.js';
-import { MAIL_COLLECTION, MAIL_CODES, MAIL_TRIES, MAIL_PER_DAY, MAIL_WAIT_MS, cleanAddr, maskAddr, accountOfMail, signupMailBegin, signupMailProve } from '../pass-mail.js';
+import { MAIL_COLLECTION, MAIL_CODES, MAIL_TRIES, MAIL_PER_DAY, MAIL_WAIT_MS, cleanAddr, maskAddr, accountOfMail, signupMailBegin, signupMailProve, forgetMailCounts, claimMail } from '../pass-mail.js';
 import { tokenSecret } from '../orbit-token.js';
 import { planClean } from '../eco-admin.js';
 
 // (Each its own minutes: the per-session limits are counted in memory, by minute.)
 let runs = 0;
 function setup() {
+  forgetMailCounts();
   const store = new Map();
   const sent = [];
   let clock = 1_800_000_000_000 + ++runs * 3_600_000;
@@ -295,4 +296,48 @@ test('a new pass with an address: a code to it, spent once; an address on a Pass
   assert.equal((await signupMailBegin(ctx({ email: 'me@example.com' }))).status, 200);
   const taken = await signupMailProve(ctx({ email: 'me@example.com', code: t.codeIn(t.sent.at(-1)) }));
   assert.equal(taken.refused.data.error.code, 'ECO_MAIL_TAKEN');
+});
+
+test('the day’s mails: new addresses stop at 60% of the budget, recovery goes on to 95%, then shut for every address alike', async () => {
+  const t = setup();
+  t.deps.mailBudget = () => 10;
+  const secret = await tokenSecret(t.env);
+  const ctx = body => ({ env: t.env, deps: t.deps, body, secret, ip: '1.1.1.1', headers: {}, request: {}, waitUntil: () => {} });
+  const a = await account(t);
+  await link(t, a.token, 'me@example.com'); // 1
+  for (let i = 0; i < 5; i++) assert.equal((await signupMailBegin(ctx({ email: `x${i}@example.com` }))).status, 200); // 6
+  const busy = await signupMailBegin(ctx({ email: 'x9@example.com' }));
+  assert.equal(busy.data.error.code, 'ECO_MAIL_BUSY');
+  assert.equal(t.sent.length, 6);
+  // Recovery still mails (to 9 of 10), and then says the same to anyone.
+  for (let i = 0; i < 3; i++) {
+    t.advance(MAIL_WAIT_MS);
+    assert.equal((await t.post({ op: 'mail-recover-begin', addr: 'me@example.com' })).status, 200);
+    await t.settle();
+  }
+  assert.equal(t.sent.length, 9);
+  const shut = [await t.post({ op: 'mail-recover-begin', addr: 'me@example.com' }), await t.post({ op: 'mail-recover-begin', addr: 'nobody@example.com' })];
+  assert.deepEqual(shut.map(r => r.data.error?.code), ['ECO_MAIL_BUSY', 'ECO_MAIL_BUSY']);
+});
+
+test('one stranger’s address: five new-address mails a day, however many passes ask', async () => {
+  const t = setup();
+  const passes = [];
+  for (let i = 0; i < 6; i++) passes.push(await account(t));
+  const codes = [];
+  for (const p of passes) codes.push((await t.post({ op: 'mail-begin', qt: p.token, addr: 'them@example.com' })).data.error?.code || 'sent');
+  assert.deepEqual(codes, ['sent', 'sent', 'sent', 'sent', 'sent', 'ECO_MAIL_TOO_MANY']);
+  assert.equal(t.sent.filter(m => m.to === 'them@example.com').length, 5);
+});
+
+test('two passes claiming one address at once: one gets it', async () => {
+  const t = setup();
+  const secret = await tokenSecret(t.env);
+  const [x, y] = await Promise.all([claimMail(t.env, t.deps, secret, 'me@example.com', 'acct-x'), claimMail(t.env, t.deps, secret, 'me@example.com', 'acct-y')]);
+  assert.deepEqual([x, y].sort(), ['', 'new']);
+  // One after the other too, the first's wallet not yet written.
+  assert.equal(await claimMail(t.env, t.deps, secret, 'me@example.com', 'acct-z'), '');
+  // A claim whose wallet never came is let go after a minute.
+  t.advance(61_000);
+  assert.equal(await claimMail(t.env, t.deps, secret, 'me@example.com', 'acct-z'), 'new');
 });
