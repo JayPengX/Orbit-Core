@@ -99,7 +99,7 @@ export function billNotice(g, lang) {
   const body = en
     ? `Pace ${pace}${pace ? ` (live refreshes ×${slow} slower${pace === PACES.length - 1 ? ', basics first: nobody new let in' : ''})` : ' (as configured)'}; ${g.free ? 'nothing is ever billed.' : 'nothing is billed past $5.'}`
     : `節流 ${pace}${pace ? `（即時更新放慢 ×${slow}${pace === PACES.length - 1 ? '，先顧基本功能：新的人先等' : ''}）` : '（照設定）'}；${g.free ? '永遠不會收費。' : '不會超過 $5。'}`;
-  return { title, body, tag: 'ops:bill', kind: 'bill', url: `${SITE}/Orbit-Core/admin/#health` };
+  return { title, body, tag: 'ops:bill', kind: 'bill', url: `${SITE}/admin/#health` };
 }
 // What's news: a higher alert, a stop, or a pace that changed (this period).
 export function news(g, told) {

@@ -105,7 +105,7 @@ Values are never written anywhere else. The admin panel's system report and
 **Never change `ECO_TOKEN_SECRET`.** Every pass is stored hashed with a
 pepper made from it: a new value locks every account out. Keep a copy of it
 somewhere safe outside GitHub (GitHub never shows a secret again).
-`ECO_ADMIN_TOKEN` opens the admin panel. Everything else can be replaced
+`ECO_ADMIN_TOKEN` opens the admin panel (`orbit.jaypengx.com/admin/`). Everything else can be replaced
 with a new key from its provider.
 
 ### 3.3 Cloudflare: the Workers
