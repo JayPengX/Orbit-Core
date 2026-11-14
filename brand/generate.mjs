@@ -167,6 +167,7 @@ async function writeManifest(id, place) {
 const RETIRED = ['og-image.jpg', 'og-image-square.jpg', 'og-image.png', 'og-image-square.png', 'og-card.jpg', 'og-card-square.jpg', 'icons/icon.svg', 'icons/favicon-16.png', 'share/story.jpg'];
 
 const only = process.argv.slice(2);
+const familyVer = {};
 for (const id of Object.keys(BRANDS)) {
   if (only.length && !only.includes(id)) continue;
   const place = await placeOf(id);
@@ -200,6 +201,11 @@ if (!only.length || only.includes('site')) {
   await png(appIcon('pass'), 32, `${here}site/icons/favicon-32.png`);
   await writeFile(`${here}site/favicon.ico`, ico(await readFile(`${here}site/icons/favicon-32.png`), 32));
   await cards('pass', `${out}pass-`, ['og', 'x']);
+  // Orbit's own cards (site/app/share/): the family's home and Orbit's page
+  // share them, each link carrying ?v= from its picture.
+  await cards('family', `${here}site/app/share/`);
+  for (const { file } of Object.values(FORMATS)) familyVer[file] = createHash('sha1').update(await readFile(`${here}site/app/share/${file}`)).digest('hex').slice(0, 8);
+  await writeFile(`${here}site/app/index.html`, orbitTags(await readFile(`${here}site/app/index.html`, 'utf8')));
   for (const id of Object.keys(BRANDS)) await writeFile(`${out}${id}.svg`, appIcon(id));
   await writeFile(`${here}site/index.html`, homePage());
   console.log('wrote site/brand and site/index.html', PASS.name);
@@ -256,8 +262,8 @@ function homePage() {
 <link rel="icon" href="${at}brand/family-orbit.svg" type="image/svg+xml"><link rel="icon" href="${at}icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="manifest" href="/app/manifest.webmanifest"><link rel="apple-touch-icon" href="/app/icons/apple-touch-icon.png"><meta name="apple-mobile-web-app-title" content="Orbit"><meta name="application-name" content="Orbit">
 <script>(()=>{let s=false;try{s=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true||sessionStorage.getItem('orbit.suite')==='1'||sessionStorage.getItem('orbit.addr')==='/'}catch{}if(s)location.replace('/app/'+location.search+location.hash)})()</script>
-${og('type', 'website')}${og('site_name', 'Orbit')}${og('title', 'Orbit')}${og('description', 'Orbit：每天用得到的 App，一個 Orbit Pass。')}${og('url', home)}${og('image', `${SITE_URL}/Orbit-Core/brand/pass-og.jpg`)}${og('image:width', 1200)}${og('image:height', 630)}
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${SITE_URL}/Orbit-Core/brand/pass-x.jpg">
+${og('type', 'website')}${og('site_name', 'Orbit')}${og('title', 'Orbit')}${og('description', 'Orbit：每天用得到的 App，一個 Orbit Pass。')}${og('url', home)}${familyCards(og)}
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${familyCard('x.jpg')}">
 <script>(()=>{let l;try{l=localStorage.getItem('orbit.lang')}catch{}if(l!=='zh'&&l!=='en'){const n=navigator.languages?.length?navigator.languages:[navigator.language||'zh-TW'];l=n.some(x=>/^zh/i.test(x))?'zh':'en'}if(l==='en')document.documentElement.lang='en'})()</script>
 <style>
 :root{color-scheme:light dark;--page:#f2f2f7;--glow:rgba(99,102,241,.16);--cell:#fff;--label:#000;--label-2:rgba(60,60,67,.6);--sep:rgba(60,60,67,.18);--press:rgba(0,0,0,.04);--btn:#4f46e5;--btn-ink:#fff;--ring:#f2f2f7}
@@ -319,4 +325,20 @@ ${two('p', { zh: '在手機上加到主畫面，就是一個 App。', en: 'On a 
 <script>if(document.documentElement.lang==='en')for(const el of document.querySelectorAll('[data-en]'))el.textContent=el.dataset.en</script>
 </body></html>
 `;
+}
+
+// Orbit's card pictures (site/app/share/, written above), for the family's
+// home and Orbit's page alike.
+function familyCard(file) {
+  return `${SITE_URL}/app/share/${file}?v=${familyVer[file]}`;
+}
+function familyCards(og) {
+  return [og('image', familyCard('og.jpg')), og('image:width', 1200), og('image:height', 630), og('image', familyCard('square.jpg')), og('image:width', 1200), og('image:height', 1200)].join('');
+}
+// Orbit's page (site/app/index.html, written by hand): its card tags made new.
+function orbitTags(page) {
+  const tag = (k, v) => `<meta property="og:${k}" content="${v}" />`;
+  const block = ['<!-- cards: brand/generate.mjs -->', familyCards(tag).replace(/\/>(?=<)/g, '/>\n'), '<meta name="twitter:card" content="summary_large_image" />', `<meta name="twitter:image" content="${familyCard('x.jpg')}" />`, '<!-- /cards -->'].join('\n');
+  if (page.includes('<!-- cards: brand/generate.mjs -->')) return page.replace(/<!-- cards: brand\/generate\.mjs -->[\s\S]*?<!-- \/cards -->/, block);
+  return page.replace(/<meta property="og:image" content="[^"]*" \/>/, block);
 }
