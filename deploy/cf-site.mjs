@@ -123,7 +123,10 @@ async function main() {
   const files = await walk(out);
   if (files.length > MAX_FILES) throw new Error(`${files.length} files: over ${MAX_FILES}`);
   for (const f of files) if ((await stat(join(out, f))).size > MAX_BYTES) throw new Error(`${f} is over 25 MB`);
-  const redirects = [...site.redirects, ...folderRules(files)];
+  // (A path the site sends elsewhere keeps only that rule: Cloudflare refuses a
+  // second one for the same path, as /pass/ → / and /pass/index.html did, 11-14.)
+  const taken = new Set(site.redirects.map(r => r.split(/\s+/)[0]));
+  const redirects = [...site.redirects, ...folderRules(files).filter(r => !taken.has(r.split(' ')[0]))];
   await writeFile(join(out, '_redirects'), redirects.join('\n') + '\n');
   await writeFile(join(out, '_headers'), ownHeaders(own, site.put) + SITE_HEADERS);
   const zone = DOMAIN.trim().toLowerCase();
