@@ -7465,6 +7465,7 @@ html.q-own-scroll body {
    (forward), each behind a hairline. On a rail or a computer's side bar the
    same buttons stand with the account at its foot. */
 .q-suite {
+  --q-suite-icon-r: 7px;
   display: flex;
   flex: none;
   align-items: center;
@@ -7472,7 +7473,10 @@ html.q-own-scroll body {
   height: 36px;
   min-width: 0;
   padding: 0 2px;
-  border-radius: 999px;
+  /* (A rounded square round a rounded-square icon, one curve: the icon's
+     radius plus the gap round it; a pill round a square looked wrong,
+     Jay 11-14.) */
+  border-radius: calc(var(--q-suite-icon-r) + 6px);
   background: var(--q-glass-strong);
   -webkit-backdrop-filter: var(--q-glass-blur);
   backdrop-filter: var(--q-glass-blur);
@@ -7517,7 +7521,7 @@ html.q-own-scroll body {
   flex: none;
   width: 24px;
   height: 24px;
-  border-radius: 6.5px;
+  border-radius: var(--q-suite-icon-r, 7px);
 }
 .q-suite-switch {
   padding: 0 6px 0 4px;
