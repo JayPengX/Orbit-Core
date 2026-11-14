@@ -102,9 +102,9 @@
   /* (The list's page: no app's rail beside it, so the kit's room for one is left out.) */
   html:not(.q-suite-host) { padding: 0 !important; }
   html:not(.q-suite-host) body { max-width: none; margin: 0; padding: 0; }
-  .door-head { display: flex; align-items: center; gap: 12px; padding: 4px 4px 22px; }
-  .door-head img { width: 44px; height: 44px; border-radius: 11px; }
-  .door-head h1 { margin: 0; color: var(--q-label); font: 700 28px/1.1 var(--q-font); letter-spacing: -0.02em; }
+  .door-head { display: flex; align-items: center; gap: 14px; padding: 4px 4px 24px; }
+  .door-head img { width: 56px; height: 56px; border-radius: 14px; box-shadow: 0 10px 26px -10px rgba(79, 70, 229, 0.65), 0 0 0 0.5px rgba(255, 255, 255, 0.12); }
+  .door-head h1 { margin: 0; color: var(--q-label); font: 700 30px/1.1 var(--q-font); letter-spacing: -0.02em; }
   .door-head p { margin: 2px 0 0; color: var(--q-label-2); font: 400 15px/1.3 var(--q-font); }
   .door img.door-icon { flex: none; width: 36px; height: 36px; border-radius: 9px; }
   .door button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
@@ -118,18 +118,21 @@
   .door-hero-role { color: var(--q-label-2); font: 400 15px/1.3 var(--q-font); }
   .door-go { position: relative; flex: none; width: 36px; height: 36px; border-radius: 50%; background: color-mix(in srgb, var(--app) 20%, transparent); }
   .door-go::after { content: ''; position: absolute; left: 13px; top: 12px; width: 8px; height: 8px; border: solid var(--app); border-width: 2.2px 2.2px 0 0; transform: rotate(45deg); }
-  .door-hero:active, .door-row:active { opacity: 0.6; }
+  .door-hero:active { opacity: 0.6; }
   .door-live { display: inline-flex; align-items: center; gap: 6px; color: var(--app); font: 500 13px/1.3 var(--q-font); }
   .door-live::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-  .door-group { margin: 0 0 24px; }
-  .door-group h2 { margin: 0 4px 8px; color: var(--q-label-2); font: 600 15px/1.3 var(--q-font); }
-  .door-rows { border-radius: var(--q-r-card, 20px); background: var(--nv-card, var(--q-surface)); box-shadow: inset 0 0 0 0.5px var(--nv-edge, transparent), var(--nv-lift, none); overflow: hidden; }
-  .door-row { position: relative; display: flex; align-items: center; gap: 14px; width: 100%; min-height: 56px; padding: 10px 16px; border: 0; background: none; text-align: left; cursor: pointer; }
-  .door-row + .door-row::before { content: ''; position: absolute; top: 0; left: 66px; right: 0; height: 0.5px; background: var(--q-sep); }
-  .door-name { flex: 1; min-width: 0; color: var(--q-label); font: 500 17px/1.3 var(--q-font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .door-role { flex: none; color: var(--q-label-2); font: 400 15px/1.3 var(--q-font); white-space: nowrap; }
-  .door-row .door-live { font-size: 15px; }
-  .door-lead { margin: -6px 4px 24px; color: var(--q-label-2); font: 400 15px/1.45 var(--q-font); }
+  .door-lead { margin: -8px 4px 20px; color: var(--q-label-2); font: 400 15px/1.45 var(--q-font); }
+  /* Every app of this Orbit, as a home screen (kit evenGrid: ten apps five by two). */
+  .door-apps { margin: 0 0 16px; padding: 14px 8px 10px; border-radius: var(--q-r-card, 22px); background: var(--nv-card, var(--q-surface)); box-shadow: inset 0 0 0 0.5px var(--nv-edge, transparent), var(--nv-lift, none); }
+  .door-apps h2 { margin: 0 8px 10px; color: var(--q-label-2); font: 600 13px/18px var(--q-font); letter-spacing: 0.02em; }
+  .door-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px 2px; }
+  .door-tile { display: grid; justify-items: center; gap: 6px; min-width: 0; padding: 2px 0; border: 0; background: none; cursor: pointer; }
+  .door-tile:active .door-tile-icon { transform: scale(0.92); }
+  .door-tile-icon { position: relative; display: block; transition: transform 0.15s ease; }
+  .door-tile-icon img.door-icon { display: block; width: 58px; height: 58px; border-radius: 14px; box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--app) 80%, transparent); }
+  .door-tile-dot { position: absolute; top: -3px; right: -3px; width: 14px; height: 14px; border-radius: 50%; background: #30d158; box-shadow: 0 0 0 2.5px var(--nv-card, var(--q-surface)); }
+  .door-tile-name { max-width: 100%; overflow: hidden; color: var(--q-label); font: 500 12px/16px var(--q-font); letter-spacing: -0.2px; white-space: nowrap; text-overflow: ellipsis; }
+  @media (max-width: 359px) { .door-tile-icon img.door-icon { width: 50px; height: 50px; border-radius: 12px; } .door-tile-name { font-size: 11px; } }
   .door-sign { display: grid; justify-items: center; gap: 10px; margin: 8px 0 0; padding: 28px 20px 20px; border-radius: 22px; background: var(--q-surface); text-align: center; }
   .door-sign h2 { margin: 0; color: var(--q-label); font: 700 22px/1.25 var(--q-font); }
   .door-sign p { margin: 0 0 10px; color: var(--q-label-2); font: 400 15px/1.4 var(--q-font); }
@@ -196,7 +199,11 @@
   .o-look[aria-checked='true'] { box-shadow: 0 0 0 2.5px var(--q-accent, #4f46e5); }
   .o-finish { margin-top: 22px; }
   .o-reset { margin: 10px auto 0; padding: 10px; border: 0; background: none; color: var(--q-label-2); font: 400 15px/1.3 var(--q-font); cursor: pointer; }
-  .door-edit { display: block; margin: 4px auto 0; padding: 12px; border: 0; background: none; color: var(--q-accent); font: 400 16px/1.3 var(--q-font); cursor: pointer; }
+  .door { --door-ink: #4f46e5; }
+  @media (prefers-color-scheme: dark) { .door { --door-ink: #a5a1ff; } }
+  .door .door-edit { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 50px; margin: 0; padding: 12px 16px; border: 0; border-radius: 14px; background: color-mix(in srgb, var(--door-ink) 14%, transparent); color: var(--door-ink); font: 600 16px/1.3 var(--q-font); cursor: pointer; }
+  .door-edit:active { opacity: 0.6; }
+  .door-edit-glyph { width: 18px; height: 18px; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='3' width='7.5' height='7.5' rx='2'/%3E%3Crect x='13.5' y='3' width='7.5' height='7.5' rx='2'/%3E%3Crect x='3' y='13.5' width='7.5' height='7.5' rx='2'/%3E%3Crect x='13.5' y='13.5' width='7.5' height='7.5' rx='2'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='3' width='7.5' height='7.5' rx='2'/%3E%3Crect x='13.5' y='3' width='7.5' height='7.5' rx='2'/%3E%3Crect x='3' y='13.5' width='7.5' height='7.5' rx='2'/%3E%3Crect x='13.5' y='13.5' width='7.5' height='7.5' rx='2'/%3E%3C/svg%3E") center / contain no-repeat; }
   .o-sheet .o-apps { margin-bottom: 8px; }
   .o-foot { padding: 0 16px calc(env(safe-area-inset-bottom) + 12px); }
   @media (prefers-color-scheme: dark) { .door { --q-accent: #6d66f0; } html.q-suite-host, html.q-suite-host body { background: var(--q-page, #000); } }
@@ -300,16 +307,16 @@
     // (This Orbit's apps only, and anything under way in another.)
     const apps = myApps();
     const first = [...live].find(id => BRANDS[id]) || used.find(id => apps.includes(id)) || null;
-    const recent = used.filter(id => id !== first && apps.includes(id)).slice(0, 3);
-    const rest = apps.filter(id => id !== first && !recent.includes(id));
     const head = ui.h('header', { class: 'door-head' }, [ui.h('img', { src: myIcon, alt: '' }), ui.h('div', {}, [ui.h('h1', { text: setup.name }), ui.h('p', { text: dayLine() })])]);
-    const row = id =>
-      ui.h('button', { class: 'door-row', type: 'button', style: `--app:${BRANDS[id].color}`, onclick: () => (live.has(id) ? openLive(id) : openApp(id)) }, [
-        icon(id),
-        ui.h('span', { class: 'door-name', text: BRANDS[id].short }),
-        live.has(id) ? ui.h('span', { class: 'door-live', text: W('進行中', 'Under way') }) : ui.h('span', { class: 'door-role', text: role(id) }),
+    // (Every app of this Orbit as a home screen's icons, in the family's
+    // order, rows kept even: Jay 11-14 "this is ugly" of the long list.)
+    const tile = id =>
+      ui.h('button', { class: 'door-tile', type: 'button', style: `--app:${BRANDS[id].color}`, 'aria-label': `${BRANDS[id].short}${live.has(id) ? W('（進行中）', ' (under way)') : ''}`, onclick: () => (live.has(id) ? openLive(id) : openApp(id)) }, [
+        ui.h('span', { class: 'door-tile-icon' }, [icon(id), live.has(id) ? ui.h('span', { class: 'door-tile-dot', 'aria-hidden': 'true' }) : null]),
+        ui.h('span', { class: 'door-tile-name', text: BRANDS[id].short })
       ]);
-    const group = (label, ids) => (ids.length ? ui.h('section', { class: 'door-group' }, [label ? ui.h('h2', { text: label }) : null, ui.h('div', { class: 'door-rows' }, ids.map(row))]) : null);
+    const grid = ui.h('div', { class: 'door-grid' }, apps.map(tile));
+    const all = ui.h('section', { class: 'door-apps' }, [ui.h('h2', { text: W('App', 'Apps') }), ui.evenGrid?.(grid, { min: 50, max: 5 }) || grid]);
     const hero = first
       ? ui.h('button', { class: 'door-hero', type: 'button', style: `--app:${BRANDS[first].color}`, onclick: () => (live.has(first) ? openLive(first) : openApp(first)), 'aria-label': `${BRANDS[first].short}，${live.has(first) ? W('進行中', 'under way') : W('上次用的', 'used last')}` }, [
           icon(first),
@@ -321,8 +328,10 @@
           ui.h('span', { class: 'door-go', 'aria-hidden': 'true' }),
         ])
       : ui.h('p', { class: 'door-lead', text: W('選一個開始，下次打開會接著用。', 'Pick one to start; next time Orbit picks up there.') });
-    const edit = mine?.setApps ? ui.h('button', { class: 'door-edit', type: 'button', text: W('選擇這個 Orbit 裡的 App', 'Choose the apps in this Orbit'), onclick: () => editApps() }) : null;
-    door.replaceChildren(...[head, hero, group(W('最近', 'Recent'), recent), group(first || recent.length ? W('其他 App', 'More apps') : '', rest), edit].filter(Boolean));
+    const edit = mine?.setApps
+      ? ui.h('button', { class: 'door-edit', type: 'button', onclick: () => editApps() }, [ui.h('span', { class: 'door-edit-glyph', 'aria-hidden': 'true' }), ui.h('span', { text: W('選擇這個 Orbit 裡的 App', 'Choose the apps in this Orbit') })])
+      : null;
+    door.replaceChildren(...[head, hero, all, edit].filter(Boolean));
     if (held) addressOf(null);
     door.classList.toggle('over', !!held);
     door.hidden = false;

@@ -10,7 +10,8 @@ you need to think more about": each was fixed one at a time until this table.)
 Words used below:
 
 - **Home**: Orbit's own screen. It shows the app to go on with as one card,
-  then the apps used lately, then the rest.
+  then this Orbit's apps as a home screen's icons in even rows (ten: five by
+  two), then a button to choose which apps the Orbit holds.
 - **Tab**: an app open in Orbit. Tabs sit beside the ⌄ switcher at the top
   line's left, or at the rail's foot on a wide screen.
 - **Live**: something under way that the person expects to keep running:
