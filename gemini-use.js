@@ -84,6 +84,8 @@ export async function lastFailed(env, model, withinMs, now = Date.now()) {
 // (Gemini NT$67, Claude US$5, OpenAI US$3): taps use a few a day each, so
 // only a runaway meets them. Read once a minute an isolate.
 export const PROVIDER_DAY = { google: 40, anthropic: 200, openai: 200 };
+// (Counted from when the caps began: the morning's made-ahead runs, stopped before, never held against 11-14's taps.)
+const CAPS_FROM = Date.parse('2026-11-14T03:40:00Z');
 const PROVIDER_MODELS = { google: 'gemini-%', anthropic: 'claude-%', openai: 'gpt-%' };
 const provSeen = new Map();
 export async function providerCapped(env, prov, now = Date.now()) {
@@ -94,7 +96,7 @@ export async function providerCapped(env, prov, now = Date.now()) {
   if (had && had.day === day && now - had.at < 60_000) return had.n >= cap;
   try {
     await table(env);
-    const row = await env.STORE.prepare('SELECT COUNT(*) AS n FROM gemini_call WHERE at >= ?1 AND model LIKE ?2').bind(Date.parse(`${day}T00:00:00+08:00`), PROVIDER_MODELS[prov]).first();
+    const row = await env.STORE.prepare('SELECT COUNT(*) AS n FROM gemini_call WHERE at >= ?1 AND model LIKE ?2').bind(Math.max(CAPS_FROM, Date.parse(`${day}T00:00:00+08:00`)), PROVIDER_MODELS[prov]).first();
     const n = Number(row?.n) || 0;
     provSeen.set(prov, { day, at: now, n });
     return n >= cap;
