@@ -12,6 +12,8 @@
 //     citing one of those articles.
 //   { mode: 'town', tc, file, url, n, lang }: one member's 總質詢 at a 代表會, from Orbit Law's reading of
 //   its transcript (law-town.js).
+//   { mode: 'paper', tc, file, url, from, to, lang }: one part of a 代表會's paper (施政報告, an office's 工作報告),
+//   summed up from Orbit Law's reading of it (law-town.js).
 //   { mode: 'ruling', id, q, lang }: a ruling (憲法法庭's or a top court's)
 //     explained or asked about from its own paragraphs (law-ruling.js),
 //     every point citing one of them.
@@ -33,7 +35,7 @@ import { paceOf } from './pace.js';
 import { sessionLimited } from './orbit-token.js';
 import { DEV } from './kit/brand.mjs';
 import { rulingId, rulingJob } from './law-ruling.js';
-import { townAsk, townJob } from './law-town.js';
+import { townAsk, townJob, paperAsk, paperJob } from './law-town.js';
 import { SITE } from './kit/domain.mjs';
 import { packReader, isPack, isPackList } from './kit/data-pack.mjs';
 import { keptRead, keptPut } from './kept-store.js';
@@ -108,6 +110,7 @@ export function readAsk(body) {
   if (q.length > LAW_LIMITS.maxQ) return 'q';
   if (mode === 'ruling') return rulingId(body.id) ? { mode, id: body.id, q, lang } : 'id';
   if (mode === 'town') return townAsk(body) ? { mode, tc: String(body.tc), file: String(body.file), url: body.url, n: body.n, lang } : 'town';
+  if (mode === 'paper') return paperAsk(body) ? { mode, tc: String(body.tc), file: String(body.file), url: body.url, from: body.from, to: body.to, lang } : 'town';
   if (mode !== 'ask' && mode !== 'diff') return 'mode';
   if (typeof p !== 'string' || !PCODE.test(p)) return 'p';
   if (!Array.isArray(arts) || !arts.length || arts.length > LAW_LIMITS.maxArts || !arts.every(a => typeof a === 'string' && ART.test(a))) return 'arts';
@@ -595,7 +598,8 @@ const JOBS = {
     };
   },
   ruling: (ask, headers, env) => rulingJob(ask, { env, askKey, fail: (code, status) => fail(code, status, headers) }),
-  town: (ask, headers) => townJob(ask, { fail: (code, status) => fail(code, status, headers) })
+  town: (ask, headers) => townJob(ask, { fail: (code, status) => fail(code, status, headers) }),
+  paper: (ask, headers) => paperJob(ask, { fail: (code, status) => fail(code, status, headers) })
 };
 
 // gemini(parts, schema) -> the upstream Response (worker.js's proxyGeminiRequest);

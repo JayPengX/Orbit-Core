@@ -92,3 +92,55 @@ export async function townJob(ask, { fail }) {
     check: raw => checkTown(raw, got.rows)
   };
 }
+
+// ---- mode 'paper': one part of a 代表會's paper in a few lines ----
+// { mode: 'paper', tc, file, url, from, to, lang }: a part of a paper Orbit Law reads into the app (施政報告, one
+// office's 工作報告, 致詞: papers[url].text, its characters from … to, the part as Law's lib/town-paper.mjs splits it).
+// Gemini sums up that part only, on a person's tap, kept a year: the first reader's tap answers everyone after.
+export const PAPER_LIMITS = { chars: 12_000, points: 6 };
+export const paperAsk = b => /^\d{8}$/.test(String(b?.tc)) && /^t\d{1,2}-\d{1,3}[re]$/.test(String(b?.file)) && typeof b?.url === 'string' && /^https:\/\/[\w.-]+\.gov\.tw\/[^\s"<>]{1,300}\.pdf$/i.test(b.url) && Number.isInteger(b?.from) && Number.isInteger(b?.to) && b.from >= 0 && b.to > b.from && b.to - b.from <= 60_000;
+
+export function paperPrompt(where, kind, text, lang) {
+  return `Below is part of a paper from a Taiwanese township council's session (${where}): ${kind}, as read from its PDF (table columns may run together). Return JSON matching the schema.
+
+Paper:
+${text}
+
+answer: 1 to 2 plain sentences for a resident: what this part reports.
+points: up to ${PAPER_LIMITS.points}, the most useful concrete things in it for a resident (a project and where it stands, a figure, a date, a place), each one short sentence, in the order they appear.
+
+Rules:
+- Use only the paper above. Nothing from outside; don't fill gaps or judge.
+- Keep every figure, date and name exactly as the paper gives them.
+- Leave out greetings, thanks and routine filing ("如書面資料").
+- covered: true when the part holds real content.
+- Write everything in ${LANG(lang)}.`;
+}
+
+export const PAPER_SCHEMA = {
+  type: 'object',
+  properties: { answer: { type: 'string' }, points: { type: 'array', items: { type: 'string' } }, covered: { type: 'boolean' } },
+  required: ['answer', 'points', 'covered']
+};
+
+export function checkPaper(raw) {
+  const str = x => (typeof x === 'string' ? x.trim() : '');
+  const points = (Array.isArray(raw?.points) ? raw.points : []).map(str).filter(Boolean).slice(0, PAPER_LIMITS.points);
+  const answer = str(raw?.answer);
+  return { answer, points, covered: raw?.covered === true && (points.length > 0 || answer.length > 0) };
+}
+
+export async function paperJob(ask, { fail }) {
+  const doc = await readData(`council/town/${ask.tc}/${ask.file}.json`);
+  const paper = doc?.papers?.[ask.url];
+  const text = typeof paper?.text === 'string' ? paper.text.slice(ask.from, ask.to).slice(0, PAPER_LIMITS.chars).trim() : '';
+  if (text.replace(/\s/g, '').length < 40) return fail('town', 404);
+  return {
+    key: `law:paper:v1:${await sha256Hex([ask.tc, ask.file, ask.url, ask.from, ask.to, ask.lang, text.length].join('|'))}`,
+    ttl: TOWN_TTL_S,
+    info: {},
+    prompt: paperPrompt(doc.n || '', paper.k || '', text, ask.lang),
+    schema: PAPER_SCHEMA,
+    check: checkPaper
+  };
+}

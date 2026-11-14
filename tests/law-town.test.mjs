@@ -34,3 +34,17 @@ test('town: one member’s turns, numbered; a point stays only on turns it was g
   assert.deepEqual(out.quotes, { 2: ['邵慧芬', '所長', '早上8點到晚上8點有管制。'] });
   assert.equal(out.covered, true);
 });
+
+// mode 'paper': one part of a paper (施政報告, an office's 工作報告), its characters from … to.
+import { paperAsk, checkPaper } from '../law-town.js';
+test('paper: the ask is a township, its session file, a government PDF and a range of its text', () => {
+  const ok = { mode: 'paper', tc: '10004010', file: 't10-8r', url: 'https://www.zhubei.gov.tw/admin/upload/twgov_file_2.pdf', from: 0, to: 2329 };
+  assert.equal(paperAsk(ok), true);
+  assert.deepEqual(readAsk(ok), { mode: 'paper', tc: '10004010', file: 't10-8r', url: ok.url, from: 0, to: 2329, lang: 'zh' });
+  for (const bad of [{ from: -1 }, { to: 0 }, { from: 5, to: 5 }, { to: 70_000 }, { from: 1.5 }, { url: 'https://evil.com/a.pdf' }]) assert.equal(readAsk({ ...ok, ...bad }), 'town', JSON.stringify(bad));
+});
+test('paper: an answer keeps only its words, at most six points', () => {
+  const r = checkPaper({ answer: ' 民政課的半年工作。 ', points: ['一', '', 2, '三', '四', '五', '六', '七', '八'], covered: true });
+  assert.deepEqual(r, { answer: '民政課的半年工作。', points: ['一', '三', '四', '五', '六', '七'], covered: true });
+  assert.equal(checkPaper({ answer: '', points: [], covered: true }).covered, false);
+});
