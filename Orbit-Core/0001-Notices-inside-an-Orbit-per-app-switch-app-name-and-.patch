@@ -1,0 +1,535 @@
+From c9aad2f54d1c7c6fe275d266a11c590727ed3d5f Mon Sep 17 00:00:00 2001
+From: orbit-agent <actions@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 15:55:25 +0000
+Subject: [PATCH] Notices inside an Orbit: per-app switch, app name and tag on
+ every push, tap opens in the Orbit, Orbit before a separate app, per-app
+ admin test
+
+---
+ MAP.md                       |   1 +
+ docs/ORBIT.md                |   5 +
+ eco-admin.js                 |  47 ++++++---
+ kit/orbit.css                |   2 +
+ kit/orbit.mjs                |  21 ++--
+ kit/sw.js                    |  10 +-
+ push.js                      |  46 ++++++++-
+ site/admin/index.html        |   2 +-
+ tests/orbit-notices.test.mjs | 192 +++++++++++++++++++++++++++++++++++
+ 9 files changed, 300 insertions(+), 26 deletions(-)
+ create mode 100644 tests/orbit-notices.test.mjs
+
+diff --git a/MAP.md b/MAP.md
+index 8f655cd..d88228f 100644
+--- a/MAP.md
++++ b/MAP.md
+@@ -395,6 +395,7 @@ Broker rules (`stock-access.mjs`, `-credit`): Securities' MAP.md.
+ 
+ Apps hand the Worker coming notices (`schedulePush`); it sends them by
+ Web Push and can check first (an ESPN final, a price, weather, a bus). One device per person per app; each kind in `NOTICE_KINDS` can be off; one due in class waits for the break (`classHold`).
++In an Orbit (`docs/ORBIT.md` rule 24) the apps share one phone endpoint but not a record: `/push/subscribe` takes `via: 'orbit'`, `o` (the Orbit's tag) and `apps` (its list), refuses an app outside it and drops the ones it left; a separate app's subscribe never takes an app from a live Orbit's. `<app>:all` in the switches is a whole app off. `decorate` names the app in the title and prefixes the tag.
+ 
+ ## 9. Speeds, capacity and the bill
+ 
+diff --git a/docs/ORBIT.md b/docs/ORBIT.md
+index 5f57b84..5ea8197 100644
+--- a/docs/ORBIT.md
++++ b/docs/ORBIT.md
+@@ -47,6 +47,7 @@ Words used below:
+ | 21 | A one-app Orbit | Opens straight into its app, with its ⌄ alone at the top. Its sheet shows that app alone and 在 Safari 設定新的 Orbit (Safari, the add page's setup): no other app is put in it (Jay 11-14, reversing "select more"). Made on the add page with one tap on an app, or in setup with one app picked: its name and icon are that app's, locked. An Orbit of several keeps two apps at least. |
+ | 22 | A separate app's page in the browser, not yet added | Goes to the add page of a one-app Orbit of that app. A separate app already on a home screen is untouched (rule 16). |
+ | 23 | The address bar | The app showing (`/sports/`, `/transit/` …) or `/` on home, never the setup (the add page alone keeps its tag). A reload comes back into the same Orbit. |
++| 24 | Notices inside an Orbit | One Orbit is one home-screen app with one phone endpoint, shared by its apps; the Worker still keeps each app's notices apart. **Subscribed, stored and switched per app**: a record per pass and app (`push:<pass>:<app>`), each with its own list; 通知 in the account sheet has a switch per app (`<app>:all`) besides each kind, so Sports off never stops Weather. **Named and tagged**: every push starts with the app's name (「Sports・…」) and carries a tag of that app (`<app>:…`), so one app's notice never replaces another's. **Tap**: opens that app as a tab in the Orbit that received it (`/app/?o=<its tag>&open=<path>`; an open Orbit takes it in place). **Once, and only its apps**: a separate app of the same app on the same pass never takes it from a live Orbit (the Orbit's subscription is kept, the notice comes once); an app not in this Orbit's list never subscribes, and one the Orbit drops is removed at the next subscribe from it. 管理頁's 測試通知 answers for each app. |
+ 
+ ## Where each rule lives
+ 
+@@ -66,3 +67,7 @@ Words used below:
+   installed separate app never moves).
+ - 23: `addressOf` in `site/app/index.html`; a reload: `reloadedInOrbit` in
+   `suite.mjs`, and the home page sends an installed window back to `/app/`.
++- 24: `enablePush`, `kindOn`, `setAppNotices` (`kit/orbit.mjs`); `handlePush`
++  (`/push/subscribe` with `via: 'orbit'`, `o`, `apps`), `decorate`, `wanted`
++  (`push.js`); the `push` and `notificationclick` handlers (`kit/sw.js`);
++  `push-test` (`eco-admin.js`). Test: `tests/orbit-notices.test.mjs`.
+diff --git a/eco-admin.js b/eco-admin.js
+index 02886d2..df83d6c 100644
+--- a/eco-admin.js
++++ b/eco-admin.js
+@@ -18,7 +18,7 @@ import { REC_WEEKLY, REC_PREFIX } from './rec-weekly.js';
+ import { doorReport, doorSet } from './door.js';
+ import { systemReport, alertAccount, tell, OPS_DOC, beats } from './ops.js';
+ import { passAccount, updateWallet, deleteAccount, ECO_APPS, NOW_COLLECTION, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet, levelOf, LEVELS, mintPass } from './eco.js';
+-import { sendPush, dueLists, pushStore } from './push.js';
++import { sendPush, dueLists, pushStore, decorate } from './push.js';
+ import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, TDX_BOOK, tdxPoints, tdxGuard, tdxUse, tdxPlan } from './transit.js';
+ import { aiUse, callsSince } from './gemini-use.js';
+ import { moneyLeft, spendOf, healthOf, PROVIDERS, MODELS } from './ai.js';
+@@ -716,20 +716,41 @@ export const ADMIN_TOOLS = {
+   async 'push-test'({ env, deps, body }) {
+     const hit = await findWallet(env, deps, body.wallet);
+     if (!hit) return notFound;
+-    const app = String(body.app || '');
+     const kv = pushStore(env);
+-    const key = `push:${hit.id}:${app}`;
+-    const record = kv ? await kv.get(key, 'json').catch(() => null) : null;
+-    if (!record?.sub) return { error: 'ADMIN_NO_PUSH', status: 404, state: 'none', text: '這個帳戶在這個 App 沒有訂閱通知。' };
+-    const host = (() => {
+-      try {
+-        return new URL(record.sub.endpoint).host;
+-      } catch {
+-        return '';
++    // One app asked for, or every app this account has a subscription for. Each is its own answer:
++    // an Orbit's apps share one phone endpoint, but each has its own record, name and tag.
++    const asked = String(body.app || '');
++    const apps = asked ? [asked] : (kv ? await pushRecords(env, `push:${hit.id}:`).catch(() => []) : []).map(r => r.app);
++    const results = [];
++    for (const app of apps) {
++      const key = `push:${hit.id}:${app}`;
++      const record = kv ? await kv.get(key, 'json').catch(() => null) : null;
++      const name = BRANDS[app]?.short || app;
++      if (!record?.sub) {
++        results.push({ app, name, error: 'ADMIN_NO_PUSH', status: 404, state: 'none', text: `這個帳戶在 ${name} 沒有訂閱通知。` });
++        continue;
+       }
+-    })();
+-    const r = String(await sendPush(env, record.sub, { title: 'Orbit 測試通知', body: '這是管理頁送出的測試通知，收到代表通知正常。', tag: `test:${deps.now()}` }).catch(e => `failed ${String(e?.message || e).slice(0, 120)}`));
+-    return pushTestResult(r, host, async () => void (await kv.delete(key).catch(() => {})));
++      const host = (() => {
++        try {
++          return new URL(record.sub.endpoint).host;
++        } catch {
++          return '';
++        }
++      })();
++      const message = decorate(app, record, { title: 'Orbit 測試通知', body: '這是管理頁送出的測試通知，收到代表通知正常。', tag: `test:${deps.now()}` });
++      const r = String(await sendPush(env, record.sub, message).catch(e => `failed ${String(e?.message || e).slice(0, 120)}`));
++      const done = await pushTestResult(r, host, async () => void (await kv.delete(key).catch(() => {})));
++      results.push({ ...done, app, name, via: record.via === 'orbit' ? 'orbit' : 'app', title: message.title, tag: message.tag });
++    }
++    // The endpoint is shared when two apps' records have the same address (an Orbit's one worker).
++    if (!asked) {
++      const ends = new Map();
++      for (const app of apps) ends.set(app, (await kv.get(`push:${hit.id}:${app}`, 'json').catch(() => null))?.sub?.endpoint || '');
++      for (const r of results) r.shared = Boolean(ends.get(r.app)) && [...ends.values()].filter(e => e === ends.get(r.app)).length > 1;
++    }
++    if (asked) return results[0];
++    if (!results.length) return { error: 'ADMIN_NO_PUSH', status: 404, state: 'none', apps: [], text: '這個帳戶沒有任何 App 訂閱通知。' };
++    return { ok: results.every(r => r.ok), apps: results, state: results.every(r => r.state === 'sent') ? 'sent' : 'mixed', text: results.map(r => `${r.name}：${r.text}`).join('\n') };
+   },
+   // An account gone for good, used or not, at its owner's request or the
+   // owner's call: its wallet, every app's data, its inbox, the share keys it
+diff --git a/kit/orbit.css b/kit/orbit.css
+index fea1ba0..1ee3b75 100644
+--- a/kit/orbit.css
++++ b/kit/orbit.css
+@@ -3883,6 +3883,8 @@ dialog.q-newpass::backdrop { background: var(--q-page); }
+   font: 600 15px/20px var(--q-font);
+   color: var(--q-label-2);
+ }
++.q-notice-app { display: flex; align-items: center; gap: 8px; }
++.q-notice-app .q-switch { margin-left: auto; flex: none; }
+ .q-notice-row {
+   display: flex;
+   align-items: center;
+diff --git a/kit/orbit.mjs b/kit/orbit.mjs
+index 4919e14..1154e73 100644
+--- a/kit/orbit.mjs
++++ b/kit/orbit.mjs
+@@ -32,7 +32,7 @@
+ 
+ import { BRANDS, APP_ORDER, FAMILY, pathOf, homeOf, appIcon, familyMark } from './brand.mjs';
+ import { DEV, cleanDev } from './brand.mjs';
+-import { encodeSetup, startOf, newId, mineSaved, mergeMine, MINE_KEY } from './orbit-mine.mjs';
++import { encodeSetup, startOf, newId, mineSaved, mergeMine, MINE_KEY, appsOf, whichTag } from './orbit-mine.mjs';
+ import { API, SITE as HOME, isApi } from './domain.mjs';
+ import { passkeyHere, passkeyName, deviceName, makePasskey, usePasskey, forgetPasskey, cancelled } from './passkey.mjs';
+ import { icons, tile, cell, pullToRefresh, setSheetDetent, toast, sheet, h as node } from './ui.mjs';
+@@ -3733,7 +3733,10 @@ export async function enablePush(s, force = false) {
+     // push only to the installed web app, so a subscription from a frame's
+     // worker, or one left from a standalone app taken off the home screen,
+     // never showed (Jay 11-14: a test notice never came).
+-    const own = inSuite() ? await navigator.serviceWorker.getRegistration('/app/').catch(() => null) : null;
++    // An app that isn't in this Orbit's list sends nothing to it.
++    const orbit = inSuite() ? { o: whichTag(), apps: appsOf(whichTag()) } : null;
++    if (orbit && !orbit.apps.includes(s.app)) return false;
++    const own = orbit ? await navigator.serviceWorker.getRegistration('/app/').catch(() => null) : null;
+     const reg = own || (await Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(r, 4000))]));
+     if (!reg?.pushManager) return false;
+     // The Worker's key, asked once a day (it was asked at every list change).
+@@ -3746,10 +3749,11 @@ export async function enablePush(s, force = false) {
+     const keyed = sub?.options?.applicationServerKey ? btoa(String.fromCharCode(...new Uint8Array(sub.options.applicationServerKey))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') === key : true;
+     if (sub && !keyed) await sub.unsubscribe().catch(() => {});
+     if (!sub || !keyed) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) });
+-    const mark = `${sub.endpoint}|${new Date().toDateString()}`;
++    // (An Orbit's list changed: given again, so the Worker drops what it left.)
++    const mark = `${sub.endpoint}|${orbit ? `${orbit.o}:${orbit.apps.join(',')}|` : ''}${new Date().toDateString()}`;
+     const storeKey = `orbit.push.sub.${s.app}`;
+     if (!force && readStore(storeKey) === mark) return true;
+-    if (await pushPost(s, 'subscribe', { sub: sub.toJSON(), lang: s.lang })) writeStore(storeKey, mark);
++    if (await pushPost(s, 'subscribe', { sub: sub.toJSON(), lang: s.lang, ...(orbit ? { via: 'orbit', o: orbit.o, apps: orbit.apps } : {}) })) writeStore(storeKey, mark);
+     return true;
+   } catch {
+     return false;
+@@ -3895,7 +3899,12 @@ function savePrefs(next, s) {
+   return prefs;
+ }
+ // Whether notices of this kind are wanted (every kind is, until turned off).
+-export const kindOn = (app, kind) => !kind || !notifyPrefs().off.includes(`${app}:${kind}`);
++// `<app>:all` is that whole app off (its own switch: Sports off never stops Weather).
++export const kindOn = (app, kind) => {
++  const off = notifyPrefs().off;
++  return !off.includes(`${app}:all`) && (!kind || !off.includes(`${app}:${kind}`));
++};
++export const setAppNotices = (app, on, s = null) => setKind(app, 'all', on, s);
+ export function setKind(app, kind, on, s = null) {
+   const prefs = notifyPrefs();
+   const off = prefs.off.filter(k => k !== `${app}:${kind}`);
+@@ -4200,7 +4209,7 @@ function notifyRows(s, note) {
+     { class: 'q-notice-kinds', hidden: true },
+     order.map(app =>
+       node('div', { class: 'q-notice-group' }, [
+-        node('p', { class: 'q-notice-app' }, [appMark(app), document.createTextNode(APPS[app].short)]),
++        node('p', { class: 'q-notice-app' }, [appMark(app), document.createTextNode(APPS[app].short), toggle(kindOn(app), T(`${APPS[app].short} 的通知`, `${APPS[app].short} notices`), on => void (setAppNotices(app, on, s), paintCount()))]),
+         ...NOTICE_KINDS[app].map(([kind, zh, e, dzh, de]) =>
+           node('div', { class: 'q-notice-row' }, [
+             node('div', { class: 'q-notice-text' }, [node('strong', { text: T(zh, e) }), node('small', { class: 'q-notice-sub', text: T(dzh, de) })]),
+diff --git a/kit/sw.js b/kit/sw.js
+index 7379f9d..e187d76 100644
+--- a/kit/sw.js
++++ b/kit/sw.js
+@@ -419,6 +419,12 @@ self.addEventListener('message', event => {
+ self.addEventListener('notificationclick', event => {
+   event.notification.close();
+   const url = new URL(event.notification.data?.url || './', self.registration.scope).href;
++  // Orbit's own worker (its scope is /app/) takes every app's notices: one for an app outside that scope opens
++  // that app inside Orbit (/app/?open=<path>, in the Orbit that got it: o), never a separate app's window.
++  const home = new URL(self.registration.scope);
++  const to = new URL(url);
++  const inOrbit = /\/app\/$/.test(home.pathname) && to.origin === home.origin && !to.href.startsWith(home.href);
++  const fresh = inOrbit ? `${home.href}?${event.notification.data?.o ? `o=${encodeURIComponent(event.notification.data.o)}&` : ''}open=${encodeURIComponent(`${to.pathname}${to.search}${to.hash}`)}` : url;
+   // (other: a page of another app, which answers only in Orbit's window, kit suite.mjs.)
+   const told = (c, other = false) =>
+     new Promise(done => {
+@@ -440,7 +446,7 @@ self.addEventListener('notificationclick', event => {
+         const said = list.length ? await Promise.all(list.map(c => told(c, true))) : [];
+         const suite = list[said.indexOf(true)];
+         if (suite) return suite.focus().catch(() => suite);
+-        return self.clients.openWindow(url);
++        return self.clients.openWindow(fresh);
+       }
+       const c = await open.focus().catch(() => open);
+       if (await told(c || open)) return c;
+@@ -459,5 +465,5 @@ self.addEventListener('push', event => {
+     data = { title: event.data?.text() || '' };
+   }
+   const icon = new URL('./icons/icon-192.png', self.registration.scope).href;
+-  event.waitUntil(self.registration.showNotification(data.title || SW.title || 'Orbit', { body: data.body || '', tag: data.tag || undefined, icon, badge: icon, data: { url: data.url || self.registration.scope } }));
++  event.waitUntil(self.registration.showNotification(data.title || SW.title || 'Orbit', { body: data.body || '', tag: data.tag || undefined, icon, badge: icon, data: { url: data.url || self.registration.scope, ...(data.o ? { o: data.o } : {}), ...(data.app ? { app: data.app } : {}) } }));
+ });
+diff --git a/push.js b/push.js
+index 0c01c14..60933cb 100644
+--- a/push.js
++++ b/push.js
+@@ -50,6 +50,7 @@
+ import { weatherCheck } from './weather.js';
+ import { tdxGet, tdxRequest } from './transit.js';
+ import { bodyText } from './http.js';
++import { BRANDS } from './kit/brand.mjs';
+ import { LEAGUES, parseStatus, overByRule, finalWords } from './kit/sports-espn.mjs';
+ import { cpblDay } from './asia-baseball.js';
+ 
+@@ -154,7 +155,7 @@ export async function sendPush(env, sub, message) {
+ 
+ // ---- The lists ------------------------------------------------------------------
+ 
+-const APP_KEYS = new Set(['match', 'stock', 'vocab', 'orbit', 'weather', 'transit', 'money']);
++const APP_KEYS = new Set(Object.keys(BRANDS));
+ const MAX_ITEMS = 60;
+ const HOLD_MS = 8 * 3_600_000;
+ const CHECK_EVERY = 15 * 60_000;
+@@ -222,7 +223,24 @@ export function cleanPrefs(body) {
+   return { on: body?.on !== false, off: [...new Set(off)] };
+ }
+ // Whether the pass's switches let this notice through (all do without any).
+-export const wanted = (prefs, app, item) => !prefs || (prefs.on !== false && !(item.kind && prefs.off?.includes(`${app}:${item.kind}`)));
++// `<app>:all` in the switches is the whole app off (Orbit's per-app switch): turning Sports off never touches Weather.
++export const wanted = (prefs, app, item) => !prefs || (prefs.on !== false && !prefs.off?.includes(`${app}:all`) && !(item.kind && prefs.off?.includes(`${app}:${item.kind}`)));
++// Every push says which app it is from and carries that app's own tag, so one
++// app's notices never replace another's (an Orbit's one phone endpoint is
++// shared by all its apps). In an Orbit (`via`) the title starts with the app's
++// name too, and `o` (which Orbit) lets a tap open the app in that Orbit.
++export function decorate(app, record, message) {
++  const out = { ...message, app };
++  const short = BRANDS[app]?.short;
++  if (out.tag && !String(out.tag).startsWith(`${app}:`)) out.tag = `${app}:${out.tag}`;
++  if (record?.via === 'orbit') {
++    if (short && !String(out.title || '').includes(short)) out.title = `${short}・${out.title || ''}`.replace(/・$/, '');
++    if (record.o) out.o = record.o;
++  }
++  return out;
++}
++// An Orbit's record outranks a separate app's for the same app while it's alive.
++const ORBIT_FRESH_MS = 35 * 86_400_000;
+ // A list kept with when its next notice is due (none: no subscription or nothing on it).
+ const dueOf = record => (record.sub && record.items?.length ? record.items[0].at : 0);
+ // D1 with KV's few calls (get, put with a ttl and `due`, delete, the due
+@@ -320,8 +338,28 @@ export async function handlePush(request, env, headers, session, path) {
+   if (path === '/push/subscribe') {
+     const sub = body?.sub;
+     if (!pushEndpoint(sub?.endpoint) || !sub.keys?.p256dh || !sub.keys?.auth) return reply({ error: { message: 'Bad subscription' } }, 400);
++    const via = body.via === 'orbit';
++    const apps = (Array.isArray(body.apps) ? body.apps : []).filter(a => typeof a === 'string' && BRANDS[a]);
++    // An app that isn't in the Orbit's list sends nothing to it.
++    if (via && !apps.includes(session.a)) return reply({ error: { message: 'Not in this Orbit' } }, 403);
++    // One notice, not two: a separate app's subscribe doesn't take the app from a live Orbit's.
++    if (!via && record.via === 'orbit' && record.sub && record.sub.endpoint !== sub.endpoint && Date.now() - (record.kept || 0) < ORBIT_FRESH_MS) return reply({ ok: true, skipped: 'orbit', n: record.items?.length || 0 });
+     record.sub = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } };
+     record.lang = body.lang === 'en' ? 'en' : 'zh';
++    if (via) {
++      record.via = 'orbit';
++      record.o = typeof body.o === 'string' && /^[\w-]{1,300}$/.test(body.o) ? body.o : '';
++      // The Orbit's apps changed: the ones it dropped stop here (same Orbit, same phone).
++      for (const k of (await kv.list({ prefix: `push:${session.d}:`, all: true })).keys || []) {
++        const other = k.name.slice(k.name.lastIndexOf(':') + 1);
++        if (k.name === key || apps.includes(other) || !BRANDS[other]) continue;
++        const rec = await kv.get(k.name, 'json').catch(() => null);
++        if (rec?.via === 'orbit' && (rec.o || '') === record.o && rec.sub?.endpoint === sub.endpoint) await kv.delete(k.name);
++      }
++    } else {
++      delete record.via;
++      delete record.o;
++    }
+   } else if (path === '/push/schedule') {
+     // News that happens once (a game's final score, a price reached) and was
+     // told already isn't taken again: an app whose copy of the game is behind
+@@ -491,7 +529,7 @@ export async function sendDue(env, now = Date.now()) {
+         const own = String(item.title || '').replace('{place}', found.place ? `${found.place} ` : '');
+         message = { ...message, title: found.title ? found.title.replace('{title}', own) : own, body: (item.body || found.body || '').replace('{result}', found.result || '') };
+       }
+-      const r = await sendPush(env, record.sub, message).catch(e => `failed ${e?.message || e}`);
++      const r = await sendPush(env, record.sub, decorate(app, record, message)).catch(e => `failed ${e?.message || e}`);
+       record.last = { at: now, r };
+       if (r === 'sent' && item.tag) record.told = { ...Object.fromEntries(Object.entries(record.told || {}).filter(([, at]) => at > now - TOLD_MS)), [toldKey(item)]: now };
+       if (r === 'gone') gone = true;
+@@ -518,7 +556,7 @@ export async function notifyNow(env, account, app, kind, make) {
+   if (!record?.sub) return 'none';
+   const prefs = await kv.get(prefsKey(account), 'json').catch(() => null);
+   if (!wanted(prefs, app, { kind })) return 'off';
+-  const r = await sendPush(env, record.sub, make(record.lang));
++  const r = await sendPush(env, record.sub, decorate(app, record, make(record.lang)));
+   if (r === 'gone') await kv.delete(key);
+   return r;
+ }
+diff --git a/site/admin/index.html b/site/admin/index.html
+index b992ab8..3ee846a 100644
+--- a/site/admin/index.html
++++ b/site/admin/index.html
+@@ -1491,7 +1491,7 @@ function drawAccount(a) {
+   });
+   recover.append(codeOut);
+   codeBtn.onclick = () => recover.run(codeBtn);
+-  const pushApp = el('select', { class: 'grow' }, a.pushes.map(x => el('option', { value: x, text: appName(x) })));
++  const pushApp = el('select', { class: 'grow' }, [...(a.pushes.length > 1 ? [el('option', { value: '', text: '每個 App' })] : []), ...a.pushes.map(x => el('option', { value: x, text: appName(x) }))]);
+   const pushBtn = el('button', { text: '送出' });
+   const pushTest = a.pushes.length
+     ? action('測試通知', '', [pushApp, pushBtn], async () => {
+diff --git a/tests/orbit-notices.test.mjs b/tests/orbit-notices.test.mjs
+new file mode 100644
+index 0000000..65a0bbe
+--- /dev/null
++++ b/tests/orbit-notices.test.mjs
+@@ -0,0 +1,192 @@
++// Notices inside an Orbit (docs/ORBIT.md rule 24): one phone endpoint is shared by all its apps, yet each app's
++// notices are subscribed, stored, switched, named, tagged and opened on their own.
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { readFileSync } from 'node:fs';
++import vm from 'node:vm';
++import { handlePush, sendDue, decorate } from '../push.js';
++import { ADMIN_TOOLS } from '../eco-admin.js';
++import { fakeD1 } from './fake-d1.mjs';
++import { WALLET_COLLECTION, emptyWallet } from '../eco.js';
++
++const KEYS = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
++const sub = id => ({ endpoint: `https://fcm.googleapis.com/fcm/send/${id}`, keys: KEYS });
++const memoryKv = () => {
++  const m = new Map();
++  const meta = new Map();
++  return {
++    get: async (k, type) => (m.has(k) ? (type === 'json' ? JSON.parse(m.get(k)) : m.get(k)) : null),
++    put: async (k, v, o) => void (m.set(k, v), meta.set(k, o?.metadata)),
++    delete: async k => void (m.delete(k), meta.delete(k)),
++    list: async ({ prefix = '' } = {}) => ({ keys: [...m.keys()].filter(k => k.startsWith(prefix)).map(name => ({ name, ...(meta.get(name) ? { metadata: meta.get(name) } : {}) })), list_complete: true }),
++    m,
++    meta
++  };
++};
++const world = () => {
++  const kv = memoryKv();
++  const env = { RATE_LIMIT_KV: kv };
++  const post = (app, path, body) => handlePush(new Request(`https://w${path}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, { d: 'acct', a: app }, path);
++  return { kv, env, post };
++};
++const rec = (kv, app) => JSON.parse(kv.m.get(`push:acct:${app}`) || 'null');
++const ORBIT = { via: 'orbit', o: 'tagA', apps: ['match', 'weather'] };
++const sendAll = async (env, now) => {
++  const sent = [];
++  const real = globalThis.fetch;
++  globalThis.fetch = async url => (sent.push(url), new Response(null, { status: 201 }));
++  try {
++    return { n: (await sendDue(env, now)).sent, sent };
++  } finally {
++    globalThis.fetch = real;
++  }
++};
++
++// 1: stored per pass and app though the endpoint is shared; off per app.
++test('1: one shared endpoint, one record per app; an app switched off never stops another', async () => {
++  const { kv, env, post } = world();
++  const now = Date.now();
++  for (const app of ['match', 'weather']) {
++    assert.equal((await post(app, '/push/subscribe', { sub: sub('shared'), ...ORBIT })).status, 200);
++    await post(app, '/push/schedule', { items: [{ at: now + 1000, title: `${app} now`, tag: 'a' }] });
++  }
++  assert.equal(rec(kv, 'match').sub.endpoint, rec(kv, 'weather').sub.endpoint);
++  assert.equal(rec(kv, 'match').items[0].title, 'match now');
++  assert.equal(rec(kv, 'weather').items[0].title, 'weather now');
++  // Sports off (its own switch), Weather's still sent.
++  await post('match', '/push/prefs', { on: true, off: ['match:all'] });
++  assert.deepEqual(JSON.parse(kv.m.get('push:prefs:acct')).off, ['match:all']);
++  const r = await sendAll(env, now);
++  assert.equal(r.n, 1);
++  assert.equal(rec(kv, 'weather').items.length, 0, 'weather was sent');
++  assert.equal(rec(kv, 'match').items.length, 0, 'sports dropped, not sent');
++});
++
++// 2: the app's name and its own tag on every push.
++test('2: a push names its app and keeps its tag per app', () => {
++  const same = { title: '開賽', tag: 'x' };
++  const a = decorate('match', { via: 'orbit', o: 'tagA' }, same);
++  const b = decorate('weather', { via: 'orbit' }, same);
++  assert.equal(a.title, 'Sports・開賽');
++  assert.equal(a.tag, 'match:x');
++  assert.equal(b.tag, 'weather:x');
++  assert.notEqual(a.tag, b.tag);
++  assert.equal(a.app, 'match');
++  assert.equal(a.o, 'tagA');
++  assert.equal(decorate('match', { via: 'orbit' }, { title: 'Sports 比分', tag: 'match:x' }).title, 'Sports 比分', 'named once');
++  assert.equal(decorate('match', {}, same).title, '開賽', 'a separate app already is its own');
++});
++
++// 3: a tap opens the app inside the Orbit that got it.
++const swSource = readFileSync(new URL('../kit/sw.js', import.meta.url), 'utf8');
++function tap(scope, data, clients) {
++  const handlers = {};
++  const did = [];
++  const self = { ORBIT_SW: { cache: 'orbit-test-v1' }, location: { origin: 'https://orbit.test' }, registration: { scope }, addEventListener: (t, f) => (handlers[t] = f), navigator: { onLine: true }, clients: { matchAll: async () => clients, openWindow: async u => did.push(['open', u]) } };
++  vm.runInNewContext(swSource, { self, caches: {}, fetch: async () => new Response(''), Response, Request, Headers, URL, AbortController, MessageChannel, setTimeout, clearTimeout, crypto, console, Promise, Date });
++  let done;
++  handlers.notificationclick({ notification: { close() {}, data }, waitUntil: p => (done = p) });
++  return done.then(() => did);
++}
++test('3: Orbit’s worker opens another app’s notice inside Orbit (/app/?open=), in its own Orbit', async () => {
++  const url = 'https://orbit.test/sports/#game=nba/1';
++  assert.deepEqual(await tap('https://orbit.test/app/', { url }, []), [['open', `https://orbit.test/app/?open=${encodeURIComponent('/sports/#game=nba/1')}`]]);
++  assert.deepEqual(await tap('https://orbit.test/app/', { url, o: 'tagA' }, []), [['open', `https://orbit.test/app/?o=tagA&open=${encodeURIComponent('/sports/#game=nba/1')}`]]);
++  // A separate app's worker keeps its own address.
++  assert.deepEqual(await tap('https://orbit.test/sports/', { url }, []), [['open', url]]);
++});
++
++// 4: Orbit before a separate app; an app outside the Orbit's list gets nothing.
++test('4: a separate app never takes an app from a live Orbit; an app outside the Orbit’s list is refused and dropped', async () => {
++  const { kv, env, post } = world();
++  await post('match', '/push/subscribe', { sub: sub('orbit'), ...ORBIT });
++  // The separate Sports app (no via) on the same phone, another endpoint: the Orbit's stays.
++  const r = await (await post('match', '/push/subscribe', { sub: sub('standalone') })).json();
++  assert.equal(r.skipped, 'orbit');
++  assert.equal(rec(kv, 'match').sub.endpoint, sub('orbit').endpoint);
++  // The other way: Orbit takes over a separate app's.
++  await post('weather', '/push/subscribe', { sub: sub('standalone-w') });
++  await post('weather', '/push/subscribe', { sub: sub('orbit'), ...ORBIT });
++  assert.equal(rec(kv, 'weather').via, 'orbit');
++  // Transit isn't in this Orbit's list.
++  assert.equal((await post('transit', '/push/subscribe', { sub: sub('orbit'), ...ORBIT })).status, 403);
++  assert.equal(rec(kv, 'transit'), null);
++  // The Orbit drops Weather: the next subscribe (any app) removes Weather's record, not another Orbit's.
++  await post('transit', '/push/subscribe', { sub: sub('orbit'), via: 'orbit', o: 'tagB', apps: ['transit'] });
++  assert.ok(rec(kv, 'weather'), 'another Orbit’s apps stay');
++  await post('match', '/push/subscribe', { sub: sub('orbit'), via: 'orbit', o: 'tagA', apps: ['match'] });
++  assert.equal(rec(kv, 'weather'), null);
++  assert.ok(rec(kv, 'match'));
++});
++
++// 5: the admin test reports per app.
++test('5: the admin push test answers for each app, with its name and tag', async () => {
++  const ID = 'abcdef1234567890';
++  const env = { STORE: fakeD1(), RATE_LIMIT_KV: { list: async () => ({ keys: [], list_complete: true }) } };
++  const deps = { now: () => 1_800_000_000_000, fsList: async (_e, c) => (c === WALLET_COLLECTION ? [{ id: ID, payload: JSON.stringify(emptyWallet(1)), updateTime: 't' }] : []), fsDelete: async () => {}, fsBatch: async () => {} };
++  const { pushStore } = await import('../push.js');
++  const store = pushStore(env);
++  const shared = { endpoint: 'https://fcm.googleapis.com/fcm/send/shared', keys: KEYS };
++  await store.put(`push:${ID}:match`, JSON.stringify({ sub: shared, via: 'orbit', items: [] }));
++  await store.put(`push:${ID}:weather`, JSON.stringify({ sub: shared, via: 'orbit', items: [] }));
++  await store.put(`push:${ID}:transit`, JSON.stringify({ sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/other', keys: KEYS }, items: [] }));
++  const real = globalThis.fetch;
++  globalThis.fetch = async url => new Response(null, { status: /other/.test(url) ? 410 : 201 });
++  try {
++    const all = await ADMIN_TOOLS['push-test']({ env, deps, body: { wallet: ID.slice(0, 8) } });
++    assert.deepEqual(all.apps.map(r => [r.app, r.name, r.state]).sort(), [['match', 'Sports', 'sent'], ['transit', 'Transit', 'gone'], ['weather', 'Weather', 'sent']]);
++    assert.equal(all.ok, false);
++    assert.equal(all.apps.find(r => r.app === 'match').shared, true);
++    assert.equal(all.apps.find(r => r.app === 'transit').shared, false);
++    assert.match(all.apps.find(r => r.app === 'match').title, /^Sports・/);
++    assert.ok(all.apps.find(r => r.app === 'weather').tag.startsWith('weather:'));
++    // Transit's was gone and removed; the shared two stay.
++    assert.equal(await store.get(`push:${ID}:transit`), null);
++    assert.ok(await store.get(`push:${ID}:match`));
++    // One app asked for: its own answer.
++    assert.equal((await ADMIN_TOOLS['push-test']({ env, deps, body: { wallet: ID, app: 'match' } })).app, 'match');
++  } finally {
++    globalThis.fetch = real;
++  }
++});
++
++// The page's side: an app's switch, and the Orbit's list.
++test('client: an app’s own switch; an app outside the Orbit’s list never subscribes; the list goes with the subscription', async () => {
++  const mem = new Map();
++  const store = { getItem: k => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, String(v)), removeItem: k => mem.delete(k) };
++  const session = new Map([['orbit.suite', '1'], ['orbit.which', '']]);
++  const ss = { getItem: k => session.get(k) ?? null, setItem: (k, v) => session.set(k, String(v)), removeItem: k => session.delete(k) };
++  const posts = [];
++  const pm = { getSubscription: async () => null, subscribe: async () => ({ endpoint: 'https://fcm.googleapis.com/fcm/send/e', options: {}, toJSON: () => ({ endpoint: 'https://fcm.googleapis.com/fcm/send/e', keys: KEYS }) }) };
++  Object.assign(globalThis, { localStorage: store, sessionStorage: ss });
++  Object.defineProperty(globalThis, 'navigator', { value: { serviceWorker: { getRegistration: async () => ({ pushManager: pm }), ready: new Promise(() => {}) }, userAgent: '' }, configurable: true });
++  globalThis.Notification = { permission: 'granted' };
++  const realFetch = globalThis.fetch;
++  globalThis.fetch = async (url, init) => {
++    if (String(url).endsWith('/key')) return Response.json({ key: 'BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8' });
++    posts.push({ url: String(url), body: JSON.parse(init.body) });
++    return Response.json({ ok: true });
++  };
++  try {
++    const o = await import('../kit/orbit.mjs');
++    const { MINE_KEY } = await import('../kit/orbit-mine.mjs');
++    o.setNotifyOn(true);
++    assert.equal(o.kindOn('match', 'x'), true);
++    o.setAppNotices('match', false);
++    assert.equal(o.kindOn('match', 'x'), false);
++    assert.equal(o.kindOn('match'), false);
++    assert.equal(o.kindOn('weather', 'x'), true, 'weather untouched');
++    o.setAppNotices('match', true);
++    assert.equal(o.kindOn('match', 'x'), true);
++    // This Orbit holds Sports and Weather (set up as an Orbit of two).
++    store.setItem(MINE_KEY, JSON.stringify({ '': { apps: ['match', 'weather'], t: 1 } }));
++    const s = app => ({ app, lang: 'zh', token: 't', ensureToken: async () => 't' });
++    assert.equal(await o.enablePush(s('transit'), true), false, 'not in the list: nothing');
++    assert.equal(posts.length, 0);
++    assert.equal(await o.enablePush(s('match'), true), true);
++    const sent = posts.find(p => p.url.includes('/subscribe'));
++    assert.deepEqual([sent.body.via, sent.body.apps], ['orbit', ['match', 'weather']]);
++  } finally {
++    globalThis.fetch = realFetch;
++  }
++});
+-- 
+2.56.1
+
