@@ -341,3 +341,11 @@ test('two passes claiming one address at once: one gets it', async () => {
   t.advance(61_000);
   assert.equal(await claimMail(t.env, t.deps, secret, 'me@example.com', 'acct-z'), 'new');
 });
+
+test('the mail’s page: its title, its lines escaped, the code large', async () => {
+  const { mailPage } = await import('../pass-mail.js');
+  const html = mailPage({ title: 'Orbit Pass 驗證碼', lines: ['a <b>'], code: '123456', lang: 'zh' });
+  assert.match(html, /lang="zh-Hant-TW"/);
+  assert.match(html, /123456/);
+  assert.match(html, /a &lt;b&gt;/);
+});

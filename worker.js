@@ -55,12 +55,12 @@ import { radarCron } from './weather-radar.js';
 import { handleTransit, tally, warmBikes, mirrorMeter } from './transit.js';
 import { readDev, capacityCron, CONFIG_COLLECTION, ADMIN_TOOLS } from './eco-admin.js';
 import { PASSKEY_COLLECTION } from './passkey.js';
-import { MAIL_COLLECTION, mailReady } from './pass-mail.js';
+import { MAIL_COLLECTION, mailReady, mailPage } from './pass-mail.js';
 import { backupStore } from './store-backup.js';
 import { paceOf } from './pace.js';
 import { beat, tellOwner, systemReport, countFolders, FOLDERS_KEY, startFreeWatch } from './ops.js';
 import { mailAlerts, gather as alertsNow } from './mail-alerts.js';
-import { mailSettings } from './mail.js';
+import { mailSettings, sendMail } from './mail.js';
 import { sweepKept, keptText } from './kept-store.js';
 import { withDataFallback, sweepDataFiles } from './data-fallback.js';
 import { applyScale } from './capacity.js';
@@ -1243,6 +1243,9 @@ const ECO_DEPS = {
   // ecoCreate; the Pass's mails, pass-mail.js), with the AI caps' counts.
   dayCount: (env, k, day = twDay(), by = 1) => addOne(env, k, day, by),
   mailBudget: async env => (await readDev(env, ECO_DEPS)).mailDay,
+  // The Pass's codes and notices (pass-mail.js), from pass@ the domain through mail.js (Resend for anyone's address).
+  sendMail: (env, m) => sendMail(env, { to: m.to, subject: m.subject, html: mailPage(m), text: m.text, from: { name: 'Orbit Pass', user: 'pass' }, kind: 'pass' }),
+  mailReady,
   // The admin panel's 系統 (ops.js): the store's collections, a Gemini check, a builder by hand.
   count: DOCS.count,
   geminiCheck: env => geminiCheck(env),

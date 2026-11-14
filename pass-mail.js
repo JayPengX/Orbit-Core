@@ -123,6 +123,15 @@ function noticeMail(kind, l) {
   const subject = en ? 'Orbit Pass: recovery email changed' : 'Orbit Pass：救援信箱已變更';
   return { subject, text: lines.join('\n\n'), lines, lang: l, title: subject };
 }
+// The mails' page (worker.js sends it through mail.js, Resend for anyone's address).
+const esc = v => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+// A plain, light note: its title, its lines, the code large when there is one.
+export function mailPage({ title = '', lines = [], code = '', lang = 'zh' }) {
+  const p = lines.map(l => `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#1c1c1e">${esc(l)}</p>`).join('');
+  const big = code ? `<p style="margin:4px 0 18px;font:600 32px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:6px;color:#1c1c1e">${esc(code)}</p>` : '';
+  return `<!doctype html><html lang="${lang === 'en' ? 'en' : 'zh-Hant-TW'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"></head><body style="margin:0;padding:24px 16px;background:#f2f2f7;font-family:-apple-system,BlinkMacSystemFont,'PingFang TC','Noto Sans TC',sans-serif"><div style="max-width:440px;margin:0 auto;background:#fff;border-radius:16px;padding:24px 22px"><h1 style="margin:0 0 16px;font-size:19px;color:#1c1c1e">${esc(title)}</h1>${big}${p}<p style="margin:18px 0 0;font-size:13px;color:#8e8e93">Orbit</p></div></body></html>`;
+}
+
 // Sent after the answer where the request can wait for it (never holding
 // the reply, and never telling by its time whether a mail went).
 function later(ctx, task) {
