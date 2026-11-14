@@ -47,6 +47,7 @@ Words used below:
 | 21 | A one-app Orbit | Opens straight into its app, with its ⌄ alone at the top. Its sheet shows that app alone and 在 Safari 設定新的 Orbit (Safari, the add page's setup): no other app is put in it (Jay 11-14, reversing "select more"). Made on the add page with one tap on an app, or in setup with one app picked: its name and icon are that app's, locked. An Orbit of several keeps two apps at least. |
 | 22 | A separate app's page in the browser, not yet added | Goes to the add page of a one-app Orbit of that app. A separate app already on a home screen is untouched (rule 16). |
 | 23 | The address bar | The app showing (`/sports/`, `/transit/` …) or `/` on home, never the setup (the add page alone keeps its tag). A reload comes back into the same Orbit. |
+| 24 | Notices inside an Orbit | One Orbit is one home-screen app with one phone endpoint, shared by its apps; the Worker still keeps each app's notices apart. **Subscribed, stored and switched per app**: a record per pass and app (`push:<pass>:<app>`), each with its own list; 通知 in the account sheet has a switch per app (`<app>:all`) besides each kind, so Sports off never stops Weather. **Named and tagged**: every push starts with the app's name (「Sports・…」) and carries a tag of that app (`<app>:…`), so one app's notice never replaces another's. **Tap**: opens that app as a tab in the Orbit that received it (`/app/?o=<its tag>&open=<path>`; an open Orbit takes it in place). **Once, and only its apps**: a separate app of the same app on the same pass never takes it from a live Orbit (the Orbit's subscription is kept, the notice comes once); an app not in this Orbit's list never subscribes, and one the Orbit drops is removed at the next subscribe from it. 管理頁's 測試通知 answers for each app. |
 
 ## Where each rule lives
 
@@ -66,3 +67,7 @@ Words used below:
   installed separate app never moves).
 - 23: `addressOf` in `site/app/index.html`; a reload: `reloadedInOrbit` in
   `suite.mjs`, and the home page sends an installed window back to `/app/`.
+- 24: `enablePush`, `kindOn`, `setAppNotices` (`kit/orbit.mjs`); `handlePush`
+  (`/push/subscribe` with `via: 'orbit'`, `o`, `apps`), `decorate`, `wanted`
+  (`push.js`); the `push` and `notificationclick` handlers (`kit/sw.js`);
+  `push-test` (`eco-admin.js`). Test: `tests/orbit-notices.test.mjs`.

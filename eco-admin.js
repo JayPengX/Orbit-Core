@@ -18,7 +18,7 @@ import { REC_WEEKLY, REC_PREFIX } from './rec-weekly.js';
 import { doorReport, doorSet } from './door.js';
 import { systemReport, alertAccount, tell, OPS_DOC, beats } from './ops.js';
 import { passAccount, updateWallet, deleteAccount, ECO_APPS, NOW_COLLECTION, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet, levelOf, LEVELS, mintPass } from './eco.js';
-import { sendPush, dueLists, pushStore } from './push.js';
+import { sendPush, dueLists, pushStore, decorate } from './push.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, TDX_BOOK, tdxPoints, tdxGuard, tdxUse, tdxPlan } from './transit.js';
 import { aiUse, callsSince } from './gemini-use.js';
 import { moneyLeft, spendOf, healthOf, PROVIDERS, MODELS } from './ai.js';
@@ -716,20 +716,41 @@ export const ADMIN_TOOLS = {
   async 'push-test'({ env, deps, body }) {
     const hit = await findWallet(env, deps, body.wallet);
     if (!hit) return notFound;
-    const app = String(body.app || '');
     const kv = pushStore(env);
-    const key = `push:${hit.id}:${app}`;
-    const record = kv ? await kv.get(key, 'json').catch(() => null) : null;
-    if (!record?.sub) return { error: 'ADMIN_NO_PUSH', status: 404, state: 'none', text: '這個帳戶在這個 App 沒有訂閱通知。' };
-    const host = (() => {
-      try {
-        return new URL(record.sub.endpoint).host;
-      } catch {
-        return '';
+    // One app asked for, or every app this account has a subscription for. Each is its own answer:
+    // an Orbit's apps share one phone endpoint, but each has its own record, name and tag.
+    const asked = String(body.app || '');
+    const apps = asked ? [asked] : (kv ? await pushRecords(env, `push:${hit.id}:`).catch(() => []) : []).map(r => r.app);
+    const results = [];
+    for (const app of apps) {
+      const key = `push:${hit.id}:${app}`;
+      const record = kv ? await kv.get(key, 'json').catch(() => null) : null;
+      const name = BRANDS[app]?.short || app;
+      if (!record?.sub) {
+        results.push({ app, name, error: 'ADMIN_NO_PUSH', status: 404, state: 'none', text: `這個帳戶在 ${name} 沒有訂閱通知。` });
+        continue;
       }
-    })();
-    const r = String(await sendPush(env, record.sub, { title: 'Orbit 測試通知', body: '這是管理頁送出的測試通知，收到代表通知正常。', tag: `test:${deps.now()}` }).catch(e => `failed ${String(e?.message || e).slice(0, 120)}`));
-    return pushTestResult(r, host, async () => void (await kv.delete(key).catch(() => {})));
+      const host = (() => {
+        try {
+          return new URL(record.sub.endpoint).host;
+        } catch {
+          return '';
+        }
+      })();
+      const message = decorate(app, record, { title: 'Orbit 測試通知', body: '這是管理頁送出的測試通知，收到代表通知正常。', tag: `test:${deps.now()}` });
+      const r = String(await sendPush(env, record.sub, message).catch(e => `failed ${String(e?.message || e).slice(0, 120)}`));
+      const done = await pushTestResult(r, host, async () => void (await kv.delete(key).catch(() => {})));
+      results.push({ ...done, app, name, via: record.via === 'orbit' ? 'orbit' : 'app', title: message.title, tag: message.tag });
+    }
+    // The endpoint is shared when two apps' records have the same address (an Orbit's one worker).
+    if (!asked) {
+      const ends = new Map();
+      for (const app of apps) ends.set(app, (await kv.get(`push:${hit.id}:${app}`, 'json').catch(() => null))?.sub?.endpoint || '');
+      for (const r of results) r.shared = Boolean(ends.get(r.app)) && [...ends.values()].filter(e => e === ends.get(r.app)).length > 1;
+    }
+    if (asked) return results[0];
+    if (!results.length) return { error: 'ADMIN_NO_PUSH', status: 404, state: 'none', apps: [], text: '這個帳戶沒有任何 App 訂閱通知。' };
+    return { ok: results.every(r => r.ok), apps: results, state: results.every(r => r.state === 'sent') ? 'sent' : 'mixed', text: results.map(r => `${r.name}：${r.text}`).join('\n') };
   },
   // An account gone for good, used or not, at its owner's request or the
   // owner's call: its wallet, every app's data, its inbox, the share keys it
