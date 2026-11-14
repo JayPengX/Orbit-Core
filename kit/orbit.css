@@ -2937,6 +2937,25 @@ input[type='checkbox'][switch] {
   background: linear-gradient(100deg, var(--q-fill-3) 30%, var(--q-fill-4) 50%, var(--q-fill-3) 70%) 0 0 / 300% 100%;
   animation: q-shimmer 1.4s ease-in-out infinite;
 }
+/* Lines of it where a list or a card is coming (the family's one loading
+   look, Jay 2026-11-14: never 載入中 words or a spinning wheel), and one
+   line in a row's place. */
+.q-skel-lines {
+  display: grid;
+  gap: 12px;
+  padding: 16px 4px;
+}
+.q-skel-lines > .q-skel,
+.q-skel-line {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+}
+.q-skel-lines > .q-skel:nth-child(4n + 1) { width: 92%; }
+.q-skel-lines > .q-skel:nth-child(4n + 2) { width: 68%; }
+.q-skel-lines > .q-skel:nth-child(4n + 3) { width: 84%; }
+.q-skel-lines > .q-skel:nth-child(4n) { width: 56%; }
+.q-skel-line { width: 60%; }
 @keyframes q-shimmer {
   from {
     background-position: 100% 0;
