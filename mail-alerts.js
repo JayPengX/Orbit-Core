@@ -36,7 +36,7 @@ import { moneyLeft, PROVIDERS } from './ai.js';
 import { DEV } from './kit/devconfig.mjs';
 import { tdxUse, tdxPoints, tdxPlan } from './transit.js';
 import { SOURCES, freshAt, sourceState } from './kit/sources.mjs';
-import { JOBS, isLate, errTone } from './site/admin/ops-watch.mjs';
+import { JOBS, isLate, errTone, errRate, realErrors, routeTone } from './site/admin/ops-watch.mjs';
 import { alertMail } from './site/admin/mail-look.mjs';
 import { mailSettings, sendMail } from './mail.js';
 import { SITE } from './kit/domain.mjs';
@@ -74,7 +74,8 @@ async function fast(env, deps, now) {
     const top = g.top || 'requests';
     out.push({ id: 'guard:alert', tone: g.alert >= 3 ? 'bad' : 'warn', mail: true, title: `Cloudflare 用量過 ${g.alert >= 3 ? '90' : '75'}%`, detail: `用得最多的是 ${top}（${pct(g.share?.[top] || 0)}）${pace ? `，已節流 ${pace} 級` : ''}。`, go: 'usage' });
   }
-  if (g?.paceTop >= 0.9 && !g.stopped) out.push({ id: 'guard:forecast', tone: 'bad', title: `Cloudflare 照這速度會用到 ${pct(g.paceTop)}`, detail: g.free ? '推估到今天結束（台灣早上 8 點重算）。' : '推估到月底。', go: 'usage' });
+  // (A forecast is amber and never mailed: the guard acts on it; guard:alert mails once 75% is really used.)
+  if (g?.paceTop >= 0.9 && !g.stopped) out.push({ id: 'guard:forecast', tone: 'warn', title: `Cloudflare 照這速度會用到 ${pct(g.paceTop)}`, detail: g.free ? '推估到今天結束（台灣早上 8 點重算）。' : '推估到月底。', go: 'usage' });
   for (const b of await beats(env).catch(() => [])) {
     if (!JOBS[b.job]) continue;
     const name = JOBS[b.job][0];
@@ -102,8 +103,8 @@ async function mid(env, deps, now) {
       out.push({ id: `src:${s.id}`, tone: 'bad', confirm: 2, title: `${s.zh.replace(/（.*）/, '')} 壞了`, detail: [s.feeds, r?.err ? `最後的錯誤：${String(r.err).slice(0, 100)}` : ''].filter(Boolean).join(' · '), go: 'health' });
     }
   for (const [name, w] of Object.entries(errs?.workers?.workers || {}))
-    if (errTone(w) === 'bad') out.push({ id: `err:${name}`, tone: 'bad', title: `${name} 的錯誤變多`, detail: `24 小時 ${w.errors.toLocaleString()} / ${w.requests.toLocaleString()} 次失敗（${pct(w.errors / w.requests)}）`, go: 'health' });
-  for (const [route, n] of Object.entries(errs?.routes || {})) if (n.today >= 100) out.push({ id: `route:${route}`, tone: 'bad', title: `代理 ${route} 今天 ${n.today} 次伺服器錯誤`, detail: `昨天 ${n.yesterday} 次。`, go: 'health' });
+    if (errTone(w) === 'bad') out.push({ id: `err:${name}`, tone: 'bad', title: `${name} 的錯誤變多`, detail: `24 小時 ${realErrors(w).toLocaleString()} / ${w.requests.toLocaleString()} 次失敗（${pct(errRate(w))}）`, go: 'health' });
+  for (const [route, n] of Object.entries(errs?.routes || {})) if (routeTone(n) === 'bad') out.push({ id: `route:${route}`, tone: 'bad', title: `代理 ${route} 今天 ${n.today} 次伺服器錯誤`, detail: `昨天 ${n.yesterday} 次。`, go: 'health' });
   if (calls && dev) {
     const today = {};
     for (const c of calls) today[c.feature] = (today[c.feature] || 0) + 1;

@@ -1497,7 +1497,7 @@ async function route(request, env, ctx, headers, origin) {
   // each count's share of the $5 plan, stopped or not. No key or token.
   if (path === '/guard' && request.method === 'GET') {
     const g = JSON.parse((await env.RATE_LIMIT_KV?.get(GUARD_STATE).catch(() => null)) || 'null');
-    return json(g ? { at: g.at, armed: g.armed, error: g.error || null, partial: g.partial || null, cpuWay: g.cpuWay || null, stopAt: g.stopAt, share: g.share || null, stopped: g.stopped ? { at: g.stopped.at, why: g.stopped.why } : null, period: g.period || null, pace: g.pace || 0, paceTop: g.paceTop ?? null, forecast: g.forecast || null, alert: g.alert || 0, accountFound: !!g.account } : { ran: false }, 200, headers);
+    return json(g ? { at: g.at, armed: g.armed, free: !!g.free, error: g.error || null, partial: g.partial || null, cpuWay: g.cpuWay || null, stopAt: g.stopAt, share: g.share || null, stopped: g.stopped ? { at: g.stopped.at, why: g.stopped.why } : null, period: g.period || null, pace: g.pace || 0, paceTop: g.paceTop ?? null, forecast: g.forecast || null, alert: g.alert || 0, accountFound: !!g.account } : { ran: false }, 200, headers);
   }
   // The Pass's store (doc-store.js): each collection's count (no
   // document), from a localhost page (the dev door).

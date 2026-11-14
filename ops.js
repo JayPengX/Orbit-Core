@@ -190,7 +190,7 @@ export async function systemReport(env, deps) {
   ]);
   return {
     at: deps.now(),
-    guard: g && { at: g.at, armed: g.armed, error: g.error, share: g.share, projected: g.projected, plan: g.plan, top: g.top, pace: g.pace || 0, paceTop: g.paceTop, paceWhy: g.paceWhy || null, forecast: g.forecast || null, paceSince: g.paceSince, alert: g.alert || 0, stopped: g.stopped ? { at: g.stopped.at, why: g.stopped.why } : null, period: g.period, partial: g.partial },
+    guard: g && { at: g.at, armed: g.armed, free: !!g.free, error: g.error, share: g.share, projected: g.projected, plan: g.plan, top: g.top, pace: g.pace || 0, paceTop: g.paceTop, paceWhy: g.paceWhy || null, forecast: g.forecast || null, paceSince: g.paceSince, alert: g.alert || 0, stopped: g.stopped ? { at: g.stopped.at, why: g.stopped.why } : null, period: g.period, partial: g.partial },
     pace,
     told,
     // (Its reference: the first 8 of its id, as the panel shows accounts.)
