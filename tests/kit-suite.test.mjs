@@ -166,7 +166,9 @@ test('Orbit opens on something live, else the last app within an hour, else the 
   const live = { transit: { t: now - 5 * 3_600_000, url: '/Orbit-Transit/#trip' }, orbit: { t: now - 3_600_000, until: now + 60_000 }, money: { t: now - 60_000, until: now - 1 } };
   assert.deepEqual(liveNow(live, now).map(x => x.app), ['orbit', 'transit']);
   assert.equal(launchTarget(saved, live, now + 2 * AWAY_MS).app, 'transit');
-  assert.deepEqual(launchTarget(saved, { transit: live.transit }, now + 2 * AWAY_MS), { app: 'transit', url: '/Orbit-Transit/#trip', y: 0 });
+  // (At its start, as on its own: the app shows what's under way itself, never the screen it was minimized on.)
+  const { pathOf } = await import('../kit/brand.mjs');
+  assert.deepEqual(launchTarget(saved, { transit: live.transit }, now + 2 * AWAY_MS), { app: 'transit', url: pathOf('transit'), y: 0 });
   assert.equal(launchTarget({ apps: {} }, {}, now), null);
 });
 

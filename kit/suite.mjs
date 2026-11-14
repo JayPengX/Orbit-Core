@@ -132,7 +132,9 @@ export function liveNow(live, now = Date.now()) {
 // The app to open, { app, url, y }, or null for the list.
 export function launchTarget(saved, live, now = Date.now(), away = AWAY_MS) {
   const on = liveNow(live, now)[0];
-  if (on) return { app: on.app, url: on.url || resumeOf(saved, on.app, now).url, y: on.url ? 0 : resumeOf(saved, on.app, now).y };
+  // (At its start, as the app on its own opens: it shows what's under way itself.
+  // The screen it had when minimized was the 路線 sheet, put back: Jay 2026-11-14.)
+  if (on) return { app: on.app, url: pathOf(on.app), y: 0 };
   // (Orbit's window says which app it showed and when it was left: kept apps behind it note their own times too.)
   const last = BRANDS[saved?.last] ? saved.last : lastApp(saved);
   const left = Number(saved?.left) || Number(saved?.apps?.[last]?.t) || 0;
@@ -611,7 +613,8 @@ export function host(box, { first = null, list = null } = {}) {
     d.dispatchEvent(new Event('visibilitychange'));
   };
   const make = (id, url, y) => {
-    const to = new URL(url || resumeOf(savedSuite(), id).url, location.href);
+    const live = liveNow(liveSaved()).some(x => x.app === id);
+    const to = new URL(url || (live ? pathOf(id) : resumeOf(savedSuite(), id).url), location.href);
     if (y > 0) writeJson('sessionStorage', PLACE_KEY, { path: to.pathname, hash: to.hash, y, t: Date.now() });
     const el = document.createElement('iframe');
     el.className = 'q-suite-frame';
@@ -709,7 +712,7 @@ export function host(box, { first = null, list = null } = {}) {
   const api = {
     go(id, url = null) {
       if (!BRANDS[id]) return;
-      if (id !== shown) writeTrail(jump(readTrail(), id, url || (frames.has(id) ? null : resumeOf(savedSuite(), id).url)));
+      if (id !== shown) writeTrail(jump(readTrail(), id, url || null));
       show(id, url);
     },
     back() {
