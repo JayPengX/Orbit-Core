@@ -7281,8 +7281,8 @@ html.q-tabrail .q-appbar .q-actions > .q-suite .q-suite-btn img {
 }
 /* (Short of room: forward, then back, kept to the sheet; at the least this
    app beside the account, never over a tab. suite.mjs fit().) */
-html.q-tabrail:not(.q-desk) .q-suite.q-suite-lean1 > .q-suite-fwd,
-html.q-tabrail:not(.q-desk) .q-suite.q-suite-lean2 > :is(.q-suite-back, .q-suite-fwd) {
+html.q-tabrail:not(.q-desk) .q-suite.q-suite-lean1 > :is(.q-suite-fwd, .q-suite-tab ~ .q-suite-tab),
+html.q-tabrail:not(.q-desk) .q-suite.q-suite-lean2 > :is(.q-suite-back, .q-suite-fwd, .q-suite-tab) {
   display: none;
 }
 html.q-tabrail:not(.q-desk) .q-appbar .q-actions.q-suite-rowed {
@@ -7309,6 +7309,73 @@ html.q-tabrail.q-desk .q-appbar .q-actions > .q-suite .q-suite-btn {
   html.q-tabrail.q-desk .q-appbar .q-actions > .q-suite .q-suite-btn:hover {
     background: color-mix(in srgb, var(--q-label) 6%, transparent);
   }
+}
+/* The other apps open in Orbit's window, as tabs after this one: icons only,
+   one hairline after this app, none between them. Something under way: a
+   green dot at the icon's corner. */
+.q-suite-tab {
+  padding: 0 5px;
+}
+.q-suite-tab + .q-suite-tab::before {
+  display: none;
+}
+.q-suite-tab:last-child {
+  padding-right: 6px;
+}
+.q-suite-tab img {
+  opacity: 0.92;
+}
+/* (Under way: the tab a pill with its word, the app's mark and a green dot.) */
+.q-suite-live {
+  margin: 0 2px 0 3px;
+  color: var(--q-green);
+  font: 600 13px/1 var(--q-font);
+  white-space: nowrap;
+}
+html.q-tabrail .q-suite-live {
+  display: none;
+}
+/* (Its word on a phone held upright; the dot where there's no room for it: a rail.) */
+html:not(.q-tabrail) .q-suite-on .q-suite-dot {
+  display: none;
+}
+.q-suite-dot {
+  position: absolute;
+  right: 2px;
+  bottom: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--q-green);
+  box-shadow: 0 0 0 2px var(--q-surface);
+}
+html.q-tabrail .q-suite-dot {
+  right: calc(50% - 16px);
+  bottom: 6px;
+}
+/* (Close, in the sheet's list of open apps.) */
+.q-suite-x {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin: -4px -6px -4px 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--q-label) 8%, transparent);
+  color: var(--q-label-2);
+  cursor: pointer;
+}
+.q-suite-x svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+.q-suite-open {
+  margin-bottom: 4px;
 }
 /* The switcher's sheet: back and forward, then every app. */
 .q-suite-sheet .q-cell-icon {
