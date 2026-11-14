@@ -573,6 +573,13 @@ textarea {
   width: min(300px, 100%);
   text-align: center;
 }
+.q-boot-icons {
+  display: flex;
+  gap: 14px;
+}
+.q-boot-logo[hidden] {
+  display: none;
+}
 .q-boot-logo {
   width: 72px;
   height: 72px;
