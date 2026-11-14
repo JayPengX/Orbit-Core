@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { handleEcoRequest, WALLET_COLLECTION, newPasscode, updateWallet } from '../eco.js';
 import { accountOfMail } from '../pass-mail.js';
-import { privacyMail, EXPORT_EVERY_MS, REPLIES_A_DAY } from '../privacy-mail.js';
+import { privacyMail, mailLang, unpack, EXPORT_EVERY_MS, REPLIES_A_DAY } from '../privacy-mail.js';
+import { gzipSync, deflateRawSync } from 'node:zlib';
 import { DOMAIN } from '../kit/domain.mjs';
 
 let runs = 0;
@@ -74,9 +75,9 @@ const mail = (from, to = `privacy@${DOMAIN}`, headers = {}) => {
   m.setReject = why => (m.rejected = why);
   return m;
 };
-async function ask(t, from) {
+async function ask(t, from, headers = {}) {
   let got = null;
-  await privacyMail(mail(from), t.env, t.deps, { now: t.now(), reply: (raw, x) => (got = { raw, ...x }) });
+  await privacyMail(mail(from, undefined, headers), t.env, t.deps, { now: t.now(), reply: (raw, x) => (got = { raw, ...x }) });
   return got;
 }
 const tokenOf = (link, kind) => new URLSearchParams(link[kind].split('#')[1]).get('t');
@@ -100,8 +101,8 @@ test('from the recovery email the link alone does it; a copy once in 30 days', a
   assert.match(r.raw, /^Subject: =\?UTF-8\?B\?/m);
   const exp = await t.post({ op: 'privacy', token: tokenOf(r.links, 'export') });
   assert.equal(exp.status, 200, JSON.stringify(exp.data));
-  assert.equal(exp.data.file.recoveryEmail, 'me@example.com');
-  assert.ok(exp.data.file.wallet);
+  assert.equal(exp.data.file.account.recoveryEmail, 'me@example.com');
+  assert.match(exp.data.file.downloadedAt, /^\d{4}-\d\d-\d\dT/);
   const again = await t.post({ op: 'privacy', token: tokenOf(r.links, 'export') });
   assert.equal(again.data.error.code, 'PRIVACY_EXPORT_WAIT');
   t.advance(EXPORT_EVERY_MS + 1);
@@ -133,4 +134,46 @@ test('a link is good 24 hours, and only as a privacy link', async () => {
   t.advance(24 * 3_600_000 + 1);
   assert.equal((await t.post({ op: 'privacy', token: tokenOf(r.links, 'delete'), passcode: 'ABCDEFGHJK' })).data.error.code, 'PRIVACY_LINK_OLD');
   assert.equal((await t.post({ op: 'privacy', token: 'abc.def' })).data.error.code, 'PRIVACY_LINK_OLD');
+});
+
+test('the reply is in one language, the mail’s own', async () => {
+  const h = o => new Map(Object.entries(o));
+  assert.equal(mailLang(h({ Subject: '刪除帳號' })), 'zh');
+  assert.equal(mailLang(h({ Subject: '=?UTF-8?B?5Yiq6Zmk5biz6Jmf?=' })), 'zh');
+  assert.equal(mailLang(h({ Subject: 'Delete my data' })), 'en');
+  assert.equal(mailLang(h({ Subject: 'hi', 'Content-Language': 'zh-TW' })), 'zh');
+  assert.equal(mailLang(h({})), 'zh');
+  const t = setup();
+  const en = await ask(t, 'a@example.com', { Subject: 'My data please' });
+  assert.equal(en.lang, 'en');
+  assert.match(en.links.export, /&l=en$/);
+  const html = Buffer.from(en.raw.split('Content-Type: text/html; charset=UTF-8')[1].split('\r\n\r\n')[1].split('--orbit')[0].replace(/\r\n/g, ''), 'base64').toString();
+  assert.match(html, /Download a copy of my data/);
+  assert.doesNotMatch(html, /下載/);
+  const zh = await ask(t, 'b@example.com', { Subject: '我的資料' });
+  assert.match(zh.links.delete, /&l=zh$/);
+});
+
+test('a copy holds each app unpacked, as it reads', async () => {
+  const data = { a: [1, 2], b: '中文' };
+  const gz = `m1:${gzipSync(JSON.stringify(data)).toString('base64')}`;
+  assert.deepEqual(await unpack(gz), data);
+  assert.deepEqual(await unpack('w1:{"a":[1,2],"b":"中文"}'), data);
+  assert.deepEqual(await unpack(JSON.stringify(data)), data);
+  assert.equal(await unpack('plain words'), 'plain words');
+  // (Class's backup text: base91 of deflate-raw, between [ORBIT] marks.)
+  const B91 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+,-./:;<=>?@[]^_`{|}~';
+  const bytes = deflateRawSync(JSON.stringify(data));
+  let b = 0, n = 0, out = '';
+  for (const x of bytes) {
+    b |= x << n;
+    n += 8;
+    if (n > 13) {
+      let v = b & 8191;
+      if (v > 88) { b >>= 13; n -= 13; } else { v = b & 16383; b >>= 14; n -= 14; }
+      out += B91[v % 91] + B91[Math.floor(v / 91)];
+    }
+  }
+  if (n > 0) { out += B91[b % 91]; if (n > 7 || b > 90) out += B91[Math.floor(b / 91)]; }
+  assert.deepEqual(await unpack(`[ORBIT]${out}[/ORBIT]`), data);
 });
