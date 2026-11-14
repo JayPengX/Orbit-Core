@@ -419,6 +419,22 @@ function fit(foot) {
 let sheetOpen = null;
 // (An app's own button for it, where the top line is hidden: Transit's trip bar while navigating.)
 export const openSwitcher = () => switcher();
+// An Orbit of one app in its switcher: the app, then the way to the others.
+function soloCard(id) {
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const page = `${location.origin}/app/#setup`;
+  return el('div', { class: 'q-sw-sec q-sw-solo' }, [
+    el('div', { class: 'q-sw-solo-app', style: `--app:${BRANDS[id]?.color || '#5e5ce6'}` }, [
+      el('span', { class: 'q-sw-solo-icon' }, [img(id)]),
+      el('span', { class: 'q-sw-row-text' }, [el('strong', { text: short(id) }), el('small', { text: W(`這個 Orbit 只有 ${short(id)}`, `This Orbit holds ${short(id)} alone`) })])
+    ]),
+    el('div', { class: 'q-sw-solo-more' }, [
+      el('strong', { text: W('想用其他 App？', 'Want other apps?') }),
+      el('p', { text: W('在 Safari 打開 Orbit，選好 App，再加入主畫面。主畫面可以放好幾個 Orbit，這個照樣留著。', 'Open Orbit in Safari, pick the apps and add it to your home screen. A home screen holds several Orbits; this one stays.') }),
+      el('a', { class: 'q-btn block', href: ios ? `x-safari-${page}` : page, target: ios ? null : '_blank', rel: 'noopener', 'data-q-quick': '', text: W(ios ? '在 Safari 設定新的 Orbit' : '設定新的 Orbit', ios ? 'Set up a new Orbit in Safari' : 'Set up a new Orbit') })
+    ])
+  ]);
+}
 async function switcher() {
   if (sheetOpen) return;
   const ui = await import('./ui.mjs');
@@ -430,39 +446,41 @@ async function switcher() {
   // (Jay 11-14, "improve the look of this": a long list of rows, the open app
   // twice. Now as a home screen: the open apps in a tray, each with its ✕,
   // then the others as a grid of icons, each app once.)
-  const tile = (id, { sub = '', now = false, live = false, onClick, onClose = null }) =>
-    el('div', { class: `q-sw-tile${now ? ' now' : ''}${live ? ' live' : ''}` }, [
-      el('button', { class: 'q-sw-go', type: 'button', 'aria-label': `${short(id)}${sub ? ` · ${sub}` : ''}`, onclick: onClick }, [
-        el('span', { class: 'q-sw-icon' }, [img(id), live ? el('span', { class: 'q-suite-dot', 'aria-hidden': 'true' }) : null]),
-        el('span', { class: 'q-sw-name', text: short(id) }),
-        sub ? el('small', { class: 'q-sw-sub', text: sub }) : null
-      ]),
-      onClose ? el('button', { class: 'q-sw-x', type: 'button', 'aria-label': W(`關閉 ${short(id)}`, `Close ${short(id)}`), html: svg('M7 7l10 10M17 7L7 17'), onclick: e => (e.stopPropagation(), onClose()) }) : null
+  const tile = (id, { now = false, onClick }) =>
+    el('div', { class: `q-sw-tile${now ? ' now' : ''}` }, [
+      el('button', { class: 'q-sw-go', type: 'button', 'aria-label': short(id), onclick: onClick }, [
+        el('span', { class: 'q-sw-icon' }, [img(id)]),
+        el('span', { class: 'q-sw-name', text: short(id) })
+      ])
     ]);
   const head = text => el('h3', { class: 'q-sw-head', text });
-  // (Orbit's window: the apps open in it, each closed with ✕, then the rest.)
+  // (Orbit's window: the apps open in it, one row each, ✕ at its end, then
+  // the rest. Jay 11-14: a tray of icons left half of it empty, its ✕ ugly,
+  // and ✕ on the app in front only loaded it again: that one has none, and
+  // with nothing else open there's no tray.)
   let open = null;
-  if (H?.tabs) {
-    const grid = el('div', { class: 'q-sw-grid q-sw-tray' });
+  const tabs = H?.tabs?.() || [];
+  if (tabs.some(x => x.app !== app || x.live)) {
+    const rows = el('div', { class: 'q-sw-rows' });
     const shut = id => {
       H.close(id);
-      grid.querySelector(`[data-sw="${id}"]`)?.remove();
-      if (!grid.children.length) open.hidden = true;
+      rows.querySelector(`[data-sw="${id}"]`)?.remove();
+      if (![...rows.children].some(r => r.dataset.sw !== app || r.classList.contains('live'))) open.hidden = true;
     };
-    for (const x of H.tabs()) {
-      const t = tile(x.app, {
-        // (The one in front is ringed; 目前 under it said it again.)
-        sub: x.live ? W('進行中', 'Live') : '',
-        now: x.app === app,
-        live: x.live,
+    for (const x of tabs) {
+      const now = x.app === app;
+      const r = el('div', { class: `q-sw-row${now ? ' now' : ''}${x.live ? ' live' : ''}` }, [
+        el('button', { class: 'q-sw-row-go', type: 'button', onclick: () => (close(), x.live && H.full ? H.full(x.app) : now ? null : H.go(x.app)) }, [
+          el('span', { class: 'q-sw-icon' }, [img(x.app), x.live ? el('span', { class: 'q-suite-dot', 'aria-hidden': 'true' }) : null]),
+          el('span', { class: 'q-sw-row-text' }, [el('strong', { text: short(x.app) }), el('small', { text: x.live ? W('進行中', 'Live') : now ? W('正在看', 'On screen') : W('開著', 'Open') })])
+        ]),
         // (Something under way isn't closed from here: it's ended in its app.)
-        onClose: x.live ? null : () => shut(x.app),
-        onClick: () => (close(), x.live && H.full ? H.full(x.app) : x.app === app ? null : H.go(x.app))
-      });
-      t.dataset.sw = x.app;
-      grid.append(t);
+        now || x.live ? null : el('button', { class: 'q-sw-x', type: 'button', 'aria-label': W(`關閉 ${short(x.app)}`, `Close ${short(x.app)}`), html: svg('M7 7l10 10M17 7L7 17'), onclick: e => (e.stopPropagation(), shut(x.app)) })
+      ]);
+      r.dataset.sw = x.app;
+      rows.append(r);
     }
-    open = grid.children.length ? el('div', { class: 'q-sw-sec' }, [head(W('開著的 App', 'Open apps')), grid]) : null;
+    open = el('div', { class: 'q-sw-sec' }, [head(W('開著的 App', 'Open apps')), rows]);
   }
   // (Every app of this Orbit under Apps, five by two for all ten: the open ones
   // left out made rows of four, four and one, Jay 11-14 "don't like the three
@@ -489,7 +507,10 @@ async function switcher() {
     : null;
   // (Which apps this Orbit holds, from any app in it: a one-app Orbit has no home.)
   const edit = H?.editApps ? el('button', { class: 'q-sw-edit', type: 'button', text: W('選擇這個 Orbit 裡的 App', 'Choose the apps in this Orbit'), onclick: () => (close(), H.editApps()) }) : null;
-  const s = ui.sheet({ title: setupOf().name || 'Orbit', cls: 'q-suite-sheet', body: [pass, hops, open, all, edit].filter(Boolean), onClose: () => (sheetOpen = null) });
+  // (An Orbit of one app, Jay 11-14: that app alone, no other added here;
+  // another Orbit, set up in Safari, for the rest.)
+  const solo = rest.length === 1 && !H?.editApps ? soloCard(rest[0]) : null;
+  const s = ui.sheet({ title: setupOf().name || 'Orbit', cls: 'q-suite-sheet', body: (solo ? [pass, hops, solo] : [pass, hops, open, all, edit]).filter(Boolean), onClose: () => (sheetOpen = null) });
   sheetOpen = s;
   function close() {
     s.close?.();

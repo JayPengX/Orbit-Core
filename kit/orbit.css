@@ -7870,11 +7870,6 @@ html.q-tabrail .q-suite-dot {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px 2px;
 }
-.q-sw-tray {
-  padding: 10px 6px;
-  border-radius: var(--q-r-card, 22px);
-  background: var(--q-surface);
-}
 .q-sw-tile {
   position: relative;
   min-width: 0;
@@ -7913,12 +7908,6 @@ html.q-tabrail .q-suite-dot {
   outline: 2px solid var(--q-label);
   outline-offset: 2px;
 }
-.q-sw-icon > .q-suite-dot {
-  right: -3px;
-  bottom: -3px;
-  width: 14px;
-  height: 14px;
-}
 .q-sw-name {
   max-width: 100%;
   overflow: hidden;
@@ -7927,37 +7916,134 @@ html.q-tabrail .q-suite-dot {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.q-sw-sub {
-  margin-top: -3px;
-  color: var(--q-label-2);
-  font: 500 11px/14px var(--q-font);
+/* The open apps: one row each in a card, the app's name and what it's doing,
+   ✕ at the row's end (none on the app in front, nor one under way). */
+.q-sw-rows {
+  overflow: hidden;
+  border-radius: var(--q-r-card, 22px);
+  background: var(--q-surface);
 }
-.q-sw-tile.live .q-sw-sub {
+.q-sw-row {
+  display: flex;
+  align-items: center;
+  min-height: 60px;
+}
+.q-sw-row + .q-sw-row {
+  box-shadow: inset 60px 0.5px 0 var(--q-surface), inset 0 0.5px 0 var(--q-sep);
+}
+.q-sw-row-go {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 60px;
+  padding: 8px 12px;
+  border: 0;
+  background: none;
+  color: var(--q-label);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.q-sw-row-go:active {
+  background: var(--q-fill-4);
+}
+.q-sw-row .q-sw-icon {
+  flex: none;
+  width: 36px;
+}
+.q-sw-row .q-sw-icon > img {
+  border-radius: 9px;
+}
+.q-sw-icon > .q-suite-dot {
+  right: -3px;
+  bottom: -3px;
+  width: 12px;
+  height: 12px;
+}
+.q-sw-row-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.q-sw-row-text strong {
+  overflow: hidden;
+  font: 600 16px/21px var(--q-font);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.q-sw-row-text small {
+  color: var(--q-label-2);
+  font: 400 13px/18px var(--q-font);
+}
+.q-sw-row.live .q-sw-row-text small {
   color: var(--q-green);
 }
 .q-sw-x {
-  position: absolute;
-  top: 1px;
-  left: calc(50% + 13px);
   display: grid;
+  flex: none;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
+  margin: 0 12px 0 4px;
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--q-label-2);
-  color: var(--q-surface);
-  box-shadow: 0 0 0 2px var(--q-surface);
+  background: var(--q-fill-4);
+  color: var(--q-label-2);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.q-sw-x:active {
+  background: var(--q-fill-3, var(--q-fill-4));
 }
 .q-sw-x svg {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 3;
+  stroke-width: 2.4;
   stroke-linecap: round;
+}
+/* An Orbit of one app: the app in a card, then the way to the others. */
+.q-sw-solo {
+  display: grid;
+  gap: 12px;
+}
+.q-sw-solo-app {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: var(--q-r-card, 22px);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--app) 18%, var(--q-surface)), var(--q-surface) 70%);
+}
+.q-sw-solo-icon img {
+  display: block;
+  width: 56px;
+  height: 56px;
+  border-radius: 13px;
+}
+.q-sw-solo-app .q-sw-row-text strong {
+  font: 600 20px/25px var(--q-font);
+}
+.q-sw-solo-more {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border-radius: var(--q-r-card, 22px);
+  background: var(--q-surface);
+}
+.q-sw-solo-more strong {
+  color: var(--q-label);
+  font: 600 16px/21px var(--q-font);
+}
+.q-sw-solo-more p {
+  margin: 0 0 6px;
+  color: var(--q-label-2);
+  font: 400 14px/20px var(--q-font);
 }
 /* The switcher's sheet: back and forward, then every app. */
 .q-suite-sheet .q-cell-icon {
@@ -8021,4 +8107,9 @@ html.q-tabrail .q-suite-dot {
   color: var(--q-label-2);
   font: 500 15px/1 var(--q-font);
   cursor: pointer;
+}
+.q-sw-solo-more .q-btn {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
 }
