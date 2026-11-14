@@ -714,7 +714,8 @@ const add = (v, k, x) => v.set(k, (v.get(k) || 0) + x);
 
 // A headline's weighed pieces, each by how rare it is among these items':
 // weigh(items, lang) → it => Map(piece → weight).
-export function weigh(items, lang) {
+export const SHARED_MIN = 4;
+export function weigh(items, lang, { loose = () => false } = {}) {
   const docOf = it => ({ p: piecesOf(it.t, lang), s: lang === 'en' && it.d ? piecesOf(unboiled(it.d), lang) : [] });
   const df = new Map();
   for (const it of items) {
@@ -730,12 +731,22 @@ export function weigh(items, lang) {
     const d = docOf(it);
     const v = new Map();
     if (!d.p.length) return v;
-    for (const [list, w] of [[d.p, 1], [d.s, SUM_WEIGHT]])
-      for (const p of list) {
-        const n = df.get(p) || 1;
-        if (n > common) continue;
-        add(v, p, w * Math.log(N / n));
-      }
+    // (A Chinese piece no other headline has links nothing, yet its weight
+    // drowns the pieces shared: 8 outlets' 桃園 shooting, each worded its
+    // own way, were 6 stories, 11-14. Kept only where a headline shares too
+    // few pieces to be read by them alone: one shared 冠軍 or 助攻 would
+    // make any two headlines one. Never in sports, loose: its few, short
+    // headlines of one player's many days then ran together.)
+    for (const lone of lang === 'zh' && !loose(it) ? [false, true] : [true]) {
+      v.clear();
+      for (const [list, w] of [[d.p, 1], [d.s, SUM_WEIGHT]])
+        for (const p of list) {
+          const n = df.get(p) || 1;
+          if (n > common || (!lone && n < 2)) continue;
+          add(v, p, w * Math.log(N / n));
+        }
+      if (v.size >= SHARED_MIN) break;
+    }
     // (The game a report names, as weighty as all its words: two reports of
     // one game are near whatever words each chose, gameOf.)
     const game = gameOf(it.t, lang);
@@ -805,16 +816,33 @@ export function gameOf(title, lang) {
   return teams?.size === 2 ? [...teams].sort().join('|') : '';
 }
 // (Both name teams, none the same: two games.)
+// (Both name teams, none the same: two games; or, Taiwan's, both name a city
+// or county and none the same: two places' news, 11-14: 新北's poll and
+// 基隆's, 台北's 政見會 and 新北's, the same words but never one story.)
 export const otherGame = (a, b) => {
   if (!a || !b) return false;
-  const bs = new Set([...b].map(plainTeam));
-  return ![...a].some(x => bs.has(plainTeam(x)));
+  for (const placed of [false, true]) {
+    const as = [...a].filter(x => x.startsWith(PLACE) === placed).map(plainTeam);
+    const bs = new Set([...b].filter(x => x.startsWith(PLACE) === placed).map(plainTeam));
+    if (as.length && bs.size && !as.some(x => bs.has(x))) return true;
+  }
+  return false;
 };
+// Taiwan's cities and counties a headline names (as p:台北…), null none.
+const PLACE = 'p:';
+const PLACES_ZH = /新北|(?<!新)北市|台北|臺北|桃園|台中|臺中|台南|臺南|高雄|基隆|新竹|苗栗|彰化|南投|雲林|嘉義|屏東|宜蘭|花蓮|台東|臺東|澎湖|金門|連江|馬祖/g;
+const PLACE_SAME = { 北市: '台北', 臺北: '台北', 臺中: '台中', 臺南: '台南', 臺東: '台東', 馬祖: '連江' };
+export function placesOf(title, lang) {
+  if (lang !== 'zh') return null;
+  const found = String(title || '').match(PLACES_ZH);
+  return found ? new Set(found.map(x => PLACE + (PLACE_SAME[x] || x))) : null;
+}
+const marksOf = (t, lang) => withTeams(teamsOf(t, lang), placesOf(t, lang));
 const withTeams = (into, more) => (more ? new Set([...(into || []), ...more]) : into);
 
-export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lang] } = {}) {
-  const vecOf = weigh(items, lang);
-  const docs = items.map(it => ({ it, v: vecOf(it), teams: teamsOf(it.t, lang) })).filter(d => d.v.size);
+export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lang], loose } = {}) {
+  const vecOf = weigh(items, lang, { loose });
+  const docs = items.map(it => ({ it, v: vecOf(it), teams: marksOf(it.t, lang) })).filter(d => d.v.size);
   for (const d of docs) d.n = norm(d.v);
   docs.sort((a, b) => (a.it.at || 0) - (b.it.at || 0));
   let groups = [];
@@ -1066,7 +1094,7 @@ export const FRAGMENT_NEAR = 0.45;
 function mergeFragments(recs, vecOf, lang, owner) {
   const info = recs.map(r => {
     const v = sumOf(r.items.filter(it => it.at >= (r.last || 0) - 24 * HOUR).map(vecOf));
-    return { r, v, n: norm(v), first: Math.min(...r.items.map(it => it.at || 0)), last: Math.max(...r.items.map(it => it.at || 0)), teams: r.items.reduce((t, it) => withTeams(t, teamsOf(it.t, lang)), null), whose: lang === 'zh' ? reportsOwner(r.items.map(it => it.t)).owner : '' };
+    return { r, v, n: norm(v), first: Math.min(...r.items.map(it => it.at || 0)), last: Math.max(...r.items.map(it => it.at || 0)), teams: r.items.reduce((t, it) => withTeams(t, marksOf(it.t, lang)), null), whose: lang === 'zh' ? reportsOwner(r.items.map(it => it.t)).owner : '' };
   });
   const by = new Map();
   for (const x of info) for (const k of x.v.keys()) (by.get(k) || by.set(k, []).get(k)).push(x);
@@ -1254,7 +1282,6 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
   for (const region of ['tw', 'intl']) {
     const lang = region === 'tw' ? 'zh' : 'en';
     const mine = items.filter(it => OUTLETS[it.o]?.region === region && now - (it.at || now) <= WINDOW[region] && !fillerOf(it, lang));
-    const vecOf = weigh(mine, lang);
     const recsHere = live.filter(r => r.r === region);
     // Sports and the rest are two desks (Jay 11-14: a story of Harry Kane's
     // record held AP's Rubio and a Washington recruit, and the FAA's ground
@@ -1268,7 +1295,8 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
       if (v === undefined) deskOf_.set(it.u, (v = SPORTS_OUTLETS.has(it.o) || ((k => k[0] === 'sport' || (k.includes('sport') && lang === 'zh' && NATIONAL.test(it.t)))(topicsOf([it.t], lang)))));
       return v;
     };
-    const twoDesks = list => [...groupStories(list.filter(sporty), lang).map(g => Object.assign(g, { sp: true })), ...groupStories(list.filter(it => !sporty(it)), lang).map(g => Object.assign(g, { sp: false }))];
+    const vecOf = weigh(mine, lang, { loose: sporty });
+    const twoDesks = list => [...groupStories(list.filter(sporty), lang, { loose: () => true }).map(g => Object.assign(g, { sp: true })), ...groupStories(list.filter(it => !sporty(it)), lang).map(g => Object.assign(g, { sp: false }))];
     // Each kept story back to its core first: what drifted from it is let go
     // before today's groups are placed, so it can join or start the story
     // it's really about (11-13: Pence's 2028 run out of Trump's Iran deal).
@@ -1334,14 +1362,14 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
         // (Another company's reports never join a company's story.)
         const gReports = lang === 'zh' ? g.map(it => it.t).filter(reportOf) : [];
         // (A game never joins another game's story.)
-        const gTeams = g.reduce((t, it) => withTeams(t, teamsOf(it.t, lang)), null);
+        const gTeams = g.reduce((t, it) => withTeams(t, marksOf(it.t, lang)), null);
         const dots = new Map();
         for (const [k, x] of gv) for (const d of daysBy.get(k) || []) dots.set(d, (dots.get(d) || 0) + x * d.v.get(k));
         for (const d of lastDays) {
           const { r, n, whose } = d;
           if (!dots.has(d) || r.last < gFirst - GAP || r.sp !== g.sp) continue;
           if (whose && gReports.length && gReports.every(t => otherReport(t, whose))) continue;
-          if (gTeams && otherGame(gTeams, (d.teams ??= r.items.reduce((t, it) => withTeams(t, teamsOf(it.t, lang)), null)))) continue;
+          if (gTeams && otherGame(gTeams, (d.teams ??= r.items.reduce((t, it) => withTeams(t, marksOf(it.t, lang)), null)))) continue;
           const sim = dots.get(d) / (gn * n);
           if (sim > bestSim) (bestSim = sim), (best = r);
         }
@@ -1409,7 +1437,12 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
       const x = sizeOf(rec);
       if (x) sized.push(x);
     }
-    const clipsOf = matchClips(vids.filter(v => OUTLETS[v.o]?.region === region), sized, vecOf, lang);
+    // (Clips are matched by every piece, a story's too, as their thresholds
+    // were set.)
+    const clipVids = vids.filter(v => OUTLETS[v.o]?.region === region);
+    const wholeOf = lang === 'zh' && clipVids.length ? weigh(mine, lang, { loose: () => true }) : vecOf;
+    const clipSized = wholeOf === vecOf ? sized : sized.map(x => (vs => (c => ({ ...x, vs, c, cn: norm(c) }))(sumOf(vs)))(x.r.items.map(wholeOf)));
+    const clipsOf = matchClips(clipVids, clipSized, wholeOf, lang);
     // (The world's stories: Taiwan's outlets' on each, from Taiwan's front.)
     const twOn = region === 'intl' ? taiwanOn(out.tw, sized, vecOf, who) : new Map();
     for (const { r, vs, c, cn } of sized) {

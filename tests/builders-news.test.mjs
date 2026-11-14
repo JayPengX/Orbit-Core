@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { piecesOf, teamsOf, otherGame, gameOf, unboiled, ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, TOPIC_MIN_OF, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN, blindOf, oneSidedOf } from '../builders/news.js';
+import { piecesOf, teamsOf, otherGame, placesOf, gameOf, unboiled, ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, TOPIC_MIN_OF, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN, blindOf, oneSidedOf } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS, SPORTS_OUTLETS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -778,14 +778,16 @@ test('a channel\'s clip a little off a big story\'s middle still finds it when o
   const vids = [
     // (0.23 off the middle, 0.20 off its 倖存者 headline: taken.)
     { o: 'ctinews', y: 'CTI00000001', t: '寶林茶室案判決 倖存者哽咽!? 婦:終身洗腎沒賠償?! 20261112', at: T + H },
-    // (0.15 off the middle, no headline near: left out.)
+    // (Off the middle of the four takes the story once held; with all six
+    // joined, 11-14, near enough: taken.)
     { o: 'ctinews', y: 'CTI00000002', t: '寶林茶室 倖存者哽咽太不公平!? 婦:終身洗腎沒賠償?! 店長無罪 20261112', at: T + H },
     { o: 'ctinews', y: 'CTI00000003', t: '颱風明天登陸 全台嚴防豪雨', at: T + H }
   ];
   const out = deskOf(items, [], NOW, { vids });
   const s = out.tw.find(x => x.title.includes('寶林'));
   assert.ok(s, 'the story');
-  assert.deepEqual(s.clips.map(c => c[1]), ['CTI00000001']);
+  assert.equal(s.n, 6, 'all six takes, each worded its own way, one story');
+  assert.deepEqual(s.clips.map(c => c[1]), ['CTI00000001', 'CTI00000002']);
 });
 
 test('a story\'s picture is an outlet\'s photo before a video\'s thumbnail, its words burned in (Jay 11-13: 民視\'s 「6死27傷！」)', () => {
@@ -929,4 +931,32 @@ test('a breaking story told over several builds is one: small stories join the o
   assert.equal(tri.n, 5, 'one story of all five');
   assert.equal(out.intl.filter(s => s.items.some(x => /Xi/.test(x[1]))).length, 1);
   assert.ok(out.intl.some(s => /asylum/.test(s.title) && s.n === 2), 'another story stays its own');
+});
+
+test('one event told in each outlet\'s own words is one story (11-14: 8 outlets\' 桃園 shooting were 6); two cities\' polls or 政見會 stay two; a lone headline stays', () => {
+  const at = h => NOW - h * H;
+  const items = [
+    item('chinatimes', '獨家》桃園觀音傳槍響 ！夜跑男無辜遭槍擊 臉部2處穿刺傷', at(5)),
+    item('tvbs', '桃園觀音隨機槍擊！41歲男持鎮暴槍朝7旬翁射擊 頭部濺血送醫', at(4.8)),
+    item('ebc', '桃園驚傳槍響！男持鎮暴槍隨機掃射7旬翁 逃基隆落網', at(4.6)),
+    item('ctinews', '桃園觀音驚傳槍擊！老翁遭鎮暴槍掃射頭臉 41歲嫌基隆落網', at(4.4)),
+    item('nextapple', '桃園7旬翁跑步「胸部中彈」 基隆逮到兇嫌！查扣鎮暴槍', at(4.2)),
+    item('udn', '工作不順竟持鎮暴槍洩憤！觀音七旬翁散步遭打傷 大園警基隆逮人', at(4)),
+    item('cna', '桃園7旬翁慢跑遭鎮暴槍射傷 警赴基隆逮捕嫌犯', at(3.8)),
+    item('ltn', '新北最新民調 蘇巧慧領先8.4％ 李四川守住永和', at(3)),
+    item('ltn', '基隆民調 童子瑋支持度領先謝國樑3.3%', at(2.8)),
+    item('setn', '民調／童子瑋支持度38% 領先謝國樑3.3%！破四成民意盼基隆政黨輪替', at(2.7)),
+    item('ftv', '新北政見會登場蘇巧慧、李四川互槓', at(2)),
+    item('cna', '台北市長選舉政見會 蔣萬安稱說到做到盼市民續支持', at(1.9)),
+    item('ltn', '台北市長選舉政見會今14：00登場 沈伯洋、蔣萬安等6候選人政見對決', at(1.8)),
+    item('pts', '易遊網遭駭逾69萬人個資外洩 業者：不含身分證、信用卡號', at(1))
+  ];
+  const groups = groupStories(items, 'zh').map(g => g.map(x => x.t));
+  const shot = groups.find(g => g.some(t => /鎮暴槍/.test(t)));
+  assert.ok(shot.length >= 6, shot.join(' | '));
+  assert.ok(!shot.some(t => /民調|政見會/.test(t)));
+  for (const g of groups) assert.ok(new Set(g.flatMap(t => [...(placesOf(t, 'zh') || [])]).filter(p => /新北|台北|基隆/.test(p) && !/鎮暴槍/.test(g[0]))).size <= 1, g.join(' | '));
+  assert.ok(groups.some(g => g.length === 1 && /易遊網/.test(g[0])), 'a headline sharing nothing still stands as its own story');
+  assert.deepEqual([...placesOf('臺北市長政見會 北市府回應', 'zh')], ['p:台北']);
+  assert.equal(placesOf('新北市長政見會', 'zh').has('p:台北'), false);
 });
