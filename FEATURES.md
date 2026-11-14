@@ -26,7 +26,7 @@ To remove a feature on purpose, delete its line here in the same commit and say 
 - A separate app opened in the browser goes to a one-app Orbit's add page (installed separate apps untouched) — `kit/orbit.mjs`: `location.replace(startOf(encodeSetup({ apps: [app], id: newId() })))`
 - Orbit's address shows the app on screen (`/sports/`), and a reload comes back into Orbit — `site/app/index.html`, `kit/suite.mjs`: `function addressOf`, `function reloadedInOrbit`
 - Every Orbit icon and app icon in the moon style: the family's ten app-colour moons, each app's own moon lit in its ring — `kit/brand.mjs`: `export function orbitIcon`, `const moonRing`
-- Orbit's home: the app to go on with as one card (something under way first, 進行中), the apps used lately, then the rest as slim rows — `site/app/index.html`: `door-hero`, `door-row`
+- Orbit's home: the app to go on with as one card (something under way first, 進行中), then this Orbit's apps as a home screen's icons in even rows, and a button to choose them — `site/app/index.html`: `door-hero`, `door-tile`, `door-edit`
 - Orbit's own loading screen when opened from its icon (its mark, name and indigo, not the app's) — `kit/boot.js`, `site/app/index.html`: `orbit.launch`, `q-boot-orbit`
 - Updates swap only once every file is on the phone — `kit/orbit.mjs`: `updateReady`
 - Pass: 里程碑 medals, passkeys, 除錯紀錄 — `kit/pass.mjs`, `kit/help.mjs`, `kit/orbit.mjs`: `里程碑`, `passkey`, `除錯紀錄`
