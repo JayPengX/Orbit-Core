@@ -16,6 +16,7 @@ import { W, en } from './lang.mjs';
 import { dayFacts } from './today.mjs';
 import { twHoliday } from './holidays.mjs';
 import { planHash } from './family.mjs';
+import { readAct } from './act.mjs';
 
 // Each app's words, in the order they're tried (the first that matches wins).
 // A trip said ("去 X", "從 X 到 Y") is Transit's before the rest but the weather's words.
@@ -40,9 +41,13 @@ const DAY_WORDS = /(今天|明天|後天|這週|這禮拜|週末|今晚|早上|�
 export function routeAsk(text) {
   const t = String(text || '').trim();
   if (!t) return null;
+  // (A command is the app's that does it, kit act.mjs: 開始專注 Class, 背單字 Words;
+  // 追蹤 X Sports unless another app's words name X, 追蹤台積電.)
+  const act = readAct(t);
+  if (act && act.act !== 'follow') return act.app;
   if (DAY_WORDS.test(t)) return 'assist';
   for (const [app, re] of RULES) if (re.test(t)) return app;
-  return null;
+  return act?.app || null;
 }
 
 // The apps the question can go to, as the fallback's taps (the family's order).

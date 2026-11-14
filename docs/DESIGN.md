@@ -73,6 +73,11 @@ loud things mean something.
   colour as an inset band or badge on them. Calm comes from what's on a card
   (fewer capsules, weights and accent marks), never from stripping cards
   away (Jay 2026-10-27).
+- **AI is quiet** (Jay 2026-11-14: the purple AI button was "disruptive and
+  ugly"). An AI action on a tap (重點摘要, 白話解釋) is the app's own grey
+  bordered button with Orbit AI's mark (kit `aiTap`, `.q-ai-tap`): the mark
+  is its one touch of colour. Never a gradient, a filled AI colour or a
+  purple bubble; what AI wrote sits on the page's own cells.
 - Icon tiles (white glyph on a colour squircle) say *which kind* (a
   category, an account). Not on every row or heading, and a group that's all
   the same kind needs none.

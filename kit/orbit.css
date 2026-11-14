@@ -1722,6 +1722,55 @@ dialog.q-sheet.q-full {
   width: 100%;
   height: 100%;
 }
+/* An AI action on a tap (kit aiTap: 重點摘要, 白話解釋): the app's own
+   bordered button, grey with its ink, Orbit AI's mark the one touch of
+   colour. Never a gradient or a filled AI colour (Jay 11-14: "disruptive
+   and ugly"). `.block`: across its card. */
+.q-ai-tap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px 0 11px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--q-fill-3);
+  color: var(--q-accent);
+  font: 600 15px/1.25 var(--q-font);
+  letter-spacing: -0.01em;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--q-dur-snappy) var(--q-spring-snappy), background-color 0.2s;
+}
+.q-ai-tap:is(:active, [data-q-press]) {
+  transform: scale(0.97);
+  background: var(--q-fill-2);
+}
+.q-ai-tap > .q-ai-mark {
+  width: 17px;
+  height: 17px;
+}
+.q-ai-tap > span:last-child {
+  min-width: 0;
+}
+/* Dark: its ink lifted toward white, as a chosen chip's (Law's indigo on black). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .q-ai-tap {
+    color: color-mix(in srgb, var(--q-accent) 62%, #fff);
+  }
+}
+:root[data-theme='dark'] .q-ai-tap {
+  color: color-mix(in srgb, var(--q-accent) 62%, #fff);
+}
+.q-ai-tap.block {
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  border-radius: var(--q-r-cell, 12px);
+}
 /* On a filled control the mark takes the control's own colour. */
 .q-ai-mono,
 .q-btn.primary,
