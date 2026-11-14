@@ -437,7 +437,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   `SHORT` in `kit/brand.mjs`; one origin, so one Pass sign-in), `orbit-pass`
   for `/`, `/pass/`, `/key/`, `/app/` (Orbit, `kit/suite.mjs`), `/admin/`, `/Orbit-Core/` and the old `/Shared-Proxy/`,
   `orbit-home` for `<DOMAIN>/`, `/showcase/` (Orbit-Showcase).
-  Mail in is refused. `deploy.yml`
+  Mail in: privacy@ only, to the proxy (Email Routing rule). `deploy.yml`
   attaches the hostnames (its token needs the zone and D1 Edit); the guard
   takes them off with the proxy.
 - **Moving Orbit** (another account, host, team or agent): `HANDOFF.md`
