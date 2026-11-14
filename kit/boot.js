@@ -221,20 +221,22 @@
   };
   var title = box.getAttribute('data-title') || document.title;
   var logo = box.getAttribute('data-logo') || './favicon.svg';
+  // (Inside Orbit, Jay 11-14: Orbit's mark with the app's own icon beside it,
+  // so the screen says which app is loading.)
+  var own = logo;
   // Orbit opened from its icon (site/app/ marks the moment it goes on to an
-  // app): Orbit's own screen, its mark and name, not the app's. A switch to
+  // app): Orbit's mark, the app's icon and name beside it. A switch to
   // another app later shows that app's, as it opens.
   var launch = 0;
   try {
     launch = Number(sessionStorage.getItem('orbit.launch')) || 0;
   } catch (e) {}
   if (launch && Date.now() - launch < 30000) {
-    title = 'Orbit';
     logo = '/app/favicon.svg';
   } else launch = 0;
   // Any app opened inside Orbit's window: the same screen every time, Orbit's
   // mark and colour with the app's name under it (Jay 2026-11-14: "unify
-  // loading screens for orbit"), never each app's own icon and colour.
+  // loading screens for orbit"), the app's icon beside it, never its colour.
   var framed = false;
   try {
     framed = window.parent !== window && !!window.parent.ORBIT_HOST;
@@ -248,7 +250,7 @@
   box.setAttribute('aria-live', 'polite');
   box.innerHTML =
     '<div class="q-boot-box">' +
-    '<img class="q-boot-logo" alt="" width="72" height="72">' +
+    '<div class="q-boot-icons"><img class="q-boot-logo" alt="" width="72" height="72"><img class="q-boot-logo q-boot-app" alt="" width="72" height="72" hidden></div>' +
     '<p class="q-boot-brand">' + 'ORBIT' + '</p>' +
     '<p class="q-boot-title"></p>' +
     '<div class="q-boot-bar" aria-hidden="true"><i></i></div>' +
@@ -260,6 +262,10 @@
     return box.querySelector(sel);
   };
   q('.q-boot-logo').src = logo;
+  if (launch && own !== logo && !/\/app\/favicon\.svg$/.test(own)) {
+    q('.q-boot-app').src = own;
+    q('.q-boot-app').hidden = false;
+  }
   q('.q-boot-title').textContent = title;
   q('[data-act=reload]').textContent = L('重新整理', 'Reload');
   q('[data-act=skip]').textContent = L('直接開啟', 'Open anyway');

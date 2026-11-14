@@ -28,7 +28,7 @@ To remove a feature on purpose, delete its line here in the same commit and say 
 - Orbit's address shows the app on screen (`/sports/`), and a reload comes back into Orbit — `site/app/index.html`, `kit/suite.mjs`: `function addressOf`, `function reloadedInOrbit`
 - Every Orbit icon and app icon in the moon style: the family's ten app-colour moons, each app's own moon lit in its ring — `kit/brand.mjs`: `export function orbitIcon`, `const moonRing`
 - Orbit's home: the app to go on with as one card (something under way first, 進行中), then this Orbit's apps as a home screen's icons in even rows, and a button to choose them — `site/app/index.html`: `door-hero`, `door-tile`, `door-edit`
-- Orbit's own loading screen when opened from its icon (its mark, name and indigo, not the app's) — `kit/boot.js`, `site/app/index.html`: `orbit.launch`, `q-boot-orbit`
+- Orbit's own loading screen inside Orbit (its mark and indigo, the app's own icon and name beside it, Jay 11-14) — `kit/boot.js`, `site/app/index.html`: `orbit.launch`, `q-boot-orbit`, `q-boot-app`
 - Updates swap only once every file is on the phone — `kit/orbit.mjs`: `updateReady`
 - Pass: 里程碑 medals, passkeys, 除錯紀錄 — `kit/pass.mjs`, `kit/help.mjs`, `kit/orbit.mjs`: `里程碑`, `passkey`, `除錯紀錄`
 - Anyone makes a pass on the sign-in screen with an email proved by a code (one account an address; a device signed in before is pointed to finding its pass), at the 基本 level (no AI); its AI taps shown locked before a tap, a tap says why — `kit/orbit.mjs`, `kit/pass-mail.mjs`, `kit/orbit.css`: `q-gate-make`, `export function createPanel`, `HAD_KEY`, `export function passLevel`, `export function aiLock`, `data-ai-lock`
