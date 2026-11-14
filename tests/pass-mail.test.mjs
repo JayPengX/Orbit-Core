@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { handleEcoRequest, WALLET_COLLECTION } from '../eco.js';
-import { MAIL_COLLECTION, MAIL_CODES, MAIL_TRIES, MAIL_PER_DAY, MAIL_WAIT_MS, cleanAddr, maskAddr } from '../pass-mail.js';
+import { MAIL_COLLECTION, MAIL_CODES, MAIL_TRIES, MAIL_PER_DAY, MAIL_WAIT_MS, cleanAddr, maskAddr, accountOfMail } from '../pass-mail.js';
 import { planClean } from '../eco-admin.js';
 
 // (Each its own minutes: the per-session limits are counted in memory, by minute.)
@@ -260,4 +260,15 @@ test('a mail that fails to go: said so, not counted, no wait to try again', asyn
   assert.equal((await t.post({ op: 'mail-begin', qt: a.token, addr: 'me@example.com' })).data.error.code, 'ECO_MAIL_OFF');
   t.deps.sendMail = async (env, mail) => void t.sent.push(mail);
   assert.equal((await t.post({ op: 'mail-begin', qt: a.token, addr: 'me@example.com' })).status, 200);
+});
+
+test('an account found by its verified recovery email, any spelling; none once removed', async () => {
+  const t = setup();
+  const a = await account(t);
+  await link(t, a.token, 'me@example.com');
+  const id = await accountOfMail(t.env, t.deps, '  ME@Example.com ');
+  assert.ok(id && t.store.has(`${WALLET_COLLECTION}/${id}`));
+  assert.equal(await accountOfMail(t.env, t.deps, 'other@example.com'), '');
+  await t.post({ op: 'mail-remove', qt: a.token });
+  assert.equal(await accountOfMail(t.env, t.deps, 'me@example.com'), '');
 });

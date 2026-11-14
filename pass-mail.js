@@ -26,7 +26,7 @@
 // person who proved it's theirs.
 
 import { WALLET_COLLECTION, parseWallet, publicWallet, poolBalance, gen, updateWallet, signIn, ECO_LIMITS } from './eco.js';
-import { readToken, sessionLimited } from './orbit-token.js';
+import { readToken, sessionLimited, tokenSecret } from './orbit-token.js';
 
 export const MAIL_COLLECTION = 'eco-mail';
 export const MAIL_CODES = 'eco-mail-codes';
@@ -286,6 +286,19 @@ export async function mailRecover(ctx) {
   // A session that takes only `rotate`: the lost pass is replaced first.
   const res = await signIn(ctx, row.d, { fresh: true });
   return res || bad(ctx, 'ECO_MAIL_CODE_WRONG', 401);
+}
+
+// The account whose verified recovery email `addr` is ('' for none): any
+// spelling of it (cleanAddr), the wallet still holding it. (privacy@'s
+// requests by mail: worker.js email.)
+export async function accountOfMail(env, deps, addr) {
+  const a = cleanAddr(addr);
+  const secret = await tokenSecret(env);
+  if (!a || !secret) return '';
+  const index = parse(await deps.fsGet(env, MAIL_COLLECTION, await addrKey(secret, a)));
+  if (!index?.d) return '';
+  const doc = await deps.fsGet(env, WALLET_COLLECTION, index.d);
+  return doc.exists && mailOf(parseWallet(doc.payload)) === a ? index.d : '';
 }
 
 // ---- Kept pointing at the account (a new pass, a merge, a delete) ----------------------
