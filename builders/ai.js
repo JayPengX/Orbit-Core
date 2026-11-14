@@ -290,6 +290,38 @@ export async function newsBriefs({ store, env, ctx, cap, until, now = Date.now()
   return { made, calls, kept: Object.keys(keep).length, ...(missed.length ? { missed: missed.slice(0, 6) } : {}) };
 }
 
+// ---- News: what a story's AI parts are made from, for when someone opens it ----
+// (Jay 11-14: "only spend it as I use it".) No AI here: each front story's
+// facts for 重點整理 and 各方怎麼說, kept in OPEN_PARTS files by its id, so
+// the proxy's /ai/open (ai-open.js) reads one small file when a person opens
+// the story and makes that story's part then, once, for everyone.
+export const OPEN_PARTS = 16;
+export function openPart(id) {
+  let n = 0;
+  for (const c of String(id)) n = (n * 31 + c.charCodeAt(0)) >>> 0;
+  return n % OPEN_PARTS;
+}
+export const openPath = i => `private/news/open/${i}.json`;
+export async function newsOpenFacts({ store }) {
+  const index = await store.json('news/index.json');
+  if (!index) return { skipped: 'no index' };
+  const state = await store.json('private/news/items.json.gz').catch(() => null);
+  const sums = new Map((state?.items || []).filter(it => it?.u && it.d).map(it => [it.u, it.d]));
+  const parts = Array.from({ length: OPEN_PARTS }, () => ({}));
+  let n = 0;
+  for (const r of ['tw', 'intl'])
+    for (const s of index[r] || []) {
+      const brief = briefWanted(s) ? briefFacts({ ...s, region: r }, sums) : null;
+      const sides = sidesWanted(s, r) ? sideFacts(s, r) : null;
+      if (!brief && !sides) continue;
+      parts[openPart(s.id)][s.id] = { m: s.m || 0, ...(brief ? { brief } : {}), ...(sides ? { sides } : {}) };
+      n++;
+    }
+  let written = 0;
+  for (let i = 0; i < OPEN_PARTS; i++) if (await store.put(openPath(i), { built: Date.now(), stories: parts[i] })) written++;
+  return { stories: n, written };
+}
+
 // ---- Words: the list's study cards, made once ----
 const WORDS_BATCH = 25;
 export async function wordsCards({ store, env, ctx, cap, until, fetchImpl = fetch }) {
@@ -352,6 +384,12 @@ export async function runAi({ store, env, proxy, now = Date.now(), cap = async (
     }
   await step('sides', 'news-sides', c => newsSides({ store, env, ctx, cap: c, until, now }));
   await step('brief', 'news-brief', c => newsBriefs({ store, env, ctx, cap: c, until, now }));
+  if (!only || only === 'open')
+    try {
+      out.open = await newsOpenFacts({ store });
+    } catch (e) {
+      out.open = { failed: String(e?.message || e).slice(0, 200) };
+    }
   await step('sport', 'news-sport', c => sportWho({ store, env, ctx, cap: c, until }));
   await step('sports', 'sports-recap', c => runRecaps({ store, env, ctx, proxy, cap: c, now, until }));
   await step('preview', 'sports-preview', c => runPreviews({ store, env, ctx, proxy, cap: c, now, until }));

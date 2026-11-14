@@ -6,6 +6,8 @@
 // SDK in the Worker). Both refuse Hong Kong, where a caller's colo can be:
 // through the Taiwan relay (gemini-relay.js) when bound.
 
+import { providerCapped } from './gemini-use.js';
+
 export const ANTHROPIC = 'https://api.anthropic.com/v1/messages';
 export const OPENAI = 'https://api.openai.com/v1/chat/completions';
 export const MODEL_LISTS = { anthropic: 'https://api.anthropic.com/v1/models', openai: 'https://api.openai.com/v1/models' };
@@ -102,6 +104,7 @@ export async function otherAnswer(model, parts, schema, env, { timeoutMs = 60_00
 // usage kept. firstMs: given up on when no text has come by then. A maker
 // without a stream here (OpenAI's) answers whole, as otherAnswer.
 export async function streamOther(model, parts, schema, env, { onText = null, timeoutMs = 60_000, firstMs = 0, effort = null } = {}) {
+  if (await providerCapped(env, makerOf(model))) return new Response(JSON.stringify({ error: { message: 'day cap' } }), { status: 429 });
   if (makerOf(model) !== 'anthropic') return otherAnswer(model, parts, schema, env, { timeoutMs, effort });
   const req = requestOf(model, parts, schema, env, effort);
   if (!env.ANTHROPIC_API_KEY) return new Response(JSON.stringify({ error: { message: 'no key' } }), { status: 503 });

@@ -101,9 +101,38 @@ async function beats() {
   notes.push(`cron jobs: ${(r.body.beats || []).length} watched, ${failing.length} failing`);
 }
 
+// The AI makers' money (Jay pays for these, 11-14): each balance typed less
+// the calls since, warned a week before it runs out or at a quarter left; and
+// today's calls against each maker's day cap (gemini-use.js PROVIDER_DAY).
+// Google's spend by our log is counted GOOGLE_BILLED times over: 11-14 its
+// bill was about 25 times what its replies' own token counts came to.
+export const GOOGLE_BILLED = 25;
+async function aiMoney() {
+  const secret = process.env.DATA_PUSH_SECRET;
+  if (!secret) return notes.push('AI money: not checked (no DATA_PUSH_SECRET)');
+  const r = await get(`https://orbit-workers-proxy.pengzjay.workers.dev/ops?check=ai-money`, { json: true, secret });
+  if (!r?.body?.money) return bad(`ops ai-money: ${r?.status} ${String(r?.text || '').slice(0, 120)}`);
+  const rate = r.body.rate || 32;
+  const said = [];
+  for (const [prov, m] of Object.entries(r.body.money)) {
+    if (!m.typed) {
+      said.push(`${prov} no balance typed`);
+      continue;
+    }
+    const x = prov === 'google' ? GOOGLE_BILLED : 1;
+    const left = m.typed.usd - m.spent * x, perDay = m.perDay * x;
+    const days = perDay > 0 ? Math.floor(left / perDay) : null;
+    said.push(`${prov} NT$${Math.round(left * rate)} left${days != null ? `, ~${days} days` : ''}`);
+    if (left <= m.typed.usd * 0.25 || (days != null && days <= 7)) bad(`AI ${prov}: about NT$${Math.max(0, Math.round(left * rate))} left${days != null ? ` (about ${days} days at this week's rate)` : ''}: top it up, or it falls to its backup`);
+  }
+  for (const [prov, t] of Object.entries(r.body.today || {})) if (t.n != null && t.cap && t.n >= t.cap * 0.8) bad(`AI ${prov}: ${t.n} of ${t.cap} calls today (its day cap)`);
+  notes.push(`AI money: ${said.join(', ')}; today ${Object.entries(r.body.today || {}).map(([p, t]) => `${p} ${t.n}/${t.cap}`).join(', ')}`);
+}
+
 const got = await smoke();
 await allowances(got.find(r => r?.body?.caps));
 await beats();
+await aiMoney();
 
 const out = [`# Orbit on the free plans: ${problems.length ? `${problems.length} problem${problems.length > 1 ? 's' : ''}` : 'all well'}`, '', ...problems.map(p => `- ❌ ${p}`), ...(problems.length ? [''] : []), ...notes.map(n => `- ${n}`)].join('\n');
 console.log(out);

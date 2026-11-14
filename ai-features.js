@@ -1076,11 +1076,13 @@ export const FEATURES = {
     }
   },
 
-  // Orbit News' 各方怎麼說 (built once a story, builders/ai.js newsSides): how
+  // Orbit News' 各方怎麼說 (made when someone first opens the story, ai-open.js): how
   // each side's outlets framed it, from their own headlines only, never
-  // which side is right. Sonnet: telling an angle from a fact is judgment.
+  // which side is right. Haiku, Luna behind it (11-14: on Sonnet, made ahead
+  // for every top story, it was 40% of the Claude bill; its checks below
+  // drop an answer that leaves a side out or brings a number of its own).
   'news-sides': {
-    models: ['sonnet', 'sol'],
+    models: ['haiku', 'luna'],
     timeoutMs: 90_000,
     maxIn: 9000,
     parts: ({ stories }) =>
@@ -1122,7 +1124,7 @@ export const FEATURES = {
     }
   },
 
-  // Orbit News' 重點整理 (built once a story, builders/ai.js newsBriefs; Jay
+  // Orbit News' 重點整理 (made when someone first opens the story, ai-open.js; Jay
   // 11-13: "make it more in app"): what happened, the background, what
   // comes next (Jay 11-13: points that didn't help him understand the
   // news), in a few short points of our own words, from the outlets' own

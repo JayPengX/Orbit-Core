@@ -68,7 +68,8 @@ import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
 import { docStore, storeReady } from './doc-store.js';
 import { handleMoneyRead } from './money-read.js';
 import { handleCal } from './cal.js';
-import { logCall, callsSince, reliability, spendOf, lastFailed } from './gemini-use.js';
+import { handleAiOpen, OPEN } from './ai-open.js';
+import { logCall, callsSince, reliability, spendOf, lastFailed, providerCapped, providerToday } from './gemini-use.js';
 import { handleAi, handleAiBuild, aiTry } from './ai.js';
 import { storyTr } from './builders/news-tr.js';
 import { handleTr } from './translate.js';
@@ -402,7 +403,9 @@ const GEMINI_ALLOWED_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.7-flash', 'gem
 
 // Gemini from Taiwan: through the relay (gemini-relay.js, pinned there) when
 // bound; this Worker runs near each caller, which Gemini may refuse (Hong Kong).
-const geminiFetch = (env, url, init) => (env.GEMINI_RELAY ? env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(url)}`, init) : fetch(url, init));
+// (Past Google's day cap, gemini-use.js providerCapped: refused here, a 429 like Google's own.)
+const geminiFetch = async (env, url, init) =>
+  (await providerCapped(env, 'google')) ? new Response(JSON.stringify({ error: { message: 'day cap' } }), { status: 429, headers: { 'Content-Type': 'application/json' } }) : env.GEMINI_RELAY ? env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(url)}`, init) : fetch(url, init);
 function geminiUrl(model, env) {
   return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${env.GEMINI_API_KEY}`;
 }
@@ -1417,6 +1420,11 @@ async function route(request, env, ctx, headers, origin) {
   // …and its 讀圖: a picture of purchases read by Gemini, on a tap only (money-read.js).
   // The family's AI door (ai.js): every app's AI taps by feature name, each with its fixed prompt and caps.
   // …and a build's built-once asks (Orbit Law's nightly build: 會議紀錄變表格, 法案週報), with its key.
+  // …and a story's AI part made the first time anyone opens it (ai-open.js: 重點整理, 各方怎麼說), kept for everyone.
+  if (path === '/ai/open') {
+    const feature = new URL(request.url).searchParams.get('f') || '';
+    return handleAiOpen(request, env, ctx, headers, { ip: ipBucket(ip), cap: OPEN[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai') });
+  }
   if (path === '/ai/build') {
     let feature = '';
     try {
@@ -1519,6 +1527,17 @@ async function route(request, env, ctx, headers, origin) {
       if (q.get('feature') === 'class-news' && q.get('peek')) return json(await classNewsPeek(env, q.get('peek'), { from: q.get('from'), n: q.get('n'), method: q.get('method') || 'GET', body: q.get('body') || '', grep: q.get('grep') || '' }), 200, headers);
       if (q.get('feature') === 'class-news' && q.get('site')) return json(await classNewsTry(env, q.get('site'), await aiCap(env, ctx, 'class-news'), { force: q.get('force') === '1' }), 200, headers);
       return json(await aiTry(env, ctx, q.get('feature') || '', { models: (q.get('models') || '').split(',').filter(Boolean), from: Number(q.get('from')) || 0, n: Number(q.get('n')) || 3, gemini: lawGemini('ai-try') }), 200, headers);
+    }
+    // Each AI provider's money left (the balances typed, less the calls since) and today's calls against
+    // its cap (the free-watch warns before one runs low). ?set=anthropic:5,openai:3,google:2.1 types balances (US$).
+    if (check === 'ai-money') {
+      const deps = { fsGet: DOCS.get, fsWrite: DOCS.write, now: () => Date.now() };
+      for (const pair of (new URL(request.url).searchParams.get('set') || '').split(',').filter(Boolean)) {
+        const [provider, usd] = pair.split(':');
+        await ADMIN_TOOLS['ai-set']({ env, deps, body: { provider, usd: Number(usd) } });
+      }
+      const a = await ADMIN_TOOLS.ai({ env, deps });
+      return json({ rate: a.rate, money: a.money, today: await providerToday(env) }, 200, headers);
     }
     // Every Gemini call of the last ?days= (30 at most) by day, feature, model and status.
     if (check === 'gemini-use') {

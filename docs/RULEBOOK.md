@@ -102,6 +102,7 @@ into absolutes; push back when a rule makes things worse.
 **AI** (11-10, 11-11).
 - 10-19 Paid AI runs only behind a person's tap, never automatically.
 - 11-11 Code first: no AI where code reads or formats reliably; numbers come from code and AI only words them.
+- 11-14 AI spends only on what someone opens (Jay: "only spend it as I use it but kept fast enough"): made the first time a person opens it, kept for everyone (`/ai/open`), on the smallest model that does it well, its shape shown while it's made; never made ahead for every story, game, word or paper (`BULK_PAUSED`). Where code can do the work (reading a scan, a title, a tag), code does it. Why it burned is fixed first; each maker's day cap (`PROVIDER_DAY`) is only the safety net, and the 3-hourly watch warns before a balance runs low.
 - 11-10 AI gets a small code-picked digest of what the page doesn't already show (insight, never a repeat of the card); prompts are crafted and tested (`/ops ai-try`); it asks back with tap pickers from the person's own lists where that helps; each call's cost shows in admin.
 - 11-11 An AI answer is never plain text: it is drawn (kit `aiAnswer`: rows with icons, logos, faces, bars), with a skeleton of its shape while it's made (`aiAnswerWait`). Names in its words are chips: a player with their face, a team with its logo (`.q-ai-ref`).
 - 11-11 Every smart feature, code-only ones too, carries the Orbit AI mark (kit `icons.ai`, `--q-ai`), never a sparkle.
@@ -171,6 +172,7 @@ Gone for good, never revived: Longshot (shut down 10-31: Worker, data and secret
 |---|---|---|
 | Keep the US$5 Workers Paid plan | Only the domain is paid (Workers Free, Runner DO) | 11-06 |
 | Gemini on its free tier like everything else | AI may be paid, a blind test picks | 11-10 |
+| AI made ahead for everyone (titles, sides, briefs, recaps, cards, minutes) | Made when someone opens it, or by code | 11-14 |
 | Gemini/AI answers as text; team chips without logos | Drawn answers; a team chip with its logo | 11-11 |
 | The look is final, no restyles (10-28) | A premium redesign, then Orbit's own look in all nine | 11-03 |
 | Native samples: Weather on its sky, game cards in both clubs' colours | Today's dark page, one colour to a surface | 11-03 |
