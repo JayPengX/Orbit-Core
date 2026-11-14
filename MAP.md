@@ -186,7 +186,7 @@ w;dur=`, noted by the 除錯紀錄 when slow, and `LOCKED` (never runs as a page
 | `/law-chat` | `law-chat.js`, `ai-other.js` | 問法律: a plan (Flash-Lite), up to 14 articles (and delegated ones) from Law's index, answered from those by Sonnet (failing: Sol), cites checked; grounded by `law-ground.js`, `law-more.js`, `law-local.js` (councils); 16 turns back; 30 a day a Pass |
 | `/law-page` | `law-page.js`, `law-hosts.js` | A gov.tw/edu.tw page in Law, cleaned, edge-cached, via Taiwan (build key: any gov.tw, `file=1` raw, `/law-judicial` 司法院's API); 500 a day a Pass; `/law-audio` (`law-audio.js`): a 代表會's Drive recording, its true type |
 | `/law-live` | `law-live.js` | 立法院's IVOD streams now, 60 s at the edge (last good read 30 min); ours only |
-| `/news-tr`, `/tr` | `builders/news-tr.js`, `translate.js` | One language, Google (`TR_PAID`): `news/tr.json`, `tr/<id>.json`; kit `translateMarked`. New ones only for a 完整 pass; D1 `tr_day` caps a day |
+| `/news-tr`, `/tr` | `builders/news-tr.js`, `translate.js` | One language, Google (`TR_PAID`), only for what is on screen (a list's titles in one batch of 30, a story's words as it opens; nothing made ahead): `news/tr/<id>.json`, `tr/<id>.json`; kit `translateMarked`. New ones only for a 完整 pass; D1 `tr_day` caps a day |
 | `/class-news` | `class-news.js` | Class's 學校公告: a school's boards read via the relay, kept 45 days, new titles worded once; R2 |
 | `/money-read` | `money-read.js` | Money's 拍照記帳: a picture → `{ buys, left }`, read by Gemini, checked; on a tap; 30 a day a Pass, 300 in all |
 | `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |

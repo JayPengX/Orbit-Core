@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { translate, peopleIn, shielded, shieldedEn, unshield, dayLeft, freshMeter, withMonth, TR_METER, TR_MONTH } from '../translate.js';
-import { newsTr, storyTr, wanted, NEWS_TR, trPath } from '../builders/news-tr.js';
+import { storyTr, batchTr, BATCH_MAX, trPath } from '../builders/news-tr.js';
 
 const memStore = (seed = {}) => {
   const m = new Map(Object.entries(seed).map(([k, v]) => [k, JSON.stringify(v)]));
@@ -57,29 +57,23 @@ test('translate: once over the day’s share it stops; a refused key waits a whi
   assert.deepEqual(await translate({}, memStore(), ['a b'], 'en', { fetchImpl: googleFake(seen) }), {});
 });
 
-test('news: every headline the AI didn’t title, the top summaries; a turned title made again an hour on', async () => {
-  const now = Date.now();
-  const w = (id, title) => ({ id, title, sum: `Summary of ${id}`, items: [['cnn', title]] });
-  const t = (id, title) => ({ id, title, sum: `${id}的摘要`, items: [['cna', title]] });
-  const index = { intl: [w('a', 'Storm hits coast'), w('b', 'Talks resume')], tw: [t('c', '颱風來襲')] };
-  const store = memStore({ 'news/index.json': index, 'news/lines.json': { lines: { b: { zh: 'AI 標題' } } } });
-  const r = await newsTr({ store, env, now, fetchImpl: googleFake() });
-  const tr = JSON.parse(store.m.get(NEWS_TR)).tr;
-  assert.equal(tr.a.zh, '譯16');
-  assert.equal(tr.b.zh, undefined); // the AI's title wins
-  assert.equal(tr.b.sum, '譯12');
-  assert.equal(tr.c.en, 'EN(颱風來襲)');
-  assert.equal(tr.c.sum, 'EN(c的摘要)');
-  assert.ok(r.made >= 4);
-  // (The same again asks nothing.)
+test('a list’s titles in one batch: each its own story’s, capped, kept like a story’s; nothing is made ahead', async () => {
+  const stories = { a: { id: 'a', title: 'Storm hits coast', items: [] }, b: { id: 'b', title: 'Talks resume', items: [] } };
+  const store = memStore();
   const seen = [];
-  await newsTr({ store, env, now: now + 60_000, fetchImpl: googleFake(seen) });
-  assert.deepEqual(seen, []);
-  // (A turned title within the hour keeps the last; past it, made again.)
-  index.intl[0].title = 'Storm hits coast hard';
-  store.m.set('news/index.json', JSON.stringify(index));
-  assert.equal(wanted(index, { b: { zh: 'AI 標題' } }, JSON.parse(store.m.get(NEWS_TR)).tr, now + 60_000).ask.length, 0);
-  assert.equal(wanted(index, { b: { zh: 'AI 標題' } }, JSON.parse(store.m.get(NEWS_TR)).tr, now + 2 * 3_600_000).ask.filter(a => a.field === 'title').length, 1);
+  const find = async id => stories[id] || null;
+  const items = [{ id: 'a', texts: ['Storm hits coast'] }, { id: 'b', texts: ['Talks resume', 'Not in the story'] }, { id: 'zz', texts: ['x'] }];
+  const r = await batchTr({ store, env, items, to: 'zh-TW', find, fetchImpl: googleFake(seen) });
+  assert.deepEqual(Object.keys(r.tr).sort(), ['Storm hits coast', 'Talks resume']);
+  assert.ok(store.m.has(trPath('a')) && store.m.has(trPath('b')));
+  const again = await batchTr({ store, env, items, to: 'zh-TW', find, fetchImpl: googleFake(seen) });
+  assert.deepEqual(again.tr, r.tr);
+  assert.equal(seen.length, 2);
+  assert.equal((await batchTr({ store, env, items, to: 'fr', find })).error, 'to');
+  const many = Array.from({ length: BATCH_MAX + 20 }, (_, i) => ({ id: 'a', texts: ['Storm hits coast'], i }));
+  let finds = 0;
+  await batchTr({ store, env, items: many, to: 'zh-TW', find: async id => (finds++, stories[id]), fetchImpl: googleFake([]) });
+  assert.equal(finds, BATCH_MAX);
 });
 
 test('a story opened: only its own texts, only those not in the reader’s language, each kept', async () => {

@@ -1,110 +1,12 @@
 // Orbit News in one language (Jay 11-13: "a full traditional Chinese
-// experience and full English experience"): every story's headline, and
-// the summary of the stories at the top, in the other language, by plain
-// translation (translate.js, Google's free month), never the AI's (its
-// titles in news/lines.json win wherever it made one; it's never run
-// through a translator). A world story's in Chinese, a Taiwan story's in
-// English. Run with the AI's steps (builders/ai.js runAi).
-//
-//   news/tr.json  { built, tr: { id: { zh | en, t, sum?, s?, at } } }
-//                 zh | en: the title in the other language, t the outlet's
-//                 title it's from; sum the summary's, s the summary it's from.
-//
-// Each text once: a story's title made again only when its title has
-// turned, an hour on at the soonest (a lead outlet changing its words
-// every few minutes costs one translation an hour, not ten). The rest of a
-// story (each outlet's headline, a summary lower down) is translated when
-// a person opens it (worker.js /news-tr, handleNewsTr).
-import { translate, peopleIn, readMeter, withMonth } from '../translate.js';
+// experience and full English experience"): the texts a person's phone asks
+// for, only as they're on screen (a list's titles in one batch, a story's
+// own words as it's opened), by plain translation (translate.js, Google's
+// free month), never the AI's. Nothing is translated ahead (11-14: it cost
+// too much). Each text once, kept in news/tr/<id>.json (worker.js /news-tr).
+import { translate, peopleIn, withMonth } from '../translate.js';
 
-export const NEWS_TR = 'news/tr.json';
-// (A new way of asking (2: a day's month put in, a headline's stop left off) asks every text again.)
 export const TR_V = 2;
-export const TR_AGAIN = 3_600_000;
-// The summaries translated ahead: the stories at the top of each side.
-export const SUM_TOP = 12;
-const NEWS_LINES = 'news/lines.json';
-
-const toOf = region => (region === 'intl' ? 'zh-TW' : 'en');
-const keyOf = region => (region === 'intl' ? 'zh' : 'en');
-export const storyPeople = s => (s.region === 'intl' ? peopleIn([s.sum, ...(s.items || []).map(it => it[1])]) : []);
-
-// What a run asks for, best first: each side's stories in their order, a
-// title its AI line doesn't cover, then the top stories' summaries.
-export function wanted(index, lines, was, now = Date.now()) {
-  const keep = {};
-  const ask = [];
-  const sides = ['intl', 'tw'].map(region => (index[region] || []).map((s, i) => ({ ...s, region, rank: i })));
-  const order = [];
-  for (let i = 0; i < Math.max(...sides.map(x => x.length)); i++) for (const side of sides) if (side[i]) order.push(side[i]);
-  for (const s of order) {
-    const k = keyOf(s.region);
-    const old = was[s.id] || {};
-    const e = { at: old.at || now };
-    // (The AI's title covers it: none of ours.)
-    const ai = lines[s.id]?.[k];
-    const fresh = now - (old.at || 0) < TR_AGAIN;
-    if (!ai && s.title) {
-      if (old[k] && !old.old && (old.t === s.title || fresh)) Object.assign(e, { [k]: old[k], t: old.t });
-      else {
-        ask.push({ s, field: 'title', text: s.title });
-        // (One made the old way shows till its new one comes.)
-        if (old.old && old[k] && old.t === s.title) Object.assign(e, { [k]: old[k], t: old.t });
-      }
-    }
-    if (s.sum && s.rank < SUM_TOP) {
-      if (old.sum && !old.old && (old.s === s.sum || fresh)) Object.assign(e, { sum: old.sum, s: old.s });
-      else {
-        ask.push({ s, field: 'sum', text: s.sum });
-        if (old.old && old.sum && old.s === s.sum) Object.assign(e, { sum: old.sum, s: old.s });
-      }
-    } else if (old.sum && old.s === s.sum) Object.assign(e, { sum: old.sum, s: old.s });
-    keep[s.id] = e;
-  }
-  // (Titles before summaries: a list's every headline first.)
-  ask.sort((a, b) => (a.field === b.field ? 0 : a.field === 'title' ? -1 : 1));
-  return { keep, ask };
-}
-
-export async function newsTr({ store, env, now = Date.now(), fetchImpl = fetch, force = false }) {
-  const index = await store.json('news/index.json');
-  if (!index) return { skipped: 'no index' };
-  const lines = (await store.json(NEWS_LINES).catch(() => null))?.lines || {};
-  const doc = await store.json(NEWS_TR).catch(() => null);
-  // (Made the old way: kept till made again, but an English one whose source names a day alone (v1's 12日 → December).)
-  const was = doc?.v === TR_V ? doc.tr || {} : Object.fromEntries(Object.entries(doc?.tr || {}).filter(([, e]) => !(e.en && /\d日/.test(`${e.t} ${e.s || ''}`))).map(([id, e]) => [id, { ...e, at: 0, old: 1 }]));
-  const { keep, ask } = wanted(index, lines, was, now);
-  let made = 0;
-  for (const to of ['zh-TW', 'en']) {
-    const mine = ask.filter(a => toOf(a.s.region) === to);
-    if (!mine.length) continue;
-    // (Each text its own story's people: one story's "York" is no other's New York.)
-    const whose = new Map(mine.map(a => [a.text, a.s]));
-    const seen = new Map();
-    const people = t => {
-      const s = whose.get(t);
-      if (!seen.has(s.id)) seen.set(s.id, storyPeople(s));
-      return seen.get(s.id);
-    };
-    const got = await translate(env, store, mine.map(a => a.text), to, { people, now, fetchImpl, force, prep: t => (to === 'en' ? withMonth(t, whose.get(t)?.at || now) : t) });
-    for (const a of mine) {
-      const v = got[a.text];
-      if (!v) continue;
-      const e = keep[a.s.id];
-      if (a.field === 'title') Object.assign(e, { [keyOf(a.s.region)]: v, t: a.text, at: now });
-      else Object.assign(e, { sum: v, s: a.text, at: now });
-      made++;
-    }
-  }
-  const tr = {};
-  for (const [id, e] of Object.entries(keep)) if (e.zh || e.en || e.sum) tr[id] = e;
-  // (The month so far beside them, for the admin panel and a look from outside: characters, and a failure's code.)
-  const m = await readMeter(store, now).catch(() => null);
-  const use = m ? { month: m.month, chars: m.chars, today: m.today || 0, ...(m.off > now ? { off: String(m.why || '').slice(0, 10) } : {}) } : null;
-  await store.put(NEWS_TR, { built: now, v: TR_V, use, tr });
-  // (The failure's whole reason to the run's log only, never the public file.)
-  return { made, asked: ask.length, kept: Object.keys(tr).length, use, ...(m?.off > now ? { why: m.why } : {}) };
-}
 
 // ---- A story opened (worker.js /news-tr) ----
 // The texts a person's phone asks for, only the story's own (its outlets'
@@ -138,4 +40,17 @@ export async function storyTr({ store, env, id, to, texts, now = Date.now(), fet
     }
   }
   return { tr: Object.fromEntries(want.filter(t => mine[t]).map(t => [t, mine[t]])) };
+}
+
+// A list's titles in one batch: `items` [{ id, texts }], at most BATCH_MAX stories, each its own
+// story's texts as above; → every translation by its source text.
+export const BATCH_MAX = 30;
+export async function batchTr({ items, ...rest }) {
+  const tr = {};
+  for (const it of (Array.isArray(items) ? items : []).slice(0, BATCH_MAX)) {
+    const r = await storyTr({ ...rest, id: String(it?.id || ''), texts: Array.isArray(it?.texts) ? it.texts.slice(0, 2) : [] });
+    if (r.error === 'to') return r;
+    Object.assign(tr, r.tr);
+  }
+  return { tr };
 }

@@ -79,7 +79,7 @@ import { handleCal } from './cal.js';
 import { handleAiOpen, OPEN } from './ai-open.js';
 import { logCall, callsSince, reliability, spendOf, lastFailed, providerCapped, providerToday } from './gemini-use.js';
 import { handleAi, handleAiBuild, aiTry } from './ai.js';
-import { storyTr } from './builders/news-tr.js';
+import { storyTr, batchTr } from './builders/news-tr.js';
 import { handleTr } from './translate.js';
 import { r2Store } from './builders/store.js';
 import { handleClassNews, classNewsTry, classNewsPeek, classNewsRead } from './class-news.js';
@@ -1337,7 +1337,7 @@ async function sessionOf(request, env, grace = 0) {
   return qt ? readToken(await tokenSecret(env), qt, 'ses', Date.now() - grace) : null;
 }
 
-// POST /news-tr { id, to, texts }: a story's own texts in the reader's
+// POST /news-tr { id, to, texts } (a story's own texts) or { to, items: [{ id, texts }] } (a list's titles, one batch of up to 30): the reader's
 // language (Google's free month, translate.js; each kept in news/tr/<id>.json).
 // The stories read from R2 a minute at a time per isolate.
 let newsPages = null;
@@ -1358,7 +1358,7 @@ async function handleNewsTr(request, env, headers, make = false) {
     newsPages.past ||= store.json('news/past.json').then(d => [...(d?.intl || []), ...(d?.tw || [])]).catch(() => []);
     return look(await newsPages.past);
   };
-  const out = await storyTr({ store, env, id: String(body.id || ''), to: String(body.to || ''), texts: body.texts, now, find, make });
+  const out = Array.isArray(body.items) ? await batchTr({ store, env, items: body.items, to: String(body.to || ''), now, find, make }) : await storyTr({ store, env, id: String(body.id || ''), to: String(body.to || ''), texts: body.texts, now, find, make });
   return json(out, out.error ? 400 : 200, headers);
 }
 
