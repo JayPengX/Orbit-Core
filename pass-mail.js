@@ -28,6 +28,7 @@
 import { WALLET_COLLECTION, parseWallet, publicWallet, poolBalance, gen, updateWallet, signIn, ECO_LIMITS } from './eco.js';
 import { readToken, sessionLimited, tokenSecret } from './orbit-token.js';
 import { DEV } from './kit/brand.mjs';
+import { passMailHtml } from './site/admin/mail-look.mjs';
 
 export const MAIL_COLLECTION = 'eco-mail';
 export const MAIL_CODES = 'eco-mail-codes';
@@ -104,33 +105,34 @@ function codeMail(kind, code, l) {
     signup: en ? 'make your Orbit Pass' : '建立你的 Orbit Pass',
     recover: en ? 'sign in to your Orbit Pass' : '登入你的 Orbit Pass'
   }[kind];
+  const head = {
+    link: en ? 'Confirm your recovery email' : '確認你的救援信箱',
+    signup: en ? 'Make your Orbit Pass' : '建立你的 Orbit Pass',
+    recover: en ? 'Sign in to your Orbit Pass' : '登入你的 Orbit Pass'
+  }[kind];
   const subject = en ? `Orbit Pass code: ${code}` : `Orbit Pass 驗證碼：${code}`;
-  const lines = en
-    ? [`Your code to ${what} is ${code}.`, 'It works once, within 10 minutes.', 'Didn’t ask for it? Ignore this mail: nothing changes without the code.']
-    : [`${what}的驗證碼是 ${code}。`, '10 分鐘內有效，只能用一次。', '不是你要求的？不必理會，沒有驗證碼什麼都不會改變。'];
-  return { subject, text: lines.join('\n\n'), lines, code, lang: l, title: en ? 'Your Orbit Pass code' : 'Orbit Pass 驗證碼' };
+  const lines = [en ? 'It works once, within 10 minutes.' : '10 分鐘內有效，只能用一次。'];
+  const aside = en ? 'Didn’t ask for it? Ignore this mail: nothing changes without the code.' : '不是你要求的？不必理會，沒有驗證碼什麼都不會改變。';
+  const first = en ? `Your code to ${what} is ${code}.` : `${what}的驗證碼是 ${code}。`;
+  return { subject, text: [first, ...lines, aside].join('\n\n'), head, lines, aside, code, lang: l, title: en ? 'Your Orbit Pass code' : 'Orbit Pass 驗證碼' };
 }
 function noticeMail(kind, l) {
   const en = l === 'en';
   const lines =
     kind === 'replaced'
       ? en
-        ? ['This address is no longer your Orbit Pass’s recovery email: another one was added in its place.', 'Not you? Sign in and check Orbit Pass › Security.']
-        : ['這個信箱已不再是你 Orbit Pass 的救援信箱：已換成另一個信箱。', '不是你改的？請登入後到 Orbit Pass › 帳戶安全查看。']
+        ? ['This address is no longer your Orbit Pass’s recovery email: another one was added in its place.']
+        : ['這個信箱已不再是你 Orbit Pass 的救援信箱：已換成另一個信箱。']
       : en
-        ? ['This address is no longer your Orbit Pass’s recovery email: it was removed.', 'Not you? Sign in and check Orbit Pass › Security.']
-        : ['這個信箱已從你的 Orbit Pass 移除，不再是救援信箱。', '不是你移除的？請登入後到 Orbit Pass › 帳戶安全查看。'];
+        ? ['This address is no longer your Orbit Pass’s recovery email: it was removed.']
+        : ['這個信箱已從你的 Orbit Pass 移除，不再是救援信箱。'];
+  const aside = en ? 'Not you? Sign in and check Orbit Pass › Security.' : '不是你改的？請登入後到 Orbit Pass › 帳戶安全查看。';
   const subject = en ? 'Orbit Pass: recovery email changed' : 'Orbit Pass：救援信箱已變更';
-  return { subject, text: lines.join('\n\n'), lines, lang: l, title: subject };
+  return { subject, text: [...lines, aside].join('\n\n'), head: en ? 'Recovery email changed' : '救援信箱已變更', lines, aside, lang: l, title: subject };
 }
-// The mails' page (worker.js sends it through mail.js, Resend for anyone's address).
-const esc = v => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-// A plain, light note: its title, its lines, the code large when there is one.
-export function mailPage({ title = '', lines = [], code = '', lang = 'zh' }) {
-  const p = lines.map(l => `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#1c1c1e">${esc(l)}</p>`).join('');
-  const big = code ? `<p style="margin:4px 0 18px;font:600 32px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:6px;color:#1c1c1e">${esc(code)}</p>` : '';
-  return `<!doctype html><html lang="${lang === 'en' ? 'en' : 'zh-Hant-TW'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"></head><body style="margin:0;padding:24px 16px;background:#f2f2f7;font-family:-apple-system,BlinkMacSystemFont,'PingFang TC','Noto Sans TC',sans-serif"><div style="max-width:440px;margin:0 auto;background:#fff;border-radius:16px;padding:24px 22px"><h1 style="margin:0 0 16px;font-size:19px;color:#1c1c1e">${esc(title)}</h1>${big}${p}<p style="margin:18px 0 0;font-size:13px;color:#8e8e93">Orbit</p></div></body></html>`;
-}
+// The mails' page (worker.js sends it through mail.js, Resend for anyone's
+// address): every Orbit mail's card (site/admin/mail-look.mjs).
+export const mailPage = m => passMailHtml(m);
 
 // Sent after the answer where the request can wait for it (never holding
 // the reply, and never telling by its time whether a mail went).

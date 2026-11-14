@@ -237,3 +237,39 @@ export function alertMail({ issues = [], fixed = [], admin = `${SITE}/admin/`, l
   const text = [head, '', ...(test ? [testWords, ''] : []), ...issues.map(i => `${i.tone === 'bad' ? '●' : '○'} ${i.title}${i.detail ? ` — ${i.detail}` : ''}`), ...fixed.map(i => `✓ ${i.title} (${W.fixed})`), '', `${W.open}: ${admin}`, '', '--', `${W.sent} · ${W.settings}`].join('\n');
   return { subject, html: frame({ lang, preheader: issues.map(i => i.title).join(' · ') || head, inner, foot: `${esc(W.sent)} · ${esc(W.settings)}` }), text };
 }
+
+// ---- Orbit Pass's mails (pass-mail.js: a code, a notice) ----
+// The same card as every Orbit mail (Jay 11-14: "make it fancier"): Orbit's
+// band with the logo, the code large in its own box, the rest quiet. No
+// picture but the logo, by its address, so nothing pushes it to junk.
+// { head, code, lines, aside, lang } → html.
+export function passMailHtml({ head = '', title = '', code = '', lines = [], aside = '', lang = 'zh' } = {}) {
+  const zh = lang !== 'en';
+  const a = accentOf('orbit');
+  const codeBox = code
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px"><tr><td align="center" bgcolor="#f5f6ff" style="padding:22px 12px 24px;background:#f5f6ff;border:1px solid #dfe2ff;border-radius:18px"><div style="font:600 12px/1 ${FONT};letter-spacing:1.6px;color:#6b7280;margin:0 0 14px">${zh ? '驗證碼' : 'YOUR CODE'}</div><div style="font:800 40px/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:10px;padding-left:10px;color:#1e1b4b">${esc(code)}</div></td></tr></table>`
+    : '';
+  const said = lines.map(l => P(esc(l), `font-family:${FONT};color:#1f2937;${code ? 'font-size:15px;color:#475569;text-align:center' : ''}`)).join('');
+  const quiet = aside ? `<div style="height:1px;background:#e5e7eb;margin:6px 0 18px"></div><p style="margin:0;font:13px/1.6 ${FONT};color:#8a90a6">${esc(aside)}</p>` : '';
+  const open = code ? '' : button(zh ? '打開 Orbit' : 'Open Orbit', `${SITE}/app/`, a);
+  const inner = band(a, `${brandRow()}<div style="height:28px"></div>${eyebrow('Orbit Pass', 'rgba(255,255,255,.78)')}${h1(head || title, '#ffffff', 'font-size:26px')}`, '26px 32px 30px') + cell(`${codeBox}${said}${open}${quiet}`, '28px 32px 30px');
+  const foot = zh ? `Orbit Pass 自動寄出 · ${DOMAIN}` : `Sent by Orbit Pass · ${DOMAIN}`;
+  return frame({ lang, preheader: code ? (zh ? `你的驗證碼 ${code}，10 分鐘內有效` : `Your code ${code}, good for 10 minutes`) : lines[0] || head, inner, foot: esc(foot) });
+}
+
+// ---- Any short mail of Orbit's in the same card (privacy-mail.js's reply) ----
+// { lang, eyebrow, headline, paras: [text], buttons: [{ label, link, danger }],
+//   note (small print under the buttons), foot (html under the card), preheader } → html.
+// A danger button is outlined red, never filled.
+export function cardMailHtml({ lang = 'zh', eyebrow: eb = 'Orbit', headline = '', paras = [], buttons = [], note = '', foot = '', preheader = '' } = {}) {
+  const a = accentOf('orbit');
+  const red = { color: '#dc2626', ink: '#b91c1c' };
+  const btn = b =>
+    b.danger && /^https:\/\//.test(b.link || '')
+      ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 6px"><tr><td style="border-radius:999px;border:1.5px solid ${red.color}"><a href="${esc(b.link)}" style="display:inline-block;padding:12px 24px;font:600 15px/1 ${FONT};color:${red.ink};text-decoration:none;border-radius:999px">${esc(b.label)}</a></td></tr></table>`
+      : button(b.label, b.link, a);
+  const inner =
+    band(a, `${brandRow()}<div style="height:28px"></div>${eb ? eyebrow(eb, 'rgba(255,255,255,.78)') : ''}${h1(headline, '#ffffff', 'font-size:26px')}`, '26px 32px 30px') +
+    cell(`${paras.map(t => P(inline(t, a.ink), `font-family:${FONT};color:#1f2937`)).join('')}${buttons.map(btn).join('')}${note ? `<div style="height:1px;background:#e5e7eb;margin:18px 0 16px"></div><p style="margin:0;font:13px/1.6 ${FONT};color:#6b7280">${esc(note)}</p>` : ''}`, '28px 32px 30px');
+  return frame({ lang, preheader: preheader || paras[0] || headline, inner, foot });
+}
