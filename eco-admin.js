@@ -17,7 +17,7 @@
 import { REC_WEEKLY, REC_PREFIX } from './rec-weekly.js';
 import { doorReport, doorSet } from './door.js';
 import { systemReport, alertAccount, tell, OPS_DOC, beats } from './ops.js';
-import { passAccount, updateWallet, deleteAccount, ECO_APPS, NOW_COLLECTION, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet, levelOf, LEVELS } from './eco.js';
+import { passAccount, updateWallet, deleteAccount, ECO_APPS, NOW_COLLECTION, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet, levelOf, LEVELS, mintPass } from './eco.js';
 import { sendPush, dueLists } from './push.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, TDX_BOOK, tdxPoints, tdxGuard, tdxUse, tdxPlan } from './transit.js';
 import { aiUse, callsSince } from './gemini-use.js';
@@ -34,8 +34,8 @@ import { govOf } from './kit/gov.mjs';
 import { listBackups, fromBackup } from './store-backup.js';
 import { PASSKEY_COLLECTION, passkeySummary, removePasskey } from './passkey.js';
 import { MAIL_COLLECTION, MAIL_CODES, mailSummary, mailIndexId } from './pass-mail.js';
+import { AI_DEFAULTS, cleanRule, levelRules, setLevelRule, allowanceOf, grantAll, forgetAllow } from './ai-allow.js';
 import { tokenSecret, readToken, signToken } from './orbit-token.js';
-import { GIFT_TOOLS, mintPass } from './gift.js';
 import { readSources } from './sources.js';
 import { readUsage } from './usage.js';
 import { SOURCES } from './kit/sources.mjs';
@@ -195,8 +195,7 @@ export async function handleAdmin({ env, deps, headers, request, ip, body, secre
   // The panel's other views and tools (adminTools below): an overview,
   // one account in full, money by hand, signing an account out,
   // a never-used pass removed, notices, the sources' health.
-  // (The public giveaway's settings and counts are gift.js's: looked up here, as the two import each other.)
-  const tool = ADMIN_TOOLS[body.action] || GIFT_TOOLS[body.action];
+  const tool = ADMIN_TOOLS[body.action];
   if (tool) {
     try {
       const out = await tool({ env, deps, body });
@@ -561,6 +560,8 @@ export const ADMIN_TOOLS = {
       priority: Boolean(wallet.sec?.priority),
       level: levelOf(wallet),
       gift: Boolean(wallet.gift),
+      // (Orbit AI 額度, ai-allow.js: the rule in force and what's used of it; `own`, the account's own rule.)
+      ai: { ...(await allowanceOf(env, deps, id, wallet, now).catch(() => null)), own: wallet.sec?.ai || null },
       ...creditOf(wallet),
       gov: govOf(wallet)
     };
@@ -601,6 +602,46 @@ export const ADMIN_TOOLS = {
     if (!hit) return notFound;
     const res = await updateWallet(env, deps, hit.id, w => (levelOf(w) === body.level && w.sec?.level ? w : { ...w, sec: { ...(w.sec || {}), level: body.level } }));
     return { ok: true, level: levelOf(res?.wallet) };
+  },
+  // Orbit AI 額度 (ai-allow.js, Jay 11-14): each level's rule as set (or
+  // none: the built-in one), the built-in ones, and how many accounts have
+  // their own.
+  async 'ai-allow'({ env, deps }) {
+    forgetAllow();
+    const levels = await levelRules(env, deps, deps.now());
+    const own = env.STORE?.prepare
+      ? await env.STORE.prepare("SELECT COALESCE(json_extract(payload, '$.sec.level'), 'free') AS lv, COUNT(*) AS n FROM docs WHERE coll = ?1 AND json_extract(payload, '$.sec.ai') IS NOT NULL GROUP BY lv").bind(WALLET_COLLECTION).all().then(r => Object.fromEntries((r.results || []).map(x => [x.lv, x.n]))).catch(() => ({}))
+      : {};
+    return { levels, defaults: AI_DEFAULTS, own };
+  },
+  // A level's rule (`rule` null: back to the built-in one).
+  async 'ai-allow-set'({ env, deps, body }) {
+    if (!LEVELS.includes(body.level)) return { error: 'ADMIN_BAD_LEVEL', status: 400 };
+    const rule = body.rule == null ? null : cleanRule(body.rule, deps.now());
+    if (body.rule != null && !rule) return { error: 'ADMIN_BAD_AMOUNT', status: 400 };
+    return { ok: true, levels: await setLevelRule(env, deps, body.level, rule) };
+  },
+  // One account's own rule (`rule` null: its level's again). Holds from its next ask.
+  async 'ai-grant'({ env, deps, body }) {
+    const rule = body.rule == null ? null : cleanRule(body.rule, deps.now());
+    if (body.rule != null && !rule) return { error: 'ADMIN_BAD_AMOUNT', status: 400 };
+    const hit = await findWallet(env, deps, body.wallet);
+    if (!hit) return notFound;
+    const res = await updateWallet(env, deps, hit.id, w => {
+      const sec = { ...(w.sec || {}) };
+      if (rule) sec.ai = rule;
+      else delete sec.ai;
+      return { ...w, sec };
+    });
+    return { ok: true, ai: await allowanceOf(env, deps, hit.id, res.wallet).catch(() => null) };
+  },
+  // Every account there is now ('all' | 'full' | 'free'): this rule as each one's own
+  // (an account made later follows its level), or each one's own taken off (`rule` null).
+  async 'ai-grant-all'({ env, deps, body }) {
+    if (!['all', 'full', 'free'].includes(body.who)) return { error: 'ADMIN_BAD_LEVEL', status: 400 };
+    const rule = body.rule == null ? null : cleanRule(body.rule, deps.now());
+    if (body.rule != null && !rule) return { error: 'ADMIN_BAD_AMOUNT', status: 400 };
+    return { ok: true, ...(await grantAll(env, deps, body.who, rule)) };
   },
   // Money by hand (a correction, a prize): an 'eco' entry, kind 'admin', with its reason.
   async grant({ env, deps, body }) {

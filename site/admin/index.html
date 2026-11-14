@@ -446,23 +446,9 @@
   @media (max-width: 899px) { .compose-view iframe { height: 520px; } }
   .compose-acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; position: sticky; bottom: 0; padding: 10px 0 2px; background: var(--q-page); }
   @media (max-width: 420px) { .looks { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; } .looks button { font-size: 12px; padding-inline: 2px; } .compose-two { grid-template-columns: 1fr; } }
-  .gift-when { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
-  .gift-when label, .gift-more label { display: grid; gap: 4px; min-width: 0; font-size: 13px; color: var(--q-muted); }
-  .gift-when input, .gift-more input { width: 100%; box-sizing: border-box; }
-  .gift-more { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
-  .gift-clean { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--q-sep); }
-  #gift-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  @media (min-width: 700px) { #gift-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-  .gift-acts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
-  .gift-acts button { padding-inline: 8px; }
-  .clean-head { display: flex; align-items: flex-start; gap: 12px; }
-  .clean-head > div { flex: 1 1 0; min-width: 0; }
-  .clean-head .q-switch { flex: none; }
-  .clean-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13.5px; }
-  .clean-list li { display: flex; justify-content: space-between; gap: 10px; }
-  .clean-list .mono { font-family: ui-monospace, monospace; }
-  .gift-link { margin-top: 12px; padding: 10px 14px; border-radius: var(--q-r-cell); background: var(--q-fill-4); font: 600 15px ui-monospace, monospace; overflow-wrap: anywhere; }
-  @media (max-width: 520px) { .gift-when { grid-template-columns: minmax(0, 1fr); } }
+  .invite-acts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+  .invite-acts button { padding-inline: 8px; }
+  .invite-link { margin-top: 12px; padding: 10px 14px; border-radius: var(--q-r-cell); background: var(--q-fill-4); font: 600 15px ui-monospace, monospace; overflow-wrap: anywhere; }
   .tool-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
   .tool-head > div { flex: 1 1 0; min-width: 0; }
   .tool-head h3 { margin: 2px 0 2px; }
@@ -656,6 +642,10 @@
         <ul class="ai-list" id="aim-feat"></ul>
         <p class="muted" style="margin:8px 0 0">每個 App：今天用了幾次 / 每天上限（全部人一起，上限在設定）。秒數：一半在這之內答完 / 九成在這之內。主要的模型沒答時，由另一家同一級的備用接手（Sonnet ↔ GPT Sol、Haiku ↔ Luna、Flash → Haiku），這時是黃字；紅字是連備用都沒答到。</p>
       </div>
+      <div class="pane-head" id="ai-allow"><div><h2>Orbit AI 額度</h2><p class="muted">每個帳戶能讓 AI 做幾次。已經做好、大家共用的答案不算次數。基本帳戶要有驗證過的信箱才有。</p></div><button class="small" id="alw-load" style="flex:none">重新整理</button></div>
+      <p id="alw-error" class="error"></p>
+      <div class="card" id="alw-levels"></div>
+      <div class="card" id="alw-all" style="margin-top:12px"></div>
       <div class="pane-head"><div><h2>TDX</h2></div></div>
       <p id="use-error" class="error"></p>
       <div class="card">
@@ -695,31 +685,11 @@
         <div class="mail-sw"><div style="flex:1 1 0"><strong>現在的狀況</strong><p class="muted" id="mail-state">載入中…</p><ul class="mail-open" id="mail-open"></ul></div><button id="mail-check" class="small" style="flex:none">現在檢查</button></div>
         <details class="note"><summary id="mail-log-sum">最近寄出</summary><div class="tablewrap"><table id="mail-log"><thead><tr><th>時間</th><th>主旨</th><th class="wide">寄給</th><th class="right">經由</th></tr></thead><tbody></tbody></table></div><p class="muted" id="mail-room" style="margin:8px 0 0"></p></details>
       </div>
-      <div class="card tool" id="tool-gift">
-        <div class="tool-head"><i data-ic="send" style="--t:#4f46e5"></i><div><h3>公開領取</h3><p class="muted">一台裝置一組，沒換通行碼的到時收回。</p></div><button class="q-switch" type="button" role="switch" aria-checked="false" aria-label="開放領取" id="gift-on"></button></div>
-        <div class="tiles" id="gift-tiles"></div>
-        <div class="row" style="margin-top:12px"><input id="gift-total" type="number" min="0" max="5000" value="50" aria-label="數量" /><span class="muted">組</span></div>
-        <div class="chips" id="gift-level" style="margin-top:10px" role="group" aria-label="等級"><button type="button" data-full="0">基本（沒有 AI）</button><button type="button" data-full="1">完整（有 Orbit AI）</button></div>
-        <div class="gift-when">
-          <label>開始（空白是現在）<input id="gift-opens" type="datetime-local" /></label>
-          <label>結束（空白是不限）<input id="gift-closes" type="datetime-local" /></label>
-        </div>
-        <div class="chips" id="gift-for" style="margin-top:10px"><button type="button" data-min="15">開 15 分鐘</button><button type="button" data-min="60">開 1 小時</button><button type="button" data-min="day">到今天結束</button><button type="button" data-min="0">不限</button></div>
-        <details class="note"><summary>防濫用</summary>
-          <div class="gift-more">
-            <label>每個網路每分鐘<input id="gift-rate" type="number" min="1" max="600" /></label>
-            <label>幾小時沒換通行碼就收回（0 不收）<input id="gift-hold" type="number" min="0" max="720" /></label>
-          </div>
-        </details>
-        <div class="row spread" style="margin-top:12px"><span id="gift-state" class="muted"></span><button id="gift-save" class="primary">儲存</button></div>
-        <p id="gift-error" class="error"></p>
-        <div class="gift-link" id="gift-url"></div>
-        <div class="gift-acts"><button id="gift-copy" class="small">複製連結</button><button id="gift-qr" class="small">QR code</button><button id="gift-round" class="small">新一輪</button></div>
-        <div class="gift-clean">
-          <div class="clean-head"><div><strong>清掉空帳戶</strong><p class="muted" style="margin:2px 0 0">領來的帳戶，久沒用又沒資料就清掉。</p></div><button class="q-switch" type="button" role="switch" aria-checked="false" aria-label="清掉空帳戶" id="clean-on"></button></div>
-          <div class="row" style="margin-top:10px"><input id="clean-days" type="number" min="7" max="365" aria-label="天數" /><span class="muted">天沒用就清</span></div>
-          <details class="note"><summary id="clean-sum"></summary><ul class="clean-list" id="clean-list"></ul><div class="row" style="margin-top:8px"><button id="clean-run" class="small">現在清理</button></div></details>
-        </div>
+      <div class="card tool" id="tool-invite">
+        <div class="tool-head"><i data-ic="send" style="--t:#4f46e5"></i><div><h3>邀請 QR code</h3><p class="muted">掃了就到 Orbit 的建立帳戶：用信箱建立基本帳戶（沒有 AI）。已經登入的裝置不會再建立。</p></div></div>
+        <div class="invite-link" id="invite-url"></div>
+        <div class="invite-acts"><button id="invite-copy" class="small">複製連結</button><button id="invite-qr" class="small">QR code</button></div>
+        <p id="invite-error" class="error"></p>
       </div>
       <div class="card tool" id="tool-issue">
         <div class="tool-head"><i data-ic="ticket" style="--t:#2563eb"></i><div><h3>發放 Orbit Pass</h3><p class="muted">完整等級（有 Orbit AI），誰先登入就是誰的。只顯示這一次，先複製或下載。</p></div></div>
@@ -861,7 +831,6 @@ const KINDS = { start: '開戶金', pay: '週薪', rank: '財富等級獎勵', r
 const kindName = k => KINDS[k] || k;
 
 const WHY = {
-  GIFT_TIMES: '結束要比開始晚。',
   FORBIDDEN: '管理金鑰不對（或還沒部署好，等一分鐘再試）。',
   ECO_PAIR_NOT_FOUND: '找不到這個帳戶代號（或對到不只一個，多貼幾碼）。',
   SYNC_PASSCODE_NOT_FOUND: '找不到這組 Orbit Pass。',
@@ -1000,9 +969,9 @@ const VIEWS = {
   accounts: () => Promise.all([loadWallets(), loadDoor()]),
   use: () => loadUse(),
   health: () => Promise.all([loadSystem(), loadSources(), loadErrors(), loadBugs()]),
-  usage: () => Promise.all([loadCapacity(), loadSystem(), loadUsage(), loadAiMoney()]),
+  usage: () => Promise.all([loadCapacity(), loadSystem(), loadUsage(), loadAiMoney(), loadAllow()]),
   dev: () => loadDev(),
-  tools: () => Promise.all([loadMail(), loadGift(), loadPushes(), loadBackups()])
+  tools: () => Promise.all([loadMail(), loadPushes(), loadBackups()])
 };
 const loaded = new Set();
 let view = 'overview';
@@ -1368,7 +1337,7 @@ const PLACES = [
   ['設定', 'dev', 'target', '#64748b', '速度 開發 ai 上限 dev config'],
   // (郵件 is 工具's first card, right under the shortcuts: no tile of its own, the six stay two even rows.)
   ['郵件', 'tools', 'mail', '#db2777', '寄信 寫信 email mail 警示信 信箱 公告 resend'],
-  ['公開領取', 'tools', 'send', '#4f46e5', '領取 發送 公開 學校 qr giveaway key', 'tool-gift'],
+  ['邀請 QR code', 'tools', 'send', '#4f46e5', '邀請 建立 註冊 學校 qr invite join', 'tool-invite'],
   ['發放 Orbit Pass', 'tools', 'ticket', '#2563eb', '發 pass 新帳戶 issue', 'tool-issue'],
   ['找回帳戶', 'tools', 'lock', '#0d9488', '裝置代碼 遺失 recover', 'tool-recover'],
   ['廣播通知', 'tools', 'bell', '#ea580c', '通知 推播 broadcast push', 'tool-notify'],
@@ -1600,8 +1569,22 @@ function drawAccount(a) {
     return r.level === 'full' ? '已改成完整' : '已改成基本';
   });
   lvlBtn.onclick = () => level.run(lvlBtn);
+  // AI 額度: this account's own (or back to its level's), from its next ask.
+  const ai = a.ai || {};
+  const aiNow = ai.n === 0 ? (ai.from === 'mail' ? '沒有（要先驗證信箱）' : '沒有') : ai.left == null ? `不限（今天用了 ${ai.used || 0} 次）` : `還有 ${ai.left} 次`;
+  const aiEd = ruleEditor(ai.own || (ai.n ? ai : { n: 10, per: 'day', until: 0 }));
+  const aiSave = el('button', { class: 'primary', text: '儲存' });
+  const aiBack = el('button', { text: '照等級', disabled: ai.own ? null : '' });
+  const aiAct = action(`AI 額度：${aiNow}`, ai.own ? `自己的額度：${ruleText(ai.own)}。` : `照等級：${ruleText(ai) || '沒有'}。設定後照自己的。`, [...aiEd.lines, [aiSave, aiBack]], async rule => {
+    const r = await admin('ai-grant', { wallet: a.ref, rule });
+    setTimeout(reload, 700);
+    return rule ? `已設定：${ruleText(r.ai)}` : '已改回照等級';
+  });
+  aiSave.onclick = () => aiAct.run(aiSave, aiEd.read());
+  aiBack.onclick = () => aiAct.run(aiBack, null);
   const ACTS = [
     ['等級', 'spark', '#7c3aed', level],
+    ['AI 額度', 'ai', '#0ea5e9', aiAct],
     ['優先', 'star', '#ca8a04', priority],
     ['調整金額', 'pencil', '#2563eb', grant],
     ['裝置代碼', 'key', '#0d9488', recover],
@@ -1888,287 +1871,23 @@ async function loadMoney() {
 }
 
 // ---- 通知與來源 ----
-// ---- 公開領取 (gift.js): the public giveaway at orbit.<domain>/key/ ----
-const GIFT_URL = `https://orbit.${DOMAIN}/key/`;
-let gift = null;
-const localTime = t => {
-  if (!t) return '';
-  const d = new Date(t - new Date(t).getTimezoneOffset() * 60_000);
-  return d.toISOString().slice(0, 16);
-};
-const fromLocal = v => (v ? new Date(v).getTime() || 0 : 0);
-function giftSay(g) {
-  const now = Date.now();
-  if (!g.live) return '關閉中';
-  if (g.closes && now >= g.closes) return `已結束（${fmt(g.closes)}）`;
-  if (g.opens && now < g.opens) return `${fmt(g.opens)} 開放`;
-  if (g.claimed >= g.total) return '領完了';
-  return g.closes ? `開放中，${fmt(g.closes)} 結束` : '開放中';
-}
-function drawClean(e) {
-  if (!e) return;
-  $('clean-on').setAttribute('aria-checked', String(!!e.on));
-  if (document.activeElement !== $('clean-days')) $('clean-days').value = e.days;
-  $('clean-sum').textContent = e.count ? `現在會清掉 ${e.count} 個` : '現在沒有要清的';
-  $('clean-list').replaceChildren(...e.first.map(a => el('li', {}, [el('span', { class: 'mono', text: a.ref }), el('span', { class: 'muted', text: `${fmt(a.last)} 最後用` })])));
-  $('clean-run').hidden = !e.count;
-}
-async function cleanCall(action, extra = {}) {
-  $('gift-error').textContent = '';
+// ---- 邀請 QR code: Orbit's sign-up (/app/?join opens 建立新的 Orbit Pass) ----
+const INVITE_URL = `https://orbit.${DOMAIN}/app/?join`;
+$('invite-url').textContent = INVITE_URL;
+$('invite-copy').onclick = async () => {
   try {
-    const out = await admin(action, extra);
-    drawGift(out.gift, out.empty);
-    return out;
-  } catch (e) {
-    $('gift-error').textContent = e.message;
-  }
-}
-$('clean-on').onclick = () => {
-  const on = $('clean-on').getAttribute('aria-checked') !== 'true';
-  $('clean-on').setAttribute('aria-checked', String(on));
-  cleanCall('gift-clean-set', { clean: on, days: Number($('clean-days').value) || 30 });
-};
-$('clean-days').onchange = () => cleanCall('gift-clean-set', { days: Number($('clean-days').value) || 30 });
-$('clean-run').onclick = async () => {
-  if (!(await sure(`現在清掉 ${$('clean-sum').textContent.replace(/\D/g, '')} 個空帳戶？`, { body: '30 天內可以在備份與復原救回。', ok: '清掉' }))) return;
-  const out = await cleanCall('gift-clean-run');
-  if (out) $('gift-state').textContent = `清掉了 ${out.cleared} 個`;
-};
-function drawGift(g, empty) {
-  drawClean(empty);
-  gift = g;
-  $('gift-on').setAttribute('aria-checked', String(!!g.live));
-  $('gift-tiles').replaceChildren(
-    tile('已領', g.claimed.toLocaleString(), g.hour ? `這小時 ${g.hour}` : ''),
-    tile('剩下', g.left.toLocaleString(), `共 ${g.total.toLocaleString()} 組`),
-    tile('已換成自己的', g.done.toLocaleString(), g.started ? `登入了還沒換 ${g.started}` : ''),
-    tile('收回', g.back.toLocaleString(), g.hold ? `${g.hold} 小時沒換` : '不收回')
-  );
-  $('gift-total').value = g.total;
-  for (const b of $('gift-level').children) b.setAttribute('aria-pressed', String(b.dataset.full === (g.full ? '1' : '0')));
-  $('gift-opens').value = localTime(g.opens);
-  $('gift-closes').value = localTime(g.closes);
-  $('gift-rate').value = g.rate;
-  $('gift-hold').value = g.hold;
-  $('gift-state').textContent = giftSay(g);
-  $('gift-url').textContent = GIFT_URL.replace('https://', '');
-}
-// ---- 郵件 (mail.js, mail-alerts.js): where the alert mails go, their switches, what's open; 寫信 ----
-let mailNow = null;
-const VIA = { cloudflare: 'Cloudflare', resend: 'Resend' };
-const KIND = { alert: '警示', test: '測試', try: '試寄', compose: '寫信' };
-function drawMail(m) {
-  mailNow = m;
-  const s = m.settings;
-  if (document.activeElement !== $('mail-to')) $('mail-to').value = s.to || '';
-  $('mail-on').setAttribute('aria-checked', String(s.on));
-  $('mail-quiet').setAttribute('aria-checked', String(s.quiet));
-  const a = m.alerts || {};
-  const today = a.day === new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10) ? a.n : 0;
-  $('mail-state').textContent = !s.to ? '還沒設定信箱：輸入你的信箱，按「寄測試信」看看收不收得到。' : !s.on ? '警示信關了。' : [a.open?.length ? `${a.open.length} 件事在看著` : '沒有要處理的事', `今天寄了 ${today} 封（最多 6 封）`, a.last ? `上次 ${ago(a.last)}` : '', a.failAt ? `上次沒寄出（${ago(a.failAt)}），6 小時後再試` : ''].filter(Boolean).join(' · ');
-  $('mail-open').replaceChildren(...(a.open || []).map(o => el('li', { class: o.tone }, [el('i'), el('span', { text: o.title }), el('small', { text: o.sent ? `寄過 ${ago(o.sent)}` : '確認中' })])));
-  const log = m.log || [];
-  $('mail-log-sum').textContent = `最近寄出（${log.length}）`;
-  $('mail-log').tBodies[0].replaceChildren(...(log.length ? log.map(r => el('tr', {}, [el('td', { text: fmtShort(r.at) }), el('td', { text: `${KIND[r.kind] ? `${KIND[r.kind]}・` : ''}${r.subject}` }), el('td', { class: 'wide mono', text: r.to }), el('td', { class: 'right', text: VIA[r.via] || r.via })])) : [el('tr', {}, [el('td', { colspan: '4', class: 'muted', text: '還沒寄過' })])]));
-  const c = m.counts;
-  $('mail-room').textContent = m.resend ? `經由 Resend（免費方案）：今天還能寄 ${Math.max(0, c.dayMax - c.dayN)} 封、這個月 ${Math.max(0, c.monthMax - c.monthN).toLocaleString()} 封；用完或 Resend 出問題時，改由 Cloudflare 寄（只寄得到在 Cloudflare 驗證過的信箱）。` : '還沒有 Resend 金鑰：只能經由 Cloudflare 寄給在那裡驗證過的信箱。';
-}
-async function loadMail() {
-  try {
-    drawMail(await admin('mail'));
-  } catch (e) {
-    $('mail-error').textContent = e.message;
-  }
-}
-async function mailSet(extra) {
-  $('mail-error').textContent = $('mail-ok').textContent = '';
-  try {
-    await admin('mail-set', extra);
-    await loadMail();
-    return true;
-  } catch (e) {
-    $('mail-error').textContent = e.message;
-  }
-}
-$('mail-save').onclick = () => busy($('mail-save'), async () => (await mailSet({ to: $('mail-to').value.trim() })) && ($('mail-ok').textContent = $('mail-to').value.trim() ? '已儲存' : '已清掉信箱：不寄警示信'));
-for (const id of ['mail-on', 'mail-quiet'])
-  $(id).onclick = () => {
-    const on = $(id).getAttribute('aria-checked') !== 'true';
-    $(id).setAttribute('aria-checked', String(on));
-    mailSet({ [id === 'mail-on' ? 'on' : 'quiet']: on });
-  };
-const NEEDS_VERIFY = '先到 Cloudflare 驗證這個信箱：jaypengx.com › Email › Email Routing › 目的地地址 › 新增，再按信裡的連結。';
-$('mail-test').onclick = () =>
-  busy($('mail-test'), async () => {
-    $('mail-error').textContent = $('mail-ok').textContent = '';
-    try {
-      const to = $('mail-to').value.trim();
-      if (to && to !== mailNow?.settings?.to && !(await mailSet({ to }))) return;
-      const r = await admin('mail-test');
-      if (r.sent) $('mail-ok').textContent = `已寄出（${VIA[r.sent.via]}）：看看 ${r.to} 的收件匣，沒看到的話也看看垃圾郵件。`;
-      else $('mail-error').textContent = `沒寄出：${r.failed}${r.needsResend ? `。${NEEDS_VERIFY}` : ''}`;
-      loadMail();
-    } catch (e) {
-      $('mail-error').textContent = e.message;
-    }
-  });
-$('mail-check').onclick = () =>
-  busy($('mail-check'), async () => {
-    $('mail-error').textContent = $('mail-ok').textContent = '';
-    try {
-      const r = await admin('mail-check');
-      $('mail-ok').textContent = r.issues.length ? `現在會寄的：${r.issues.map(i => i.title).join('、')}（同一件事看到兩次才寄）` : '現在沒有要寄的事。';
-    } catch (e) {
-      $('mail-error').textContent = e.message;
-    }
-  });
-
-// 寫信: the form is the mail; mail-look.mjs draws the preview exactly as mail.js will send it.
-const compose = $('compose');
-const CM = ['to', 'name', 'subject', 'headline', 'body', 'code', 'button', 'link', 'sign'];
-const DRAFT = 'orbit.admin.mail-draft.v1';
-let cm = { look: 'announce', accent: 'orbit', lang: 'zh' };
-try {
-  Object.assign(cm, JSON.parse(localStorage.getItem(DRAFT) || '{}'));
-} catch {}
-const cmFields = () => ({ ...cm, ...Object.fromEntries(CM.map(k => [k, $(`cm-${k}`).value])) });
-$('cm-looks').innerHTML = Object.entries(MAIL_LOOKS).map(([k, l]) => `<button type="button" data-look="${k}" title="${escHtml(l.about.zh)}"><span class="look-pic ${k}" style="--c:#4f46e5"><b></b><u></u></span>${escHtml(l.zh)}</button>`).join('');
-$('cm-colors').innerHTML = MAIL_ACCENTS.map(a => `<button type="button" data-accent="${a.id}" style="--c:${a.color}" title="${escHtml(a.zh)}" aria-label="${escHtml(a.zh)}"></button>`).join('');
-let cmTimer = 0;
-function cmDraw() {
-  const f = cmFields();
-  const look = MAIL_LOOKS[f.look] || MAIL_LOOKS.announce;
-  const color = (MAIL_ACCENTS.find(a => a.id === f.accent) || MAIL_ACCENTS[0]).color;
-  for (const b of $('cm-looks').children) (b.setAttribute('aria-pressed', String(b.dataset.look === f.look)), b.querySelector('.look-pic').style.setProperty('--c', color));
-  for (const b of $('cm-colors').children) b.setAttribute('aria-pressed', String(b.dataset.accent === f.accent));
-  for (const b of $('cm-lang').children) b.setAttribute('aria-pressed', String(b.dataset.lang === f.lang));
-  for (const n of compose.querySelectorAll('[data-f]')) n.hidden = !look.fields.includes(n.dataset.f);
-  $('cm-digest-hint').hidden = f.look !== 'digest';
-  const m = mailRender(f);
-  $('cm-v-subject').textContent = m.subject || '（沒有主旨）';
-  $('cm-v-from').textContent = `${f.name || mailNow?.settings?.name || 'Orbit'} <hello@${DOMAIN}>${mailNow?.settings?.to ? ` · 回信寄到 ${mailNow.settings.to}` : ''}`;
-  $('cm-frame').srcdoc = m.html.replace('<head>', '<head><base target="_blank">');
-  try {
-    localStorage.setItem(DRAFT, JSON.stringify(f));
-  } catch {}
-}
-const cmSoon = () => (clearTimeout(cmTimer), (cmTimer = setTimeout(cmDraw, 150)));
-function cmSample(force) {
-  const s = MAIL_LOOKS[cm.look].sample[cm.lang];
-  for (const k of ['subject', 'headline', 'body', 'button', 'link', 'code', 'sign']) if (force || !$(`cm-${k}`).value.trim()) $(`cm-${k}`).value = s[k] || '';
-  cmDraw();
-}
-$('cm-looks').onclick = e => {
-  const b = e.target.closest('[data-look]');
-  if (!b) return;
-  // (Words still the last look's sample follow the new look; words typed stay.)
-  const was = MAIL_LOOKS[cm.look].sample[cm.lang];
-  const same = ['subject', 'headline', 'body', 'button', 'link', 'sign'].every(k => !$(`cm-${k}`).value.trim() || $(`cm-${k}`).value === (was[k] || ''));
-  cm = { ...cmFields(), look: b.dataset.look };
-  cmSample(same);
-};
-$('cm-colors').onclick = e => {
-  const b = e.target.closest('[data-accent]');
-  if (b) ((cm = { ...cmFields(), accent: b.dataset.accent }), cmDraw());
-};
-$('cm-lang').onclick = e => {
-  const b = e.target.closest('[data-lang]');
-  if (b) ((cm = { ...cmFields(), lang: b.dataset.lang }), cmDraw());
-};
-compose.addEventListener('input', cmSoon);
-$('cm-sample').onclick = () => cmSample(true);
-$('compose-close').onclick = () => compose.close();
-$('mail-write').onclick = () => {
-  for (const k of CM) $(`cm-${k}`).value = cm[k] ?? '';
-  if (!$('cm-name').value) $('cm-name').value = mailNow?.settings?.name || 'Orbit';
-  $('cm-error').textContent = $('cm-ok').textContent = '';
-  if (!$('cm-body').value.trim()) cmSample(false);
-  else cmDraw();
-  compose.showModal();
-};
-// (As mail.js addressesOf reads them: `Name <a@b>` is its address.)
-const toList = raw => [...new Set(String(raw).replace(/[^,;\n，；<]*<([^>]+)>/g, ' $1 ').split(/[\s,;，；]+/).map(a => a.trim().toLowerCase()).filter(Boolean))];
-async function cmSend(test) {
-  $('cm-error').textContent = $('cm-ok').textContent = '';
-  const f = cmFields();
-  const to = test ? [] : toList(f.to);
-  if (test && !mailNow?.settings?.to) throw new Error('先在 郵件 存好你的信箱，才能寄給自己看看。');
-  if (!test && !to.length) throw new Error(WHY.MAIL_NO_TO);
-  if (!test && to.length > (mailNow?.maxTo || 20)) throw new Error(WHY.MAIL_TOO_MANY);
-  if (!test && !(await sure(`寄給 ${to.length} 個人？`, { body: `「${mailRender(f).subject}」，一人一封，寄出就收不回來。${to.slice(0, 5).join('、')}${to.length > 5 ? ` 等 ${to.length} 個` : ''}`, ok: '寄出' }))) return;
-  const r = await admin('mail-send', { ...f, to: to.join(','), test });
-  const ok = r.sent.length, bad = r.failed;
-  $('cm-ok').textContent = ok ? (test ? `已寄到 ${mailNow.settings.to}，看看收件匣。` : `已寄出 ${ok} 封。`) : '';
-  $('cm-error').textContent = bad.length ? `${bad.length} 封沒寄出：${bad.map(b => `${b.to}（${b.why}）`).join('、')}${bad.some(b => /驗證/.test(b.why)) ? '。寄給別人要用 Resend（免費）：在 resend.com 加入 jaypengx.com，把 API 金鑰放進 GitHub 的 RESEND_API_KEY。' : ''}` : '';
-  if (ok) toast(test ? '已寄給自己' : `已寄出 ${ok} 封`);
-  loadMail();
-}
-$('cm-try').onclick = () => busy($('cm-try'), () => cmSend(true).catch(e => ($('cm-error').textContent = e.message)));
-$('cm-send').onclick = () => busy($('cm-send'), () => cmSend(false).catch(e => ($('cm-error').textContent = e.message)));
-
-async function loadGift() {
-  try {
-    const out = await admin('gift');
-    drawGift(out.gift, out.empty);
-  } catch (e) {
-    $('gift-error').textContent = e.message;
-  }
-}
-async function giftSet(extra = {}) {
-  $('gift-error').textContent = '';
-  $('gift-save').disabled = true;
-  try {
-    // (A number left empty is left as it was: never saved as 0.)
-    const count = id => ($(id).value.trim() === '' ? undefined : Number($(id).value));
-    const out = await admin('gift-set', { total: count('gift-total'), opens: fromLocal($('gift-opens').value), closes: fromLocal($('gift-closes').value), rate: count('gift-rate'), hold: count('gift-hold'), ...extra });
-    drawGift(out.gift, out.empty);
-  } catch (e) {
-    $('gift-error').textContent = e.message;
-  }
-  $('gift-save').disabled = false;
-}
-$('gift-save').onclick = () => giftSet();
-// The round's level (eco.js levelOf): saved at once, for the passes claimed from now on.
-$('gift-level').onclick = e => {
-  const b = e.target.closest('button[data-full]');
-  if (b) giftSet({ full: b.dataset.full === '1' });
-};
-// The switch saves at once (the times and count as they stand in the form).
-$('gift-on').onclick = () => {
-  const on = $('gift-on').getAttribute('aria-checked') !== 'true';
-  $('gift-on').setAttribute('aria-checked', String(on));
-  giftSet({ live: on });
-};
-$('gift-for').onclick = e => {
-  const b = e.target.closest('button[data-min]');
-  if (!b) return;
-  const start = fromLocal($('gift-opens').value) || Date.now();
-  const m = b.dataset.min;
-  const end = m === '0' ? 0 : m === 'day' ? new Date(new Date(start).setHours(23, 59, 0, 0)).getTime() : start + Number(m) * 60_000;
-  $('gift-closes').value = localTime(end);
-};
-$('gift-copy').onclick = async () => {
-  try {
-    await navigator.clipboard.writeText(GIFT_URL);
-    $('gift-copy').textContent = '已複製';
-    setTimeout(() => ($('gift-copy').textContent = '複製連結'), 1500);
+    await navigator.clipboard.writeText(INVITE_URL);
+    $('invite-copy').textContent = '已複製';
+    setTimeout(() => ($('invite-copy').textContent = '複製連結'), 1500);
   } catch {}
 };
-$('gift-qr').onclick = async () => {
+// (The kit's share sheet: the QR code with Orbit's icon, saved as PNG or SVG to print.)
+$('invite-qr').onclick = async () => {
   try {
     const share = await import('/Orbit-Core/kit/share.mjs');
-    share.shareSheet?.({ url: GIFT_URL, title: '領一組 Orbit Pass', app: 'pass' });
+    share.shareSheet?.({ url: INVITE_URL, title: '建立 Orbit Pass', app: 'pass' });
   } catch (e) {
-    $('gift-error').textContent = e.message;
-  }
-};
-$('gift-round').onclick = async () => {
-  if (!(await sure('開新的一輪？', { body: '已領的不受影響，每台裝置可以再領一組，數字從 0 算起。', ok: '開新的一輪' }))) return;
-  try {
-    const out = await admin('gift-round');
-    drawGift(out.gift, out.empty);
-  } catch (e) {
-    $('gift-error').textContent = e.message;
+    $('invite-error').textContent = e.message;
   }
 };
 
@@ -3173,6 +2892,70 @@ $('aim-rate-save').onclick = () =>
       $('aim-error').textContent = e.message;
     }
   });
+
+// Orbit AI 額度 (Orbit-Core ai-allow.js, Jay 11-14): a rule is { n (blank: 不限), per, until };
+// each level's (or its built-in one), an account's own (帳戶 › AI 額度), or set on every account there is now.
+const PER_NAME = { day: '每天', month: '每月', total: '總共' };
+const twDate = ms => new Date(ms + 8 * 3_600_000).toISOString().slice(0, 10);
+const ruleText = r => (!r ? '' : `${r.n == null ? '不限次數' : r.n === 0 ? '沒有' : `${PER_NAME[r.per] || '每天'} ${r.n} 次`}${r.until ? `，到 ${twDate(r.until).slice(5).replace('-', '/')}` : ''}`);
+function ruleEditor(r) {
+  const n = el('input', { type: 'number', min: '0', max: '100000', placeholder: '不限', style: 'width:84px;flex:none', 'aria-label': '次數（空白是不限）' });
+  const per = el('select', { style: 'flex:none', 'aria-label': '每' }, Object.entries(PER_NAME).map(([k, v]) => el('option', { value: k, text: v })));
+  const until = el('input', { type: 'date', class: 'grow', 'aria-label': '到哪天（空白是不限期）' });
+  n.value = r?.n ?? '';
+  per.value = r?.per || 'day';
+  until.value = r?.until ? twDate(r.until) : '';
+  const read = () => ({ n: n.value === '' ? null : Number(n.value), per: per.value, until: until.value ? Date.parse(`${until.value}T23:59:59+08:00`) : 0 });
+  // (Two lines: how many, then until when; a date squeezed beside them couldn't be read.)
+  return { lines: [[per, n, el('span', { class: 'muted', text: '次' })], [el('span', { class: 'muted', text: '到期', style: 'flex:none' }), until, el('span', { class: 'muted', text: '空白是不限期', style: 'flex:none' })]], read };
+}
+let alw = null;
+function drawAllow() {
+  const now = Date.now();
+  $('alw-levels').replaceChildren(
+    ...['full', 'free'].map(lv => {
+      const set = alw.levels?.[lv];
+      const live = set && !(set.until && set.until <= now) ? set : null;
+      const ed = ruleEditor(live || alw.defaults[lv]);
+      const save = el('button', { class: 'primary', text: '儲存' });
+      const back = el('button', { text: '恢復預設', disabled: live ? null : '' });
+      const own = alw.own?.[lv] ? `另有 ${alw.own[lv]} 個帳戶有自己的額度。` : '';
+      const note = [lv === 'free' ? '要有驗證過的信箱。' : '', live ? `到期或恢復後是預設的${ruleText(alw.defaults[lv])}。` : '', own].join('');
+      const box = action(`${LEVEL_NAME[lv]}：${ruleText(live || alw.defaults[lv])}${live ? '' : '（預設）'}`, note, [...ed.lines, [save, back]], async rule => {
+        await admin('ai-allow-set', { level: lv, rule });
+        setTimeout(loadAllow, 700);
+        return rule ? `已儲存：${LEVEL_NAME[lv]}${ruleText(rule)}` : '已恢復預設';
+      });
+      save.onclick = () => box.run(save, ed.read());
+      back.onclick = () => box.run(back, null);
+      return box;
+    })
+  );
+  const who = el('select', { class: 'grow', 'aria-label': '哪些帳戶' }, [['all', '全部帳戶'], ['full', '完整帳戶'], ['free', '基本帳戶']].map(([v, t]) => el('option', { value: v, text: t })));
+  const ed = ruleEditor({ n: 10, per: 'day', until: 0 });
+  const go = el('button', { class: 'primary', text: '套用' });
+  const off = el('button', { text: '清除個別額度' });
+  const box = action('套用到現有帳戶', '現在有的帳戶各自拿到這個額度，之後新建的照等級。清除後回到照等級。', [[who], ...ed.lines, [go, off]], async rule => {
+    const label = who.selectedOptions[0].textContent;
+    if (!(await sure(rule ? `${label}都設成${ruleText(rule)}？` : `清除${label}的個別額度？`, { body: rule ? '會換掉這些帳戶原本自己的額度。' : '這些帳戶回到照等級的額度。', ok: rule ? '套用' : '清除' }))) return '已取消';
+    const r = await admin('ai-grant-all', { who: who.value, rule });
+    setTimeout(loadAllow, 700);
+    return `${rule ? '已套用到' : '已清除'} ${r.changed} 個帳戶`;
+  });
+  go.onclick = () => box.run(go, ed.read());
+  off.onclick = () => box.run(off, null);
+  $('alw-all').replaceChildren(box);
+}
+async function loadAllow() {
+  $('alw-error').textContent = '';
+  try {
+    alw = await admin('ai-allow');
+    drawAllow();
+  } catch (e) {
+    $('alw-error').textContent = e.message;
+  }
+}
+$('alw-load').onclick = () => busy($('alw-load'), loadAllow);
 
 // A saved key is checked again as a new one is (it may have been changed
 // since): a key turned away shows the gate, any other failure opens anyway.

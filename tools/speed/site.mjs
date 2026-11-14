@@ -263,7 +263,7 @@ function ecoAnswer(dev, body, method, url) {
 }
 
 // The API's routes that would spend (Gemini) or need a real Pass: never asked live.
-const NEVER = /^\/(gemini|nl-edit|law-ask|law-chat|money-read|law-page|stock|showcase|gift|store)\b/;
+const NEVER = /^\/(gemini|nl-edit|law-ask|law-chat|money-read|law-page|stock|showcase|store)\b/;
 // The routes the proxy's dev door answers a localhost page without a Pass (worker.js, sports.js).
 const LIVE_API = 'https://api.jaypengx.com';
 

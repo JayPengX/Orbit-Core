@@ -18,7 +18,7 @@
 //
 // Code first: an app parses what it can itself and calls these only for the rest.
 import { h, sheet, search, cell, icons } from './ui.mjs';
-import { workerJson, netState } from './orbit.mjs';
+import { workerJson, netState, aiAllowance } from './orbit.mjs';
 import { W } from './lang.mjs';
 
 export async function aiCall(feature, input, { answers = [], timeout = 40_000 } = {}) {
@@ -61,6 +61,11 @@ export function aiSays(error, left = null) {
   if (error === 'signin') return W('登入 Orbit Pass 後才能用 AI。', 'Sign in with your Orbit Pass to use AI.');
   // (A pass made in an app, Orbit-Core eco.js levelOf 'free': no AI on it.)
   if (error === 'level') return W('這組 Orbit Pass 沒有 Orbit AI。', 'This Orbit Pass doesn’t include Orbit AI.');
+  // (The account's Orbit AI allowance used up, Orbit-Core ai-allow.js: said by its period, calmly.)
+  if (error === 'used') {
+    const per = aiAllowance()?.per;
+    return per === 'month' ? W('這個月的 Orbit AI 次數用完了。', 'That’s all of your Orbit AI this month.') : per === 'total' ? W('這組 Orbit Pass 的 Orbit AI 次數用完了。', 'That’s all of this Orbit Pass’s Orbit AI.') : W('今天的 Orbit AI 次數用完了，明天再來。', 'That’s all of your Orbit AI for today. More tomorrow.');
+  }
   if (error === 'busy') return W('有點太快了，等幾秒再試。', 'A little fast. Try again in a few seconds.');
   if (error === 'paused') return W('AI 暫停中，稍後再試。', 'AI is paused for now. Try again later.');
   if (error === 'offline') return W('連不上網路，等一下再試。', 'You’re offline. Try again in a moment.');

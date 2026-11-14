@@ -46,10 +46,10 @@ import { handleLawAudio } from './law-audio.js';
 import { handleLawLive } from './law-live.js';
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
-import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, fullSession, stampLevels } from './eco.js';
+import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, stampLevels } from './eco.js';
+import { aiSpend, aiMay } from './ai-allow.js';
 import { checkStock } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
-import { handleGift, giftNight } from './gift.js';
 import { handleShowcasePass, showcaseOf, SHOW_PER_MIN, SHOWCASE_ORIGINS } from './showcase.js';
 import { handlePush, sendDue } from './push.js';
 import { handleWeather } from './weather.js';
@@ -1377,13 +1377,18 @@ async function route(request, env, ctx, headers, origin) {
   // A pass's level (eco.js levelOf): only a 'full' pass starts anything that
   // costs money (an AI call). Read from the account at each ask, so a phone
   // can't lift it and the admin panel's change holds at once.
-  const maySpend = session => fullSession(env, ECO_DEPS, session);
-  const notFull = () => json({ error: 'level' }, 403, headers);
+  // (Each AI call started for a person takes one of the account's Orbit AI
+  // allowance, ai-allow.js: true | 'level' (none) | 'used' (none left now).
+  // An answer already kept for everyone is free; mayAsk only looks.)
+  const spendFor = session => () => (session ? aiSpend(env, ECO_DEPS, session) : Promise.resolve('level'));
+  const mayAsk = async session => Boolean(session) && (await aiMay(env, ECO_DEPS, session)) === true;
+  const refused = why => json({ error: why }, why === 'used' ? 429 : 403, headers);
 
   // Orbit Class's AI features need a Orbit Pass session (`qt=`).
   if (path === '/gemini' || path === '/nl-edit') {
     const session = await sessionOf(request, env);
-    if (request.method === 'POST' && session && !(await maySpend(session))) return errorJson('PASS_LEVEL', 403, headers, request);
+    const why = request.method === 'POST' && session ? await spendFor(session)() : true;
+    if (why !== true) return errorJson(why === 'used' ? 'AI_USED' : 'PASS_LEVEL', why === 'used' ? 429 : 403, headers, request);
     return path === '/gemini' ? handleGeminiRequest(request, env, headers, ip, ctx, session) : handleNlEditRequest(request, env, headers, ip, ctx, session);
   }
   // One Orbit's manifest, read from its tag (orbit-manifest.js): its name and icon at Add to Home Screen.
@@ -1394,8 +1399,6 @@ async function route(request, env, ctx, headers, origin) {
   if (path === '/sports-proxy') return handleSports(request, env, ctx, headers, ip);
   // The showcase's live demos (showcase.js): a short pass for its reads, never a real Pass.
   if (path === '/showcase/pass') return handleShowcasePass(request, env, headers, { ip, origin, ctx });
-  // Passes given away in public (gift.js): the page at orbit.<domain>/key/, the owner's switch and count.
-  if (path === '/gift') return handleGift(request, env, headers, { ip, origin, ctx, deps: ECO_DEPS });
   // Orbit Sports' day of scoreboards on one request (sports-today.js): public
   // scores, so no Pass, but a page of ours or a local one (the origin, as the
   // Gemini routes'); built on demand, kept 60 s at the edge, no cron.
@@ -1420,8 +1423,12 @@ async function route(request, env, ctx, headers, origin) {
   };
   if (path === '/law-ask' || path === '/law-chat') {
     const session = await sessionOf(request, env);
-    if (session && !(await maySpend(session))) return notFull();
-    return path === '/law-ask' ? handleLawAsk(request, env, ctx, headers, session, lawGemini('law-ask'), await aiCap(env, ctx, 'law-ask')) : handleLawChat(request, env, ctx, headers, session, lawGemini('law-chat'), await aiCap(env, ctx, 'law-chat'));
+    // (問法律's every turn asks a model: taken here. A quick question may be kept: taken only when it isn't.)
+    if (path === '/law-chat' && request.method === 'POST' && session) {
+      const why = await spendFor(session)();
+      if (why !== true) return refused(why);
+    }
+    return path === '/law-ask' ? handleLawAsk(request, env, ctx, headers, session, lawGemini('law-ask'), await aiCap(env, ctx, 'law-ask'), spendFor(session)) : handleLawChat(request, env, ctx, headers, session, lawGemini('law-chat'), await aiCap(env, ctx, 'law-chat'));
   }
   // …and government pages read inside the app (law-page.js): the same Pass, gov.tw only, nothing stored.
   if (path === '/law-page') return handleLawPage(request, env, ctx, headers, await sessionOf(request, env));
@@ -1469,7 +1476,7 @@ async function route(request, env, ctx, headers, origin) {
   if (path === '/ai/open') {
     const feature = new URL(request.url).searchParams.get('f') || '';
     const session = await sessionOf(request, env);
-    return handleAiOpen(request, env, ctx, headers, { ip: ipBucket(ip), cap: OPEN[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai'), full: Boolean(session) && (await maySpend(session)) });
+    return handleAiOpen(request, env, ctx, headers, { ip: ipBucket(ip), cap: OPEN[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai'), spend: spendFor(session) });
   }
   if (path === '/ai/build') {
     let feature = '';
@@ -1486,8 +1493,8 @@ async function route(request, env, ctx, headers, origin) {
     // (The showcase's 問 Orbit: its own pass, never a Pass session's door.)
     const show = FEATURES[feature]?.app === 'showcase';
     const session = show ? await showcaseOf(request, env, { ip, origin }) : await sessionOf(request, env);
-    const full = Boolean(session) && (show || (await maySpend(session)));
-    return handleAi(request, env, ctx, headers, session, { cap: FEATURES[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai'), full });
+    const spend = show ? async () => (session ? true : 'level') : spendFor(session);
+    return handleAi(request, env, ctx, headers, session, { cap: FEATURES[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai'), spend });
   }
   // Orbit Class's 學校公告摘要 (class-news.js): a school's list read by code, worded once an hour by the AI, kept in R2.
   // Orbit News in one language: a story's own headlines and summary in the reader's, as it's opened (builders/news-tr.js).
@@ -1508,11 +1515,14 @@ async function route(request, env, ctx, headers, origin) {
   }
   if (path === '/class-news') {
     const session = await sessionOf(request, env);
-    return handleClassNews(request, env, ctx, headers, session, { cap: await aiCap(env, ctx, 'class-news'), ai: Boolean(session) && (await maySpend(session)) });
+    return handleClassNews(request, env, ctx, headers, session, { cap: await aiCap(env, ctx, 'class-news'), ai: await mayAsk(session) });
   }
   if (path === '/money-read') {
     const session = await sessionOf(request, env);
-    if (session && !(await maySpend(session))) return notFull();
+    if (session && request.method === 'POST') {
+      const why = await spendFor(session)();
+      if (why !== true) return refused(why);
+    }
     return handleMoneyRead(request, env, headers, session, lawGemini('money-read'), await aiCap(env, ctx, 'money-read'));
   }
   // The bill's guard (guard.js), as it last read the bill: armed or not,
@@ -1905,8 +1915,6 @@ async function cronTick(event, env, ctx, part) {
     run('meter', () => mirrorMeter(env, tick.getTime()), r => (r.seeded ? r : null));
     // The Pass's store kept safe each night, 04:30 Taiwan: old versions
     // thinned (doc-store.js), then the whole store copied to R2 (store-backup.js).
-    // The giveaway's (gift.js): passes never replaced back to the pool, and its empty accounts cleared if the owner turned that on, 03:50 Taiwan.
-    if (min === 50 && tick.getUTCHours() === 19) run('gift-clean', () => giftNight(env, ECO_DEPS), r => (r.back || r.cleared ? r : null));
     if (min === 30 && tick.getUTCHours() === 20) run('store-backup', async () => ({ pruned: await DOCS.prune(env), sources: await pruneSources(env, tick.getTime()).catch(e => ({ failed: String(e?.message || e).slice(0, 80) })), usage: await pruneUsage(env, tick.getTime()).catch(e => ({ failed: String(e?.message || e).slice(0, 80) })), bugs: await pruneReports(env, tick.getTime()).catch(e => ({ failed: String(e?.message || e).slice(0, 80) })), ...(await backupStore(env, DOCS, tick.getTime())) }));
     // The live refreshes by how many people there are (capacity.js), every 6 hours.
     if (min === 20 && tick.getUTCHours() % 6 === 0) run('capacity', () => capacityCron(env, ECO_DEPS));

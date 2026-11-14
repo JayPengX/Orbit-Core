@@ -10,7 +10,6 @@
 // the hosts' DNS and certificates.
 //   an app (kit/brand.mjs SHORT)  orbit.<d>/<slug>…  → orbit-<slug>
 //   Orbit-Core                    orbit.<d>/… bar the apps: / (the family's home),
-//                                 /key/ (the public giveaway, gift.js),
 //                                 /admin/ (the owner's panel),
 //                                 /app/ (Orbit, every app in one: kit/suite.mjs),
 //                                 /privacy/, /terms/ (the policy and terms),
@@ -40,9 +39,9 @@ export function siteFor(repo, domain = DOMAIN) {
   if (repo === 'Orbit-Core') {
     return {
       name: 'orbit-pass',
-      put: [['', '/Orbit-Core'], ['index.html', '/index.html'], ['key', '/key'], ['app', '/app'], ['admin', '/admin'], ['privacy', '/privacy'], ['terms', '/terms'], ['favicon.ico', '/favicon.ico'], ['icons/apple-touch-icon.png', '/apple-touch-icon.png'], ['icons/apple-touch-icon.png', '/apple-touch-icon-precomposed.png']],
+      put: [['', '/Orbit-Core'], ['index.html', '/index.html'], ['app', '/app'], ['admin', '/admin'], ['privacy', '/privacy'], ['terms', '/terms'], ['favicon.ico', '/favicon.ico'], ['icons/apple-touch-icon.png', '/apple-touch-icon.png'], ['icons/apple-touch-icon.png', '/apple-touch-icon-precomposed.png']],
       // (The root's pages only at the root: not a second copy under /Orbit-Core/.)
-      skip: ['index.html', 'key', 'app', 'admin', 'privacy', 'terms'],
+      skip: ['index.html', 'app', 'admin', 'privacy', 'terms'],
       // The whole orbit. host bar the apps' paths (theirs are more
       // specific, so they win): the root, the family page, the kit, the root
       // icons, and a 404 for anything else. The kit on the bare host too

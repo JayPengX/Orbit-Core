@@ -379,7 +379,7 @@ if (typeof document !== 'undefined') {
   document.addEventListener('pointerdown', () => root.removeAttribute('data-q-keys'), true);
 }
 
-const KEY = { refresh: 'orbit.refresh', account: 'orbit.account', wallet: 'orbit.wallet', level: 'orbit.level', aff: 'orbit.aff', dismiss: 'orbit.dismiss' };
+const KEY = { refresh: 'orbit.refresh', account: 'orbit.account', wallet: 'orbit.wallet', level: 'orbit.level', ai: 'orbit.ai', aff: 'orbit.aff', dismiss: 'orbit.dismiss' };
 // This device's localStorage, never throwing (a private window, storage
 // full or blocked): a string, or a value as JSON (`fallback` when there's
 // none or it can't be read); null (or undefined) removes the key.
@@ -438,6 +438,12 @@ function cacheWallet(account, wallet) {
 // money), '' not known yet. The Worker refuses a 'free' pass's AI whatever
 // the phone does; here it's only shown calmly: <html data-pass-level>, the
 // AI taps hidden (orbit.css), aiSays('level') for an ask turned away.
+// What's left of this account's Orbit AI, as the Worker last said (ai-allow.js aiLeft):
+// { n, per: 'day' | 'month' | 'total', left, until } (n, left null: no limit), or null for none.
+export function aiAllowance(account = storedAccount()) {
+  const saved = readJson(KEY.ai, null);
+  return account && saved?.account === account ? saved.ai || null : null;
+}
 export function passLevel(account = storedAccount()) {
   const saved = readJson(KEY.level, null);
   return saved && account && saved.account === account && ['free', 'full'].includes(saved.level) ? saved.level : '';
@@ -1970,6 +1976,9 @@ function makeSession(app, { lang, heartbeat }) {
     get level() {
       return passLevel();
     },
+    get ai() {
+      return aiAllowance();
+    },
     get pool() {
       return poolBalance(wallet);
     },
@@ -2035,6 +2044,10 @@ function makeSession(app, { lang, heartbeat }) {
       writeStore(KEY.level, JSON.stringify({ account: storedAccount(), level: data.level }));
       markLevel(data.level);
       emit('level', data.level);
+    }
+    if ('ai' in data && JSON.stringify(data.ai ?? null) !== JSON.stringify(aiAllowance())) {
+      writeStore(KEY.ai, JSON.stringify({ account: storedAccount(), ai: data.ai ?? null }));
+      emit('ai', data.ai ?? null);
     }
     if (typeof data.payload === 'string') cachePayload(app, storedAccount(), data.payload);
     if (data.active != null) setActive(Boolean(data.active), data.live || null);
@@ -2168,7 +2181,7 @@ function makeSession(app, { lang, heartbeat }) {
     // An account was signed in here: everything of it goes. (Never signed
     // in, a token asked for by a data fetch: nothing to wipe.)
     if (had) wipeDevice();
-    else for (const k of [KEY.refresh, KEY.account, KEY.wallet, KEY.level, payloadKey(app), tokenKey]) writeStore(k, null);
+    else for (const k of [KEY.refresh, KEY.account, KEY.wallet, KEY.level, KEY.ai, payloadKey(app), tokenKey]) writeStore(k, null);
     markLevel('');
     token = '';
     keptRead = ['', 0];
@@ -2622,6 +2635,8 @@ const ERR = {
   SYNC_PASSCODE_NOT_FOUND: ['找不到這組通行碼。', 'No Orbit Pass has this code.'],
   ECO_CREATE_CLOSED: ['現在不開放自己建立，請向分享 Orbit 給你的人索取。', 'Making a pass is closed for now: ask the person who shared Orbit with you.'],
   ECO_CREATE_FULL: ['今天能建立的 Orbit Pass 已經滿了，明天再試。', 'No more new passes today. Try again tomorrow.'],
+  PASS_LEVEL: ['這組 Orbit Pass 沒有 Orbit AI。', 'This Orbit Pass doesn’t include Orbit AI.'],
+  AI_USED: ['這組 Orbit Pass 的 Orbit AI 次數用完了。', 'This Orbit Pass’s Orbit AI is used up for now.'],
   ECO_PAIR_NOT_FOUND: ['這組裝置代碼無效或已過期（10 分鐘內、只能用一次）。', 'That device code isn’t valid or has expired (10 minutes, once).'],
   RATE_LIMITED: ['嘗試太多次，請稍後再試。', 'Too many tries. Please wait a little.'],
   ORBIT_FULL: ['現在人有點多，請過一兩分鐘再試。', 'Orbit is busy. Try again in a minute or two.'],
@@ -2819,6 +2834,9 @@ function signInGate(s, look = null) {
     keepOnTop(gate);
     keys?.start();
     setTimeout(() => input.focus(), 50);
+    // An invite (admin's 邀請 QR code, /app/?join):
+    // 建立 opened at once, where a pass can be made. (A device signed in never sees this screen.)
+    if (/[?&]join(?:[=&]|$)/.test(globalThis.location?.search || '')) setTimeout(() => !make.hidden && !make.disabled && make.click(), make.hidden ? 2600 : 80);
   });
 }
 
@@ -3350,7 +3368,15 @@ export function passAccount(s, { extra = null, close = () => {}, looks = () => {
 }
 // Orbit AI's allowance, a row under the account (none while there's none to show).
 function aiRows(s) {
-  return [];
+  const value = node('span', { class: 'q-cell-value num' });
+  const row = node('div', { class: 'q-cell' }, [node('span', { class: 'q-cell-icon', style: '--q-cell-tint:var(--q-indigo, #5856d6)', html: icons.ai || icons.spark }), node('span', { class: 'q-cell-text' }, [node('span', { text: 'Orbit AI' })]), value]);
+  const paint = () => {
+    value.textContent = aiLeftText(s.ai, s.lang);
+    row.hidden = !value.textContent;
+  };
+  paint();
+  s.on?.('ai', () => row.isConnected && paint());
+  return [row];
 }
 // ---- The recovery email (pass-mail.mjs, loaded when first needed) -----------------------
 
@@ -3361,6 +3387,18 @@ export const mailKit = () => (mailing ||= import('./pass-mail.mjs').catch(e => (
 // (dev passMail, the Worker's), or to remove one linked before. One block of
 // rows in 登入與安全 (pass-mail.mjs's head and sub: never shown here).
 let mailOpen = false;
+// Orbit AI left, one quiet line under the account (Jay 11-14: allowances, seen calmly);
+// nothing for a pass without Orbit AI (its taps are hidden too).
+// What's left, the row's value: 今天還有 12 次, 不限次數 (到 12/31); '' with none.
+export function aiLeftText(ai, lang = 'zh') {
+  const en = lang === 'en';
+  if (!ai || ai.n === 0) return '';
+  const when = { day: en ? 'today' : '今天', month: en ? 'this month' : '這個月', total: '' }[ai.per] ?? '';
+  const day = ai.until ? new Date(ai.until + 8 * 3_600_000).toISOString().slice(5, 10).replace('-', '/') : '';
+  const until = day ? (en ? ` (until ${day})` : `（到 ${day}）`) : '';
+  if (ai.left == null) return `${en ? 'No limit' : '不限次數'}${until}`;
+  return en ? `${ai.left} left${when ? ` ${when}` : ''}${until}` : `${when}還有 ${ai.left} 次${until}`;
+}
 function mailSlot(s, note) {
   const box = node('div', { class: 'q-mail', id: 'q-mail', hidden: true });
   const open = mailOpen;

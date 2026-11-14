@@ -605,8 +605,10 @@ const JOBS = {
 };
 
 // gemini(parts, schema) -> the upstream Response (worker.js's proxyGeminiRequest);
-// session: the request's Orbit Pass session (worker.js), or null.
-export async function handleLawAsk(request, env, ctx, headers, session, gemini, dayCap = LAW_LIMITS.perDay) {
+// session: the request's Orbit Pass session (worker.js), or null. ai(): one of
+// the account's Orbit AI allowance, taken only when the model is asked
+// (ai-allow.js aiSpend → true | 'level' | 'used'); a kept answer is anyone's.
+export async function handleLawAsk(request, env, ctx, headers, session, gemini, dayCap = LAW_LIMITS.perDay, ai = async () => true) {
   const pass = passOf(session);
   const ask = await opening(request, env, headers, { maxBody: LAW_LIMITS.maxBody, read: readAsk, who: pass });
   if (ask instanceof Response) return ask;
@@ -637,6 +639,9 @@ export async function handleLawAsk(request, env, ctx, headers, session, gemini, 
   }
 
   if (!env.GEMINI_API_KEY) return fail('setup', 503, headers);
+  if (await countOf(env, who, day) >= cap) return fail('cap', 429, headers, { left: 0 });
+  const why = await ai();
+  if (why !== true) return fail(why, why === 'used' ? 429 : 403, headers);
   const used = await spend(env, who, cap, day, dayCap);
   if (!used) return fail('cap', 429, headers, { left: 0 });
 
