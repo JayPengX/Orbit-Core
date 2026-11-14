@@ -2151,3 +2151,32 @@ export function edgeBack({ target, back, edge = 24, within = null } = {}) {
     removeEventListener('touchcancel', up);
   };
 }
+
+// ---- Grids of even rows (Jay 2026-11-14 "don't like the unbalance") ----
+// A grid of tiles (apps, icons) never ends on a lonely row: ten apps are five
+// by two, never nine and one or four, four and two. The columns: the most that
+// fit (each at least `min` px, at most `max`) that split the tiles evenly;
+// when none above half of that does, the most whose last row is at least half
+// full. docs/RULEBOOK.md.
+export function evenCols(n, fit, max = n) {
+  const top = Math.max(1, Math.min(Math.floor(fit) || 1, max, n));
+  for (let c = top; c >= Math.max(2, Math.ceil(top / 2)); c--) if (n % c === 0) return c;
+  for (let c = top; c >= 2; c--) if (n % c >= Math.ceil(c / 2)) return c;
+  return top;
+}
+// The grid's columns kept even as its width changes (a CSS grid; its gap read
+// from its style). Returns the grid.
+export function evenGrid(grid, { min = 56, max = 5 } = {}) {
+  if (!grid) return grid;
+  const fit = () => {
+    if (!grid.clientWidth) return;
+    const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
+    const c = evenCols(grid.children.length, (grid.clientWidth + gap) / (min + gap), max);
+    grid.style.gridTemplateColumns = `repeat(${c}, minmax(0, 1fr))`;
+  };
+  grid.classList.add('q-even-grid');
+  grid.style.setProperty('--q-even-max', String(max));
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fit).observe(grid);
+  if (typeof MutationObserver !== 'undefined') new MutationObserver(fit).observe(grid, { childList: true });
+  return grid;
+}

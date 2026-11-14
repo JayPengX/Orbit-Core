@@ -175,6 +175,8 @@
   .o-app { position: relative; display: grid; justify-items: center; gap: 5px; padding: 6px 0 4px; border: 0; border-radius: 14px; background: none; color: var(--q-label); font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .o-app img.o-app-icon { width: 52px; height: 52px; border-radius: 12px; transition: opacity 0.15s ease, filter 0.15s ease; }
   .o-app-name { max-width: 100%; font: 400 12px/1.2 var(--q-font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* (Five across on the narrowest phone: every name whole, kit evenGrid.) */
+  @media (max-width: 359px) { .o-apps { gap: 8px 0; } .o-app img.o-app-icon { width: 48px; height: 48px; border-radius: 11px; } .o-app-name { font-size: 11px; letter-spacing: -0.3px; } .o-check { left: calc(50% + 13px); } }
   .o-app[aria-pressed='false'] img.o-app-icon { opacity: 0.35; filter: grayscale(0.9); }
   .o-app[aria-pressed='false'] .o-app-name { color: var(--q-label-3, #8e8e93); }
   .o-check { position: absolute; top: 2px; left: calc(50% + 16px); width: 20px; height: 20px; border-radius: 50%; background: var(--q-accent, #4f46e5); box-shadow: 0 0 0 2px var(--q-surface, #fff); }
@@ -362,7 +364,7 @@
       };
       grid.append(b);
     }
-    return grid;
+    return ui.evenGrid?.(grid, { min: 52, max: 5 }) || grid;
   }
   function editApps() {
     const chosen = new Set(myApps());
@@ -413,7 +415,7 @@
         lookButtons.set(l, b);
         g.append(b);
       }
-      return [ui.h('h4', { class: 'o-sub', text: title }), g];
+      return [ui.h('h4', { class: 'o-sub', text: title }), ui.evenGrid?.(g, { min: 48, max: 6 }) || g];
     };
     const LOOKS = brand.LOOKS || [];
     looks.append(...lookGroup(W('彩色衛星', 'Coloured moons'), LOOKS.filter(l => !brand.lookApp(l) && !/-white$/.test(l))), ...lookGroup(W('白色衛星', 'White moons'), LOOKS.filter(l => /-white$/.test(l))), ...lookGroup(W('App 的圖示', 'An app’s icon'), LOOKS.filter(l => brand.lookApp(l))));

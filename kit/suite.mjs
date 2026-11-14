@@ -474,7 +474,7 @@ async function switcher() {
   const all = rest.length
     ? el('div', { class: 'q-sw-sec' }, [
         open ? head('Apps') : null,
-        el('div', { class: 'q-sw-grid' }, rest.map(id => tile(id, { now: id === app, onClick: () => (close(), id === app ? null : go(id)) })))
+        ui.evenGrid(el('div', { class: 'q-sw-grid' }, rest.map(id => tile(id, { now: id === app, onClick: () => (close(), id === app ? null : go(id)) }))), { min: 56, max: 5 })
       ])
     : null;
   // (The Orbit Pass first, Jay 11-14: its settings and signing out one tap
