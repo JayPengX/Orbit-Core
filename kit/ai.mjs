@@ -14,6 +14,7 @@
 //   askBox(ask, { lists })                a question with chips, AI's or code's own → { box, answer }
 //   aiNote(text)                          the quiet line under what AI wrote ("AI 整理，送出前可以改")
 //   aiSays(error, left)                   why an ask was turned away, in words
+//   aiTap(label, onTap, { block })        an AI action on a tap (重點摘要, 白話解釋): quiet, the mark its one colour
 //
 // Code first: an app parses what it can itself and calls these only for the rest.
 import { h, sheet, search, cell, icons } from './ui.mjs';
@@ -68,6 +69,13 @@ export function aiSays(error, left = null) {
 const mark = () => h('span', { class: 'q-ai-mark', 'aria-hidden': 'true', html: icons.ai || icons.spark });
 
 export const aiNote = (text = W('AI 整理，存之前都可以改', 'Sorted by AI: change anything before saving')) => h('p', { class: 'q-ai-note' }, [mark(), h('span', { text })]);
+
+// An AI action on a tap (重點摘要, 白話解釋): the app's own grey button with
+// Orbit AI's mark, never a filled AI colour (Jay 11-14: the purple one was
+// "disruptive and ugly"). The HTML for apps that draw strings (aiTapHtml).
+export const aiTapHtml = (label, { block = false, attrs = '' } = {}) =>
+  `<button type="button" class="q-ai-tap${block ? ' block' : ''}"${attrs ? ` ${attrs}` : ''}><span class="q-ai-mark" aria-hidden="true">${icons.ai || icons.spark}</span><span>${String(label).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])}</span></button>`;
+export const aiTap = (label, onTap, { block = false } = {}) => h('button', { type: 'button', class: `q-ai-tap${block ? ' block' : ''}`, onclick: onTap }, [mark(), h('span', { text: label })]);
 
 // A thinking line: the spark breathing beside what it's doing.
 export const aiThinking = (text = W('想一下…', 'Thinking…')) => h('div', { class: 'q-ai-think', role: 'status' }, [mark(), h('span', { text })]);

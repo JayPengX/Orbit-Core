@@ -24,3 +24,8 @@ test('ask-orbit: a question about the day is Orbit 助理’s, before any app’
   assert.equal(routeAsk('今天有什麼新聞'), 'news');
   assert.equal(routeAsk('明天要帶傘嗎'), 'weather');
 });
+
+test('ask-orbit: a command goes to the app that does it (kit act.mjs)', () => {
+  const cases = { '開始專注飛行 50 分鐘': 'orbit', '加段考倒數 11/30': 'orbit', 背十個單字: 'vocab', 追蹤湖人: 'match', 追蹤公鹿: 'match', 追蹤台積電: 'stock' };
+  for (const [q, app] of Object.entries(cases)) assert.equal(routeAsk(q), app, q);
+});
