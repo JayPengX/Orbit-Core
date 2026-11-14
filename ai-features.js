@@ -623,6 +623,8 @@ export const FEATURES = {
   // can't write, from the game's own facts only, every number one of theirs.
   'sports-recap': {
     models: ['haiku', 'luna'],
+    // (Low: made when someone opens a finished game; picking the turn still wants a little thought.)
+    effort: { haiku: 'low', luna: 'low' },
     maxIn: 6000,
     parts: ({ facts }) =>
       text(
@@ -662,7 +664,8 @@ export const FEATURES = {
   // only what the game's page doesn't show at a glance; every number one of the digest's.
   'sports-preview': {
     models: ['haiku', 'luna'],
-    effort: { luna: 'low' },
+    // (No thinking: made when someone opens a game to come, who waits for it.)
+    effort: { haiku: 'none', luna: 'low' },
     maxIn: 6100,
     parts: ({ facts }) =>
       text(
@@ -1085,8 +1088,8 @@ export const FEATURES = {
   // drop an answer that leaves a side out or brings a number of its own).
   'news-sides': {
     models: ['haiku', 'luna'],
-    // (Low: a reader waits while it's made, 11-14: 19 s at the model's own default.)
-    effort: 'low',
+    // (No thinking: a reader waits while it's made, 11-14: 19 s at the model's own default, 15 s at low.)
+    effort: { haiku: 'none', luna: 'low' },
     timeoutMs: 90_000,
     maxIn: 9000,
     parts: ({ stories }) =>
@@ -1136,7 +1139,8 @@ export const FEATURES = {
   // 禁止轉載), each number theirs.
   'news-brief': {
     models: ['haiku', 'luna'],
-    effort: 'low',
+    // (No thinking: a reader waits while it's made; 11-14 Haiku thought ~2.7k tokens, 13 s.)
+    effort: { haiku: 'none', luna: 'low' },
     timeoutMs: 60_000,
     maxIn: 16000,
     parts: ({ stories }) =>

@@ -91,3 +91,14 @@ test('a first model whose answer the checks drop: the next model answers', async
   assert.equal(r.out.points.length, 2);
   assert.equal(env.calls(), 2);
 });
+
+test('made on open, Claude answers without thinking first (13 s of thinking for a 3-point brief, 11-14)', async () => {
+  const { requestOf } = await import('../ai-other.js');
+  const { FEATURES } = await import('../ai-features.js');
+  const { effortFor } = await import('../ai.js');
+  for (const f of ['news-brief', 'news-sides', 'sports-preview']) assert.equal(effortFor(FEATURES[f], 'haiku'), 'none', f);
+  const b = JSON.parse(requestOf('claude-haiku-5-5', [{ text: 'x' }], null, {}, 'none').init.body);
+  assert.deepEqual(b.thinking, { type: 'disabled' });
+  assert.equal(b.output_config.effort, 'low');
+  assert.equal(JSON.parse(requestOf('gpt-6-luna', [{ text: 'x' }], null, {}, 'none').init.body).reasoning_effort, 'low');
+});
