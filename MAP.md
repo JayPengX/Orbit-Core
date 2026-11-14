@@ -372,8 +372,8 @@ A season is kept until the next one's first game.
 - **Passkeys** (`passkey.js`, `webauthn.js`; `kit/passkey.mjs`): any number
   per Pass, RP ID `jaypengx.com`. Sign-in, a new pass and the admin key are
   forms password managers fill. **Recovery email**: `pass-mail.js`.
-- **Devices never keep the pass:** a refresh token (60 days) and a short
-  session token (`orbit-token.js`, HMAC under `ECO_TOKEN_SECRET`).
+- **Devices never keep the pass** (a 60-day refresh and a short session
+  token, `orbit-token.js`) **nor the admin key** (a 14-day `adm` token).
 - **Ops:** login, refresh, read/patch/delete, device codes (`eco-pairs`),
   `#qh=`, sign out everywhere, rotate, merge (`eco-inbox`), share keys (`eco-shares`), admin.
 

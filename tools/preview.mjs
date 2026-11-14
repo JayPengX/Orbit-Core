@@ -902,7 +902,7 @@ if (key === 'admin') {
     docs.set(`${WALLET_COLLECTION}/${createHash('sha256').update(`PREVIEW${i}`).digest('hex')}`, { payload: JSON.stringify(w), updateTime: new Date(made).toISOString() });
   }
   const kv = new Map();
-  const env = { ECO_ADMIN_TOKEN: ADMIN_KEY, RATE_LIMIT_KV: { get: async k => kv.get(k) ?? null, put: async (k, v) => void kv.set(k, v), list: async () => ({ keys: [] }), delete: async k => void kv.delete(k) } };
+  const env = { ECO_ADMIN_TOKEN: ADMIN_KEY, ECO_TOKEN_SECRET: 'preview-token-secret', RATE_LIMIT_KV: { get: async k => kv.get(k) ?? null, put: async (k, v) => void kv.set(k, v), list: async () => ({ keys: [] }), delete: async k => void kv.delete(k) } };
   // (The bill as the guard keeps it, at the live shares of 2026-11-03, and its
   // last 7 days hour by hour: the panel's 容量. Made up, never the account's.)
   {

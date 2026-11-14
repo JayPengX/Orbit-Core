@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { handleEcoRequest, paydayEntries, poolBalance, PAY, WALLET_COLLECTION, ECO_APPS, SHARE_MS, OVERDRAFT_RATE, taipeiMonth } from '../eco.js';
 import { SESSION_MS, REFRESH_MS } from '../orbit-token.js';
+import { ADMIN_SESSION_MS } from '../eco-admin.js';
 
 function setup() {
   const store = new Map();
@@ -175,6 +176,29 @@ test('the owner\'s key: under 32 characters or wrong is FORBIDDEN', async () => 
     assert.equal(r.status, 403, token.length);
     assert.equal(r.data.error.code, 'FORBIDDEN');
   }
+});
+
+test('the panel keeps a 14-day sign-in, not the key: only the key trades for one; it ends by itself and with a new key; a session token is never the key', async () => {
+  const t = setup();
+  const key = 'o'.repeat(40);
+  const s = await t.call('POST', '', { op: 'admin', token: key, action: 'session' });
+  assert.equal(s.status, 200);
+  assert.ok(s.data.token.includes('.') && !s.data.token.includes(key));
+  assert.equal((await t.call('POST', '', { op: 'admin', token: s.data.token, action: 'wallets' })).status, 200);
+  // (a token can't make itself new ones)
+  assert.equal((await t.call('POST', '', { op: 'admin', token: s.data.token, action: 'session' })).status, 403);
+  // (a pass's own session, or one signed for something else, is no admin token)
+  const a = await newPass(t);
+  assert.equal((await t.call('POST', '', { op: 'admin', token: a.token, action: 'wallets' })).status, 403);
+  // (a new key ends it)
+  t.env.ECO_ADMIN_TOKEN = 'n'.repeat(40);
+  assert.equal((await t.call('POST', '', { op: 'admin', token: s.data.token, action: 'wallets' })).status, 403);
+  t.env.ECO_ADMIN_TOKEN = key;
+  assert.equal((await t.call('POST', '', { op: 'admin', token: s.data.token, action: 'wallets' })).status, 200);
+  // (and so does time)
+  t.advance(ADMIN_SESSION_MS);
+  assert.equal((await t.call('POST', '', { op: 'admin', token: s.data.token, action: 'wallets' })).status, 403);
+  assert.equal((await t.call('POST', '', { op: 'admin', token: key, action: 'wallets' })).status, 200);
 });
 
 test('reset (owner only): the kept apps stay, every other app\'s data goes, devices out, the opening money again', async () => {

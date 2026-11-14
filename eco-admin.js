@@ -34,7 +34,7 @@ import { govOf } from './kit/gov.mjs';
 import { listBackups, fromBackup } from './store-backup.js';
 import { PASSKEY_COLLECTION, passkeySummary, removePasskey } from './passkey.js';
 import { MAIL_COLLECTION, MAIL_CODES, mailSummary, mailIndexId } from './pass-mail.js';
-import { tokenSecret } from './orbit-token.js';
+import { tokenSecret, readToken, signToken } from './orbit-token.js';
 import { GIFT_TOOLS, mintPass } from './gift.js';
 import { readSources } from './sources.js';
 import { SOURCES } from './kit/sources.mjs';
@@ -144,14 +144,33 @@ export function tidyWallet(w, now) {
   return { wallet: { ...rest, entries, settings, ...(rest.apps ? { apps } : {}) }, gone };
 }
 
-export async function handleAdmin({ env, deps, headers, request, ip, body }) {
+// The panel's sign-in (2026-11-14): the key typed once is traded for a
+// signed `adm` token good for ADMIN_SESSION_MS, and only that is kept in the
+// browser. The key itself is never stored on orbit.<domain>, where every
+// app's script runs; a kept token copied off a phone ends by itself, and a
+// new ECO_ADMIN_TOKEN ends every one at once (each names the key it came from).
+export const ADMIN_SESSION_MS = 14 * 86_400_000;
+const keyTag = async (deps, key) => (await deps.sha256Hex(`adm:${key}`)).slice(0, 16);
+
+export async function handleAdmin({ env, deps, headers, request, ip, body, secret }) {
   const limited = await deps.rateLimitResponse(env, ip, 'eco:admin', ECO_LIMITS.admin, headers, request);
   if (limited) return limited;
-  // The owner's token: the Worker's secret ECO_ADMIN_TOKEN (set by tools/issue-passes.mjs).
+  // The owner's token: the Worker's secret ECO_ADMIN_TOKEN (set by tools/issue-passes.mjs),
+  // or the panel's `adm` token traded for it.
   const token = typeof body.token === 'string' ? body.token : '';
-  const hash = token.length >= 32 ? await deps.sha256Hex(token) : '';
-  const owner = hash && env.ECO_ADMIN_TOKEN && hash === (await deps.sha256Hex(env.ECO_ADMIN_TOKEN));
-  if (!owner) return deps.errorJson('FORBIDDEN', 403, headers, request);
+  if (!env.ECO_ADMIN_TOKEN || !token) return deps.errorJson('FORBIDDEN', 403, headers, request);
+  secret ??= await tokenSecret(env);
+  const isKey = token.length >= 32 && !token.includes('.') && (await deps.sha256Hex(token)) === (await deps.sha256Hex(env.ECO_ADMIN_TOKEN));
+  const held = !isKey && token.includes('.') ? await readToken(secret, token, 'adm', deps.now()) : null;
+  if (!isKey && !(held && held.h === (await keyTag(deps, env.ECO_ADMIN_TOKEN)))) return deps.errorJson('FORBIDDEN', 403, headers, request);
+  // The key traded for a token (only the key itself trades: a token copied
+  // away can't make itself new ones).
+  if (body.action === 'session') {
+    if (!isKey) return deps.errorJson('FORBIDDEN', 403, headers, request);
+    if (!secret) return deps.errorJson('ADMIN_NO_SESSION', 503, headers, request);
+    const e = deps.now() + ADMIN_SESSION_MS;
+    return deps.json({ token: await signToken(secret, { k: 'adm', h: await keyTag(deps, env.ECO_ADMIN_TOKEN), e }), exp: e }, 200, headers);
+  }
   // Passes to hand out: `issue` { count } makes up to 100 new ones (no one
   // signed in on them yet) and answers their codes, once.
   if (body.action === 'issue') {
