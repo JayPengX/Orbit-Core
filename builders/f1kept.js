@@ -41,17 +41,25 @@ export function f1ToKeep(events, now = Date.now()) {
 // next run). `per` 0: only counted.
 // → { sessions, kept, read, stopped? }.
 export const F1KEPT_MS = 12 * 60_000;
+export const KEPT_LIST = 'private/f1/kept-sessions.json';
 const SESSION_MS = 30_000;
 export async function runF1Kept({ store, proxy, now = Date.now(), per = Infinity, until = now + F1KEPT_MS, sleep = ms => new Promise(r => setTimeout(r, ms)), clock = Date.now }) {
   const year = new Date(now).getUTCFullYear();
   const events = (await store.json(`sports/f1/${year}.json`))?.events || [];
   const missing = [];
   const all = f1ToKeep(events, now);
+  // (Sessions found kept, listed once (KEPT_LIST): not looked for again. Each run looked for
+  // all 200 files of the season's 100 sessions, 55 s of the Runner's time three times an hour.)
+  const done = new Set((await store.json(KEPT_LIST).catch(() => null))?.done || []);
+  const found = [];
   for (const urls of all) {
+    if (done.has(urls[0])) continue;
     const todo = [];
     for (const url of urls) if (!(await store.has(`${mirrorPath(url, '')}.gz`))) todo.push(url);
     if (todo.length) missing.push(todo);
+    else found.push(urls[0]);
   }
+  if (found.length) await store.put(KEPT_LIST, { done: [...done, ...found] });
   let read = 0;
   const failed = [];
   let inRow = 0;

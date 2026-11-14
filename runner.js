@@ -114,8 +114,8 @@ export async function toRunner(request, env, fallback) {
 export const CRON_PARTS = ['main', 'slow'];
 const SLOW_JOBS = new Set(['store-backup', 'capacity', 'data-folders', 'gift-clean', 'weather-skill', 'radar']);
 export const partOf = job => (job.startsWith('build:') || SLOW_JOBS.has(job) ? 'slow' : 'main');
-export function tickRunner(event, env, ctx) {
-  for (const part of CRON_PARTS) {
+export function tickRunner(event, env, ctx, parts = CRON_PARTS) {
+  for (const part of parts) {
     const body = JSON.stringify({
       cron: event.cron,
       at: event.scheduledTime || Date.now(),

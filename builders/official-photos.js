@@ -282,14 +282,15 @@ export function pendingNames({ espn, covered, carried = {}, now = Date.now() }) 
 }
 // Looks up `names` in turn (at most `budget`): the kept list with what's found.
 // `until`: a time to stop by too (a day run's hour).
-export async function cutouts({ names, carried = {}, search = tsdbCutout, budget = 450, until = Infinity, gap = 2100, sleep = ms => new Promise(r => setTimeout(r, ms)), now = Date.now(), espn, covered }) {
+// `waitOnLimit` false: turned away (429) ends the run at once, never a minute's wait (a Worker's time is billed while it waits).
+export async function cutouts({ names, carried = {}, search = tsdbCutout, budget = 450, until = Infinity, gap = 2100, sleep = ms => new Promise(r => setTimeout(r, ms)), now = Date.now(), espn, covered, waitOnLimit = true }) {
   if (!names) names = pendingNames({ espn, covered, carried, now });
   const found = new Map((carried.players || []).map(([n, u]) => [nameKey(n), [n, u]]));
   const none = Object.fromEntries(Object.entries(carried.none || {}).filter(([, t]) => now - t < NONE_AGAIN));
   let asked = 0;
   let limited = 0;
   for (const n of names) {
-    if (asked >= budget || limited >= 2 || Date.now() > until) break;
+    if (asked >= budget || limited >= (waitOnLimit ? 2 : 1) || Date.now() > until) break;
     if (asked) await sleep(gap);
     asked++;
     try {
@@ -299,9 +300,11 @@ export async function cutouts({ names, carried = {}, search = tsdbCutout, budget
     } catch (error) {
       if (error?.status === 429) {
         limited++;
-        await sleep(60_000);
+        if (waitOnLimit) await sleep(60_000);
       }
     }
   }
-  return { players: [...found.values()], none, asked, left: names.slice(asked) };
+  // (A name turned away is still to look up.)
+  const left = limited && !waitOnLimit ? names.slice(asked - 1) : names.slice(asked);
+  return { players: [...found.values()], none, asked, left, limited };
 }

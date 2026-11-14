@@ -27,7 +27,7 @@
 //   preview  sports/previews/<YYYY-MM-DD>.json  { v, built, games: { '<league>:<id>': { points, who } } }
 //            賽前看點: up to two points before each game of today and tomorrow (builders/previews.js).
 // Lean input (Jay 11-10): code picks and trims the facts before any call.
-import { aiOnce } from '../ai.js';
+import { aiOnce, BULK_PAUSED } from '../ai.js';
 import { newsOpenAhead } from '../ai-open.js';
 import { VAGUE } from '../ai-features.js';
 import { runRecaps } from './recaps.js';
@@ -369,6 +369,9 @@ export async function runAi({ store, env, proxy, now = Date.now(), cap = async (
   const step = async (name, feature, fn) => {
     if (only && only !== name) return;
     if (Date.now() >= until) return void (out[name] = { later: true });
+    // (Paused, ai.js BULK_PAUSED: not started. Each still read its sources first, every game's
+    // ESPN pages four times an hour, for an AI call that was never made, 11-14.)
+    if (BULK_PAUSED.has(feature) && env?.AI_BULK !== 'on') return void (out[name] = { paused: true });
     try {
       out[name] = await fn(await cap(feature));
     } catch (e) {

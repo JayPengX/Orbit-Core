@@ -103,3 +103,17 @@ test('cutouts: only names no list has, kept from night to night, within the nigh
   assert.equal(again.asked, 1);
   assert.deepEqual(again.left, ['Kieran Tierney', 'Unknown Kid', 'Old None', 'Covered Star']);
 });
+
+test('the hourly cutouts: turned away, the run ends at once (no minute’s wait) and the next rests six hours', async () => {
+  const { runCutouts, CUTOUTS_REST } = await import('../builders/photos.js');
+  const files = new Map([['sports/cutouts/pending.json', { names: ['A B', 'C D'] }]]);
+  const store = { json: async k => files.get(k) ?? null, put: async (k, v) => void files.set(k, v) };
+  let waited = 0;
+  const now = Date.parse('2026-11-14T05:00Z');
+  const r = await runCutouts({ store, now, sleep: async ms => (waited += ms), search: async () => { throw Object.assign(new Error('429'), { status: 429 }); } });
+  assert.equal(r.limited, true);
+  assert.equal(waited, 0);
+  assert.deepEqual(files.get('sports/cutouts/pending.json').names, ['A B', 'C D'], 'the name turned away still to look up');
+  assert.equal(files.get('sports/cutouts/pending.json').rest, now + CUTOUTS_REST);
+  assert.equal((await runCutouts({ store, now: now + 3_600_000, search: async () => assert.fail() })).resting, true);
+});

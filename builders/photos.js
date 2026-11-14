@@ -335,12 +335,17 @@ export async function runPhotos({ store, proxy, now = Date.now(), jobs = jobsOf(
 
 // Every hour: a few cutouts looked up (TheSportsDB's free key: one every 2.1 s).
 export const CUTOUTS_PER_HOUR = 20;
+// Turned away (TheSportsDB's 429, as every run 11-14: two minutes of the Runner's time an hour
+// waiting for nothing): the run ends at once and the next waits CUTOUTS_REST.
+export const CUTOUTS_REST = 6 * 3_600_000;
 export async function runCutouts({ store, now = Date.now(), sleep, search }) {
-  const pending = (await store.json('sports/cutouts/pending.json'))?.names || [];
+  const doc = await store.json('sports/cutouts/pending.json');
+  const pending = doc?.names || [];
   if (!pending.length) return { left: 0 };
+  if (doc.rest > now) return { resting: true, left: pending.length };
   const kept = (await store.json('sports/cutouts/photos.json')) || {};
-  const got = await cutouts({ names: pending, carried: kept, budget: CUTOUTS_PER_HOUR, now, ...(sleep ? { sleep } : {}), ...(search ? { search } : {}) });
+  const got = await cutouts({ names: pending, carried: kept, budget: CUTOUTS_PER_HOUR, now, waitOnLimit: false, ...(sleep ? { sleep } : {}), ...(search ? { search } : {}) });
   await store.put('sports/cutouts/photos.json', { built: new Date(now).toISOString().slice(0, 10), players: got.players, none: got.none });
-  await store.put('sports/cutouts/pending.json', { built: new Date(now).toISOString().slice(0, 10), names: got.left });
-  return { asked: got.asked, left: got.left.length };
+  await store.put('sports/cutouts/pending.json', { built: new Date(now).toISOString().slice(0, 10), names: got.left, ...(got.limited ? { rest: now + CUTOUTS_REST } : {}) });
+  return { asked: got.asked, left: got.left.length, ...(got.limited ? { limited: true } : {}) };
 }
