@@ -179,3 +179,16 @@ test("an app held in Orbit's window gets the phone's safe area written in (a fra
   assert.equal(withInsets('bottom: max(12px, env(safe-area-inset-bottom, 0px)); top: env( safe-area-inset-top , var(--x, 4px))', ins), 'bottom: max(12px, 34px); top: 59px');
   assert.equal(withInsets('padding: 0', ins), 'padding: 0');
 });
+
+test("a held app's page stops at its ends: a drag past either is held, never a bounce that takes its tabs along", async () => {
+  const { pastEnd } = await import('../kit/suite.mjs');
+  // (dy > 0: the finger going down, towards the page's top.)
+  assert.equal(pastEnd(0, 2000, 800, 30), true);
+  assert.equal(pastEnd(0, 2000, 800, -30), false);
+  assert.equal(pastEnd(1200, 2000, 800, -30), true);
+  assert.equal(pastEnd(1199.5, 2000, 800, -30), true);
+  assert.equal(pastEnd(1000, 2000, 800, -30), false);
+  assert.equal(pastEnd(1200, 2000, 800, 30), false);
+  // (A page shorter than the screen: nowhere to go either way.)
+  assert.equal(pastEnd(0, 600, 800, -30), true);
+});
