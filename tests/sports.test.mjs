@@ -523,3 +523,12 @@ test("FotMob's team page keeps its squad's roles and ages (ESPN's MLS roster cal
     { name: 'Sam Surridge', shirt: 9, role: 'F', age: 28 }
   ]);
 });
+
+test('a crowd asking one address at once is one ask of its source', async () => {
+  const a = 'https://site.api.espn.com/apis/site/v2/sports/soccer/ita.1/scoreboard?crowd=1';
+  const before = upstreamCalls.length;
+  const answers = await Promise.all(Array.from({ length: 5 }, () => get(`https://proxy.test/sports-proxy?url=${encodeURIComponent(a)}`)));
+  assert.deepEqual(answers.map(r => r.status), [200, 200, 200, 200, 200]);
+  for (const r of answers) assert.equal((await r.json()).from, a, 'each its own whole body');
+  assert.equal(upstreamCalls.slice(before).filter(x => x === a).length, 1);
+});
