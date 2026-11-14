@@ -29,7 +29,8 @@ into absolutes; push back when a rule makes things worse.
 - 10-30 "Faster" means a substantial, measured improvement: find where the wait really goes, cut it structurally, report before/after times.
 - 10-23 Secrets stay sealed in Cloudflare/GitHub; never ask Jay to dig up keys. While he's away or quota is out: don't ask, wait for the reset and resume.
 - Questions to Jay: tap options (a decision card, with "Other"), never typed questions, never overnight; one message when everything is done. Flag anything waiting on him at once.
-- 11-06 A finished round's report is a new document written from scratch, each point led by before → after numbers; never the old one with dated sections stacked on (his recap too, 11-10).
+- 11-06 A finished round's report is a new document written from scratch, each point led by before → after numbers; never the old one with dated sections stacked on (his recap too, 11-10), never 「新」 marks.
+- Reports: a short morning brief; when everything is done, one short message of what Jay should test on his phone.
 - 11-11 Threads: resolve one as soon as its work is done and checked, rename it to its current scope, reuse an existing thread for a repeat; do related work together in one thread.
 - The coordinator posts a digest (Live / In progress / Waiting on) only when something shipped.
 - Files for Jay go into the project's shared folder by category (its `INDEX.md`), nothing loose at the top.
@@ -53,7 +54,7 @@ into absolutes; push back when a rule makes things worse.
 - Ids never change with a name (storage keys, cache names, manifests' `id`). Saved copies carry a version in their key (`fx.day.v4`), bumped when the meaning changes. A failed read is a failure, never "nothing there", and is never saved; never an older copy over a newer one.
 
 **Docs.**
-- 11-11 One structure, nothing twice, short enough to read before every task: the layout is in Orbit-Core's `CLAUDE.md`. Each fact has one home and is linked elsewhere; a doc is updated in the same push as the change that made it wrong; no handoffs, plans or logs in repos (the git log is the history).
+- 11-11 One structure, nothing twice, short enough to read before every task: the layout is in Orbit-Core's `CLAUDE.md`. Each fact has one home and is linked elsewhere; a doc is updated in the same push as the change that made it wrong; no plans or logs in repos (the git log is the history). 11-14 The one handoff is `HANDOFF.md`: how a new workspace or agent starts, what lives outside git (accounts, secrets by name, data, schedules); updated in the push that adds an account, a secret or a schedule.
 - 11-03 Orbit-Core's `MAP.md` names every part of the architecture (`tests/claude-map.test.mjs`) so nothing is built twice.
 
 ## 2. Every app (family product rules)
@@ -64,8 +65,9 @@ into absolutes; push back when a rule makes things worse.
 - Real data, no guessing: a dash, not a made-up 0; 待定 when a time isn't set. Rules on real data decide what people see, not AI. 10-21 Never invent user data (no guessed 要帶 in Class, no made-up balances).
 - Visual over text: icons, colour, pictures; no hints for the obvious, no source names or back-end notes on screen; automatic over buttons (10-21: no manual "check results" buttons). One question per tab.
 - Every Orbit app sits behind the Orbit Pass and asks for Add to Home Screen on a phone (exception: Showcase).
-- 11-12 Orbit (`/app/`, kit `suite.mjs`): every app in one home-screen app, to become the main way to use Orbit; the separate apps are always kept and stay unchanged. Never called a "portal" on screen. It feels like the separate apps (no grid of tiles): a light switcher, back and forward across apps, every cross-app feature opening in place. A separate app may suggest Orbit at a hop to another app, always declinable, never nagging (`suiteAsk`).
+- 11-12 Orbit (`/app/`, kit `suite.mjs`): every app in one home-screen app, to become the main way to use Orbit. Never called a "portal" on screen. It feels like the separate apps (no grid of tiles): tabs across apps with an animated switch, never a white flash (11-14, every case in `docs/ORBIT.md`), every cross-app feature opening in place. A separate app may suggest Orbit at a hop to another app, always declinable, never nagging (`suiteAsk`).
 - 11-14 Orbit is THE way to use the apps: the website, Showcase and every README tell people to add Orbit first, the separate apps second. A separate app shows a quiet banner recommending Orbit (at most once a day, gone by itself, 打開 Orbit, one tap 不再顯示 kept for good; kit `orbitTip`), and its add-to-home-screen page recommends Orbit first. Never inside Orbit.
+- 11-14 Many Orbits: before Add to Home Screen, an optional setup picks which apps and which icon (many to choose from); a person may add several Orbits for different purposes, single-app ones too. Setup is never required. For new people a single-app Orbit replaces the separate apps; separate apps already on a home screen keep working.
 - 11-13 Orbit keeps every app opened running: switching back never loads it again, and an app playing sound (Beats) is never closed however many apps are opened after it.
 - 11-13 Where Orbit opens: an app with something live (a trip, a rental, a bus alert, 專注飛行, Beats playing) on that screen; else, back to an Orbit the phone kept, the last app if left under an hour ago; else (and always after Orbit was closed) the app list, last app on top, every app at its start. Orbit Pass sign-in comes first.
 - 10-21 AI editors can do anything the app can do by hand. 10-21 Never blame the network for a slow AI or a failed update.
@@ -108,7 +110,7 @@ into absolutes; push back when a rule makes things worse.
 - 11-10 AI gets a small code-picked digest of what the page doesn't already show (insight, never a repeat of the card); prompts are crafted and tested (`/ops ai-try`); it asks back with tap pickers from the person's own lists where that helps; each call's cost shows in admin.
 - 11-11 An AI answer is never plain text: it is drawn (kit `aiAnswer`: rows with icons, logos, faces, bars), with a skeleton of its shape while it's made (`aiAnswerWait`). Names in its words are chips: a player with their face, a team with its logo (`.q-ai-ref`).
 - 11-11 Every smart feature, code-only ones too, carries the Orbit AI mark (kit `icons.ai`, `--q-ai`), never a sparkle.
-- 11-11 A fallback is the same class from another maker (Sonnet ↔ GPT Sol for judgement, Haiku ↔ Luna for writing, Flash only for pictures and the cheapest), each answer naming its model in admin.
+- 11-11 A fallback is the same class from another maker (Sonnet ↔ GPT Sol for judgement, Haiku ↔ Luna for writing, Flash only for pictures and the cheapest), each answer naming its model in admin. AI makers are Anthropic, OpenAI and Google only (never DeepSeek or Qwen).
 
 ## 3. Design
 
@@ -162,6 +164,7 @@ App rules: each app's `MAP.md` › Rules.
 - 10-27 Pass card: avatar, 里程碑 n/30, the account number's first 6 without prefix, the medal strip on one row; no money on the Pass.
 - 10-27 Milestones: one per app, bronze, silver and gold, kept for good; 外觀 leads with what's worn, then the nearest next medal (a faint progress ring), then one row each; no locks, greyed grid or glows.
 - 10-27 Passkeys: any number per Pass, named and removable, one for every app and the admin page (RP ID the domain); the pass and passkeys both sign in, no passkey-only mode. Every sign-in is a form password managers fill. 11-14 An account with no passkey is nudged by a brief quiet banner (加入 / 不再顯示, at most every 3 days on a device, gone in seconds; 不再顯示 kept for the account), never a dialog.
+- 11-14 Anyone may make a pass again (public sign-up), but a pass someone makes for themselves gets no AI and nothing billable, with no way around it (the server decides); only passes the admin issues get AI.
 - 10-27 The pass is stored hashed slow and peppered; no lockouts. 11-03 A pass the owner issued is replaced at its first sign-in (required, enforced by the Worker), then a passkey is offered (以後再說 skips it); passes in use are never asked.
 - 11-14 Recovery email: a Pass may link one email, proved by a code mailed to it; a lost pass is recovered by a code to it, then replaced at once. Never tells whether an address is on a Pass. A quiet tip suggests adding one (every 3 days at most, 不再顯示 for good), never on the open the passkey tip showed.
 - 11-05 Public giveaway at `/key/`, set in admin (count, open and close times, QR): opening claims nothing, one pass a device, an unused pass back to the pool after the hours set. Its empty accounts can be cleared (off until turned on; only giveaway accounts unused for the days set, with no passkey, priority, money or data; kept 30 days in history).
@@ -193,6 +196,9 @@ Gone for good, never revived: Longshot (shut down 10-31: Worker, data and secret
 | Apps on GitHub Pages, read through `orbit-site` | Each repo publishes to Cloudflare (`deploy/cf-site.mjs`) | 11-01 |
 | `jaypengx.github.io` paths, then `/<Repo>/` on the domain | `orbit.jaypengx.com/<short>`, no redirects | 10-27 |
 | Money on the Pass | Money in Securities only | 10-22 |
+| The separate apps always kept, unchanged (11-12) | New people get a single-app Orbit; installed separate apps keep working | 11-14 |
+| Orbit moves back and forward across apps (11-12) | Tabs with an animated switch (`docs/ORBIT.md`) | 11-14 |
+| No handoffs in repos (11-11) | One `HANDOFF.md` in Orbit-Core | 11-14 |
 | No forced resets for any pass | An issued pass is replaced at first sign-in | 11-03 |
 | Showcase demos frozen snapshots only | Live, read-only behind a showcase pass | 10-30 |
 | Screenshot sets lead with the latest feature asked for | Lead with the hero screen | 10-28 |
