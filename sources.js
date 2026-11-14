@@ -171,10 +171,11 @@ export async function pruneSources(env, now = Date.now()) {
 // Each source's last 7 days ({ [src]: { ok, fail, ms, lastOk, lastFail, err,
 // hours: [[hour, ok, fail]] (the last 24 h), week: { ok, fail }, sides: { side: { ok, fail, lastOk, lastFail } } } }):
 // ok/fail/ms are the last 24 hours'; lastOk/lastFail/err the week's.
-export async function readSources(env, now = Date.now()) {
+// (`days`: how far back; the alert mails read one day, mail-alerts.js.)
+export async function readSources(env, now = Date.now(), days = 7) {
   if (!env?.STORE) return {};
   await table(env.STORE);
-  const since = Math.floor((now - 7 * DAY) / HOUR);
+  const since = Math.floor((now - days * DAY) / HOUR);
   const dayAgo = Math.floor((now - DAY) / HOUR);
   const { results } = await env.STORE.prepare('SELECT src, hour, side, ok, fail, ms, last_ok, last_fail, err FROM sources WHERE hour >= ?1').bind(since).all();
   const out = {};

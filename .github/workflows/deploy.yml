@@ -36,6 +36,7 @@ jobs:
       HAS_LAW_BUILD_KEY: ${{ secrets.LAW_BUILD_KEY != '' }}
       HAS_ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
       HAS_OPENAI_KEY: ${{ secrets.OPENAI_API_KEY != '' }}
+      HAS_RESEND_KEY: ${{ secrets.RESEND_API_KEY != '' }}
     steps:
       # The account: the deploy token's own (one), so it needn't be a secret.
       - name: The account
@@ -159,6 +160,14 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # Resend's key (mail.js): the admin panel's 寫信 to anyone, not only the
+      # owner's own inbox; only when the repo has it.
+      - name: Resend's key on the proxy
+        if: ${{ env.HAS_RESEND_KEY == 'true' }}
+        run: printf '%s' "$RESEND_API_KEY" | npx --yes wrangler@4 secret put RESEND_API_KEY
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       # The owner's admin token (tools/issue-passes.mjs makes it and keeps it
       # on the owner's computer): handing out passes, /eco op 'admin'.
       - name: Owner's admin token on the eco Worker

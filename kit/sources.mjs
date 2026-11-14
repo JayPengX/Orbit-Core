@@ -132,7 +132,8 @@ export const SOURCES = [
 
   // ---- 其他 ----
   { id: 'adsb', zh: 'ADS-B 航班', group: 'other', apps: ['orbit'], feeds: '專注飛行的真實航班', hosts: ['api.adsb.lol', 'api.adsbdb.com', 'opendata.adsb.fi'], where: ['worker'] },
-  { id: 'github', zh: 'GitHub', group: 'other', apps: [], feeds: '管理頁的部署、中職備援', hosts: ['api.github.com', 'github.com'], where: ['worker'] }
+  { id: 'github', zh: 'GitHub', group: 'other', apps: [], feeds: '管理頁的部署、中職備援', hosts: ['api.github.com', 'github.com'], where: ['worker'] },
+  { id: 'resend', zh: 'Resend（寄信）', group: 'other', apps: [], feeds: '管理頁的寫信寄給別人（寄給自己走 Cloudflare）', hosts: ['api.resend.com'], where: ['worker'] }
 ];
 
 export const SOURCE_BY_ID = Object.fromEntries(SOURCES.map(s => [s.id, s]));

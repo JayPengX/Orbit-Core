@@ -50,6 +50,13 @@ service = "gemini-relay"
 binding = "LAW_SITE"
 service = "orbit-law"
 
+# Mail from the domain (mail.js): Cloudflare's own sending, to the account's
+# verified Email Routing addresses (the owner's inbox), free on Workers Free.
+# No address here (the owner's is in D1, set in the panel); mail to anyone
+# else goes through Resend (RESEND_API_KEY).
+[[send_email]]
+name = "MAIL"
+
 [vars]
 # Orbit Transit (transit.js): TDX calls a minute this Worker allows itself.
 # The owner is on a paid TDX plan (5 a second at least): 4 a second.

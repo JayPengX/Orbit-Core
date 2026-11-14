@@ -39,6 +39,9 @@ import { GIFT_TOOLS, mintPass } from './gift.js';
 import { readSources } from './sources.js';
 import { SOURCES } from './kit/sources.mjs';
 import { lawFetch, DATA as LAW_DATA } from './law.js';
+import { mailSettings, setMailSettings, sendMail, sentCounts, mailLog, addressesOf, isAddress, MAX_TO, RESEND_DAY, RESEND_MONTH } from './mail.js';
+import { alertState, gather } from './mail-alerts.js';
+import { mailRender, alertMail } from './site/admin/mail-look.mjs';
 
 // The developer settings (kit/devconfig.mjs), one document; GET /config
 // answers them to everyone (worker.js), the panel's 開發 changes them.
@@ -914,6 +917,49 @@ export const ADMIN_TOOLS = {
     const told = await tell(env, account, lang => ({ title: lang === 'en' ? 'Orbit admin: a test notice' : 'Orbit 管理：測試通知', body: lang === 'en' ? 'Bill alerts arrive here.' : '帳單警示會送到這裡。', tag: 'ops:test', kind: 'bill', url: `${SITE}/Orbit-Core/admin/` }));
     return { told };
   },
+  // ---- 郵件 (mail.js, mail-alerts.js): the alert mails' address and switches, and 寫信 ----
+  async mail({ env, deps }) {
+    const [settings, counts, log, alerts] = await Promise.all([mailSettings(env, deps), sentCounts(env, deps.now()), mailLog(env), alertState(env)]);
+    return { settings, counts: { ...counts, dayMax: RESEND_DAY, monthMax: RESEND_MONTH }, log: log.slice(0, 15), alerts, cloudflare: !!env.MAIL, resend: !!env.RESEND_API_KEY, maxTo: MAX_TO };
+  },
+  async 'mail-set'({ env, deps, body }) {
+    return setMailSettings(env, deps, body);
+  },
+  // A test alert mail to the address set (or the one typed).
+  async 'mail-test'({ env, deps, body }) {
+    const to = String(body.to || '').trim().toLowerCase() || (await mailSettings(env, deps)).to;
+    if (!isAddress(to)) return { error: 'MAIL_BAD_ADDRESS', status: 400 };
+    try {
+      return { sent: await sendMail(env, { to, ...alertMail({ test: true, issues: [{ tone: 'warn', title: '範例：Claude 的預付餘額剩 22%', detail: '約 US$1.10，照最近 7 天的速度約 9 天用完。', go: 'usage' }] }), from: { name: 'Orbit 警示', user: 'alerts' }, kind: 'test' }, { now: deps.now() }), to };
+    } catch (e) {
+      return { failed: e.why || String(e?.message || e), needsResend: !!e.needsResend, to };
+    }
+  },
+  // What the alert mails would say now (every check; nothing mailed).
+  async 'mail-check'({ env, deps }) {
+    return { issues: await gather(env, deps, ['fast', 'mid', 'slow']) };
+  },
+  // 寫信: one look (site/admin/mail-look.mjs) to each address, one mail each; `test` to the owner only.
+  async 'mail-send'({ env, deps, body }) {
+    const set = await mailSettings(env, deps);
+    const to = body.test ? [set.to].filter(Boolean) : addressesOf(body.to);
+    if (!to.length) return { error: 'MAIL_NO_TO', status: 400 };
+    if (to.length > MAX_TO) return { error: 'MAIL_TOO_MANY', status: 400 };
+    const bad = to.filter(a => !isAddress(a));
+    if (bad.length) return { error: 'MAIL_BAD_ADDRESS', status: 400, bad };
+    const m = mailRender(body);
+    if (!m.subject) return { error: 'MAIL_NO_SUBJECT', status: 400 };
+    const sent = [];
+    const failed = [];
+    for (const a of to) {
+      try {
+        sent.push({ to: a, ...(await sendMail(env, { to: a, ...m, from: { name: String(body.name || set.name || 'Orbit').slice(0, 60), user: 'hello' }, replyTo: set.to, kind: body.test ? 'try' : 'compose' }, { now: deps.now() })) });
+      } catch (e) {
+        failed.push({ to: a, why: e.why || String(e?.message || e) });
+      }
+    }
+    return { sent, failed };
+  },
   // One tiny Gemini call through the relay.
   async 'gemini-check'({ env, deps }) {
     return deps.geminiCheck ? deps.geminiCheck(env) : { ok: false, error: 'not here' };
@@ -928,11 +974,12 @@ export const ADMIN_TOOLS = {
   // counted them (sources.js), with the ages of what's built from them: the
   // cron jobs' heartbeats, R2's files, Orbit Law's nightly parts. The panel
   // puts them together with kit/sources.mjs and the usage (額度).
-  async sources({ env, deps }) {
+  // (`days`: the last days' counts, 7 unless asked; the alert mails read 1, mail-alerts.js.)
+  async sources({ env, deps, body = {} }) {
     const now = deps.now();
     const files = [...new Set(SOURCES.map(s => s.fresh?.r2).filter(Boolean))];
     const [rows, jobs, heads, law] = await Promise.all([
-      readSources(env, now).catch(e => ({ error: String(e?.message || e).slice(0, 160) })),
+      readSources(env, now, Math.min(7, Math.max(1, Number(body.days) || 7))).catch(e => ({ error: String(e?.message || e).slice(0, 160) })),
       beats(env).catch(() => []),
       Promise.all(files.map(f => (env.DATA ? env.DATA.head(f).catch(() => null) : null))),
       lawFetch(`${LAW_DATA}status.json`, { signal: AbortSignal.timeout(5000) })

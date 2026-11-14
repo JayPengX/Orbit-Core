@@ -112,7 +112,7 @@ export async function toRunner(request, env, fallback) {
 
 // The cron's side: each part woken with the tick.
 export const CRON_PARTS = ['main', 'slow'];
-const SLOW_JOBS = new Set(['store-backup', 'capacity', 'data-folders', 'gift-clean', 'weather-skill', 'radar']);
+const SLOW_JOBS = new Set(['store-backup', 'capacity', 'data-folders', 'gift-clean', 'weather-skill', 'radar', 'mail-alerts']);
 export const partOf = job => (job.startsWith('build:') || SLOW_JOBS.has(job) ? 'slow' : 'main');
 export function tickRunner(event, env, ctx, parts = CRON_PARTS) {
   for (const part of parts) {

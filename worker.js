@@ -59,6 +59,8 @@ import { MAIL_COLLECTION, mailReady } from './pass-mail.js';
 import { backupStore } from './store-backup.js';
 import { paceOf } from './pace.js';
 import { beat, tellOwner, systemReport, countFolders, FOLDERS_KEY, startFreeWatch } from './ops.js';
+import { mailAlerts, gather as alertsNow } from './mail-alerts.js';
+import { mailSettings } from './mail.js';
 import { sweepKept, keptText } from './kept-store.js';
 import { withDataFallback, sweepDataFiles } from './data-fallback.js';
 import { applyScale } from './capacity.js';
@@ -1517,6 +1519,11 @@ async function route(request, env, ctx, headers, origin) {
     if (check === 'system') return json(await systemReport(env, ECO_DEPS), 200, headers);
     // Every account standing before levels began made 'full', once (eco.js stampLevels; ?dry=1 counts).
     if (check === 'levels') return json(await stampLevels(env, { dry: new URL(request.url).searchParams.get('dry') === '1' }), 200, headers);
+    // What the alert mails would say now, and whether an address is set (never the address): mail-alerts.js.
+    if (check === 'mail-check') {
+      const set = await mailSettings(env, ECO_DEPS);
+      return json({ address: !!set.to, on: set.on, quiet: set.quiet, mail: !!env.MAIL, resend: !!env.RESEND_API_KEY, issues: await alertsNow(env, ECO_DEPS, ['fast', 'mid', 'slow']) }, 200, headers);
+    }
     // The paid makers' keys and their models' names (ai-other.js).
     if (check === 'ai-models') return json(await modelsOf(env), 200, headers);
     // 問法律's answer by each model named (?models=a,b,…; Gemini's or ai-other.js's) on the
@@ -1832,6 +1839,8 @@ async function cronTick(event, env, ctx, part) {
     if (event.cron !== ODD_CRON && min % 10 === 0) {
       if (env.GUARD && part !== 'slow') ctx.waitUntil(env.GUARD.fetch('https://quota-guard/tick').catch(() => {}));
       if (storeReady(env)) run('alerts', () => tellOwner(env, ECO_DEPS), r => (r.news ? r : null));
+      // The owner's alert mails (mail-alerts.js): what the panel would show red, mailed once.
+      if (storeReady(env)) run('mail-alerts', () => mailAlerts(env, ECO_DEPS, tick.getTime()), r => (r.mailed || r.failed ? r : null));
     }
     // Odd minutes: F1 only (above).
     if (event.cron === ODD_CRON) return;
