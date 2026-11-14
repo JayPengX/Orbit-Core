@@ -216,9 +216,10 @@ export async function aiOnce(env, ctx, name, input, cap) {
 }
 
 // POST /ai: a tap from an app.
-// (`full`: the session's pass may spend (eco.js fullSession; the showcase's
-// own pass too). A shared answer already kept is anyone's; nothing else is asked for a 'free' pass.)
-export async function handleAi(request, env, ctx, headers, session, { cap = 0, gemini = null, full = false } = {}) {
+// (`spend`: takes one of the account's Orbit AI allowance as a call starts,
+// ai-allow.js aiSpend → true | 'level' | 'used'; `full`, a test's yes to all.
+// A shared answer already kept is anyone's, and never counted.)
+export async function handleAi(request, env, ctx, headers, session, { cap = 0, gemini = null, full = false, spend = null } = {}) {
   if (request.method !== 'POST') return json({ error: 'method' }, 405, headers);
   if (!isAllowedOrigin(request.headers.get('Origin') || '')) return json({ error: 'origin' }, 403, headers);
   const text = await bodyText(request, 6_000_000);
@@ -239,11 +240,12 @@ export async function handleAi(request, env, ctx, headers, session, { cap = 0, g
   const keptKey = f.shared && (env.RATE_LIMIT_KV || env.DATA) ? `ai:kept:${name}:${(await sha256Hex(JSON.stringify(input))).slice(0, 32)}` : '';
   const kept = keptKey ? await keptRead(env, keptKey) : null;
   if (kept?.out) return json({ out: kept.out, ask: null, left: f.perPass, model: kept.model || null, kept: true }, 200, headers);
-  if (!full) return json({ error: 'level' }, 403, headers);
   // Spent before the call: the Pass's count first (a capped one adds nothing to the day's).
   const day = twDay();
   const who = `ai:${name}:${(await sha256Hex(`ai|${day}|${pass}`)).slice(0, 24)}`;
   if ((await countOf(env, who, day)) >= f.perPass) return json({ error: 'cap', left: 0 }, 429, headers);
+  const why = await (spend || (async () => (full ? true : 'level')))();
+  if (why !== true) return json({ error: why }, why === 'used' ? 429 : 403, headers);
   if (!(await spendDay(env, name, f.dayCap ? Math.min(cap, f.dayCap) : cap, day))) return json({ error: 'cap', left: 0 }, 429, headers);
   const used = await addOne(env, who, day);
   const left = Math.max(0, f.perPass - used);

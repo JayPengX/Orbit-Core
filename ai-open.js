@@ -16,7 +16,7 @@
 // on Haiku without thinking (about NT$0.01 a call), AHEAD_DAY a day each at most.
 //
 //   GET /ai/open?f=<feature>&id=<id>
-//     → { out, kept? } | { error: 'origin' | 'feature' | 'story' | 'busy' | 'cap' | 'upstream' }
+//     → { out, kept? } | { error: 'origin' | 'feature' | 'story' | 'busy' | 'cap' | 'level' | 'used' | 'upstream' }
 import { json, isAllowedOrigin } from './http.js';
 import { sessionLimited } from './orbit-token.js';
 import { keptRead, keptPut } from './kept-store.js';
@@ -140,15 +140,22 @@ export async function openMake(env, ctx, name, id, { allow = async () => true, g
   }
 }
 
-// (`full`: the asker's pass may spend (eco.js fullSession). What's kept is
-// anyone's, as it costs nothing; only a full pass has one made.)
-export async function handleAiOpen(request, env, ctx, headers, { ip = '', cap = 0, gemini = null, full = false, now = Date.now(), fetchImpl = globalThis.fetch } = {}) {
+// (`spend`: one of the asker's Orbit AI allowance taken as one is made,
+// ai-allow.js aiSpend → true | 'level' | 'used'; `full`, a test's yes to all.
+// What's kept is anyone's, as it costs nothing, and never counted.)
+export async function handleAiOpen(request, env, ctx, headers, { ip = '', cap = 0, gemini = null, full = false, spend = null, now = Date.now(), fetchImpl = globalThis.fetch } = {}) {
   if (request.method !== 'GET') return json({ error: 'method' }, 405, headers);
   if (!isAllowedOrigin(request.headers.get('Origin') || '')) return json({ error: 'origin' }, 403, headers);
   const q = new URL(request.url).searchParams;
   const name = q.get('f') || '';
   const id = String(q.get('id') || '').slice(0, 80);
-  const allow = async () => (!full ? 'level' : sessionLimited(`ai-open:${ip}`, 20) ? 'busy' : (await spendDay(env, name, cap, twDay(now))) ? true : 'cap');
+  const may = spend || (async () => (full ? true : 'level'));
+  const allow = async () => {
+    if (sessionLimited(`ai-open:${ip}`, 20)) return 'busy';
+    const why = await may();
+    if (why !== true) return why;
+    return (await spendDay(env, name, cap, twDay(now))) ? true : 'cap';
+  };
   const r = await openMake(env, ctx, name, id, { allow, gemini, now, fetchImpl });
   return r.error ? json({ error: r.error }, r.status, headers) : json(r.kept ? { out: r.out, kept: true } : { out: r.out }, 200, headers);
 }

@@ -46,14 +46,7 @@ test('the family page (site/index.html) links where the kit does: regenerate it 
   assert.deepEqual(links, Object.keys(kit.APPS).map(brand.shortPathOf).sort());
 });
 
-test('/pass and /key pick the language by one rule (kit detectLang: Chinese for a phone in any Chinese, else English)', () => {
+test('/pass picks the language by the kit’s one rule (detectLang: Chinese for a phone in any Chinese, else English)', () => {
   const rule = page => /navigator\.languages\?\.length\?navigator\.languages:\[navigator\.language\|\|'zh-TW'\];l=n\.some\(x=>\/\^zh\/i\.test\(x\)\)\?'zh':'en'/.test(page);
-  for (const f of ['../site/index.html', '../site/key/index.html']) assert.ok(rule(readFileSync(new URL(f, import.meta.url), 'utf8')), f);
-});
-
-test('/key/: the ten apps sit two to a row, icon beside name (three to a row left Securities alone on a fourth)', async () => {
-  const { readFileSync } = await import('node:fs');
-  const key = readFileSync(new URL('../site/key/index.html', import.meta.url), 'utf8');
-  assert.ok(key.includes('.apps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }'));
-  assert.match(key, /\.app \{ display: flex; align-items: center; gap: 10px; padding: 8px 10px; min-width: 0; white-space: nowrap;/);
+  assert.ok(rule(readFileSync(new URL('../site/index.html', import.meta.url), 'utf8')));
 });

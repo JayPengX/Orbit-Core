@@ -121,7 +121,7 @@ export const CRON_PARTS = ['main', 'slow'];
 // twice; 'slow' (the builders' minutes of CPU) its own, never holding a route up.
 // (A Durable Object is billed while awake: a request or alarm, then about ten seconds more.)
 export const cronObject = part => (part === 'main' ? 'route:0' : `cron:${part}`);
-const SLOW_JOBS = new Set(['store-backup', 'capacity', 'data-folders', 'gift-clean', 'weather-skill', 'radar', 'mail-alerts']);
+const SLOW_JOBS = new Set(['store-backup', 'capacity', 'data-folders', 'weather-skill', 'radar', 'mail-alerts']);
 export const partOf = job => (job.startsWith('build:') || SLOW_JOBS.has(job) ? 'slow' : 'main');
 export function tickRunner(event, env, ctx, parts = CRON_PARTS) {
   for (const part of parts) {

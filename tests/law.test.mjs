@@ -202,8 +202,8 @@ test('the count is spent only on a real call; a store that fails turns the ask a
   for (let i = 0; i < 3; i++) assert.equal((await (await ask(OK, { env, pass })).json()).left, LAW_LIMITS.perPass - 1);
   const broken = { ...envOf(), STORE: { prepare: () => ({ bind: () => ({ first: async () => { throw new Error('d1'); }, run: async () => { throw new Error('d1'); } }), run: async () => { throw new Error('d1'); } }) } };
   const before = gemini.length;
-  // (Its account unreadable, its level is too: turned away before the count, eco.js fullSession.)
-  assert.equal((await ask(OK, { env: broken })).status, 403);
+  // (Its count unreadable: turned away as used up before any model, law.js countOf.)
+  assert.equal((await ask(OK, { env: broken })).status, 429);
   assert.equal(gemini.length, before);
 });
 
@@ -386,4 +386,23 @@ test('an article explained ahead for this version is answered without Gemini, ch
 test("answers made ahead are packed: an article's by a hundred numbers, a ruling's by fifty", async () => {
   const { aiBucket } = await import('../law.js');
   assert.deepEqual(['1', '15-1', '99', '100', '1225', 's748', 's1', 'j115-7', 'j115-51'].map(aiBucket), ['0', '0', '0', '1', '12', 's14', 's0', 'j115-0', 'j115-1']);
+});
+
+test("a quick question's Orbit AI is taken only when the model is asked: kept, it's anyone's; a 基本 pass is refused before a model", async () => {
+  const { SCHEMA } = await import('../doc-store.js');
+  const db = fakeD1(SCHEMA);
+  const put = (id, level) => db.prepare('INSERT INTO docs (coll, id, payload, updated) VALUES (?1, ?2, ?3, ?4)').bind('eco-wallets', id, JSON.stringify({ v: 1, created: 1, entries: [], sec: { level } }), 'v1').run();
+  await put('fullone', 'full');
+  await put('freeone', 'free');
+  const env = { ...envOf(), STORE: db };
+  const first = await ask(OK, { env, pass: 'fullone' });
+  assert.equal(first.status, 200);
+  const before = gemini.length;
+  const kept = await ask(OK, { env, pass: 'freeone' });
+  assert.equal(kept.status, 200);
+  assert.equal((await kept.json()).cached, true);
+  const fresh = await ask({ ...OK, q: '另一個問題：輔助宣告後能做什麼？' }, { env, pass: 'freeone' });
+  assert.equal(fresh.status, 403);
+  assert.equal((await fresh.json()).error, 'level');
+  assert.equal(gemini.length, before, 'no model asked for the 基本 pass');
 });

@@ -940,7 +940,6 @@ if (key === 'admin') {
     env.DOOR = { idFromName: () => 'door', get: () => ({ fetch: (url, init) => door.fetch(new Request(url, init)) }) };
   }
   // (Made-up Gemini calls over the week, the panel's AI 今天 and Google's day: D1 over node:sqlite.)
-  // (The docs table too: 公開領取 counts its claims' accounts from it, gift.js.)
   env.STORE = (await import('../tests/fake-d1.mjs')).fakeD1((await import('../doc-store.js')).SCHEMA);
   const { logCall } = await import('../gemini-use.js');
   const usage = { promptTokenCount: 1800, cachedContentTokenCount: 400, candidatesTokenCount: 220, thoughtsTokenCount: 90 };

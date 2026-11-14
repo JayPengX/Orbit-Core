@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { handleEcoRequest, WALLET_COLLECTION } from '../eco.js';
-import { mintPass } from '../gift.js';
+import { mintPass } from '../eco.js';
 import { MAIL_COLLECTION, MAIL_CODES, MAIL_TRIES, MAIL_PER_DAY, MAIL_WAIT_MS, cleanAddr, maskAddr, accountOfMail, signupMailBegin, signupMailProve, forgetMailCounts, claimMail } from '../pass-mail.js';
 import { tokenSecret } from '../orbit-token.js';
 import { planClean } from '../eco-admin.js';

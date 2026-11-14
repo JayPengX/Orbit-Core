@@ -42,3 +42,9 @@ test('the admin page reaches the kit and pictures at their own addresses', async
   assert.doesNotMatch(page, /["'(]\.\.\//);
   assert.match(page, /"#kit\/":"\/Orbit-Core\/kit\/"/);
 });
+
+test('/key/ (the giveaway, retired 11-14) is gone: no page and no forward (Jay 11-14: no legacy forwarding)', () => {
+  const core = siteFor('Orbit-Core', 'example.tw');
+  assert.ok(!core.put.some(([from]) => from === 'key'));
+  assert.ok(!(core.redirects || []).some(r => String(r).startsWith('/key')));
+});

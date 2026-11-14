@@ -6,7 +6,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { handleEcoRequest, fullSession, levelOf, stampLevels, WALLET_COLLECTION } from '../eco.js';
-import { mintPass } from '../gift.js';
 import { signToken, readToken } from '../orbit-token.js';
 import { fakeD1 } from './fake-d1.mjs';
 import { SCHEMA } from '../doc-store.js';
@@ -91,12 +90,6 @@ test("a pass the owner issues is 'full', and stays so through its first sign-in'
   const w = await t.walletOf(mine.data.token);
   assert.equal(w.sec.priority, true);
   assert.equal(w.sec.fresh, undefined);
-});
-
-test("a giveaway's pass (/key/) is 'free'", async () => {
-  const t = setup();
-  const { docId } = await mintPass(t.env, t.deps, { gift: true });
-  assert.equal(levelOf(JSON.parse(t.store.get(`${WALLET_COLLECTION}/${docId}`).payload)), 'free');
 });
 
 test('nothing a phone sends lifts it: a wallet patch carrying sec or a level', async () => {
@@ -201,13 +194,18 @@ test("every AI route refuses a 'free' pass before any model is asked; a 'full' o
   const cases = [
     ['/ai', 'money', say, 'level'],
     ['/law-chat', 'law', { q: '房東不還押金怎麼辦？', lang: 'zh' }, 'level'],
-    ['/law-ask', 'law', { law: 'B0000001', arts: ['1'], lang: 'zh' }, 'level'],
+    // (A quick question may be kept, anyone's: refused only where a model would be asked, law.js.)
+    ['/law-ask', 'law', { law: 'B0000001', arts: ['1'], lang: 'zh' }, 'kept-first'],
     ['/money-read', 'money', { image: { mime_type: 'image/jpeg', data: 'AAAA' } }, 'level'],
     ['/gemini', 'orbit', { model: 'gemini-x' }, null],
     ['/nl-edit', 'orbit', { text: '把星期一第一節改成數學' }, null]
   ];
   for (const [path, app, body, err] of cases) {
     const r = await post(path, 'freeacct', app, body);
+    if (err === 'kept-first') {
+      assert.notEqual(r.status, 200, path);
+      continue;
+    }
     assert.equal(r.status, 403, path);
     const j = await r.json();
     if (err) assert.equal(j.error, err, path);

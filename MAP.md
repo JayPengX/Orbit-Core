@@ -192,7 +192,6 @@ w;dur=`, noted by the 除錯紀錄 when slow, and `LOCKED` (never runs as a page
 | `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |
 | `/flight` | `flight.js`, `kit/flight.mjs` | Class's 專注飛行: real planes landing in about N minutes; pool: R2 `flight/` (§5.5) |
 | `/orbit-manifest` | `orbit-manifest.js` | An Orbit's manifest, from its tag |
-| `/gift` | `gift.js` | 公開領取 at `/key/` (`site/key/`), set in admin; one a device (D1 `gift_claim`), `op: 'go'` a `#qh=` into an app; unreplaced back after `hold` hours |
 | `/showcase/pass` | `showcase.js` | The showcase's pass: demos' reads, 問 Orbit (`showcase-ask`); capped per address a day |
 | `/data/…` | `data.js` | R2, public reads (§5.5); `/data/build` (POST, Bearer `DATA_PUSH_SECRET`, `build.yml`) runs a builder now |
 | `/usage` | `usage.js` | Usage beacons, a day's counts; admin 使用 |
@@ -295,7 +294,7 @@ A read (`kit proxyJson`) goes down these until one answers:
 
 | Store | Binding | What's in it |
 | --- | --- | --- |
-| D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data and what's under way (§5.3), the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced; `gemini_call`: every AI call, each maker's day cap (`gemini-use.js`); `law_day`: the AI caps' counts a day; `gift`, `gift_claim`: the giveaway (`gift.js`); `beats`: each job's last run and failures (`ops.js`); `meter`: Google's and TDX's counts a month (`transit.js`); `push_kv`: notices' devices and lists (`push.js`); `kept`: the Worker's own (`kept-store.js`), swept 6-hourly (not KV); `data_file`: R2's files while R2 refuses (`data-fallback.js`); `sources`: outside calls by hour (`sources.js`); `usage`: counts by day, app, kind, key (`usage.js`) |
+| D1 `orbit-store` | `STORE` | `docs(coll, id, payload, updated)`: every wallet, each app's data and what's under way (§5.3), the inbox, passkeys, the config (`doc-store.js`); `history`: every version a write replaced; `gemini_call`: every AI call, each maker's day cap (`gemini-use.js`); `law_day`: the AI caps' counts a day; `ai_use`: each account's Orbit AI used (`ai-allow.js`); `gift`, `gift_claim`: the retired giveaway's, unread; `beats`: each job's last run and failures (`ops.js`); `meter`: Google's and TDX's counts a month (`transit.js`); `push_kv`: notices' devices and lists (`push.js`); `kept`: the Worker's own (`kept-store.js`), swept 6-hourly (not KV); `data_file`: R2's files while R2 refuses (`data-fallback.js`); `sources`: outside calls by hour (`sources.js`); `usage`: counts by day, app, kind, key (`usage.js`) |
 | R2 `orbit-data` | `DATA` | Public: builders' packs (`sports/`, `winprob/`, photos, `bus/`, `shape/`, `station/`, `rail/`, `tdx/`, `where.json`), proxy's kept reads (`mirror/`), radar's (`weather/`), schools' news (`class-news/`), `flight/`. Never served: `private/` (nightly backups `private/store/`, Firestore's last copy) |
 | KV | `RATE_LIMIT_KV` | Few writes (Free: 1,000 a day for the account): the guard's state, pace and alerts (`guard:*`); copies from before D1's `kept`, read until they end; the showcase's passes a day (`showcase:passes:*`); the door's state (`door:state`); `ops:data-folders` |
 | Durable Objects | `F1_LOG`, `DOOR`, `RUNNER`, `CLOCK` | `F1Log`: F1's laps; `Door`: seats and the line; `Runner` (`runner.js`): heavy routes, crons by alarm, relays past 40 outside calls or when refused; `GuardClock`: the guard's alarm |
@@ -370,8 +369,10 @@ A season is kept until the next one's first game.
 
 - **A pass** is made at sign-in, its email proved (`create-start`, `create`;
   `passNewDay`), or issued (admin;
-  replaced at first sign-in: `freshPass`, `rotate`). **Levels** (`levelOf`):
-  `free` never starts a paid call; AI routes ask `fullSession` first. Its id:
+  replaced at first sign-in: `freshPass`, `rotate`). **Levels** (`levelOf`) and
+  **Orbit AI allowances** (`ai-allow.js`): a level's rule or an account's own, a
+  day, a month or in all, until a date; 基本 needs a verified email. Taken in
+  D1 `ai_use` as a model is asked (`aiSpend`); a kept answer is free. Its id:
   PBKDF2 of the pass, peppered by `ECO_TOKEN_SECRET` (`passKey`), which
   **must never change**. Sign-ins: 30 an hour an address.
 - **Passkeys** (`passkey.js`, `webauthn.js`; `kit/passkey.mjs`): any number
@@ -437,7 +438,7 @@ Web Push and can check first (an ESPN final, a price, weather, a bus). One devic
   it is set. Each repo publishes its built site with `deploy/cf-site.mjs`
   (§4.2; `SITE_HEADERS`, `site/_headers`: no other site's frame): `orbit.<DOMAIN>/<slug>/` every app (`slug`,
   `SHORT` in `kit/brand.mjs`; one origin, so one Pass sign-in), `orbit-pass`
-  for `/`, `/key/`, `/app/` (Orbit, `kit/suite.mjs`), `/admin/` and `/Orbit-Core/` (the kit and the pictures),
+  for `/`, `/app/` (Orbit, `kit/suite.mjs`), `/admin/` and `/Orbit-Core/` (the kit and the pictures),
   each at one address, nothing forwarded,
   `orbit-home` for `<DOMAIN>/`, `/showcase/` (Orbit-Showcase).
   Mail in: privacy@ only, to the proxy (Email Routing rule). `deploy.yml`

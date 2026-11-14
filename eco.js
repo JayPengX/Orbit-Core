@@ -67,6 +67,7 @@ import { passkeyBegin, passkeyLogin, passkeyAddBegin, passkeyAdd, passkeyRemove,
 import { mailBegin, mailConfirm, mailRemove, mailRecoverBegin, mailRecover, signupMailBegin, signupMailProve, mailSummary, mailOf, pointMail, dropMailIndex, mailReady, claimMail } from './pass-mail.js';
 import { privacyDo } from './privacy-mail.js';
 import { PAY_WEEK, weekStart, mondayId, reliefCheck, reliefEntry } from './kit/pay.mjs';
+import { aiLeft } from './ai-allow.js';
 
 export const ECO_PASSCODE_LENGTH = 10;
 export const ECO_PASSCODE_PATTERN = /^[2-9A-HJ-NP-Z]{10}$/;
@@ -315,7 +316,7 @@ export function mergeWallet(a, b) {
     ...(base.passkeys ? { passkeys: base.passkeys } : {}),
     ...(base.mail ? { mail: base.mail } : {}),
     ...(base.merged ? { merged: base.merged } : {}),
-    // (A giveaway's account: when it was claimed, gift.js; the only ones ever cleared.)
+    // (A giveaway's account: when it was claimed; the giveaway, gift.js, is gone since 11-14.)
     ...(base.gift ? { gift: base.gift } : {})
   };
 }
@@ -706,9 +707,9 @@ export const priorityPass = w => Boolean(w?.sec?.priority);
 
 // ---- Levels: what a pass may spend (Jay 2026-11-14) -------------------------------
 //
-// 'free' (基本): a pass someone made for themselves (`create`, the giveaway
-// at /key/): every app, but nothing that costs money: no AI is ever asked
-// for it. 'full' (完整): a pass the owner issued in the admin panel, or set
+// 'free' (基本): a pass someone made for themselves (`create`; the old
+// giveaway's): every app, but no Orbit AI unless an allowance gives it
+// (ai-allow.js). 'full' (完整): a pass the owner issued in the admin panel, or set
 // there by hand: Orbit AI too. Kept in the wallet's `sec`, which only this
 // Worker writes (a patch, a merge or a restore from a phone never carries
 // it); anything without it is 'free'. Read from the account itself at each
@@ -820,6 +821,8 @@ async function sessionReply(env, deps, secret, result, c, now, { app, inbox = fa
     walletTime: result.updateTime,
     pool: poolBalance(result.wallet),
     level: levelOf(result.wallet),
+    // (Orbit AI left, ai-allow.js: { n, per, left, until } or null for none.)
+    ai: await aiLeft(env, deps, c.d, result.wallet),
     payload: '',
     updateTime: ''
   };
@@ -1251,6 +1254,14 @@ export async function passAccount(env, deps, passcode) {
   return (await deps.fsGet(env, WALLET_COLLECTION, old)).exists ? old : '';
 }
 
+// A pass the owner issues (admin 發 Pass, eco-admin.js issue): a new account,
+// 'full' (Orbit AI), replaced at its first sign-in (freshPass).
+export async function mintPass(env, deps, { full = true } = {}) {
+  const now = deps.now();
+  const { passcode, docId } = await newPasscode(env, deps);
+  await updateWallet(env, deps, docId, w => ({ ...w, v2: now, sec: { fresh: true, level: full ? 'full' : 'free' } }), { create: true });
+  return { passcode, docId };
+}
 export async function newPasscode(env, deps) {
   // A fresh passcode that's already taken is astronomically unlikely (32^10),
   // but checked all the same.
