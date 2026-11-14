@@ -2767,12 +2767,24 @@ function dropFromTop(dialog) {
 // typed here is no password: the field stops being one before it's sent, so
 // nothing offers to save it over the pass. Where passkeys work, a button
 // (and the keyboard's passkey suggestion) signs in with one.
-// `look` (Orbit's own sign-in page, site/app): { hero, title, lede, accent }
-// in place of the app's icon, name and colour; on a wide screen the hero
-// stands beside the form.
+// One look in every app and in Orbit (Jay 11-14: no app's own sign-in):
+// Orbit's mark with the apps circling it, "Orbit", one line, Orbit's colour;
+// on a wide screen the ring stands beside the form. `look` (an Orbit of
+// one's own, site/app): { ring: { core, apps }, title } over that.
+export const ORBIT_ACCENT = '#5e5ce6';
+const orbitMarkSrc = () => `data:image/svg+xml,${encodeURIComponent(familyMark())}`;
+// Orbit's mark (`core`, a picture's address) with `apps` circling it.
+export function orbitRing({ core = orbitMarkSrc(), apps = APP_ORDER } = {}) {
+  const spin = node('div', { class: 'q-orbit-ring-spin' });
+  apps.forEach((id, i) => {
+    const at = node('span', { class: 'q-orbit-ring-at', style: `--a:${(360 / apps.length) * i}deg` });
+    at.append(node('img', { class: 'q-orbit-ring-icon', src: `data:image/svg+xml,${encodeURIComponent(appIcon(id, { crisp: true }))}`, alt: '' }));
+    spin.append(at);
+  });
+  return node('div', { class: 'q-orbit-ring', 'aria-hidden': 'true' }, [node('img', { class: 'q-orbit-ring-core', src: core, alt: '' }), node('div', { class: 'q-orbit-ring-path' }), spin]);
+}
 function signInGate(s, look = null) {
   const en = s.lang === 'en';
-  const a = APPS[s.app];
   document.getElementById('loading')?.setAttribute('hidden', '');
   return new Promise(resolve => {
     const input = passInput(BRAND.pass, { save: 'current-password' });
@@ -2822,10 +2834,7 @@ function signInGate(s, look = null) {
       },
       [passUser(), node('label', { class: 'q-gate-label', for: input.id, text: en ? 'Your Orbit Pass or a device code' : 'Orbit Pass 或裝置代碼' }), passField(input, s.lang), error, enter]
     );
-    const lede = look?.lede || (en ? 'Sign in with your Orbit Pass: one account for every Orbit app.' : '用 Orbit Pass 登入：所有 Orbit 的 App 共用一個帳戶。');
-    const top = look?.hero
-      ? [look.hero, node('h1', { class: 'q-gate-title', text: look.title || a.name }), node('p', { class: 'q-gate-lede', text: lede })]
-      : [node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }), node('p', { class: 'q-gate-brand', text: 'ORBIT' }), node('h1', { class: 'q-gate-title', text: look?.title || a.name }), node('p', { class: 'q-gate-lede', text: lede })];
+    const top = [orbitRing(look?.ring), node('h1', { class: 'q-gate-title', text: look?.title || 'Orbit' }), node('p', { class: 'q-gate-lede', text: en ? 'Ten apps, one Orbit Pass.' : '十個 App，一個 Orbit Pass。' })];
     // A pass forgotten: a code to the recovery email (pass-mail.mjs) in the
     // form's place, where mail can be sent (dev passMail, read again shortly
     // on a device that hasn't asked yet).
@@ -2883,8 +2892,8 @@ function signInGate(s, look = null) {
       make,
       node('p', { class: 'q-gate-note', text: en ? 'Signed in on another device? There, Orbit Pass › Devices gives a code for this one.' : '已在其他裝置登入？在那裡的 Orbit Pass › 裝置取得裝置代碼，就能在這裡登入。' })
     ];
-    const box = look?.hero ? node('div', { class: 'q-gate-box q-gate-split' }, [node('div', { class: 'q-gate-side' }, top), node('div', { class: 'q-gate-main' }, rest)]) : node('div', { class: 'q-gate-box' }, [...top, ...rest]);
-    const gate = node('dialog', { class: 'q-gate', 'aria-modal': 'true', style: `--q-accent:${look?.accent || a.color}` }, [box]);
+    const box = node('div', { class: 'q-gate-box q-gate-split' }, [node('div', { class: 'q-gate-side' }, top), node('div', { class: 'q-gate-main' }, rest)]);
+    const gate = node('dialog', { class: 'q-gate', 'aria-modal': 'true', style: `--q-accent:${ORBIT_ACCENT}` }, [box]);
     document.documentElement.classList.add('q-signing-in');
     // Alone on screen: any sheet the app had open closes first.
     for (const d of document.querySelectorAll('dialog[open]')) if (!onTop.has(d)) d.close();
@@ -2912,9 +2921,9 @@ export async function signInScreen(s, look = null) {
 // skippable) where this browser can make one. Answers the sign-in reply of
 // the new pass, the app's first.
 function passScreen(s, { title, lede, body }) {
-  const gate = node('dialog', { class: 'q-gate q-fresh', 'aria-modal': 'true', style: `--q-accent:${APPS[s.app].color}` }, [
+  const gate = node('dialog', { class: 'q-gate q-fresh', 'aria-modal': 'true', style: `--q-accent:${ORBIT_ACCENT}` }, [
     node('div', { class: 'q-gate-box' }, [
-      node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
+      node('img', { class: 'q-gate-icon', src: orbitMarkSrc(), alt: '', width: '72', height: '72' }),
       node('p', { class: 'q-gate-brand', text: 'ORBIT PASS' }),
       node('h1', { class: 'q-gate-title', text: title }),
       node('p', { class: 'q-gate-lede', text: lede }),
@@ -3644,7 +3653,7 @@ export function showNewPass(s, passcode) {
       ok.disabled = typed !== tail;
       hint.textContent = typed.length === 5 && typed !== tail ? T('不對：請對照上面的通行碼。', 'That doesn’t match: check the pass above.') : '';
     });
-    const box = node('dialog', { class: 'q-gate q-newpass', style: `--q-accent:${APPS[s.app].color}` }, [
+    const box = node('dialog', { class: 'q-gate q-newpass', style: `--q-accent:${ORBIT_ACCENT}` }, [
       node('div', { class: 'q-gate-box' }, [
         node('p', { class: 'q-gate-brand', text: 'ORBIT PASS' }),
         node('h1', { class: 'q-gate-title', text: T('這是你的新通行碼', 'This is your new pass') }),

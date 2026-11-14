@@ -11,11 +11,18 @@ const between = (text, a, b) => text.slice(text.indexOf(a), text.indexOf(b, text
 test("Orbit's 登入 is the sign-in itself, never the Pass's settings (Jay 2026-11-14)", () => {
   assert.equal(typeof signInScreen, 'function');
   const sign = between(door, 'function showSignIn(', '\n  }\n');
-  assert.match(sign, /signInScreen\(session, \{ hero: orbitRing\(\)/);
+  assert.match(sign, /signInScreen\(session, \{ ring: \{ core: myIcon, apps: myApps\(\) \}/);
   // (accountSheet only for an older kit without signInScreen.)
   assert.ok(sign.indexOf('if (signInScreen)') < sign.indexOf('accountSheet('));
   // No pass is made here (eco.js ecoCreate is closed): never offered.
   assert.doesNotMatch(door, /或建立一個新的/);
+});
+
+test('one sign-in everywhere (Jay 11-14): every app and Orbit get the same screen, Orbit\'s ring and colour, never an app\'s own', () => {
+  const gate = between(kit, 'function signInGate(', '\n}\n');
+  assert.match(gate, /orbitRing\(look\?\.ring\)/);
+  assert.match(gate, /--q-accent:\$\{ORBIT_ACCENT\}/);
+  assert.doesNotMatch(gate, /favicon\.svg|APPS\[s\.app\]/);
 });
 
 test('signed out, the Pass sheet opens the sign-in instead of settings that mean nothing yet', () => {
