@@ -32,7 +32,7 @@
 
 import { BRANDS, APP_ORDER, FAMILY, pathOf, homeOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
-import { encodeSetup, startOf, mineSaved, mergeMine, MINE_KEY } from './orbit-mine.mjs';
+import { encodeSetup, startOf, newId, mineSaved, mergeMine, MINE_KEY } from './orbit-mine.mjs';
 import { API, SITE as HOME, isApi } from './domain.mjs';
 import { passkeyHere, passkeyName, deviceName, makePasskey, usePasskey, forgetPasskey, cancelled } from './passkey.mjs';
 import { icons, tile, cell, pullToRefresh, setSheetDetent, toast, h as node } from './ui.mjs';
@@ -4627,7 +4627,7 @@ export function installGate(app, lang = detectLang(), as = null) {
   // never on its own. Apps already on a home screen on their own still open
   // as they always did (isStandalone, above).
   if (!as && APPS[app] && typeof location !== 'undefined') {
-    location.replace(startOf(encodeSetup({ apps: [app] })));
+    location.replace(startOf(encodeSetup({ apps: [app], id: newId() })));
     return true;
   }
   // Installed from this page (Chrome moves the tab into the app's window

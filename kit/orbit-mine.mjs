@@ -48,29 +48,38 @@ export const defaultName = apps => (apps.length === 1 ? BRANDS[apps[0]].short : 
 // The look an Orbit is offered: a one-app Orbit wears its app's icon.
 export const defaultLook = apps => (apps.length === 1 ? `app-${apps[0]}` : DEFAULT_LOOK);
 
+// Each Orbit's own id (Jay 2026-11-14: a new Orbit opened with the apps
+// picked in another): minted on the add page, so two Orbits alike in every
+// other way never share the apps changed in one of them.
+const ID = /^[a-z0-9]{6,12}$/;
+export const newId = () => Array.from(globalThis.crypto.getRandomValues(new Uint8Array(8)), b => '0123456789abcdefghijklmnopqrstuvwxyz'[b % 36]).join('');
 // A setup made whole: every app when none is said, a name and a look.
 export function cleanSetup(s = {}) {
   const apps = cleanApps(s.apps);
   const all = apps.length ? apps : [...APP_ORDER];
-  return { name: cleanName(s.name) || defaultName(all), apps: all, look: isLook(s.look) ? s.look : defaultLook(all) };
+  const out = { name: cleanName(s.name) || defaultName(all), apps: all, look: isLook(s.look) ? s.look : defaultLook(all) };
+  if (ID.test(s.id || '')) out.id = s.id;
+  return out;
 }
 // The plain Orbit: every app, its name and first look.
 export const isPlain = s => s.apps.length === APP_ORDER.length && s.name === 'Orbit' && s.look === DEFAULT_LOOK;
 
-// A setup as its tag ('' for the plain Orbit), and back (null if it isn't one).
+// A setup as its tag ('' for the plain Orbit without an id; the plain one
+// with an id is its id alone), and back (null if it isn't one).
 export function encodeSetup(setup) {
   const s = cleanSetup(setup);
-  if (isPlain(s)) return '';
-  return b64.to(JSON.stringify({ n: s.name, a: s.apps.join('.'), l: s.look }));
+  if (isPlain(s)) return s.id ? b64.to(JSON.stringify({ i: s.id })) : '';
+  return b64.to(JSON.stringify({ n: s.name, a: s.apps.join('.'), l: s.look, ...(s.id ? { i: s.id } : {}) }));
 }
 export function decodeSetup(tag) {
   if (!tag || typeof tag !== 'string' || tag.length > 400 || !/^[A-Za-z0-9_-]+$/.test(tag)) return null;
   try {
     const x = JSON.parse(b64.from(tag));
     if (!x || typeof x !== 'object') return null;
-    const apps = cleanApps(String(x.a || '').split('.'));
+    const id = ID.test(x.i || '') ? x.i : undefined;
+    const apps = x.a == null && id ? [...APP_ORDER] : cleanApps(String(x.a || '').split('.'));
     if (!apps.length) return null;
-    return cleanSetup({ name: x.n, apps, look: x.l });
+    return cleanSetup({ name: x.n, apps, look: x.l, id });
   } catch {
     return null;
   }

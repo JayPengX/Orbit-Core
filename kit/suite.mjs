@@ -369,11 +369,8 @@ function drawTabs(H) {
   // or focus in sight from any app, a tap back to it. Jay 2026-11-14.)
   const all = H.tabs().filter(x => x.app !== app);
   const tabs = [...all.filter(x => x.live), ...all.filter(x => !x.live)];
-  // (A one-app Orbit, nothing else open: the app as it is on its own, no switcher. kit orbit-mine.mjs)
-  if (!tabs.length && appsOf().length === 1 && appsOf()[0] === app) {
-    bar?.remove();
-    return;
-  }
+  // (A one-app Orbit keeps its ⌄ alone: the way to put more apps in it,
+  // Jay 2026-11-14 "I can no longer go back and select more". kit orbit-mine.mjs)
   const max = tabs.some(x => x.live) ? TABS_MAX - 1 : TABS_MAX;
   bar ||= el('div', { class: 'q-suite', role: 'group', 'aria-label': 'Orbit' });
   bar.replaceChildren(
@@ -490,7 +487,9 @@ async function switcher() {
         el('span', { class: 'q-suite-chev', html: svg(RIGHT) })
       ])
     : null;
-  const s = ui.sheet({ title: setupOf().name || 'Orbit', cls: 'q-suite-sheet', body: [pass, hops, open, all].filter(Boolean), onClose: () => (sheetOpen = null) });
+  // (Which apps this Orbit holds, from any app in it: a one-app Orbit has no home.)
+  const edit = H?.editApps ? el('button', { class: 'q-sw-edit', type: 'button', text: W('選擇這個 Orbit 裡的 App', 'Choose the apps in this Orbit'), onclick: () => (close(), H.editApps()) }) : null;
+  const s = ui.sheet({ title: setupOf().name || 'Orbit', cls: 'q-suite-sheet', body: [pass, hops, open, all, edit].filter(Boolean), onClose: () => (sheetOpen = null) });
   sheetOpen = s;
   function close() {
     s.close?.();
@@ -752,7 +751,7 @@ function tellInsets(doc, ins) {
 }
 // onShow(id): told each app shown (the page puts it in the address); mine():
 // this Orbit's apps (kit orbit-mine.mjs), the ones a return may land on.
-export function host(box, { first = null, list = null, onShow = null, mine = null } = {}) {
+export function host(box, { first = null, list = null, onShow = null, mine = null, edit = null } = {}) {
   const frames = new Map();
   let shown = null;
   const top = document;
@@ -938,6 +937,8 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
     onShow?.(id);
   };
   const api = {
+    // Which apps are in this Orbit, chosen again (Orbit's page: its sheet).
+    editApps: edit ? () => edit() : null,
     go(id, url = null) {
       if (!BRANDS[id]) return;
       if (id !== shown) writeTrail(jump(readTrail(), id, url || null));

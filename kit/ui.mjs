@@ -2171,8 +2171,12 @@ export function evenGrid(grid, { min = 56, max = 5 } = {}) {
   const fit = () => {
     if (!grid.clientWidth) return;
     const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
-    const c = evenCols(grid.children.length, (grid.clientWidth + gap) / (min + gap), max);
-    grid.style.gridTemplateColumns = `repeat(${c}, minmax(0, 1fr))`;
+    const n = grid.children.length;
+    const room = Math.max(1, Math.min(Math.floor((grid.clientWidth + gap) / (min + gap)), max));
+    const c = evenCols(n, room, max);
+    // (One row of a few: each tile its usual width, from the start, not
+    // stretched across the row.)
+    grid.style.gridTemplateColumns = n <= c && c < room ? `repeat(${c}, calc((100% - ${gap * (room - 1)}px) / ${room}))` : `repeat(${c}, minmax(0, 1fr))`;
   };
   grid.classList.add('q-even-grid');
   grid.style.setProperty('--q-even-max', String(max));

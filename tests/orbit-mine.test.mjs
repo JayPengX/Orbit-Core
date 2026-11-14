@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, access } from 'node:fs/promises';
 import { APP_ORDER, BRANDS, LOOKS, DEFAULT_LOOK, lookApp, orbitIcon, familyMark } from '../kit/brand.mjs';
-import { encodeSetup, decodeSetup, cleanSetup, orbitManifest, lookFiles, startOf, mergeMine, defaultLook } from '../kit/orbit-mine.mjs';
+import { encodeSetup, decodeSetup, cleanSetup, orbitManifest, lookFiles, startOf, mergeMine, defaultLook, newId, appsOf } from '../kit/orbit-mine.mjs';
 import { handleOrbitManifest } from '../orbit-manifest.js';
 
 test('the plain Orbit has no tag; any other setup round-trips through its tag', () => {
@@ -84,4 +84,18 @@ test("apps changed in an Orbit: the newer of the phone's and the Pass's wins, pe
   assert.ok(r.changed);
   assert.ok(r.up.a);
   assert.equal(mergeMine({ a: { apps: ['money'], t: 1 } }, { a: { apps: ['money'], t: 1 } }).up, null);
+});
+
+test('every Orbit added has its own id, so apps changed in one never show up in another', () => {
+  const a = encodeSetup({ id: newId() }), b = encodeSetup({ id: newId() });
+  assert.notEqual(a, b);
+  assert.deepEqual(decodeSetup(a).apps, APP_ORDER);
+  assert.equal(decodeSetup(a).name, 'Orbit');
+  const saved = { '': { apps: ['money'], t: 1 } };
+  assert.deepEqual(appsOf(a, saved), APP_ORDER);
+  assert.deepEqual(appsOf(b, { ...saved, [a]: { apps: ['news'], t: 2 } }), APP_ORDER);
+  assert.notEqual(orbitManifest(a).id, orbitManifest(b).id);
+  const one = encodeSetup({ apps: ['money'], id: newId() });
+  assert.deepEqual(decodeSetup(one).apps, ['money']);
+  assert.equal(decodeSetup(one).name, 'Money');
 });
