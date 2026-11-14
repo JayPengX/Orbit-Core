@@ -724,7 +724,9 @@ export function host(box, { first = null, list = null } = {}) {
     if (y > 0) writeJson('sessionStorage', PLACE_KEY, { path: to.pathname, hash: to.hash, y, t: Date.now() });
     const el = document.createElement('iframe');
     el.className = 'q-suite-frame';
-    el.title = short(id);
+    // (Named for a screen reader, not by title: Safari and Chrome showed the
+    // title as a tooltip wherever the page under the pointer had none, Jay 11-14.)
+    el.setAttribute('aria-label', short(id));
     el.setAttribute('allow', 'autoplay; fullscreen; geolocation; microphone; camera; clipboard-read; clipboard-write; web-share; publickey-credentials-get; publickey-credentials-create; screen-wake-lock');
     el.src = to.href;
     const f = { app: id, el, used: Date.now() };

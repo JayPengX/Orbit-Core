@@ -1547,6 +1547,37 @@ dialog.q-sheet.q-full {
   color: #ffffff;
   font-size: 17px;
 }
+/* A card that's tapped as a whole (.q-press: a lead game, a score card, a
+   trip) lights under a mouse as a row does (orbit.mjs hoverLikePress), its whole a shade brighter, whatever its ground (Jay 11-14: hover "not consistent"). */
+@media (hover: hover) and (pointer: fine) {
+  .q-press:not(:disabled):hover {
+    filter: brightness(var(--q-hover-lift, 0.97));
+  }
+  :where(:root[data-theme='dark']) {
+    --q-hover-lift: 1.3;
+  }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-color-scheme: dark) {
+  :where(:root:not([data-theme='light'])) {
+    --q-hover-lift: 1.3;
+  }
+}
+/* (A show-more button is never what the page keeps in place as rows come
+   in above it: orbit.mjs holdScrollOnMore.) */
+:is(.q-more, .lw-more, [data-keep-scroll]) {
+  overflow-anchor: none;
+}
+/* (An app's own icon as the cell's: drawn on nothing, its corners its own;
+   the tint behind it showed as a coloured edge round it, Jay 11-14.) */
+.q-cell-icon:has(> img) {
+  background: none;
+  overflow: hidden;
+}
+.q-cell-icon > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 .q-cell-icon svg {
   width: 19px;
   height: 19px;
@@ -6382,6 +6413,13 @@ html.q-tabrail:not(.q-float) {
   --q-sheet-w: min(600px, calc(100vw - 32px));
   --q-sheet-full-w: min(720px, calc(100vw - 32px));
 }
+/* (A computer's sheets: wider than a phone's, Jay 11-14 "on computer you
+   don't have to limit the sheet to this phone like size"; a page-sized one,
+   .q-sheet-wide, to 1080 as on a tablet.) */
+:root.q-float.q-desk {
+  --q-sheet-w: min(720px, calc(100vw - 48px));
+  --q-sheet-full-w: min(860px, calc(100vw - 48px));
+}
 :root.q-float dialog.q-sheet {
   margin: auto;
   border-radius: var(--q-r-sheet);
@@ -7401,9 +7439,16 @@ html.q-tabrail.q-desk .q-appbar .q-actions > .q-suite {
   width: auto;
   min-width: 0;
   height: 44px;
-  overflow: hidden;
+  /* (More apps open than fit: the row slides sideways, never one cut off at an edge.) */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+html.q-tabrail.q-desk .q-appbar .q-actions > .q-suite::-webkit-scrollbar {
+  display: none;
 }
 html.q-tabrail.q-desk .q-appbar .q-actions > .q-suite .q-suite-btn {
+  flex: none;
   width: auto;
   height: 44px;
   padding: 0 6px;

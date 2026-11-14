@@ -1508,6 +1508,100 @@ function pressOnlyWhenPressed() {
 }
 pressOnlyWhenPressed();
 
+// A mouse over anything that lights when pressed lights it the same way
+// (Jay 11-14: "the mouse hovering on card light up effect is not
+// consistent"): every :active rule that only paints a background (the
+// kit's rows, an app's own), the kit's and each app's sheets alike, is
+// copied as :hover for a mouse or trackpad (a finger has no hover; a
+// pressed-only rule stays the phone's). One rule for all, so a row in
+// Sports lights as one in Money does.
+export const hoverSelector = sel =>
+  sel
+    .split(/,(?![^()]*\))/)
+    .filter(p => /:active\b/.test(p) && !/:not\([^)]*:active/.test(p) && !/:hover\b/.test(p))
+    .map(p => p.replace(/:active\b/g, ':hover').replace(/:is\(:hover, \[data-q-press\]\)/g, ':hover'))
+    .join(', ');
+function hoverLikePress() {
+  if (typeof document === 'undefined' || document.__orbitHover || typeof matchMedia === 'undefined' || !matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+  document.__orbitHover = true;
+  const done = new WeakSet();
+  const out = document.createElement('style');
+  out.id = 'q-hover';
+  let sheets = -1;
+  const walk = (rules, acc) => {
+    for (const r of rules || []) {
+      if (r.cssRules && !r.selectorText) {
+        // (@media and the like: only those that hold for this screen.)
+        if (r.media && !matchMedia(r.media.mediaText).matches) continue;
+        walk(r.cssRules, acc);
+        continue;
+      }
+      if (!r.selectorText?.includes(':active') || !r.style) continue;
+      // (Its background only, as written: a shorthand with var() reads back
+      // empty longhands. A press that also moves or recolours keeps that to the press.)
+      const decl = r.style.cssText
+        .split(/;(?![^()]*\))/)
+        .map(d => d.trim())
+        .filter(d => /^background(?:-color|-image)?\s*:/.test(d));
+      if (!decl.length) continue;
+      const sel = hoverSelector(r.selectorText);
+      if (sel) acc.push(`${sel} { ${decl.join('; ')}; }`);
+    }
+  };
+  const fix = () => {
+    if (document.styleSheets.length === sheets) return;
+    sheets = document.styleSheets.length;
+    const acc = [];
+    for (const s of document.styleSheets) {
+      if (s.ownerNode === out || done.has(s)) continue;
+      try {
+        walk(s.cssRules, acc);
+        done.add(s);
+      } catch {
+        sheets = -1;
+      }
+    }
+    if (!acc.length) return;
+    out.textContent += acc.join('\n') + '\n';
+    if (!out.isConnected) document.head.append(out);
+    sheets = document.styleSheets.length;
+  };
+  fix();
+  addEventListener('load', fix);
+  document.addEventListener('DOMContentLoaded', fix);
+  document.addEventListener('pointerover', fix, { passive: true, capture: true });
+}
+hoverLikePress();
+
+// A 再看 / 再顯示 (show more) tap leaves the page where it was: what was in
+// view stays in view and the new rows come in under it (Jay 11-14: News's
+// 再看 20 則 and Law's 再顯示 N 個會期 "jump the UI"). Every scroller round
+// the button is held for the moment its list is drawn again or its button
+// taken away (a browser's scroll anchoring kept the button in place, so the
+// rows went in above the reader; a focused button removed moved the page).
+export const MORE_SEL = '.q-more, .lw-more, [data-keep-scroll]';
+function holdScrollOnMore() {
+  if (typeof document === 'undefined' || document.__orbitMore) return;
+  document.__orbitMore = true;
+  document.addEventListener(
+    'click',
+    e => {
+      const b = e.target instanceof Element && e.target.closest(MORE_SEL);
+      if (!b || b.getAttribute('aria-expanded') === 'true') return;
+      const held = [];
+      for (let p = b.parentElement; p; p = p.parentElement) if (p.scrollHeight > p.clientHeight && p.scrollTop) held.push([p, p.scrollTop]);
+      const se = document.scrollingElement;
+      if (se && !held.some(([p]) => p === se)) held.push([se, se.scrollTop]);
+      const put = () => held.forEach(([p, top]) => p.scrollTop !== top && (p.scrollTop = top));
+      // (After the app's own handler, and once more after its next frame.)
+      queueMicrotask(put);
+      requestAnimationFrame(() => (put(), requestAnimationFrame(put)));
+    },
+    true
+  );
+}
+holdScrollOnMore();
+
 // Every switch in every app (.q-switch: the kit's builders' and the apps' own
 // HTML), one way (Jay 2026-11-03: "doesn't have the smoothness"): a tap is felt
 // (haptic), and a finger can drag the knob across: it follows the finger (the
