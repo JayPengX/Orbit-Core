@@ -209,3 +209,20 @@ test("the 進行中 tab asks its app, once, for what's under way in full", async
   assert.equal(takeFull('transit'), false);
   delete globalThis.sessionStorage;
 });
+
+test('a separate app recommends Orbit once a day at most, never after 不再顯示, opening this screen in Orbit', async () => {
+  const K = await import('../kit/orbit.mjs');
+  const now = Date.parse('2026-11-14T12:00:00Z');
+  assert.equal(K.tipDue({ now }), true);
+  assert.equal(K.tipDue({ at: String(now - 3_600_000), now }), false);
+  assert.equal(K.tipDue({ at: String(now - K.TIP_EVERY), now }), true);
+  assert.equal(K.tipDue({ never: '1', at: null, now }), false);
+  assert.equal(K.orbitTarget('/sports/#game=1'), '/app/?open=%2Fsports%2F%23game%3D1');
+  // (An iPhone's home-screen app: Orbit's page in Safari, where it can be added.)
+  assert.equal(K.orbitTarget('/law/', { iosApp: true, origin: 'https://orbit.jaypengx.com' }), 'x-safari-https://orbit.jaypengx.com/app/');
+  // (A phone adds Orbit to its home screen: its plain page, so the icon doesn't always open this app.)
+  assert.equal(K.orbitTarget('/law/', { install: true }), '/app/');
+  // Never inside Orbit, a frame, a gated page or a tool's browser.
+  const kit = readFileSync(new URL('../kit/orbit.mjs', import.meta.url), 'utf8');
+  assert.match(kit, /if \(inSuite\(\) \|\| installCovered \|\| globalThis\.navigator\?\.webdriver\) return;/);
+});

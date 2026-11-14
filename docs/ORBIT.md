@@ -37,7 +37,7 @@ Words used below:
 | 13 | More than 3 quiet tabs | The one used longest ago closes quietly. Tapped later, it opens again where it was left (a short load). Live and playing apps are never closed. |
 | 14 | A notice, link or cross-app action (今天, 問 Orbit, 去球場 …) | That app opens as a tab, on that screen. The app it came from stays a tab. |
 | 15 | The page of an app scrolled to its top or foot | It stops there. No bounce, and the app's tab bar never moves. Pull-to-refresh at the top still works. |
-| 16 | An app's own home-screen icon (a separate app) | Unchanged by Orbit. It never opens inside Orbit. |
+| 16 | An app's own home-screen icon (a separate app) | It never opens inside Orbit. At most once a day a quiet banner recommends Orbit: 打開 Orbit, or 不再顯示 (one tap, never again on that device). |
 | 17 | Loading (Orbit or an app) | Orbit's own loading screen at launch. Never a white flash, in dark mode too. |
 
 ## Where each rule lives
@@ -49,4 +49,4 @@ Words used below:
 - 9: `openSwitcher`, from the `apps` button on Transit's trip bar (`nav.mjs`).
 - 10, 11: `setLive` (from the kit session's `putNow`) and the host's 15-second redraw.
 - 15: `noBounce` and `html.q-in-suite` in `orbit.css`.
-- 16: `start()` only runs inside Orbit's window (`inSuite`).
+- 16: `start()` only runs inside Orbit's window (`inSuite`); the banner is `orbitTip` in `orbit.mjs`.

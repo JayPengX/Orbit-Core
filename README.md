@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>The engine room behind every Orbit app.</b><br>
-  <a href="https://orbit.jaypengx.com/pass/"><b>orbit.jaypengx.com</b></a> · proxy at <code>api.jaypengx.com</code>
+  <a href="https://orbit.jaypengx.com/app/"><b>Use Orbit</b></a> · <a href="https://orbit.jaypengx.com/pass/">orbit.jaypengx.com</a> · proxy at <code>api.jaypengx.com</code>
 </p>
 
 <p align="center">
@@ -21,9 +21,13 @@ The Orbit apps are static sites. Everything server-side, plus the kit and brand 
   <img src="docs/screenshots/family-3.webp" width="30%" alt="Settings that follow you">
 </p>
 
+## Use Orbit
+
+**[Orbit](https://orbit.jaypengx.com/app/)** is the way to use the family: one home-screen app with every app inside, signed in once, switching between them without reloading. Open [orbit.jaypengx.com/app](https://orbit.jaypengx.com/app/) on your phone and add it to the home screen. Each app below also works on its own, for anyone who wants just one; it suggests Orbit now and then, which one tap turns off.
+
 ## The family
 
-| App | Link | What it is |
+| App | On its own | What it is |
 | --- | --- | --- |
 | [Orbit Sports](https://github.com/JayPengX/Orbit-Sports) | [orbit.jaypengx.com/sports](https://orbit.jaypengx.com/sports/) | Every game, live |
 | [Orbit Transit](https://github.com/JayPengX/Orbit-Transit) | [orbit.jaypengx.com/transit](https://orbit.jaypengx.com/transit/) | Bus, train and bike |

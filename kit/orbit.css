@@ -2537,6 +2537,7 @@ input[type='checkbox'][switch] {
   top: calc(var(--q-top) + 8px);
   transform: translateX(-50%);
   width: min(420px, calc(var(--q-vw) - 16px));
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -2627,6 +2628,30 @@ input[type='checkbox'][switch] {
   color: var(--q-label-2);
   font-size: 20px;
   line-height: 1;
+  cursor: pointer;
+}
+
+/* Orbit recommended in a separate app (orbit.mjs orbitTip): two quiet actions under the words */
+.q-orbit-tip > div {
+  gap: 2px;
+}
+.q-orbit-tip-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin: 8px 0 0;
+}
+.q-orbit-tip .q-banner-go {
+  padding: 7px 14px;
+}
+.q-orbit-tip-never {
+  padding: 6px 2px;
+  white-space: nowrap;
+  border: 0;
+  background: none;
+  color: var(--q-label-2);
+  font: var(--q-t-subhead);
   cursor: pointer;
 }
 
@@ -3239,6 +3264,12 @@ dialog.q-moved::backdrop {
 }
 .q-gate-error:empty {
   display: none;
+}
+.q-gate-orbit {
+  margin: 0 0 4px;
+  color: var(--q-accent);
+  font: 600 14px/1.4 var(--q-font);
+  text-decoration: none;
 }
 .q-gate-note {
   margin: 4px 0 0;
