@@ -1292,8 +1292,6 @@ export function parseNominatim(list) {
     .filter(p => p.name && p.lat != null && p.lon != null);
 }
 
-// The near ones that carry the whole name first (nearest first), then
-// Google's order; each place once.
 const squash = s => String(s || '').replace(/\s+/g, '').replace(/台/g, '臺').toLowerCase();
 const distM = (a, b, c, d) => {
   const R = 6371000;
@@ -1330,19 +1328,65 @@ export function folded(list, text) {
     wholes.some(w => (i.lat != null ? distM(w.lat, w.lon, i.lat, i.lon) <= 400 : i.dist != null && w.dist != null && Math.abs(i.dist - w.dist) <= 400) && (isPart(i.types) || squash(i.name).includes(squash(w.name))));
   return list.filter(i => !partOf(i));
 }
+// How well a place's name answers the words typed, 0 to 1: the name itself
+// (立法院), the name ending in them (中華民國立法院, 國立清華大學: the
+// place, its full name), a part or branch of it (立法院群賢樓, 新竹高中214班,
+// 八方雲集竹北店), the words somewhere in it, else the
+// share of their characters and pairs of characters it holds (Google's
+// spelling of a typo: 八分雲集 → 八方雲集; but 立法委員 … 服務處 only half 立法院).
+const plain = s => squash(s).replace(/[()（）\-－·・,，、.]/g, '');
+const pairs = s => Array.from({ length: Math.max(0, s.length - 1) }, (_, i) => s.slice(i, i + 2));
+export function nameMatch(name, text) {
+  const n = plain(name);
+  const t = plain(text);
+  if (!t || !n) return 0;
+  if (n === t) return 1;
+  if (n.endsWith(t)) return 0.9;
+  if (n.startsWith(t)) return 0.75;
+  if (n.includes(t)) return 0.7;
+  const words = String(text).trim().split(/\s+/).map(plain).filter(Boolean);
+  if (words.length > 1 && words.every(w => n.includes(w))) return 0.65;
+  const chars = [...new Set(t)];
+  const c = chars.filter(x => n.includes(x)).length / chars.length;
+  const p = pairs(t);
+  const b = p.length ? p.filter(x => n.includes(x)).length / p.length : c;
+  return 0.4 * ((c + b) / 2);
+}
+// The places found, best first (Jay 2026-11-14: 立法院 listed four
+// legislators' offices near 竹北 before the Legislative Yuan; "sorting by
+// distance alone is not the best approach"): each scored by how well its
+// name answers the words (`nameMatch`), Google's own order (its sense of
+// what's known: Autocomplete's five, Text Search's twenty), less the
+// distance on a log scale (a kilometre costs little, 50 km a fair bit,
+// never all), a landmark a little more (`LANDMARK`). Every branch of a chain near you (Text Search's, Google's own
+// spelling of the name: 八分雲集 → 八方雲集) and a branch in another city
+// left out while one's near; a place and its parts folded (`folded`). 15 at most.
+export const MATCH_KM = 0.3;
+// A place people head for by name (a mall, a station, a school, a government
+// office, a park…) a little over what's in or by it: 巨城's mall before its
+// sogo's VIP room; a bus stop or a shop never.
+const LANDMARK = new Set([...WHOLE, 'government_office', 'city_hall', 'local_government_office', 'courthouse', 'school', 'secondary_school', 'primary_school', 'tourist_attraction', 'park', 'library']);
 export function nearFirst(found, near, text) {
-  const t = squash(text);
   const all = folded([...near, ...found], text);
-  const items = found.filter(i => all.includes(i));
-  near = near.filter(i => all.includes(i));
-  const close = all.filter(i => i.dist != null && i.dist <= NEAR_M).sort((a, b) => a.dist - b.dist);
-  // (A name typed whole, found near: those first among the near ones, the
-  // place called exactly that before the ones it is part of: 新竹高中 over 新竹高中214班.)
-  const whole = close.filter(i => squash(i.name).includes(t)).sort((a, b) => (squash(b.name) === t) - (squash(a.name) === t));
+  const close = all.filter(i => i.dist != null && i.dist <= NEAR_M);
   const chains = new Set(close.map(i => stem(i.name)).filter(Boolean));
-  const rest = [...items, ...near].filter(i => !(i.dist != null && i.dist > NEAR_M && chains.has(stem(i.name))));
-  const seen = new Set();
-  return [...whole, ...close, ...rest].filter(i => !seen.has(i.id) && seen.add(i.id)).slice(0, 15);
+  const keep = all.filter(i => !(i.dist != null && i.dist > NEAR_M && chains.has(stem(i.name))));
+  const known = new Map();
+  const mark = (list, n, w) => list.forEach((i, k) => known.set(i.id, Math.max(known.get(i.id) || 0, w * (1 - k / n))));
+  mark(near, 20, 0.08);
+  mark(found, 5, 0.15);
+  // (Found by both of Google's searches: a little surer.)
+  const both = new Set(found.filter(i => near.some(j => j.id === i.id)).map(i => i.id));
+  const far = i => MATCH_KM * Math.log10(1 + (i.dist ?? NEAR_M) / 1000);
+  const score = i => nameMatch(i.name, text) + (known.get(i.id) || 0) + (both.has(i.id) ? 0.05 : 0) + ((i.types || []).some(x => LANDMARK.has(x)) ? 0.15 : 0) - far(i);
+  // (Each place once: the copy with its position, Text Search's, kept.)
+  const once = new Map();
+  for (const i of keep) if (!once.has(i.id) || (once.get(i.id).lat == null && i.lat != null)) once.set(i.id, i);
+  return [...once.values()]
+    .map(i => [i, score(i)])
+    .sort(([a, x], [b, y]) => y - x || (a.dist ?? Infinity) - (b.dist ?? Infinity))
+    .map(([i]) => i)
+    .slice(0, 15);
 }
 
 async function search(env, q, { fetchFn, ctx, now, cache, by }) {
