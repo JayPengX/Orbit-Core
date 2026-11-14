@@ -18,7 +18,7 @@ import { REC_WEEKLY, REC_PREFIX } from './rec-weekly.js';
 import { doorReport, doorSet } from './door.js';
 import { systemReport, alertAccount, tell, OPS_DOC, beats } from './ops.js';
 import { passAccount, updateWallet, deleteAccount, ECO_APPS, NOW_COLLECTION, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet, levelOf, LEVELS, mintPass } from './eco.js';
-import { sendPush, dueLists } from './push.js';
+import { sendPush, dueLists, pushStore } from './push.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, TDX_BOOK, tdxPoints, tdxGuard, tdxUse, tdxPlan } from './transit.js';
 import { aiUse, callsSince } from './gemini-use.js';
 import { moneyLeft, spendOf, healthOf, PROVIDERS, MODELS } from './ai.js';
@@ -374,9 +374,9 @@ export async function planClean(env, deps) {
   const kvDeletes = pushes.filter(r => !accounts.has(r.account) || !ECO_APPS[r.app]).map(r => r.key);
   return { collections, counts, deletes, kvDeletes, tidy, retired };
 }
-const PUSH_KV = '通知訂閱（KV）';
+const PUSH_KV = '通知訂閱';
 async function dropPushes(env, keys) {
-  const kv = env.RATE_LIMIT_KV;
+  const kv = pushStore(env);
   if (!kv || !keys.length) return;
   // (A list's due time is its own key's: gone with it.)
   for (const k of keys) await kv.delete(k);
@@ -426,14 +426,25 @@ export function creditOf(wallet) {
     tax: govOf(wallet).paidTotal
   };
 }
-// Push records in KV: push:<account>:<app> ({ sub, items, last, told }).
+// The plain words for a push service's answer (sendPush's), the gone one removed.
+export async function pushTestResult(r, host, remove) {
+  const who = /apple/.test(host) ? 'Apple' : host || '推播服務';
+  if (r === 'sent') return { ok: true, result: r, state: 'sent', host, text: `${who} 已收下通知（送達與否由手機決定；若沒出現，請檢查 iPhone 的通知設定與是否開著主畫面 App）。` };
+  if (r === 'gone') {
+    await remove();
+    return { ok: false, result: r, state: 'gone', host, removed: true, text: `${who} 說這個訂閱已失效（404/410），已刪除。請在手機上重新開啟通知。` };
+  }
+  const code = /^failed (\d{3})/.exec(r)?.[1] || '';
+  return { ok: false, result: r, state: 'failed', host, status: code ? Number(code) : null, text: code ? `${who} 拒絕了（狀態碼 ${code}）。` : `送出失敗（${r}）。` };
+}
+// Push records in D1 (pushStore): push:<account>:<app> ({ sub, items, last, told }).
 async function pushRecords(env, prefix = 'push:') {
-  const kv = env.RATE_LIMIT_KV;
+  const kv = pushStore(env);
   if (!kv?.list) return [];
   const out = [];
   let cursor;
   for (let i = 0; i < 10; i++) {
-    const page = await kv.list({ prefix, cursor });
+    const page = await kv.list({ prefix, cursor, all: true });
     for (const k of page.keys) {
       const rest = k.name.slice(5);
       if (k.name === 'push:due' || rest.startsWith('prefs:')) continue;
@@ -681,7 +692,7 @@ export const ADMIN_TOOLS = {
   // Notices: who's subscribed, per app, and what's waiting to be sent.
   async pushes({ env, deps }) {
     const records = await pushRecords(env);
-    const kv = env.RATE_LIMIT_KV;
+    const kv = pushStore(env);
     const due = kv?.list ? Object.fromEntries(await dueLists(kv)) : {};
     // A subscription outlives an account removed some other way (it keeps
     // 60 days in KV): those are shown apart and 整理 takes them.
@@ -698,15 +709,27 @@ export const ADMIN_TOOLS = {
     );
     return { records: live.length, accounts: new Set(live.map(r => r.account)).size, orphans: records.length - live.length, apps, list, due: next.length, next: next[0] || null };
   },
-  // A test notice to one account's device for one app.
+  // A test notice to one account's device for one app. Answers per subscription:
+  // state 'none' (nothing saved), 'sent' (taken by the push service, Apple's
+  // web.push.apple.com for an iPhone), 'gone' (404/410: removed) or 'failed'
+  // (its status code).
   async 'push-test'({ env, deps, body }) {
     const hit = await findWallet(env, deps, body.wallet);
     if (!hit) return notFound;
     const app = String(body.app || '');
-    const record = env.RATE_LIMIT_KV ? await env.RATE_LIMIT_KV.get(`push:${hit.id}:${app}`, 'json') : null;
-    if (!record?.sub) return { error: 'ADMIN_NO_PUSH', status: 404 };
-    const r = await sendPush(env, record.sub, { title: 'Orbit 測試通知', body: '這是管理頁送出的測試通知，收到代表通知正常。', tag: `test:${deps.now()}` });
-    return { ok: r === 'sent', result: String(r) };
+    const kv = pushStore(env);
+    const key = `push:${hit.id}:${app}`;
+    const record = kv ? await kv.get(key, 'json').catch(() => null) : null;
+    if (!record?.sub) return { error: 'ADMIN_NO_PUSH', status: 404, state: 'none', text: '這個帳戶在這個 App 沒有訂閱通知。' };
+    const host = (() => {
+      try {
+        return new URL(record.sub.endpoint).host;
+      } catch {
+        return '';
+      }
+    })();
+    const r = String(await sendPush(env, record.sub, { title: 'Orbit 測試通知', body: '這是管理頁送出的測試通知，收到代表通知正常。', tag: `test:${deps.now()}` }).catch(e => `failed ${String(e?.message || e).slice(0, 120)}`));
+    return pushTestResult(r, host, async () => void (await kv.delete(key).catch(() => {})));
   },
   // An account gone for good, used or not, at its owner's request or the
   // owner's call: its wallet, every app's data, its inbox, the share keys it
@@ -731,7 +754,7 @@ export const ADMIN_TOOLS = {
         }
       }
     }
-    const kv = env.RATE_LIMIT_KV;
+    const kv = pushStore(env);
     let pushes = 0;
     if (kv) {
       const records = await pushRecords(env, `push:${hit.id}:`).catch(() => []);
@@ -805,7 +828,7 @@ export const ADMIN_TOOLS = {
     const text = String(body.body || '').trim().slice(0, 200);
     const app = String(body.app || 'all');
     if (!title || !text) return { error: 'ADMIN_BAD_NOTICE', status: 400 };
-    const kv = env.RATE_LIMIT_KV;
+    const kv = pushStore(env);
     if (!kv) return { error: 'ADMIN_NO_PUSH', status: 404 };
     const records = (await pushRecords(env)).filter(r => app === 'all' || r.app === app).slice(0, 500);
     const out = { sent: 0, failed: 0, gone: 0 };

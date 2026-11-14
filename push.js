@@ -272,11 +272,16 @@ export function pushStore(env) {
       await ready();
       await db.prepare('DELETE FROM push_kv WHERE key = ?1').bind(key).run();
     },
-    // (Only lists with a notice due: all dueLists reads.)
-    async list() {
+    // (Only lists with a notice due, all dueLists reads; `all` with a
+    // `prefix`: every key under it, what the admin page reads.)
+    async list(o = {}) {
       await ready();
       const now = Date.now();
       await db.prepare('DELETE FROM push_kv WHERE expires > 0 AND expires < ?1').bind(now).run();
+      if (o.all) {
+        const { results: rows } = await db.prepare('SELECT key, due FROM push_kv WHERE substr(key, 1, length(?1)) = ?1').bind(String(o.prefix || 'push:')).all();
+        return { keys: (rows || []).map(r => ({ name: r.key, metadata: { due: r.due } })), list_complete: true };
+      }
       const { results } = await db.prepare("SELECT key, due FROM push_kv WHERE due > 0 AND key LIKE 'push:%'").all();
       return { keys: (results || []).map(r => ({ name: r.key, metadata: { due: r.due } })), list_complete: true };
     }
