@@ -1,0 +1,63 @@
+From c82222c034f39054b18be4f8d3b75d68d7d97db2 Mon Sep 17 00:00:00 2001
+From: orbit-agent <actions@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 16:16:32 +0000
+Subject: [PATCH] Money without AI: AI-only rows and boxes close up
+ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---
+ public/views/calendar.mjs | 4 ++--
+ public/views/entry.mjs    | 2 +-
+ public/views/more.mjs     | 2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/public/views/calendar.mjs b/public/views/calendar.mjs
+index 72073c5..e08130f 100644
+--- a/public/views/calendar.mjs
++++ b/public/views/calendar.mjs
+@@ -191,7 +191,7 @@ function reviewCard(b, now) {
+   const tipBox = h('div', { class: 'mn-review-tip', 'aria-live': 'polite' });
+   const saved = kept(REVIEW(ym));
+   // (The AI writes the figures as given, 12169: shown as the app writes money, 12,169.)
+-  const showTip = tip => tipBox.replaceChildren(h('span', { class: 'q-ai-mark', 'aria-hidden': 'true', html: icons.ai || icons.spark || '' }), h('span', { text: tip.replace(/\d{4,}/g, n => (/^(19|20)\d\d$/.test(n) ? n : Number(n).toLocaleString('en-US'))) }));
++  const showTip = tip => (tipBox.removeAttribute('data-ai-only'), tipBox).replaceChildren(h('span', { class: 'q-ai-mark', 'aria-hidden': 'true', html: icons.ai || icons.spark || '' }), h('span', { text: tip.replace(/\d{4,}/g, n => (/^(19|20)\d\d$/.test(n) ? n : Number(n).toLocaleString('en-US'))) }));
+   // (The AI's tip on a tap (Jay 11-14: "make AI feature like this a button to click like we do in
+   // orbit law, never spend a penny on AI on things user didn't interact with"), kept on the phone after.)
+   const ask = () => {
+@@ -209,7 +209,7 @@ function reviewCard(b, now) {
+       .catch(() => ((askingTip = ''), tipButton(W('AI 現在沒有回應，再試一次。', 'AI didn’t answer. Try again.'))));
+   };
+   const tipButton = (note = '') =>
+-    tipBox.replaceChildren(
++    (tipBox.setAttribute('data-ai-only', ''), tipBox).replaceChildren(
+       ...[
+         h('button', { type: 'button', class: 'q-ai-tap', onclick: ask }, [h('span', { class: 'q-ai-mark', 'aria-hidden': 'true', html: icons.ai || icons.spark || '' }), h('span', { text: W('這個月怎麼調整', 'What to change this month') })]),
+         note ? h('small', { class: 'mn-review-note', text: note }) : null
+diff --git a/public/views/entry.mjs b/public/views/entry.mjs
+index 1bd20ae..97ddcfe 100644
+--- a/public/views/entry.mjs
++++ b/public/views/entry.mjs
+@@ -626,7 +626,7 @@ export function openEntry({ entry = null, day = today(), kind = '', inv = null,
+     : // (A new one: 拍照 where the delete would be; the picture's read opens this sheet again, filled in.)
+       // (And 用說的記帳 beside it, Jay 11-10: say it, the sheet's entries come back filled in.)
+       h('span', { class: 'mn-leads' }, [
+-        h('button', { class: 'q-close mn-snap', type: 'button', 'aria-label': W('拍照記帳', 'From a photo'), html: icons.camera, onclick: () => snap({ picked: () => ((handled = true), s.close()) }) }),
++        h('button', { class: 'q-close mn-snap', type: 'button', 'data-ai-tap': '', 'aria-label': W('拍照記帳', 'From a photo'), html: icons.camera, onclick: () => snap({ picked: () => ((handled = true), s.close()) }) }),
+         h('button', { class: 'q-close mn-say-btn', type: 'button', 'aria-label': W('用說的記帳', 'Say what you spent'), html: icons.ai || icons.spark, onclick: () => (((handled = true), s.close()), openSay()) })
+       ]);
+   const s = sheet({
+diff --git a/public/views/more.mjs b/public/views/more.mjs
+index e49c790..261e3eb 100644
+--- a/public/views/more.mjs
++++ b/public/views/more.mjs
+@@ -21,7 +21,7 @@ import { openBudgets } from './stats.mjs';
+ export function renderMore(box) {
+   // 拍照記帳 first, as a row of its own with what it reads (Jay 10-31: the
+   // gold button with a caption under it floated; "ugly").
+-  const snapRow = h('button', { class: 'q-ritem chevron mn-tool mn-snaprow', type: 'button', onclick: () => snap() }, [
++  const snapRow = h('button', { class: 'q-ritem chevron mn-tool mn-snaprow', type: 'button', 'data-ai-tap': '', onclick: () => snap() }, [
+     tile(glyph('camera'), 'var(--q-accent)'),
+     h('span', { class: 'q-ritem-text' }, [h('span', { class: 'q-ritem-title', text: W('拍照記帳', 'Add from a photo') }), h('small', { text: W('收據、帳單、截圖，AI 幫你填好', 'AI reads receipts and bills') })])
+   ]);
+-- 
+2.56.1
+

@@ -1,0 +1,40 @@
+From 8c431d34b98852a69a53026cedc580d14a947ddb Mon Sep 17 00:00:00 2001
+From: orbit-agent <actions@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 16:16:32 +0000
+Subject: [PATCH] Sports without AI: AI-only rows and boxes close up
+ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---
+ public/app.js    | 2 +-
+ public/sheets.js | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/public/app.js b/public/app.js
+index 42c3add..93ad521 100644
+--- a/public/app.js
++++ b/public/app.js
+@@ -4322,7 +4322,7 @@ function askSource() {
+ // 問比賽's way in: the Orbit AI mark, a question to start from.
+ // (ask.js and the kit's AI read on the tap, not with the first screen.)
+ const askRow = () =>
+-  el('div', { class: 'q-rowcard ask-card' }, [
++  el('div', { class: 'q-rowcard ask-card', 'data-ai-only': '' }, [
+     el('button', { class: 'q-ritem chevron ask-row', type: 'button', 'data-ai-tap': '', onclick: () => import('./ask.js').then(m => m.openAsk(askSource())).catch(() => {}) }, [
+       el('span', { class: 'q-tile ask-tile', 'aria-hidden': 'true', html: kitUI.icons?.ai || icon('spark') }),
+       el('span', { class: 'q-ritem-text' }, [el('span', { class: 'q-ritem-title', text: L({ zh: '問比賽', en: 'Ask about your teams' }) }), el('small', { text: L({ zh: '例如「我的球隊排第幾」', en: '“When do my teams play next?”' }) })])
+diff --git a/public/sheets.js b/public/sheets.js
+index 9f0fea7..2a7f27d 100644
+--- a/public/sheets.js
++++ b/public/sheets.js
+@@ -1025,7 +1025,7 @@ const madeOnTap = (f, key) => workerJson('/ai/open', `f=${f}&id=${encodeURICompo
+ // The AI button in a part's place: a tap makes it (`make` → a node, or { error }), its
+ // spark breathing meanwhile; a failure says why under the button.
+ function aiAsk(label, make) {
+-  const box = el('div', { class: 'ai-ask' });
++  const box = el('div', { class: 'ai-ask', 'data-ai-only': '' });
+   const button = (note = '') => box.replaceChildren(...[aiTap(label, go), note ? el('small', { class: 'ai-ask-note', text: note }) : null].filter(Boolean));
+   async function go() {
+     box.replaceChildren(el('div', { class: 'q-ai-think', role: 'status' }, [el('span', { class: 'q-ai-mark', 'aria-hidden': 'true', html: kitUI.icons?.ai || '' }), el('span', { text: L() === 'en' ? 'Thinking…' : '想一下…' })]));
+-- 
+2.56.1
+

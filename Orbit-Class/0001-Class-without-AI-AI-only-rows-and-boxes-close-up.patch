@@ -1,0 +1,47 @@
+From 6fc393147c212e9766a0ed2aec7b05543f2ca84d Mon Sep 17 00:00:00 2001
+From: orbit-agent <actions@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 16:16:32 +0000
+Subject: [PATCH] Class without AI: AI-only rows and boxes close up
+ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---
+ index.html   | 2 +-
+ src/tools.js | 4 +++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/index.html b/index.html
+index a65570b..36fc686 100644
+--- a/index.html
++++ b/index.html
+@@ -131,7 +131,7 @@
+     <details class="editor-fold" id="editor-fold-schedule" data-no-back-button>
+       <summary class="editor-fold-summary" data-i18n="editorCore.scheduleFoldLabel">課表</summary>
+       <div class="editor-fold-body">
+-        <div class="q-hero-card ed-ask" id="nl-edit-box">
++        <div class="q-hero-card ed-ask" id="nl-edit-box" data-ai-only>
+           <span class="q-hc-eyebrow"><span class="q-ai-mark" data-glyph="ai" aria-hidden="true"></span><span data-i18n="tools.aiEditSub">一句話改課表、問課表</span></span>
+           <div class="q-hc-pill ed-ask-pill">
+             <input id="nl-edit-input" type="text" maxlength="200" placeholder="例如：把週二第三節改成物理、下週三幾點放學？" data-i18n-placeholder="nlEdit.inputPlaceholder" autocomplete="off" enterkeyhint="send">
+diff --git a/src/tools.js b/src/tools.js
+index f9fe003..b1de540 100644
+--- a/src/tools.js
++++ b/src/tools.js
+@@ -156,12 +156,14 @@ function renderTools(again = false) {
+     card.style.setProperty('--subject', color);
+     return card;
+   };
++  // (Both ways are Orbit AI's: the section is gone with none on the account, kit aiLock.)
++  const aiOnly = n => (n.setAttribute('data-ai-only', ''), n);
+   const ai = el('div', 'cx-ways', [way('cx-way is-ai', 'ai', '#0284c7', t('tools.aiEditTitle'), t('tools.aiEditSub'), () => openPart('editor-fold-schedule')), way('cx-way is-photo', 'camera', '#f97316', t('tools.photoTitle'), t('tools.photoSub'), () => openTransfer('photo'))]);
+   const share = el('div', 'q-rowcard', [row({ cls: 'cx-way is-key', icon: tile('key', 'var(--q-green)'), title: t('tools.keyTitle'), sub: t('tools.keySub'), onClick: () => openTransfer('key') }), calRow()]);
+   // Two columns on a wide screen (.q-cols): the week beside the rest; one on a phone.
+   box.classList.add('q-cols');
+   // (The timetable's parts under it, so the two columns end about level.)
+-  box.replaceChildren(el('div', 'cx-tools-a', [weekCard(), section(t('tools.partsSection'), parts)]), el('div', 'cx-tools-b', [section(t('flight.section'), flightCard()), section(L('學習', 'Study'), studyRows(), { ai: true }), section(t('tools.aiSection'), ai, { ai: true }), section(t('tools.shareSection'), share)]));
++  box.replaceChildren(el('div', 'cx-tools-a', [weekCard(), section(t('tools.partsSection'), parts)]), el('div', 'cx-tools-b', [section(t('flight.section'), flightCard()), section(L('學習', 'Study'), studyRows(), { ai: true }), aiOnly(section(t('tools.aiSection'), ai, { ai: true })), section(t('tools.shareSection'), share)]));
+ }
+ 
+ // Kept current while it's on screen (a timetable arriving from the pass).
+-- 
+2.56.1
+

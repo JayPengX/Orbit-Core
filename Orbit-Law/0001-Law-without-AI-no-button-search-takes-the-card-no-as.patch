@@ -1,0 +1,128 @@
+From c53ea6622b53b648e540e94ef060787a1ae0a198 Mon Sep 17 00:00:00 2001
+From: orbit-agent <actions@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 16:16:32 +0000
+Subject: [PATCH] =?UTF-8?q?Law=20without=20AI:=20no=20=E5=95=8F=E6=B3=95?=
+ =?UTF-8?q?=E5=BE=8B=20button,=20search=20takes=20the=20card,=20no=20ask?=
+ =?UTF-8?q?=20rows;=20composer=20docks=20through=20the=20kit=20Co-Authored?=
+ =?UTF-8?q?-By:=20Claude=20Sonnet=205.5=20<noreply@anthropic.com>?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ public/app.mjs  | 32 ++++++--------------------------
+ public/law.css  |  7 -------
+ public/look.css |  9 +++++++++
+ 3 files changed, 15 insertions(+), 33 deletions(-)
+
+diff --git a/public/app.mjs b/public/app.mjs
+index f0daa2b..9dc6495 100644
+--- a/public/app.mjs
++++ b/public/app.mjs
+@@ -517,10 +517,12 @@ function findCard() {
+   const form = h('form', { class: 'nv-find-field', role: 'search', onsubmit: e => (e.preventDefault(), findGo(input.value, 's')) }, [h('i', { class: 'nv-find-icon', html: ICON_SEARCH }), input]);
+   const ways = h('div', { class: 'nv-find-ways' }, [
+     h('button', { class: 'nv-way q-press', type: 'button', onclick: () => (input.value.trim() ? findGo(input.value, 's') : go('tab=laws')) }, [h('i', { html: ICON_SEARCH }), W('搜尋法規', 'Search laws')]),
+-    h('button', { class: 'nv-way is-ask q-press', type: 'button', onclick: () => (input.value.trim() ? findGo(input.value, 'a') : go('tab=ask')) }, [h('i', { html: ICON_SPARK }), W('問法律', 'Ask the law')]),
++    h('button', { class: 'nv-way is-ask q-press', type: 'button', 'data-ai-tap': '', onclick: () => (input.value.trim() ? findGo(input.value, 'a') : go('tab=ask')) }, [h('i', { html: ICON_SPARK }), W('問法律', 'Ask the law')]),
+     h('button', { class: 'nv-way is-contract q-press', type: 'button', 'data-ai-tap': '', onclick: () => go('tab=ask&contract=1') }, [h('i', { html: ICON_SPARK }), W('拍合約幫你看', 'Check a contract')])
+   ]);
+-  const head = h('div', { class: 'nv-find-head' }, [h('b', { class: 'nv-find-title', text: W('有法律問題？用白話問', 'A legal question? Just ask') }), h('small', { class: 'nv-find-sub', text: W('答案都附上條文，也能直接查法規、判決', 'Answers cite the law. Or look it up yourself.') })]);
++  // (With no Orbit AI on the account the card says only what it still does: kit .q-no-ai / [data-ai-tap].)
++  const both = (ai, none) => [h('span', { 'data-ai-tap': '', text: ai }), h('span', { class: 'q-no-ai', text: none })];
++  const head = h('div', { class: 'nv-find-head' }, [h('b', { class: 'nv-find-title' }, both(W('有法律問題？用白話問', 'A legal question? Just ask'), W('找法規、判決、立法', 'Laws, rulings, bills'))), h('small', { class: 'nv-find-sub' }, both(W('答案都附上條文，也能直接查法規、判決', 'Answers cite the law. Or look it up yourself.'), W('直接搜尋法規、判決和立法院的議案', 'Search the laws, rulings and bills in the legislature')))]);
+   nvAsks = h('div', { class: 'nv-asks' });
+   return (nvFind = h('section', { class: 'q-card nv-find' }, [head, form, ways, nvAsks]));
+ }
+@@ -532,7 +534,7 @@ function asksHtml() {
+   const chats = loadChats().slice(0, 3).map(c => ({ q: c.t, k: 'a', u: c.u }));
+   const mine = [...finds, ...chats.filter(c => !finds.some(f => f.q === c.q))].sort((a, b) => b.u - a.u).slice(0, 3);
+   const starters = STARTERS.filter(([zh, e]) => !mine.some(x => x.q === W(zh, e))).slice(0, 3 - mine.length);
+-  const row = (href, q, mark, sub) => `<a class="nv-ask" href="${href}">${mark}<span class="nv-ask-text"><b class="q-fit-wrap">${esc(q)}</b><small>${esc(sub)}</small></span>${CHEVRON}</a>`;
++  const row = (href, q, mark, sub) => `<a class="nv-ask" href="${href}"${href.includes('tab=ask') ? ' data-ai-tap' : ''}>${mark}<span class="nv-ask-text"><b class="q-fit-wrap">${esc(q)}</b><small>${esc(sub)}</small></span>${CHEVRON}</a>`;
+   return [
+     ...mine.map(x => row(`#${x.k === 'a' ? 'tab=ask&amp;q=' : 'tab=laws&amp;q='}${encodeURIComponent(x.q)}`, x.q, `<i class="nv-ask-mark">${ICON_CLOCK}</i>`, x.k === 'a' ? W('最近問過', 'Asked lately') : W('最近找過', 'Searched lately'))),
+     ...starters.map(([zh, e, topic]) => row(`#tab=ask&amp;q=${encodeURIComponent(W(zh, e))}`, W(zh, e), topicTile(topic, 'sm'), `${topicName(topic, en)} · ${W('試試這樣問', 'Try asking')}`))
+@@ -806,7 +808,7 @@ async function findAll(q, out) {
+   // Bills by their law's name, then by what they're for (their purpose line).
+   const bills = [...state.items.filter(it => terms.some(t => it.n?.includes(t))), ...state.items.filter(it => !terms.some(t => it.n?.includes(t)) && terms.some(t => it.about?.includes(t)))].filter(it => !it.dropped).slice(0, 5);
+   const jumpRow = jumpTo && lawRow([jumpTo.row[0], `${jumpTo.row[1]} ${artLabel(jumpTo.key, en)}`], { topic: rowTopic(jumpTo.row), sub: W('直接打開這一條', 'Open this article'), href: `#law=${jumpTo.row[0]}&a=${jumpTo.key}` });
+-  const ask = `<a class="lw-find-ask" href="#tab=ask&amp;q=${encodeURIComponent(q)}">${MENU_ICON.ask || ''}<span><b>${W(`用白話問「${esc(q)}」`, `Ask about “${esc(quickName(q))}”`)}</b><small>${W('問法律會引用條文回答', 'Answered from the articles, cited')}</small></span></a>`;
++  const ask = `<a class="lw-find-ask" data-ai-tap href="#tab=ask&amp;q=${encodeURIComponent(q)}">${MENU_ICON.ask || ''}<span><b>${W(`用白話問「${esc(q)}」`, `Ask about “${esc(quickName(q))}”`)}</b><small>${W('問法律會引用條文回答', 'Answered from the articles, cited')}</small></span></a>`;
+   let ruleHits = 0;
+   const lawLaws = laws.length ? section(exact ? W('名稱相近的法律', 'Laws with similar names') : W('法律', 'Laws'), list(laws.map(r => lawItem(r)))) : '';
+   // Names before the articles that only mention them: 子法, then 行政規則 and 地方法規 (filled as they load).
+@@ -2180,7 +2182,6 @@ function drawAsk() {
+       ask(v);
+     });
+     input.addEventListener('keydown', e => e.key === 'Enter' && !e.shiftKey && !e.isComposing && (e.preventDefault(), form.requestSubmit()));
+-    dockComposer(form, input);
+     const tools = h('div', { class: 'lw-ask-tools' }, [
+       h('button', { type: 'button', class: 'lw-tool', 'aria-label': W('對話紀錄', 'Chats'), html: MENU_ICON.history, onclick: () => chatHistory() }),
+       h('button', { type: 'button', class: 'lw-tool', 'aria-label': W('新對話', 'New chat'), html: MENU_ICON.edit, onclick: () => newChat() })
+@@ -2212,27 +2213,6 @@ function drawAsk() {
+   drawChat();
+ }
+ 
+-// While its field is typed in, the composer sits on the keys: its foot at
+-// the visible part's foot (visualViewport), whether iOS shrank the page or
+-// slid it up (offsetTop) under the keys.
+-function dockComposer(form, input) {
+-  const vv = globalThis.visualViewport;
+-  if (!vv) return;
+-  let frame = 0;
+-  const place = () => {
+-    frame = 0;
+-    const on = document.activeElement === input;
+-    const gap = Math.round(innerHeight - vv.height - vv.offsetTop);
+-    form.classList.toggle('lw-on-keys', on && gap > 60);
+-    if (on) form.style.setProperty('--lw-keys', `${Math.max(8, gap + 8)}px`);
+-  };
+-  const soon = () => (frame ||= requestAnimationFrame(place));
+-  vv.addEventListener('resize', soon);
+-  vv.addEventListener('scroll', soon);
+-  input.addEventListener('focus', () => (soon(), setTimeout(soon, 300)));
+-  input.addEventListener('blur', () => setTimeout(soon, 60));
+-}
+-
+ function drawPin() {
+   const el = document.querySelector('.lw-pin');
+   if (!el) return;
+diff --git a/public/law.css b/public/law.css
+index 17370b8..def0b69 100644
+--- a/public/law.css
++++ b/public/law.css
+@@ -4258,13 +4258,6 @@ a.q-more.lw-more-link { margin: 8px 0 16px; }
+   font: 600 12px/16px var(--q-font);
+ }
+ 
+-/* The composer right on the keys, where the keys really start (app.mjs
+-   dockComposer: the visible part's foot, iOS's slide of the page counted;
+-   the kit's --q-kb alone left it ~80px up with the slide, Jay 2026-10-27). */
+-html body .lw-composer.lw-on-keys {
+-  bottom: var(--lw-keys, 8px) !important;
+-}
+-
+ /* 問法律's own button beside the tab bar: the spark, filled. */
+ .q-tab-action svg {
+   fill: currentColor;
+diff --git a/public/look.css b/public/look.css
+index 8d9e03d..4d598eb 100644
+--- a/public/look.css
++++ b/public/look.css
+@@ -290,3 +290,12 @@ html[data-look='native'].q-wide .nv-asks {
+ html[data-look='native'][data-look='native'] #panel-home .q-section-head > :is(a, button) {
+   color: var(--q-label-2);
+ }
++
++/* No Orbit AI on the account: the search way takes the card's width, and the
++   questions' list is gone with its rows (no hairline or padding left behind). */
++html[data-ai-lock='level'][data-look='native'] .nv-find-ways {
++  grid-template-columns: minmax(0, 1fr);
++}
++html[data-ai-lock='level'][data-look='native'] .nv-asks:not(:has(.nv-ask:not([data-ai-tap]))) {
++  display: none;
++}
+-- 
+2.56.1
+

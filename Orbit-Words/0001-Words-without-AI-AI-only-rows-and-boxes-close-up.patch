@@ -1,0 +1,29 @@
+From e734855179295d1b151462bbd909e651c4ca05d8 Mon Sep 17 00:00:00 2001
+From: orbit-agent <actions@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 16:16:32 +0000
+Subject: [PATCH] Words without AI: AI-only rows and boxes close up
+ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---
+ public/views/sheet.js | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/public/views/sheet.js b/public/views/sheet.js
+index 8091da5..d81597e 100644
+--- a/public/views/sheet.js
++++ b/public/views/sheet.js
+@@ -227,7 +227,10 @@ function tryBlock(word) {
+     show();
+   };
+   kitAI ? fill() : aiReady.then(fill);
+-  return block(t('tryTitle'), body);
++  // (The whole block is Orbit AI's: gone with none on the account, kit aiLock.)
++  const tryBlock = block(t('tryTitle'), body);
++  tryBlock.setAttribute('data-ai-only', '');
++  return tryBlock;
+ }
+ 
+ function draw(word, at) {
+-- 
+2.56.1
+

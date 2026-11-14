@@ -1,0 +1,26 @@
+From 21c7174bb150e858e174fbf8aae944e65f8177da Mon Sep 17 00:00:00 2001
+From: orbit-agent <actions@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 16:16:32 +0000
+Subject: [PATCH] News without AI: AI-only rows and boxes close up
+ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---
+ public/views/story.mjs | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/public/views/story.mjs b/public/views/story.mjs
+index c291f2f..91dcd38 100644
+--- a/public/views/story.mjs
++++ b/public/views/story.mjs
+@@ -440,6 +440,8 @@ function aiPart(key, label, { kept, make, shape, draw }) {
+   const button = (note = '') => {
+     const btn = aiTap(label, go);
+     if (kept()) btn.dataset.aiFree = '';
++    // (The box holds only the AI's button: gone with it for a pass with none, unless the answer is kept, free for all.)
++    box.toggleAttribute('data-ai-only', !kept());
+     box.replaceChildren(...[btn, note ? h('small', { class: 'nw-ai-note', text: note }) : null].filter(Boolean));
+   };
+   async function go() {
+-- 
+2.56.1
+

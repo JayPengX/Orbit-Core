@@ -1,0 +1,184 @@
+From f0192b37e12e304bd74418d04f8fb5d9a9f26720 Mon Sep 17 00:00:00 2001
+From: orbit-agent <actions@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 16:16:32 +0000
+Subject: [PATCH] =?UTF-8?q?Typing=20in=20=E5=95=8F=E6=B3=95=E5=BE=8B=20ris?=
+ =?UTF-8?q?es=20above=20the=20keys,=20and=20a=20pass=20without=20AI=20lose?=
+ =?UTF-8?q?s=20every=20AI=20part=20with=20no=20gap=20left=20Co-Authored-By?=
+ =?UTF-8?q?:=20Claude=20Sonnet=205.5=20<noreply@anthropic.com>?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ docs/RULEBOOK.md             |  1 +
+ kit/orbit.css                | 27 +++++++++++++++++++++++++--
+ kit/orbit.mjs                |  8 ++++++++
+ kit/suite.mjs                |  5 +++++
+ tests/kit-ai-hidden.test.mjs | 30 ++++++++++++++++++++++++++++++
+ 5 files changed, 69 insertions(+), 2 deletions(-)
+ create mode 100644 tests/kit-ai-hidden.test.mjs
+
+diff --git a/docs/RULEBOOK.md b/docs/RULEBOOK.md
+index ac5004a..324623d 100644
+--- a/docs/RULEBOOK.md
++++ b/docs/RULEBOOK.md
+@@ -106,6 +106,7 @@ into absolutes; push back when a rule makes things worse.
+ 
+ **AI** (11-10, 11-11).
+ - 10-19 Paid AI runs only behind a person's tap, never automatically. 11-14 (Jay: "make AI feature like this a button to click like we do in orbit law, never spend a penny on AI on things user didn't interact with across app"): every AI part is the kit's quiet AI button (`aiTap`), as Orbit Law's; opening a story, a game or a page never starts one, nor does a finger touching it, and nothing is made ahead, not even 頭條's lead stories. A tap that only shows an answer already kept for everyone costs nothing and is open to every pass (`data-ai-free`).
++- 11-14 No AI means no trace of it (Jay: a no-AI pass "should not even feel AI features existed"): every AI button, row, card, box and section carries `data-ai-tap` (or `.q-ai-tap`), a box holding nothing else `data-ai-only`, its words for that person `.q-no-ai`; a row of buttons left with one fills the width (`.q-ai-row`), a tab bar with an AI action (`action.ai`) stretches over the room it leaves. Never an empty gap.
+ - 11-11 Code first: no AI where code reads or formats reliably; numbers come from code and AI only words them.
+ - 11-14 The server's helper (the Runner) is billed while awake: each request or alarm, then about ten seconds more. So a live beat asks no faster than its data changes (bus boards 30 s → cards 20 s; YouBike 60 s), light background work shares the routes' already-awake object, and nothing wakes it to find nothing (F1's odd minutes only while a session runs).
+ - 11-14 Nothing runs for nobody (Jay: "make sure Orbit's background tasks aren't burning our quota"): a hidden page, the phone's other app or Orbit's other tab, asks nothing (a live beat checks `document.visibilityState`; kit `suite.mjs` reports a hidden frame as hidden); a background job does only what's left (what's done is listed, not looked for again), stops at once when a source turns it away (never a wait in the Worker: its time is billed while it waits), and a paused job isn't started at all.
+diff --git a/kit/orbit.css b/kit/orbit.css
+index fea1ba0..d729488 100644
+--- a/kit/orbit.css
++++ b/kit/orbit.css
+@@ -1102,6 +1102,13 @@ button,
+   width: var(--q-tb-w);
+   transform: none;
+ }
++/* No Orbit AI (aiLock 'level'): the AI action is gone, so its bar is the plain
++   one, across the room the button left (never an empty gap at its right). */
++:root[data-ai-lock='level']:not(.q-tabrail) .q-tabbar.q-tabbar.q-tabbar-ai {
++  left: var(--q-mid, 50%);
++  width: min(calc(var(--q-vw) - 32px), calc(var(--q-tabs, 4) * 92px));
++  transform: translateX(-50%);
++}
+ .q-tab-action {
+   box-sizing: border-box;
+   position: fixed;
+@@ -1773,6 +1780,22 @@ dialog.q-sheet.q-full {
+   opacity: 0.45;
+   filter: grayscale(1);
+ }
++/* Its words for the person with none: `.q-no-ai` shows only then, beside the
++   AI's own (marked [data-ai-tap]); `[data-ai-only]` is a box that holds
++   nothing else, gone with them, and a row of buttons left with one fills
++   its width (`.q-ai-row`, a grid of equal columns). */
++.q-no-ai {
++  display: none !important;
++}
++:root[data-ai-lock='level'] .q-no-ai {
++  display: revert !important;
++}
++:root[data-ai-lock='level'] [data-ai-only]:not([data-ai-free]) {
++  display: none !important;
++}
++:root[data-ai-lock='level'] .q-ai-row {
++  grid-template-columns: minmax(0, 1fr) !important;
++}
+ /* (A locked box or form: a tap anywhere on it says why, never a keyboard.) */
+ :root[data-ai-lock] [data-ai-tap] :is(textarea, input, button) {
+   pointer-events: none;
+@@ -5875,11 +5898,11 @@ html.q-foot-stuck :is(.q-tabbar, .q-accessory, .q-toast, .q-net, .q-foot) {
+ }
+ /* A bar that belongs on top of the keys (a composer, a search's results bar). */
+ html.q-kb .q-kb-dock {
+-  bottom: var(--q-kb) !important;
++  bottom: var(--q-kb-foot, var(--q-kb)) !important;
+ }
+ /* A bar fixed at the foot whose field is being typed in (a composer): on the keys. */
+ html.q-kb .q-kb-docked {
+-  bottom: calc(var(--q-kb) + 8px) !important;
++  bottom: calc(var(--q-kb-foot, var(--q-kb)) + 8px) !important;
+ }
+ 
+ /* A grid of like tiles that never ends on a part row (orbit.mjs fullRows): the tiles past its last full row. */
+diff --git a/kit/orbit.mjs b/kit/orbit.mjs
+index 4919e14..0b54bfc 100644
+--- a/kit/orbit.mjs
++++ b/kit/orbit.mjs
+@@ -5361,7 +5361,9 @@ function watchKeyboard() {
+     const el = document.activeElement;
+     if (!up) held = null;
+     else if (!held || held.el !== el || Math.abs(held.keys - keys) > 60) held = { el, keys, vvh: Math.round(vv.height), lift: true, backs: 0 };
++    if (held && held.foot == null) held.foot = keysFoot();
+     root.style.setProperty('--q-kb', `${held ? held.keys : 0}px`);
++    root.style.setProperty('--q-kb-foot', `${held ? held.foot : 0}px`);
+     root.style.setProperty('--q-vvh', `${held ? held.vvh : Math.round(vv.height)}px`);
+     root.classList.toggle('q-kb', up);
+     // The keys gone, the foot left behind: iOS 26 can keep the frame that
+@@ -5393,6 +5395,8 @@ function watchKeyboard() {
+       unslide();
+     }
+   };
++  // (How far the keys' top is above the page's own foot: iOS's slide of the page (offsetTop) counted, so a bar fixed at the foot lands on the keys, never above them or under.)
++  const keysFoot = () => Math.max(0, Math.round(globalThis.innerHeight - vv.height - vv.offsetTop));
+   const unslide = () => globalThis.scrollTo?.(globalThis.scrollX, Math.max(0, globalThis.scrollY - vv.offsetTop));
+   // (The screen's foot: what the visible part reaches.)
+   const footGap = () => {
+@@ -5465,6 +5469,8 @@ function watchKeyboard() {
+       root.style.setProperty('--q-kb', `${keys}px`);
+       root.style.setProperty('--q-vvh', `${held.vvh}px`);
+     }
++    held.foot = keysFoot();
++    root.style.setProperty('--q-kb-foot', `${held.foot}px`);
+     if (root.querySelector('.q-kb-docked')?.contains(el)) return;
+     const r = el.getBoundingClientRect?.();
+     if (r && r.height && (r.bottom > vv.offsetTop + vv.height - 4 || r.top < vv.offsetTop)) lift(el, held.keys);
+@@ -6379,6 +6385,8 @@ export function tabBar({ tabs, onSelect, onShow = null, hash = id => `#${id}`, n
+   nav.replaceChildren(...buttons.values());
+   if (action) {
+     nav.classList.add('q-tabbar-act');
++    // (An AI action's bar stretches over the room it leaves when no Orbit AI is on the account.)
++    if (action.ai) nav.classList.add('q-tabbar-ai');
+     // (Its count where the button's place is worked out too.)
+     document.documentElement.style.setProperty('--q-tabs', String(tabs.length));
+     // (action.ai: an Orbit AI tab, gone with no Orbit AI on the account: aiLock.)
+diff --git a/kit/suite.mjs b/kit/suite.mjs
+index f85c3f3..c5b4a09 100644
+--- a/kit/suite.mjs
++++ b/kit/suite.mjs
+@@ -1040,7 +1040,12 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
+   // Orbit's window never moves: on an iPhone the scroll bar's handle, dragged,
+   // scrolled the window itself, the app shown and its tab bar with it, black
+   // under (Jay 2026-11-14, Law). Put back at once, whatever moved it.
++  // (Not while the keyboard is up: iOS slides the window to the field and the
++  // frame below follows it; put back at once, the field stayed under the keys
++  // and the screen flashed, Jay 11-14, 問法律.)
+   const still = () => {
++    const keys = globalThis.visualViewport ? globalThis.innerHeight - globalThis.visualViewport.height > 80 : false;
++    if (keys) return;
+     if (globalThis.scrollX || globalThis.scrollY) globalThis.scrollTo(0, 0);
+     for (const el of [document.documentElement, document.body]) if (el && (el.scrollTop || el.scrollLeft)) (el.scrollTop = 0), (el.scrollLeft = 0);
+   };
+diff --git a/tests/kit-ai-hidden.test.mjs b/tests/kit-ai-hidden.test.mjs
+new file mode 100644
+index 0000000..88fa670
+--- /dev/null
++++ b/tests/kit-ai-hidden.test.mjs
+@@ -0,0 +1,30 @@
++// A composer fixed at the foot lands on the keys (iOS 26 slide counted), the
++// host window isn't put back while the keys are up, and with no Orbit AI the
++// AI action's bar closes the gap (Jay 11-14, Law's 問法律 and 首頁).
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { readFileSync } from 'node:fs';
++
++const read = f => readFileSync(new URL(`../kit/${f}`, import.meta.url), 'utf8');
++
++test('the keys\' height above the page foot counts iOS\'s slide, and docked bars use it', () => {
++  const js = read('orbit.mjs');
++  assert.match(js, /innerHeight - vv\.height - vv\.offsetTop/);
++  assert.match(js, /--q-kb-foot/);
++  const css = read('orbit.css');
++  assert.match(css, /html\.q-kb \.q-kb-docked \{\s*bottom: calc\(var\(--q-kb-foot, var\(--q-kb\)\) \+ 8px\) !important/);
++});
++
++test('Orbit\'s window is not scrolled back while the keys are up', () => {
++  const js = read('suite.mjs');
++  assert.match(js, /const still = \(\) => \{\s*const keys = [^\n]*\n\s*if \(keys\) return;/);
++});
++
++test('a bar with an AI action stretches over its room when the AI is gone', () => {
++  const js = read('orbit.mjs');
++  assert.match(js, /if \(action\.ai\) nav\.classList\.add\('q-tabbar-ai'\)/);
++  const css = read('orbit.css');
++  assert.match(css, /data-ai-lock='level'\]:not\(\.q-tabrail\) \.q-tabbar\.q-tabbar\.q-tabbar-ai \{[^}]*translateX\(-50%\)/);
++  assert.match(css, /\[data-ai-only\]:not\(\[data-ai-free\]\)/);
++  assert.match(css, /\.q-no-ai/);
++});
+-- 
+2.56.1
+

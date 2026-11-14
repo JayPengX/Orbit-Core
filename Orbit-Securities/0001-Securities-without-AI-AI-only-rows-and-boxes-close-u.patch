@@ -1,0 +1,35 @@
+From 2d39d60e7b396917b04af2eba683be4411fc3a0a Mon Sep 17 00:00:00 2001
+From: orbit-agent <actions@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 16:16:32 +0000
+Subject: [PATCH] Securities without AI: AI-only rows and boxes close up
+ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+
+---
+ public/app.js | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/public/app.js b/public/app.js
+index fb7af3b..3090881 100644
+--- a/public/app.js
++++ b/public/app.js
+@@ -3182,7 +3182,7 @@ function filingsHtml(symbol, q) {
+       const lit = new Set(told?.show?.length ? shown : []);
+       return `<div class="fl-card">
+         <div class="fl-head"><strong>${h(shortTitle(f.title, name))}</strong><small>${h(when(f.at))}</small></div>
+-        ${told ? `<p class="fl-line"><span class="q-ai-mono" aria-hidden="true">${kitUI.icons.ai || kitUI.icons.spark || ''}</span><span>${h(told.line)}</span></p>` : filingAsked.has(f.id) && f.rows.length ? `<p class="fl-line wait q-skel" aria-hidden="true"></p>` : f.rows.length ? `<p class="fl-ask">${aiTapHtml(t('filingAsk'), `data-action="filing-ask" data-id="${h(f.id)}"`)}</p>` : ''}
++        ${told ? `<p class="fl-line"><span class="q-ai-mono" aria-hidden="true">${kitUI.icons.ai || kitUI.icons.spark || ''}</span><span>${h(told.line)}</span></p>` : filingAsked.has(f.id) && f.rows.length ? `<p class="fl-line wait q-skel" aria-hidden="true"></p>` : f.rows.length ? `<p class="fl-ask" data-ai-only>${aiTapHtml(t('filingAsk'), `data-action="filing-ask" data-id="${h(f.id)}"`)}</p>` : ''}
+         ${shown.length ? `<div class="fl-rows">${shown.map(r => row(r, lit.has(r))).join('')}${open ? rest.map(r => row(r, false)).join('') : ''}</div>` : ''}
+         ${rest.length ? kitUI.moreHtml({ more: t('filingMore', { n: f.rows.length }), less: t('filingLess'), open, attr: `data-action="filing-more" data-id="${h(f.id)}"` }) : ''}
+       </div>`;
+@@ -5502,7 +5502,7 @@ function renderLesson() {
+       `${told ? `<p class="fl-line ls-line"><span class="q-ai-mono" aria-hidden="true">${kitUI.icons.ai || kitUI.icons.spark || ''}</span><span>${h(told.line)}</span></p>` : asked ? '<p class="fl-line wait q-skel" aria-hidden="true"></p>' : ''}
+     <div class="fl-card"><div class="fl-rows">${rows}</div></div>`
+     }
+-    ${!told && !asked ? `<p class="fl-ask ls-ask">${aiTapHtml(t('lessonAsk'), `data-action="lesson-ask"${ready ? '' : ' disabled'}`)}</p>` : ''}
++    ${!told && !asked ? `<p class="fl-ask ls-ask" data-ai-only>${aiTapHtml(t('lessonAsk'), `data-action="lesson-ask"${ready ? '' : ' disabled'}`)}</p>` : ''}
+     <p class="foot-note">${h(t('lessonFoot'))}</p>
+     <div class="q-sheet-foot q-sf"><button class="q-btn" type="button" data-action="open" data-symbol="${h(c.symbol)}">${h(t('lessonGo', { name: lessonNow.name }))}</button></div>`
+   );
+-- 
+2.56.1
+
