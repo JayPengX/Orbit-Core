@@ -577,11 +577,35 @@ test('a TDX answer that fails with a 5xx is asked once more', async () => {
 test('place search: the near branches of a chain first, nearest first; the same chain far away left out while one is near', () => {
   const far = [{ id: 'a', name: '錢都日式涮涮鍋 桃園店', dist: 45000 }, { id: 'b', name: '錢都 中壢店', dist: 38000 }];
   const near = [{ id: 'c', name: '錢都 竹北光明店', dist: 2100 }, { id: 'd', name: '錢都 新竹店', dist: 9000 }, { id: 'e', name: '金錢豹', dist: 900 }];
-  // (The name typed whole first among the near; 中壢店 gone, 錢都 being near; 涮涮鍋 another name.)
-  assert.deepEqual(nearFirst(far, near, '錢都').map(i => i.id), ['c', 'd', 'e', 'a']);
+  // (The near branches nearest first; 中壢店 gone, 錢都 being near; 錢都日式涮涮鍋 far, still before 金錢豹, which isn't 錢都 at all.)
+  assert.deepEqual(nearFirst(far, near, '錢都').map(i => i.id), ['c', 'd', 'a', 'e']);
   assert.deepEqual(nearFirst([{ id: 'x', name: '台北車站', dist: 70000 }], [], '台北車站').map(i => i.id), ['x']);
   // The place named exactly what was typed first, though a part of it (a class, a hall) is a few metres nearer.
   assert.deepEqual(nearFirst([], [{ id: 'k', name: '新竹高中214班', dist: 1390 }, { id: 's', name: '新竹高中', dist: 1430 }, { id: 'g', name: '新竹高中劍道館', dist: 1500 }], '新竹高中').map(i => i.id), ['s', 'k', 'g']);
+});
+
+test('place search, 立法院 from 竹北 (Jay 2026-11-14): the Legislative Yuan, 56 km off, before the legislators\' offices and the council next door', () => {
+  const gov = ['government_office', 'point_of_interest'];
+  const office = ['association_or_organization', 'point_of_interest'];
+  // Autocomplete: the 立法院's buildings, by Google's sense of what's known.
+  const found = [
+    { id: 'q', name: '立法院群賢樓', sub: '臺北市中正區', dist: 56503, types: gov },
+    { id: 'y', name: '立法院研究大樓', sub: '臺北市中正區', dist: 56604, types: gov },
+    { id: 'w', name: '立法院民主草坪', sub: '臺中市霧峰區', dist: 91827, types: ['park'] }
+  ];
+  // Text Search, near you: what's near and about lawmaking first, the real one far down.
+  const near = [
+    { id: 'h', name: '新竹縣議會', lat: 24.8258, lon: 121.0138, dist: 159, types: gov },
+    { id: 'o1', name: '立法委員王婉諭竹北服務處', lat: 24.8245, lon: 121.0144, dist: 309, types: office },
+    { id: 'o2', name: '立法委員徐欣瑩服務處', lat: 24.8297, lon: 121.0049, dist: 871, types: office },
+    { id: 'o3', name: '柯建銘服務處', lat: 24.7982, lon: 120.9627, dist: 5999, types: office },
+    { id: 'ly', name: '中華民國立法院', lat: 25.0439, lon: 121.5195, dist: 56479, types: gov }
+  ];
+  const ids = nearFirst(found, near, '立法院').map(i => i.id);
+  assert.equal(ids[0], 'ly', ids.join(' '));
+  assert.ok(ids.indexOf('q') < ids.indexOf('o1') && ids.indexOf('o1') < ids.indexOf('h'), ids.join(' '));
+  // Still: of two places as well named, the nearer first.
+  assert.deepEqual(nearFirst([{ id: 'f', name: '國立新竹高中', dist: 20000 }], [{ id: 'n', name: '新竹高中', lat: 24.8, lon: 121, dist: 1400 }, { id: 'm', name: '國立新竹高中', lat: 24.8, lon: 121, dist: 9000 }], '新竹高中').map(i => i.id), ['n', 'm', 'f']);
 });
 
 test('place search: LaLaport is LaLaport, not its cinema, its car parks or a shop in it; two branches of a chain stay two; a shop asked by name stays', async () => {
