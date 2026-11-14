@@ -232,8 +232,9 @@ export const DEV = {
   // Orbit Passes anyone makes for themselves in an app (eco.js ecoCreate), everyone together a Taiwan day; 0 closes it.
   passNewDay: { def: 200, min: 0, max: 5000, unit: '個', group: 'pass', zh: '每天可自己建立的 Orbit Pass', en: 'Orbit Passes people can make a day', note: '在 App 的登入畫面自己建立，是基本等級（沒有 AI）；0 = 不開放' },
   // Orbit's mails a day, everyone together (pass-mail.js): codes to new
-  // addresses stop at 60% of it, recovery's go on to 95% (Resend free: 100).
-  mailDay: { def: 100, min: 0, max: 50000, unit: '封', group: 'pass', zh: '每天寄信上限', en: 'Mails a day', note: '驗證碼和通知一起算；新信箱用到 60% 就停，找回帳戶留到 95%。照寄信服務的方案設（Resend 免費：100）' },
+  // addresses stop at 60% of it, recovery's go on to 95% (Resend free: 100 a
+  // day, mail.js stops at 90; the owner's alerts need a few).
+  mailDay: { def: 80, min: 0, max: 50000, unit: '封', group: 'pass', zh: '每天寄信上限', en: 'Mails a day', note: '驗證碼和通知一起算；新信箱用到 60% 就停，找回帳戶留到 95%。照寄信服務的方案設（Resend 免費每天 100，留一些給管理通知）' },
   mirror: { def: true, group: 'data', zh: '使用每晚的資料副本', en: 'Use the nightly copies', note: '關掉：所有 App 都直接問代理（除錯用）' },
   // Each paid AI feature's calls a day, everyone together (the proxy's
   // routes named in `ai`; 0 pauses it, the app then says today's AI is used up).
