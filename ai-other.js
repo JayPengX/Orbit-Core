@@ -51,21 +51,26 @@ function openaiBlock(p, i) {
   return media === 'application/pdf' ? { type: 'file', file: { filename: `file${i + 1}.pdf`, file_data: url } } : { type: 'image_url', image_url: { url } };
 }
 
-// The request each maker takes. effort: 'low' | 'medium' | 'high' (the model's own default when not said).
+// The request each maker takes. effort: 'low' | 'medium' | 'high' (the model's own default when not said),
+// or 'none': Claude answers without thinking first (11-14: Haiku's thinking was ~2.7k tokens and
+// 13 s of a 3-point brief someone waits for); OpenAI's takes it as 'low'.
 export function requestOf(model, parts, schema, env, effort = null) {
   const maker = makerOf(model);
   if (maker === 'anthropic') {
     const body = { model, max_tokens: 16000, messages: [{ role: 'user', content: parts.map(claudeBlock).filter(Boolean) }] };
     const config = {};
     if (schema) config.format = { type: 'json_schema', schema: jsonSchemaOf(schema) };
-    if (effort) config.effort = effort;
+    if (effort === 'none') {
+      body.thinking = { type: 'disabled' };
+      config.effort = 'low';
+    } else if (effort) config.effort = effort;
     if (Object.keys(config).length) body.output_config = config;
     return { url: ANTHROPIC, init: { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY || '', 'anthropic-version': '2026-10-21' }, body: JSON.stringify(body) } };
   }
   if (maker === 'openai') {
     const body = { model, max_completion_tokens: 16000, messages: [{ role: 'user', content: parts.map(openaiBlock).filter(Boolean) }] };
     if (schema) body.response_format = { type: 'json_schema', json_schema: { name: 'answer', schema: jsonSchemaOf(schema), strict: false } };
-    if (effort) body.reasoning_effort = effort;
+    if (effort) body.reasoning_effort = effort === 'none' ? 'low' : effort;
     return { url: OPENAI, init: { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.OPENAI_API_KEY || ''}` }, body: JSON.stringify(body) } };
   }
   return null;
