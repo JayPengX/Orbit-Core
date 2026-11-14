@@ -419,6 +419,12 @@ self.addEventListener('message', event => {
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   const url = new URL(event.notification.data?.url || './', self.registration.scope).href;
+  // Orbit's own worker (its scope is /app/) takes every app's notices: one for an app outside that scope opens
+  // that app inside Orbit (/app/?open=<path>, in the Orbit that got it: o), never a separate app's window.
+  const home = new URL(self.registration.scope);
+  const to = new URL(url);
+  const inOrbit = /\/app\/$/.test(home.pathname) && to.origin === home.origin && !to.href.startsWith(home.href);
+  const fresh = inOrbit ? `${home.href}?${event.notification.data?.o ? `o=${encodeURIComponent(event.notification.data.o)}&` : ''}open=${encodeURIComponent(`${to.pathname}${to.search}${to.hash}`)}` : url;
   // (other: a page of another app, which answers only in Orbit's window, kit suite.mjs.)
   const told = (c, other = false) =>
     new Promise(done => {
@@ -440,7 +446,7 @@ self.addEventListener('notificationclick', event => {
         const said = list.length ? await Promise.all(list.map(c => told(c, true))) : [];
         const suite = list[said.indexOf(true)];
         if (suite) return suite.focus().catch(() => suite);
-        return self.clients.openWindow(url);
+        return self.clients.openWindow(fresh);
       }
       const c = await open.focus().catch(() => open);
       if (await told(c || open)) return c;
@@ -459,5 +465,5 @@ self.addEventListener('push', event => {
     data = { title: event.data?.text() || '' };
   }
   const icon = new URL('./icons/icon-192.png', self.registration.scope).href;
-  event.waitUntil(self.registration.showNotification(data.title || SW.title || 'Orbit', { body: data.body || '', tag: data.tag || undefined, icon, badge: icon, data: { url: data.url || self.registration.scope } }));
+  event.waitUntil(self.registration.showNotification(data.title || SW.title || 'Orbit', { body: data.body || '', tag: data.tag || undefined, icon, badge: icon, data: { url: data.url || self.registration.scope, ...(data.o ? { o: data.o } : {}), ...(data.app ? { app: data.app } : {}) } }));
 });

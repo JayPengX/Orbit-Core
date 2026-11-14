@@ -50,6 +50,7 @@
 import { weatherCheck } from './weather.js';
 import { tdxGet, tdxRequest } from './transit.js';
 import { bodyText } from './http.js';
+import { BRANDS } from './kit/brand.mjs';
 import { LEAGUES, parseStatus, overByRule, finalWords } from './kit/sports-espn.mjs';
 import { cpblDay } from './asia-baseball.js';
 
@@ -154,7 +155,7 @@ export async function sendPush(env, sub, message) {
 
 // ---- The lists ------------------------------------------------------------------
 
-const APP_KEYS = new Set(['match', 'stock', 'vocab', 'orbit', 'weather', 'transit', 'money']);
+const APP_KEYS = new Set(Object.keys(BRANDS));
 const MAX_ITEMS = 60;
 const HOLD_MS = 8 * 3_600_000;
 const CHECK_EVERY = 15 * 60_000;
@@ -222,7 +223,24 @@ export function cleanPrefs(body) {
   return { on: body?.on !== false, off: [...new Set(off)] };
 }
 // Whether the pass's switches let this notice through (all do without any).
-export const wanted = (prefs, app, item) => !prefs || (prefs.on !== false && !(item.kind && prefs.off?.includes(`${app}:${item.kind}`)));
+// `<app>:all` in the switches is the whole app off (Orbit's per-app switch): turning Sports off never touches Weather.
+export const wanted = (prefs, app, item) => !prefs || (prefs.on !== false && !prefs.off?.includes(`${app}:all`) && !(item.kind && prefs.off?.includes(`${app}:${item.kind}`)));
+// Every push says which app it is from and carries that app's own tag, so one
+// app's notices never replace another's (an Orbit's one phone endpoint is
+// shared by all its apps). In an Orbit (`via`) the title starts with the app's
+// name too, and `o` (which Orbit) lets a tap open the app in that Orbit.
+export function decorate(app, record, message) {
+  const out = { ...message, app };
+  const short = BRANDS[app]?.short;
+  if (out.tag && !String(out.tag).startsWith(`${app}:`)) out.tag = `${app}:${out.tag}`;
+  if (record?.via === 'orbit') {
+    if (short && !String(out.title || '').includes(short)) out.title = `${short}・${out.title || ''}`.replace(/・$/, '');
+    if (record.o) out.o = record.o;
+  }
+  return out;
+}
+// An Orbit's record outranks a separate app's for the same app while it's alive.
+const ORBIT_FRESH_MS = 35 * 86_400_000;
 // A list kept with when its next notice is due (none: no subscription or nothing on it).
 const dueOf = record => (record.sub && record.items?.length ? record.items[0].at : 0);
 // D1 with KV's few calls (get, put with a ttl and `due`, delete, the due
@@ -320,8 +338,28 @@ export async function handlePush(request, env, headers, session, path) {
   if (path === '/push/subscribe') {
     const sub = body?.sub;
     if (!pushEndpoint(sub?.endpoint) || !sub.keys?.p256dh || !sub.keys?.auth) return reply({ error: { message: 'Bad subscription' } }, 400);
+    const via = body.via === 'orbit';
+    const apps = (Array.isArray(body.apps) ? body.apps : []).filter(a => typeof a === 'string' && BRANDS[a]);
+    // An app that isn't in the Orbit's list sends nothing to it.
+    if (via && !apps.includes(session.a)) return reply({ error: { message: 'Not in this Orbit' } }, 403);
+    // One notice, not two: a separate app's subscribe doesn't take the app from a live Orbit's.
+    if (!via && record.via === 'orbit' && record.sub && record.sub.endpoint !== sub.endpoint && Date.now() - (record.kept || 0) < ORBIT_FRESH_MS) return reply({ ok: true, skipped: 'orbit', n: record.items?.length || 0 });
     record.sub = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } };
     record.lang = body.lang === 'en' ? 'en' : 'zh';
+    if (via) {
+      record.via = 'orbit';
+      record.o = typeof body.o === 'string' && /^[\w-]{1,300}$/.test(body.o) ? body.o : '';
+      // The Orbit's apps changed: the ones it dropped stop here (same Orbit, same phone).
+      for (const k of (await kv.list({ prefix: `push:${session.d}:`, all: true })).keys || []) {
+        const other = k.name.slice(k.name.lastIndexOf(':') + 1);
+        if (k.name === key || apps.includes(other) || !BRANDS[other]) continue;
+        const rec = await kv.get(k.name, 'json').catch(() => null);
+        if (rec?.via === 'orbit' && (rec.o || '') === record.o && rec.sub?.endpoint === sub.endpoint) await kv.delete(k.name);
+      }
+    } else {
+      delete record.via;
+      delete record.o;
+    }
   } else if (path === '/push/schedule') {
     // News that happens once (a game's final score, a price reached) and was
     // told already isn't taken again: an app whose copy of the game is behind
@@ -491,7 +529,7 @@ export async function sendDue(env, now = Date.now()) {
         const own = String(item.title || '').replace('{place}', found.place ? `${found.place} ` : '');
         message = { ...message, title: found.title ? found.title.replace('{title}', own) : own, body: (item.body || found.body || '').replace('{result}', found.result || '') };
       }
-      const r = await sendPush(env, record.sub, message).catch(e => `failed ${e?.message || e}`);
+      const r = await sendPush(env, record.sub, decorate(app, record, message)).catch(e => `failed ${e?.message || e}`);
       record.last = { at: now, r };
       if (r === 'sent' && item.tag) record.told = { ...Object.fromEntries(Object.entries(record.told || {}).filter(([, at]) => at > now - TOLD_MS)), [toldKey(item)]: now };
       if (r === 'gone') gone = true;
@@ -518,7 +556,7 @@ export async function notifyNow(env, account, app, kind, make) {
   if (!record?.sub) return 'none';
   const prefs = await kv.get(prefsKey(account), 'json').catch(() => null);
   if (!wanted(prefs, app, { kind })) return 'off';
-  const r = await sendPush(env, record.sub, make(record.lang));
+  const r = await sendPush(env, record.sub, decorate(app, record, make(record.lang)));
   if (r === 'gone') await kv.delete(key);
   return r;
 }

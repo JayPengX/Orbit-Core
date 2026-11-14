@@ -3883,6 +3883,8 @@ dialog.q-newpass::backdrop { background: var(--q-page); }
   font: 600 15px/20px var(--q-font);
   color: var(--q-label-2);
 }
+.q-notice-app { display: flex; align-items: center; gap: 8px; }
+.q-notice-app .q-switch { margin-left: auto; flex: none; }
 .q-notice-row {
   display: flex;
   align-items: center;

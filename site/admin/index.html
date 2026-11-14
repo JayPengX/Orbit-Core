@@ -1491,7 +1491,7 @@ function drawAccount(a) {
   });
   recover.append(codeOut);
   codeBtn.onclick = () => recover.run(codeBtn);
-  const pushApp = el('select', { class: 'grow' }, a.pushes.map(x => el('option', { value: x, text: appName(x) })));
+  const pushApp = el('select', { class: 'grow' }, [...(a.pushes.length > 1 ? [el('option', { value: '', text: '每個 App' })] : []), ...a.pushes.map(x => el('option', { value: x, text: appName(x) }))]);
   const pushBtn = el('button', { text: '送出' });
   const pushTest = a.pushes.length
     ? action('測試通知', '', [pushApp, pushBtn], async () => {

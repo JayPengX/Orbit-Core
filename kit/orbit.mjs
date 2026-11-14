@@ -32,7 +32,7 @@
 
 import { BRANDS, APP_ORDER, FAMILY, pathOf, homeOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
-import { encodeSetup, startOf, newId, mineSaved, mergeMine, MINE_KEY } from './orbit-mine.mjs';
+import { encodeSetup, startOf, newId, mineSaved, mergeMine, MINE_KEY, appsOf, whichTag } from './orbit-mine.mjs';
 import { API, SITE as HOME, isApi } from './domain.mjs';
 import { passkeyHere, passkeyName, deviceName, makePasskey, usePasskey, forgetPasskey, cancelled } from './passkey.mjs';
 import { icons, tile, cell, pullToRefresh, setSheetDetent, toast, sheet, h as node } from './ui.mjs';
@@ -3733,7 +3733,10 @@ export async function enablePush(s, force = false) {
     // push only to the installed web app, so a subscription from a frame's
     // worker, or one left from a standalone app taken off the home screen,
     // never showed (Jay 11-14: a test notice never came).
-    const own = inSuite() ? await navigator.serviceWorker.getRegistration('/app/').catch(() => null) : null;
+    // An app that isn't in this Orbit's list sends nothing to it.
+    const orbit = inSuite() ? { o: whichTag(), apps: appsOf(whichTag()) } : null;
+    if (orbit && !orbit.apps.includes(s.app)) return false;
+    const own = orbit ? await navigator.serviceWorker.getRegistration('/app/').catch(() => null) : null;
     const reg = own || (await Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(r, 4000))]));
     if (!reg?.pushManager) return false;
     // The Worker's key, asked once a day (it was asked at every list change).
@@ -3746,10 +3749,11 @@ export async function enablePush(s, force = false) {
     const keyed = sub?.options?.applicationServerKey ? btoa(String.fromCharCode(...new Uint8Array(sub.options.applicationServerKey))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') === key : true;
     if (sub && !keyed) await sub.unsubscribe().catch(() => {});
     if (!sub || !keyed) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) });
-    const mark = `${sub.endpoint}|${new Date().toDateString()}`;
+    // (An Orbit's list changed: given again, so the Worker drops what it left.)
+    const mark = `${sub.endpoint}|${orbit ? `${orbit.o}:${orbit.apps.join(',')}|` : ''}${new Date().toDateString()}`;
     const storeKey = `orbit.push.sub.${s.app}`;
     if (!force && readStore(storeKey) === mark) return true;
-    if (await pushPost(s, 'subscribe', { sub: sub.toJSON(), lang: s.lang })) writeStore(storeKey, mark);
+    if (await pushPost(s, 'subscribe', { sub: sub.toJSON(), lang: s.lang, ...(orbit ? { via: 'orbit', o: orbit.o, apps: orbit.apps } : {}) })) writeStore(storeKey, mark);
     return true;
   } catch {
     return false;
@@ -3895,7 +3899,12 @@ function savePrefs(next, s) {
   return prefs;
 }
 // Whether notices of this kind are wanted (every kind is, until turned off).
-export const kindOn = (app, kind) => !kind || !notifyPrefs().off.includes(`${app}:${kind}`);
+// `<app>:all` is that whole app off (its own switch: Sports off never stops Weather).
+export const kindOn = (app, kind) => {
+  const off = notifyPrefs().off;
+  return !off.includes(`${app}:all`) && (!kind || !off.includes(`${app}:${kind}`));
+};
+export const setAppNotices = (app, on, s = null) => setKind(app, 'all', on, s);
 export function setKind(app, kind, on, s = null) {
   const prefs = notifyPrefs();
   const off = prefs.off.filter(k => k !== `${app}:${kind}`);
@@ -4200,7 +4209,7 @@ function notifyRows(s, note) {
     { class: 'q-notice-kinds', hidden: true },
     order.map(app =>
       node('div', { class: 'q-notice-group' }, [
-        node('p', { class: 'q-notice-app' }, [appMark(app), document.createTextNode(APPS[app].short)]),
+        node('p', { class: 'q-notice-app' }, [appMark(app), document.createTextNode(APPS[app].short), toggle(kindOn(app), T(`${APPS[app].short} 的通知`, `${APPS[app].short} notices`), on => void (setAppNotices(app, on, s), paintCount()))]),
         ...NOTICE_KINDS[app].map(([kind, zh, e, dzh, de]) =>
           node('div', { class: 'q-notice-row' }, [
             node('div', { class: 'q-notice-text' }, [node('strong', { text: T(zh, e) }), node('small', { class: 'q-notice-sub', text: T(dzh, de) })]),
