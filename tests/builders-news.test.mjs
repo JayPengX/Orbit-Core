@@ -3,8 +3,8 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { teamsOf, otherGame, ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN } from '../builders/news.js';
-import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS } from '../kit/news-outlets.mjs';
+import { teamsOf, otherGame, gameOf, unboiled, ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN } from '../builders/news.js';
+import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS, SPORTS_OUTLETS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
 const NOW = Date.parse('2026-11-10T03:00:00Z');
@@ -152,9 +152,14 @@ test('快訊: a story many outlets carried in the last 2 hours is live and ranke
   assert.equal(storyOf(game, 'tw', NOW).live, undefined);
 });
 
-test('outlets: every one has a place and a reason; only state media stand apart', () => {
+test('outlets: every one has a place and a reason; only state media and the sports outlets stand apart', () => {
   for (const o of Object.values(OUTLETS)) {
     assert.ok(o.basis.length, o.id);
+    // (The sports outlets on no scale, Jay 11-14: "let them be alone".)
+    if (SPORTS_OUTLETS.has(o.id)) {
+      assert.equal(sideOf(o, o.region), null, o.id);
+      continue;
+    }
     if (o.region === 'tw') assert.ok([-2, -1, 0, 1, 2].includes(o.tw), o.id);
     // (No 未評 left, Jay 11-10: AllSides, else Media Bias/Fact Check.)
     if (o.kind === 'state') assert.equal(sideOf(o, 'intl'), null, o.id);
@@ -810,4 +815,33 @@ test('two games never one story: one outlet’s template previews naming other t
   assert.ok(groups.every(g => g.length === 1), groups.map(g => g.map(it => it.t).join(' + ')).join(' | '));
   assert.equal(teamsOf('Senators push AI bill', 'en'), null, 'a Senators’ bill isn’t a game');
   assert.ok(!otherGame(teamsOf('Curry out as Warriors face Spurs', 'en'), teamsOf('Warriors visit Spurs Friday in NBA Cup group stage', 'en')));
+});
+
+test('sports and the rest are two desks; one game is one story; betting and boilerplate are out (Jay 11-14)', () => {
+  // Taiwan's reports of one game, in words too different to join by words alone.
+  const game = [
+    ['chinatimes', '詹皇再休兵沒差 七六人上演17分逆轉秀擊退暴龍'],
+    ['ltn', '詹姆斯沒打！七六人靠馬克西領軍克服17分落後大逆轉暴龍'],
+    ['nownews', 'NBA 11/13戰報》東區第2支10勝球隊！沒詹皇的76人123:112宰暴龍'],
+    ['ctinews', 'NBA/詹皇沒打不要緊！七六人驚天逆轉 三巨頭合砍65分痛宰暴龍']
+  ].map(([o, t], i) => item(o, t, NOW - H - i * 600_000));
+  assert.equal(gameOf(game[2].t, 'zh'), '76人|暴龍', '七六人 and 76人 one team');
+  assert.equal(gameOf('NBA 11/13賽程》詹皇、恩比德出戰成疑 七六人戰暴龍', 'zh'), '', 'a preview names no game');
+  const tw = deskOf(game, [], NOW);
+  assert.equal(tw.sport.tw.filter(s => s.n >= 4).length, 1, 'one story of four outlets');
+  // A sports outlet's report on the games a ground stop held up stays out of the ground stop's story.
+  const faa = ['ap', 'reuters', 'nyt', 'cnn'].map((o, i) => item(o, `FAA orders nationwide ground stop of all departing flights ${i}`, NOW - H - i * 60_000, { img: `https://${o}.example/faa.jpg` }));
+  const si = item('si', 'Texas Longhorns cleared for new takeoff time after FAA lifts nationwide ground stop of flights', NOW - 30 * 60_000, { img: 'https://si.example/longhorns.jpg' });
+  const out = deskOf([...faa, si], [], NOW);
+  const story = out.intl.find(s => /ground stop/.test(s.title));
+  assert.ok(story && !story.items.some(it => it[0] === 'si') && !/longhorns/.test(story.img));
+  // A story mixed before is mended: the other desk's reports let go.
+  const mixed = { id: 'mix', r: 'intl', first: NOW - 2 * H, last: NOW - H, peak: 5, items: [...faa, si].map(({ o, t, u, at }) => ({ o, t, u, at })) };
+  const mended = deskOf([...faa, si], [mixed], NOW);
+  assert.ok(!mended.intl.find(s => s.id === 'mix')?.items.some(it => it[0] === 'si'));
+  // Betting tips aren't news; a feed's copyright line is no summary.
+  assert.equal(fillerOf({ t: 'Spain vs England predictions: Uefa Nations League tips and odds', u: 'https://x/1' }, 'en'), 'betting');
+  assert.equal(fillerOf({ t: 'Harry Kane breaks caps record as England reach Nations League knockouts', u: 'https://x/2' }, 'en'), '');
+  assert.equal(unboiled('Copyright 2026 The Associated Press. All Rights Reserved. Passengers wait at a terminal.'), 'Passengers wait at a terminal.');
+  assert.equal(unboiled('Kane scored again. Continue reading...'), 'Kane scored again.');
 });

@@ -8,7 +8,8 @@
 //   cs  統獨: −2 主張獨立, −1 偏獨, 0 不站邊, 1 偏統, 2 親北京
 //   lr  English outlets' left and right (AllSides): −2 Left … 2 Right;
 //       where AllSides has none, Media Bias/Fact Check's (`mbfc`); null
-//       only for China's state media, counted apart as 官媒
+//       for China's state media, counted apart as 官媒, and the sports
+//       outlets (SPORTS_OUTLETS), placed on no scale
 //   kind  private | public (公共媒體) | gov (政府出資) | nonprofit | state (中國官媒)
 //
 // No outlet is placed as 白 (民眾黨): no study rates one so. A story says
@@ -110,7 +111,7 @@ const ROWS = [
   ['ithome', 'iThome', 'iThome', 'ithome.com.tw', 'private', 0, 0, null, 'iThome', 'iThome', ['stance'], true],
   ['technews', '科技新報', 'TechNews', 'technews.tw', 'private', 0, 0, null, '科技新報', 'TechNews', ['stance'], true],
   ['pansci', '泛科學', 'PanSci', 'pansci.asia', 'private', 0, 0, null, '泛科知識', 'PanSci Knowledge', ['stance'], true],
-  ['sportsv', '運動視界', 'Sports Vision', 'sportsv.net', 'private', 0, 0, null, '運動視界', 'Sports Vision', ['stance'], true],
+  ['sportsv', '運動視界', 'Sports Vision', 'sportsv.net', 'private', null, null, null, '運動視界', 'Sports Vision', ['stance'], true],
   // (11-13, Jay: "even more news outlet from Taiwan and international".)
   ['ctv', '中視', 'CTV News', 'ctv.com.tw', 'private', 1, 1, null, '旺旺中時集團（蔡衍明）', 'Want Want China Times (Tsai Eng-meng)', ['teds2019'], false],
   ['ttv', '台視', 'TTV News', 'ttv.com.tw', 'private', 0, 0, null, '台灣電視（非凡集團）', 'Taiwan Television (USTV group)', ['teds2019'], false],
@@ -214,16 +215,16 @@ const ROWS = [
   ['yonhap', '韓聯社', 'Yonhap', 'yna.co.kr', 'gov', null, null, 1, '聯合通訊社（政府出資）', 'Yonhap (government-funded)', ['mbfc'], false],
   ['straits', '海峽時報', 'The Straits Times', 'straitstimes.com', 'private', null, null, 1, '新報業媒體信託', 'SPH Media Trust', ['mbfc'], false],
   // (11-13: a sports desk, for Orbit Sports' links to the news: no rating of its own, placed as CBS News, its group's.)
-  ['cbssports', 'CBS Sports', 'CBS Sports', 'cbssports.com', 'private', null, null, -1, '派拉蒙', 'Paramount', ['group'], true],
+  ['cbssports', 'CBS Sports', 'CBS Sports', 'cbssports.com', 'private', null, null, null, '派拉蒙', 'Paramount', ['group'], true],
   // (11-13, Jay: the sports outlets themselves. Placed as their group's news
   // outlet where it has one (ESPN as ABC News, The Athletic as The New York
   // Times); the rest unrated, 中間 marked weak.
   // A game has no sides: none of it shows on a sports story.)
-  ['espn', 'ESPN', 'ESPN', 'espn.com', 'private', null, null, -1, '迪士尼', 'Disney', ['group'], true],
-  ['athletic', 'The Athletic', 'The Athletic', 'theathletic.com', 'private', null, null, -1, '紐約時報公司', 'The New York Times Company', ['group'], true],
-  ['yahoosports', 'Yahoo 體育', 'Yahoo Sports', 'sports.yahoo.com', 'private', null, null, 0, 'Yahoo（阿波羅）', 'Yahoo (Apollo)', ['stance'], true],
-  ['skysports', 'Sky Sports', 'Sky Sports', 'skysports.com', 'private', null, null, 0, '天空（康卡斯特）', 'Sky (Comcast)', ['stance'], true],
-  ['si', '運動畫刊', 'Sports Illustrated', 'si.com', 'private', null, null, 0, 'Minute Media', 'Minute Media', ['stance'], true]
+  ['espn', 'ESPN', 'ESPN', 'espn.com', 'private', null, null, null, '迪士尼', 'Disney', ['group'], true],
+  ['athletic', 'The Athletic', 'The Athletic', 'theathletic.com', 'private', null, null, null, '紐約時報公司', 'The New York Times Company', ['group'], true],
+  ['yahoosports', 'Yahoo 體育', 'Yahoo Sports', 'sports.yahoo.com', 'private', null, null, null, 'Yahoo（阿波羅）', 'Yahoo (Apollo)', ['stance'], true],
+  ['skysports', 'Sky Sports', 'Sky Sports', 'skysports.com', 'private', null, null, null, '天空（康卡斯特）', 'Sky (Comcast)', ['stance'], true],
+  ['si', '運動畫刊', 'Sports Illustrated', 'si.com', 'private', null, null, null, 'Minute Media', 'Minute Media', ['stance'], true]
 ];
 
 // Taiwan's outlets come first in ROWS; the rest (from the BBC) are the English ones.
@@ -232,6 +233,10 @@ export const OUTLETS = Object.fromEntries(
   ROWS.map(([id, zh, en, site, kind, tw, cs, lr, ownerZh, ownerEn, basis, weak], i) => [id, { id, zh, en, site, kind, tw, cs, lr, owner: { zh: ownerZh, en: ownerEn }, basis, weak, region: i < TW_COUNT ? 'tw' : 'intl' }])
 );
 export const outletOf = id => OUTLETS[id] || null;
+// The sports outlets: a desk of their own, never on the lean scale (Jay
+// 11-14: "why are you trying to categorize sport news outlet, let them be
+// alone"). The builder groups their reports with sports only.
+export const SPORTS_OUTLETS = new Set(['sportsv', 'cbssports', 'espn', 'athletic', 'yahoosports', 'skysports', 'si']);
 // An outlet's mark: its site's own small icon (no picture of ours), through
 // Google's icon service. Where Google has none for the outlet's site (it
 // sends a grey globe), the address it does have: another of the outlet's
