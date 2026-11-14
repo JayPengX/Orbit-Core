@@ -394,7 +394,7 @@ Broker rules (`stock-access.mjs`, `-credit`): Securities' MAP.md.
 ## 8. Notices (`/push`)
 
 Apps hand the Worker coming notices (`schedulePush`); it sends them by
-Web Push and can check first (an ESPN final, a price, weather, a bus). One device per person per app; each kind in `NOTICE_KINDS` can be off; one due in class waits for the break (`classHold`).
+Web Push and can check first (an ESPN final, a price, weather, a bus). One device per person per app. Subscriptions live in D1 (`push_kv`, `pushStore(env)`), never read from `RATE_LIMIT_KV` directly: the admin's `push-test`, `pushes`, `broadcast` and account delete (`eco-admin.js`) all go through it; `push-test` answers per subscription (none, accepted by Apple or the push service, gone and removed, failed with its status). Orbit (`/app/`) subscribes with its own worker (scope `/app/`), saved under each framed app's slug;  each kind in `NOTICE_KINDS` can be off; one due in class waits for the break (`classHold`).
 
 ## 9. Speeds, capacity and the bill
 

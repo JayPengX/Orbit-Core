@@ -1496,7 +1496,9 @@ function drawAccount(a) {
   const pushTest = a.pushes.length
     ? action('測試通知', '', [pushApp, pushBtn], async () => {
         const r = await admin('push-test', { wallet: a.ref, app: pushApp.value });
-        return r.ok ? '已送出' : `沒送到（${r.result}）`;
+        // One plain answer per subscription (eco-admin.js pushTestResult): taken by Apple, gone (removed), or failed with its code.
+        if (!r.ok) throw new Error(r.text || `沒送到（${r.result}）`);
+        return r.text || '已送出';
       })
     : null;
   if (pushTest) pushBtn.onclick = () => pushTest.run(pushBtn);
