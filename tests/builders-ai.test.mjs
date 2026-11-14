@@ -69,7 +69,7 @@ test('news: a title in the other language, once a story; no line under it; an ol
 });
 
 test('news sides: only stories sides frame and both ends carry; each side’s headlines, four outlets at most', async () => {
-  const items = [['ltn', '綠一'], ['ltn', '綠一再'], ['setn', '綠二'], ['cna', '中一'], ['udn', '藍一'], ['chinatimes', '藍二'], ['globaltimes', '官媒'], ['newtalk', 'n'], ['peoples', 'p'], ['ftv', 'f']];
+  const items = [['ltn', '綠一'], ['ltn', '綠一再'], ['setn', '綠二'], ['cna', '中一'], ['udn', '藍一'], ['chinatimes', '藍二'], ['newtalk', 'n'], ['peoples', 'p'], ['ftv', 'f']];
   const s = { id: 'x', m: 9, topics: ['pol'], sides: { g: 5, c: 1, b: 2 }, items };
   assert.equal(sidesWanted(s, 'tw'), true);
   assert.equal(sidesWanted({ ...s, topics: ['biz'] }, 'tw'), false, 'a company’s revenue reads the same from both ends');
