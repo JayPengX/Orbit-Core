@@ -212,7 +212,7 @@ if (!only.length || only.includes('site')) {
 }
 await browser.close();
 
-// The family's home (orbit.<d>/pass/, and / sends here): Orbit first, the
+// The family's home (orbit.<d>/, the root; /pass/ forwards here): Orbit first, the
 // whole family in one home-screen app (/app/), then each app on its own,
 // the Pass that signs into all of them last. In one language at a time
 // (Jay 2026-10-27: "mixed with two languages"): written in Chinese, each text
@@ -221,15 +221,17 @@ await browser.close();
 // 2026-11-14: the language is picked by itself). Jay 2026-11-14: "look
 // better", not more on it; the lines are the brand's short pitches.
 function homePage() {
-  const home = `${SITE_URL}${DOMAIN ? '/pass/' : '/Orbit-Core/'}`;
+  const home = `${SITE_URL}${DOMAIN ? '/' : '/Orbit-Core/'}`;
+  // (served at the root, its files stay where the site is: /pass/…)
+  const at = DOMAIN ? '/pass/' : './';
   const two = (tag, t, attrs = '') => `<${tag}${attrs} data-en="${esc(t.en)}">${esc(t.zh)}</${tag}>`;
   const chev = '<svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>';
   const ids = Object.keys(BRANDS);
   const card = id => {
     const b = BRANDS[id];
-    return `<a class="app" href="${DOMAIN ? shortPathOf(id) : pathOf(id)}"><img src="brand/${id}.svg" alt="" width="48" height="48"><span class="t"><strong>${esc(b.name)}</strong>${two('small', b.pitch)}</span>${chev}</a>`;
+    return `<a class="app" href="${DOMAIN ? shortPathOf(id) : pathOf(id)}"><img src="${at}brand/${id}.svg" alt="" width="48" height="48"><span class="t"><strong>${esc(b.name)}</strong>${two('small', b.pitch)}</span>${chev}</a>`;
   };
-  const stack = ids.map((id, i) => `<img src="brand/${id}.svg" alt="" width="40" height="40" style="--i:${i}">`).join('');
+  const stack = ids.map((id, i) => `<img src="${at}brand/${id}.svg" alt="" width="40" height="40" style="--i:${i}">`).join('');
   const og = (k, v) => `<meta property="og:${k}" content="${esc(v)}">`;
   return `<!doctype html>
 <html lang="zh-Hant"><head>
@@ -237,9 +239,11 @@ function homePage() {
 <title>Orbit</title>
 <meta name="description" content="Orbit：每天用得到的 App，全部用同一個 Orbit Pass。">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f2f7"><meta name="theme-color" media="(prefers-color-scheme: dark)" content="#05051a">
-<link rel="icon" href="brand/family-orbit.svg" type="image/svg+xml"><link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-${og('type', 'website')}${og('site_name', 'Orbit')}${og('title', 'Orbit')}${og('description', 'Orbit：每天用得到的 App，一個 Orbit Pass。')}${og('url', home)}${og('image', `${home}brand/pass-og.jpg`)}${og('image:width', 1200)}${og('image:height', 630)}
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${home}brand/pass-x.jpg">
+<link rel="icon" href="${at}brand/family-orbit.svg" type="image/svg+xml"><link rel="icon" href="${at}icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="manifest" href="/app/manifest.webmanifest"><link rel="apple-touch-icon" href="/app/icons/apple-touch-icon.png"><meta name="apple-mobile-web-app-title" content="Orbit"><meta name="application-name" content="Orbit">
+<script>(()=>{let s=false;try{s=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true||sessionStorage.getItem('orbit.suite')==='1'}catch{}if(s)location.replace('/app/'+location.search+location.hash)})()</script>
+${og('type', 'website')}${og('site_name', 'Orbit')}${og('title', 'Orbit')}${og('description', 'Orbit：每天用得到的 App，一個 Orbit Pass。')}${og('url', home)}${og('image', `${SITE_URL}${DOMAIN ? '/pass/' : '/Orbit-Core/'}brand/pass-og.jpg`)}${og('image:width', 1200)}${og('image:height', 630)}
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${SITE_URL}${DOMAIN ? '/pass/' : '/Orbit-Core/'}brand/pass-x.jpg">
 <script>(()=>{let l;try{l=localStorage.getItem('orbit.lang')}catch{}if(l!=='zh'&&l!=='en'){const n=navigator.languages?.length?navigator.languages:[navigator.language||'zh-TW'];l=n.some(x=>/^zh/i.test(x))?'zh':'en'}if(l==='en')document.documentElement.lang='en'})()</script>
 <style>
 :root{color-scheme:light dark;--page:#f2f2f7;--glow:rgba(99,102,241,.16);--cell:#fff;--label:#000;--label-2:rgba(60,60,67,.6);--sep:rgba(60,60,67,.18);--press:rgba(0,0,0,.04);--btn:#4f46e5;--btn-ink:#fff;--ring:#f2f2f7}
@@ -287,7 +291,7 @@ a:focus-visible,button:focus-visible{outline:2px solid #6366f1;outline-offset:2p
 @media (hover:hover) and (pointer:fine){.note{display:none}}
 </style></head><body><main>
 <section class="hero">
-<img class="mark" src="brand/family-orbit.svg" alt="">
+<img class="mark" src="${at}brand/family-orbit.svg" alt="">
 <h1>${FAMILY.name}</h1>
 <p class="lead">${two('span', { zh: '每天用得到的 App，', en: 'Your everyday apps, ' })}${two('span', { zh: '都在一個圖示裡，登入一次就好。', en: 'all in one icon, signed in once.' })}</p>
 <div class="stack" aria-hidden="true">${stack}</div>
@@ -296,7 +300,7 @@ ${two('p', { zh: '在手機上加到主畫面，就是一個 App。', en: 'On a 
 </section>
 <section>${two('h2', { zh: '也可以單獨打開', en: 'Or open one on its own' })}<div class="apps">${ids.map(card).join('')}</div></section>
 <a class="more" href="https://jaypengx.com/showcase/"><span class="glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H4zM12 16v3M8 20h8M8 13v-3M12 13V8M16 13v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="t"><strong data-en="Showcase">展示</strong><small data-en="How Orbit is built">Orbit 怎麼做出來的</small></span>${chev}</a>
-<p class="pass"><img src="brand/pass.svg" alt=""><span><strong>${esc(PASS.name)}</strong> · <span class="nb" data-en="${esc(PASS.tag.en)}">${esc(PASS.tag.zh)}</span></span></p>
+<p class="pass"><img src="${at}brand/pass.svg" alt=""><span><strong>${esc(PASS.name)}</strong> · <span class="nb" data-en="${esc(PASS.tag.en)}">${esc(PASS.tag.zh)}</span></span></p>
 </main>
 <script>if(document.documentElement.lang==='en')for(const el of document.querySelectorAll('[data-en]'))el.textContent=el.dataset.en</script>
 </body></html>
