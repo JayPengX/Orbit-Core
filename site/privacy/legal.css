@@ -8,6 +8,7 @@ main{max-width:720px;margin:0 auto;padding:max(24px,env(safe-area-inset-top)) ma
 .top img{width:40px;height:40px;border-radius:10px;flex:none}
 .top nav{margin-left:auto;display:flex;gap:16px;font-size:15px;white-space:nowrap}
 .top nav a{color:var(--label-2);text-decoration:none}.top nav a[aria-current]{color:var(--label);font-weight:600}
+.top .back{font:inherit;font-size:17px;padding:6px 0;border:0;background:none;color:var(--accent);cursor:pointer}.top .back+img{display:none}
 h1{margin:0 0 4px;font:700 32px/1.15 ui-rounded,-apple-system,BlinkMacSystemFont,"SF Pro Rounded",system-ui,sans-serif}
 .date{margin:0 0 24px;color:var(--label-2);font-size:15px}
 .sum{margin:0 0 24px;padding:16px;border-radius:16px;background:var(--cell)}

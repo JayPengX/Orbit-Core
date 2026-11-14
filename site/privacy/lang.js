@@ -17,3 +17,14 @@
   for (const a of document.querySelectorAll('[data-keep-lang]')) a.href += `?lang=${l}`;
   document.title = document.querySelector(`article:not([hidden]) h1`)?.textContent + ' · Orbit';
 })();
+// A home-screen app has no back button: opened there on its own (not in the
+// app's sheet), the page gives one, back where it came from or to Orbit.
+(() => {
+  const alone = globalThis.top === globalThis && (globalThis.navigator?.standalone === true || globalThis.matchMedia?.('(display-mode: standalone)').matches);
+  const top = document.querySelector('.top');
+  if (!alone || !top) return;
+  const en = document.documentElement.lang === 'en';
+  const b = Object.assign(document.createElement('button'), { type: 'button', className: 'back', textContent: en ? '‹ Back' : '‹ 返回' });
+  b.onclick = () => (history.length > 1 ? history.back() : location.assign('/app/'));
+  top.prepend(b);
+})();
