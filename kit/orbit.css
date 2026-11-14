@@ -7609,10 +7609,21 @@ html.q-tabrail .q-appbar .q-actions > .q-suite .q-suite-btn {
   backdrop-filter: none;
   box-shadow: none;
 }
+/* (The app's icon as tall as the account's face beside it, a square's 4px
+   less than a circle's to look the same: a 28px icon over a 46px face was
+   lopsided, Jay 11-14 "unbalanced size". On a tablet the face a little
+   smaller in Orbit, so the icon isn't outsized either.) */
+html.q-in-suite.q-tabrail.q-float:not(.q-desk) {
+  --q-tabrail-face: 38px;
+}
 html.q-tabrail .q-appbar .q-actions > .q-suite .q-suite-btn img {
-  width: 28px;
-  height: 28px;
-  border-radius: 7.5px;
+  --q-sw-i: calc(var(--q-tabrail-face, 36px) - 4px);
+  width: var(--q-sw-i);
+  height: var(--q-sw-i);
+  border-radius: calc(var(--q-sw-i) * 0.26);
+}
+html.q-tabrail.q-desk .q-appbar .q-actions > .q-suite .q-suite-btn img {
+  --q-sw-i: 32px;
 }
 /* (Short of room: forward, then back, kept to the sheet; at the least this
    app beside the account, never over a tab. suite.mjs fit().) */
