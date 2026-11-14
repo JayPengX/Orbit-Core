@@ -208,6 +208,19 @@ export function teamsByZh(query, most = 6) {
 }
 // The full name (the lottery's), or the name as it came.
 export const teamZh = (key, name, sport = '') => teamNameZh(key, name, sport)?.full ?? name;
+// The NBA's or MLB's clubs a headline names by nickname (English as
+// written, "Rockets"; Chinese, 火箭), by their English names: a game's
+// related news leaves out another game's report (Jay 11-14: "Rockets halt
+// Warriors' 8-game winning streak" under Warriors v Spurs).
+export function usTeamsIn(key, text) {
+  const t = US[key];
+  const s = String(text || '');
+  if (!t || !s) return [];
+  return Object.keys(t).filter(n => {
+    const nick = (n.match(/(?:Red Sox|White Sox|Blue Jays|Trail Blazers|\S+)$/) || [''])[0];
+    return new RegExp(`(?:^|[^A-Za-z0-9])${nick.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:$|[^A-Za-z0-9])`).test(s) || (t[n][1] && s.includes(t[n][1]));
+  });
+}
 // A US team as a news line names it ("the Rockets", "Houston", "Trail
 // Blazers", "Golden State"): its English name (teamNameZh's key), or null
 // when none is, or the words are two teams' (New York, Chicago, Sox).

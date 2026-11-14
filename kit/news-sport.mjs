@@ -17,7 +17,7 @@
 // none: when in doubt, left out.
 //
 // Imports only kit modules: the builder runs it too.
-import { fold, teamNameZh, teamsByZh } from './names.mjs';
+import { fold, teamNameZh, teamsByZh, usTeamsIn } from './names.mjs';
 
 export const SPORT_PATH = 'news/sport.json';
 export const SPORT_VERSION = 1;
@@ -158,6 +158,7 @@ const ALIAS = {
 const ALIAS_BY = new Map(Object.entries(ALIAS).map(([k, v]) => [fold(k), v]));
 
 const US_LEAGUES = new Set(['nba', 'mlb']);
+const TW_HOOPS = /PLG|TPBL|P\.?\s?LEAGUE|富邦勇士|新北國王|獵鷹|領航猿|攻城獅|夢想家|雲豹|海神|戰神|特攻/;
 const TWO_WORDS = /\b(?:Red Sox|White Sox|Blue Jays|Trail Blazers)$/;
 
 // A team as Sports knows it: { name (ESPN's), short (its short name, "Lakers",
@@ -277,12 +278,17 @@ export function cleanSport(raw) {
 //   most     how many (4)
 // → [story…], a player's or team's own kinds of news (injury first) ahead
 // of the rest, newest first within each; a story once.
-export function newsAbout(pack, { players = [], teams = [], both = false, kinds = null, from = 0, to = Infinity, most = 4, now = Date.now() } = {}) {
+// `game`: the teams are a game's sides, and a story whose title names another
+// club of their league is another game's (Jay 11-14: "Rockets halt Warriors'
+// 8-game winning streak" under Warriors v Spurs).
+export function newsAbout(pack, { players = [], teams = [], both = false, game = false, kinds = null, from = 0, to = Infinity, most = 4, now = Date.now() } = {}) {
   const pw = players.map(playerWays).filter(w => w.full || w.zh.length >= 2);
   const tw = teams.map(teamWays).filter(w => w.name);
   if (!pw.length && !tw.length) return [];
   const out = [];
   const isSide = x => tw.some(w => fold(x) === fold(w.name));
+  const leagues = [...new Set(teams.map(t => t.league))];
+  const others = text => leagues.some(l => usTeamsIn(l, text).some(n => !isSide(n)));
   for (const s of pack?.list || []) {
     // (Reported within the times: its first report or its last. A game's
     // story is still told the day after, its last report past the window.)
@@ -297,8 +303,15 @@ export function newsAbout(pack, { players = [], teams = [], both = false, kinds 
     // never only in one of its links' headlines. A round-up the story drew
     // in, "Doncic helps Lakers beat Hawks; Wembanyama powers Spurs", put
     // Dončić's ankle under the Warriors v Spurs: Jay 2026-11-13.)
+    // (Named in its own words, never only in its links' headlines, read by
+    // the AI or not: the AI's reading is paused (11-14), and a story the
+    // builder drew a Warriors–Spurs report into, "Predicted Bundesliga
+    // lineups", stood under Warriors v Spurs, Jay 11-14.)
     const all = sportText(s);
-    const text = readBy(s) ? ownText(s) : all;
+    const text = ownText(s);
+    if (game && others(text)) continue;
+    // (Taiwan's own basketball, PLG and TPBL: its 勇士 is 富邦's, never the Warriors.)
+    if (leagues.includes('nba') && TW_HOOPS.test(text) && !/NBA/i.test(text)) continue;
     const hitP = pw.some(w => namesPlayer(text, w, s.who, { about: all }));
     const hitT = tw.length ? (both ? tw.every(w => namesTeam(text, w, s.who, { about: all })) : tw.some(w => namesTeam(text, w, s.who, { about: all }))) : false;
     if (hitP || hitT) out.push({ s, p: hitP });
