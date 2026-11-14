@@ -12,6 +12,7 @@ const memStore = (seed = {}) => {
 };
 const ev = o => `event: ${o.type}\ndata: ${JSON.stringify(o)}\n\n`;
 const claudeEnv = (answer, seen = []) => ({
+  AI_BULK: 'on',
   ANTHROPIC_API_KEY: 'a',
   OPENAI_API_KEY: 'o',
   GEMINI_RELAY: {
@@ -203,4 +204,12 @@ test('news AI: a Chinese title never keeps an English number unit (11-13: 「$30
   const { FEATURES } = await import('../ai-features.js');
   const stories = [{ id: 'a', lang: 'zh', heads: ['White House urges Congress to provide $30.1 billion for air traffic overhaul'] }];
   assert.deepEqual(FEATURES['news-lines'].clean({ items: [{ id: 'a', title: '白宮籲國會提供$30.1 billion推動航空改革' }] }, { stories }), {});
+});
+
+test("made ahead for everyone is paused (Jay 11-14: only what's opened): no call, no spend", async () => {
+  const { aiOnce } = await import('../ai.js');
+  let asked = 0;
+  const env = { ...claudeEnv(() => (asked++, { items: [] })), AI_BULK: undefined };
+  for (const f of ['news-lines', 'news-sides', 'news-brief', 'news-sport', 'news-markets', 'sports-recap', 'sports-preview', 'f1-story', 'words-cards', 'law-minutes']) assert.equal(await aiOnce(env, null, f, {}, 100), null, f);
+  assert.equal(asked, 0);
 });

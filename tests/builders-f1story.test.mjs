@@ -46,6 +46,7 @@ test('a race over is told once, as points with their drivers named; one with not
   const proxy = async url => (asked.push(url), session);
   let answer = { points: [{ lap: 4, no: '', zh: '安全車出動', en: 'The safety car came out' }, { lap: 6, no: '1', zh: '超前 Leclerc，換硬胎跑完 12 圈', en: 'Passed Leclerc, then 12 laps on hards' }] };
   const env = {
+    AI_BULK: 'on',
     ANTHROPIC_API_KEY: 'a',
     GEMINI_RELAY: { fetch: async () => new Response([{ type: 'content_block_delta', delta: { type: 'text_delta', text: JSON.stringify(answer) } }, { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: {} }].map(o => `event: ${o.type}\ndata: ${JSON.stringify(o)}\n\n`).join('')) }
   };

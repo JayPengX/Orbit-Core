@@ -192,8 +192,16 @@ async function spendDay(env, name, cap, day) {
 // A built-once job (a builder's recap, a title): the day's cap only.
 // → { out, model }; null when capped (the builder stops till tomorrow);
 // { error } when no model gave a usable answer (that one is tried again later).
+// Made ahead for everyone, read or not (Jay 11-14: "I don't want money spent
+// on things I don't open"): paused. Gemini cost US$52 in 4 days (Law's
+// 代表會 minutes, whole scanned PDFs, read in bulk each night), the Claude
+// credit ran out on News's bulk runs (各方怎麼說 on Sonnet 4 times an hour).
+// Each comes back made when someone opens it, or as code; till then the
+// apps show what was made before, or the outlet's own words. (env AI_BULK
+// 'on': made ahead again; the tests.)
+export const BULK_PAUSED = new Set(['news-lines', 'news-sides', 'news-brief', 'news-sport', 'news-markets', 'sports-recap', 'sports-preview', 'f1-story', 'words-cards', 'law-minutes']);
 export async function aiOnce(env, ctx, name, input, cap) {
-  if (!FEATURES[name]) return null;
+  if (!FEATURES[name] || (BULK_PAUSED.has(name) && env?.AI_BULK !== 'on')) return null;
   if (!(await spendDay(env, name, cap, twDay()))) return null;
   try {
     return await runFeature(env, ctx, name, input);
@@ -260,6 +268,8 @@ export async function handleAiBuild(request, env, ctx, headers, { cap = 0, gemin
   const name = String(body?.feature || '');
   const f = FEATURES[name];
   if (!f?.build || !BUILD_KEYS[f.build]) return json({ error: 'feature' }, 400, headers);
+  // (A bulk job paused: the build keeps what it has; 429 stops its asks for the run.)
+  if (BULK_PAUSED.has(name) && env?.AI_BULK !== 'on') return json({ error: 'cap', why: 'paused' }, 429, headers);
   if (!buildKeyOk(request.headers.get('X-Build-Key'), env?.[BUILD_KEYS[f.build]])) return json({ error: 'key' }, 401, headers);
   const input = f.input ? f.input(body?.input) : body?.input;
   if (!input) return json({ error: 'input' }, 400, headers);
