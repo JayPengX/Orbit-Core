@@ -597,6 +597,23 @@ function ownScroll(w = globalThis, d = document) {
   w.scrollBy = (x, y) => b.scrollBy(to(x, y));
   // (The body's scroll, told as the window's: it doesn't bubble by itself.)
   b.addEventListener('scroll', e => e.target === b && d.dispatchEvent(new Event('scroll', { bubbles: true })), { passive: true });
+  // Back on the screen (Orbit swiped away and opened again, or this app shown
+  // again): the body's scroll made afresh, where it was. An iPhone kept the old
+  // one's measure, its scroll bar longer than the page and deaf to a hold
+  // (Jay 11-14, News and family-wide).
+  const anew = () => {
+    if (d.visibilityState !== 'visible') return;
+    const y = b.scrollTop;
+    b.style.overflowY = 'hidden';
+    void b.offsetHeight;
+    b.style.overflowY = '';
+    b.scrollTop = y;
+  };
+  d.addEventListener('visibilitychange', anew);
+  w.addEventListener('pageshow', anew);
+  try {
+    w.top.document.addEventListener('visibilitychange', () => w.top.document.visibilityState === 'visible' && setTimeout(anew, 0));
+  } catch {}
 }
 // A sheet open over the page: a swipe in it scrolls the sheet or nothing,
 // never the page behind it (Jay 11-14, the switcher's).
