@@ -47,7 +47,7 @@ orbit-site (site.js): the domain's hosts as custom domains
 | Orbit Securities | `stock` | `/securities/` | Orbit-Securities | `stock-study-accounts` |
 
 Order: `APP_ORDER`. Orbit-Showcase: Jay's homepage, `/showcase/`. This repo's site has the family page
-(`/pass/`) and the admin page (`site/admin/`). A new app: a `slug` in
+(`/`) and the admin page (`site/admin/`). A new app: a `slug` in
 `kit/brand.mjs` and a collection in `eco.js` `ECO_APPS`.
 
 **An app's shape.** `public/index.html` is `<html data-look="native">` (DESIGN

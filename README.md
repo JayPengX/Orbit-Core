@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>The engine room behind every Orbit app.</b><br>
-  <a href="https://orbit.jaypengx.com/app/"><b>Use Orbit</b></a> · <a href="https://orbit.jaypengx.com/pass/">orbit.jaypengx.com</a> · proxy at <code>api.jaypengx.com</code>
+  <a href="https://orbit.jaypengx.com/app/"><b>Use Orbit</b></a> · <a href="https://orbit.jaypengx.com/">orbit.jaypengx.com</a> · proxy at <code>api.jaypengx.com</code>
 </p>
 
 <p align="center">
@@ -40,7 +40,7 @@ The Orbit apps are static sites. Everything server-side, plus the kit and brand 
 | [Orbit Money](https://github.com/JayPengX/Orbit-Money) | [orbit.jaypengx.com/money](https://orbit.jaypengx.com/money/) | Every dollar, in its place |
 | [Orbit News](https://github.com/JayPengX/Orbit-News) | [orbit.jaypengx.com/news](https://orbit.jaypengx.com/news/) | One story, every side |
 
-The family page and Orbit Pass sign-in are at [orbit.jaypengx.com/pass](https://orbit.jaypengx.com/pass/); how it's all built, in pictures and numbers, is at [jaypengx.com/showcase](https://jaypengx.com/showcase/).
+The family page is at [orbit.jaypengx.com](https://orbit.jaypengx.com/); how it's all built, in pictures and numbers, is at [jaypengx.com/showcase](https://jaypengx.com/showcase/).
 
 ## Features
 

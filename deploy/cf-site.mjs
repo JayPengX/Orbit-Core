@@ -9,7 +9,7 @@
 // over orbit-site's custom domains on the same hosts (site.js), which hold
 // the hosts' DNS and certificates.
 //   an app (kit/brand.mjs SHORT)  orbit.<d>/<slug>…  → orbit-<slug>
-//   Orbit-Core                    orbit.<d>/… bar the apps: / (→ /pass/), /pass/,
+//   Orbit-Core                    orbit.<d>/… bar the apps: / (the family's home), /pass/ (→ /),
 //                                 /key/ (the public giveaway, gift.js),
 //                                 /app/ (Orbit, every app in one: kit/suite.mjs),
 //                                 /Orbit-Core/ (and the old /Shared-Proxy/);
@@ -38,13 +38,15 @@ export function siteFor(repo, domain = DOMAIN) {
     const kitRoots = ['Orbit-Core', 'Shared-Proxy'];
     return {
       name: 'orbit-pass',
-      put: [['', '/pass'], ...kitRoots.map(r => ['', `/${r}`]), ['key', '/key'], ['app', '/app'], ['favicon.ico', '/favicon.ico'], ['icons/apple-touch-icon.png', '/apple-touch-icon.png'], ['icons/apple-touch-icon.png', '/apple-touch-icon-precomposed.png']],
+      put: [['', '/pass'], ['index.html', '/index.html'], ...kitRoots.map(r => ['', `/${r}`]), ['key', '/key'], ['app', '/app'], ['favicon.ico', '/favicon.ico'], ['icons/apple-touch-icon.png', '/apple-touch-icon.png'], ['icons/apple-touch-icon.png', '/apple-touch-icon-precomposed.png']],
       // The whole orbit. host bar the apps' paths (theirs are more
       // specific, so they win): the root, the family page, the kit, the root
       // icons, and a 404 for anything else. The kit on the bare host too
       // (the showcase loads it).
       routes: [`${orbit}/*`, ...kitRoots.map(r => `${d}/${r}*`)],
-      redirects: ['/ /pass/ 302']
+      // (The family's home is the root since 2026-11-14, Jay: "orbit.jaypengx.com is the home for
+      // all those apps"; its pictures stay under /pass/, and the admin page at /pass/admin/.)
+      redirects: ['/pass/ / 301', '/pass/index.html / 301']
     };
   }
   if (repo === 'Orbit-Showcase') {
