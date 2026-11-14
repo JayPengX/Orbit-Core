@@ -2193,6 +2193,14 @@ function makeSession(app, { lang, heartbeat }) {
   s.passkeyAddBegin = () => withToken(qt => call('POST', '', { op: 'passkey-add-begin', qt }));
   s.passkeyAdd = (challenge, credential) => withToken(qt => call('POST', '', { op: 'passkey-add', qt, challenge, credential, device: deviceName() })).then(absorb);
   s.passkeyRemove = id => withToken(qt => call('POST', '', { op: 'passkey-remove', qt, id })).then(absorb);
+  // The recovery email (pass-mail.mjs's screens; the Worker's pass-mail.js):
+  // a code mailed to link it, and one to sign in by it when the pass is lost
+  // (a fresh session: a new pass next, freshGate).
+  s.mailBegin = addr => withToken(qt => call('POST', '', { op: 'mail-begin', qt, addr, lang: s.lang }));
+  s.mailConfirm = code => withToken(qt => call('POST', '', { op: 'mail-confirm', qt, code, lang: s.lang })).then(absorb);
+  s.mailRemove = () => withToken(qt => call('POST', '', { op: 'mail-remove', qt, lang: s.lang })).then(absorb);
+  s.mailRecoverBegin = addr => call('POST', '', { op: 'mail-recover-begin', addr, lang: s.lang });
+  s.mailRecover = (addr, code) => signIn({ op: 'mail-recover', addr, code });
   // (The heartbeat's read every 2 minutes: the whole wallet, up to hundreds
   // of KB, came back each time, and every app redrew for it.)
   // (`since`: the updateTime of the app's data held here; while it's still
@@ -2282,10 +2290,11 @@ function makeSession(app, { lang, heartbeat }) {
     if (!first) first = await signInGate(s);
     // A pass someone handed over: replaced before the app opens (the
     // Worker opens nothing else with it; eco.js freshPass).
-    if (first?.fresh) first = await freshGate(s);
+    if (first?.fresh) first = await freshGate(s, first);
     s.first = first;
     // A while after opening signed in: the one-time passkey offer.
-    if (!first?.offline) setTimeout(() => passkeyOffer(s).catch(() => {}), 12_000);
+    // (Then, on an open it didn't show, the recovery email's.)
+    if (!first?.offline) setTimeout(() => passkeyOffer(s).then(shown => shown || mailOffer(s)).catch(() => {}), 12_000);
     // The loading screen's line (boot.js): signed in, the app's data next.
     globalThis.__bootStep?.('', 0.8);
     loop();
@@ -2581,6 +2590,13 @@ const ERR = {
   ECO_PASSKEY_EXPIRED: ['等太久了，請再試一次。', 'That took too long. Please try again.'],
   ECO_PASSKEY_TAKEN: ['這個通行密鑰已經加入過了。', 'This passkey is already added.'],
   ECO_PASSKEY_FULL: ['最多 10 個通行密鑰，請先移除一個。', 'Ten passkeys at most: remove one first.'],
+  ECO_MAIL_INVALID: ['請輸入完整的電子郵件地址。', 'Enter a whole email address.'],
+  ECO_MAIL_CODE_WRONG: ['驗證碼不對或已過期，請再試一次或重寄。', 'That code is wrong or has expired. Try again, or send a new one.'],
+  ECO_MAIL_WAIT: ['剛寄過，請等一分鐘再重寄。', 'One was just sent. Wait a minute to send another.'],
+  ECO_MAIL_TOO_MANY: ['今天寄給這個信箱的驗證碼太多了，請明天再試。', 'Too many codes to this address today. Try again tomorrow.'],
+  ECO_MAIL_TAKEN: ['這個信箱已是另一個 Orbit Pass 的救援信箱。', 'This address is already another Orbit Pass’s recovery email.'],
+  ECO_MAIL_SAME: ['這個信箱已經是你的救援信箱。', 'This is already your recovery email.'],
+  ECO_MAIL_OFF: ['現在無法寄信，請稍後再試。', 'Email can’t be sent right now. Please try again later.'],
   INVALID_PASSCODE: ['請輸入 10 碼通行碼（例如 ABCDE-23456）或 8 碼裝置代碼。', 'Enter your 10-character pass (like ABCDE-23456) or an 8-character device code.'],
   ECO_DATA_CHANGED: ['另一台裝置剛改過，請再試一次。', 'Another device just changed this. Please try again.'],
   OFFLINE: ['沒有網路連線，連上後會再試一次。', 'No connection. It tries again once you’re online.']
@@ -2695,9 +2711,41 @@ function signInGate(s, look = null) {
     const top = look?.hero
       ? [look.hero, node('h1', { class: 'q-gate-title', text: look.title || a.name }), node('p', { class: 'q-gate-lede', text: lede })]
       : [node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }), node('p', { class: 'q-gate-brand', text: 'ORBIT' }), node('h1', { class: 'q-gate-title', text: look?.title || a.name }), node('p', { class: 'q-gate-lede', text: lede })];
+    // A pass forgotten: a code to the recovery email (pass-mail.mjs) in the
+    // form's place, where mail can be sent (dev passMail, read again shortly
+    // on a device that hasn't asked yet).
+    const forgot = node('button', {
+      class: 'q-mail-link q-gate-forgot',
+      type: 'button',
+      hidden: !dev('passMail'),
+      text: en ? 'Forgot your pass? Use your recovery email' : '忘記通行碼？用救援信箱找回',
+      onclick: async () => {
+        forgot.disabled = true;
+        try {
+          const m = await mailKit();
+          const panel = m.recoverPanel(s, {
+            done: res => finish(res),
+            back: () => {
+              panel.el.remove();
+              rest.forEach(n => n.style.removeProperty('display'));
+              forgot.disabled = false;
+              input.focus();
+            }
+          });
+          rest.forEach(n => n.style.setProperty('display', 'none'));
+          rest[0].before(panel.el);
+          panel.focus();
+        } catch (e) {
+          error.textContent = errorText(e, s.lang);
+          forgot.disabled = false;
+        }
+      }
+    });
+    if (forgot.hidden) setTimeout(() => (forgot.hidden = !dev('passMail')), 2500);
     const rest = [
       form,
       ...(keys ? [keys.row] : []),
+      forgot,
       node('p', { class: 'q-gate-note', text: en ? 'No Orbit Pass yet? Ask the person who shared Orbit with you for one.' : '還沒有 Orbit Pass？請向分享 Orbit 給你的人索取。' }),
       node('p', { class: 'q-gate-note', text: en ? 'Signed in on another device? There, Orbit Pass › Devices gives a code for this one.' : '已在其他裝置登入？在那裡的 Orbit Pass › 裝置取得裝置代碼，就能在這裡登入。' })
     ];
@@ -2717,7 +2765,7 @@ function signInGate(s, look = null) {
 // over pass replaced. Answers the sign-in reply.
 export async function signInScreen(s, look = null) {
   let res = await signInGate(s, look);
-  if (res?.fresh) res = await freshGate(s);
+  if (res?.fresh) res = await freshGate(s, res);
   return res;
 }
 
@@ -2740,7 +2788,9 @@ function passScreen(s, { title, lede, body }) {
   keepOnTop(gate);
   return gate;
 }
-function freshGate(s) {
+// (`first`: the sign-in reply; `recovered`, signed in by the recovery email:
+// the lost pass is replaced.)
+function freshGate(s, first = null) {
   const en = s.lang === 'en';
   const T = (zh, e) => (en ? e : zh);
   document.getElementById('loading')?.setAttribute('hidden', '');
@@ -2765,7 +2815,12 @@ function freshGate(s) {
         }
       }
     });
-    const gate = passScreen(s, { title: T('先換掉這組通行碼', 'Replace this pass first'), lede: T('這組是別人給你的，先換成你自己的。', 'It was given to you. Make it yours before you start.'), body: [go, error] });
+    const gate = passScreen(
+      s,
+      first?.recovered
+        ? { title: T('帳戶已找回', 'You’re back in'), lede: T('換一組新的通行碼，舊的就不能再用。', 'Get a new pass: the old one stops working.'), body: [go, error] }
+        : { title: T('先換掉這組通行碼', 'Replace this pass first'), lede: T('這組是別人給你的，先換成你自己的。', 'It was given to you. Make it yours before you start.'), body: [go, error] }
+    );
   });
   return step1.then(async res => {
     // (The passkey's challenge asked for now, on the new pass's session,
@@ -3170,6 +3225,7 @@ export function passAccount(s, { extra = null, close = () => {}, looks = () => {
     node('h3', { class: 'q-sheet-h', text: T('裝置', 'Devices') }),
     node('div', { class: 'q-rows' }, [act(T('新增裝置（取得裝置代碼）', 'Add a device (get a device code)'), async () => showCode(await s.deviceCode())), device]),
     ...passkeyRows(s, note),
+    ...mailSlot(s, note),
     node('h3', { class: 'q-sheet-h', text: T('通知', 'Notifications') }),
     ...notifyRows(s, note),
     ...(inHomeApp() ? [node('h3', { class: 'q-sheet-h', text: T('連結', 'Links') }), linkRows(s)] : []),
@@ -3201,7 +3257,7 @@ export function passAccount(s, { extra = null, close = () => {}, looks = () => {
         'q-row-btn danger'
       )
     ]),
-    node('p', { class: 'q-sheet-sub', text: T('忘記通行碼？在已登入的裝置按「更換通行碼」。', 'Forgot your pass? Choose “Change my pass” on a signed-in device.') }),
+    node('p', { class: 'q-sheet-sub', text: T('忘記通行碼？用救援信箱找回，或在已登入的裝置按「更換通行碼」。', 'Forgot your pass? Get back in with your recovery email, or choose “Change my pass” on a signed-in device.') }),
     note
   ];
   // card(): the card drawn again alone (a milestone or a look changed while
@@ -3213,6 +3269,32 @@ export function passAccount(s, { extra = null, close = () => {}, looks = () => {
   };
   return { nodes, card, stop: () => clearInterval(tick) };
 }
+// ---- The recovery email (pass-mail.mjs, loaded when first needed) -----------------------
+
+let mailing = null;
+export const mailKit = () => (mailing ||= import('./pass-mail.mjs').catch(e => ((mailing = null), Promise.reject(e))));
+// The Pass tab's 救援信箱, drawn once its module is in (`mailOpen`: the
+// tip's 加入, the form shown at once). Only where mail can be sent
+// (dev passMail, the Worker's), or to remove one linked before.
+let mailOpen = false;
+function mailSlot(s, note) {
+  const T = (zh, e) => (s.lang === 'en' ? e : zh);
+  const head = node('h3', { class: 'q-sheet-h', id: 'q-mail', text: T('救援信箱', 'Recovery email'), hidden: true });
+  const box = node('div', { class: 'q-rows q-mail', hidden: true });
+  const sub = node('p', { class: 'q-sheet-sub', text: T('忘記通行碼時，用這個信箱收驗證碼找回帳戶。', 'Forgot your pass? A code sent here gets you back in.'), hidden: true });
+  const open = mailOpen;
+  mailOpen = false;
+  if (dev('passMail') || s.wallet?.mail)
+    mailKit()
+      .then(m => m.mailRows(s, note, { head, box, sub, open }))
+      .catch(() => {});
+  return [head, box, sub];
+}
+export function openMail(s) {
+  mailOpen = true;
+  return accountSheet(s, { tab: 'pass' });
+}
+
 // ---- Passkeys: the Pass sheet's list and the one-time offer -----------------------------
 
 // A challenge to make a passkey, asked for ahead of the tap (Safari takes
@@ -3341,7 +3423,8 @@ export async function passkeyOffer(s) {
   // (Nothing else of Orbit's on screen first: no sheet, no sign-in, no dialog, no other banner.)
   if (document.querySelector('dialog[open]') || document.visibilityState === 'hidden' || passkeysOf(s).length || bannerEl?.isConnected) return;
   writeStore(KEY_TIP_AT, String(Date.now()));
-  quietTip({
+  // (Answers whether it showed: the recovery email's tip waits for another open.)
+  return Boolean(quietTip({
     accent: '#0a84ff',
     mark: node('span', { class: 'q-tip-mark', html: icons.key || '' }),
     label: T('通行密鑰', 'Passkey'),
@@ -3357,7 +3440,18 @@ export async function passkeyOffer(s) {
       }
     },
     onNever: () => s.write({ wallet: settingPatch('passkeyAsk', 'never') }).catch(() => {})
-  });
+  }));
+}
+
+// Signed in with no recovery email, where mail can be sent: the same quiet
+// tip (pass-mail.mjs mailTip: every 3 days at most on a device, 不再顯示 for
+// the account), never on an open the passkey's showed.
+export async function mailOffer(s) {
+  if (typeof document === 'undefined' || !dev('passMail') || !s.wallet || s.wallet.mail || s.wallet.settings?.mailAsk?.value === 'never') return false;
+  if (globalThis.navigator?.webdriver || installCovered) return false;
+  if (document.querySelector('dialog[open]') || document.visibilityState === 'hidden' || bannerEl?.isConnected) return false;
+  const m = await mailKit();
+  return m.mailTip(s, { quietTip, accent: '#30b0c7', openSheet: () => openMail(s), readStore, writeStore });
 }
 
 export function showNewPass(s, passcode) {

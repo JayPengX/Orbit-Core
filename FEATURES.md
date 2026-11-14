@@ -25,6 +25,7 @@ To remove a feature on purpose, delete its line here in the same commit and say 
 - Updates swap only once every file is on the phone — `kit/orbit.mjs`: `updateReady`
 - Pass: 里程碑 medals, passkeys, 除錯紀錄 — `kit/pass.mjs`, `kit/help.mjs`, `kit/orbit.mjs`: `里程碑`, `passkey`, `除錯紀錄`
 - Orbit's sign-in page (apps circling its mark) and the passkey nudge banner — `site/app/index.html`, `kit/orbit.mjs`: `const orbitRing`, `export async function signInScreen`, `export function quietTip`
+- Pass recovery email: linked by a mailed code, a lost pass recovered by one (then a new pass), a quiet tip to add one — `pass-mail.js`, `kit/pass-mail.mjs`, `kit/orbit.mjs`: `export async function mailRecover`, `export function recoverPanel`, `export function mailRows`, `export function mailTip`, `s.mailBegin`
 - A typhoon day off acts like a holiday — `kit/dayoff.mjs`: `dayOffOn`, `loadDayOff`
 - Law's 代表會 recordings play on iPhone — `law-audio.js`: `handleLawAudio`, `audioType`
 - Law's live feed keeps its last good read — `law-live.js`: `KEY_LAST`

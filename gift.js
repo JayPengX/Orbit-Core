@@ -159,7 +159,7 @@ export async function emptyGiftAccounts(env, deps, days) {
   const out = [];
   for (const r of rows) {
     const w = parseWallet(r.payload);
-    if (!w?.gift || w.sec?.priority || w.passkeys?.keys?.length || w.merged) continue;
+    if (!w?.gift || w.sec?.priority || w.passkeys?.keys?.length || w.mail || w.merged) continue;
     if ((w.entries || []).some(e => e.app !== 'eco' || !MINE_ONLY.has(e.kind))) continue;
     const last = lastUse(w);
     if (now - last < days * 86_400_000) continue;

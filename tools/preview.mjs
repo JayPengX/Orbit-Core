@@ -183,7 +183,7 @@ for (let c; (c = opt('entry', null)); ) extraEntries.push({ t: Date.now(), ...JS
 // --setting 'key={json}': a wallet setting the account starts with (repeatable),
 // e.g. 'ms.beats={"n":12}' or 'avatar={"id":"ms-beats"}'; --apps law,beats: apps it has opened.
 // (The made-up account was asked about Face ID already: the offer never covers a screenshot.)
-const extraSettings = { passkeyAsk: { value: true, t: Date.now() } };
+const extraSettings = { passkeyAsk: { value: true, t: Date.now() }, mailAsk: { value: 'never', t: Date.now() } };
 for (let c; (c = opt('setting', null)); ) extraSettings[c.slice(0, c.indexOf('='))] = { value: JSON.parse(c.slice(c.indexOf('=') + 1)), t: Date.now() };
 const openedApps = Object.fromEntries(opt('apps', '').split(',').filter(Boolean).map(a => [a, { first: Date.now(), last: Date.now() }]));
 // --eval 'js': an expression run on the page after the clicks; its result is printed.
@@ -822,6 +822,8 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
   // saved answer only when one is given (--fixture 'law-ask=file.json', '/ai=file.json'), for a sheet's layout.
   // ('feature:<name>' matches an /ai ask's feature or a /law-ask's mode instead of the URL.)
   const aiPath = new URL(req.url()).pathname;
+  // The settings: the defaults, the recovery email able to send (its ops are answered below).
+  if (aiPath === '/config') return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ passMail: true }) });
   const aiFixture = fixtures.find(([text]) => ['/law-ask', '/law-chat', '/ai', '/class-news'].includes(aiPath) && (text.startsWith('feature:') ? [body.feature, body.mode].includes(text.slice(8)) : req.url().includes(text)));
   // --ai-log file: each AI ask without a saved answer, as the phone sent it (for tools/shots/ai/, build.yml as-phone).
   if (!aiFixture && aiLog && ['/law-ask', '/law-chat', '/ai', '/class-news'].includes(aiPath)) writeFileSync(aiLog, `${JSON.stringify({ path: aiPath, body })}\n`, { flag: 'a' });
@@ -862,6 +864,11 @@ await context.route(/^https:\/\/orbit-workers-proxy\.pengzjay\.workers\.dev\/(?!
   if (req.method() === 'POST' && (body.op === 'refresh' || body.op === 'login' || body.op === 'redeem')) Object.assign(reply, { payload: payload ?? '', inbox: [] });
   if (req.method() === 'GET' && new URL(req.url()).searchParams.get('app')) Object.assign(reply, { payload: payload ?? '', inbox: [] });
   if (body.op === 'pair-create') Object.assign(reply, { code: 'ABCD2345', exp: Date.now() + 600_000 });
+  // The recovery email (pass-mail.js): any code 6 digits long is right here.
+  if (body.op === 'mail-begin' || body.op === 'mail-recover-begin') Object.assign(reply, { sent: true, exp: Date.now() + 600_000 });
+  if (body.op === 'mail-confirm') wallet.mail = { shown: 'ja•••@gmail.com', t: Date.now() };
+  if (body.op === 'mail-remove') delete wallet.mail;
+  if (body.op === 'mail-recover') Object.assign(reply, { fresh: true, recovered: true, payload: '' });
   if (body.op === 'rotate') (freshPass = false), Object.assign(reply, { passcode: 'K7Q2M9XR4T', payload: payload ?? '', inbox: [] });
   if (freshPass && (body.op === 'refresh' || body.op === 'login' || body.op === 'redeem')) Object.assign(reply, { fresh: true, payload: '' });
   await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(reply) });

@@ -2609,6 +2609,81 @@ input[type='checkbox'][switch] {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--q-accent) 55%, transparent);
 }
 
+/* ---- The recovery email (pass-mail.mjs): the Pass sheet's 救援信箱, the sign-in screen's 用信箱找回 ---- */
+.q-mail-form,
+.q-mail-step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.q-mail .q-mail-form {
+  padding: 14px 16px 4px;
+}
+.q-mail > .q-mail-link {
+  margin: 0 16px 4px;
+}
+.q-mail-step[hidden] {
+  display: none;
+}
+.q-mail .q-cell-text {
+  min-width: 0;
+}
+.q-mail-addr {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.q-pass-input.q-mail-input {
+  font: 500 17px/1.2 var(--q-font);
+  letter-spacing: normal;
+  text-transform: none;
+}
+.q-mail-code {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3em;
+  text-align: center;
+}
+.q-pass-input.q-mail-code {
+  font: 700 24px/1 ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.3em;
+}
+.q-mail-sent {
+  margin: 0;
+  color: var(--q-text-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.q-mail-error {
+  margin: 0;
+  color: var(--q-bad);
+  font-size: 13px;
+}
+.q-mail-error:empty {
+  display: none;
+}
+.q-mail-links {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.q-mail-link {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--q-accent);
+  font: 600 14px/1.3 var(--q-font);
+  cursor: pointer;
+  align-self: flex-start;
+}
+.q-mail-link:disabled {
+  color: var(--q-muted);
+  cursor: default;
+}
+.q-mail-recover {
+  text-align: left;
+}
+
 /* ---- Banners (in-app notices): an iOS notification, down from the top ---- */
 .q-banner {
   position: fixed;

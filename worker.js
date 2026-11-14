@@ -55,6 +55,7 @@ import { radarCron } from './weather-radar.js';
 import { handleTransit, tally, warmBikes, mirrorMeter } from './transit.js';
 import { readDev, capacityCron, CONFIG_COLLECTION, ADMIN_TOOLS } from './eco-admin.js';
 import { PASSKEY_COLLECTION } from './passkey.js';
+import { MAIL_COLLECTION, mailReady } from './pass-mail.js';
 import { backupStore } from './store-backup.js';
 import { paceOf } from './pace.js';
 import { beat, tellOwner, systemReport, countFolders, FOLDERS_KEY, startFreeWatch } from './ops.js';
@@ -1216,7 +1217,7 @@ function generateCode(length) {
 // The Pass's store (doc-store.js): D1. Every version these replace is kept
 // (doc-store.js history): the wallets, each app's data, the inbox, the
 // config and the books, and Securities' checked money and fills.
-const DOCS = docStore({ keep: new Set([WALLET_COLLECTION, INBOX_COLLECTION, CONFIG_COLLECTION, PASSKEY_COLLECTION, 'stock-verified', 'stock-fills', ...Object.values(ECO_APPS).map(a => a.collection)]) });
+const DOCS = docStore({ keep: new Set([WALLET_COLLECTION, INBOX_COLLECTION, CONFIG_COLLECTION, PASSKEY_COLLECTION, MAIL_COLLECTION, 'stock-verified', 'stock-fills', ...Object.values(ECO_APPS).map(a => a.collection)]) });
 const ECO_DEPS = {
   json,
   errorJson,
@@ -1305,7 +1306,8 @@ async function devBody(env, ctx) {
   // the two, never both, so everyone in keeps the same steady baseline.
   const { state } = await doorOf(env);
   const slow = Math.max(pace.slow || 1, doorSlow(state));
-  const dev = await readDev(env, ECO_DEPS);
+  // (passMail: the Worker's own, whether the recovery email can mail anyone.)
+  const dev = { ...(await readDev(env, ECO_DEPS)), passMail: mailReady(env) };
   const body = JSON.stringify(slow > 1 ? { ...applyScale(dev, slow), pace: pace.pace, ...(state !== 'open' ? { door: state } : {}) } : dev);
   ctx.waitUntil(caches.default.put(key, new Response(body, { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' } })));
   return body;

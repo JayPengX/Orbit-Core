@@ -52,6 +52,7 @@
 //   POST   /eco { op: 'share-redeem', qt, key }       a copy of that schedule
 //   POST   /eco { op: 'admin', token, action }        the store's clean-up
 //   POST   /eco { op: 'passkey-…' }                    passkeys (passkey.js)
+//   POST   /eco { op: 'mail-…' }                       the recovery email (pass-mail.js)
 //   POST   /eco { op: 'now', qt, set?, family? }       what's under way, the family's notebook (below)
 
 import { cleanReport, REC_PREFIX } from './rec-weekly.js';
@@ -61,6 +62,7 @@ import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSIO
 import { admit, seenNow, limitOf, fullBody } from './door.js';
 import { handleAdmin } from './eco-admin.js';
 import { passkeyBegin, passkeyLogin, passkeyAddBegin, passkeyAdd, passkeyRemove, passkeySummary, pointPasskeys, dropIndex, passkeyIds } from './passkey.js';
+import { mailBegin, mailConfirm, mailRemove, mailRecoverBegin, mailRecover, mailSummary, mailOf, pointMail, dropMailIndex } from './pass-mail.js';
 import { PAY_WEEK, weekStart, mondayId, reliefCheck, reliefEntry } from './kit/pay.mjs';
 
 export const ECO_PASSCODE_LENGTH = 10;
@@ -111,7 +113,7 @@ const MAX_MERGE_SOURCES = 12;
 // session are counted per session and app in memory (TOKEN_LIMIT a minute).
 // (admin: the owner's panel, whose token is 32+ random characters; its tools
 // call several times a view.)
-export const ECO_LIMITS = { create: 20, login: 30, merge: 20, share: 30, admin: 600, passkey: 120 };
+export const ECO_LIMITS = { create: 20, login: 30, merge: 20, share: 30, admin: 600, passkey: 120, mail: 10 };
 export const TOKEN_LIMIT = 90;
 
 export function emptyWallet(now = Date.now()) {
@@ -308,6 +310,7 @@ export function mergeWallet(a, b) {
     ...(base.live ? { live: base.live } : {}),
     ...(base.sec ? { sec: base.sec } : {}),
     ...(base.passkeys ? { passkeys: base.passkeys } : {}),
+    ...(base.mail ? { mail: base.mail } : {}),
     ...(base.merged ? { merged: base.merged } : {}),
     // (A giveaway's account: when it was claimed, gift.js; the only ones ever cleared.)
     ...(base.gift ? { gift: base.gift } : {})
@@ -339,11 +342,12 @@ function touchApp(wallet, app, now) {
 }
 
 // What clients see of the wallet: not the Worker's own bookkeeping, and of
-// its passkeys only what the Pass sheet lists (never a key).
+// its passkeys only what the Pass sheet lists (never a key), its recovery
+// email masked.
 export function publicWallet(w) {
   if (!w) return w;
-  const { sec, passkeys, ...rest } = w;
-  return passkeys ? { ...rest, passkeys: passkeySummary(w) } : rest;
+  const { sec, passkeys, mail, ...rest } = w;
+  return { ...rest, ...(passkeys ? { passkeys: passkeySummary(w) } : {}), ...(mail ? { mail: mailSummary(w) } : {}) };
 }
 
 // The live session of each app (an app opened somewhere else takes only its
@@ -503,7 +507,12 @@ const OPS = {
   'passkey-login': passkeyLogin,
   'passkey-add-begin': passkeyAddBegin,
   'passkey-add': passkeyAdd,
-  'passkey-remove': passkeyRemove
+  'passkey-remove': passkeyRemove,
+  'mail-begin': mailBegin,
+  'mail-confirm': mailConfirm,
+  'mail-remove': mailRemove,
+  'mail-recover-begin': mailRecoverBegin,
+  'mail-recover': mailRecover
 };
 
 export async function handleEcoRequest(request, env, headers, ip, deps, waitUntil = null) {
@@ -704,7 +713,7 @@ async function doorFor(ctx, id, wallet) {
 // no passkey, never signed out). The mark goes only with the pass itself:
 // `rotate` makes the account's new one; a passkey is offered after (the
 // kit's freshGate). A pass shown to its own maker (`create`) is never fresh.
-export const unusedPass = w => !gen(w) && !w.entries?.length && !Object.keys(w.apps || {}).length && !w.passkeys?.keys?.length && !w.merged;
+export const unusedPass = w => !gen(w) && !w.entries?.length && !Object.keys(w.apps || {}).length && !w.passkeys?.keys?.length && !w.mail && !w.merged;
 export const freshPass = w => Boolean(w?.sec?.fresh);
 const markFresh = w => (freshPass(w) || !unusedPass(w) ? w : { ...w, sec: { ...(w.sec || {}), fresh: true } });
 const refreshToken = (secret, c, now) => signToken(secret, { k: 'ref', d: c.d, s: c.s, g: c.g, e: now + REFRESH_MS });
@@ -713,8 +722,10 @@ const refreshToken = (secret, c, now) => signToken(secret, { k: 'ref', d: c.d, s
 
 // A new device session on account `docId` for `app`, made app's live one: the
 // reply every way of signing in shares (a refresh token for the device, a
-// session for the app, the wallet and the app's data).
-export async function signIn(ctx, docId, { passcode = null } = {}) {
+// session for the app, the wallet and the app's data). `fresh`: this session
+// takes only `rotate` though the pass isn't fresh (signed in by the recovery
+// email: the lost pass is replaced first, pass-mail.js).
+export async function signIn(ctx, docId, { passcode = null, fresh = false } = {}) {
   const { env, headers, deps, secret, body, app } = ctx;
   if (!ECO_APPS[app]) return deps.errorJson('ECO_UNKNOWN_APP', 400, headers, ctx.request);
   const now = deps.now();
@@ -725,11 +736,12 @@ export async function signIn(ctx, docId, { passcode = null } = {}) {
   if (!result) return null;
   const turned = await doorFor(ctx, docId, result.wallet);
   if (turned) return turned;
-  const c = { d: docId, s: sid, a: app, g: gen(result.wallet), f: freshPass(result.wallet), p: priorityPass(result.wallet) };
+  const c = { d: docId, s: sid, a: app, g: gen(result.wallet), f: fresh || freshPass(result.wallet), p: priorityPass(result.wallet) };
   const out = await sessionReply(env, deps, secret, result, c, now, { app: c.f ? '' : app, inbox: !c.f && body.inbox, shelves: {} });
   out.refresh = await refreshToken(secret, c, now);
   if (passcode) out.passcode = passcode;
   if (c.f) out.fresh = true;
+  if (fresh) out.recovered = true;
   return deps.json(out, 200, headers);
 }
 
@@ -1023,8 +1035,9 @@ async function ecoRotate(ctx) {
       (inbox[app] ||= []).push(next);
     }
   await deps.fsWrite(env, WALLET_COLLECTION, docId, JSON.stringify({ ...wallet, inbox, sec: { gen: gen(wallet) }, live: null }), { exists: false });
-  // (The passkeys come along: they sign in to the new pass.)
+  // (The passkeys and the recovery email come along: they sign in to the new pass.)
   await pointPasskeys(env, deps, docId, wallet);
+  await pointMail(env, deps, ctx.secret, docId, wallet);
   await deleteAccount(env, deps, c.d);
   return signIn({ ...ctx, app: c.a }, docId, { passcode });
 }
@@ -1119,6 +1132,7 @@ export async function deleteAccount(env, deps, docId, { retire: gone = false } =
   for (const { collection } of Object.values(ECO_APPS)) await deps.fsDelete(env, collection, docId);
   for (const name of [...Object.keys(ECO_APPS), FAMILY_SHELF]) await deps.fsDelete(env, NOW_COLLECTION, shelfId(docId, name));
   await dropIndex(env, deps, docId, passkeyIds(wallet));
+  await dropMailIndex(env, deps, await tokenSecret(env), docId, mailOf(wallet));
   await deps.fsDelete(env, WALLET_COLLECTION, docId);
 }
 
@@ -1266,9 +1280,14 @@ async function ecoMerge(ctx) {
   // The sources' passkeys sign in to this pass from now on.
   const keys = found.flatMap(src => src.wallet.passkeys?.keys || []);
   const withKeys = w => (keys.length ? { ...w, passkeys: { user: w.passkeys?.user || found.find(src => src.wallet.passkeys?.user)?.wallet.passkeys.user, keys: [...(w.passkeys?.keys || []), ...keys.filter(k => !(w.passkeys?.keys || []).some(x => x.id === k.id))] } } : w);
-  let result = await updateWallet(env, deps, targetId, w => ((ours = gen(w) === c.g) ? withKeys({ ...mergeWallet(w, { entries: carried, settings, inbox: inboxAdd }), merged: { t: now, apps: mergedApps } }) : w));
+  // (A source's recovery email too, where this pass has none.)
+  const mail = found.map(src => src.wallet.mail).find(m => m?.addr);
+  let tookMail = false;
+  const withMail = w => (w.mail || !mail ? w : ((tookMail = true), { ...w, mail }));
+  let result = await updateWallet(env, deps, targetId, w => ((ours = gen(w) === c.g) ? withMail(withKeys({ ...mergeWallet(w, { entries: carried, settings, inbox: inboxAdd }), merged: { t: now, apps: mergedApps } })) : w));
   if (!result || !ours) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
   if (keys.length) await pointPasskeys(env, deps, targetId, { passkeys: { keys } });
+  if (tookMail) await pointMail(env, deps, ctx.secret, targetId, result.wallet);
   // What this Worker still watches for a source (Securities' fills book) goes to this pass, then anything it paid the
   // source meanwhile comes along too (the same ids: nothing twice).
   for (const src of found) {
