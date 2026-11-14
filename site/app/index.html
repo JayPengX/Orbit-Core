@@ -165,6 +165,20 @@
   .o-custom-text strong { font: 600 16px/1.3 var(--q-font); }
   .o-custom-text small { color: var(--q-label-2); font: 400 13px/1.35 var(--q-font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .o-custom-go { flex: none; width: 8px; height: 8px; margin-right: 4px; border: solid var(--q-label-3, #8e8e93); border-width: 2px 2px 0 0; transform: rotate(45deg); }
+  .o-custom { background: color-mix(in srgb, var(--q-accent, #4f46e5) 12%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--q-accent, #4f46e5) 45%, transparent); }
+  .o-custom-text strong { color: var(--q-accent, #4f46e5); }
+  .o-choose { margin: 4px 0 14px; text-align: left; }
+  .o-choose .o-custom { margin: 0; }
+  .o-solo { margin-top: 10px; padding: 12px 10px 8px; border-radius: 14px; background: var(--q-fill, rgba(120, 120, 128, 0.12)); }
+  .o-solo-head { margin: 0 4px 8px; color: var(--q-label-2); font: 500 13px/1.35 var(--q-font); }
+  .o-solo-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px 2px; }
+  .o-solo-app { display: grid; justify-items: center; gap: 4px; padding: 4px 0; border: 0; border-radius: 12px; background: none; color: var(--q-label); font: 400 11px/1.2 var(--q-font); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .o-solo-app:active { background: var(--q-fill-4, rgba(120, 120, 128, 0.16)); }
+  .o-solo-app span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .o-solo-icon { width: 40px; height: 40px; border-radius: 10px; }
+  .o-solo-app[aria-pressed='true'] .o-solo-icon { box-shadow: 0 0 0 2px var(--q-page, #fff), 0 0 0 4px var(--app); }
+  .o-solo-all { display: block; margin: 6px auto 0; padding: 8px; border: 0; background: none; color: var(--q-accent, #4f46e5); font: 400 14px/1.3 var(--q-font); cursor: pointer; }
+  .o-name:disabled { color: var(--q-label-2); -webkit-text-fill-color: var(--q-label-2); opacity: 1; }
   .q-gate-box.o-setting > :not(.o-setup) { display: none !important; }
   .q-gate-box.o-setting { text-align: left; }
   .o-setup { display: grid; gap: 0; width: 100%; }
@@ -240,7 +254,7 @@
     try {
       sessionStorage.setItem('orbit.launch', String(Date.now()));
     } catch {}
-    held = suite.host(document.getElementById('frames'), { first: { ...first, app }, list: () => (myApps().length === 1 ? openApp(myApps()[0]) : showList()), onShow: id => addressOf(id), mine: myApps, edit: () => editApps() });
+    held = suite.host(document.getElementById('frames'), { first: { ...first, app }, list: () => (myApps().length === 1 ? openApp(myApps()[0]) : showList()), onShow: id => addressOf(id), mine: myApps, edit: setup.apps.length > 1 ? () => editApps() : null });
   };
   // The list of apps, the one used last on top (over the apps held, on a return).
   const icon = id => Object.assign(document.createElement('img'), { className: 'door-icon', src: `data:image/svg+xml,${encodeURIComponent(appIcon(id, { crisp: true }))}`, alt: '' });
@@ -354,13 +368,13 @@
   }
 
   // Which apps are in this Orbit, changed inside it (kit orbit-mine.mjs setApps; the Pass keeps it too).
-  function appTiles(chosen, onChange) {
+  function appTiles(chosen, onChange, least = 1) {
     const grid = ui.h('div', { class: 'o-apps', role: 'group', 'aria-label': W('App', 'Apps') });
     for (const id of APP_ORDER) {
       const b = ui.h('button', { class: 'o-app', type: 'button', 'aria-pressed': String(chosen.has(id)), style: `--app:${BRANDS[id].color}` }, [Object.assign(icon(id), { className: 'o-app-icon' }), ui.h('span', { class: 'o-app-name', text: BRANDS[id].short }), ui.h('span', { class: 'o-check', 'aria-hidden': 'true' })]);
       b.onclick = () => {
-        // (At least one app: the last one stays.)
-        if (chosen.has(id) && chosen.size === 1) return;
+        // (At least one app: the last one stays; two in an Orbit of several.)
+        if (chosen.has(id) && chosen.size <= least) return;
         chosen.has(id) ? chosen.delete(id) : chosen.add(id);
         b.setAttribute('aria-pressed', String(chosen.has(id)));
         onChange?.();
@@ -372,7 +386,7 @@
   function editApps() {
     const chosen = new Set(myApps());
     const done = ui.h('button', { class: 'q-btn primary block', type: 'button', text: W('完成', 'Done') });
-    const s = ui.sheet({ title: W('這個 Orbit 裡的 App', 'Apps in this Orbit'), cls: 'o-sheet', body: [ui.h('p', { class: 'o-note', text: W('選一個，打開就直接是那個 App。名稱和圖示在加入主畫面時就定好了。', 'Pick one and Orbit opens straight into it. The name and icon were set when it was added.') }), appTiles(chosen)], foot: ui.h('div', { class: 'o-foot' }, [done]) });
+    const s = ui.sheet({ title: W('這個 Orbit 裡的 App', 'Apps in this Orbit'), cls: 'o-sheet', body: [ui.h('p', { class: 'o-note', text: W('名稱和圖示在加入主畫面時就定好了。只要一個 App 的 Orbit，在 Safari 另外加入一個。', 'The name and icon were set when it was added. For an Orbit of one app, add another one from Safari.') }), appTiles(chosen, null, 2)], foot: ui.h('div', { class: 'o-foot' }, [done]) });
     done.onclick = () => {
       mine.setApps(tag, [...chosen]);
       s.close?.();
@@ -404,20 +418,35 @@
     name.value = setup.name;
     const looks = ui.h('div', { class: 'o-looks', role: 'radiogroup', 'aria-label': W('圖示', 'Icon') });
     const lookButtons = new Map();
+    // (One app: its own name and icon, locked, Jay 11-14; several again, what was picked comes back.)
+    let typed = setup.name;
+    let picked = setup.look;
+    const locked = ui.h('p', { class: 'o-note o-locked', hidden: true });
     const draw = () => {
-      if (!named) name.value = plainName(chosen);
-      if (!lookPicked) look = mine.defaultLook([...chosen]);
+      const one = chosen.size === 1;
+      name.disabled = one;
+      looks.hidden = one;
+      locked.hidden = !one;
+      if (one) {
+        const id = [...chosen][0];
+        locked.textContent = W(`只有一個 App 的 Orbit，名稱和圖示就是 ${BRANDS[id].short} 的。`, `An Orbit of one app takes ${BRANDS[id].short}’s name and icon.`);
+        name.value = plainName(chosen);
+        look = mine.defaultLook([id]);
+      } else {
+        name.value = named ? typed : plainName(chosen);
+        look = lookPicked ? picked : mine.defaultLook([...chosen]);
+      }
       preview.src = lookSrc(look);
       label.textContent = name.value.trim() || plainName(chosen);
       for (const [l, b] of lookButtons) b.setAttribute('aria-checked', String(l === look));
     };
-    name.addEventListener('input', () => ((named = name.value.trim() !== ''), draw()));
+    name.addEventListener('input', () => ((named = name.value.trim() !== ''), (typed = name.value), draw()));
     name.addEventListener('keydown', e => e.key === 'Enter' && name.blur());
     const lookGroup = (title, list) => {
       const g = ui.h('div', { class: 'o-look-grid' });
       for (const l of list) {
         const b = ui.h('button', { class: 'o-look', type: 'button', role: 'radio', 'aria-label': brand.lookName(l, lang), title: brand.lookName(l, lang) }, [ui.h('img', { src: lookSrc(l), alt: '', loading: 'lazy' })]);
-        b.onclick = () => ((look = l), (lookPicked = true), draw());
+        b.onclick = () => ((picked = l), (lookPicked = true), draw());
         lookButtons.set(l, b);
         g.append(b);
       }
@@ -435,7 +464,7 @@
     };
     const reset = ui.h('button', { class: 'o-reset', type: 'button', text: W('還原成預設：全部 App', 'Back to the default: every app'), onclick: () => (chosen.clear(), APP_ORDER.forEach(id => chosen.add(id)), (named = false), (lookPicked = false), panel.querySelectorAll('.o-app').forEach(b => b.setAttribute('aria-pressed', 'true')), draw()) });
     const panel = ui.h('div', { class: 'o-setup' }, [
-      ui.h('div', { class: 'o-setup-bar' }, [ui.h('button', { class: 'o-cancel', type: 'button', text: W('取消', 'Cancel'), onclick: () => box.classList.remove('o-setting') }), ui.h('h2', { text: W('自訂 Orbit', 'Customize Orbit') }), ui.h('button', { class: 'o-done', type: 'button', text: W('完成', 'Done'), onclick: finish })]),
+      ui.h('div', { class: 'o-setup-bar' }, [ui.h('button', { class: 'o-cancel', type: 'button', text: W('取消', 'Cancel'), onclick: () => (panel.remove(), box.classList.remove('o-setting'), (box.scrollTop = 0), box.closest('dialog')?.scrollTo?.(0, 0)) }), ui.h('h2', { text: W('自訂 Orbit', 'Customize Orbit') }), ui.h('button', { class: 'o-done', type: 'button', text: W('完成', 'Done'), onclick: finish })]),
       ui.h('div', { class: 'o-preview' }, [preview, label]),
       ui.h('h3', { class: 'o-head', text: W('名稱', 'Name') }),
       name,
@@ -443,6 +472,7 @@
       ui.h('p', { class: 'o-note', text: W('只選一個，就是只有那個 App 的 Orbit。主畫面可以放好幾個 Orbit。', 'Pick just one for an Orbit of that app alone. A home screen can hold several Orbits.') }),
       appTiles(chosen, draw),
       ui.h('h3', { class: 'o-head', text: W('圖示', 'Icon') }),
+      locked,
       looks,
       ui.h('button', { class: 'q-btn primary block o-finish', type: 'button', text: W('完成', 'Done'), onclick: finish }),
       reset
@@ -460,7 +490,17 @@
     const more = mine?.encodeSetup && brand.LOOKS
       ? ui.h('button', { class: 'o-custom', type: 'button' }, [ui.h('span', { class: 'o-custom-text' }, [ui.h('strong', { text: !plain && !asIs ? W('已自訂', 'Customized') : W('自訂名稱、App 和圖示', 'Choose its name, apps and icon') }), ui.h('small', { text: !plain ? picked : W('可以不用，直接加入就是全部 App', 'Optional: added as it is, it holds every app') })]), ui.h('span', { class: 'o-custom-go', 'aria-hidden': 'true' })])
       : null;
-    installGate('suite', lang, { name: setup.name, color: brand.lookApp?.(setup.look) ? brand.lookColor(setup.look) : '#5e5ce6', icon: myIcon, more });
+    // (Jay 11-14: setup easy to miss, an app on its own not known to be there.
+    // One tap on an app makes this an Orbit of that app alone, its name and icon.)
+    const one = setup.apps.length === 1 ? setup.apps[0] : null;
+    const solo = more
+      ? ui.h('div', { class: 'o-solo' }, [
+          ui.h('p', { class: 'o-solo-head', text: W('只要一個 App？點它，就加入只有它的 Orbit：', 'Just one app? Tap it to add an Orbit of that app alone:') }),
+          ui.evenGrid?.(ui.h('div', { class: 'o-solo-grid' }, APP_ORDER.map(id => ui.h('button', { class: 'o-solo-app', type: 'button', 'aria-pressed': String(id === one), style: `--app:${BRANDS[id].color}`, onclick: () => location.replace(mine.startOf(mine.encodeSetup({ apps: [id], id: setup.id || mine.newId?.() }))) }, [Object.assign(icon(id), { className: 'o-solo-icon' }), ui.h('span', { text: BRANDS[id].short })]))), { min: 44, max: 5 }),
+          one ? ui.h('button', { class: 'o-solo-all', type: 'button', text: W('改回全部 App 的 Orbit', 'Back to an Orbit of every app'), onclick: () => location.replace(mine.startOf(mine.encodeSetup({ apps: APP_ORDER, id: setup.id || mine.newId?.() }))) }) : null
+        ])
+      : null;
+    installGate('suite', lang, { name: setup.name, color: brand.lookApp?.(setup.look) ? brand.lookColor(setup.look) : '#5e5ce6', icon: myIcon, more: more ? ui.h('div', { class: 'o-choose' }, [more, solo]) : null });
     if (more) {
       more.onclick = () => {
         const box = more.closest('.q-gate-box');
