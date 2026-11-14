@@ -2644,6 +2644,9 @@ const ERR = {
 export const errorText = (error, lang) => {
   const e = ERR[error?.code];
   if (e) return lang === 'en' ? e[1] : e[0];
+  // (Too many asks, or Orbit's server busy or out of the day's free amount (Cloudflare's own
+  // refusal, 1027, 503…): busy, not an error code (Jay 11-14: "handle it like we expect it").)
+  if (error?.status === 429 || error?.status >= 500) return lang === 'en' ? 'Orbit is busy right now. Please try again in a little while.' : 'Orbit 現在比較忙，請稍後再試。';
   if (error?.status) {
     const code = error.code || `HTTP_${error.status}`;
     return lang === 'en' ? `Orbit answered with an error (${code}). Please try again later.` : `Orbit 回覆錯誤（${code}），請稍後再試。`;
