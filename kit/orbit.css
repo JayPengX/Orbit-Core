@@ -2685,7 +2685,8 @@ input[type='checkbox'][switch] {
   color: var(--q-muted);
   cursor: default;
 }
-.q-mail-recover {
+.q-mail-recover,
+.q-mail-create {
   text-align: left;
 }
 

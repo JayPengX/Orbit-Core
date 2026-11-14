@@ -368,7 +368,8 @@ A season is kept until the next one's first game.
 
 ## 6. The Orbit Pass (`/eco`)
 
-- **A pass** is made at sign-in (`create`, `passNewDay`) or issued (admin;
+- **A pass** is made at sign-in, its email proved (`create-start`, `create`;
+  `passNewDay`), or issued (admin;
   replaced at first sign-in: `freshPass`, `rotate`). **Levels** (`levelOf`):
   `free` never starts a paid call; AI routes ask `fullSession` first. Its id:
   PBKDF2 of the pass, peppered by `ECO_TOKEN_SECRET` (`passKey`), which

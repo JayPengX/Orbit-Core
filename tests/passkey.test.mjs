@@ -7,6 +7,7 @@ import { handleEcoRequest, passKey, WALLET_COLLECTION } from '../eco.js';
 import { PASSKEY_COLLECTION, RP_ID, PASSKEY_MAX } from '../passkey.js';
 import { cborDecode, parseAuthData, derToRaw, b64url, unb64url } from '../webauthn.js';
 import { planClean } from '../eco-admin.js';
+import { newPass } from './new-pass.mjs';
 
 const ORIGIN = 'https://orbit.jaypengx.com';
 
@@ -129,7 +130,7 @@ async function authenticator({ alg = -7, rpId = RP_ID, flags = 0x05 | 0x08 | 0x1
 }
 
 async function signedIn(t) {
-  const made = await t.post({ op: 'create', app: 'stock' });
+  const made = await newPass(t.post, t.deps, 'stock');
   assert.equal(made.status, 200);
   return made.data;
 }

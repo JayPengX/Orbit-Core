@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { handleEcoRequest, WALLET_COLLECTION } from '../eco.js';
+import { mintPass } from '../gift.js';
 import { MAIL_COLLECTION, MAIL_CODES, MAIL_TRIES, MAIL_PER_DAY, MAIL_WAIT_MS, cleanAddr, maskAddr, accountOfMail, signupMailBegin, signupMailProve, forgetMailCounts, claimMail } from '../pass-mail.js';
 import { tokenSecret } from '../orbit-token.js';
 import { planClean } from '../eco-admin.js';
@@ -58,8 +59,11 @@ function setup() {
   const codeIn = mail => mail.text.match(/\b(\d{6})\b/)[1];
   return { store, deps, env, post, sent, settle, codeIn, advance: ms => (clock += ms) };
 }
+// (A pass with no email yet: one the owner issued, signed in and replaced at once, as its owner would.)
 async function account(t, app = 'match') {
-  const res = await t.post({ op: 'create', app });
+  const { passcode } = await mintPass(t.env, t.deps);
+  const first = await t.post({ op: 'login', passcode, app });
+  const res = await t.post({ op: 'rotate', qt: first.data.token });
   assert.equal(res.status, 200);
   return res.data;
 }
@@ -226,6 +230,8 @@ test('a merge brings a source pass’s email when the target has none; a delete 
   const t = setup();
   const a = await account(t);
   const b = await account(t);
+  // (A pass with no email: one the owner issued, or one whose email was taken off.)
+  await t.post({ op: 'mail-remove', qt: a.token });
   await link(t, b.token, 'b@example.com');
   const merged = await t.post({ op: 'merge', qt: a.token, sources: [{ passcode: b.passcode }] });
   assert.equal(merged.status, 200);
@@ -246,11 +252,13 @@ test('a merge brings a source pass’s email when the target has none; a delete 
 
 test('no sender for everyone’s addresses yet: the ops say so, nothing is written', async () => {
   const t = setup();
-  t.deps.mailReady = () => false;
   const a = await account(t);
+  t.deps.mailReady = () => false;
+  const had = [...t.store.keys()].filter(k => k.startsWith(MAIL_CODES)).length;
   assert.equal((await t.post({ op: 'mail-begin', qt: a.token, addr: 'me@example.com' })).data.error.code, 'ECO_MAIL_OFF');
   assert.equal((await t.post({ op: 'mail-recover-begin', addr: 'me@example.com' })).data.error.code, 'ECO_MAIL_OFF');
-  assert.equal([...t.store.keys()].some(k => k.startsWith(MAIL_CODES)), false);
+  assert.equal([...t.store.keys()].filter(k => k.startsWith(MAIL_CODES)).length, had);
+  assert.equal((await t.post({ op: 'create-start', app: 'match', addr: 'new@example.com' })).data.error.code, 'ECO_MAIL_OFF', 'and no new pass');
 });
 
 test('a mail that fails to go: said so, not counted, no wait to try again', async () => {
@@ -357,4 +365,33 @@ test('the day’s count read through law.js’s counts (as worker.js wires it): 
   t.deps.dayCount = (env, k, day, by = 1) => (by === 0 ? countOf({}, k, day) : addOne({}, k, day, by));
   const res = await t.post({ op: 'mail-recover-begin', addr: 'nobody@example.com' });
   assert.equal(res.status, 200, JSON.stringify(res.data));
+});
+
+test('a new pass needs a verified email: one account to an address, 基本, found again by that email', async () => {
+  const t = setup();
+  t.sent.length = 0;
+  assert.equal((await t.post({ op: 'create', app: 'match', addr: 'me@example.com', code: '123456' })).data.error.code, 'ECO_MAIL_CODE_WRONG', 'no code asked for');
+  const start = await t.post({ op: 'create-start', app: 'match', addr: ' Me@Example.com ' });
+  assert.equal(start.status, 200);
+  assert.equal(start.data.shown, 'm•••@example.com');
+  assert.match(t.sent.at(-1).text, /建立你的 Orbit Pass/);
+  const code = t.codeIn(t.sent.at(-1));
+  assert.equal((await t.post({ op: 'create', app: 'match', addr: 'me@example.com', code: code === '000000' ? '111111' : '000000' })).status, 401);
+  const made = await t.post({ op: 'create', app: 'match', addr: 'me@example.com', code });
+  assert.equal(made.status, 200);
+  assert.equal(made.data.level, 'free');
+  assert.equal(made.data.wallet.mail.shown, 'm•••@example.com');
+  assert.ok(await accountOfMail(t.env, t.deps, 'me@example.com'), 'the address finds it');
+  assert.equal((await t.post({ op: 'create', app: 'match', addr: 'me@example.com', code })).status, 401, 'a code works once');
+  // The same address again: told it's on a pass (after its code), never a second account.
+  t.advance(MAIL_WAIT_MS);
+  await t.post({ op: 'create-start', app: 'match', addr: 'me@example.com' });
+  const again = await t.post({ op: 'create', app: 'match', addr: 'me@example.com', code: t.codeIn(t.sent.at(-1)) });
+  assert.equal(again.status, 409);
+  assert.equal(again.data.error.code, 'ECO_MAIL_TAKEN');
+  // And the address finds the pass it's on.
+  t.advance(MAIL_WAIT_MS);
+  await t.post({ op: 'mail-recover-begin', addr: 'me@example.com' });
+  await t.settle();
+  assert.equal((await t.post({ op: 'mail-recover', addr: 'me@example.com', code: t.codeIn(t.sent.at(-1)), app: 'match' })).status, 200);
 });

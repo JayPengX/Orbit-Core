@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { handleEcoRequest, mergeWallet, poolBalance, cleanPatch, emptyWallet, paydayEntries, worthOf, PAY, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, ECO_APPS, rankEntries, RANKS } from '../eco.js';
 import { planClean, tidyWallet } from '../eco-admin.js';
 import { passKey } from '../eco.js';
+import { newPass as viaMail } from './new-pass.mjs';
 
 function setup() {
   const store = new Map();
@@ -56,7 +57,7 @@ function setup() {
 }
 
 async function newPass(t, app = 'stock') {
-  const made = await t.call('POST', '', { op: 'create', app });
+  const made = await viaMail(b => t.call('POST', '', b), t.deps, app);
   assert.equal(made.status, 200);
   return made.data;
 }
@@ -493,9 +494,9 @@ test('setting ECO_TOKEN_SECRET signs nobody out: tokens signed the old way (from
 
 test('anyone makes a pass in an app unless the panel closed it (0 a day); the owner issues them in a batch', async () => {
   const t = setup();
-  assert.equal((await t.call('POST', '', { op: 'create', app: 'stock' })).status, 200);
+  assert.equal((await viaMail(b => t.call('POST', '', b), t.deps, 'stock')).status, 200);
   await t.deps.fsWrite(t.env, 'orbit-config', 'dev', JSON.stringify({ passNewDay: 0 }));
-  const closed = await t.call('POST', '', { op: 'create', app: 'stock' });
+  const closed = await viaMail(b => t.call('POST', '', b), t.deps, 'stock');
   assert.equal(closed.status, 403);
   assert.match(JSON.stringify(closed.data), /ECO_CREATE_CLOSED/);
   const refused = await t.call('POST', '', { op: 'admin', token: 'x'.repeat(40), action: 'issue', count: 3 });

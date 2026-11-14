@@ -11,6 +11,7 @@ import { signToken, readToken } from '../orbit-token.js';
 import { fakeD1 } from './fake-d1.mjs';
 import { SCHEMA } from '../doc-store.js';
 import worker from '../worker.js';
+import { newPass } from './new-pass.mjs';
 
 function setup({ dayCount = null } = {}) {
   const store = new Map();
@@ -70,7 +71,7 @@ const signedIn = async (t, code) => {
 
 test("a pass made in an app is 'free': said so on sign-in, and it may not spend", async () => {
   const t = setup();
-  const made = await t.call({ op: 'create', app: 'stock' });
+  const made = await newPass(t.call, t.deps, 'stock');
   assert.equal(made.status, 200);
   assert.equal(made.data.level, 'free');
   assert.equal(levelOf(await t.walletOf(made.data.token)), 'free');
@@ -100,7 +101,7 @@ test("a giveaway's pass (/key/) is 'free'", async () => {
 
 test('nothing a phone sends lifts it: a wallet patch carrying sec or a level', async () => {
   const t = setup();
-  const made = (await t.call({ op: 'create', app: 'stock' })).data;
+  const made = (await newPass(t.call, t.deps, 'stock')).data;
   const r = await handleEcoRequest({ method: 'PATCH', url: `https://w/eco?qt=${encodeURIComponent(made.token)}&app=stock`, body: { wallet: { sec: { level: 'full', priority: true }, level: 'full', created: 1 } } }, t.env, {}, '1.1.1.1', t.deps);
   assert.equal(r.status, 200);
   const w = await t.walletOf(made.token);
@@ -127,7 +128,7 @@ test("a forged, another account's or signed-out token may not spend; nor the Wor
 
 test("the panel sets it, and it holds at the next ask (no new sign-in)", async () => {
   const t = setup();
-  const made = (await t.call({ op: 'create', app: 'stock' })).data;
+  const made = (await newPass(t.call, t.deps, 'stock')).data;
   const ref = (await t.admin('wallets')).data.wallets[0].ref;
   assert.equal((await t.admin('wallets')).data.wallets[0].level, 'free');
   assert.equal((await t.admin('level', { wallet: ref, level: 'full' })).data.level, 'full');
@@ -141,7 +142,7 @@ test("the panel sets it, and it holds at the next ask (no new sign-in)", async (
 
 test("a merge keeps the higher level of the passes brought together (all the same person's)", async () => {
   const t = setup();
-  const free = (await t.call({ op: 'create', app: 'stock' })).data;
+  const free = (await newPass(t.call, t.deps, 'stock')).data;
   const code = (await t.admin('issue', { count: 1 })).data.passes[0];
   const r = await t.call({ op: 'merge', qt: free.token, sources: [{ passcode: code }] });
   assert.equal(r.status, 200);
@@ -150,18 +151,18 @@ test("a merge keeps the higher level of the passes brought together (all the sam
   const t2 = setup();
   const code2 = (await t2.admin('issue', { count: 1 })).data.passes[0];
   const full = await signedIn(t2, code2);
-  const other = (await t2.call({ op: 'create', app: 'stock' })).data;
+  const other = (await newPass(t2.call, t2.deps, 'stock')).data;
   assert.equal((await t2.call({ op: 'merge', qt: full.token, sources: [{ passcode: other.passcode }] })).status, 200);
   assert.equal(await t2.may(full.token), true);
 });
 
 test('making passes stops at the day the panel set, everyone together', async () => {
   let n = 0;
-  const t = setup({ dayCount: async () => ++n });
+  const t = setup({ dayCount: async (env, k) => (k === 'pass-new' ? ++n : 0) });
   await t.deps.fsWrite(t.env, 'orbit-config', 'dev', JSON.stringify({ passNewDay: 2 }));
-  assert.equal((await t.call({ op: 'create', app: 'stock' })).status, 200);
-  assert.equal((await t.call({ op: 'create', app: 'stock' })).status, 200);
-  const third = await t.call({ op: 'create', app: 'stock' });
+  assert.equal((await newPass(t.call, t.deps, 'stock')).status, 200);
+  assert.equal((await newPass(t.call, t.deps, 'stock')).status, 200);
+  const third = await newPass(t.call, t.deps, 'stock');
   assert.equal(third.status, 429);
   assert.equal(third.data.error.code, 'ECO_CREATE_FULL');
 });

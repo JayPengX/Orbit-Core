@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { handleEcoRequest, paydayEntries, poolBalance, PAY, WALLET_COLLECTION, ECO_APPS, SHARE_MS, OVERDRAFT_RATE, taipeiMonth } from '../eco.js';
 import { SESSION_MS, REFRESH_MS } from '../orbit-token.js';
 import { ADMIN_SESSION_MS } from '../eco-admin.js';
+import { newPass as viaMail } from './new-pass.mjs';
 
 function setup() {
   const store = new Map();
@@ -59,7 +60,7 @@ function setup() {
 }
 
 async function newPass(t, app = 'stock') {
-  const made = await t.call('POST', '', { op: 'create', app });
+  const made = await viaMail(b => t.call('POST', '', b), t.deps, app);
   assert.equal(made.status, 200);
   return made.data;
 }

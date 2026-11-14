@@ -7,6 +7,7 @@ import { forgetPace } from '../pace.js';
 import { handleEcoRequest } from '../eco.js';
 import { ADMIN_TOOLS } from '../eco-admin.js';
 import { readToken, sessionLimited } from '../orbit-token.js';
+import { newPass } from './new-pass.mjs';
 
 const T = 1_800_000_000_000;
 
@@ -155,7 +156,7 @@ test('/eco: everyone gets in while open, the door counts them behind the answer'
   forgetDoor();
   forgetPace();
   const t = setup();
-  const a = await t.call({ op: 'create', app: 'stock' });
+  const a = await newPass(t.call, t.deps, 'stock');
   assert.equal(a.status, 200);
   await t.settle();
   assert.equal(report(t.door.book, Date.now()).n, 1);
@@ -165,14 +166,14 @@ test('/eco: full, a newcomer is turned away with a place in line; someone alread
   forgetDoor();
   forgetPace();
   const t = setup();
-  const first = await t.call({ op: 'create', app: 'stock' });
+  const first = await newPass(t.call, t.deps, 'stock');
   await t.settle();
   t.door.book.max = 1;
   // The door tells KV it's full (at its next answer); isolates read it.
   await t.door.fetch(new Request('https://door/now'));
   assert.equal(JSON.parse(t.env.RATE_LIMIT_KV.m.get(DOOR_STATE_KEY)).state, 'full');
   forgetDoor();
-  const second = await t.call({ op: 'create', app: 'stock' });
+  const second = await newPass(t.call, t.deps, 'stock');
   assert.equal(second.status, 503);
   assert.equal(second.data.error.code, 'ORBIT_FULL');
   assert.equal(second.data.error.place, 1);
@@ -191,8 +192,8 @@ test('/eco: a priority pass signs in with p in its session while the door is ful
   forgetPace();
   const t = setup();
   // Two passes, made while open.
-  const a = await t.call({ op: 'create', app: 'stock' });
-  const b = await t.call({ op: 'create', app: 'stock' });
+  const a = await newPass(t.call, t.deps, 'stock');
+  const b = await newPass(t.call, t.deps, 'stock');
   await t.settle();
   const bId = (await readToken('test-secret', b.data.token, 'ses')).d;
   await ADMIN_TOOLS.priority({ env: t.env, deps: t.deps, body: { wallet: bId.slice(0, 8), on: true } });

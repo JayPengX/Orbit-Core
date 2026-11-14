@@ -1,7 +1,8 @@
 // The Orbit Pass's recovery email in the browser (the Worker's pass-mail.js):
 // the Pass sheet's 救援信箱 (added, changed, removed, each by a code mailed
 // to it), the sign-in screen's 用信箱找回 (a code mailed to a linked address
-// signs in; a new pass comes next, orbit.mjs freshGate), and the quiet tip
+// signs in; a new pass comes next, orbit.mjs freshGate), 建立新的 Orbit Pass
+// (a code to the address that goes on it, createPanel), and the quiet tip
 // that suggests one. Loaded when first needed (orbit.mjs mailKit).
 import { errorText, ask, settingPatch } from './orbit.mjs';
 import { icons, toast, h as node } from './ui.mjs';
@@ -177,7 +178,7 @@ export function mailRows(s, note, { head, box, sub, open = false }) {
 
 // The panel that takes the sign-in form's place: an address, then the code.
 // done(res): signed in (res.fresh: a new pass comes next); back(): the form again.
-export function recoverPanel(s, { done, back }) {
+export function recoverPanel(s, { done, back, addr = '' }) {
   const lang = s.lang;
   const T = tr(lang);
   const form = twoStep({
@@ -186,12 +187,51 @@ export function recoverPanel(s, { done, back }) {
     begin: addr => s.mailRecoverBegin(addr),
     finish: async (addr, code) => done(await s.mailRecover(addr, code)),
     sent: addr => T(`如果 ${addr} 是 Orbit Pass 的救援信箱，驗證碼已經寄出，10 分鐘內有效。`, `If ${addr} is an Orbit Pass recovery email, a code is on its way (valid 10 minutes).`),
-    go: T('登入', 'Sign in')
+    go: T('登入', 'Sign in'),
+    addr
   });
   const el = node('div', { class: 'q-gate-form q-mail-recover' }, [
     node('p', { class: 'q-gate-label', text: T('用救援信箱找回帳戶', 'Get back in with your recovery email') }),
     form.el,
     node('button', { class: 'q-mail-link', type: 'button', text: T('返回用通行碼登入', 'Back to signing in with a pass'), onclick: () => (form.stop(), back()) })
+  ]);
+  return { el, focus: form.focus };
+}
+
+// ---- The sign-in screen: 建立新的 Orbit Pass ------------------------------------------------
+//
+// A new pass needs its email proved (Jay 11-14: one account a person; the
+// address is the pass's recovery email from the start). done(res): made and
+// signed in (res.passcode: shown next); back(): the form again; recover(addr):
+// 用救援信箱找回 with that address (it's already on a pass); had: this device
+// was signed in before (orbit.mjs HAD_KEY), so finding that pass comes first.
+export function createPanel(s, { done, back, recover, had = false }) {
+  const lang = s.lang;
+  const T = tr(lang);
+  let taken = '';
+  const find = node('button', { class: 'q-btn block', type: 'button', hidden: true, text: T('用這個信箱找回帳戶', 'Get back in with this email'), onclick: () => (form.stop(), recover(taken)) });
+  const form = twoStep({
+    lang,
+    gate: true,
+    begin: addr => ((find.hidden = true), s.createStart(addr)),
+    finish: async (addr, code) => {
+      try {
+        await done(await s.create(addr, code));
+      } catch (e) {
+        if (e?.code === 'ECO_MAIL_TAKEN') ((taken = addr), (find.hidden = false));
+        throw e;
+      }
+    },
+    sent: addr => T(`驗證碼已寄到 ${addr}，10 分鐘內有效。`, `A code is on its way to ${addr} (valid 10 minutes).`),
+    go: T('建立 Orbit Pass', 'Make my Orbit Pass')
+  });
+  const el = node('div', { class: 'q-gate-form q-mail-create' }, [
+    node('p', { class: 'q-gate-label', text: T('用電子郵件建立 Orbit Pass', 'Make an Orbit Pass with your email') }),
+    node('p', { class: 'q-gate-note', text: had ? T('這台裝置用過 Orbit Pass。如果是你的，用救援信箱找回就好：一人一個帳戶。', 'This device has used an Orbit Pass. If it was yours, get it back with your recovery email: one account a person.') : T('一人一個帳戶：這個信箱也是你的救援信箱，忘記通行碼時用它找回。', 'One account a person: this email is also your recovery email, for when you forget your pass.') }),
+    form.el,
+    find,
+    ...(had ? [node('button', { class: 'q-mail-link', type: 'button', text: T('用救援信箱找回', 'Use my recovery email'), onclick: () => (form.stop(), recover('')) })] : []),
+    node('button', { class: 'q-mail-link', type: 'button', text: T('返回登入', 'Back to sign in'), onclick: () => (form.stop(), back()) })
   ]);
   return { el, focus: form.focus };
 }

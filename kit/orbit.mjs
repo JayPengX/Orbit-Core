@@ -672,7 +672,11 @@ export function clearData() {
 // how the device itself is set up stays: its language and its screen's
 // safe area, and the kit's version (the app files stay cached, so the
 // sign-in screen opens offline).
-const DEVICE_KEYS = new Set(['orbit.lang', 'orbit.safeBottom', 'orbit.kit', 'orbit.kitFiles']);
+// (`orbit.had`: an account was signed in here once. Kept past sign-out so the
+// sign-in screen points to finding that one before making another: one
+// account a person, Jay 11-14.)
+export const HAD_KEY = 'orbit.had';
+const DEVICE_KEYS = new Set(['orbit.lang', 'orbit.safeBottom', 'orbit.kit', 'orbit.kitFiles', HAD_KEY]);
 export function wipeDevice() {
   for (const store of [globalThis.localStorage, globalThis.sessionStorage]) {
     try {
@@ -2016,6 +2020,7 @@ function makeSession(app, { lang, heartbeat }) {
     if (data.refresh) {
       writeStore(KEY.refresh, data.refresh);
       writeStore(KEY.account, accountOf(data.refresh));
+      writeStore(HAD_KEY, '1');
     }
     if (data.token) {
       token = data.token;
@@ -2103,7 +2108,8 @@ function makeSession(app, { lang, heartbeat }) {
   // Every way of signing in ends here: a refresh token for this device.
   const signIn = body => claimed(call('POST', '', { ...body, app, inbox: true }).then(res => absorb({ ...res, active: true })));
   const login = code => signIn(DEVICE_CODE_PATTERN.test(cleanCode(code)) ? { op: 'pair-redeem', code: cleanCode(code) } : { op: 'login', passcode: cleanCode(code) });
-  const create = () => signIn({ op: 'create' });
+  // A new pass: a code mailed to the address that goes on it first (Jay 11-14).
+  const create = (addr, code) => signIn({ op: 'create', addr, code });
   // A session from the device's refresh token (claim: make this app live).
   // One at a time: a data fetch that needs a token while the start's sign-in
   // is on its way waits for that one (not a second call to the Worker).
@@ -2233,6 +2239,7 @@ function makeSession(app, { lang, heartbeat }) {
   s.mailRemove = () => withToken(qt => call('POST', '', { op: 'mail-remove', qt, lang: s.lang })).then(absorb);
   s.mailRecoverBegin = addr => call('POST', '', { op: 'mail-recover-begin', addr, lang: s.lang });
   s.mailRecover = (addr, code) => signIn({ op: 'mail-recover', addr, code });
+  s.createStart = addr => call('POST', '', { op: 'create-start', addr, app, lang: s.lang });
   // (The heartbeat's read every 2 minutes: the whole wallet, up to hundreds
   // of KB, came back each time, and every app redrew for it.)
   // (`since`: the updateTime of the app's data held here; while it's still
@@ -2709,7 +2716,7 @@ function signInGate(s, look = null) {
     const error = node('p', { class: 'q-gate-error', role: 'alert' });
     const enter = node('button', { class: 'q-btn primary block', type: 'submit', text: en ? 'Sign in' : '登入' });
     const keys = passkeyHere() ? passkeyGate(s, error, res => finish(res), on => busy(on)) : null;
-    const make = node('button', { class: 'q-btn block q-gate-make', type: 'button', text: en ? 'Make a new Orbit Pass' : '建立新的 Orbit Pass', onclick: () => done(makePass) });
+    const make = node('button', { class: 'q-btn block q-gate-make', type: 'button', text: en ? 'Make a new Orbit Pass' : '建立新的 Orbit Pass', onclick: () => swap(m => m.createPanel(s, { done: made, back: unswap, recover, had: readStore(HAD_KEY) === '1' })) });
     const busy = on => [enter, input, keys?.button, make].forEach(b => b && (b.disabled = on));
     let over = false;
     const finish = res => {
@@ -2720,10 +2727,10 @@ function signInGate(s, look = null) {
       document.documentElement.classList.remove('q-signing-in');
       resolve(res);
     };
-    const makePass = async () => {
-      const res = await s.create();
+    // A pass made (createPanel): shown once to keep, then in.
+    const made = async res => {
       if (res?.passcode) await showNewPass(s, res.passcode);
-      return res;
+      finish(res);
     };
     const done = async task => {
       busy(true);
@@ -2764,28 +2771,32 @@ function signInGate(s, look = null) {
       type: 'button',
       hidden: !dev('passMail'),
       text: en ? 'Forgot your pass? Use your recovery email' : '忘記通行碼？用救援信箱找回',
-      onclick: async () => {
-        forgot.disabled = true;
-        try {
-          const m = await mailKit();
-          const panel = m.recoverPanel(s, {
-            done: res => finish(res),
-            back: () => {
-              panel.el.remove();
-              rest.forEach(n => n.style.removeProperty('display'));
-              forgot.disabled = false;
-              input.focus();
-            }
-          });
-          rest.forEach(n => n.style.setProperty('display', 'none'));
-          rest[0].before(panel.el);
-          panel.focus();
-        } catch (e) {
-          error.textContent = errorText(e, s.lang);
-          forgot.disabled = false;
-        }
-      }
+      onclick: () => recover()
     });
+    const recover = (addr = '') => swap(m => m.recoverPanel(s, { done: res => finish(res), back: unswap, addr }));
+    // A panel of pass-mail.mjs (用信箱找回, 建立) in the form's place; back: the form again.
+    let panel = null;
+    const unswap = () => {
+      panel?.el.remove();
+      panel = null;
+      rest.forEach(n => n.style.removeProperty('display'));
+      forgot.disabled = make.disabled = false;
+      input.focus();
+    };
+    const swap = async open => {
+      forgot.disabled = make.disabled = true;
+      try {
+        const m = await mailKit();
+        panel?.el.remove();
+        panel = open(m);
+        rest.forEach(n => n.style.setProperty('display', 'none'));
+        rest[0].before(panel.el);
+        panel.focus();
+      } catch (e) {
+        error.textContent = errorText(e, s.lang);
+        forgot.disabled = make.disabled = false;
+      }
+    };
     if (forgot.hidden) setTimeout(() => (forgot.hidden = !dev('passMail')), 2500);
     // 建立新的 Orbit Pass: only where a new pass can be made (a day's count
     // in 設定) and its email proved (Jay 11-14: one account a person).
