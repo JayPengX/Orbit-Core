@@ -1083,6 +1083,8 @@ export const FEATURES = {
   // drop an answer that leaves a side out or brings a number of its own).
   'news-sides': {
     models: ['haiku', 'luna'],
+    // (Low: a reader waits while it's made, 11-14: 19 s at the model's own default.)
+    effort: 'low',
     timeoutMs: 90_000,
     maxIn: 9000,
     parts: ({ stories }) =>
@@ -1132,6 +1134,7 @@ export const FEATURES = {
   // 禁止轉載), each number theirs.
   'news-brief': {
     models: ['haiku', 'luna'],
+    effort: 'low',
     timeoutMs: 60_000,
     maxIn: 16000,
     parts: ({ stories }) =>

@@ -34,7 +34,10 @@ async function factsOf(env, id, now) {
     .then(j => j?.stories || {})
     .catch(() => ({}));
   parts.set(i, { at: now, p });
-  return (await p)[id] || null;
+  const got = await p;
+  // (A part not written yet is read again soon, not held empty two minutes.)
+  if (!Object.keys(got).length) parts.set(i, { at: now - 105_000, p });
+  return got[id] || null;
 }
 
 // Two people opening the same story at once: one call.
