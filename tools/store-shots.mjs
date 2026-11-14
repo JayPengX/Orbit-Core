@@ -33,7 +33,9 @@ const langs = opt('lang', 'zh,en').split(',');
 const apply = flag('apply');
 // --clock 2026-11-13T08:30: every shot on that Taipei time (Jay 11-12: at night, shoot on the next
 // morning's timetable rather than wait for Taiwan's daytime). Comes first, so it wins over a shot's own.
-const clock = opt('clock', '');
+// (Every shot of a run on one clock and one Math.random sequence, so the Chinese and English
+// shots are the same screen, only the language differs; Jay 11-14.)
+const clock = opt('clock', '') || new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 16);
 const [key, ...only] = argv;
 const set = STORE[key];
 if (!set) { console.error(`usage: store-shots.mjs <${Object.keys(STORE).join('|')}> [n…] [--apply]`); process.exit(2); }
@@ -48,11 +50,14 @@ const run = (cmd, args, o = {}) => new Promise(res => {
 });
 
 // A made-up account: a saved one in tools/shots/accounts, or Money's demo books made fresh (sample-books.mjs).
-function accountFile(name) {
+// (`<app>-<name>.<lang>.txt` first: an account in that language, Class's English timetable.)
+function accountFile(name, lang) {
+  const inLang = join(HERE, 'shots', 'accounts', `${set.app}-${name}.${lang}.txt`);
+  if (existsSync(inLang)) return inLang;
   const saved = join(HERE, 'shots', 'accounts', `${set.app}-${name}.txt`);
   if (existsSync(saved) || !(set.app === 'money' && name === 'demo')) return saved;
-  const made = join(dir, 'money-demo.txt');
-  if (!existsSync(made)) writeFileSync(made, execFileSync(process.execPath, [join(ROOT, 'Orbit-Money/tools/sample-books.mjs')], { cwd: join(ROOT, 'Orbit-Money'), encoding: 'utf8' }));
+  const made = join(dir, `money-demo.${lang}.txt`);
+  if (!existsSync(made)) writeFileSync(made, execFileSync(process.execPath, [join(ROOT, 'Orbit-Money/tools/sample-books.mjs'), '--lang', lang], { cwd: join(ROOT, 'Orbit-Money'), encoding: 'utf8' }));
   return made;
 }
 
@@ -67,16 +72,18 @@ async function shoot(n, lang) {
   if (s.page && !page) throw new Error(`${key} ${n}: no page "${s.page}" in pages.mjs`);
   const tmp = join(dir, `.tmp-${n}-${lang}`); rmSync(tmp, { recursive: true, force: true });
   const account = s.account ?? set.account;
-  const payload = account ? ['--payload', account.startsWith('/') ? account : accountFile(account)] : [];
+  const payload = account ? ['--payload', account.startsWith('/') ? account : accountFile(account, lang)] : [];
   const hash = (h => (h && typeof h === 'object' ? h[lang] : h))(s.hash || page.hash);
   // A real AI answer, asked once as a phone (build.yml as-phone) and kept: tools/shots/ai/<name>.<lang>.ndjson|json.
   const ai = (s.ai || []).flatMap(([text, name]) => {
     const f = ['ndjson', 'json'].map(x => join(HERE, 'shots', 'ai', `${name}.${lang}.${x}`)).find(existsSync);
     return f ? ['--fixture', `${text}=${f}`] : [];
   });
-  const args = [join(HERE, 'preview.mjs'), set.app, ...(hash ? [hash] : []), '--live', '--lang', lang, ...(s.device && s.device !== 'phone' ? ['--device', { tablet: 'ipad', computer: 'pc' }[s.device]] : ['--width', '375', '--height', '812']), '--wait', String(s.wait ?? 6000), '--out', tmp, ...(clock ? ['--clock', clock] : []),
-    // (every set in the app's own dark look, Jay 11-14: light shots beside a dark app read as another app)
-    ...((s.dark ?? set.dark ?? true) ? ['--dark'] : []), ...payload, ...ai, ...(set.args || []), ...(page.args || []), ...((a => (Array.isArray(a) ? a : a?.[lang]))(s.args) || [])];
+  const args = [join(HERE, 'preview.mjs'), set.app, ...(hash ? [hash] : []), '--live', '--lang', lang, ...(s.device && s.device !== 'phone' ? ['--device', { tablet: 'ipad', computer: 'pc' }[s.device]] : ['--width', '375', '--height', '812']), '--wait', String(s.wait ?? 6000), '--out', tmp,
+    // (dark and light mixed, Jay 11-14: shots 1, 3, 5 dark, 2, 4, 6 light; a shot's own `dark` wins)
+    '--seed', String(n), ...((s.dark ?? set.dark ?? n % 2 === 1) ? ['--dark'] : []), ...payload, ...ai, ...(set.args || []), ...(page.args || []), ...((a => (Array.isArray(a) ? a : a?.[lang]))(s.args) || [])];
+  // (the run's one clock, unless the shot sets its own: Class's school morning)
+  if (!args.includes('--clock') || opt('clock', '')) args.push('--clock', clock);
   const r = await run(process.execPath, args, { cwd: join(HERE, '..') });
   const png = existsSync(tmp) && readdirSync(tmp).find(f => f.endsWith('.png'));
   const file = join(dir, `${n}.${lang}.png`);
@@ -121,8 +128,8 @@ const encode = async (src, dest, w, h, frame) => {
       body{background:radial-gradient(120% 70% at 20% 0%,${hi}66 0%,transparent 60%),linear-gradient(165deg,${mid} 0%,${lo} 100%);font-family:'Inter Display','Inter','PingFang TC','Noto Sans TC','WenQuanYi Zen Hei',sans-serif;-webkit-font-smoothing:antialiased}
       .hd{position:absolute;top:0;left:66px;right:66px;height:370px;display:flex;align-items:center;justify-content:center}
       h1{margin:0;text-align:center;color:#fff;font-weight:700;font-size:${frame.zh ? 64 : 68}px;line-height:1.12;letter-spacing:${frame.zh ? '0.02em' : '-0.025em'};text-wrap:balance;word-break:keep-all;overflow-wrap:anywhere}
-      .ph{position:absolute;top:390px;left:50%;transform:translateX(-50%);width:645px;padding:18px;border-radius:96px;background:#0b0b0f;box-shadow:0 45px 120px rgba(0,0,0,.35),0 0 0 3px rgba(255,255,255,.14)}
-      .ph img{display:block;width:645px;border-radius:78px}
+      .ph{position:absolute;top:330px;left:50%;transform:translateX(-50%);width:600px;padding:18px;border-radius:92px;background:#0b0b0f;box-shadow:0 45px 120px rgba(0,0,0,.35),0 0 0 3px rgba(255,255,255,.14)}
+      .ph img{display:block;width:600px;border-radius:74px}
       .ph.tablet{top:400px;width:724px;padding:20px;border-radius:56px}.ph.tablet img{width:724px;border-radius:36px}
       .ph.computer{top:auto;bottom:451px;width:800px;padding:14px;border-radius:30px}.ph.computer img{width:800px;border-radius:16px}
       .stand{position:absolute;left:50%;transform:translateX(-50%);bottom:401px;width:880px;height:50px;border-radius:0 0 40px 40px;background:linear-gradient(#2a2a30,#0b0b0f);box-shadow:0 30px 60px rgba(0,0,0,.35)}</style>
@@ -150,8 +157,11 @@ for (const [i, s] of set.shots.entries()) {
     const suf = l === 'zh' ? '.zh' : '';
     const [w, h] = DEVICES[s.device || 'phone'];
     const across = { phone: 750, tablet: 1100, computer: 1600 }[s.device || 'phone'];
-    await encode(join(dir, `${n}.${l}.png`), join(shotsDir, `${n}${suf}.webp`), across, Math.round((across * h) / w));
+    // (the README's poster is the Showcase's too, Jay 11-14: one set, the whole phone in it; the
+    // first shot's bare screen, screen.webp, for the Showcase's own phone frames)
     await encode(join(dir, `${n}.${l}.png`), join(docs, `${set.prefix}-${n}${suf}.webp`), 900, 1770, { title: l === 'zh' ? s.zh : s.en, zh: l === 'zh', device: s.device });
+    copyFileSync(join(docs, `${set.prefix}-${n}${suf}.webp`), join(shotsDir, `${n}${suf}.webp`));
+    if (n === 1) await encode(join(dir, `${n}.${l}.png`), join(shotsDir, `screen${suf}.webp`), across, Math.round((across * h) / w));
   }
   console.log(`${key} ${n}: ${s.zh} / ${s.en}`);
 }
@@ -176,4 +186,7 @@ const B = '<p align="center">\\n(?:  <img src="docs/screenshots/[^\\n]*\\n)+</p>
 const oldBlock = new RegExp(`${B}(?:\\n\\n${B})*(?:\\n\\n<details>\\n<summary>中文畫面</summary>\\n\\n${B}(?:\\n\\n${B})*\\n\\n</details>)?`);
 if (!oldBlock.test(md)) throw new Error(`no screenshot rows in ${readme}`);
 writeFileSync(readme, md.replace(oldBlock, () => block));
+// (each shot's content stamp on its Showcase URL, so no phone shows a kept old one)
+const stamps = join(ROOT, 'Orbit-Showcase', 'scripts', 'shot-versions.mjs');
+if (existsSync(stamps)) await run(process.execPath, [stamps]);
 console.log(`written: ${shotsDir}, ${docs}, ${appsFile}, ${readme}`);

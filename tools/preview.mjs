@@ -13,6 +13,7 @@
 //                          [--entry '{json}']  (a wallet entry to add: an economy scenario)
 //                          [--clock 2026-10-06T10:05]  (the page's clock, Taipei time)
 //                          [--radar 3 [--radar-in 20] [--radar-for 30]]  (Weather: a shower that hard, mm an hour, coming on the radar)
+//                          [--seed n]  (Math.random a fixed sequence: the same picks in every run)
 //                          [--snap '{json}']  (the wallet's snap to start with)
 //                          [--ai-log file]  (each AI ask without a saved answer, a JSON line: build.yml as-phone)
 //                          [--fixture 'text-in-url=file.json']  (repeatable: that saved answer; 'feature:<name>=' an AI feature's
@@ -248,6 +249,8 @@ const reopen = flag('reopen') || Boolean(upgrade) || Boolean(net);
 // --freezes: every stretch over 100 ms the page couldn't answer a tap (its
 // main thread busy), from the moment it starts: [when, how long] in ms.
 const freezes = flag('freezes');
+// --seed n: the page's Math.random a fixed sequence, so two runs (a screenshot in each language) draw the same picks.
+const seed = opt('seed', '');
 // --profile: where the page's main thread spent its time until the loading
 // screen went (Chromium): each function's own time, the 15 largest.
 const profileFor = Number(opt('profile-for', 0));
@@ -649,6 +652,16 @@ if (freezes)
     };
     setTimeout(tick, 0);
   });
+if (seed)
+  await context.addInitScript(n => {
+    let a = n >>> 0;
+    Math.random = () => {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }, Number(seed) || 1);
 if (gate) await context.addInitScript({ path: new URL('./gate-page.js', import.meta.url).pathname });
 if (shuffle)
   await context.addInitScript(() => {

@@ -14,8 +14,8 @@
 // confident and carrying a real number where one sells (counted from the data, rounded so it
 // stays true). Every shot shows different content (another story, game, stock, word); one shot
 // per feature; Orbit AI at most once, only where it is central; never a competitor's name.
-// One look per set, the app's own dark (Jay 11-14; `dark: false` for a light one), never light and
-// dark mixed. Six a set, so the README's rows of three come out whole: four on a phone, one on an
+// Dark and light mixed (Jay 11-14, later: shots 1, 3, 5 dark, 2, 4, 6 light; `dark` on a shot wins),
+// each shot's Chinese and English the same screen (store-shots: one clock, a seeded Math.random). Six a set, so the README's rows of three come out whole: four on a phone, one on an
 // iPad and one on a computer (`device`, Jay 11-14), the big two in the middle column. Nothing half-empty, cut by
 // the tab bar, loading, showing zeros or NT$0, or another language's headlines (Jay 11-13).
 import { tap, wait } from './pages.mjs';
@@ -83,7 +83,8 @@ export const STORE = {
       { zh: '你的比賽，一打開就看到', en: 'Your games, the moment you open it', wait: 14000 },
       { zh: '台灣轉播的 15 項賽事，全在這', en: 'All 15 competitions on TV in Taiwan', device: 'computer', args: click('#tab-matches', wait(5000), "js:[...document.querySelectorAll('[data-day]')].filter(e=>e.offsetParent&&/^(明天|Tmrw)/.test(e.textContent.trim())).forEach(e=>e.click())", wait(5000)), wait: 8000 },
       { zh: '每場比賽在哪一台播，一次看', en: 'Every game, and the channel it’s on', page: 'guide', args: click("js:[...document.querySelectorAll('dialog.q-sheet[open] button')].filter(e=>e.offsetParent&&/^(明天|Tmrw)/.test(e.textContent.trim())).pop()?.click()", wait(4000)) },
-      { zh: '勝率走勢與關鍵時刻', en: 'How the game swung, and when', args: click('#tab-matches', '[data-league=nba]', wait(2500), yesterday, wait(3000), closeNba, wait(8000), sheetCard('勝率走勢|Win probability'), wait(1500)) },
+      // (never the win chance: it comes from betting prices, and the Showcase shows no betting)
+      { zh: '打完的比賽，比分和誰最亮眼', en: 'A finished game: the score and who stood out', args: click('#tab-matches', '[data-league=nba]', wait(2500), yesterday, wait(3000), closeNba, wait(8000), sheetCard('數據領先|Leaders', 'start'), wait(1500)) },
       { zh: '積分榜與爭冠形勢', en: 'The table and the title race', device: 'tablet', page: 'epl-table' },
       { zh: '每位球員的數據，一頁看完', en: 'Every player’s numbers on one page', page: 'player-ohtani-overview', wait: 10000 }
     ]
@@ -129,12 +130,12 @@ export const STORE = {
   news: {
     app: 'news', brand: 'news', show: 'news', prefix: 'news',
     shots: [
-      { zh: '每則新聞，各家怎麼報一次看', en: 'Every story, as every outlet tells it', wait: 9000 },
+      { zh: '每則新聞，各家怎麼報一次看', en: 'Every story, as every outlet tells it', wait: 18000 },
       { zh: '同一件事，偏綠、中間、偏藍怎麼下標', en: 'One story, each side’s headline', device: 'computer', args: click("js:[...document.querySelectorAll('.nw-card')].filter(e=>e.offsetParent)[0]?.click()", wait(3000), toTop("[...document.querySelectorAll('dialog[open] .nw-spec')].pop()", 70), wait(1000)), wait: 9000 },
-      { zh: '各家的影音新聞，一頁看', en: 'Every outlet’s video news, in one place', hash: 'tw', args: click(wait(2500), tap('影音|Video'), wait(1500)), wait: 9000 },
-      { zh: '國際大事，台灣媒體怎麼報', en: 'World news, and how Taiwan reports it', hash: 'intl', args: click(tap('能源|Energy'), wait(2500)), wait: 9000 },
+      { zh: '各家的影音新聞，一頁看', en: 'Every outlet’s video news, in one place', hash: 'intl', args: click(wait(2500), tap('影音|Video'), wait(1500)), wait: 14000 },
+      { zh: '國際大事，台灣媒體怎麼報', en: 'World news, and how Taiwan reports it', hash: 'intl', args: click(tap('能源|Energy'), wait(2500)), wait: 18000 },
       { zh: '118 家媒體，立場都有出處', en: '118 outlets, each place sourced', device: 'tablet', hash: 'outlets', args: click(toTop("[...document.querySelectorAll('h2,h3,.q-section-head,header')].find(e=>e.offsetParent&&/^(台灣媒體|Taiwan’s outlets)/.test(e.textContent.trim()))", 40), wait(800)), wait: 9000 },
-      { zh: '14 個主題，照重要程度排', en: '14 topics, ranked by importance', hash: 'tw', args: click(tap('科學|Science'), wait(2500)), wait: 9000 }
+      { zh: '14 個主題，照重要程度排', en: '14 topics, ranked by importance', hash: 'tw', args: click(tap('科學|Science'), wait(2500)), wait: 18000 }
     ]
   },
   // The 大考 list taught hard on purpose: your own mix-ups as the wrong options, a memory model decides.
