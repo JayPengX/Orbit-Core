@@ -1059,6 +1059,45 @@ const sumOf = vs => {
   for (const x of vs) for (const [k, w] of x) add(v, k, w);
   return v;
 };
+// Small stories into the story they're one with (deskOf): `recs` the open
+// ones of a region, emptied as they join (their ids let go).
+export const FRAGMENT = 6;
+export const FRAGMENT_NEAR = 0.45;
+function mergeFragments(recs, vecOf, lang, owner) {
+  const info = recs.map(r => {
+    const v = sumOf(r.items.filter(it => it.at >= (r.last || 0) - 24 * HOUR).map(vecOf));
+    return { r, v, n: norm(v), first: Math.min(...r.items.map(it => it.at || 0)), last: Math.max(...r.items.map(it => it.at || 0)), teams: r.items.reduce((t, it) => withTeams(t, teamsOf(it.t, lang)), null), whose: lang === 'zh' ? reportsOwner(r.items.map(it => it.t)).owner : '' };
+  });
+  const by = new Map();
+  for (const x of info) for (const k of x.v.keys()) (by.get(k) || by.set(k, []).get(k)).push(x);
+  // (Smallest first, each into the biggest it's near: a chain of small ones ends in one.)
+  for (const x of [...info].sort((a, b) => a.r.items.length - b.r.items.length)) {
+    if (!x.r.items.length || x.r.items.length > FRAGMENT || x.r.sp) continue;
+    const dots = new Map();
+    for (const [k, w] of x.v) for (const y of by.get(k) || []) if (y !== x && y.r.items.length) dots.set(y, (dots.get(y) || 0) + w * (y.v.get(k) || 0));
+    let best = null;
+    let bestSim = 0;
+    for (const [y, dot] of dots) {
+      if (y.r.sp !== x.r.sp || y.first > x.last + GAP || x.first > y.last + GAP) continue;
+      if (otherGame(x.teams, y.teams)) continue;
+      if (x.whose && y.whose && x.whose !== y.whose) continue;
+      const sim = dot / (x.n * (y.n || 1));
+      if (sim >= FRAGMENT_NEAR && (sim > bestSim + 1e-9 || (Math.abs(sim - bestSim) <= 1e-9 && y.r.items.length > best.r.items.length))) (bestSim = sim), (best = y);
+    }
+    if (!best || best.r.items.length < x.r.items.length) continue;
+    const have = new Set(best.r.items.map(it => it.u));
+    for (const it of x.r.items) if (!have.has(it.u)) best.r.items.push(it), owner.set(it.u, best.r);
+    for (const [k, w] of x.v) {
+      if (!best.v.has(k)) (by.get(k) || by.set(k, []).get(k)).push(best);
+      add(best.v, k, w);
+    }
+    best.n = norm(best.v);
+    best.first = Math.min(best.first, x.first);
+    best.last = Math.max(best.last, x.last);
+    best.teams = withTeams(best.teams, x.teams);
+    x.r.items = [];
+  }
+}
 // What a story keeps of a headline.
 // (A story's headline this far from the rest of it, leaving it out, isn't
 // the story's: measured on 11-12's page, strays sat under 0.05 (English) and
@@ -1318,6 +1357,17 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
         owner.set(it.u, rec);
       }
     }
+    // A breaking story whose headlines came over several builds is one (11-14:
+    // the White House's Trump–Xi–Putin meeting, fifteen outlets, sat in five
+    // stories of two or three: a later build's headlines start their own when
+    // the first story's core doesn't take them, and stories never met again).
+    // A small story (FRAGMENT headlines at most) joins the story its middle is
+    // near (FRAGMENT_NEAR: past MERGE, measured on a 40-hour replay where
+    // nearer than MERGE but under it also took 台北's 政見會 into 新北's), in the
+    // same days, never another company's; news only (sports' small stories
+    // are a day's many games and moves).
+    mergeFragments(recsHere.filter(r => r.items.length && open(r)), vecOf, lang, owner);
+    for (const r of recsHere) for (const it of r.items) owner.set(it.u, r);
     const freed = [];
     const sizeOf = r => {
       if (!r.items.length) return null;
