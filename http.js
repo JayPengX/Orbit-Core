@@ -45,6 +45,13 @@ export function corsHeaders(origin, colo) {
   };
 }
 
+// Every answer of the proxy is data a page reads with fetch, never a page of
+// its own (worker.js puts these on each): opened in a tab (a link to
+// orbit.<domain>/api/… someone sent, an upstream's HTML the data proxy passed
+// through), nothing in it runs, reads the site's storage (the Pass's sign-in,
+// the admin key) or sits in a frame. A fetch never reads them.
+export const LOCKED = { 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'; sandbox" };
+
 export function json(data, status, headers) {
   return new Response(JSON.stringify(data), {
     status,

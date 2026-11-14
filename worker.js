@@ -63,7 +63,7 @@ import { withDataFallback, sweepDataFiles } from './data-fallback.js';
 import { applyScale } from './capacity.js';
 import { handleSports, sportsCron, useDevSettings } from './sports.js';
 import { handleToday } from './sports-today.js';
-import { isAllowedOrigin, corsHeaders, json, LOCAL_ORIGIN, bodyText, sha256Hex, ipBucket } from './http.js';
+import { isAllowedOrigin, corsHeaders, json, LOCAL_ORIGIN, bodyText, sha256Hex, ipBucket, LOCKED } from './http.js';
 import { handleData } from './data.js';
 import { handleStock, moveBook } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
@@ -1685,14 +1685,19 @@ async function route(request, env, ctx, headers, origin) {
 // the apps (http.js exposes it): the kit's 除錯紀錄 notes it with a slow
 // request, so a slow answer says whether the time went here (an upstream
 // such as ESPN or TDX) or on the way to the phone.
+// (Each answer LOCKED, http.js: data for a page's fetch, never a page that runs.)
 function timed(res, t0) {
   if (!res || res.status === 101 || res.webSocket) return res;
+  const mark = h => {
+    h.set('Server-Timing', `w;dur=${Date.now() - t0}`);
+    for (const [k, v] of Object.entries(LOCKED)) h.set(k, v);
+  };
   try {
-    res.headers.set('Server-Timing', `w;dur=${Date.now() - t0}`);
+    mark(res.headers);
     return res;
   } catch {
     const copy = new Response(res.body, res);
-    copy.headers.set('Server-Timing', `w;dur=${Date.now() - t0}`);
+    mark(copy.headers);
     return copy;
   }
 }
@@ -1758,7 +1763,7 @@ async function handle(request, env, ctx) {
     } catch (error) {
       console.log('route failed', new URL(request.url).pathname, String(error?.message || error).slice(0, 200));
       countError(env, ctx, request);
-      return errorJson('WORKER_FAILED', 500, headers, request);
+      return timed(errorJson('WORKER_FAILED', 500, headers, request), t0);
     } finally {
       flushSources(env, ctx);
     }

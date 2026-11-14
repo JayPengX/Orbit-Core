@@ -241,7 +241,7 @@ export async function handleAi(request, env, ctx, headers, session, { cap = 0, g
   const day = twDay();
   const who = `ai:${name}:${(await sha256Hex(`ai|${day}|${pass}`)).slice(0, 24)}`;
   if ((await countOf(env, who, day)) >= f.perPass) return json({ error: 'cap', left: 0 }, 429, headers);
-  if (!(await spendDay(env, name, cap, day))) return json({ error: 'cap', left: 0 }, 429, headers);
+  if (!(await spendDay(env, name, f.dayCap ? Math.min(cap, f.dayCap) : cap, day))) return json({ error: 'cap', left: 0 }, 429, headers);
   const used = await addOne(env, who, day);
   const left = Math.max(0, f.perPass - used);
   try {
