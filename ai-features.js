@@ -694,6 +694,8 @@ export const FEATURES = {
         if (bare(zh).replace(/\s/g, '').length > 34 || en.split(/\s+/).filter(Boolean).length > 20) continue;
         // (What the card shows, said again: its place, its last five, its averages, the win chance.)
         if (/排名第\s*\d+|近\s*[五5]\s*場|場均|勝率/.test(bare(zh))) continue;
+        // (The places, or the gap between them, with nothing a result would change: Jay 11-14, 「排名第 2 對第 3，只差 2 分」 over the table that says it.)
+        if (/第\s*\d+\s*(名\s*)?對\s*第\s*\d+|龍頭之爭|只差|相差|勝差|\bapart\b|\bgames? (back|behind)\b/i.test(`${bare(zh)} ${bare(en)}`) && !/若|如果|一旦|贏球|勝則|獲勝|擊敗|輸球|落敗|即可|就能|就會|升上|升至|跌至|超越|追平|晉級|淘汰|降級|季後賽|\bif\b|\bwith a (win|loss)\b|\bwould\b|\bclinch|\bmove (up|into)\b/i.test(`${bare(zh)} ${bare(en)}`)) continue;
         if (/士氣|低迷|信心|關鍵戰|復仇|宿敵/.test(bare(zh))) continue;
         // (The streak, which the card's 連勝敗 row shows outside football: Jay
         // 11-13, 「馬刺豪取10連勝」 over W10. The last ten only as the facts give it.)
