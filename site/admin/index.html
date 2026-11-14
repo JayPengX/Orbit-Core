@@ -614,6 +614,7 @@
         <div class="tool-head"><i data-ic="send" style="--t:#4f46e5"></i><div><h3>公開領取</h3><p class="muted">一台裝置一組，沒換通行碼的到時收回。</p></div><button class="q-switch" type="button" role="switch" aria-checked="false" aria-label="開放領取" id="gift-on"></button></div>
         <div class="tiles" id="gift-tiles"></div>
         <div class="row" style="margin-top:12px"><input id="gift-total" type="number" min="0" max="5000" value="50" aria-label="數量" /><span class="muted">組</span></div>
+        <div class="chips" id="gift-level" style="margin-top:10px" role="group" aria-label="等級"><button type="button" data-full="0">基本（沒有 AI）</button><button type="button" data-full="1">完整（有 Orbit AI）</button></div>
         <div class="gift-when">
           <label>開始（空白是現在）<input id="gift-opens" type="datetime-local" /></label>
           <label>結束（空白是不限）<input id="gift-closes" type="datetime-local" /></label>
@@ -636,7 +637,7 @@
         </div>
       </div>
       <div class="card tool" id="tool-issue">
-        <div class="tool-head"><i data-ic="ticket" style="--t:#2563eb"></i><div><h3>發放 Orbit Pass</h3><p class="muted">誰先登入就是誰的。這裡只顯示這一次，先複製或下載。</p></div></div>
+        <div class="tool-head"><i data-ic="ticket" style="--t:#2563eb"></i><div><h3>發放 Orbit Pass</h3><p class="muted">完整等級（有 Orbit AI），誰先登入就是誰的。只顯示這一次，先複製或下載。</p></div></div>
         <div class="row"><input id="count" type="number" min="1" max="500" value="10" /><span class="muted">組</span><button id="issue" class="primary">發放</button></div>
         <p id="issue-error" class="error"></p>
         <div id="issued" hidden>
@@ -1151,8 +1152,12 @@ const FILTERS = {
   neg: ['透支', w => w.balance < 0],
   relief: ['紓困過', w => w.reliefs],
   idle: ['30 天沒用', w => w.lastUsed && Date.now() - lastOf(w) > 30 * 86_400_000],
-  passkey: ['有通行密鑰', w => w.passkeys > 0]
+  passkey: ['有通行密鑰', w => w.passkeys > 0],
+  full: ['完整', w => w.level === 'full'],
+  free: ['基本', w => w.level !== 'full']
 };
+// A pass's level (eco.js levelOf): 完整 asks Orbit AI; 基本 (made by anyone, or the giveaway's) never spends.
+const LEVEL_NAME = { full: '完整', free: '基本' };
 const SORTS = { lastUsed: lastOf, balance: w => w.balance ?? -Infinity, created: w => Date.parse(w.created || 0) || 0 };
 // A Orbit Pass as typed (10 letters and digits, a dash or spaces anywhere).
 const asPass = q => {
@@ -1219,8 +1224,8 @@ $('sort').onclick = e => {
   drawWallets();
 };
 $('csv').onclick = () => {
-  const head = ['代號', '狀態', 'App', '建立', '最後使用', '餘額', '紀錄筆數', '紓困次數', '繳稅', '通行密鑰'];
-  const rows = wallets.map(w => [w.ref, w.lastUsed ? '使用中' : '未使用', w.apps.map(appName).join(' / '), w.created || '', w.lastUsed || '', w.balance ?? '', w.entries, w.reliefs || '', w.tax || '', w.passkeys || 0]);
+  const head = ['代號', '狀態', '等級', 'App', '建立', '最後使用', '餘額', '紀錄筆數', '紓困次數', '繳稅', '通行密鑰'];
+  const rows = wallets.map(w => [w.ref, w.lastUsed ? '使用中' : '未使用', LEVEL_NAME[w.level] || LEVEL_NAME.free, w.apps.map(appName).join(' / '), w.created || '', w.lastUsed || '', w.balance ?? '', w.entries, w.reliefs || '', w.tax || '', w.passkeys || 0]);
   const text = '﻿' + [head, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const a = el('a', { href: URL.createObjectURL(new Blob([text], { type: 'text/csv' })), download: `Orbit 帳戶 ${new Date().toISOString().slice(0, 10)}.csv` });
   a.click();
@@ -1347,7 +1352,7 @@ const kindIc = k => KIND_IC[k] || ['list', '#94a3b8'];
 const REC_FILTERS = { all: ['全部', () => true], in: ['進', e => e.amount > 0], out: ['出', e => e.amount < 0], eco: ['Orbit', e => e.app === 'eco'] };
 function drawAccount(a) {
   const reload = () => openAccount(a.ref);
-  const tags = [a.priority ? '優先' : '', a.balance < 0 ? '透支' : '', a.reliefs ? `紓困 ×${a.reliefs}` : '', a.lastUsed ? '' : '未使用'].filter(Boolean);
+  const tags = [LEVEL_NAME[a.level] || LEVEL_NAME.free, a.priority ? '優先' : '', a.balance < 0 ? '透支' : '', a.reliefs ? `紓困 ×${a.reliefs}` : '', a.lastUsed ? '' : '未使用'].filter(Boolean);
   const hero = el('div', { class: 'acct-hero' });
   hero.innerHTML = heroCardHtml({ eyebrow: '餘額', icon: ic('wallet'), big: money(a.balance), sub: a.apps.length ? `${a.apps.length} 個 App · ${ago(a.lastUsed)}用過` : '還沒用過', color: refColor(a.ref) }, tags.length ? `<div class="hero-chips">${tags.map(t => `<button type="button" tabindex="-1">${escHtml(t)}</button>`).join('')}</div>` : '');
   const facts = el('div', { class: 'facts' });
@@ -1458,7 +1463,17 @@ function drawAccount(a) {
     return r.priority ? '已設為優先' : '已取消優先';
   });
   priBtn.onclick = () => priority.run(priBtn);
+  // 等級: 完整 has Orbit AI; 基本 never starts anything that costs money. Holds from the next ask.
+  const full = a.level === 'full';
+  const lvlBtn = el('button', { class: full ? '' : 'primary', text: full ? '改成基本' : '改成完整' });
+  const level = action(full ? '完整：有 Orbit AI' : '基本：沒有 AI', full ? '改成基本：AI 和其他花錢的功能都關掉。' : '改成完整：可以用 Orbit AI。', [lvlBtn], async () => {
+    const r = await admin('level', { wallet: a.ref, level: full ? 'free' : 'full' });
+    setTimeout(() => (reload(), loadWallets()), 700);
+    return r.level === 'full' ? '已改成完整' : '已改成基本';
+  });
+  lvlBtn.onclick = () => level.run(lvlBtn);
   const ACTS = [
+    ['等級', 'spark', '#7c3aed', level],
     ['優先', 'star', '#ca8a04', priority],
     ['調整金額', 'pencil', '#2563eb', grant],
     ['裝置代碼', 'key', '#0d9488', recover],
@@ -1802,6 +1817,7 @@ function drawGift(g, empty) {
     tile('收回', g.back.toLocaleString(), g.hold ? `${g.hold} 小時沒換` : '不收回')
   );
   $('gift-total').value = g.total;
+  for (const b of $('gift-level').children) b.setAttribute('aria-pressed', String(b.dataset.full === (g.full ? '1' : '0')));
   $('gift-opens').value = localTime(g.opens);
   $('gift-closes').value = localTime(g.closes);
   $('gift-rate').value = g.rate;
@@ -1831,6 +1847,11 @@ async function giftSet(extra = {}) {
   $('gift-save').disabled = false;
 }
 $('gift-save').onclick = () => giftSet();
+// The round's level (eco.js levelOf): saved at once, for the passes claimed from now on.
+$('gift-level').onclick = e => {
+  const b = e.target.closest('button[data-full]');
+  if (b) giftSet({ full: b.dataset.full === '1' });
+};
 // The switch saves at once (the times and count as they stand in the form).
 $('gift-on').onclick = () => {
   const on = $('gift-on').getAttribute('aria-checked') !== 'true';

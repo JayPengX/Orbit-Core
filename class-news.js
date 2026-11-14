@@ -352,7 +352,9 @@ const edge = () => (typeof caches !== 'undefined' && caches.default) || null;
 // phone asking again a few seconds on. One wording at a time a school.
 const NEWS_V = 4; // the class-news prompt's version: a new one words every school again (4: English beside, Jay 11-13)
 const unworded = x => (x?.items || []).some(it => it.line == null);
-export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now = Date.now(), build = true, force = false } = {}) {
+// (`ai`: false for a pass that may not spend (eco.js levelOf 'free'): the
+// school's list read by code, its titles alone, the AI never asked.)
+export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now = Date.now(), build = true, force = false, ai = true } = {}) {
   const key = keyOf(site);
   let kept = null;
   try {
@@ -388,6 +390,7 @@ export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now
   };
   if (kept && !force && now - kept.at < NEWS.freshMs) {
     if (!unworded(kept)) return kept;
+    if (!ai) return { ...kept, wording: false };
     if (wording(kept) || !build) return { ...kept, wording: wording(kept) };
     return startWording(kept);
   }
@@ -411,18 +414,18 @@ export async function schoolNews(env, ctx, site, { cap = 0, fetchFn = fetch, now
     later(
       rebuild().then(out => {
         if (out.stale || out.unread) return;
-        return unworded(out) ? put({ ...out, wordingAt: now }).then(() => word(out)) : put(out);
+        return unworded(out) && ai ? put({ ...out, wordingAt: now }).then(() => word(out)) : put(out);
       })
     );
     return { ...kept, stale: true, wording: false };
   }
   const out = await rebuild();
   if (!out.items.length) return out;
-  return unworded(out) ? startWording(out) : (later(put(out)), out);
+  return unworded(out) && ai ? startWording(out) : (later(put(out)), out);
 }
 
 // GET /class-news?site=… (a session of Orbit Class's).
-export async function handleClassNews(request, env, ctx, headers, session, { cap = 0, fetchFn = null } = {}) {
+export async function handleClassNews(request, env, ctx, headers, session, { cap = 0, fetchFn = null, ai = false } = {}) {
   if (request.method !== 'GET') return json({ error: 'method' }, 405, headers);
   if (!isAllowedOrigin(request.headers.get('Origin') || '')) return json({ error: 'origin' }, 403, headers);
   const pass = session?.a === 'orbit' && typeof session.d === 'string' ? session.d : null;
@@ -438,7 +441,7 @@ export async function handleClassNews(request, env, ctx, headers, session, { cap
   const who = `class-news:${(await sha256Hex(`cn|${day}|${pass}`)).slice(0, 24)}`;
   const may = (await countOf(env, who, day)) < NEWS.perPass;
   const via = fetchFn || (env.GEMINI_RELAY ? (u, init) => env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(u)}`, init) : fetch);
-  const out = await schoolNews(env, ctx, site, { cap, fetchFn: via, build: may });
+  const out = await schoolNews(env, ctx, site, { cap, fetchFn: via, build: may, ai });
   if (!out) return json({ error: 'cap' }, 429, headers);
   if (may && out.at > Date.now() - 60_000) await addOne(env, who, day);
   const body = { site: out.site, at: out.at, how: out.how, stale: !!out.stale, unread: !!out.unread, wording: !!out.wording, items: (out.items || []).map(({ desc, ...it }) => it) };

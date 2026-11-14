@@ -363,12 +363,11 @@ A season is kept until the next one's first game.
 
 ## 6. The Orbit Pass (`/eco`)
 
-- **A pass** is a random 10-character code the owner issues (admin page,
-  `tools/issue-passes.mjs`), replaced at its first sign-in (`freshPass`: its `new`
-  session takes only `rotate`; then a passkey, `freshGate`). The account's id is
-  PBKDF2-SHA256 of it, peppered by `ECO_TOKEN_SECRET` (`passKey`), which **must
-  never change**: passes since 2026-10-27 would lose their accounts. Sign-ins:
-  30 an hour an address.
+- **A pass** is made at sign-in (`create`, `passNewDay`) or issued (admin;
+  replaced at first sign-in: `freshPass`, `rotate`). **Levels** (`levelOf`):
+  `free` never starts a paid call; AI routes ask `fullSession` first. Its id:
+  PBKDF2 of the pass, peppered by `ECO_TOKEN_SECRET` (`passKey`), which
+  **must never change**. Sign-ins: 30 an hour an address.
 - **Passkeys** (`passkey.js`, `webauthn.js`; `kit/passkey.mjs`): any number
   per Pass, RP ID `jaypengx.com`. Sign-in, a new pass and the admin key are
   forms password managers fill. **Recovery email**: `pass-mail.js`.

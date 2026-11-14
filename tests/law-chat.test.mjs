@@ -143,7 +143,7 @@ function fakeKV() {
   const m = new Map();
   return { m, get: async (k, o) => (m.has(k) ? (o?.type === 'json' ? JSON.parse(m.get(k)) : m.get(k)) : null), put: async (k, v) => void m.set(k, v) };
 }
-const envOf = () => ({ GEMINI_API_KEY: 'k', ANTHROPIC_API_KEY: 'a', OPENAI_API_KEY: 'o', ECO_TOKEN_SECRET: 'test-secret', STORE: fakeD1(), RATE_LIMIT_KV: fakeKV() });
+const envOf = () => ({ GEMINI_API_KEY: 'k', ANTHROPIC_API_KEY: 'a', OPENAI_API_KEY: 'o', ECO_TOKEN_SECRET: 'test-secret', STORE: fakeD1('', { fullPasses: true }), RATE_LIMIT_KV: fakeKV() });
 const qtOf = (d, { a = 'law', e = Date.now() + 600_000 } = {}) => signToken('test-secret', { k: 'ses', d, s: `s-${d}`, a, e });
 let passN = 0;
 const chat = async (body, { origin = 'https://jaypengx.github.io', pass = `acct${++passN}`, qt, ip = '198.51.100.1', env = envOf() } = {}) => {

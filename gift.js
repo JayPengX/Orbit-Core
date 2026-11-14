@@ -55,7 +55,7 @@ export const GIFT_SCHEMA = [
   'CREATE INDEX IF NOT EXISTS gift_claim_place ON gift_claim (place, at)'
 ];
 // (Added after the table was first made: run once, an error for a column already there ignored.)
-const GIFT_COLUMNS = ['ALTER TABLE gift ADD COLUMN clean INTEGER NOT NULL DEFAULT 0', 'ALTER TABLE gift ADD COLUMN days INTEGER NOT NULL DEFAULT 30'];
+const GIFT_COLUMNS = ['ALTER TABLE gift ADD COLUMN clean INTEGER NOT NULL DEFAULT 0', 'ALTER TABLE gift ADD COLUMN days INTEGER NOT NULL DEFAULT 30', 'ALTER TABLE gift ADD COLUMN full INTEGER NOT NULL DEFAULT 0'];
 export const EMPTY_BYTES = 2000;
 const CLEAN_MAX = 200;
 export const GIFT_DEFAULTS = { live: 0, total: 50, opens: 0, closes: 0, rate: 20, hold: 2 };
@@ -95,10 +95,13 @@ export function giftState(g, now) {
 
 // One pass, fresh (its first sign-in replaces it): the admin's `issue` and
 // a claim (`gift`: marked as the giveaway's, the only accounts ever cleared).
-export async function mintPass(env, deps, { gift = false } = {}) {
+// Its level (eco.js levelOf): the owner's own are 'full' (AI too); a
+// giveaway's are what the owner set for the round (`full`, Jay 2026-11-14:
+// a class handed Orbit AI by QR), else 'free' like a pass made in an app.
+export async function mintPass(env, deps, { gift = false, full = !gift } = {}) {
   const now = deps.now();
   const { passcode, docId } = await newPasscode(env, deps);
-  await updateWallet(env, deps, docId, w => ({ ...w, v2: now, sec: { fresh: true }, ...(gift ? { gift: now } : {}) }), { create: true });
+  await updateWallet(env, deps, docId, w => ({ ...w, v2: now, sec: { fresh: true, level: full ? 'full' : 'free' }, ...(gift ? { gift: now } : {}) }), { create: true });
   return { passcode, docId };
 }
 
@@ -245,7 +248,7 @@ export async function handleGift(request, env, headers, { ip = '', origin = '', 
   }
   let pass;
   try {
-    pass = await mintPass(env, deps, { gift: true });
+    pass = await mintPass(env, deps, { gift: true, full: Boolean(g.full) });
     await d.prepare('UPDATE gift_claim SET doc = ?1 WHERE round = ?2 AND device = ?3').bind(pass.docId, g.round, device).run();
   } catch (e) {
     await drop();
@@ -279,7 +282,7 @@ async function giftView(env, deps) {
   }
   const hour = rows.filter(r => now - r.at < 3_600_000).length;
   const empty = await emptyGiftAccounts(env, deps, g.days);
-  return { empty: { on: !!g.clean, days: g.days, count: empty.length, first: empty.slice(0, 20).map(({ id, ...a }) => a) }, gift: { ...publicGift(g, now), live: !!g.live, rate: g.rate, hold: g.hold, round: g.round, claimed: g.claimed, back: g.back, started, done, hour, last: rows[0]?.at || 0 } };
+  return { empty: { on: !!g.clean, days: g.days, count: empty.length, first: empty.slice(0, 20).map(({ id, ...a }) => a) }, gift: { ...publicGift(g, now), live: !!g.live, full: !!g.full, rate: g.rate, hold: g.hold, round: g.round, claimed: g.claimed, back: g.back, started, done, hour, last: rows[0]?.at || 0 } };
 }
 
 export const GIFT_TOOLS = {
@@ -287,11 +290,12 @@ export const GIFT_TOOLS = {
     await sweepGift(env, deps).catch(() => {});
     return giftView(env, deps);
   },
-  // { live, total, opens, closes, rate, hold }: any of them.
+  // { live, full, total, opens, closes, rate, hold }: any of them (`full`: the passes of Orbit AI's level).
   async 'gift-set'({ env, deps, body }) {
     const g = await readGift(env);
     const next = {
       live: body.live == null ? g.live : body.live ? 1 : 0,
+      full: body.full == null ? g.full || 0 : body.full ? 1 : 0,
       total: body.total == null ? g.total : num(body.total, 0, GIFT_MAX, g.total),
       opens: body.opens == null ? g.opens : num(body.opens, 0, 8.64e15, 0),
       closes: body.closes == null ? g.closes : num(body.closes, 0, 8.64e15, 0),
@@ -299,7 +303,7 @@ export const GIFT_TOOLS = {
       hold: body.hold == null ? g.hold : num(body.hold, 0, 720, g.hold)
     };
     if (next.opens && next.closes && next.closes <= next.opens) return { error: 'GIFT_TIMES', status: 400 };
-    await (await db(env)).prepare('UPDATE gift SET live = ?1, total = ?2, opens = ?3, closes = ?4, rate = ?5, hold = ?6, updated = ?7 WHERE id = 1').bind(next.live, next.total, next.opens, next.closes, next.rate, next.hold, deps.now()).run();
+    await (await db(env)).prepare('UPDATE gift SET live = ?1, total = ?2, opens = ?3, closes = ?4, rate = ?5, hold = ?6, updated = ?7, full = ?8 WHERE id = 1').bind(next.live, next.total, next.opens, next.closes, next.rate, next.hold, deps.now(), next.full).run();
     return giftView(env, deps);
   },
   // The empty accounts' clearing: { clean, days } (days 7 to 365).

@@ -205,3 +205,25 @@ test('empty giveaway accounts are cleared only when the owner turns it on, after
   // Days below 7 aren't taken.
   assert.equal((await t.admin('gift-clean-set', { days: 1 })).empty.days, 7);
 });
+
+test("a round's passes are 'free' unless the owner set the round 'full' (eco.js levelOf)", async () => {
+  const t = setup();
+  await t.admin('gift-set', { live: true, total: 5 });
+  assert.equal((await t.admin('gift')).gift.full, false);
+  const a = t.device('1.1.1.1');
+  await a();
+  const free = (await a('POST', { op: 'claim' })).data.mine.code;
+  const lv = async code => (await t.eco({ op: 'login', passcode: code, app: 'stock' })).data;
+  assert.equal((await lv(free)).fresh, true);
+  const one = async code => {
+    const signed = await lv(code);
+    return (await t.eco({ op: 'rotate', qt: signed.token })).data.level;
+  };
+  assert.equal(await one(free), 'free');
+  assert.equal((await t.admin('gift-set', { full: true })).gift.full, true);
+  const b = t.device('2.2.2.2');
+  await b();
+  assert.equal(await one((await b('POST', { op: 'claim' })).data.mine.code), 'full');
+  // (Left as it was when the form sends the rest only.)
+  assert.equal((await t.admin('gift-set', { total: 6 })).gift.full, true);
+});

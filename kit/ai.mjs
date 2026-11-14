@@ -59,6 +59,8 @@ export function pickPicture({ camera = false, multiple = false, accept = 'image/
 export function aiSays(error, left = null) {
   if (error === 'cap') return W('今天這個 AI 的次數用完了，明天再試。', 'That’s all of this AI for today. Try again tomorrow.');
   if (error === 'signin') return W('登入 Orbit Pass 後才能用 AI。', 'Sign in with your Orbit Pass to use AI.');
+  // (A pass made in an app, Orbit-Core eco.js levelOf 'free': no AI on it.)
+  if (error === 'level') return W('這組 Orbit Pass 沒有 Orbit AI。', 'This Orbit Pass doesn’t include Orbit AI.');
   if (error === 'busy') return W('有點太快了，等幾秒再試。', 'A little fast. Try again in a few seconds.');
   if (error === 'paused') return W('AI 暫停中，稍後再試。', 'AI is paused for now. Try again later.');
   if (error === 'offline') return W('連不上網路，等一下再試。', 'You’re offline. Try again in a moment.');

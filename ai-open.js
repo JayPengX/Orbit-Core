@@ -120,7 +120,7 @@ export async function openMake(env, ctx, name, id, { allow = async () => true, g
     return out ? { out } : { error: 'upstream', status: 502 };
   }
   const no = await allow();
-  if (no !== true) return { error: no, status: 429 };
+  if (no !== true) return { error: no, status: no === 'level' ? 403 : 429 };
   const job = (async () => {
     const { out } = await runFeature(env, ctx, name, f.input, { gemini, open: true, need: x => !!o.out(x, id, f) });
     const made = o.out(out, id, f);
@@ -140,13 +140,15 @@ export async function openMake(env, ctx, name, id, { allow = async () => true, g
   }
 }
 
-export async function handleAiOpen(request, env, ctx, headers, { ip = '', cap = 0, gemini = null, now = Date.now(), fetchImpl = globalThis.fetch } = {}) {
+// (`full`: the asker's pass may spend (eco.js fullSession). What's kept is
+// anyone's, as it costs nothing; only a full pass has one made.)
+export async function handleAiOpen(request, env, ctx, headers, { ip = '', cap = 0, gemini = null, full = false, now = Date.now(), fetchImpl = globalThis.fetch } = {}) {
   if (request.method !== 'GET') return json({ error: 'method' }, 405, headers);
   if (!isAllowedOrigin(request.headers.get('Origin') || '')) return json({ error: 'origin' }, 403, headers);
   const q = new URL(request.url).searchParams;
   const name = q.get('f') || '';
   const id = String(q.get('id') || '').slice(0, 80);
-  const allow = async () => (sessionLimited(`ai-open:${ip}`, 20) ? 'busy' : (await spendDay(env, name, cap, twDay(now))) ? true : 'cap');
+  const allow = async () => (!full ? 'level' : sessionLimited(`ai-open:${ip}`, 20) ? 'busy' : (await spendDay(env, name, cap, twDay(now))) ? true : 'cap');
   const r = await openMake(env, ctx, name, id, { allow, gemini, now, fetchImpl });
   return r.error ? json({ error: r.error }, r.status, headers) : json(r.kept ? { out: r.out, kept: true } : { out: r.out }, 200, headers);
 }

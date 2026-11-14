@@ -52,7 +52,7 @@ function setup() {
     now: () => (clock += 1000)
   };
   const puts = [];
-  const env = { DATA: { put: async (k, v) => void puts.push(k) }, puts, STORE: {}, ECO_TOKEN_SECRET: 'test-secret', ECO_OPEN_SIGNUP: 'on', ECO_ADMIN_TOKEN: 'o'.repeat(40) };
+  const env = { DATA: { put: async (k, v) => void puts.push(k) }, puts, STORE: {}, ECO_TOKEN_SECRET: 'test-secret', PASS_MAIL: 'on', PASS_MAIL: 'on', ECO_ADMIN_TOKEN: 'o'.repeat(40) };
   const call = (method, query = '', body, cf) => handleEcoRequest({ method, url: `https://w/eco${query}`, body, ...(cf ? { cf } : {}) }, env, {}, '1.1.1.1', deps);
   const qt = token => `?qt=${encodeURIComponent(token)}`;
   return { store, deps, env, call, qt, advance: ms => (clock += ms) };

@@ -32,7 +32,7 @@ const tap = (feature, input, session = { a: 'money', d: 'pass1' }) => new Reques
 test('a tap: only its own app, only its fixed prompt, capped a Pass a day and in all', async () => {
   const env = envWith({ openai: () => ({ buys: [{ k: 'out', day: '', store: '火鍋', total: 350, items: [], cat: 'c1', pay: '', invoice: '' }], ask: { q: '', options: [] } }) });
   const input = { text: '跟同學吃火鍋花了三百五', today: '2026-11-10', cats: [{ id: 'c1', name: '餐飲 › 晚餐', k: 'out' }] };
-  const call = (session, cap = 5, feature = 'money-say') => handleAi(tap(feature, input), env, {}, {}, session, { cap }).then(async r => ({ status: r.status, ...(await r.json()) }));
+  const call = (session, cap = 5, feature = 'money-say') => handleAi(tap(feature, input), env, {}, {}, session, { cap, full: true }).then(async r => ({ status: r.status, ...(await r.json()) }));
   assert.equal((await call({ a: 'vocab', d: 'p' })).error, 'signin', 'another app’s session');
   assert.equal((await call({ a: 'money', d: 'p' }, 5, 'nope')).error, 'feature');
   assert.equal((await call({ a: 'money', d: 'p' }, 5, 'words-cards')).error, 'feature', 'a built-once job is never a tap');

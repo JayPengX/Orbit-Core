@@ -43,7 +43,7 @@ import { handleLawAudio } from './law-audio.js';
 import { handleLawLive } from './law-live.js';
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
-import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION } from './eco.js';
+import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, fullSession, stampLevels } from './eco.js';
 import { checkStock } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
 import { handleGift, giftNight } from './gift.js';
@@ -1236,6 +1236,8 @@ const ECO_DEPS = {
   sha256Hex,
   generateCode,
   now: () => Date.now(),
+  // A count a Taiwan day in D1, everyone together (new passes a day, eco.js ecoCreate).
+  dayCount: (env, k) => addOne(env, k, twDay()),
   // The admin panel's 系統 (ops.js): the store's collections, a Gemini check, a builder by hand.
   count: DOCS.count,
   geminiCheck: env => geminiCheck(env),
@@ -1360,9 +1362,16 @@ async function route(request, env, ctx, headers, origin) {
   }
 
 
+  // A pass's level (eco.js levelOf): only a 'full' pass starts anything that
+  // costs money (an AI call). Read from the account at each ask, so a phone
+  // can't lift it and the admin panel's change holds at once.
+  const maySpend = session => fullSession(env, ECO_DEPS, session);
+  const notFull = () => json({ error: 'level' }, 403, headers);
+
   // Orbit Class's AI features need a Orbit Pass session (`qt=`).
   if (path === '/gemini' || path === '/nl-edit') {
     const session = await sessionOf(request, env);
+    if (request.method === 'POST' && session && !(await maySpend(session))) return errorJson('PASS_LEVEL', 403, headers, request);
     return path === '/gemini' ? handleGeminiRequest(request, env, headers, ip, ctx, session) : handleNlEditRequest(request, env, headers, ip, ctx, session);
   }
   if (path === '/eco') return handleEcoRequest(request, env, headers, ip, ECO_DEPS, p => ctx.waitUntil(p));
@@ -1395,8 +1404,11 @@ async function route(request, env, ctx, headers, origin) {
     // (Flash stuck or failing: Flash-Lite's answer instead, geminiAnswer.)
     return geminiAnswer(m, parts, schema, env, headers, ctx, feature, { timeoutMs: 40_000, liteMs: 25_000, thinking: level, onText });
   };
-  if (path === '/law-ask') return handleLawAsk(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-ask'), await aiCap(env, ctx, 'law-ask'));
-  if (path === '/law-chat') return handleLawChat(request, env, ctx, headers, await sessionOf(request, env), lawGemini('law-chat'), await aiCap(env, ctx, 'law-chat'));
+  if (path === '/law-ask' || path === '/law-chat') {
+    const session = await sessionOf(request, env);
+    if (session && !(await maySpend(session))) return notFull();
+    return path === '/law-ask' ? handleLawAsk(request, env, ctx, headers, session, lawGemini('law-ask'), await aiCap(env, ctx, 'law-ask')) : handleLawChat(request, env, ctx, headers, session, lawGemini('law-chat'), await aiCap(env, ctx, 'law-chat'));
+  }
   // …and government pages read inside the app (law-page.js): the same Pass, gov.tw only, nothing stored.
   if (path === '/law-page') return handleLawPage(request, env, ctx, headers, await sessionOf(request, env));
   if (path === '/law-judicial') return handleLawJudicial(request, env, headers);
@@ -1429,7 +1441,8 @@ async function route(request, env, ctx, headers, origin) {
   // …and a story's AI part made the first time anyone opens it (ai-open.js: 重點整理, 各方怎麼說), kept for everyone.
   if (path === '/ai/open') {
     const feature = new URL(request.url).searchParams.get('f') || '';
-    return handleAiOpen(request, env, ctx, headers, { ip: ipBucket(ip), cap: OPEN[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai') });
+    const session = await sessionOf(request, env);
+    return handleAiOpen(request, env, ctx, headers, { ip: ipBucket(ip), cap: OPEN[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai'), full: Boolean(session) && (await maySpend(session)) });
   }
   if (path === '/ai/build') {
     let feature = '';
@@ -1444,8 +1457,10 @@ async function route(request, env, ctx, headers, origin) {
       feature = String((await request.clone().json())?.feature || '');
     } catch {}
     // (The showcase's 問 Orbit: its own pass, never a Pass session's door.)
-    const session = FEATURES[feature]?.app === 'showcase' ? await showcaseOf(request, env, { ip, origin }) : await sessionOf(request, env);
-    return handleAi(request, env, ctx, headers, session, { cap: FEATURES[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai') });
+    const show = FEATURES[feature]?.app === 'showcase';
+    const session = show ? await showcaseOf(request, env, { ip, origin }) : await sessionOf(request, env);
+    const full = Boolean(session) && (show || (await maySpend(session)));
+    return handleAi(request, env, ctx, headers, session, { cap: FEATURES[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai'), full });
   }
   // Orbit Class's 學校公告摘要 (class-news.js): a school's list read by code, worded once an hour by the AI, kept in R2.
   // Orbit News in one language: a story's own headlines and summary in the reader's, as it's opened (builders/news-tr.js).
@@ -1457,8 +1472,15 @@ async function route(request, env, ctx, headers, origin) {
     const dev = !signed && LOCAL_ORIGIN.test(origin) && !sessionLimited(`tr:dev:${ip}`, 20);
     return handleTr(request, env, headers, signed || (dev ? { s: 'dev' } : null));
   }
-  if (path === '/class-news') return handleClassNews(request, env, ctx, headers, await sessionOf(request, env), { cap: await aiCap(env, ctx, 'class-news') });
-  if (path === '/money-read') return handleMoneyRead(request, env, headers, await sessionOf(request, env), lawGemini('money-read'), await aiCap(env, ctx, 'money-read'));
+  if (path === '/class-news') {
+    const session = await sessionOf(request, env);
+    return handleClassNews(request, env, ctx, headers, session, { cap: await aiCap(env, ctx, 'class-news'), ai: Boolean(session) && (await maySpend(session)) });
+  }
+  if (path === '/money-read') {
+    const session = await sessionOf(request, env);
+    if (session && !(await maySpend(session))) return notFull();
+    return handleMoneyRead(request, env, headers, session, lawGemini('money-read'), await aiCap(env, ctx, 'money-read'));
+  }
   // The bill's guard (guard.js), as it last read the bill: armed or not,
   // each count's share of the $5 plan, stopped or not. No key or token.
   if (path === '/guard' && request.method === 'GET') {
@@ -1486,6 +1508,8 @@ async function route(request, env, ctx, headers, origin) {
     // 問法律's steps timed on real questions, nothing kept read or written (law-chat.js).
     if (check === 'law-chat') return json(await lawChatTimes(env, ctx, headers, lawGemini('law-chat'), new URL(request.url).searchParams.get('try') || ''), 200, headers);
     if (check === 'system') return json(await systemReport(env, ECO_DEPS), 200, headers);
+    // Every account standing before levels began made 'full', once (eco.js stampLevels; ?dry=1 counts).
+    if (check === 'levels') return json(await stampLevels(env, { dry: new URL(request.url).searchParams.get('dry') === '1' }), 200, headers);
     // The paid makers' keys and their models' names (ai-other.js).
     if (check === 'ai-models') return json(await modelsOf(env), 200, headers);
     // 問法律's answer by each model named (?models=a,b,…; Gemini's or ai-other.js's) on the

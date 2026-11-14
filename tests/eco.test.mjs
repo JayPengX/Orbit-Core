@@ -49,7 +49,7 @@ function setup() {
     },
     now: () => (clock += 1000)
   };
-  const env = { STORE: {}, ECO_TOKEN_SECRET: 'test-secret', ECO_OPEN_SIGNUP: 'on', ECO_ADMIN_TOKEN: 'o'.repeat(40) };
+  const env = { STORE: {}, ECO_TOKEN_SECRET: 'test-secret', PASS_MAIL: 'on', ECO_ADMIN_TOKEN: 'o'.repeat(40) };
   const call = (method, query = '', body, cf) => handleEcoRequest({ method, url: `https://w/eco${query}`, body, ...(cf ? { cf } : {}) }, env, {}, '1.1.1.1', deps);
   const qt = token => `?qt=${encodeURIComponent(token)}`;
   return { store, deps, env, call, qt, advance: ms => (clock += ms) };
@@ -491,9 +491,10 @@ test('setting ECO_TOKEN_SECRET signs nobody out: tokens signed the old way (from
   assert.equal(await readToken('other', old, 'ref'), null);
 });
 
-test('passes are handed out by the owner: no one makes one from an app; the owner issues them in a batch', async () => {
+test('anyone makes a pass in an app unless the panel closed it (0 a day); the owner issues them in a batch', async () => {
   const t = setup();
-  t.env.ECO_OPEN_SIGNUP = '';
+  assert.equal((await t.call('POST', '', { op: 'create', app: 'stock' })).status, 200);
+  await t.deps.fsWrite(t.env, 'orbit-config', 'dev', JSON.stringify({ passNewDay: 0 }));
   const closed = await t.call('POST', '', { op: 'create', app: 'stock' });
   assert.equal(closed.status, 403);
   assert.match(JSON.stringify(closed.data), /ECO_CREATE_CLOSED/);

@@ -28,7 +28,7 @@ function envWith(answer, seen, kv = new Map()) {
 }
 const filing = { title: '公告本公司董事會決議股利分派', name: '台積電', rows: [['普通股每股配發現金股利(元)', '5'], ['除息交易日', '115/12/17']], lang: 'zh' };
 const tap = (feature, input) => new Request('https://w/ai', { method: 'POST', headers: { Origin: 'https://orbit.jaypengx.com' }, body: JSON.stringify({ feature, input }) });
-const call = (env, session, feature = 'sec-filing', input = filing, cap = 100) => handleAi(tap(feature, input), env, {}, {}, session, { cap }).then(async r => ({ status: r.status, ...(await r.json()) }));
+const call = (env, session, feature = 'sec-filing', input = filing, cap = 100) => handleAi(tap(feature, input), env, {}, {}, session, { cap, full: true }).then(async r => ({ status: r.status, ...(await r.json()) }));
 const good = { line: '在除息交易日前持有股票才領得到股利，除息當天股價會扣掉股利。', show: [1, 2] };
 
 test('taps too quick: past the feature\'s per-minute count, busy', async () => {

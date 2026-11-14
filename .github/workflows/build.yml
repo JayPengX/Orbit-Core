@@ -12,10 +12,10 @@ on:
       job:
         description: The job
         type: choice
-        options: [watch, watch-full, cutouts, buses, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, news, markets, gemini-check, gemini-use, ai-money, law-chat-time, ai-models, ai-compare, ai-try, as-phone, ai, ai-news, ai-sports, ai-preview, ai-f1, ai-sides, ai-words, ai-tr, system, capacity, detail, cpu, sources, sources-state]
+        options: [watch, watch-full, cutouts, buses, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, news, markets, gemini-check, gemini-use, ai-money, law-chat-time, ai-models, ai-compare, ai-try, as-phone, ai, ai-news, ai-sports, ai-preview, ai-f1, ai-sides, ai-words, ai-tr, system, levels, capacity, detail, cpu, sources, sources-state]
         default: watch
       try:
-        description: "law-chat-time: settings to try, e.g. answer=minimal,plan=minimal,model=lite; gemini-check: a model name; ai-money: set=anthropic:5,openai:3 (balances, US$); ai-compare: models=a,b&from=0&n=3; cpu: query, e.g. hours=24&group=…&keys=1&script=…; as-phone: path=/ai&app=money&body=<base64 JSON>; sources: ids, e.g. tnn-bus,txg-bus"
+        description: "law-chat-time: settings to try, e.g. answer=minimal,plan=minimal,model=lite; gemini-check: a model name; ai-money: set=anthropic:5,openai:3 (balances, US$); ai-compare: models=a,b&from=0&n=3; cpu: query, e.g. hours=24&group=…&keys=1&script=…; as-phone: path=/ai&app=money&body=<base64 JSON>; sources: ids, e.g. tnn-bus,txg-bus; levels: dry=1 to count only"
         default: ''
 jobs:
   run:
@@ -35,6 +35,7 @@ jobs:
             ai-try) url="$base/ops?check=ai-try&$TRY" ;;
             as-phone) url="$base/ops?check=as-phone&$TRY" ;;
             system) url="$base/ops?check=system" ;;
+            levels) url="$base/ops?check=levels&$TRY" ;;
             capacity) url="$base/ops?check=capacity" ;;
             cpu) url="$base/ops?check=cpu&$TRY" ;;
             detail) url="$base/ops?check=detail" ;;

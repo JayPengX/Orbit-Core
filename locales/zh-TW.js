@@ -8,6 +8,8 @@
 export default {
   POST_ONLY: '僅支援 POST 方法。',
   RATE_LIMITED: '請求過於頻繁，請稍後再試。',
+  PASS_LEVEL: '這組 Orbit Pass 沒有 Orbit AI。',
+  ECO_CREATE_FULL: '今天能建立的 Orbit Pass 已經滿了，明天再試。',
   DAILY_QUOTA_EXCEEDED: '今日額度已用盡，請明天再試。',
   INVALID_JSON: '無效的 JSON 請求內容。',
   UNSUPPORTED_MODEL: '不支援的模型。',

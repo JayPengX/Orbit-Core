@@ -142,7 +142,7 @@ function setup() {
     },
     now: () => (clock += 1000)
   };
-  const env = { STORE: {}, ECO_TOKEN_SECRET: 'test-secret', ECO_OPEN_SIGNUP: 'on', RATE_LIMIT_KV: fakeKv() };
+  const env = { STORE: {}, ECO_TOKEN_SECRET: 'test-secret', PASS_MAIL: 'on', RATE_LIMIT_KV: fakeKv() };
   const { door, ns } = fakeDoor(env);
   env.DOOR = ns;
   const later = [];

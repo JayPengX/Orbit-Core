@@ -4,7 +4,7 @@
 // have, and past the day's cap. And the AI made ahead stays paused.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { handleAiOpen, newsOpenAhead, AHEAD_TW } from '../ai-open.js';
+import { handleAiOpen, newsOpenAhead, AHEAD_TW, forgetParts } from '../ai-open.js';
 import { newsOpenFacts, openPart, openPath, OPEN_PARTS } from '../builders/ai.js';
 import { aiOnce } from '../ai.js';
 
@@ -39,20 +39,20 @@ const points = { items: [{ id: 's1', points: [{ k: 'what', zh: '颱風明天登�
 
 test('a story’s 重點整理 is made the first time anyone opens it, then kept for everyone', async () => {
   const env = envWith({ s1: { m: 6, brief } }, () => points);
-  const r1 = await (await handleAiOpen(ask('f=news-brief&id=s1'), env, null, {}, { ip: '1', cap: 10 })).json();
+  const r1 = await (await handleAiOpen(ask('f=news-brief&id=s1'), env, null, {}, { ip: '1', full: true, cap: 10 })).json();
   assert.equal(r1.out.points.length, 2);
   assert.equal(env.calls(), 1);
-  const r2 = await (await handleAiOpen(ask('f=news-brief&id=s1'), env, null, {}, { ip: '2', cap: 10 })).json();
+  const r2 = await (await handleAiOpen(ask('f=news-brief&id=s1'), env, null, {}, { ip: '2', full: true, cap: 10 })).json();
   assert.equal(r2.kept, true, 'the second reader gets the kept one');
   assert.equal(env.calls(), 1, 'no second call');
 });
 
 test('refused: another site, a story the build doesn’t have, a feature not made on open, the day’s cap', async () => {
   const env = envWith({ s1: { m: 6, brief } }, () => points);
-  assert.equal((await handleAiOpen(ask('f=news-brief&id=s1', 'https://evil.example'), env, null, {}, { ip: '1', cap: 10 })).status, 403);
-  assert.equal((await handleAiOpen(ask('f=news-brief&id=nope'), env, null, {}, { ip: '1', cap: 10 })).status, 404);
-  assert.equal((await handleAiOpen(ask('f=law-chat&id=s1'), env, null, {}, { ip: '1', cap: 10 })).status, 400);
-  assert.equal((await handleAiOpen(ask('f=news-brief&id=s1'), env, null, {}, { ip: '1', cap: 0 })).status, 429);
+  assert.equal((await handleAiOpen(ask('f=news-brief&id=s1', 'https://evil.example'), env, null, {}, { ip: '1', full: true, cap: 10 })).status, 403);
+  assert.equal((await handleAiOpen(ask('f=news-brief&id=nope'), env, null, {}, { ip: '1', full: true, cap: 10 })).status, 404);
+  assert.equal((await handleAiOpen(ask('f=law-chat&id=s1'), env, null, {}, { ip: '1', full: true, cap: 10 })).status, 400);
+  assert.equal((await handleAiOpen(ask('f=news-brief&id=s1'), env, null, {}, { ip: '1', full: true, cap: 0 })).status, 429);
   assert.equal(env.calls(), 0);
 });
 
@@ -76,9 +76,9 @@ test('a game’s line is asked only of a game over (its preview only of one to c
   const env = envWith({}, () => ({}));
   const urls = [];
   const live = async u => (urls.push(u), new Response(JSON.stringify({ header: { competitions: [{ date: new Date(Date.now() + 3_600_000).toISOString(), status: { type: { state: 'in' } }, competitors: [] }] } })));
-  assert.equal((await handleAiOpen(ask('f=sports-recap&id=nba:401700001'), env, null, {}, { ip: '1', cap: 10, fetchImpl: live })).status, 404, 'still being played');
-  assert.equal((await handleAiOpen(ask('f=sports-preview&id=nba:401700001'), env, null, {}, { ip: '1', cap: 10, fetchImpl: live })).status, 404, 'already begun');
-  assert.equal((await handleAiOpen(ask('f=sports-recap&id=nope:1'), env, null, {}, { ip: '1', cap: 10, fetchImpl: live })).status, 404, 'a league never asked');
+  assert.equal((await handleAiOpen(ask('f=sports-recap&id=nba:401700001'), env, null, {}, { ip: '1', full: true, cap: 10, fetchImpl: live })).status, 404, 'still being played');
+  assert.equal((await handleAiOpen(ask('f=sports-preview&id=nba:401700001'), env, null, {}, { ip: '1', full: true, cap: 10, fetchImpl: live })).status, 404, 'already begun');
+  assert.equal((await handleAiOpen(ask('f=sports-recap&id=nope:1'), env, null, {}, { ip: '1', full: true, cap: 10, fetchImpl: live })).status, 404, 'a league never asked');
   assert.equal(urls.length, 2);
   assert.match(urls[0], /\/summary\?event=401700001$/);
   assert.equal(env.calls(), 0);
@@ -87,7 +87,7 @@ test('a game’s line is asked only of a game over (its preview only of one to c
 test('a first model whose answer the checks drop: the next model answers', async () => {
   let n = 0;
   const env = envWith({ s1: { m: 6, brief } }, () => (++n === 1 ? { items: [{ id: 's1', points: [{ k: 'why', zh: '背景', en: 'Background.' }] }] } : points));
-  const r = await (await handleAiOpen(ask('f=news-brief&id=s1'), env, null, {}, { ip: '1', cap: 10 })).json();
+  const r = await (await handleAiOpen(ask('f=news-brief&id=s1'), env, null, {}, { ip: '1', full: true, cap: 10 })).json();
   assert.equal(r.out.points.length, 2);
   assert.equal(env.calls(), 2);
 });
@@ -115,6 +115,19 @@ test('the front page’s lead stories are made ahead once, the rest only when op
   const again = await newsOpenAhead({ store, env });
   assert.equal(again.kept, AHEAD_TW);
   assert.equal(env.calls(), AHEAD_TW, 'kept: no second call');
-  const opened = await (await handleAiOpen(ask('f=news-brief&id=t0'), env, null, {}, { ip: '1', cap: 10 })).json();
+  const opened = await (await handleAiOpen(ask('f=news-brief&id=t0'), env, null, {}, { ip: '1', full: true, cap: 10 })).json();
   assert.equal(opened.kept, true, 'opened after: instant');
+});
+
+test("a 'free' pass (eco.js levelOf) never has one made: refused without a call; what's kept is still anyone's", async () => {
+  forgetParts();
+  const env = envWith({ s1: { m: 6, brief } }, () => points);
+  const free = await handleAiOpen(ask('f=news-brief&id=s1'), env, null, {}, { ip: '1', cap: 10 });
+  assert.equal(free.status, 403);
+  assert.deepEqual(await free.json(), { error: 'level' });
+  assert.equal(env.calls(), 0);
+  await handleAiOpen(ask('f=news-brief&id=s1'), env, null, {}, { ip: '2', full: true, cap: 10 });
+  const kept = await (await handleAiOpen(ask('f=news-brief&id=s1'), env, null, {}, { ip: '1', cap: 10 })).json();
+  assert.equal(kept.kept, true);
+  assert.equal(env.calls(), 1);
 });

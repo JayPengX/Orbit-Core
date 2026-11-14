@@ -17,7 +17,7 @@
 import { REC_WEEKLY, REC_PREFIX } from './rec-weekly.js';
 import { doorReport, doorSet } from './door.js';
 import { systemReport, alertAccount, tell, OPS_DOC, beats } from './ops.js';
-import { passAccount, updateWallet, deleteAccount, ECO_APPS, NOW_COLLECTION, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet } from './eco.js';
+import { passAccount, updateWallet, deleteAccount, ECO_APPS, NOW_COLLECTION, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet, levelOf, LEVELS } from './eco.js';
 import { sendPush, dueLists } from './push.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, TDX_BOOK, tdxPoints, tdxGuard, tdxUse, tdxPlan } from './transit.js';
 import { aiUse, callsSince } from './gemini-use.js';
@@ -280,6 +280,7 @@ async function walletList(env, deps) {
       passkeys: wallet?.passkeys?.keys?.length || 0,
       mail: Boolean(wallet?.mail),
       priority: Boolean(wallet?.sec?.priority),
+      level: levelOf(wallet),
       ...creditOf(wallet),
       updateTime: w.updateTime
     };
@@ -553,6 +554,8 @@ export const ADMIN_TOOLS = {
       passkeys: passkeySummary(wallet),
       mail: mailSummary(wallet),
       priority: Boolean(wallet.sec?.priority),
+      level: levelOf(wallet),
+      gift: Boolean(wallet.gift),
       ...creditOf(wallet),
       gov: govOf(wallet)
     };
@@ -584,6 +587,15 @@ export const ADMIN_TOOLS = {
       return { ...w, sec };
     });
     return { ok: true, priority: Boolean(res?.wallet?.sec?.priority) };
+  },
+  // A pass's level (eco.js levelOf): 'full' asks Orbit AI, 'free' never
+  // spends. Read at each ask, so it holds from the next one.
+  async level({ env, deps, body }) {
+    if (!LEVELS.includes(body.level)) return { error: 'ADMIN_BAD_LEVEL', status: 400 };
+    const hit = await findWallet(env, deps, body.wallet);
+    if (!hit) return notFound;
+    const res = await updateWallet(env, deps, hit.id, w => (levelOf(w) === body.level && w.sec?.level ? w : { ...w, sec: { ...(w.sec || {}), level: body.level } }));
+    return { ok: true, level: levelOf(res?.wallet) };
   },
   // Money by hand (a correction, a prize): an 'eco' entry, kind 'admin', with its reason.
   async grant({ env, deps, body }) {
