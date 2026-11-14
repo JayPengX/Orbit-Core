@@ -22,7 +22,7 @@ Words used below:
 
 | # | When | What the person sees |
 | --- | --- | --- |
-| 1 | Orbit opened, not signed in | The sign-in card, before anything else. Once signed in: rule 2 or 3. |
+| 1 | Orbit opened, not signed in | The sign-in itself, before anything else (the pass or a passkey; Orbit's mark with every app circling it, beside the form on a wide screen), never the Pass's settings. Once signed in: rule 2 or 3. |
 | 2 | Orbit opened after it was closed, nothing live | Home. Every app starts fresh at its own start. |
 | 3 | Orbit opened after it was closed, something live | The app looked at last, where it was left. The live app is a 進行中 tab beside it. If the live app was the one looked at last (or there's none), that app at its start, which shows what's under way. |
 | 4 | Back to Orbit without closing it, within an hour | Exactly as left: the same app, screen and scroll, and every tab as it was. |

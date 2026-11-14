@@ -2642,7 +2642,10 @@ function dropFromTop(dialog) {
 // typed here is no password: the field stops being one before it's sent, so
 // nothing offers to save it over the pass. Where passkeys work, a button
 // (and the keyboard's passkey suggestion) signs in with one.
-function signInGate(s) {
+// `look` (Orbit's own sign-in page, site/app): { hero, title, lede, accent }
+// in place of the app's icon, name and colour; on a wide screen the hero
+// stands beside the form.
+function signInGate(s, look = null) {
   const en = s.lang === 'en';
   const a = APPS[s.app];
   document.getElementById('loading')?.setAttribute('hidden', '');
@@ -2688,18 +2691,18 @@ function signInGate(s) {
       },
       [passUser(), node('label', { class: 'q-gate-label', for: input.id, text: en ? 'Your Orbit Pass or a device code' : 'Orbit Pass 或裝置代碼' }), passField(input, s.lang), error, enter]
     );
-    const gate = node('dialog', { class: 'q-gate', 'aria-modal': 'true', style: `--q-accent:${a.color}` }, [
-      node('div', { class: 'q-gate-box' }, [
-        node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
-        node('p', { class: 'q-gate-brand', text: 'ORBIT' }),
-        node('h1', { class: 'q-gate-title', text: a.name }),
-        node('p', { class: 'q-gate-lede', text: en ? 'Sign in with your Orbit Pass: one account for every Orbit app.' : '用 Orbit Pass 登入：所有 Orbit 的 App 共用一個帳戶。' }),
-        form,
-        ...(keys ? [keys.row] : []),
-        node('p', { class: 'q-gate-note', text: en ? 'No Orbit Pass yet? Ask the person who shared Orbit with you for one.' : '還沒有 Orbit Pass？請向分享 Orbit 給你的人索取。' }),
-        node('p', { class: 'q-gate-note', text: en ? 'Signed in on another device? There, Orbit Pass › Devices gives a code for this one.' : '已在其他裝置登入？在那裡的 Orbit Pass › 裝置取得裝置代碼，就能在這裡登入。' })
-      ])
-    ]);
+    const lede = look?.lede || (en ? 'Sign in with your Orbit Pass: one account for every Orbit app.' : '用 Orbit Pass 登入：所有 Orbit 的 App 共用一個帳戶。');
+    const top = look?.hero
+      ? [look.hero, node('h1', { class: 'q-gate-title', text: look.title || a.name }), node('p', { class: 'q-gate-lede', text: lede })]
+      : [node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }), node('p', { class: 'q-gate-brand', text: 'ORBIT' }), node('h1', { class: 'q-gate-title', text: look?.title || a.name }), node('p', { class: 'q-gate-lede', text: lede })];
+    const rest = [
+      form,
+      ...(keys ? [keys.row] : []),
+      node('p', { class: 'q-gate-note', text: en ? 'No Orbit Pass yet? Ask the person who shared Orbit with you for one.' : '還沒有 Orbit Pass？請向分享 Orbit 給你的人索取。' }),
+      node('p', { class: 'q-gate-note', text: en ? 'Signed in on another device? There, Orbit Pass › Devices gives a code for this one.' : '已在其他裝置登入？在那裡的 Orbit Pass › 裝置取得裝置代碼，就能在這裡登入。' })
+    ];
+    const box = look?.hero ? node('div', { class: 'q-gate-box q-gate-split' }, [node('div', { class: 'q-gate-side' }, top), node('div', { class: 'q-gate-main' }, rest)]) : node('div', { class: 'q-gate-box' }, [...top, ...rest]);
+    const gate = node('dialog', { class: 'q-gate', 'aria-modal': 'true', style: `--q-accent:${look?.accent || a.color}` }, [box]);
     document.documentElement.classList.add('q-signing-in');
     // Alone on screen: any sheet the app had open closes first.
     for (const d of document.querySelectorAll('dialog[open]')) if (!onTop.has(d)) d.close();
@@ -2707,6 +2710,15 @@ function signInGate(s) {
     keys?.start();
     setTimeout(() => input.focus(), 50);
   });
+}
+
+// Sign in without starting an app (Orbit's own page, site/app, and the
+// Pass sheet asked for while signed out): the sign-in screen, then a handed-
+// over pass replaced. Answers the sign-in reply.
+export async function signInScreen(s, look = null) {
+  let res = await signInGate(s, look);
+  if (res?.fresh) res = await freshGate(s);
+  return res;
 }
 
 // A pass someone handed over (the owner issued it): the first sign-in
@@ -2766,6 +2778,7 @@ function freshGate(s) {
     document.documentElement.classList.remove('q-signing-in');
     // (Asked here: the one-time passkey offer never asks again.)
     s.write({ wallet: settingPatch('passkeyAsk', withKey ? 'yes' : 'no') }).catch(() => {});
+    writeStore(KEY_TIP_AT, String(Date.now()));
     return res;
   });
 }
@@ -3064,6 +3077,8 @@ function warmPassLater() {
   setTimeout(when, 1000);
 }
 export async function accountSheet(s, { extra = null, tab = 'pass', help = null } = {}) {
+  // (Signed out, there's no Pass to show: its settings mean nothing yet. The sign-in instead.)
+  if (typeof document !== 'undefined' && tab !== 'help' && !storedAccount()) return signInScreen(s);
   const { openPass } = await warmPass();
   return openPass(s, { extra, tab, help });
 }
@@ -3307,30 +3322,42 @@ function passkeyRows(s, note) {
   return [head, box, sub];
 }
 
-// Once, a while after an app opens signed in: "加入 Face ID 登入", where this
-// browser can make a passkey and the account has none. 以後再說 or done, it
-// never asks again (the account's setting `passkeyAsk`, every device).
+// A while after an app opens signed in, where this browser can make a
+// passkey and the account has none: a quiet banner, as Orbit's own (quietTip;
+// Jay 2026-11-14 "use similar approach ... to encourage setting up pass
+// key"). At most every 3 days on a device, gone by itself in a few seconds;
+// 加入 makes one at once; 不再顯示 is one tap, kept for the account
+// (passkeyAsk 'never', every device). The Pass sheet's 通行密鑰 adds one any time.
+export const KEY_TIP_AT = 'orbit.keytip.at';
+export const KEY_TIP_EVERY = 3 * 86_400_000;
 export async function passkeyOffer(s) {
-  if (typeof document === 'undefined' || !passkeyHere() || !s.wallet || passkeysOf(s).length || s.wallet.settings?.passkeyAsk) return;
-  const en = s.lang === 'en';
-  const T = (zh, e) => (en ? e : zh);
+  if (typeof document === 'undefined' || !passkeyHere() || !s.wallet || passkeysOf(s).length || s.wallet.settings?.passkeyAsk?.value === 'never') return;
+  if (globalThis.navigator?.webdriver || installCovered) return;
+  const at = Number(readStore(KEY_TIP_AT));
+  if (at > 0 && Date.now() - at < KEY_TIP_EVERY) return;
+  const T = (zh, e) => (s.lang === 'en' ? e : zh);
   const ch = addChallenge(s);
   if (!(await ch.get().catch(() => null))) return;
-  // (Nothing else of Orbit's on screen first: no sheet, no sign-in, no dialog.)
-  if (document.querySelector('dialog[open]') || document.visibilityState === 'hidden' || passkeysOf(s).length) return;
-  // (Kept fresh while the question waits: the tap on 加入 goes straight to the browser.)
-  const keep = setInterval(() => ch.get().catch(() => {}), 240_000);
-  const yes = await ask({ lang: s.lang, icon: 'key', tint: '#0a84ff', title: T('加入 Face ID 登入', 'Sign in with Face ID'), body: T('建立通行密鑰，之後在新裝置用 Face ID 或 Touch ID 就能登入，不必輸入通行碼。', 'Make a passkey: on a new device, sign in with Face ID or Touch ID instead of typing your pass.'), ok: T('加入', 'Add'), cancel: T('以後再說', 'Not now') });
-  clearInterval(keep);
-  if (yes) {
-    try {
-      if ((await addPasskey(s, ch)) === true) toast(T('已加入通行密鑰', 'Passkey added'));
-    } catch (e) {
-      toast(errorText(e, s.lang));
-    }
-  }
-  // Asked once, whatever the answer (the Pass sheet's 通行密鑰 adds one any time).
-  s.write({ wallet: settingPatch('passkeyAsk', yes ? 'yes' : 'no') }).catch(() => {});
+  // (Nothing else of Orbit's on screen first: no sheet, no sign-in, no dialog, no other banner.)
+  if (document.querySelector('dialog[open]') || document.visibilityState === 'hidden' || passkeysOf(s).length || bannerEl?.isConnected) return;
+  writeStore(KEY_TIP_AT, String(Date.now()));
+  quietTip({
+    accent: '#0a84ff',
+    mark: node('span', { class: 'q-tip-mark', html: icons.key || '' }),
+    label: T('通行密鑰', 'Passkey'),
+    title: T('加入通行密鑰', 'Add a passkey'),
+    line: /iPhone|iPad|Macintosh/.test(globalThis.navigator?.userAgent || '') ? T('下次用 Face ID 登入，免輸入通行碼。', 'Next time, sign in with Face ID.') : T('下次用指紋或臉孔登入，免輸入通行碼。', 'Next time, sign in with your fingerprint or face.'),
+    go: T('加入', 'Add'),
+    never: T('不再顯示', 'Don’t show again'),
+    onGo: async () => {
+      try {
+        if ((await addPasskey(s, ch)) === true) toast(T('已加入通行密鑰', 'Passkey added'));
+      } catch (e) {
+        toast(errorText(e, s.lang));
+      }
+    },
+    onNever: () => s.write({ wallet: settingPatch('passkeyAsk', 'never') }).catch(() => {})
+  });
 }
 
 export function showNewPass(s, passcode) {
@@ -3725,6 +3752,49 @@ function orbitTip(s) {
   later();
   document.body.append(el);
   bannerEl = el;
+}
+
+// A quiet banner that asks for one thing (Orbit recommended, a passkey):
+// its mark, a line, a go button and 不再顯示 under the words. Brief (Jay
+// 2026-11-14: one that hangs on pushes people to 不再顯示): gone by itself
+// after TIP_FOR, at once on a scroll or a tap elsewhere; a touch on it gives
+// it TIP_FOR more. Answers the banner, or nothing when another is up.
+export const QUIET_TIP_FOR = 5_000;
+export function quietTip({ accent = '', mark = null, label = '', title, line, go, never, onGo = () => {}, onNever = () => {}, cls = '' }) {
+  if (typeof document === 'undefined' || !document.body || bannerEl?.isConnected) return null;
+  const el = node('div', { class: `q-banner q-banner-ask q-orbit-tip ${cls}`.trim(), role: 'dialog', 'aria-label': label || title, style: accent ? `--q-accent:${accent}` : '' }, [
+    mark,
+    node('div', {}, [
+      node('strong', { text: title }),
+      node('span', { text: line }),
+      node('p', { class: 'q-orbit-tip-acts' }, [node('button', { class: 'q-banner-go', type: 'button', text: go }), node('button', { class: 'q-orbit-tip-never', type: 'button', text: never })])
+    ])
+  ]);
+  let timer = 0;
+  const outside = event => !el.contains(event.target) && gone();
+  const off = () => {
+    removeEventListener('scroll', gone, true);
+    removeEventListener('pointerdown', outside, true);
+  };
+  function gone() {
+    clearTimeout(timer);
+    off();
+    el.classList.add('out');
+    setTimeout(() => el.remove(), 250);
+  }
+  const wait = () => {
+    clearTimeout(timer);
+    timer = setTimeout(gone, QUIET_TIP_FOR);
+  };
+  el.querySelector('.q-orbit-tip-never').addEventListener('click', () => (gone(), onNever()));
+  el.querySelector('.q-banner-go').addEventListener('click', () => (gone(), onGo()));
+  el.addEventListener('pointerdown', wait);
+  addEventListener('scroll', gone, { capture: true, passive: true });
+  addEventListener('pointerdown', outside, true);
+  wait();
+  document.body.append(el);
+  bannerEl = el;
+  return el;
 }
 
 // A switch: role=switch, aria-checked.

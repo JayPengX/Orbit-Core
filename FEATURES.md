@@ -24,6 +24,7 @@ To remove a feature on purpose, delete its line here in the same commit and say 
 - Orbit's own loading screen when opened from its icon (its mark, name and indigo, not the app's) — `kit/boot.js`, `site/app/index.html`: `orbit.launch`, `q-boot-orbit`
 - Updates swap only once every file is on the phone — `kit/orbit.mjs`: `updateReady`
 - Pass: 里程碑 medals, passkeys, 除錯紀錄 — `kit/pass.mjs`, `kit/help.mjs`, `kit/orbit.mjs`: `里程碑`, `passkey`, `除錯紀錄`
+- Orbit's sign-in page (apps circling its mark) and the passkey nudge banner — `site/app/index.html`, `kit/orbit.mjs`: `const orbitRing`, `export async function signInScreen`, `export function quietTip`
 - A typhoon day off acts like a holiday — `kit/dayoff.mjs`: `dayOffOn`, `loadDayOff`
 - Law's 代表會 recordings play on iPhone — `law-audio.js`: `handleLawAudio`, `audioType`
 - Law's live feed keeps its last good read — `law-live.js`: `KEY_LAST`
