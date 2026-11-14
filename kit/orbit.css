@@ -1753,10 +1753,16 @@ dialog.q-sheet.q-full {
   width: 100%;
   height: 100%;
 }
-/* A pass with no Orbit AI (Orbit-Core eco.js levelOf 'free', kit passLevel):
-   its AI taps aren't offered at all (the Worker refuses them anyway). */
-:root[data-pass-level='free'] .q-ai-tap {
-  display: none !important;
+/* No Orbit AI for this account now (kit aiLock: a 基本 pass, or its
+   allowance used): every AI tap shown locked before it's tried; a tap says
+   why (orbit.mjs) and asks nothing. */
+:root[data-ai-lock] :is(.q-ai-tap, [data-ai-tap]) {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+/* (A locked box or form: a tap anywhere on it says why, never a keyboard.) */
+:root[data-ai-lock] [data-ai-tap] :is(textarea, input, button) {
+  pointer-events: none;
 }
 /* An AI action on a tap (kit aiTap: 重點摘要, 白話解釋): the app's own
    bordered button, grey with its ink, Orbit AI's mark the one touch of

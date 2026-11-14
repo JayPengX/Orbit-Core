@@ -63,20 +63,24 @@ let devNow = (() => {
   }
 })();
 let devReadAt = 0;
+// The Worker's read under way, settled (true: read now) when it lands or fails.
+let devRead = Promise.resolve(false);
 export const dev = key => devNow[key] ?? DEV[key]?.def;
+export const devFresh = () => devRead;
 export function readDev() {
   if (typeof window === 'undefined' || Date.now() - devReadAt < 5 * 60_000) return;
   devReadAt = Date.now();
-  fetch(DEV_URL, { signal: AbortSignal.timeout(8_000) })
+  devRead = fetch(DEV_URL, { signal: AbortSignal.timeout(8_000) })
     .then(r => (r.ok ? r.json() : null))
     .then(x => {
-      if (!x) return;
+      if (!x) return false;
       devNow = cleanDev(x);
       try {
         localStorage.setItem(DEV_KEY, JSON.stringify(devNow));
       } catch {}
+      return true;
     })
-    .catch(() => {});
+    .catch(() => false);
 }
 readDev();
 // fn again every dev(key) seconds, the setting read at each beat (a change
@@ -433,27 +437,70 @@ export function cachedWallet(account = storedAccount()) {
 function cacheWallet(account, wallet) {
   if (account && wallet) writeStore(KEY.wallet, JSON.stringify({ account, wallet }));
 }
-// The pass's level (Orbit-Core eco.js levelOf), as the Worker last said:
-// 'full' (Orbit AI), 'free' (a pass made in an app: nothing that costs
-// money), '' not known yet. The Worker refuses a 'free' pass's AI whatever
-// the phone does; here it's only shown calmly: <html data-pass-level>, the
-// AI taps hidden (orbit.css), aiSays('level') for an ask turned away.
 // What's left of this account's Orbit AI, as the Worker last said (ai-allow.js aiLeft):
 // { n, per: 'day' | 'month' | 'total', left, until } (n, left null: no limit), or null for none.
 export function aiAllowance(account = storedAccount()) {
   const saved = readJson(KEY.ai, null);
   return account && saved?.account === account ? saved.ai || null : null;
 }
+// The pass's level (Orbit-Core eco.js levelOf), as the Worker last said:
+// 'full' (Orbit AI), 'free' (a pass made in an app: nothing that costs
+// money), '' not known yet.
 export function passLevel(account = storedAccount()) {
   const saved = readJson(KEY.level, null);
   return saved && account && saved.account === account && ['free', 'full'].includes(saved.level) ? saved.level : '';
+}
+// Orbit AI shut for this account, as the Worker last said: 'level' (none: a
+// 基本 pass, or an allowance of 0), 'used' (all of it used for now), '' open
+// or not known yet. The Worker refuses whatever the phone does; here it's
+// shown before a tap (Jay 11-14: "I have to try it then it reject me"):
+// <html data-ai-lock>, every AI tap (.q-ai-tap, [data-ai-tap]) shown locked,
+// a tap on one says why (aiLockText) and asks nothing.
+export function aiLock(account = storedAccount()) {
+  if (!account) return '';
+  const saved = readJson(KEY.ai, null);
+  const known = saved?.account === account;
+  const ai = known ? saved.ai : null;
+  if (ai) return ai.left === 0 ? 'used' : '';
+  return known || passLevel(account) === 'free' ? 'level' : '';
+}
+export function aiLockText(lock = aiLock(), lang = 'zh') {
+  const en = lang === 'en';
+  if (lock === 'used') {
+    const per = aiAllowance()?.per;
+    const back = { day: en ? ' Back tomorrow.' : '明天再來。', month: en ? ' Back next month.' : '下個月再來。' }[per] || '';
+    return en ? `Your Orbit AI is used up for now.${back}` : `你的 Orbit AI 次數用完了，${back || '之後再來。'}`;
+  }
+  return lock ? (en ? 'Orbit AI is invite-only for now.' : 'Orbit AI 目前只開放給受邀帳戶。') : '';
+}
+// At the start of an AI-only step: true (and why, said) when this account has no Orbit AI now.
+export function aiStop() {
+  const lock = aiLock();
+  if (lock) toast(aiLockText(lock, detectLang()));
+  return Boolean(lock);
 }
 function markLevel(level = passLevel()) {
   const root = globalThis.document?.documentElement;
   if (!root) return;
   if (level) root.dataset.passLevel = level;
   else delete root.dataset.passLevel;
+  const lock = aiLock();
+  if (lock) root.dataset.aiLock = lock;
+  else delete root.dataset.aiLock;
 }
+// A tap on a locked AI tap: why, and nothing asked (before the app's own handler).
+if (globalThis.document?.addEventListener)
+  document.addEventListener(
+    'click',
+    e => {
+      const lock = document.documentElement.dataset.aiLock;
+      if (!lock || !e.target?.closest?.('.q-ai-tap, [data-ai-tap]')) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      toast(aiLockText(lock, detectLang()));
+    },
+    true
+  );
 // The app's own data as last read or written on this device (under the
 // account), so a cold start paints at once, before the Worker answers.
 // Only small ones (Securities keeps its own compressed copy).
@@ -2045,8 +2092,9 @@ function makeSession(app, { lang, heartbeat }) {
       markLevel(data.level);
       emit('level', data.level);
     }
-    if ('ai' in data && JSON.stringify(data.ai ?? null) !== JSON.stringify(aiAllowance())) {
+    if ('ai' in data && (JSON.stringify(data.ai ?? null) !== JSON.stringify(aiAllowance()) || readJson(KEY.ai, null)?.account !== storedAccount())) {
       writeStore(KEY.ai, JSON.stringify({ account: storedAccount(), ai: data.ai ?? null }));
+      markLevel();
       emit('ai', data.ai ?? null);
     }
     if (typeof data.payload === 'string') cachePayload(app, storedAccount(), data.payload);
@@ -2784,7 +2832,6 @@ function signInGate(s, look = null) {
     const forgot = node('button', {
       class: 'q-mail-link q-gate-forgot',
       type: 'button',
-      hidden: !dev('passMail'),
       text: en ? 'Forgot your pass? Use your recovery email' : '忘記通行碼？用救援信箱找回',
       onclick: () => recover()
     });
@@ -2812,12 +2859,22 @@ function signInGate(s, look = null) {
         forgot.disabled = make.disabled = false;
       }
     };
-    if (forgot.hidden) setTimeout(() => (forgot.hidden = !dev('passMail')), 2500);
-    // 建立新的 Orbit Pass: only where a new pass can be made (a day's count
-    // in 設定) and its email proved (Jay 11-14: one account a person).
+    // 忘記通行碼 where mail can be sent; 建立新的 Orbit Pass only where a new
+    // pass can be made (a day's count in 設定) and its email proved (Jay 11-14:
+    // one account a person). Until the Worker's settings land (a device new
+    // to Orbit has none kept), each keeps its place unseen, so nothing on the
+    // screen moves when they appear (Jay 11-14: 建立 jumped in after seconds).
     const canMake = () => dev('passMail') && dev('passNewDay') > 0;
-    make.hidden = !canMake();
-    if (make.hidden) setTimeout(() => (make.hidden = !canMake()), 2500);
+    const placeOf = (b, on, settled) => {
+      b.hidden = settled && !on;
+      b.style.visibility = on ? '' : 'hidden';
+    };
+    placeOf(forgot, dev('passMail'), false);
+    placeOf(make, canMake(), false);
+    const shown = devFresh().then(() => {
+      placeOf(forgot, dev('passMail'), true);
+      placeOf(make, canMake(), true);
+    });
     const rest = [
       form,
       ...(keys ? [keys.row] : []),
@@ -2836,7 +2893,7 @@ function signInGate(s, look = null) {
     setTimeout(() => input.focus(), 50);
     // An invite (admin's 邀請 QR code, /app/?join):
     // 建立 opened at once, where a pass can be made. (A device signed in never sees this screen.)
-    if (/[?&]join(?:[=&]|$)/.test(globalThis.location?.search || '')) setTimeout(() => !make.hidden && !make.disabled && make.click(), make.hidden ? 2600 : 80);
+    if (/[?&]join(?:[=&]|$)/.test(globalThis.location?.search || '')) shown.then(() => setTimeout(() => !over && !make.hidden && !make.disabled && make.click(), 80));
   });
 }
 

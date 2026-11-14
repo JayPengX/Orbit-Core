@@ -81,6 +81,8 @@ export function askOrbitCard({ go, apps = {} } = {}) {
     placeholder: W('問 Orbit：要帶傘嗎？', 'Ask Orbit: umbrella?'),
     label: W('問 Orbit', 'Ask Orbit'),
     max: 200,
+    // (Which app answers is code's: open with no Orbit AI on the account.)
+    code: true,
     onSend(text) {
       const app = routeAsk(text);
       if (app && app !== 'assist') return send(app, text);
@@ -104,8 +106,9 @@ export function askOrbitCard({ go, apps = {} } = {}) {
     try {
       facts = dayFacts({ en, holiday: twHoliday, plan: planHash });
     } catch {}
-    // (Nothing told on this phone and not about the day: straight to the taps.)
-    if (!facts.length && !day) return show(taps(text));
+    // (Nothing told on this phone and not about the day, or no Orbit AI on
+    // the account: straight to the taps.)
+    if ((!facts.length && !day) || globalThis.document?.documentElement.dataset.aiLock) return show(taps(text));
     show(aiAnswerWait({ rows: Math.min(3, Math.max(1, facts.length)), text: W('看看你的 App…', 'Looking at your apps…') }));
     const now = Date.now();
     const at = new Date(now + 8 * 3_600_000);
