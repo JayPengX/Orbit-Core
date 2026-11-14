@@ -35,7 +35,7 @@ const KIND_RES = [
   [
     'injury',
     /受傷|傷勢|傷兵|傷病|傷退|缺席|傷癒|傷停|養傷|帶傷|舊傷|新傷|傷號|缺陣|開刀|手術|拉傷|扭傷|挫傷|骨折|撕裂|韌帶|腦震盪|痠痛|發炎|復健|休養|高掛免戰牌|[膝肩踝腿腳手肘背腰腹臀頸腕指趾筋]傷|腿筋|腹斜肌|腹股溝|阿基里斯腱|核磁共振|MRI/,
-    /\binjur(?:y|ies|ed)\b|\bhurt\b|\bsprain(?:s|ed)?\b|\bstrain(?:s|ed)?\b|\btorn\b|\bfracture[sd]?\b|\bsurgery\b|\bconcussion\b|\bruled out\b|\bday-to-day\b|\bsidelined\b|\bsetback\b|\bMRI\b|\binjured list\b|\bACL\b|\bhamstring\b|\bAchilles\b|\bwill miss\b|\bto miss\b|(?<!called )\bout (?:for|indefinitely|with)\b|\bdoubtful\b|\bfitness (?:doubt|test|blow)\b|\bknock\b/i
+    /\binjur(?:y|ies|ed)\b|\bhurt\b|\bsprain(?:s|ed)?\b|\bstrain(?:s|ed)?\b|\btorn\b|\bfracture[sd]?\b|\bsurgery\b|\bconcussion\b|\bruled out\b|\bday-to-day\b|\bsidelined\b|\babsence\b|\bsetback\b|\bMRI\b|\binjured list\b|\bACL\b|\bhamstring\b|\bAchilles\b|\bwill miss\b|\bto miss\b|(?<!called )\bout (?:for|indefinitely|with)\b|\bdoubtful\b|\bfitness (?:doubt|test|blow)\b|\bknock\b/i
   ],
   [
     'coach',
@@ -105,6 +105,9 @@ const FAMILY = { basketball: 'basketball', baseball: 'baseball', soccer: 'soccer
 export function sportText(s) {
   return [s?.title, s?.zh, s?.en, s?.sum, ...(s?.items || []).flatMap(it => [it[1], it[2]])].filter(Boolean).join('\n');
 }
+// A guide to a day's games or what's on TV, not a story about any of them.
+// A tip for betting on it (運彩報報, "best bets") neither.
+const GUIDE = /賽事預告|轉播(?:表|預告|資訊)|今日賽程|賽程表|節目表|today'?s (?:games|schedule)|how to watch|TV schedule|what'?s on TV|運彩|讓分|賠率|投注|下注|\b(?:best bets?|betting|odds|parlays?|player props?|predictions?)\b/i;
 // Its own words: its title and the AI's titles of it (not its summary, which
 // names the other side of the game he was hurt in: 「威爾森手部骨折」, the
 // Bulls', "…in Wednesday's loss to the Spurs", stood under 勇士 v 馬刺, 11-13;
@@ -279,9 +282,17 @@ export function newsAbout(pack, { players = [], teams = [], both = false, kinds 
   const tw = teams.map(teamWays).filter(w => w.name);
   if (!pw.length && !tw.length) return [];
   const out = [];
+  const isSide = x => tw.some(w => fold(x) === fold(w.name));
   for (const s of pack?.list || []) {
-    if (!(s.at >= from && s.at <= to) || now - s.at > SPORT_MS) continue;
+    // (Reported within the times: its first report or its last. A game's
+    // story is still told the day after, its last report past the window.)
+    if (!((s.first || s.at) <= to && s.at >= from) || now - s.at > SPORT_MS) continue;
     if (kinds && !kinds.includes(s.k)) continue;
+    // (A guide to the day's games, 「今日賽事預告與轉播」, is no story of any of them.)
+    if (GUIDE.test(ownText(s))) continue;
+    // (A game's: about its two sides alone, by the AI's reading, not a round-up
+    // with something else in it: 「七六人對決暴龍 台灣亞冠賽戰澳洲」, Jay 11-14.)
+    if (both && Array.isArray(s.who?.a) && !s.who.a.every(isSide)) continue;
     // (A story the AI has read, `who`: named in its own words or by the AI,
     // never only in one of its links' headlines. A round-up the story drew
     // in, "Doncic helps Lakers beat Hawks; Wembanyama powers Spurs", put
@@ -292,10 +303,19 @@ export function newsAbout(pack, { players = [], teams = [], both = false, kinds 
     const hitT = tw.length ? (both ? tw.every(w => namesTeam(text, w, s.who, { about: all })) : tw.some(w => namesTeam(text, w, s.who, { about: all }))) : false;
     if (hitP || hitT) out.push({ s, p: hitP });
   }
-  // (A player's own story ahead of his team's; then its kind; then the newest.)
-  out.sort((a, b) => b.p - a.p || KIND_ORDER[a.s.k] - KIND_ORDER[b.s.k] || b.s.at - a.s.at);
-  // (The same news told by Taiwan's outlets and the world's: both kept, they're each a story.)
-  return out.slice(0, most).map(x => x.s);
+  // (A player's own story ahead of his team's; then the world's sports
+  // outlets' ahead of Taiwan's, which only fill what's left (Jay 11-14: "all
+  // Taiwan news … the worst you can find about sport"); then its kind; then the newest.)
+  out.sort((a, b) => b.p - a.p || (a.s.region === 'tw') - (b.s.region === 'tw') || KIND_ORDER[a.s.k] - KIND_ORDER[b.s.k] || b.s.at - a.s.at);
+  // (A game's: where the world's have it, one of Taiwan's at most beside
+  // them, a player's own story aside: four Taiwan retellings of the same
+  // win under the world's report of it said nothing more.)
+  const world = both && out.some(x => x.s.region !== 'tw');
+  let local = 0;
+  return out
+    .filter(x => x.p || x.s.region !== 'tw' || !world || local++ < 1)
+    .slice(0, most)
+    .map(x => x.s);
 }
 
 // A story's title in the reader's language where the AI made one
