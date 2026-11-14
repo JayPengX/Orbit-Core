@@ -212,45 +212,90 @@ if (!only.length || only.includes('site')) {
 }
 await browser.close();
 
-// The family's home (Orbit-Core's Pages root): every app, in one language at a
-// time (Jay 2026-10-27: "mixed with two languages"). The page is written in
-// Chinese; each text carries its English in data-en, and a few lines swap them
-// for a reader whose Orbit language (orbit.lang, kit detectLang's rule) is English.
+// The family's home (orbit.<d>/pass/, and / sends here): Orbit first, the
+// whole family in one home-screen app (/app/), then each app on its own,
+// the Pass that signs into all of them last. In one language at a time
+// (Jay 2026-10-27: "mixed with two languages"): written in Chinese, each text
+// carries its English in data-en, swapped for a reader whose Orbit language
+// (orbit.lang, kit detectLang's rule) is English. Jay 2026-11-14: "look
+// better", not more on it; the lines are the brand's short pitches.
 function homePage() {
   const home = `${SITE_URL}${DOMAIN ? '/pass/' : '/Orbit-Core/'}`;
   const two = (tag, t, attrs = '') => `<${tag}${attrs} data-en="${esc(t.en)}">${esc(t.zh)}</${tag}>`;
+  const chev = '<svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>';
+  const ids = Object.keys(BRANDS);
   const card = id => {
     const b = BRANDS[id];
-    return `<a class="app" href="${DOMAIN ? shortPathOf(id) : pathOf(id)}"><img src="brand/${id}.svg" alt="" width="64" height="64"><span><strong>${esc(b.name)}</strong>${two('small', b.tag)}</span></a>`;
+    return `<a class="app" href="${DOMAIN ? shortPathOf(id) : pathOf(id)}"><img src="brand/${id}.svg" alt="" width="48" height="48"><span class="t"><strong>${esc(b.name)}</strong>${two('small', b.pitch)}</span>${chev}</a>`;
   };
-  const family = `<section><h2><img src="brand/family-orbit.svg" alt="" width="36" height="36">${FAMILY.name}${two('small', FAMILY.tag)}</h2><div class="apps">${Object.keys(BRANDS).map(card).join('')}</div></section>`;
+  const stack = ids.map((id, i) => `<img src="brand/${id}.svg" alt="" width="40" height="40" style="--i:${i}">`).join('');
   const og = (k, v) => `<meta property="og:${k}" content="${esc(v)}">`;
   return `<!doctype html>
 <html lang="zh-Hant"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Orbit</title>
 <meta name="description" content="Orbit：每天用得到的 App，全部用同一個 Orbit Pass。">
-<link rel="icon" href="brand/pass.svg" type="image/svg+xml"><link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f2f7"><meta name="theme-color" media="(prefers-color-scheme: dark)" content="#05051a">
+<link rel="icon" href="brand/family-orbit.svg" type="image/svg+xml"><link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 ${og('type', 'website')}${og('site_name', 'Orbit')}${og('title', 'Orbit')}${og('description', 'Orbit：每天用得到的 App，一個 Orbit Pass。')}${og('url', home)}${og('image', `${home}brand/pass-og.jpg`)}${og('image:width', 1200)}${og('image:height', 630)}
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${home}brand/pass-x.jpg">
 <script>(()=>{let l;try{l=localStorage.getItem('orbit.lang')}catch{}if(l!=='zh'&&l!=='en'){const n=navigator.languages?.length?navigator.languages:[navigator.language||'zh-TW'];l=n.some(x=>/^zh/i.test(x))?'zh':'en'}if(l==='en')document.documentElement.lang='en'})()</script>
 <style>
-:root{color-scheme:light dark;--bg:#f4f5f8;--card:#fff;--text:#0f172a;--muted:#64748b;--line:#e2e8f0}
-@media (prefers-color-scheme:dark){:root{--bg:#020617;--card:#0f172a;--text:#e2e8f0;--muted:#94a3b8;--line:#1e293b}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,'Noto Sans TC',sans-serif}
-main{max-width:880px;margin:0 auto;padding:40px 16px 64px}
-header{display:flex;align-items:center;gap:16px;margin-bottom:28px}header img{width:72px;height:72px}
-h1{margin:0;font-size:32px;letter-spacing:-.02em}header p{margin:2px 0 0;color:var(--muted)}
-.lang{display:block;margin:32px auto 0;padding:8px 16px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--muted);font:500 13px/1.2 inherit;cursor:pointer}
-h2{display:flex;align-items:center;gap:10px;font-size:22px;margin:32px 0 12px}h2 img{border-radius:9px}h2 small{font-size:14px;font-weight:500;color:var(--muted)}
-.apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
-.app{display:flex;gap:14px;align-items:center;padding:14px;border-radius:18px;background:var(--card);border:1px solid var(--line);color:inherit;text-decoration:none}
-.app:hover{border-color:var(--muted)}.app img{flex:none;border-radius:15px}.app span{display:grid;min-width:0}
-.app small{color:var(--muted);font-size:13px}
+:root{color-scheme:light dark;--page:#f2f2f7;--glow:rgba(99,102,241,.16);--cell:#fff;--label:#000;--label-2:rgba(60,60,67,.6);--sep:rgba(60,60,67,.18);--press:rgba(0,0,0,.04);--btn:#4f46e5;--btn-ink:#fff;--ring:#f2f2f7}
+@media (prefers-color-scheme:dark){:root{--page:#05051a;--glow:rgba(99,102,241,.32);--cell:rgba(255,255,255,.06);--label:#fff;--label-2:rgba(235,235,245,.6);--sep:rgba(255,255,255,.09);--press:rgba(255,255,255,.06);--btn:#eef0ff;--btn-ink:#1e1b4b;--ring:#0b0b26}}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100vh;background:radial-gradient(120% 60% at 50% -10%,var(--glow),transparent 70%) no-repeat,var(--page);color:var(--label);font:17px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+main{max-width:1120px;margin:0 auto;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(40px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.top{display:flex;justify-content:flex-end;min-height:44px;align-items:center}
+.lang{padding:6px 12px;border:0;border-radius:999px;background:var(--press);color:var(--label-2);font:500 13px/1.2 inherit;cursor:pointer}
+.lang:hover{color:var(--label)}
+.hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:24px 0 48px}
+.mark{width:96px;height:96px;border-radius:22px;box-shadow:0 12px 32px rgba(30,27,75,.28)}
+h1{margin:20px 0 0;font:700 44px/1.05 ui-rounded,-apple-system,BlinkMacSystemFont,"SF Pro Rounded",system-ui,sans-serif;letter-spacing:-.01em}
+.lead{margin:8px 0 0;font-size:17px;color:var(--label-2)}.lead span{display:inline-block}
+.stack{display:grid;grid-template-columns:repeat(10,minmax(0,40px));justify-content:center;gap:6px;width:100%;margin:28px 0 0}
+.stack img{width:100%;height:auto;aspect-ratio:1;border-radius:23%;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.go{display:inline-flex;align-items:center;gap:8px;margin-top:28px;padding:14px 28px;border-radius:999px;background:var(--btn);color:var(--btn-ink);font-weight:600;text-decoration:none;transition:transform .2s}
+.go:hover{transform:translateY(-1px)}.go:active{transform:scale(.97)}
+.go svg{width:16px;height:16px}
+.note{margin:12px 0 0;font-size:13px;color:var(--label-2)}
+h2{margin:0 16px 8px;font-size:15px;font-weight:600;line-height:1.3;color:var(--label-2)}
+.apps{background:var(--cell);border-radius:22px;overflow:hidden}
+.app{position:relative;display:flex;align-items:center;gap:14px;padding:10px 16px;min-height:68px;color:inherit;text-decoration:none;-webkit-tap-highlight-color:transparent}
+.app+.app::before{content:"";position:absolute;top:0;left:78px;right:0;border-top:.5px solid var(--sep)}
+.app:hover,.app:active{background:var(--press)}
+.app img{flex:none;width:48px;height:48px;border-radius:12px}
+.t{display:grid;flex:1;min-width:0}.t strong{font-weight:500}.t small{font-size:15px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chev{flex:none;width:8px;height:14px;fill:none;stroke:var(--label-2);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.6}
+.pass{display:flex;align-items:center;gap:12px;margin:32px 16px 0;color:var(--label-2);font-size:15px}
+.pass img{flex:none;width:32px;height:32px;border-radius:8px}.nb{display:inline-block}.pass strong{color:var(--label);font-weight:500}
+a:focus-visible,button:focus-visible{outline:2px solid #6366f1;outline-offset:2px}
+@media (min-width:720px){
+  .hero{padding:48px 0 64px}.mark{width:112px;height:112px;border-radius:26px}h1{font-size:56px}.lead{font-size:19px}
+  .stack{grid-template-columns:repeat(10,48px);gap:10px}
+  .apps{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;background:none;border-radius:0;overflow:visible}
+  .app{background:var(--cell);border-radius:20px;padding:14px 16px}.app+.app::before{display:none}
+  .app img{width:56px;height:56px;border-radius:14px}
+  .pass{justify-content:center;margin-top:40px}
+}
+@media (min-width:1000px){
+  .apps{grid-template-columns:repeat(5,1fr)}
+  .app{flex-direction:column;align-items:flex-start;gap:12px;padding:20px}.app img{width:64px;height:64px;border-radius:15px}.app .chev{display:none}
+  .t small{white-space:normal}
+}
+@media (hover:hover) and (pointer:fine){.note{display:none}}
 </style></head><body><main>
-<header><img src="brand/pass.svg" alt=""><div><h1>Orbit Pass</h1>${two('p', PASS.tag)}</div></header>
-${family}
-<button class="lang" type="button" data-en="中文">English</button>
+<div class="top"><button class="lang" type="button" data-en="中文">English</button></div>
+<section class="hero">
+<img class="mark" src="brand/family-orbit.svg" alt="">
+<h1>${FAMILY.name}</h1>
+<p class="lead">${two('span', { zh: '每天用得到的 App，', en: 'Your everyday apps, ' })}${two('span', { zh: '都在一個圖示裡，登入一次就好。', en: 'all in one icon, signed in once.' })}</p>
+<div class="stack" aria-hidden="true">${stack}</div>
+<a class="go" href="/app/"><span data-en="Open Orbit">打開 Orbit</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+${two('p', { zh: '在手機上加到主畫面，就是一個 App。', en: 'On a phone, add it to your Home Screen.' }, ' class="note"')}
+</section>
+<section>${two('h2', { zh: '也可以單獨打開', en: 'Or open one on its own' })}<div class="apps">${ids.map(card).join('')}</div></section>
+<p class="pass"><img src="brand/pass.svg" alt=""><span><strong>${esc(PASS.name)}</strong> · <span class="nb" data-en="${esc(PASS.tag.en)}">${esc(PASS.tag.zh)}</span></span></p>
 </main>
 <script>(()=>{const zh=new Map(),show=l=>{document.documentElement.lang=l==='en'?'en':'zh-Hant';for(const el of document.querySelectorAll('[data-en]')){if(!zh.has(el))zh.set(el,el.textContent);el.textContent=l==='en'?el.dataset.en:zh.get(el)}};if(document.documentElement.lang==='en')show('en');document.querySelector('.lang').onclick=()=>{const l=document.documentElement.lang==='en'?'zh':'en';try{localStorage.setItem('orbit.lang',l)}catch{}show(l)}})()</script>
 </body></html>
