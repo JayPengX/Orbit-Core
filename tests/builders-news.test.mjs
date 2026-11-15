@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { piecesOf, teamsOf, otherGame, placesOf, placeHints, marksAll, gameOf, unboiled, ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, TOPIC_MIN_OF, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN, blindOf, oneSidedOf, coreKeep } from '../builders/news.js';
+import { piecesOf, teamsOf, otherGame, placesOf, placeHints, marksAll, gameOf, unboiled, ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, TOPIC_MIN_OF, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN, blindOf, oneSidedOf, coreKeep, twoWords, weigh } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS, SPORTS_OUTLETS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -999,4 +999,33 @@ test('Taiwan’s 富邦勇士 is never the NBA’s Warriors (11-14: PLG’s open
   assert.ok(otherGame(plg, nba));
   assert.ok(!otherGame(plg, teamsOf('車侑城18分+克羅馬24分 勇士久等的首戰狂勝獵鷹', 'zh')));
   assert.ok(!otherGame(nba, teamsOf('柯瑞腹斜肌撕裂恐休近一個月！勇士陷考驗', 'zh')));
+});
+
+test('one shared word never makes two headlines one story; two words apart, or one long run, do (Jay 11-15)', () => {
+  const T = NOW - 3 * H;
+  const groupsOf = (heads, lang = 'zh', opts = {}) => groupStories(heads.map(([o, t], i) => item(o, t, T + i * 60_000)), lang, opts).map(g => g.map(it => it.o).sort().join(','));
+  // 「工程師」 alone: a cheating engineer, a building firm's win, a fake 台塑 engineer.
+  const eng = groupsOf([['chinatimes', '女工程師偷吃同事！公司內「羞恥搖尾」嗨喊太刺激 幼子神解鎖抓包'], ['ltn', '假台塑工程師瞞婚 6年騙炮250次賠50萬'], ['setn', '龍邁建設退鳳凰收下本季首勝 可利工程師橫掃三福']]);
+  assert.equal(eng.length, 3, '三則各自一則');
+  // 「鄭朝方」 alone: his public pianos, and a councillor quitting the KMT for him.
+  const zheng = groupsOf([['ltn', '推公共鋼琴 鄭朝方打造竹縣「圓夢舞台」'], ['nextapple', '鄭朝方推公共鋼琴、圓夢舞台 打造新竹縣美學新日常'], ['setn', '不管被撤銷黨籍！藍營女將「照挺鄭朝方」主動退黨 新竹縣黨部回應了'], ['cts', '力挺鄭朝方遭鍘！ 上官秋燕宣布「主動放棄黨籍」']]);
+  assert.deepEqual(zheng.sort(), ['cts,setn', 'ltn,nextapple']);
+  // "Spurs" alone: San Antonio's and Tottenham's.
+  const spurs = groupsOf([['yahoosports', 'Spurs guard Stephon Castle has jokes about dunk contest'], ['yahoosports', 'Tottenham Women 0-0 Everton: wasteful Spurs draw Toffees at home']], 'en', { loose: () => true, hint: null });
+  assert.equal(spurs.length, 2);
+  // Two words, or one long run (寶林茶室案一審), tie.
+  const v = t => weigh([item('a', t, T)], 'zh', { loose: () => true })(item('a', t, T));
+  assert.equal(twoWords(v('黃仁勳辭輝達執行長'), v('輝達董事會撤換黃仁勳')), true);
+  assert.equal(twoWords(v('寶林茶室案一審宣判'), v('寶林茶室案一審 檢方將上訴')), true);
+  assert.equal(twoWords(v('女工程師偷吃同事'), v('假台塑工程師瞞婚')), false);
+});
+
+test('a question, an essay or a column never leads a story when the news itself is there (Jay 11-15)', () => {
+  const T = NOW - 2 * H;
+  const items = [
+    { ...item('bi', "Why Jensen Huang's Nvidia scandal has everyone quoting Warren Buffett and Charlie Munger", T), near: 0.9 },
+    { ...item('reuters', "Colette Kress is Nvidia's interim CEO after Jensen Huang quits", T + 60_000), near: 0.8 },
+    { ...item('cnbc', 'Who could replace Jensen Huang?', T + 120_000), near: 0.85 }
+  ];
+  assert.match(storyOf(items, 'intl', NOW).title, /^Colette Kress/);
 });

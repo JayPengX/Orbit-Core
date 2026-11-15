@@ -97,7 +97,7 @@ export const STORE = {
       { zh: '台灣轉播的 15 項賽事，全在這', en: 'All 15 competitions on TV in Taiwan', device: 'computer', args: click('#tab-matches', wait(5000), "js:[...document.querySelectorAll('[data-day]')].filter(e=>e.offsetParent&&/^(明天|Tmrw)/.test(e.textContent.trim())).forEach(e=>e.click())", wait(5000)), wait: 8000 },
       { zh: '每場比賽在哪一台播，一次看', en: 'Every game, and the channel it’s on', page: 'guide', args: click("js:[...document.querySelectorAll('dialog.q-sheet[open] button')].filter(e=>e.offsetParent&&/^(明天|Tmrw)/.test(e.textContent.trim())).pop()?.click()", wait(4000)) },
       // (never the win chance: it comes from betting prices, and the Showcase shows no betting)
-      { zh: '打完的比賽，比分和誰最亮眼', en: 'A finished game: the score and who stood out', args: click('#tab-matches', '[data-league=nba]', wait(2500), yesterday, wait(3000), closeNba, wait(8000), sheetCard('數據領先|Leaders', 'start'), wait(1500)) },
+      { zh: '打完的比賽，比分和誰最亮眼', en: 'A finished game: the score and who stood out', args: click('#tab-matches', '[data-league=nba]', wait(2500), yesterday, wait(3000), closeNba, wait(8000), sheetTop, wait(1500)) },
       { zh: '積分榜與爭冠形勢', en: 'The table and the title race', device: 'tablet', page: 'epl-table' },
       { zh: '每位球員的數據，一頁看完', en: 'Every player’s numbers on one page', page: 'player-ohtani-overview', wait: 10000 }
     ]

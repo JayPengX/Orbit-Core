@@ -42,7 +42,7 @@
 //     out, an important story the other side carries widely; oneSidedOf),
 //     parties: ['g','b','w'], topics: ['pol'…], imp, live (快訊: outlets
 //     on it in the last 2 hours, only while it's breaking),
-//     clips: [[outlet, youtubeId, url, title, picture]] (a YouTube clip, or
+//     clips: [[outlet, youtubeId, url, title, picture, at]] (a YouTube clip, or
 //     an outlet's own video page when the id is ''),
 //     items: [[outlet, title, url, at, video?]] }  (each outlet's newest first).
 // State (private/news/items.json.gz): the 48 hours' headlines, feeds' ETags,
@@ -697,6 +697,41 @@ function cosine(a, an, b, bn) {
   }
   return dot / (an * bn);
 }
+// Two headlines (or stories) are one only where they share two words or
+// more, apart, or name the same game: one word alone is any two stories'
+// (Jay 11-15: 「工程師」 alone made one story of a cheating engineer, a
+// building firm's win and OpenAI's tools; 「鄭朝方」 alone joined his public
+// pianos to a councillor quitting the KMT for him; "Spurs" alone, San
+// Antonio's and Tottenham's). A Chinese word is its two-character pieces
+// that run into each other (黃仁 and 仁勳: one word, 黃仁勳). A company's
+// own report is tied by its name alone (its report's words are ZH_STOP's).
+// (A place's name is no word of it: a 新竹縣 story and the next.)
+let PLACE_BITS = null;
+const placeBit = k => {
+  PLACE_BITS ||= new Set(PLACES_ZH.source.replace(/\(\?<![^)]*\)/g, '').split('|').flatMap(p => [p, `${p}縣`, `${p}市`].flatMap(w => [...w].slice(0, -1).map((c, i) => c + w[i + 1]))).concat(['台灣', '臺灣', '縣長', '市長']));
+  return PLACE_BITS.has(k);
+};
+export function twoWords(a, b) {
+  const [s, l] = a.size < b.size ? [a, b] : [b, a];
+  const zh = [];
+  let other = 0;
+  for (const k of s.keys()) {
+    if (!l.has(k) || k.startsWith('#t:')) continue;
+    if (k.startsWith('#')) return true;
+    if (/^[㐀-鿿]{2}$/.test(k)) placeBit(k) || zh.push(k);
+    else if (++other >= 2) return true;
+  }
+  // (The pieces that share a character, one word.)
+  const root = zh.map((_, i) => i);
+  const find = i => (root[i] === i ? i : (root[i] = find(root[i])));
+  for (let i = 0; i < zh.length; i++) for (let j = i + 1; j < zh.length; j++) if (zh[i][1] === zh[j][0] || zh[j][1] === zh[i][0] || zh[i][0] === zh[j][0] || zh[i][1] === zh[j][1]) root[find(i)] = find(j);
+  // (A long run is two words or more: 寶林茶室案一審, five characters or more.)
+  const chars = new Map();
+  for (const [i, k] of zh.entries()) (chars.get(find(i)) || chars.set(find(i), new Set()).get(find(i))).add(k[0]).add(k[1]);
+  let words = other;
+  for (const c of chars.values()) words += c.size >= 5 ? 2 : 1;
+  return words >= 2;
+}
 // How near is near enough: by language (two-character pieces overlap more
 // by chance); then stories whose middles are this near are one.
 export const JOIN = { zh: 0.27, en: 0.24 };
@@ -918,7 +953,7 @@ export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lan
     let best = null;
     let bestSim = 0;
     for (const [g, dot] of dots) {
-      if (otherGame(d.teams, g.teams)) continue;
+      if (otherGame(d.teams, g.teams) || !twoWords(d.v, g.v)) continue;
       const sim = dot / (d.n * (g.n ??= norm(g.v)));
       if (sim > bestSim) (bestSim = sim), (best = g);
     }
@@ -958,7 +993,7 @@ export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lan
     for (const [h, dot] of dots) {
       const a = root(g);
       const b = root(h);
-      if (a !== b && !otherGame(a.teams, b.teams) && dot / (g.n * h.n) >= merge) into.set(b, a), (a.teams = marksAll([a.teams, b.teams]));
+      if (a !== b && !otherGame(a.teams, b.teams) && dot / (g.n * h.n) >= merge && twoWords(g.v, h.v)) into.set(b, a), (a.teams = marksAll([a.teams, b.teams]));
     }
   }
   const whole = new Map();
@@ -984,6 +1019,7 @@ export const THUMB_PIC = /^https?:\/\/(?:i\d?\.ytimg\.com|img\.youtube\.com)\//;
 const STEADY = new Set(['gov', 'public']);
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t.id, t]));
 const twDay = at => new Date(at + 8 * HOUR).toISOString().slice(5, 10);
+const ANGLE = /^(?:why|how|what|who|whom|when|where|is|are|can|should|will|could|would|does|do|did|has|have|opinion|analysis|commentary|explainer|column|editorial|letters?|the case for|inside)\b|^[^:：]{0,24}[:：]\s*(?:why|how|what)\b|\?\s*$|？\s*$|觀點|社論|評論|專欄|^[^／/]{0,8}[／/]?(?:為何|為什麼|如何|怎麼)/i;
 export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, items), vids = [] } = {}) {
   const lang = region === 'tw' ? 'zh' : 'en';
   const newest = [...items].sort((a, b) => (b.at || 0) - (a.at || 0));
@@ -996,7 +1032,10 @@ export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, i
   const at = Math.max(...ats);
   const first = Math.min(...ats);
   // (A video page doesn't lead: its headline is often "Watch: …".)
-  const rank = it => (it.near ?? 0) + (STEADY.has(OUTLETS[it.o]?.kind) ? 0.12 : 0) - (it.v ? 0.3 : 0);
+  // (Nor a question, an essay or a column: they're one angle on the news, not
+  // the news, Jay 11-15: Jensen Huang's fall led by "Why … everyone quoting
+  // Warren Buffett and Charlie Munger".)
+  const rank = it => (it.near ?? 0) + (STEADY.has(OUTLETS[it.o]?.kind) ? 0.12 : 0) - (it.v ? 0.3 : 0) - (ANGLE.test(cleanTitle(it.t)) ? 0.2 : 0);
   const lead = items.filter(it => (it.at || now) >= at - 24 * HOUR).sort((a, b) => rank(b) - rank(a))[0];
   // (In the headline's own language: a Chinese headline over an English
   // outlet's summary was seen on the iPhone, 11-12; none rather than that.)
@@ -1023,14 +1062,14 @@ export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, i
     const y = (pages[it.u]?.y || []).filter(id => same.clip(it.o, id, mine) && !ids.has(id));
     for (const id of y) {
       ids.add(id);
-      clips.push([it.o, id, it.u, cleanTitle(it.t), ytPicture(id)]);
+      clips.push([it.o, id, it.u, cleanTitle(it.t), ytPicture(id), it.at || 0]);
     }
-    if (!y.length && (it.v || (pages[it.u]?.v || []).some(u => same.clip(it.o, u, mine)))) own.push([it.o, '', it.u, cleanTitle(it.t), bigPicture(it.img || pages[it.u]?.i || '')]);
+    if (!y.length && (it.v || (pages[it.u]?.v || []).some(u => same.clip(it.o, u, mine)))) own.push([it.o, '', it.u, cleanTitle(it.t), bigPicture(it.img || pages[it.u]?.i || ''), it.at || 0]);
   }
   for (const v of [...vids].sort((x, z) => z.at - x.at)) {
     if (ids.has(v.y) || clips.length >= CLIPS_MAX) continue;
     ids.add(v.y);
-    clips.push([v.o, v.y, `https://www.youtube.com/watch?v=${v.y}`, clipTitle(v.t), ytPicture(v.y)]);
+    clips.push([v.o, v.y, `https://www.youtube.com/watch?v=${v.y}`, clipTitle(v.t), ytPicture(v.y), v.at || 0]);
   }
   // (Each outlet's first before any outlet's second: many voices, not one
   // channel's six takes.)
@@ -1164,6 +1203,7 @@ function mergeFragments(recs, vecOf, lang, owner, hint) {
       if (y.r.sp !== x.r.sp || y.first > x.last + GAP || x.first > y.last + GAP) continue;
       if (otherGame(x.teams, y.teams)) continue;
       if (x.whose && y.whose && x.whose !== y.whose) continue;
+      if (!twoWords(x.v, y.v)) continue;
       const sim = dot / (x.n * (y.n || 1));
       if (sim >= FRAGMENT_NEAR && (sim > bestSim + 1e-9 || (Math.abs(sim - bestSim) <= 1e-9 && y.r.items.length > best.r.items.length))) (bestSim = sim), (best = y);
     }
@@ -1239,12 +1279,16 @@ export const PAIR = { zh: 0.18, en: 0.17 };
 // of any one headline it holds, 11-12: the Hegseth impeachment story held
 // LSU's coach, China's car sales and oil prices), as long as enough outlets
 // are left (else all). vs: the headlines' weighed pieces.
-export function keptOf(vs, lang, region, outlets) {
+export function keptOf(vs, lang, region, outlets, titles = []) {
   if (vs.length < STRAY_MIN) return vs.map(() => true);
   const near = coreKeep(vs, lang);
   const c = sumOf(vs);
   const keep = vs.map((v, i) => {
     if (!near[i]) return false;
+    // (Tied to no other headline of it by two words: let go, twoWords.)
+    // (A company's report, or a headline another outlet ran word for word, stays.)
+    const tied = (lang === 'zh' && reportOf(titles[i] || '')) || (titles[i] && titles.some((t, j) => j !== i && t === titles[i])) || vs.some((w, j) => j !== i && twoWords(v, w));
+    if (!tied) return false;
     const rest = new Map(c);
     for (const [k, x] of v) rest.set(k, rest.get(k) - x);
     return cosine(v, norm(v), rest, norm(rest)) >= STRAY[lang];
@@ -1373,7 +1417,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
       const own = r.items.filter(it => sporty(it) === r.sp && !fillerOf(it, lang));
       if (own.length < r.items.length) r.items = enough(new Set(own.map(it => it.o)), region) || (r.sp && new Set(own.map(it => it.o)).size >= 2) ? own : [];
       if (!r.items.length) continue;
-      const keep = keptOf(r.items.map(vecOf), lang, region, r.items.map(it => it.o));
+      const keep = keptOf(r.items.map(vecOf), lang, region, r.items.map(it => it.o), r.items.map(it => it.t));
       if (keep.some(k => !k)) r.items = r.items.filter((_, i) => keep[i]);
     }
     const owner = new Map();
@@ -1437,7 +1481,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
           if (whose && gReports.length && gReports.every(t => otherReport(t, whose))) continue;
           if (gTeams && otherGame(gTeams, (d.teams ??= marksAll(r.items.map(it => marksOf(it.t, lang, hint)))))) continue;
           const sim = dots.get(d) / (gn * n);
-          if (sim > bestSim) (bestSim = sim), (best = r);
+          if (sim > bestSim && twoWords(gv, d.v)) (bestSim = sim), (best = r);
         }
         if (bestSim >= MERGE[lang]) rec = best;
       }
@@ -1480,7 +1524,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
       if (r.items.length > REC_ITEMS) r.items = [...r.items.slice(0, 10), ...r.items.slice(10 - REC_ITEMS)];
       // (What came in with this build's groups and drifted from the core, let go.)
       let vs = r.items.map(vecOf);
-      const keep = keptOf(vs, lang, region, r.items.map(it => it.o));
+      const keep = keptOf(vs, lang, region, r.items.map(it => it.o), r.items.map(it => it.t));
       if (keep.some(k => !k)) {
         freed.push(...r.items.filter((_, i) => !keep[i]));
         r.items = r.items.filter((_, i) => keep[i]);

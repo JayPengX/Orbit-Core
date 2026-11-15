@@ -4055,7 +4055,8 @@ function orbitTip(s) {
 // it TIP_FOR more. Answers the banner, or nothing when another is up.
 export const QUIET_TIP_FOR = TIP_FOR;
 export function quietTip({ accent = '', mark = null, label = '', title, line, go, never = '', onGo = () => {}, onNever = () => {}, cls = '' }) {
-  if (typeof document === 'undefined' || !document.body || bannerEl?.isConnected) return null;
+  // (Never in a showcase demo, window.__DEMO: nobody's account is there to ask.)
+  if (typeof document === 'undefined' || !document.body || bannerEl?.isConnected || globalThis.__DEMO) return null;
   const acts = [node('button', { class: 'q-banner-go', type: 'button', text: go }), never ? node('button', { class: 'q-orbit-tip-never', type: 'button', text: never }) : null];
   const el = node('div', { class: `q-banner q-banner-ask q-orbit-tip ${cls}`.trim(), role: 'dialog', 'aria-label': label || title, style: accent ? `--q-accent:${accent}` : '' }, [
     mark,

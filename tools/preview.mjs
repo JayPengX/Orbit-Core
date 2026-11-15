@@ -4,6 +4,7 @@
 //   node tools/preview.mjs <app> [hash…] [--out dir] [--width 390] [--height 844]
 //                          [--full] [--lang zh|en] [--dark] [--wait ms] [--click selector|js:code|xy:x,y]
 //                          [--scale 2]  (the screen's pixels per point)
+//                          [--css '<rules>']  (a stylesheet over the page, for posters)
 //                          [--settle]  (--wait and each click's wait end early once the page has stopped changing)
 //                          [--type 'selector=text']  (fills a field after the clicks)
 //                          [--store 'key=value']  (a localStorage entry to start with; a reload keeps the page's own)
@@ -141,6 +142,8 @@ const snapStart = JSON.parse(opt('snap', '{}'));
 const adminPeople = Number(opt('people', 12));
 const wait = Number(opt('wait', 6000));
 const settle = flag('settle');
+// --css '<rules>': a stylesheet over the page (a poster's touch-ups: tools/store-shots.mjs).
+const extraCss = opt('css', '');
 // (--scale 1: a quarter of the pixels drawn, for checks that read the page, not the picture.)
 const scale = Number(opt('scale', 2));
 const payloadFile = opt('payload', '');
@@ -673,6 +676,12 @@ if (seed)
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }, Number(seed) || 1);
+if (extraCss)
+  await context.addInitScript(css => {
+    const add = () => document.head?.append(Object.assign(document.createElement('style'), { textContent: css }));
+    if (document.head) add();
+    else document.addEventListener('DOMContentLoaded', add);
+  }, extraCss);
 if (gate) await context.addInitScript({ path: new URL('./gate-page.js', import.meta.url).pathname });
 if (shuffle)
   await context.addInitScript(() => {

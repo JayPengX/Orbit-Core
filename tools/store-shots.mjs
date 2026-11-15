@@ -64,7 +64,13 @@ function accountFile(name, lang) {
 
 // The screens a shot can be taken on (`device`; Jay 11-14: a few iPad and computer shots in
 // every set, so it's plain every device is supported). A phone's is the default.
-const DEVICES = { phone: [375, 812], tablet: [820, 1180], computer: [1440, 900] };
+// (A computer's is a browser window 1180 wide and tall, Jay 11-15 "screenshots still suck": a
+// 1440×900 screen shrunk into a tall poster was too small to read and left half of it empty;
+// 1000 is still the computer's layout, drawn at its own size, and the window fills the poster.)
+const DEVICES = { phone: [375, 812], tablet: [820, 1180], computer: [1000, 1240] };
+// A poster's touch-ups (Jay 11-15: "you are allowed to not be 100% real app look so the shots
+// look better"): no account button, notice, tip or scroll bar on the screen; the app as it is.
+const TOUCH = '.q-account,.q-orbit-tip,.q-banner,.q-toast,.q-ptr{display:none!important}*{scrollbar-width:none!important}::-webkit-scrollbar{display:none!important}';
 
 // One shot in one language: preview.mjs at 375×812 (750×1624 at 2×), an iPad's or a computer's size.
 async function shoot(n, lang) {
@@ -80,7 +86,7 @@ async function shoot(n, lang) {
     const f = ['ndjson', 'json'].map(x => join(HERE, 'shots', 'ai', `${name}.${lang}.${x}`)).find(existsSync);
     return f ? ['--fixture', `${text}=${f}`] : [];
   });
-  const args = [join(HERE, 'preview.mjs'), set.app, ...(hash ? [hash] : []), '--live', '--lang', lang, ...(s.device && s.device !== 'phone' ? ['--device', { tablet: 'ipad', computer: 'pc' }[s.device]] : ['--width', '375', '--height', '812']), '--wait', String(s.wait ?? 6000), '--out', tmp,
+  const args = [join(HERE, 'preview.mjs'), set.app, ...(hash ? [hash] : []), '--live', '--lang', lang, ...(s.device && s.device !== 'phone' ? ['--device', { tablet: 'ipad', computer: 'pc' }[s.device], '--width', String(DEVICES[s.device][0]), '--height', String(DEVICES[s.device][1])] : ['--width', '375', '--height', '812']), '--css', TOUCH, '--wait', String(s.wait ?? 6000), '--out', tmp,
     // (dark and light mixed, Jay 11-14: shots 1, 3, 5 dark, 2, 4, 6 light; a shot's own `dark` wins)
     '--seed', String(n), ...((s.dark ?? set.dark ?? n % 2 === 1) ? ['--dark'] : []), ...payload, ...ai, ...(set.args || []), ...(page.args || []), ...((a => (Array.isArray(a) ? a : a?.[lang]))(s.args) || [])];
   // (the run's one clock, unless the shot sets its own: Class's school morning)
@@ -125,17 +131,30 @@ const encode = async (src, dest, w, h, frame) => {
   const p = await b.newPage({ viewport: { width: w, height: h } });
   const pic = `data:image/png;base64,${readFileSync(src).toString('base64')}`;
   const [hi, mid, lo] = [brand.from, brand.ink, brand.to];
+  // The poster (Jay 11-15: "align the text on the shots and design it better"): the app's name
+  // and the headline at one place on every poster, left-aligned, the headline at most two
+  // lines; the device at one height under it, the same size on every phone poster; a tablet
+  // and a computer as large as the poster lets them be (a computer's screen bleeding off the
+  // right edge, its left side, where an app's rail and lists start, whole; a browser window, so
+  // it can be as tall as the poster).
   await p.setContent(frame
     ? `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;width:${w}px;height:${h}px;overflow:hidden}
-      body{background:radial-gradient(120% 70% at 20% 0%,${hi}66 0%,transparent 60%),linear-gradient(165deg,${mid} 0%,${lo} 100%);font-family:'Inter Display','Inter','PingFang TC','Noto Sans TC','WenQuanYi Zen Hei',sans-serif;-webkit-font-smoothing:antialiased}
-      .hd{position:absolute;top:0;left:66px;right:66px;height:370px;display:flex;align-items:center;justify-content:center}
-      h1{margin:0;text-align:center;color:#fff;font-weight:700;font-size:${frame.zh ? 64 : 68}px;line-height:1.12;letter-spacing:${frame.zh ? '0.02em' : '-0.025em'};text-wrap:balance;word-break:keep-all;overflow-wrap:anywhere}
-      .ph{position:absolute;top:330px;left:50%;transform:translateX(-50%);width:600px;padding:18px;border-radius:92px;background:#0b0b0f;box-shadow:0 45px 120px rgba(0,0,0,.35),0 0 0 3px rgba(255,255,255,.14)}
-      .ph img{display:block;width:600px;border-radius:74px}
-      .ph.tablet{top:400px;width:724px;padding:20px;border-radius:56px}.ph.tablet img{width:724px;border-radius:36px}
-      .ph.computer{top:auto;bottom:451px;width:800px;padding:14px;border-radius:30px}.ph.computer img{width:800px;border-radius:16px}
-      .stand{position:absolute;left:50%;transform:translateX(-50%);bottom:401px;width:880px;height:50px;border-radius:0 0 40px 40px;background:linear-gradient(#2a2a30,#0b0b0f);box-shadow:0 30px 60px rgba(0,0,0,.35)}</style>
-      <div class="hd"><h1>${frame.title}</h1></div>${frame.device === 'computer' ? '<div class="stand"></div>' : ''}<div class="ph ${frame.device || ''}"><img src="${pic}"></div>`
+      body{background:radial-gradient(90% 55% at 15% 0%,${hi}55 0%,transparent 65%),linear-gradient(170deg,${mid} 0%,${lo} 100%);font-family:'Inter Display','Inter','PingFang TC','Noto Sans TC','Noto Sans CJK TC','WenQuanYi Zen Hei',sans-serif;-webkit-font-smoothing:antialiased;color:#fff}
+      .hd{position:absolute;top:92px;left:80px;right:80px}
+      .k{display:flex;align-items:center;gap:14px;margin:0 0 22px;font-size:28px;font-weight:600;letter-spacing:.01em;opacity:.82}
+      .k i{display:block;width:40px;height:4px;border-radius:2px;background:#fff;opacity:.7}
+      h1{margin:0;font-weight:750;font-size:${frame.zh ? 60 : 64}px;line-height:1.14;letter-spacing:${frame.zh ? '0.01em' : '-0.025em'};text-wrap:balance;word-break:keep-all;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+      .dv{position:absolute;background:#0b0b0f;box-shadow:0 50px 120px rgba(0,0,0,.38),0 0 0 3px rgba(255,255,255,.14)}
+      .dv img{display:block}
+      .phone{top:420px;left:150px;width:600px;padding:18px;border-radius:92px}.phone img{width:600px;border-radius:74px}
+      .tablet{top:420px;left:80px;width:800px;padding:22px;border-radius:58px}.tablet img{width:800px;border-radius:38px}
+      
+      .computer{top:420px;left:80px;width:1000px;padding:0;border-radius:24px 0 0 24px;overflow:hidden;background:#1c1c20}
+      .computer img{width:1000px}
+      .bar{display:flex;align-items:center;gap:12px;height:52px;padding:0 22px;background:#26262b}
+      .bar b{width:16px;height:16px;border-radius:50%;background:#ff5f57}.bar b+b{background:#febc2e}.bar b+b+b{background:#28c840}
+      .bar span{margin-left:28px;padding:8px 26px;border-radius:12px;background:#1a1a1e;color:#a1a1aa;font-size:20px}</style>
+      <div class="hd"><p class="k"><i></i>${frame.name}</p><h1>${frame.zh ? frame.title.replace(/，/, '，<br>') : frame.title}</h1></div><div class="dv ${frame.device || 'phone'}">${frame.device === 'computer' ? '<div class="bar"><b></b><b></b><b></b><span>orbit.jaypengx.com</span></div>' : ''}<img src="${pic}"></div>`
     : `<!doctype html><style>html,body{margin:0}img{display:block;width:${w}px;height:${h}px}</style><img src="${pic}">`);
   await p.waitForTimeout(150);
   const shot = await p.screenshot({ type: 'png' }); await p.close();
@@ -161,7 +180,7 @@ for (const [i, s] of set.shots.entries()) {
     const across = { phone: 750, tablet: 1100, computer: 1600 }[s.device || 'phone'];
     // (the README's poster is the Showcase's too, Jay 11-14: one set, the whole phone in it; the
     // first shot's bare screen, screen.webp, for the Showcase's own phone frames)
-    await encode(join(dir, `${n}.${l}.png`), join(docs, `${set.prefix}-${n}${suf}.webp`), 900, 1770, { title: l === 'zh' ? s.zh : s.en, zh: l === 'zh', device: s.device });
+    await encode(join(dir, `${n}.${l}.png`), join(docs, `${set.prefix}-${n}${suf}.webp`), 900, 1770, { title: l === 'zh' ? s.zh : s.en, zh: l === 'zh', device: s.device, name: brand.name });
     if (!shotsDir) continue;
     copyFileSync(join(docs, `${set.prefix}-${n}${suf}.webp`), join(shotsDir, `${n}${suf}.webp`));
     if (n === 1) await encode(join(dir, `${n}.${l}.png`), join(shotsDir, `screen${suf}.webp`), across, Math.round((across * h) / w));

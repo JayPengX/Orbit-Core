@@ -85,7 +85,7 @@ const KIND_ORDER = { injury: 0, ban: 1, coach: 2, move: 3, '': 4 };
 // story's sport; 'other' is one Sports doesn't show (the NFL, hockey,
 // colleges), which a bare nickname never matches into.
 const SPORT_RES = {
-  basketball: /NBA|WNBA|籃球|籃板|三分球|灌籃|大三元|雙十|PLG|TPBL|P\.?\s?LEAGUE|basketball|\brebounds?\b|\b3-pointers?\b|\btriple-double\b|\bdouble-double\b|\bG League\b|\/nba\/|\/basketball\//i,
+  basketball: /NBA|WNBA|籃球|籃板|三分球|灌籃|\bdunk(?:s|ed|ing)?\b|\b3-point\b|大三元|雙十|PLG|TPBL|P\.?\s?LEAGUE|basketball|\brebounds?\b|\b3-pointers?\b|\btriple-double\b|\bdouble-double\b|\bG League\b|\/nba\/|\/basketball\//i,
   baseball: /MLB|大聯盟|美職|棒球|投手|全壘打|開轟|安打|三振|牛棚|打點|中職|日職|韓職|賽揚|捕手|游擊手|外野手|內野手|經典賽|12強|baseball|\bpitch(?:er|ers|ing)\b|\bhomers?\b|\bhome runs?\b|\binnings?\b|\bRBIs?\b|\bCy Young\b|\bWorld Series\b|\bbullpen\b|\bshortstop\b|\boutfielder\b|\/mlb\/|\/baseball\//i,
   soccer: /足球|英超|西甲|義甲|德甲|法甲|蘇超|歐冠|歐霸|歐協聯|美職聯|世界盃資格|足總盃|國家聯賽|進球|射門|門將|前鋒|中場|後衛|點球|帽子戲法|soccer|Premier League|La Liga|Serie A|Bundesliga|Ligue 1|Champions League|Europa League|Conference League|\bMLS\b|\bFA Cup\b|\bUEFA\b|\bFIFA\b|\bstriker\b|\bmidfielder\b|\bgoalkeeper\b|\bdefender\b|\bhat-trick\b|\bclean sheet\b|Nations League|\/football\/|\/soccer\//i,
   racing: /F1|一級方程式|賽車|大獎賽|排位賽|Formula (?:1|One)|Grand Prix|\/f1\/|\/formula1\//i,

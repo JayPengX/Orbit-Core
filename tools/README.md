@@ -79,7 +79,10 @@ full one (`tools/layout-faults.mjs`, also in an open wide sheet), and
 anything wider than the screen or sliding sideways. A shot that can't be
 taken (no network) is skipped, never a failure. `push.sh` runs it for an app
 whose visible files changed, and for every app on a change to the kit's
-CSS or frame. Every run shares one keep of the Workers' answers, 15 minutes
+CSS or frame. Each shot is taken once its page stops changing (`preview.mjs
+--settle`: no loading screen or placeholder, the same elements and height,
+every picture in; 12 s at most) and drawn at 1×, four at a time: the same
+shots in about two thirds of the time. Every run shares one keep of the Workers' answers, 15 minutes
 (`/tmp/orbit-live-keep`). `shots.mjs` prints the same `layout` faults.
 
 ## `node tools/live-scroll.mjs [app…] [--sheet "<js>"] [--account <name>] [--fast] [--no-days] [--webkit] [--live-only]`: nothing jumps
@@ -130,6 +133,11 @@ One set per app, in both languages, for the Showcase's App tab and the app's REA
 (what each shot is: `tools/shots/store.mjs`). Without `--apply` it shoots and writes
 `sheet.png` to look at; `--apply` writes the Showcase's copies and captions and the
 README's framed copies and picture rows (English, then 中文畫面 in a fold).
+A poster (Jay 11-15): the app's name and the headline left-aligned at one place
+on every poster (Chinese broken after its first ，, two lines at most), the device
+at one height under it; a phone 375 wide, an iPad, a computer as a browser window
+1000 × 1240 (the computer's layout at its own size, bleeding off the right edge).
+Every screen gets `--css` touch-ups: no account button, notice, toast or scroll bar.
 
 ## `node tools/help-shots.mjs [app…] [--stops a,b] [--keep dir [--reuse]]`: the guides' screenshots
 
@@ -217,6 +225,7 @@ node tools/preview.mjs sports --live --width 375
 | `--width`, `--height`, `--full`, `--dark`, `--lang en` | The screen |
 | `--click "<selector>"` or `--click "js:…"` | Act before the shot (repeatable) |
 | `--eval "<js>"`, `--wait ms` | Read something out; wait first |
+| `--settle`, `--scale 1`, `--css '<rules>'` | End `--wait` and each click's wait once the page stops changing; draw at 1× (checks that read the page); a stylesheet over the page (posters) |
 | `--script file.mjs` | Run a scenario after the clicks: its default export gets `{ page, context, base, out, errors, hash }` (Playwright), taps on and prints what it found |
 | `--store key=value`, `--payload file.json` | Start with this localStorage or Pass payload |
 | `--keep-account file` | Save what the app writes to its account during the run (a demo account for `shots.mjs --account`) |
