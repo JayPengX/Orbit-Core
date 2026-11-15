@@ -82,3 +82,13 @@ test('/app/: the home-screen app subscribes with its own worker (scope /app/), s
   assert.match(orbit, /orbit\.push\.sub\.\$\{s\.app\}/);
   assert.match(readFileSync(new URL('../site/app/index.html', import.meta.url), 'utf8'), /register\('\.\/sw\.js'\)/);
 });
+
+test('the admin download never carries the vault’s recovery copy, only that there is one', async () => {
+  const { WALLET_COLLECTION, emptyWallet } = await import('../eco.js');
+  const ID = 'feedc0de12345678';
+  const vault = { v: 1, id: 'abcdefabcdef', escrow: { iv: 'iv', key: 'wrapped' }, sealed: 1 };
+  const deps = { now: () => 1, fsList: async (_e, c) => (c === WALLET_COLLECTION ? [{ id: ID, payload: JSON.stringify({ ...emptyWallet(1), vault }), updateTime: 't' }] : []), fsGet: async () => ({ exists: false }) };
+  const out = await ADMIN_TOOLS.export({ env: {}, deps, body: { wallet: ID.slice(0, 8) } });
+  assert.equal(out.wallet.vault.escrow, true);
+  assert.ok(!JSON.stringify(out).includes('wrapped'));
+});

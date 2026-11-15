@@ -85,7 +85,7 @@ holds no key that opens it.
   follows, links, Orbits, looks) and an app's figures go up as `{ t, e }`
   (kit `vault.mjs` `sealParts`; the session opens them for the apps,
   `openParts`); the Worker merges by `t` and never reads a value, and the
-  sweep locks any left open (`eco.js` `sealWalletParts`, from `PARTS_FROM`).
+  sweep locks any left open (`eco.js` `sealWalletParts`).
 - **The owner's own copy** (privacy@'s data request, a verified ask: the
   recovery email's link or the pass typed) comes unlocked: `privacy-mail.js`
   `exportOf` opens each locked part with the account's vault (`eco.js`

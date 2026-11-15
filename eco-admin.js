@@ -17,7 +17,7 @@
 import { REC_WEEKLY, REC_PREFIX } from './rec-weekly.js';
 import { doorReport, doorSet } from './door.js';
 import { systemReport, alertAccount, tell, OPS_DOC, beats } from './ops.js';
-import { passAccount, updateWallet, deleteAccount, ECO_APPS, NOW_COLLECTION, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet, levelOf, LEVELS, mintPass } from './eco.js';
+import { publicVault, passAccount, updateWallet, deleteAccount, ECO_APPS, NOW_COLLECTION, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet, levelOf, LEVELS, mintPass } from './eco.js';
 import { sendPush, dueLists, pushStore, decorate, subsOf } from './push.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, TDX_BOOK, tdxPoints, tdxGuard, tdxUse, tdxPlan } from './transit.js';
 import { aiUse, callsSince } from './gemini-use.js';
@@ -862,7 +862,8 @@ export const ADMIN_TOOLS = {
         apps[app] = d.payload;
       }
     }
-    return { ref: hit.id.slice(0, 8), at: deps.now(), wallet: hit.wallet, apps };
+    // (Never the vault's recovery copy, even wrapped: only that there is one, Jay 11-15.)
+    return { ref: hit.id.slice(0, 8), at: deps.now(), wallet: { ...hit.wallet, ...(hit.wallet.vault ? { vault: publicVault(hit.wallet.vault) } : {}) }, apps };
   },
   // A notice to everyone subscribed in an app (or every app): a news item
   // or a heads-up. Answers how many it reached.
