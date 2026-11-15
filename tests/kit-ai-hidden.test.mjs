@@ -15,9 +15,12 @@ test('the keys\' height above the page foot counts iOS\'s slide, and docked bars
   assert.match(css, /html\.q-kb \.q-kb-docked \{\s*bottom: calc\(var\(--q-kb-foot, var\(--q-kb\)\) \+ 8px\) !important/);
 });
 
-test('Orbit\'s window is not scrolled back while the keys are up', () => {
+test('typing in an app inside Orbit: frames fit the part above the keys at the top, the slide put back a few times at most (Jay 11-15, flashing)', () => {
   const js = read('suite.mjs');
-  assert.match(js, /const still = \(\) => \{\s*const keys = [^\n]*\n\s*if \(keys\) return;/);
+  assert.match(js, /const kb = Boolean\(el\) && base - vv\.height > 80/);
+  assert.match(js, /backs < 3\) \{\s*backs\+\+;\s*globalThis\.scrollTo\(0, 0\)/);
+  assert.match(js, /if \(frameField\(\)\) return fit\(\)/);
+  assert.match(js, /__orbitFit\?\.\(\)/);
 });
 
 test('a bar with an AI action stretches over its room when the AI is gone', () => {

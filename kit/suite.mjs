@@ -634,7 +634,42 @@ function ownScroll(w = globalThis, d = document) {
   w.addEventListener('pageshow', anew);
   try {
     w.top.document.addEventListener('visibilitychange', () => w.top.document.visibilityState === 'visible' && setTimeout(anew, 0));
-  } catch {}
+  } catch {}  // Dragged up past the foot: the page gives a little and comes back, the
+  // same every time (Jay 11-15: "it only bounce once then it no longer
+  // bounce"). A body already at its end hands an iPhone's drag to the frame
+  // itself after its first bounce, and the whole app slid with black under.
+  // (The top's drag is the kit's pull to refresh: orbit.mjs pullAnyway.)
+  let y0 = 0, x0 = 0, live = false, on = false, page = null;
+  const give = dy => 90 * (1 - Math.exp(-dy / 90));
+  b.addEventListener('touchstart', e => {
+    on = false;
+    live = e.touches.length === 1 && !e.target.closest?.('dialog[open], input, textarea, select, [contenteditable], .leaflet-container, [data-no-ptr], .q-tabbar');
+    if (live) ((x0 = e.touches[0].clientX), (y0 = e.touches[0].clientY));
+  }, { passive: true });
+  b.addEventListener('touchmove', e => {
+    if (!live || !e.cancelable) return;
+    const dy = e.touches[0].clientY - y0;
+    if (!on) {
+      if (Math.abs(e.touches[0].clientX - x0) > Math.abs(dy)) return void (live = false);
+      if (dy > -6) return;
+      if (!pastEnd(b.scrollTop, b.scrollHeight, b.clientHeight, dy) || roomIn(e.target, dy, d)) return void (live = false);
+      on = true;
+      page = d.querySelector('main') || b.firstElementChild;
+    }
+    e.preventDefault();
+    if (page) ((page.style.transition = 'none'), (page.style.transform = `translateY(${-Math.round(give(-dy - 6))}px)`));
+  }, { passive: false });
+  const back = () => {
+    live = false;
+    if (!on || !page) return;
+    on = false;
+    const p = page;
+    p.style.transition = 'transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)';
+    p.style.transform = '';
+    setTimeout(() => p.style.transform || (p.style.transition = ''), 340);
+  };
+  b.addEventListener('touchend', back);
+  b.addEventListener('touchcancel', back);
 }
 // A sheet open over the page: a swipe in it scrolls the sheet or nothing,
 // never the page behind it (Jay 11-14, the switcher's).
@@ -853,6 +888,8 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
       try {
         new w.MutationObserver(() => inset(f)).observe(w.document.head, { childList: true });
         w.document.addEventListener('load', e => e.target?.tagName === 'LINK' && inset(f), true);
+        // (A field taken or left in the app: Orbit's window fits the frames to the keys.)
+        for (const k of ['focusin', 'focusout']) w.document.addEventListener(k, () => setTimeout(() => globalThis.__orbitFit?.(), 30), true);
       } catch {}
       look(f, shown === id);
       if (shown === id) w.__orbitSuite?.draw?.();
@@ -1040,36 +1077,68 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
   // Orbit's window never moves: on an iPhone the scroll bar's handle, dragged,
   // scrolled the window itself, the app shown and its tab bar with it, black
   // under (Jay 2026-11-14, Law). Put back at once, whatever moved it.
-  // (Not while the keyboard is up: iOS slides the window to the field and the
-  // frame below follows it; put back at once, the field stayed under the keys
-  // and the screen flashed, Jay 11-14, 問法律.)
+  //
+  // Typing in an app (Jay 11-15: Money's 記一筆 and 備註, Law: "the whole UI
+  // breaks … typing will just have the screen flashing"): the keys are seen
+  // by the visible part's height against its height before typing (Safari
+  // keeps the page and slides it; a home-screen app on iOS 26 shrinks the page
+  // but can leave fixed boxes at full height, WebKit 297779), never by
+  // innerHeight alone. With a field in the shown app and the keys up, the
+  // frames get exactly the part left above them, at the top, and iOS's slide
+  // of the window is put back: the app lays itself out to that height and
+  // brings its field into view inside it (orbit.mjs watchKeyboard), so iOS
+  // has nothing left to slide to. Followed instead of put back only past a
+  // few tries for one field (11-14: following every slide, the frame moved,
+  // iOS slid again, and the screen flashed; putting back with the frame left
+  // full height, the field stayed under the keys).
+  const vv = globalThis.visualViewport;
+  const typingEl = el => Boolean(el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable) && !/^(checkbox|radio|range|button|submit|reset|color|file|hidden|image)$/.test(el.type) && !el.readOnly);
+  const frameField = () => {
+    try {
+      const f = shown && frames.get(shown)?.el;
+      const el = f && top.activeElement === f ? f.contentDocument?.activeElement : null;
+      return typingEl(el) ? el : null;
+    } catch {
+      return null;
+    }
+  };
+  let base = 0, baseW = 0, was = '', backs = 0, field = null;
+  const fit = () => {
+    if (!vv) return;
+    const w = globalThis.innerWidth;
+    if (w !== baseW) ((baseW = w), (base = 0));
+    const el = frameField();
+    if (!el) base = Math.max(Math.round(vv.height), Math.round(globalThis.innerHeight));
+    else base = Math.max(base, globalThis.innerHeight);
+    const kb = Boolean(el) && base - vv.height > 80;
+    if (!kb || el !== field) backs = 0;
+    field = kb ? el : null;
+    if (kb && (vv.offsetTop > 1 || globalThis.scrollY > 1) && backs < 3) {
+      backs++;
+      globalThis.scrollTo(0, 0);
+      if (vv.offsetTop <= 1) return void requestAnimationFrame(fit);
+    }
+    const now = kb ? `${backs >= 3 ? Math.round(vv.offsetTop) : 0}/${Math.round(vv.height)}` : '';
+    if (now === was) return;
+    was = now;
+    const [t, h] = now.split('/');
+    box.style.top = kb ? `${t}px` : '';
+    box.style.height = kb ? `${h}px` : '';
+    box.style.bottom = kb ? 'auto' : '';
+  };
   const still = () => {
-    const keys = globalThis.visualViewport ? globalThis.innerHeight - globalThis.visualViewport.height > 80 : false;
-    if (keys) return;
+    if (frameField()) return fit();
     if (globalThis.scrollX || globalThis.scrollY) globalThis.scrollTo(0, 0);
     for (const el of [document.documentElement, document.body]) if (el && (el.scrollTop || el.scrollLeft)) (el.scrollTop = 0), (el.scrollLeft = 0);
   };
   globalThis.addEventListener('scroll', still, { passive: true });
   document.body?.addEventListener('scroll', still, { passive: true });
-  globalThis.visualViewport?.addEventListener('scroll', still, { passive: true });
-  // The keyboard up: the frames as tall as what's left above it, where the
-  // phone shows the page (Jay 11-14, 問法律: the field under the keyboard,
-  // typing flashed as the phone moved the window to it and this put it back).
-  // The app inside lays itself out again to that height, its field over the keys.
-  const vv = globalThis.visualViewport;
   if (vv) {
-    let was = '';
-    const fit = () => {
-      const kb = globalThis.innerHeight - vv.height > 80;
-      const now = kb ? `${Math.round(vv.offsetTop)}/${Math.round(vv.height)}` : '';
-      if (now === was) return;
-      was = now;
-      box.style.top = kb ? `${Math.round(vv.offsetTop)}px` : '';
-      box.style.height = kb ? `${Math.round(vv.height)}px` : '';
-      box.style.bottom = kb ? 'auto' : '';
-    };
     vv.addEventListener('resize', fit, { passive: true });
     vv.addEventListener('scroll', fit, { passive: true });
+    // (A field taken or left in the app: its frame tells, focus never reaching this window.)
+    globalThis.__orbitFit = fit;
+    fit();
   }
   // Off the phone's screen: which app, and when (where Orbit opens next). Back
   // on it: the rules of launchTarget again, with a playing app live too.

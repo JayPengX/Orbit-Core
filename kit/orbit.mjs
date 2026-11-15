@@ -6633,6 +6633,23 @@ export function tabBar({ tabs, onSelect, onShow = null, hash = id => `#${id}`, n
 //     account button), opening on this app's guide.
 // Returns { help, refresh } (the buttons, or null, or refresh's stand-in).
 let stopPull = null;
+// The top of every app's page on a touch screen is a pull to refresh (Jay
+// 11-15: "I should not be able to scroll the top row … in theory should be a
+// refresh trigger not just let me pull it all the way"): dragged down from
+// the top, the page gives a little (the kit's rubber band, 90 px at most),
+// never the whole app, and let go past the mark it refreshes. An app that
+// gave topActions a refresh runs it; any other is told as when it's back on
+// the screen (a visibilitychange, which every app answers by reading again
+// what's stale) and an orbit-refresh event.
+const refreshAny = () => {
+  globalThis.dispatchEvent?.(new Event('orbit-refresh'));
+  document.dispatchEvent(new Event('visibilitychange'));
+};
+function pullAnyway() {
+  if (typeof document === 'undefined' || stopPull || !globalThis.matchMedia?.('(pointer: coarse)').matches) return;
+  stopPull = pullToRefresh(refreshAny);
+}
+pullAnyway();
 export function topActions(s, { help = null, refresh = null, extra = null, into = document.getElementById('top-actions') } = {}) {
   const en = s.lang === 'en';
   let helpBtn = null;
@@ -6664,6 +6681,7 @@ export function topActions(s, { help = null, refresh = null, extra = null, into 
     document.body?.append(refreshButton);
   }
   if (pull) stopPull = pullToRefresh(() => refresh(), { disabled: () => refreshButton.disabled });
+  else pullAnyway();
   into.classList.add('q-actions');
   into.replaceChildren(...[helpBtn, pull ? null : refreshButton, accountButton(s, { extra })].filter(Boolean));
   return { help: helpBtn, refresh: refreshBtn };
