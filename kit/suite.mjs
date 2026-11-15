@@ -794,7 +794,8 @@ export function start() {
   // that app in orbit … make standalone app no more"). Not inside another
   // page's frame (the Showcase's demos), nor a browser driven by our tools
   // (preview.mjs, the layout check: navigator.webdriver), nor `?solo`.
-  else if (alone()) {
+  // (A browser's tab, a computer's, stays on the app's own address, its Orbit beside it, Jay 11-15.)
+  else if (alone() && (globalThis.matchMedia?.('(display-mode: standalone)').matches || globalThis.navigator?.standalone === true)) {
     try {
       if (Date.now() - (Number(sessionStorage.getItem('orbit.into')) || 0) >= 8000) {
         sessionStorage.setItem('orbit.into', String(Date.now()));

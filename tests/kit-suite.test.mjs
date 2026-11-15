@@ -192,7 +192,7 @@ test("the 進行中 tab asks its app, once, for what's under way in full", async
 test('no separate apps: an app’s page opened on its own goes into Orbit at that app (Jay 11-15), never inside a frame, a tool’s browser or ?solo', () => {
   const kit = readFileSync(new URL('../kit/suite.mjs', import.meta.url), 'utf8');
   assert.ok(kit.includes("return globalThis.top === globalThis && !globalThis.navigator?.webdriver && !/[?&]solo\\b/.test(location.search)"));
-  assert.ok(kit.includes('else if (alone()) {'));
+  assert.ok(kit.includes("else if (alone() && (globalThis.matchMedia?.('(display-mode: standalone)').matches"), 'a home-screen window only: a browser tab stays on the app address');
   const orbit = readFileSync(new URL('../kit/orbit.mjs', import.meta.url), 'utf8');
   assert.ok(!/function orbitTip|function movedGate|suiteAsk/.test(orbit), 'the separate apps’ banner, signed-out screen and offer are gone');
 });

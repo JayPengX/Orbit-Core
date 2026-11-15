@@ -59,7 +59,7 @@ Words used below:
 - 10, 11: `setLive` (from the kit session's `putNow`) and the host's 15-second redraw.
 - 15: `ownScroll` (suite.mjs) and `html.q-own-scroll` in `orbit.css`, phones only (overscroll-behavior on a framed root stopped Safari's wheel on a Mac); the host's `still`.
 - 17: `kit/boot.js` (`framed`), the host's `raise` and `.q-suite-under`.
-- 16, 22: kit `suite.mjs` `start()`: an app's page that is the whole window (`alone`) goes to `/app/?open=`.
+- 16, 22: kit `suite.mjs` `start()`: an app's page that is a home-screen window of its own (`alone`, standalone) goes to `/app/?open=`; a browser's tab (a computer's) stays on the app's address, its Orbit beside it.
 - 18–21: `setupPanel` and `editApps` in `site/app/index.html`; the tag, the
   manifest and the apps kept per Orbit in `kit/orbit-mine.mjs` (`syncOrbits` in
   `orbit.mjs` for the Pass); the manifest served by `orbit-manifest.js`.
