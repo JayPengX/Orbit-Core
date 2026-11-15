@@ -51,7 +51,10 @@ export function appAt(pathname, paths = Object.fromEntries(APP_ORDER.map(id => [
 // over, a question asked once).
 const ONCE = /^(qh|ask)=/;
 export function keepable(url) {
-  const s = String(url || '');
+  // (Never an update's ?v=: the service worker opens that version as kept,
+  // so an app reopened there stayed on it after every deploy, Transit in
+  // Orbit, Jay 11-15: 今天不行駛 hours after the fix was live.)
+  const s = String(url || '').replace(/([?&])v=[^&#]*&?/, '$1').replace(/[?&](?=#|$)/, '');
   const at = s.indexOf('#');
   if (at < 0) return s;
   const parts = s
@@ -105,7 +108,7 @@ export const step = (t, by) => {
 // Where an app opens from the switcher: where it was left, if lately.
 export function resumeOf(saved, app, now = Date.now()) {
   const at = saved?.apps?.[app];
-  if (at?.url && now - (Number(at.t) || 0) < RESUME_MS) return { url: at.url, y: Number(at.y) || 0 };
+  if (at?.url && now - (Number(at.t) || 0) < RESUME_MS) return { url: keepable(at.url), y: Number(at.y) || 0 };
   return { url: pathOf(app), y: 0 };
 }
 // The app used last (Orbit's icon opens on it).
