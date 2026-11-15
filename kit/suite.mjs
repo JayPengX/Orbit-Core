@@ -440,7 +440,9 @@ function fit(foot) {
   const set = cls => (bar.className = `q-suite ${cls}`.trim());
   const root = document.documentElement.style;
   root.removeProperty('--q-tabrail-tab');
-  document.documentElement.classList.remove('q-tabrail-tight');
+  // (On the tab bar, never the page's root: place() follows the root's class, and changing it from here looped, the page frozen, Jay 11-15.)
+  const tabs = document.querySelector('.q-tabbar');
+  tabs?.classList.remove('q-tabrail-tight');
   if (!foot) return set('');
   const above = () => {
     let end = 0;
@@ -465,7 +467,7 @@ function fit(foot) {
   const h = Math.max(34, Math.floor(tab.getBoundingClientRect().height - short / n));
   root.setProperty('--q-tabrail-tab', `${h}px`);
   // (Too short for a name under its icon: the icon alone.)
-  if (h < 50) document.documentElement.classList.add('q-tabrail-tight');
+  if (h < 50) tabs?.classList.add('q-tabrail-tight');
 }
 
 let sheetOpen = null;

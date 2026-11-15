@@ -7736,7 +7736,7 @@ html.q-tabrail:not(.q-desk) .q-suite.q-suite-lean2 > :is(.q-suite-back, .q-suite
 }
 /* (The tabs shortened to fit the switcher and the account under them, never
    beside each other: at the shortest, each tab its icon alone. suite.mjs fit().) */
-html.q-tabrail.q-tabrail-tight:not(.q-desk) .q-tabbar .q-tab-label {
+html.q-tabrail:not(.q-desk) .q-tabbar.q-tabrail-tight .q-tab-label {
   display: none;
 }
 /* In Orbit's window: the switcher and the apps open a row of their own
