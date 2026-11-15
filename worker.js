@@ -1620,6 +1620,31 @@ async function route(request, env, ctx, headers, origin) {
       const a = await ADMIN_TOOLS.ai({ env, deps });
       return json({ rate: a.rate, money: a.money, today: await providerToday(env) }, 200, headers);
     }
+    // What each account's documents and kept versions look like (?hours=, 24): sizes, times, how
+    // each is stored (e1: sealed and its vault, m1: compressed, plain) and why a version was kept;
+    // never a byte of what's in them. How a loss is traced before anything is put back.
+    if (check === 'trace') {
+      if (!env.STORE) return json({ d1: false }, 200, headers);
+      const since = Date.now() - Math.min(240, Number(new URL(request.url).searchParams.get('hours')) || 24) * 3_600_000;
+      const form = p => (typeof p !== 'string' ? typeof p : p.startsWith('e1:') ? `e1:${p.split(':')[1]?.slice(0, 6)}` : p.slice(0, 3));
+      const docs = (await env.STORE.prepare('SELECT coll, id, updated, substr(payload, 1, 40) AS head, length(payload) AS size FROM docs WHERE coll IN (' + [WALLET_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)].map(() => '?').join(',') + ')').bind(WALLET_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)).all()).results || [];
+      const hist = (await env.STORE.prepare('SELECT coll, id, updated, at, why, substr(payload, 1, 40) AS head, length(payload) AS size FROM history WHERE at > ? ORDER BY at').bind(since).all()).results || [];
+      const wallets = Object.fromEntries((await ECO_DEPS.fsList(env, WALLET_COLLECTION, 2000)).map(w => {
+        let x = null;
+        try { x = JSON.parse(w.payload); } catch {}
+        return [w.id, x];
+      }));
+      const out = {};
+      for (const [id, w] of Object.entries(wallets)) {
+        out[id.slice(0, 8)] = {
+          created: w?.created, vault: w?.vault ? { id: String(w.vault.id).slice(0, 6), sealed: w.vault.sealed || null, escrow: Boolean(w.vault.escrow), pass: Boolean(w.vault.pass) } : null,
+          settings: Object.keys(w?.settings || {}), entries: (w?.entries || []).length, apps: Object.fromEntries(Object.entries(w?.apps || {}).map(([a, x]) => [a, x?.last])), live: Object.fromEntries(Object.entries(w?.live || {}).map(([a, x]) => [a, x?.t])), passkeys: (w?.passkeys?.keys || []).length,
+          docs: docs.filter(d => d.id === id).map(d => [d.coll, d.updated, d.size, form(d.head)]),
+          kept: hist.filter(h => h.id === id).map(h => [new Date(h.at).toISOString().slice(5, 19), h.coll, h.why, h.size, form(h.head)])
+        };
+      }
+      return json(out, 200, headers);
+    }
     // The vault sweep (docs/PRIVACY.md): how many accounts are sealed; ?now=1 runs it first.
     if (check === 'vault') {
       const swept = new URL(request.url).searchParams.get('now') ? await sealSweep(env, ECO_DEPS) : null;

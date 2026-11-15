@@ -122,6 +122,12 @@ async function vault() {
   if (sealed < accounts) bad(`vault: ${accounts - sealed} account(s) still plain`);
   if (escrow < accounts) notes.push(`vault: ${accounts - escrow} account(s) waiting for a device that holds the key (op vault-escrow)`);
 }
+// (TRACE=1, a run by hand: each account's documents and kept versions, no content: ops trace.)
+async function trace() {
+  if (!process.env.TRACE || !process.env.DATA_PUSH_SECRET) return;
+  const r = await get(`https://orbit-workers-proxy.pengzjay.workers.dev/ops?check=trace&hours=${process.env.TRACE}`, { json: true, secret: process.env.DATA_PUSH_SECRET });
+  console.log(JSON.stringify(r?.body ?? r?.text, null, 1));
+}
 async function aiMoney() {
   const secret = process.env.DATA_PUSH_SECRET;
   if (!secret) return notes.push('AI money: not checked (no DATA_PUSH_SECRET)');
@@ -149,6 +155,7 @@ await allowances(got.find(r => r?.body?.caps));
 await beats();
 await aiMoney();
 await vault();
+await trace();
 
 const out = [`# Orbit on the free plans: ${problems.length ? `${problems.length} problem${problems.length > 1 ? 's' : ''}` : 'all well'}`, '', ...problems.map(p => `- ❌ ${p}`), ...(problems.length ? [''] : []), ...notes.map(n => `- ${n}`)].join('\n');
 console.log(out);

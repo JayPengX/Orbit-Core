@@ -8,6 +8,11 @@ on:
   schedule:
     - cron: '17 */3 * * *'
   workflow_dispatch:
+    inputs:
+      trace:
+        description: 'Hours of saves to trace (ops trace), empty for none'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -27,3 +32,4 @@ jobs:
         run: node tools/free-watch.mjs
         env:
           DATA_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET }}
+          TRACE: ${{ inputs.trace }}

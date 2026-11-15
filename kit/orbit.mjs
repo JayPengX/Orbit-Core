@@ -2021,9 +2021,8 @@ function makeSession(app, { lang, heartbeat }) {
     const key = await keyFor(id);
     const open = key ? await V.unseal(key, res.payload) : null;
     if (open != null) return { ...res, payload: open };
-    // (Locked under a vault the account no longer has, a lost pass's: gone, read as nothing.)
-    const now = (res.wallet || wallet)?.vault;
-    if (now && now.id !== id) return { ...res, payload: '' };
+    // (Locked under a vault the account no longer has: never read as nothing
+    // and saved over, Jay 11-15 "all my saved things are lost"; kept as it is.)
     if (!locked) ((locked = true), emit('locked', true));
     // (Never a page stuck loading on data it can't read, Jay 11-15: this
     // device's own last copy shown meanwhile, else nothing; nothing saved
@@ -2513,7 +2512,8 @@ function makeSession(app, { lang, heartbeat }) {
       // Locked as it goes, when the account has a vault (kit vault.mjs); a device without its key saves nothing over it.
       let sent = payload;
       if (typeof payload === 'string' && sealable() && wallet?.vault) {
-        const key = await keyNow();
+        // (This page read data it couldn't open: what it holds isn't the account's, never saved over it.)
+        const key = locked ? null : await keyNow();
         if (!key) {
           const error = new Error('locked');
           error.code = 'ECO_PAYLOAD_LOCKED';
