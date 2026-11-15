@@ -93,7 +93,7 @@ export const OPEN = {
       const g = await gameOf(id, fetchImpl);
       const start = Date.parse(g?.e.start);
       if (g?.state !== 'pre' || !(start > now)) return null;
-      const f = previewFacts(g.summary, g.e);
+      const f = previewFacts(g.summary, g.e, { tap: true });
       // (Made again once within 6 hours of the start: the injury list and the rest by then.)
       return f ? { input: { facts: f.facts }, key: `v2:${start - now < 6 * 3_600_000 ? 'near' : 'far'}`, people: f.people } : null;
     },

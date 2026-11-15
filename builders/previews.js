@@ -127,7 +127,11 @@ const LEAGUES_DROP = new Set(['eng.1', 'ita.1', 'esp.1']);
 
 // The game's digest, lean (≈ 300–1,200 characters), or null when there's
 // nothing beyond what the page shows. Teams and players as tokens.
-export function previewFacts(summary, e) {
+// (`tap`: asked for on a tap of its AI button. Anything beyond the teams'
+// line will do then, the AI saying nothing when there's nothing: an MLS
+// wild card five days off, no AP preview or injuries yet, was "no facts"
+// and an error under the button, Jay 11-15.)
+export function previewFacts(summary, e, { tap = false } = {}) {
   const comp = summary?.header?.competitions?.[0];
   if (!comp) return null;
   const sport = LEAGUES[e.league]?.sport || '';
@@ -210,8 +214,11 @@ export function previewFacts(summary, e) {
   }
   // The series, in a play-off.
   if (comp.series?.summary) worth.push(`Series: ${cut(comp.series.summary, 60)}`);
+  // A play-off game with no series (one game, the loser out: MLS's wild card,
+  // a cup's knockout): its round, as ESPN names the season part.
+  else if (/play-?offs?|knockout|final|wild card|round of/i.test(summary?.header?.season?.name || '')) worth.push(`Stage: ${cut(summary.header.season.name, 80)}`);
 
-  if (!worth.length) return null;
+  if (!worth.length && !(tap && lines.length > 2)) return null;
   const all = [...lines, ...worth].join('\n');
   const named = Object.entries(who).filter(([id]) => all.includes(`{p:${id}}`));
   const text = [...lines, ...worth, ...(named.length ? [`Players: ${named.map(([id, p]) => `{p:${id}} = ${p.name} (${tok(p.team)})`).join('; ')}`] : [])].join('\n');
