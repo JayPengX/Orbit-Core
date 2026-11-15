@@ -98,8 +98,9 @@ modules for modulepreload.
 | `ai.mjs`, `family.mjs`, `today.mjs`, `ask-orbit.mjs` | AI (mark `icons.ai`, `--q-ai`; `.q-ai-ref` a name chip): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer`, `aiAnswerWait` (answers drawn); the family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天; 問 Orbit (`routeAsk`, an app's `#ask=` by `takeAsk`); `act.mjs` `readAct`: a command said (start a focus, add a countdown, follow a team, a round of words) read by code, no AI call |
 | `testtools.mjs` | 測試工具, hidden until unlocked (seven taps on 除錯紀錄 in 4 s): a moved or fast clock, a place, a trip's fixes played back (`playTrip`), the network off/slow/failing (`boot.js`, `orbit.tester`), test notices (`pushTest`), each app's switches (`ORBIT_TEST_TOOLS`, `ORBIT_TEST?.flags?.x`), versions; a pill while anything is on |
 | `suite.mjs` | Orbit (`site/app/`; `inSuite()`): each app a frame of `host`, kept running (`toClose`), tabs, the ⌄ switcher; behaviour: `docs/ORBIT.md` |
-| `orbit-mine.mjs` | An Orbit's setup (name, apps, look) as the tag its icon opens (`/app/?o=`), its manifest, apps changed in it (Pass `orbits`) |
-| `vault.mjs` | Data sealed on the phone (§5.3) |
+| `notice-kinds.mjs` | Notice kinds |
+| `orbit-mine.mjs` | An Orbit's setup (name, apps, look) as its icon's tag (`/app/?o=`), manifest, apps changed (Pass `orbits`) |
+| `vault.mjs` | Data sealed (§5.3) |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law, Beats |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs`: qrcode-generator 2.0.4 (MIT), vendored |
 | `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays` |
