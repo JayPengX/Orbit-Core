@@ -117,9 +117,10 @@ async function vault() {
   if (!secret) return notes.push('vault: not checked (no DATA_PUSH_SECRET)');
   const r = await get(`https://orbit-workers-proxy.pengzjay.workers.dev/ops?check=vault&now=1`, { json: true, secret });
   if (r?.body?.accounts == null) return bad(`ops vault: ${r?.status} ${String(r?.text || '').slice(0, 120)}`);
-  const { accounts, sealed, swept } = r.body;
-  notes.push(`vault: ${sealed} of ${accounts} accounts sealed${swept?.accounts ? ` (${swept.accounts} just now)` : ''}`);
+  const { accounts, sealed, escrow, swept } = r.body;
+  notes.push(`vault: ${sealed} of ${accounts} accounts sealed, ${escrow} openable by their devices${swept?.accounts ? ` (${swept.accounts} just now)` : ''}`);
   if (sealed < accounts) bad(`vault: ${accounts - sealed} account(s) still plain`);
+  if (escrow < accounts) notes.push(`vault: ${accounts - escrow} account(s) waiting for a device that holds the key (op vault-escrow)`);
 }
 async function aiMoney() {
   const secret = process.env.DATA_PUSH_SECRET;

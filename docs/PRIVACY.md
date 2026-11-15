@@ -3,7 +3,7 @@
 The one home of how a person's data is kept from everyone but them (Jay
 2026-11-15; RULEBOOK 11-15). What usage is counted: `kit/usage.mjs` and the
 privacy policy. The code: `kit/vault.mjs` (its header), `kit/orbit.mjs`
-(`makeSession`: `openReply`, `vaultPass`, `vaultSheet`), `eco.js` (`ecoVault`,
+(`makeSession`: `openReply`, `vaultPass`, `keyFor`, `keyWait`), `eco.js` (`ecoVault`, `ecoVaultEscrow`,
 `overSealed`).
 
 ## Every account sealed (11-15, Jay: "it should apply now to everyone including existing data")
@@ -50,10 +50,13 @@ holds no key that opens it.
   vault or, with none yet, makes it (`op: 'vault'`); a new account's makes it;
   `rotate` locks the same key again with the new pass (`relock`), and is
   refused on a device without the key (`ECO_VAULT_LOCKED`: it would leave the
-  key under the old pass). A passkey or device-code sign-in has no pass: the
-  device asks for it once (`vaultSheet`, kept by password managers as the
-  Orbit Pass). An account from before with no vault: offered every 3 days
-  (`vaultAsk`, a quiet tip). Unlocked, every app of the device opens again
+  key under the old pass). Nothing is ever asked to read one's own data (Jay 11-15: a
+  Pass page for it "should never exist"): a device without the key takes it
+  from the Worker (`vault-key`), quietly again every minute and when the app
+  comes back while it can't (`keyWait`); a vault a phone made before the
+  Worker kept its copy gets that copy from the first device holding the key
+  (`op: 'vault-escrow'`, taken only if the key opens the account's sealed
+  data). Unlocked, every app of the device opens again
   with its data (`BroadcastChannel('orbit-vault')`, a reload).
 - **The Worker** (`eco.js`): `op: 'vault'` stores it only with the account's
   own pass (`passAccount(passcode) === docId`: a stolen session can't lock the

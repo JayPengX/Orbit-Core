@@ -521,7 +521,8 @@ const OPS = {
   'mail-recover-begin': mailRecoverBegin,
   'mail-recover': mailRecover,
   vault: ecoVault,
-  'vault-key': ecoVaultKey
+  'vault-key': ecoVaultKey,
+  'vault-escrow': ecoVaultEscrow
 };
 
 export async function handleEcoRequest(request, env, headers, ip, deps, waitUntil = null) {
@@ -1254,6 +1255,44 @@ async function ecoVaultKey(ctx) {
   } catch {
     return deps.errorJson('ECO_VAULT_NO_RECOVERY', 403, headers, request);
   }
+}
+// { op: 'vault-escrow', qt, key }: a vault made by a phone before the Worker
+// kept its copy (Jay 11-15: the Pass asked to read your own data "should never
+// exist"): a signed-in device that holds the key gives it, nothing typed. Taken
+// only if it opens the account's sealed data (AES-GCM: a wrong key can't).
+async function ecoVaultEscrow(ctx) {
+  const { env, headers, deps, body, request } = ctx;
+  const c = await liveSession(ctx);
+  if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
+  if (sessionLimited(`vesc:${c.s}`, 6, 60_000, deps.now())) return deps.errorJson('RATE_LIMITED', 429, headers, request);
+  if (typeof body.key !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(body.key)) return deps.errorJson('ECO_VAULT_INVALID', 400, headers, request);
+  const w = parseWallet((await deps.fsGet(env, WALLET_COLLECTION, c.d)).payload);
+  const v = w?.vault;
+  if (!v) return deps.errorJson('ECO_VAULT_INVALID', 400, headers, request);
+  if (v.escrow) return deps.json({ ok: true, vault: publicVault(v) }, 200, headers);
+  if (!(await opensSealed(env, deps, c.d, v.id, body.key))) return deps.errorJson('ECO_VAULT_INVALID', 403, headers, request);
+  const escrow = await escrowOf(env, body.key);
+  const result = await updateWallet(env, deps, c.d, x => (x.vault?.id === v.id && !x.vault.escrow ? { ...x, vault: { ...x.vault, escrow } } : x));
+  return deps.json({ ok: true, vault: publicVault(result?.wallet?.vault) }, 200, headers);
+}
+// Does `raw` open one of the account's app data sealed under vault `id`? (None sealed: nothing to protect, yes.)
+async function opensSealed(env, deps, docId, id, raw) {
+  const key = await crypto.subtle.importKey('raw', unb64u(raw), 'AES-GCM', false, ['decrypt']);
+  let any = false;
+  for (const [app, { collection }] of Object.entries(ECO_APPS)) {
+    if (SEAL_PLAIN.has(app)) continue;
+    const doc = await deps.fsGet(env, collection, docId).catch(() => null);
+    const parts = doc?.exists && typeof doc.payload === 'string' && isSealed(doc.payload) ? doc.payload.split(':') : null;
+    if (!parts || parts[1] !== id) continue;
+    any = true;
+    try {
+      await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64u(parts[2]) }, key, unb64u(parts[3]));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return !any;
 }
 async function ecoVault(ctx) {
   const { env, headers, deps, body, request } = ctx;

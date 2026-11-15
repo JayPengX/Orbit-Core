@@ -272,3 +272,19 @@ test('the vault’s key: kept only sealed by the Worker’s secret, never shown 
   assert.equal(await V.unseal(key, stored), '{"days":[1]}');
   assert.equal((await t.call('POST', '?app=orbit', { op: 'vault-key', qt: 'nope' })).status, 401);
 });
+
+test('a vault a phone made before the Worker kept its key: a signed-in device holding the key gives it, nothing typed, only if it opens the sealed data (Jay 11-15: no Pass page to read your own data)', async () => {
+  const t = setup();
+  const a = await newPass(t, 'orbit');
+  const V = await import('../kit/vault.mjs');
+  const made = await V.makeVault(a.passcode);
+  assert.equal((await t.call('POST', '?app=orbit', { op: 'vault', qt: a.token, passcode: a.passcode, vault: made.vault })).status, 200);
+  assert.equal((await t.call('PATCH', `${t.qt(a.token)}&app=orbit`, { payload: await V.seal(made.key, made.vault.id, '{"days":[3]}') })).status, 200);
+  assert.equal((await t.call('POST', '?app=orbit', { op: 'vault-key', qt: a.token })).status, 403, 'no copy yet');
+  const raw = V.b64(await crypto.subtle.exportKey('raw', made.key));
+  const wrong = V.b64(crypto.getRandomValues(new Uint8Array(32)));
+  assert.equal((await t.call('POST', '?app=orbit', { op: 'vault-escrow', qt: a.token, key: wrong })).status, 403, 'a key that doesn’t open it');
+  const gave = await t.call('POST', '?app=orbit', { op: 'vault-escrow', qt: a.token, key: raw });
+  assert.equal(gave.data.vault.escrow, true);
+  assert.equal((await t.call('POST', '?app=orbit', { op: 'vault-key', qt: a.token })).data.key, raw, 'every device takes it now');
+});

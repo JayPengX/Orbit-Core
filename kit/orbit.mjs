@@ -2039,8 +2039,23 @@ function makeSession(app, { lang, heartbeat }) {
         return { id: r.id, key };
       })
       .catch(() => null)
-      .finally(() => setTimeout(() => (asking = null), 30_000)));
-  const keyFor = async id => (id ? (await V.heldKey(id)) || (await fetchKey().then(k => (k?.id === id ? k.key : null))) : null);
+      .finally(() => (asking = null)));
+  // (A vault a phone made before the Worker kept its copy: the key this device
+  // holds given to it, once, so every other device opens with nothing typed; eco.js ecoVaultEscrow.)
+  let gave = false;
+  const giveKey = async (id, key) => {
+    if (gave || !wallet?.vault || wallet.vault.id !== id || wallet.vault.escrow) return;
+    gave = true;
+    await withToken(async qt => ecoCall('POST', '', { op: 'vault-escrow', qt, key: await rawOf(key) }))
+      .then(res => res?.vault && wallet && setWallet({ ...wallet, vault: res.vault }))
+      .catch(() => null);
+  };
+  const keyFor = async id => {
+    if (!id) return null;
+    const held = await V.heldKey(id);
+    if (held) return void giveKey(id, held), held;
+    return fetchKey().then(k => (k?.id === id ? k.key : null));
+  };
   const keyNow = async () => keyFor(wallet?.vault?.id);
   // (`key`: the data key itself, for the recovery copy the Worker seals with
   // a secret of its own, opened only for a recovery email's session: eco.js
@@ -2575,9 +2590,9 @@ function makeSession(app, { lang, heartbeat }) {
     // show, the recovery email's).
     setTimeout(() => usageNotice(s), 4_000);
     if (!first?.offline) setTimeout(() => passkeyOffer(s).then(shown => shown || mailOffer(s)).catch(() => {}), 12_000);
-    // (The data locked and this device without its key: asked at once; no vault yet: offered after a while.)
-    s.on?.('locked', () => vaultAsk(s));
-    if (!first?.offline) setTimeout(() => vaultAsk(s), s.locked ? 600 : 20_000);
+    // (The data locked and this device without its key yet: taken quietly, nothing asked.)
+    s.on?.('locked', () => keyWait(s));
+    if (s.locked) keyWait(s);
     // The loading screen's line (boot.js): signed in, the app's data next.
     globalThis.__bootStep?.('', 0.8);
     loop();
@@ -3752,55 +3767,18 @@ function passkeyRows(s, note) {
 // (passkeyAsk 'never', every device). The Pass sheet's 通行密鑰 adds one any time.
 export const KEY_TIP_AT = 'orbit.keytip.at';
 export const KEY_TIP_EVERY = 3 * 86_400_000;
-// The vault on this device (kit vault.mjs; Jay 11-15): the app's data was
-// sent locked and the Worker had no key to give this device (a vault made by
-// a phone before the Worker kept one): the Orbit Pass, once, opens it here.
-// Securities' stays open.
-export async function vaultAsk(s) {
-  if (typeof document === 'undefined' || !V.supported() || V.PLAIN_APPS.has(s?.app) || !s?.vault) return;
-  if (document.querySelector('dialog[open]')) return void setTimeout(() => vaultAsk(s), 8000);
-  if (s.locked) return vaultSheet(s, { locked: true });
-  // (No vault yet: the Worker seals every account by itself, eco.js sealSweep; nothing to ask.)
-}
-export function vaultSheet(s, { locked }) {
-  const T = (zh, e) => (s.lang === 'en' ? e : zh);
-  for (const d of document.querySelectorAll('dialog[open]')) d.close();
-  const input = node('input', { class: 'q-pass-input num', type: 'password', name: 'password', autocomplete: 'current-password', autocapitalize: 'characters', spellcheck: 'false', placeholder: 'XXXX-XXXX-XX', 'aria-label': 'Orbit Pass' });
-  const say = node('small', { class: 'q-newpass-hint', role: 'status' });
-  const go = node('button', { class: 'q-btn primary block', type: 'submit', text: locked ? T('解鎖', 'Unlock') : T('鎖起來', 'Lock it') });
-  const later = locked ? null : node('button', { class: 'q-btn plain block', type: 'button', text: T('之後再說', 'Not now'), onclick: () => box.close() });
-  const fresh = node('button', { class: 'q-btn plain block danger', type: 'button', hidden: true, text: T('重新開始（舊資料就打不開了）', 'Start over (the old data stays locked)') });
-  const form = node('form', { class: 'q-vault-form', onsubmit: async e => {
-    e.preventDefault();
-    go.disabled = true;
-    say.textContent = T('開鎖中…', 'Working…');
-    const r = await s.vault(input.value);
-    go.disabled = false;
-    if (r === 'open' || r === 'made') return void ((say.textContent = T('好了：你的資料只有你的裝置打得開。', 'Done: only your devices can read your data now.')), setTimeout(() => box.close(), 1200));
-    if (r === 'wrong') return void (say.textContent = T('這不是這個帳戶的 Orbit Pass。', 'That isn’t this account’s Orbit Pass.'));
-    if (r === 'old') return void ((say.textContent = T('資料是用舊的 Pass 鎖的：在以前登入過的裝置上用這組 Pass 登入一次，資料就會回來；或重新開始。', 'Your data was locked with your earlier pass: sign in with this pass once on a device you used before and it comes back, or start over.')), (fresh.hidden = false));
-    say.textContent = T('沒有連上，再試一次。', 'Couldn’t reach Orbit: try again.');
-  } }, [passUser(), input, say, go]);
-  fresh.onclick = async () => {
-    const r = await s.vault(input.value, { fresh: true });
-    say.textContent = r === 'made' ? T('重新開始了。', 'Started over.') : T('沒有成功，再試一次。', 'That didn’t work: try again.');
-  };
-  const box = node('dialog', { class: 'q-gate q-newpass', style: `--q-accent:${ORBIT_ACCENT}` }, [
-    node('div', { class: 'q-gate-box' }, [
-      node('p', { class: 'q-gate-brand', text: 'ORBIT PASS' }),
-      node('h1', { class: 'q-gate-title', text: locked ? T('在這台裝置上打開你的資料', 'Open your data on this device') : T('把你的資料鎖起來', 'Lock your data') }),
-      node('p', { class: 'q-gate-lede', text: locked ? T('你的資料只有你的裝置打得開。輸入 Orbit Pass，這台裝置就記住。', 'Only your devices can read your data. Type your Orbit Pass once and this device remembers.') : T('只有你的裝置打得開，連 Orbit 也看不到。忘了 Pass 又沒有登入的裝置，資料就打不開了。', 'Only your devices can read it, not even Orbit. Lose your pass with no device signed in, and it stays locked.') }),
-      form,
-      later,
-      fresh
-    ])
-  ]);
-  // (Locked: not closed by a tap outside, the app's data isn't readable until it's opened.)
-  if (locked) box.addEventListener('cancel', e => e.preventDefault());
-  box.addEventListener('close', () => box.remove());
-  document.body.append(box);
-  box.showModal();
-  setTimeout(() => input.focus(), 200);
+// The data locked and this device without its key (Jay 11-15: a page asking
+// for the Pass to read your own data "should never exist"): the key taken
+// from the Worker quietly, again every minute and when the app comes back,
+// till it opens (kit makeSession `unlocked` opens every app of the device).
+let keyWaiting = false;
+export function keyWait(s) {
+  if (keyWaiting || typeof document === 'undefined' || !s?.vaultKey) return;
+  keyWaiting = true;
+  const tryNow = () => s.locked && s.vaultKey().then(k => k && location.reload(), () => null);
+  setInterval(tryNow, 60_000);
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && tryNow());
+  tryNow();
 }
 export async function passkeyOffer(s) {
   if (typeof document === 'undefined' || !passkeyHere() || !s.wallet || passkeysOf(s).length || s.wallet.settings?.passkeyAsk?.value === 'never') return;
