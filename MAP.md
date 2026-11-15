@@ -99,6 +99,7 @@ modules for modulepreload.
 | `testtools.mjs` | 測試工具, hidden until unlocked (seven taps on 除錯紀錄 in 4 s): a moved or fast clock, a place, a trip's fixes played back (`playTrip`), the network off/slow/failing (`boot.js`, `orbit.tester`), test notices (`pushTest`), each app's switches (`ORBIT_TEST_TOOLS`, `ORBIT_TEST?.flags?.x`), versions; a pill while anything is on |
 | `suite.mjs` | Orbit (`site/app/`; `inSuite()`): each app a frame of `host`, kept running (`toClose`), tabs, the ⌄ switcher; behaviour: `docs/ORBIT.md` |
 | `orbit-mine.mjs` | An Orbit's setup (name, apps, look) as the tag its icon opens (`/app/?o=`), its manifest, apps changed in it (Pass `orbits`) |
+| `vault.mjs` | Data sealed on the phone (§5.3) |
 | `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law, Beats |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs`: qrcode-generator 2.0.4 (MIT), vendored |
 | `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays` |
@@ -324,12 +325,12 @@ A new Cloudflare product goes into `guard.js` `PLAN` with it.
 - **Under way** (`eco-now`, RULEBOOK 11-13): a shelf per account and app
   (`q.putNow`, the live session's; `now` in replies) and the notebook's
   (`mergeHeard`), newer per key (`mergeShelf`).
-- **Nothing lost:** a save is refused if it would turn JSON data into
-  anything else or was merged over an older copy (`base`). Every version a
-  write or delete replaces goes to D1's `history` (whole 2 days, daily 30),
-  the whole store to R2 each night (`store-backup.js`), and D1's Time Travel
-  covers 30 days; the admin page's 備份與復原 puts any of them back.
+- **Nothing lost:** refused, a save turning JSON into anything else, over an
+  older copy (`base`) or open over sealed. Replaced versions: D1 `history`
+  (2 days whole, 30 daily), R2 nightly (`store-backup.js`), D1 Time Travel 30
+  days; admin's 備份與復原 puts any back.
 - **Saved copies carry a version in their key** (`fx.day.v4`), bumped when the meaning changes.
+- **Sealed:** docs/PRIVACY.md.
 
 ### 5.4 On the device
 
@@ -381,7 +382,7 @@ A season is kept until the next one's first game.
 - **Devices never keep the pass** (a 60-day refresh and a short session
   token, `orbit-token.js`) **nor the admin key** (a 14-day `adm` token).
 - **Ops:** login, refresh, read/patch/delete, device codes (`eco-pairs`),
-  `#qh=`, sign out everywhere, rotate, merge (`eco-inbox`), share keys (`eco-shares`), admin.
+  `#qh=`, sign out everywhere, rotate, merge (`eco-inbox`), share keys (`eco-shares`), `vault`, admin.
 
 ## 7. The economy
 

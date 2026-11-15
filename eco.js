@@ -350,8 +350,8 @@ function touchApp(wallet, app, now) {
 // email masked.
 export function publicWallet(w) {
   if (!w) return w;
-  const { sec, passkeys, mail, ...rest } = w;
-  return { ...rest, ...(passkeys ? { passkeys: passkeySummary(w) } : {}), ...(mail ? { mail: mailSummary(w) } : {}) };
+  const { sec, passkeys, mail, vault, ...rest } = w;
+  return { ...rest, ...(passkeys ? { passkeys: passkeySummary(w) } : {}), ...(mail ? { mail: mailSummary(w) } : {}), ...(vault ? { vault: publicVault(vault) } : {}) };
 }
 
 // The live session of each app (an app opened somewhere else takes only its
@@ -520,7 +520,8 @@ const OPS = {
   'mail-remove': mailRemove,
   'mail-recover-begin': mailRecoverBegin,
   'mail-recover': mailRecover,
-  vault: ecoVault
+  vault: ecoVault,
+  'vault-key': ecoVaultKey
 };
 
 export async function handleEcoRequest(request, env, headers, ip, deps, waitUntil = null) {
@@ -1139,6 +1140,8 @@ async function ecoRotate(ctx) {
 // again (a new pass: the same id) or, `fresh`, by a new one when the old
 // can't be opened any more (a lost pass): what it locked is then gone.
 const B64U = /^[A-Za-z0-9_-]+$/;
+// (What a device sees of it: the recovery copy stays with the Worker.)
+export const publicVault = v => (v ? { ...v, escrow: v.escrow ? true : undefined } : v);
 export function cleanVault(v) {
   if (!v || v.v !== 1) return null;
   const ok = (x, min, max) => typeof x === 'string' && B64U.test(x) && x.length >= min && x.length <= max;
@@ -1146,23 +1149,66 @@ export function cleanVault(v) {
   if (!Number.isInteger(v.rounds) || v.rounds < 100_000 || v.rounds > 5_000_000) return null;
   return { v: 1, id: v.id, rounds: v.rounds, salt: v.salt, iv: v.iv, pass: v.pass };
 }
+// The recovery copy (Jay 11-15: email recovery "seamless … no data locked or
+// missing", the data "still not readable server side"): the data key, as
+// the phone gives it, sealed by a key made from ECO_TOKEN_SECRET (HKDF; a
+// Worker secret, never in the database): the database, its backups and the
+// admin page can't open it. Opened once, by the Worker alone, for a session
+// a recovery email's code started (`sec.recovered`, VAULT_RECOVER_MS), and
+// handed to that device, which locks it again by its new pass.
+export const VAULT_RECOVER_MS = 15 * 60_000;
+const te8 = t => new TextEncoder().encode(t);
+async function escrowKey(env) {
+  const base = await crypto.subtle.importKey('raw', te8(env.ECO_TOKEN_SECRET || ''), 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: te8('orbit-vault'), info: te8('orbit-vault-escrow-v1') }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+const b64u = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64u = t => Uint8Array.from(atob(t.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((t.length + 3) % 4)), c => c.charCodeAt(0));
+async function escrowOf(env, raw) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  return { iv: b64u(iv), key: b64u(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await escrowKey(env), unb64u(raw))) };
+}
+async function ecoVaultKey(ctx) {
+  const { env, headers, deps, request } = ctx;
+  const c = await liveSession(ctx, { fresh: true });
+  if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
+  let out = null;
+  await updateWallet(env, deps, c.d, w => {
+    out = null;
+    if (!(w.sec?.recovered > deps.now() - VAULT_RECOVER_MS) || !w.vault?.escrow) return w;
+    out = { id: w.vault.id, escrow: w.vault.escrow };
+    // (Once: the mark goes as it's used.)
+    const { recovered, ...sec } = w.sec;
+    return { ...w, sec };
+  });
+  if (!out) return deps.errorJson('ECO_VAULT_NO_RECOVERY', 403, headers, request);
+  try {
+    const raw = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64u(out.escrow.iv) }, await escrowKey(env), unb64u(out.escrow.key));
+    return deps.json({ id: out.id, key: b64u(raw) }, 200, headers);
+  } catch {
+    return deps.errorJson('ECO_VAULT_NO_RECOVERY', 403, headers, request);
+  }
+}
 async function ecoVault(ctx) {
   const { env, headers, deps, body, request } = ctx;
   const c = await liveSession(ctx);
   if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
-  if (sessionLimited(`vault:${c.s}`, 6, 60_000, deps.now())) return deps.errorJson('RATE_LIMITED', 429, headers, request);
+  if (sessionLimited(`vault:${c.s}`, 12, 60_000, deps.now())) return deps.errorJson('RATE_LIMITED', 429, headers, request);
   const vault = cleanVault(body.vault);
   if (!vault) return deps.errorJson('ECO_VAULT_INVALID', 400, headers, request);
   const passcode = cleanCode(body.passcode);
   const mine = ECO_PASSCODE_PATTERN.test(passcode) && (await passAccount(env, deps, passcode)) === c.d;
   if (!mine) return deps.errorJson('INVALID_PASSCODE', 403, headers, request);
+  // (The data key as the phone gives it, for the recovery copy alone: 32 bytes.)
+  const escrow = typeof body.key === 'string' && /^[A-Za-z0-9_-]{43}$/.test(body.key) ? await escrowOf(env, body.key) : null;
   let clash = null;
   const result = await updateWallet(env, deps, c.d, w => {
     clash = w.vault && w.vault.id !== vault.id && !body.fresh ? w.vault : null;
-    return clash ? w : { ...w, vault };
+    const kept = w.vault?.id === vault.id ? w.vault.escrow : null;
+    return clash ? w : { ...w, vault: { ...vault, ...(escrow || kept ? { escrow: escrow || kept } : {}) } };
   });
-  if (clash) return deps.json({ error: { code: 'ECO_VAULT_EXISTS', message: 'ECO_VAULT_EXISTS' }, vault: clash }, 409, headers);
-  return deps.json({ ok: true, vault: result?.wallet?.vault || vault }, 200, headers);
+  if (clash) return deps.json({ error: { code: 'ECO_VAULT_EXISTS', message: 'ECO_VAULT_EXISTS' }, vault: publicVault(clash) }, 409, headers);
+  return deps.json({ ok: true, vault: publicVault(result?.wallet?.vault || vault) }, 200, headers);
 }
 
 // ---- Orbit Class: a schedule others can copy --------------------------------------

@@ -103,7 +103,8 @@ Values are never written anywhere else. The admin panel's system report and
   `RESEND_API_KEY` (when mail is set up).
 
 **Never change `ECO_TOKEN_SECRET`.** Every pass is stored hashed with a
-pepper made from it: a new value locks every account out. Keep a copy of it
+pepper made from it: a new value locks every account out, and the recovery
+copies of every account's data key are sealed by it (docs/PRIVACY.md). Keep a copy of it
 somewhere safe outside GitHub (GitHub never shows a secret again).
 `ECO_ADMIN_TOKEN` opens the admin panel (`orbit.jaypengx.com/admin/`). Everything else can be replaced
 with a new key from its provider.
@@ -121,7 +122,10 @@ hand-made except the hand-typed secrets above. Details: `MAP.md` §1, §4.2, §1
 ### 3.4 Cloudflare: the data (the only copy)
 
 - **D1 `orbit-store`**: every account, wallet and app's saved data, history,
-  AI and quota counts. Copied whole to R2 `private/store/` every night
+  AI and quota counts. Since 11-15 each app's data (all but Securities') is
+  locked on the owner's phones (`kit/vault.mjs`, MAP §5.6): a copy of the
+  store restores it, but nobody, Jay included, can read it without the
+  owner's pass or device. Copied whole to R2 `private/store/` every night
   (14 nights plus each month's first, kept a year).
 - **R2 `orbit-data`**: built data (sports, news, buses, law packs), the
   nightly store copies.
@@ -191,5 +195,10 @@ days without a commit: re-enable them in each repo's Actions tab.
   12-02); 12-05 the Firebase key goes; 12-31 Gemini Flash's price doubles;
   the domain's renewal (Cloudflare › Domain Registration).
 - **AI money:** prepaid balances are small (the Anthropic credit key's
-  balance was empty on 11-14); `free-watch` warns a week before one runs
-  out. Re-type balances with `build.yml` job `ai-money`.
+  balance was empty on 11-14); `free-watch` notes a low one in its report
+  (never a failed run: no mail, Jay 11-15). Re-type balances with `build.yml` job `ai-money`.
+- **11-15, end to end:** each app's data is locked on the phone (MAP §5.6,
+  RULEBOOK 11-15). Next for it: a passkey that unlocks it (WebAuthn PRF), so a
+  passkey sign-in needs no pass typed; merge keeping both passes' locked data;
+  Jay may tell it on the Showcase (not yet: his call). Recovery email
+  brings the data back through the Worker-sealed recovery copy (docs/PRIVACY.md).

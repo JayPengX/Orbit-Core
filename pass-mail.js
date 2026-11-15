@@ -380,6 +380,8 @@ export async function mailRecover(ctx) {
   const index = parse(await deps.fsGet(env, MAIL_COLLECTION, at));
   const doc = index?.d === row.d ? await deps.fsGet(env, WALLET_COLLECTION, row.d) : { exists: false };
   if (!doc.exists || mailOf(parseWallet(doc.payload)) !== addr) return bad(ctx, 'ECO_MAIL_CODE_WRONG', 401);
+  // Its data's recovery copy may be opened for this device, once, for a while (eco.js ecoVaultKey).
+  await updateWallet(env, deps, row.d, w => ({ ...w, sec: { ...(w.sec || {}), recovered: deps.now() } })).catch(() => null);
   // A session that takes only `rotate`: the lost pass is replaced first.
   const res = await signIn(ctx, row.d, { fresh: true });
   return res || bad(ctx, 'ECO_MAIL_CODE_WRONG', 401);

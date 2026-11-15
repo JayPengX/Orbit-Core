@@ -745,7 +745,12 @@ export function clearData() {
 // account a person, Jay 11-14.)
 export const HAD_KEY = 'orbit.had';
 const DEVICE_KEYS = new Set(['orbit.lang', 'orbit.safeBottom', 'orbit.kit', 'orbit.kitFiles', HAD_KEY]);
-export function wipeDevice() {
+// `keepKeys`: signed out by the Pass, not by the person (a new pass made
+// elsewhere, the recovery email, 登出所有裝置): the data keys stay (kit
+// vault.mjs), so signing in here again with the new pass brings the data
+// back, locked again by it. Nothing is readable without signing in: the data
+// itself goes, and a key opens only what the Pass gives a signed-in device.
+export function wipeDevice({ keepKeys = false } = {}) {
   for (const store of [globalThis.localStorage, globalThis.sessionStorage]) {
     try {
       const keys = [];
@@ -754,8 +759,8 @@ export function wipeDevice() {
     } catch {}
   }
   clearData();
-  // (The data keys too: signed out, this device opens nothing of the account's.)
-  V.forgetKeys();
+  // (The data keys too, when the person signed out here.)
+  if (!keepKeys) V.forgetKeys();
 }
 // The last copy kept on this device, of any age: { at, data } or null.
 export const peekJson = (url, { trim = '' } = {}) => persistedSoon(dataKey(url, trim));
@@ -2025,8 +2030,12 @@ function makeSession(app, { lang, heartbeat }) {
     const v = wallet?.vault;
     return v ? V.heldKey(v.id) : null;
   };
-  const postVault = (pass, vault, fresh = false) =>
-    withToken(qt => ecoCall('POST', '', { op: 'vault', qt, passcode: cleanCode(pass), vault, ...(fresh ? { fresh: true } : {}) })).then(res => {
+  // (`key`: the data key itself, for the recovery copy the Worker seals with
+  // a secret of its own, opened only for a recovery email's session: eco.js
+  // ecoVaultKey. Its vault as it is, without the copy: given once more.)
+  const rawOf = async key => (key ? V.b64(await crypto.subtle.exportKey('raw', key)) : undefined);
+  const postVault = async (pass, vault, fresh = false, key = null) =>
+    withToken(async qt => ecoCall('POST', '', { op: 'vault', qt, passcode: cleanCode(pass), vault: { v: vault.v, id: vault.id, rounds: vault.rounds, salt: vault.salt, iv: vault.iv, pass: vault.pass }, key: await rawOf(key), ...(fresh ? { fresh: true } : {}) })).then(res => {
       if (res?.vault && wallet) setWallet({ ...wallet, vault: res.vault });
       return res;
     });
@@ -2039,14 +2048,20 @@ function makeSession(app, { lang, heartbeat }) {
       const v = wallet?.vault;
       if (v && !fresh) {
         const key = await V.openVault(v, pass);
-        if (key) return void (await V.holdKey(v.id, key), unlocked()) || 'open';
+        if (key) {
+          await V.holdKey(v.id, key);
+          // (A vault from before the recovery copy: given it now.)
+          if (!v.escrow) await postVault(pass, v, false, key).catch(() => null);
+          unlocked();
+          return 'open';
+        }
         const held = await V.heldKey(v.id);
-        if (held) return void (await postVault(pass, await V.relock(held, v, pass))) || 'open';
+        if (held) return void (await postVault(pass, await V.relock(held, v, pass), false, held)) || 'open';
         // (Its own vault sent back, unchanged: is the pass the account's?)
         return (await postVault(pass, v).then(() => 'old', e => (e?.code === 'INVALID_PASSCODE' ? 'wrong' : '')));
       }
       const made = await V.makeVault(pass);
-      const res = await postVault(pass, made.vault, fresh).catch(async e => {
+      const res = await postVault(pass, made.vault, fresh, made.key).catch(async e => {
         if (e?.code !== 'ECO_VAULT_EXISTS') throw e;
         // (Another device made it first: that one, read and opened.)
         await s.read?.().catch(() => null);
@@ -2339,11 +2354,12 @@ function makeSession(app, { lang, heartbeat }) {
       throw error;
     }
   }
-  function signedOut() {
+  function signedOut({ chosen = false } = {}) {
     const had = Boolean(storedAccount());
-    // An account was signed in here: everything of it goes. (Never signed
+    // An account was signed in here: everything of it goes, its data keys
+    // only when the person signed out (wipeDevice keepKeys). (Never signed
     // in, a token asked for by a data fetch: nothing to wipe.)
-    if (had) wipeDevice();
+    if (had) wipeDevice({ keepKeys: !chosen });
     else for (const k of [KEY.refresh, KEY.account, KEY.wallet, KEY.level, KEY.ai, payloadKey(app), tokenKey]) writeStore(k, null);
     markLevel('');
     token = '';
@@ -2393,7 +2409,7 @@ function makeSession(app, { lang, heartbeat }) {
   s.vaultKey = keyNow;
   // ({ data, since }: the app's data in the same request, as for read.)
   s.claim = ({ data = false, since = '' } = {}) => refresh({ claim: true, data, since });
-  s.signOut = () => signedOut();
+  s.signOut = () => signedOut({ chosen: true });
   // Every other device signed out; this one stays signed in.
   s.signOutEverywhere = () => withToken(qt => call('POST', '', { op: 'signout-all', qt })).then(absorb);
   // A new pass for the account: shown once, the old one stops working.
@@ -2428,7 +2444,17 @@ function makeSession(app, { lang, heartbeat }) {
   s.mailConfirm = code => withToken(qt => call('POST', '', { op: 'mail-confirm', qt, code, lang: s.lang })).then(absorb);
   s.mailRemove = () => withToken(qt => call('POST', '', { op: 'mail-remove', qt, lang: s.lang })).then(absorb);
   s.mailRecoverBegin = addr => call('POST', '', { op: 'mail-recover-begin', addr, lang: s.lang });
-  s.mailRecover = (addr, code) => signIn({ op: 'mail-recover', addr, code });
+  // (Signed in by the recovery email: the data's key handed back to this
+  // device, once, so the new pass made next locks it again and nothing is
+  // missing; eco.js ecoVaultKey.)
+  s.mailRecover = (addr, code) =>
+    signIn({ op: 'mail-recover', addr, code }).then(async res => {
+      if (sealable())
+        await withToken(qt => ecoCall('POST', '', { op: 'vault-key', qt }))
+          .then(async r => r?.key && r.id && V.holdKey(r.id, await crypto.subtle.importKey('raw', V.unb64(r.key), 'AES-GCM', true, ['encrypt', 'decrypt'])))
+          .catch(() => null);
+      return res;
+    });
   s.createStart = addr => call('POST', '', { op: 'create-start', addr, app, lang: s.lang });
   // (The heartbeat's read every 2 minutes: the whole wallet, up to hundreds
   // of KB, came back each time, and every app redrew for it.)
@@ -3762,7 +3788,7 @@ export function vaultSheet(s, { locked }) {
     go.disabled = false;
     if (r === 'open' || r === 'made') return void ((say.textContent = T('好了：你的資料只有你的裝置打得開。', 'Done: only your devices can read your data now.')), setTimeout(() => box.close(), 1200));
     if (r === 'wrong') return void (say.textContent = T('這不是這個帳戶的 Orbit Pass。', 'That isn’t this account’s Orbit Pass.'));
-    if (r === 'old') return void ((say.textContent = T('資料是用舊的 Pass 鎖的：在還開得了的裝置上登入一次，或重新開始。', 'Your data was locked with an earlier pass: sign in once on a device that still opens it, or start over.')), (fresh.hidden = false));
+    if (r === 'old') return void ((say.textContent = T('資料是用舊的 Pass 鎖的：在以前登入過的裝置上用這組 Pass 登入一次，資料就會回來；或重新開始。', 'Your data was locked with your earlier pass: sign in with this pass once on a device you used before and it comes back, or start over.')), (fresh.hidden = false));
     say.textContent = T('沒有連上，再試一次。', 'Couldn’t reach Orbit: try again.');
   } }, [passUser(), input, say, go]);
   fresh.onclick = async () => {
