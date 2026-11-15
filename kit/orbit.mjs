@@ -6666,7 +6666,7 @@ let stopPull = null;
 // The top of every app's page on a touch screen is a pull to refresh (Jay
 // 11-15: "I should not be able to scroll the top row … in theory should be a
 // refresh trigger not just let me pull it all the way"): dragged down from
-// the top, the page gives a little (the kit's rubber band, 90 px at most),
+// the top, the page bounces as it always does (natively, never moved by hand),
 // never the whole app, and let go past the mark it refreshes. An app that
 // gave topActions a refresh runs it; any other is told as when it's back on
 // the screen (a visibilitychange, which every app answers by reading again

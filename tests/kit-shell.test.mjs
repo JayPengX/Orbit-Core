@@ -339,7 +339,7 @@ test('pull to refresh: past the threshold it ticks once and refreshes on release
   // Short of the threshold.
   root.dispatch('touchstart', touch('touchstart', 100, 100));
   let e = root.dispatch('touchmove', touch('touchmove', 100, 150));
-  assert.equal(e.defaultPrevented, true, 'the page does not scroll under the pull');
+  assert.equal(e.defaultPrevented, false, "the page's own bounce, never held");
   assert.ok(ptr(), 'a spinner follows the finger');
   root.dispatch('touchend');
   assert.equal(calls, 0);

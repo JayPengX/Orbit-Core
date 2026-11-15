@@ -45,24 +45,35 @@ const apps = args.length ? args : ['sports', 'transit', 'weather', 'orbit', 'mon
 const env = { ...process.env, ORBIT_LIVE_KEEP: process.env.ORBIT_LIVE_KEEP || join(tmpdir(), 'orbit-live-keep'), ORBIT_LIVE_KEEP_S: process.env.ORBIT_LIVE_KEEP_S || '900' };
 const run = argv => new Promise(ok => execFile(process.execPath, argv, { cwd: join(HERE, '..'), env, maxBuffer: 64 << 20 }, (e, stdout, stderr) => ok({ code: e?.code || 0, text: `${stdout}${stderr}` })));
 
-let bad = 0;
-for (const app of apps) {
+// (Faster, 2026-11-15, Jay: "every push waiting layout check so long is so
+// tedious": each shot taken once its page stops changing (preview --settle,
+// at most 12 s), not after a fixed 6 s and 2.5 s a tap, drawn at 1× (the
+// check reads the page, not the picture). More shots at once only starve the
+// CPU: pages then take longer to draw than the waits saved.)
+const checkApp = async app => {
   const key = app === 'class' ? 'orbit' : app;
   const book = PAGES[key] || PAGES[app] || {};
   const pages = ['tabs', ...(book.check || [])];
   const dir = join(out, app);
   const acc = ACCOUNT[app] && existsSync(join(HERE, 'shots/accounts', `${key}-${ACCOUNT[app]}.txt`)) ? ['--account', ACCOUNT[app]] : [];
-  const r = await run([join(HERE, 'shots.mjs'), key, ...pages, '--screens', screens, '--themes', 'dark', '--engines', 'chromium', ...acc, '--out', dir]);
+  const r = await run([join(HERE, 'shots.mjs'), key, ...pages, '--screens', screens, '--themes', 'dark', '--engines', 'chromium', '--jobs', process.env.ORBIT_LAYOUT_JOBS || '4', ...acc, '--out', dir, '--', '--settle', '--scale', '1', '--wait', process.env.ORBIT_LAYOUT_WAIT || '12000']);
   const file = join(dir, 'manifest.json');
-  if (!existsSync(file)) {
-    console.log(`${app}: no shots (${r.text.trim().split('\n').slice(-2).join(' ')}), skipped`);
-    continue;
-  }
+  if (!existsSync(file)) return { lines: [`${app}: no shots (${r.text.trim().split('\n').slice(-2).join(' ')}), skipped`], bad: false };
   const { cells } = JSON.parse(readFileSync(file, 'utf8'));
   const skipped = cells.filter(c => c.failed);
   const faults = cells.flatMap(c => c.faults.filter(f => BLOCKS.has(f.kind)).map(f => `${c.page} at ${c.width}: ${f.kind}: ${f.items.slice(0, 2).join(' · ')}`));
-  if (faults.length) bad++;
-  console.log(`${app}: ${cells.length - skipped.length} shots, ${faults.length ? `${faults.length} layout faults` : 'clean'}${skipped.length ? `, ${skipped.length} not taken` : ''}  ${join(dir, 'index.html')}`);
-  for (const f of faults) console.log(`  ${f}`);
-}
+  return { bad: faults.length > 0, lines: [`${app}: ${cells.length - skipped.length} shots, ${faults.length ? `${faults.length} layout faults` : 'clean'}${skipped.length ? `, ${skipped.length} not taken` : ''}  ${join(dir, 'index.html')}`, ...faults.map(f => `  ${f}`)] };
+};
+const done = new Array(apps.length);
+let next = 0, said = 0, bad = 0;
+await Promise.all(
+  Array.from({ length: Math.min(Number(process.env.ORBIT_LAYOUT_APPS || 1), apps.length) }, async () => {
+    while (next < apps.length) {
+      const i = next++;
+      done[i] = await checkApp(apps[i]);
+      // (Said in the apps' order, each as soon as the ones before it are.)
+      for (; said < apps.length && done[said]; said++) (console.log(done[said].lines.join('\n')), done[said].bad && bad++);
+    }
+  })
+);
 process.exit(bad ? 1 : 0);

@@ -7555,9 +7555,10 @@ html.q-own-scroll body {
   box-sizing: border-box;
   overflow-x: hidden;
   overflow-y: auto;
-  /* Never pulled past its ends, the scroll bar's handle dragged included (Jay 11-15: the side bar pushed the
-     page down, black above); the top's pull is the kit's refresh, the foot's give the kit's (suite.mjs). */
-  overscroll-behavior-y: none;
+  /* Its own bounce, native, at both ends (Jay 11-15: "give back to native one"), never handed on to
+     Orbit's window (the whole app sliding off with black under). The top's pull is the kit's refresh,
+     read off this bounce (ui.mjs pullToRefresh). */
+  overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
 }
 /* ---- Orbit's window (kit/suite.mjs): every app in one home-screen app ----

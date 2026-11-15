@@ -183,19 +183,6 @@ test("an app held in Orbit's window gets the phone's safe area written in (a fra
   assert.equal(withInsets('padding: 0', ins), 'padding: 0');
 });
 
-test("a held app's page stops at its ends: a drag past either is held, never a bounce that takes its tabs along", async () => {
-  const { pastEnd } = await import('../kit/suite.mjs');
-  // (dy > 0: the finger going down, towards the page's top.)
-  assert.equal(pastEnd(0, 2000, 800, 30), true);
-  assert.equal(pastEnd(0, 2000, 800, -30), false);
-  assert.equal(pastEnd(1200, 2000, 800, -30), true);
-  assert.equal(pastEnd(1199.5, 2000, 800, -30), true);
-  assert.equal(pastEnd(1000, 2000, 800, -30), false);
-  assert.equal(pastEnd(1200, 2000, 800, 30), false);
-  // (A page shorter than the screen: nowhere to go either way.)
-  assert.equal(pastEnd(0, 600, 800, -30), true);
-});
-
 test("the 進行中 tab asks its app, once, for what's under way in full", async () => {
   const store = new Map();
   globalThis.sessionStorage = { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };

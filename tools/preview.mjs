@@ -3,6 +3,8 @@
 //
 //   node tools/preview.mjs <app> [hash…] [--out dir] [--width 390] [--height 844]
 //                          [--full] [--lang zh|en] [--dark] [--wait ms] [--click selector|js:code|xy:x,y]
+//                          [--scale 2]  (the screen's pixels per point)
+//                          [--settle]  (--wait and each click's wait end early once the page has stopped changing)
 //                          [--type 'selector=text']  (fills a field after the clicks)
 //                          [--store 'key=value']  (a localStorage entry to start with; a reload keeps the page's own)
 //                          [--geo lat,lon]  (where the phone is; Transit's default 新竹車站)
@@ -138,6 +140,9 @@ const snapStart = JSON.parse(opt('snap', '{}'));
 // --people n: admin only, its made-up accounts (12).
 const adminPeople = Number(opt('people', 12));
 const wait = Number(opt('wait', 6000));
+const settle = flag('settle');
+// (--scale 1: a quarter of the pixels drawn, for checks that read the page, not the picture.)
+const scale = Number(opt('scale', 2));
 const payloadFile = opt('payload', '');
 // --keep-account file: what the app saves to its account during the run
 // (its payload, as the Worker would keep it) written to that file, and read
@@ -626,7 +631,7 @@ const contextOptions = {
   // --net they run: an app opens offline on what its worker kept).
   serviceWorkers: net || upgrade ? 'allow' : 'block',
   viewport: { width, height },
-  deviceScaleFactor: 2,
+  deviceScaleFactor: scale,
   isMobile: device !== 'pc',
   hasTouch: device !== 'pc',
   locale: lang === 'en' ? 'en-US' : 'zh-TW',
@@ -1341,6 +1346,29 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
   // (A failed resource by its address: the console only says "404".)
   page.on('response', r => r.status() >= 400 && errors.push(`${r.status()} ${r.url().replace(/([?&](qt|u)=)[^&]+/g, '$1…').slice(0, 160)}`));
   const started = Date.now();
+  // --settle: waits up to `ms`, but only till the page has stopped changing for `calm` ms: no
+  // loading screen, no placeholder (`skel`) on screen, the same elements and height, every picture
+  // in. (Not the network: an app prefetching the next days keeps that busy long after it's drawn.)
+  const pause = async (ms, calm = 800) => {
+    if (!settle) return page.waitForTimeout(ms);
+    const until = Date.now() + ms;
+    let last = '', since = Date.now();
+    await page.waitForTimeout(Math.min(ms, 500));
+    while (Date.now() < until) {
+      const now = await page
+        .evaluate(() => {
+          const b = document.getElementById('loading');
+          if (b && (!b.hidden || b.classList.contains('q-boot-hold'))) return 'loading';
+          if ([...document.querySelectorAll('[class*="skel"]')].some(e => e.getClientRects().length && e.getBoundingClientRect().top < innerHeight)) return 'placeholder';
+          const pics = [...document.images].filter(i => !i.complete && i.getClientRects().length && i.getBoundingClientRect().top < innerHeight).length;
+          return `${document.getElementsByTagName('*').length}|${document.documentElement.scrollHeight}|${document.body?.innerText.length}|${pics}`;
+        })
+        .catch(() => 'loading');
+      if (now !== last) (last = now), (since = Date.now());
+      else if (!/^(loading|placeholder)$/.test(now) && /\|0$/.test(now) && Date.now() - since >= calm) return void console.log(`settled in ${ms - (until - Date.now())} ms`);
+      await page.waitForTimeout(150);
+    }
+  };
   const own = [];
   page.on('request', r => r.url().startsWith(base) && own.push({ url: r.url().slice(base.length) || '/', at: Date.now() - started }));
   // Each call: when it was asked, how long its answer took (or that it failed).
@@ -1448,7 +1476,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
       await page.waitForTimeout(Math.min(geoEvery, Math.max(0, until - Date.now())));
     }
     if (Date.now() < until) await page.waitForTimeout(until - Date.now());
-  } else await page.waitForTimeout(wait);
+  } else await pause(wait, 1000);
   if (gate) {
     const base = join(out, `${key}${lang !== 'zh' ? `-${lang}` : ''}-${width}${dark ? '-dark' : ''}`);
     const result = { app: key, width, dark, lang, lift: await page.evaluate(() => globalThis.__gate?.lift ?? null), end: await page.evaluate(() => globalThis.__gate?.screenNow()), tabs: [] };
@@ -1528,7 +1556,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
       const [x, y] = sel.slice(3).split(',').map(Number);
       await page.touchscreen.tap(x, y).catch(() => page.mouse.click(x, y)).catch(e => errors.push(`click ${sel}: ${e.message.split('\n')[0]}`));
     } else await page.click(sel).catch(e => errors.push(`click ${sel}: ${e.message.split('\n')[0]}`));
-    await page.waitForTimeout(2500);
+    await pause(2500, 600);
   }
   if (cdp && clicks.length) await stopProfile();
   for (const [sel, text] of typings) {

@@ -108,10 +108,9 @@ async function beats() {
 // Google's spend by our log is counted GOOGLE_BILLED times over: 11-14 its
 // bill was about 25 times what its replies' own token counts came to.
 export const GOOGLE_BILLED = 25;
-// A low balance mails once a day (the 08:17 Taiwan run, or a run by hand),
-// never every three hours (Jay 11-15: "keep getting this email"); the other
-// runs list it as a note. A maker running out only falls to its backup.
-const MONEY_MAILS = process.env.GITHUB_EVENT_NAME !== 'schedule' || new Date().getUTCHours() < 3;
+// A low balance is a note, never a failed run (GitHub mails each one; Jay
+// 11-15: "stop me from getting this email"): a maker running out only falls
+// to its backup, and the admin panel shows each balance.
 async function aiMoney() {
   const secret = process.env.DATA_PUSH_SECRET;
   if (!secret) return notes.push('AI money: not checked (no DATA_PUSH_SECRET)');
@@ -128,7 +127,7 @@ async function aiMoney() {
     const left = m.typed.usd - m.spent * x, perDay = m.perDay * x;
     const days = perDay > 0 ? Math.floor(left / perDay) : null;
     said.push(`${prov} NT$${Math.round(left * rate)} left${days != null ? `, ~${days} days` : ''}`);
-    if (left <= m.typed.usd * 0.25 || (days != null && days <= 7)) (MONEY_MAILS ? bad : n => notes.push(`low: ${n}`))(`AI ${prov}: about NT$${Math.max(0, Math.round(left * rate))} left${days != null ? ` (about ${days} days at this week's rate)` : ''}: top it up, or it falls to its backup`);
+    if (left <= m.typed.usd * 0.25 || (days != null && days <= 7)) notes.push(`low: AI ${prov}: about NT$${Math.max(0, Math.round(left * rate))} left${days != null ? ` (about ${days} days at this week's rate)` : ''}: top it up, or it falls to its backup`);
   }
   for (const [prov, t] of Object.entries(r.body.today || {})) if (t.n != null && t.cap && t.n >= t.cap * 0.8) bad(`AI ${prov}: ${t.n} of ${t.cap} calls today (its day cap)`);
   notes.push(`AI money: ${said.join(', ')}; today ${Object.entries(r.body.today || {}).map(([p, t]) => `${p} ${t.n}/${t.cap}`).join(', ')}`);

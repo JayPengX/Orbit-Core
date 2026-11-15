@@ -606,8 +606,6 @@ async function warm() {
 // while what's fixed (the tab bar, the top bar) stays (Jay: "let it be
 // native"). The window's scroll as the apps and the kit read and set it
 // (scrollY, scrollTo, scrollingElement, its scroll event) is the body's.
-// (pastEnd: is a drag of dy (> 0 the finger going down) past an end.)
-export const pastEnd = (top, height, view, dy) => (dy > 0 && top <= 0) || (dy < 0 && top + view >= height - 1);
 function ownScroll(w = globalThis, d = document) {
   const b = d.body;
   if (!b || d.documentElement.classList.contains('q-own-scroll')) return;
@@ -649,62 +647,15 @@ function ownScroll(w = globalThis, d = document) {
   w.addEventListener('pageshow', anew);
   try {
     w.top.document.addEventListener('visibilitychange', () => (w.top.document.visibilityState === 'hidden' ? (away = true) : setTimeout(anew, 0)));
-  } catch {}  // Dragged up past the foot: the page gives a little and comes back, the
-  // same every time (Jay 11-15: "it only bounce once then it no longer
-  // bounce"). A body already at its end hands an iPhone's drag to the frame
-  // itself after its first bounce, and the whole app slid with black under.
-  // (The top's drag is the kit's pull to refresh: orbit.mjs pullAnyway.)
-  let y0 = 0, x0 = 0, live = false, on = false, page = null;
-  const give = dy => 90 * (1 - Math.exp(-dy / 90));
-  b.addEventListener('touchstart', e => {
-    on = false;
-    live = e.touches.length === 1 && !e.target.closest?.('dialog[open], input, textarea, select, [contenteditable], .leaflet-container, [data-no-ptr], .q-tabbar');
-    if (live) ((x0 = e.touches[0].clientX), (y0 = e.touches[0].clientY));
-  }, { passive: true });
-  b.addEventListener('touchmove', e => {
-    if (!live || !e.cancelable) return;
-    const dy = e.touches[0].clientY - y0;
-    if (!on) {
-      if (Math.abs(e.touches[0].clientX - x0) > Math.abs(dy)) return void (live = false);
-      if (dy > -6) return;
-      if (!pastEnd(b.scrollTop, b.scrollHeight, b.clientHeight, dy) || roomIn(e.target, dy, d)) return void (live = false);
-      on = true;
-      page = d.querySelector('main') || b.firstElementChild;
-    }
-    e.preventDefault();
-    if (page) ((page.style.transition = 'none'), (page.style.transform = `translateY(${-Math.round(give(-dy - 6))}px)`));
-  }, { passive: false });
-  const back = () => {
-    live = false;
-    if (!on || !page) return;
-    on = false;
-    const p = page;
-    p.style.transition = 'transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)';
-    p.style.transform = '';
-    setTimeout(() => p.style.transform || (p.style.transition = ''), 340);
-  };
-  b.addEventListener('touchend', back);
-  b.addEventListener('touchcancel', back);
+  } catch {}
 }
-// A sheet open over the page: a swipe in it scrolls the sheet or nothing,
-// never the page behind it (Jay 11-14, the switcher's).
-function roomIn(el, dy, root) {
-  for (let n = el; n && n !== root.body && n !== root.documentElement; n = n.parentElement) {
-    if (n.scrollHeight <= n.clientHeight + 1) continue;
-    if (!/auto|scroll/.test(globalThis.getComputedStyle?.(n).overflowY || '')) continue;
-    if (!pastEnd(n.scrollTop, n.scrollHeight, n.clientHeight, dy)) return true;
-  }
-  return false;
-}
-// Dragged up past a sheet's foot, what's in it gives a little and comes back,
-// every time (Jay 11-15: in a Sports sheet "the bounce only happen once then
-// stuck": its first drag bounced natively, each one after started at the
-// foot and was held still here). The top's drag is the sheet's own swipe down.
+// A sheet open over the page: a drag in it scrolls the sheet (bouncing
+// natively at its ends, as every scroller does), or, in a sheet with nothing
+// to scroll, nothing: never the page behind it. Never a bounce made by hand
+// (Jay 11-15: "do not ever try to fake a bounce cause it never work").
 function sheetHold(root = document) {
   let x = 0;
   let y = 0;
-  let moved = [];
-  const give = dy => 90 * (1 - Math.exp(-dy / 90));
   root.addEventListener('touchstart', e => e.touches.length === 1 && ((x = e.touches[0].clientX), (y = e.touches[0].clientY)), { passive: true });
   root.addEventListener(
     'touchmove',
@@ -713,22 +664,18 @@ function sheetHold(root = document) {
       const d = e.target.closest?.('dialog[open]');
       if (!d) return;
       const dy = e.touches[0].clientY - y;
-      if (!dy || Math.abs(e.touches[0].clientX - x) > Math.abs(dy) || roomIn(e.target, dy, root)) return;
+      if (!dy || Math.abs(e.touches[0].clientX - x) > Math.abs(dy) || scrollsIn(e.target, d)) return;
       e.preventDefault();
-      if (dy >= 0 || e.target.closest('input, textarea, select, .leaflet-container')) return;
-      if (!moved.length) moved = [...d.children].filter(c => !c.matches('.q-sheet-head, .q-sheet-foot, .q-sheet-grab, form[method=dialog]'));
-      for (const c of moved) ((c.style.transition = 'none'), (c.style.transform = `translateY(${-Math.round(give(-dy))}px)`));
     },
     { passive: false }
   );
-  const back = () => {
-    const was = moved;
-    moved = [];
-    for (const c of was) ((c.style.transition = 'transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)'), (c.style.transform = ''));
-    setTimeout(() => was.forEach(c => c.style.transform || (c.style.transition = '')), 340);
-  };
-  root.addEventListener('touchend', back, { passive: true });
-  root.addEventListener('touchcancel', back, { passive: true });
+}
+// (Something between the finger and the sheet scrolls up and down.)
+function scrollsIn(el, stop) {
+  for (let n = el; n && n !== stop.parentElement; n = n.parentElement) {
+    if (n.scrollHeight > n.clientHeight + 1 && /auto|scroll/.test(globalThis.getComputedStyle?.(n).overflowY || '')) return true;
+  }
+  return false;
 }
 
 // This page is the address Orbit's window put up for the app it showed
