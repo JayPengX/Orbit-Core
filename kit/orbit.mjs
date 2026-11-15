@@ -2013,6 +2013,11 @@ function makeSession(app, { lang, heartbeat }) {
   // account's vault or makes it. Securities stays open: the Worker fills its
   // orders. `locked`: this device holds no key for the data it was sent.
   const sealable = () => !V.PLAIN_APPS.has(app) && V.supported();
+  // (The account's own vault and the wallet's parts, the look worn, its
+  // settings, are the account's, not this app's data: opened and locked in
+  // every app, Securities too, whose data alone stays plain. Jay 11-15: no
+  // ring, no avatar in Securities only.)
+  const vaultable = () => V.supported();
   let locked = false;
   const call = (...a) => ecoCall(...a).then(openReply);
   async function openReply(res) {
@@ -2073,7 +2078,7 @@ function makeSession(app, { lang, heartbeat }) {
   // new pass on a device that holds its key). → 'open' | 'made' | 'old' (the
   // pass is the account's, the vault an older pass's) | 'wrong' | ''.
   async function vaultPass(pass, { fresh = false } = {}) {
-    if (!sealable() || !pass) return '';
+    if (!vaultable() || !pass) return '';
     try {
       const v = wallet?.vault;
       if (v && !fresh) {
@@ -2205,7 +2210,7 @@ function makeSession(app, { lang, heartbeat }) {
     if (!w) return;
     rawWallet = w;
     const { wallet: opened, missing } = V.openParts(w, parts);
-    if (missing.length && sealable())
+    if (missing.length && vaultable())
       keyNow()
         .then(key => V.unlockParts(missing, key, parts))
         .then(() => rawWallet === w && setWallet(w))
@@ -2464,7 +2469,7 @@ function makeSession(app, { lang, heartbeat }) {
   s.rotate = ({ full = false } = {}) =>
     (async () => {
       // (A vault this device can't open would stay locked by the old pass: opened first, s.vault.)
-      if (wallet?.vault && sealable() && !(await keyNow())) {
+      if (wallet?.vault && vaultable() && !(await keyNow())) {
         const error = new Error('locked');
         error.code = 'ECO_VAULT_LOCKED';
         throw error;
@@ -2496,7 +2501,7 @@ function makeSession(app, { lang, heartbeat }) {
   // missing; eco.js ecoVaultKey.)
   s.mailRecover = (addr, code) =>
     signIn({ op: 'mail-recover', addr, code }).then(async res => {
-      if (sealable())
+      if (vaultable())
         await withToken(qt => ecoCall('POST', '', { op: 'vault-key', qt }))
           .then(async r => r?.key && r.id && V.holdKey(r.id, await crypto.subtle.importKey('raw', V.unb64(r.key), 'AES-GCM', true, ['encrypt', 'decrypt'])))
           .catch(() => null);
@@ -2542,7 +2547,7 @@ function makeSession(app, { lang, heartbeat }) {
       // sent open and locked by the Worker's next sweep: eco.js sealWalletParts.)
       // (Only for a patch that carries them: a save of the data alone never waits on the key twice.)
       const hasParts = patch && (Object.keys(patch.settings || {}).length || Object.keys(patch.snap || {}).length);
-      const key = hasParts && sealable() && wallet?.vault && !locked ? await keyNow() : null;
+      const key = hasParts && vaultable() && wallet?.vault && !locked ? await keyNow() : null;
       const shut = key ? await V.sealParts(patch, key, wallet.vault.id, parts) : patch;
       return call('POST', qs({ app }), { op: 'write', qt, payload: sent, wallet: shut, w: wallet ? walletAt : '', ...keep });
     }).then(res => {
