@@ -223,3 +223,29 @@ test('reset (owner only): the kept apps stay, every other app\'s data goes, devi
   const o = await t.call('GET', `${t.qt(c.data.token)}&app=orbit`);
   assert.ok(!o.data.payload, 'Class\'s schedule gone');
 });
+
+test('the vault: set only with the account’s own pass, replaced only by itself or on purpose; an open copy never goes over a locked one; a locked timetable is shared as the copy its phone sends', async () => {
+  const t = setup();
+  const a = await newPass(t, 'orbit');
+  const v = { v: 1, id: 'AbCdEfGhIjKl', rounds: 600000, salt: 'A'.repeat(22), iv: 'B'.repeat(16), pass: 'C'.repeat(64) };
+  assert.equal((await t.call('POST', '?app=orbit', { op: 'vault', qt: a.token, passcode: 'ZZZZZZZZZZ', vault: v })).status, 403, 'not its pass');
+  assert.equal((await t.call('POST', '?app=orbit', { op: 'vault', qt: a.token, passcode: a.passcode, vault: { ...v, rounds: 10 } })).status, 400);
+  const set = await t.call('POST', '?app=orbit', { op: 'vault', qt: a.token, passcode: a.passcode, vault: v });
+  assert.equal(set.status, 200);
+  assert.deepEqual(wallet(t).vault, v);
+  const other = await t.call('POST', '?app=orbit', { op: 'vault', qt: a.token, passcode: a.passcode, vault: { ...v, id: 'ZyXwVuTsRqPo' } });
+  assert.equal(other.status, 409);
+  assert.equal(other.data.vault.id, v.id, 'the one there comes back');
+  assert.equal((await t.call('POST', '?app=orbit', { op: 'vault', qt: a.token, passcode: a.passcode, vault: { ...v, pass: 'D'.repeat(64) } })).status, 200, 'itself locked again');
+  assert.equal((await t.call('POST', '?app=orbit', { op: 'vault', qt: a.token, passcode: a.passcode, vault: { ...v, id: 'ZyXwVuTsRqPo' }, fresh: true })).status, 200, 'a new one on purpose');
+  // Locked data: an open copy can't go over it; a locked one can.
+  assert.equal((await t.call('PATCH', `${t.qt(a.token)}&app=orbit`, { payload: 'e1:ZyXwVuTsRqPo:iv:data' })).status, 200);
+  const plain = await t.call('PATCH', `${t.qt(a.token)}&app=orbit`, { payload: '{"days":[]}' });
+  assert.equal(plain.data.error.code, 'ECO_PAYLOAD_LOCKED');
+  assert.equal((await t.call('PATCH', `${t.qt(a.token)}&app=orbit`, { payload: 'e1:ZyXwVuTsRqPo:iv2:data2' })).status, 200);
+  // Sharing: the locked one isn't, the copy sent is.
+  assert.equal((await t.call('POST', '?app=orbit', { op: 'share-create', qt: a.token })).data.error.code, 'ECO_NOTHING_TO_SHARE');
+  const made = await t.call('POST', '?app=orbit', { op: 'share-create', qt: a.token, payload: '{"days":[2]}' });
+  const b = await newPass(t, 'orbit');
+  assert.equal((await t.call('POST', '?app=orbit', { op: 'share-redeem', qt: b.token, key: made.data.key })).data.payload, '{"days":[2]}');
+});

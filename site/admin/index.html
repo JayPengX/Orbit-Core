@@ -1435,6 +1435,8 @@ async function openAccount(ref) {
 // every level folded, the first two open.
 async function unpackAny(v) {
   if (typeof v !== 'string') return v;
+  // (Locked on its owner's phone, kit vault.mjs: nobody else, this page included, can read it.)
+  if (v.startsWith('e1:')) return `🔒 已上鎖：只有本人的裝置打得開（${Math.round(v.length / 1024)} KB）`;
   const m = /^([a-z]+\d*):([A-Za-z0-9+/=]+)$/.exec(v);
   if (m && m[2].length > 16 && typeof DecompressionStream !== 'undefined') {
     try {

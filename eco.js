@@ -519,7 +519,8 @@ const OPS = {
   'mail-confirm': mailConfirm,
   'mail-remove': mailRemove,
   'mail-recover-begin': mailRecoverBegin,
-  'mail-recover': mailRecover
+  'mail-recover': mailRecover,
+  vault: ecoVault
 };
 
 export async function handleEcoRequest(request, env, headers, ip, deps, waitUntil = null) {
@@ -598,6 +599,7 @@ export async function handleEcoRequest(request, env, headers, ip, deps, waitUnti
       const coll = hasPayload && ECO_APPS[app].collection;
       const stored = hasPayload ? await deps.fsGet(env, coll, docId) : null;
       if (hasPayload && !savable(stored, body.payload)) return errorJson('ECO_PAYLOAD_INVALID', 400, headers, request);
+      if (hasPayload && overSealed(stored, body.payload)) return errorJson('ECO_PAYLOAD_LOCKED', 409, headers, request);
       const base = str(body.base, 64);
       if (base && base !== stored.updateTime) return json({ error: { code: 'ECO_DATA_CHANGED', message: 'ECO_DATA_CHANGED' }, updateTime: stored.updateTime }, 409, headers);
       const now = deps.now();
@@ -689,7 +691,11 @@ const asJson = text => {
 // (JSON is what parses as JSON: Class's schedule is `[ORBIT]…[/ORBIT]`, which
 // starts with `[` and isn't JSON. Taken for JSON, every save of a Class
 // schedule after the first was refused, ECO_PAYLOAD_INVALID, 2026-11-03.)
-export const savable = (stored, payload) => !stored?.exists || !/^\s*[[{]/.test(stored.payload) || !asJson(stored.payload) || asJson(payload);
+export const savable = (stored, payload) => !stored?.exists || !/^\s*[[{]/.test(stored.payload) || !asJson(stored.payload) || asJson(payload) || isSealed(payload);
+// An app's data locked on the phone (kit vault.mjs): only its owner's devices read it.
+export const isSealed = payload => typeof payload === 'string' && payload.startsWith('e1:');
+// (An open copy over a locked one: a device that couldn't read the data would write its empty state over it.)
+export const overSealed = (stored, payload) => Boolean(stored?.exists && isSealed(stored.payload) && !isSealed(payload));
 
 // (Read side by side, not one after another: up to 12 round trips to D1.)
 async function readInbox(env, deps, wallet, app) {
@@ -1123,6 +1129,42 @@ async function ecoRotate(ctx) {
   return signIn({ ...ctx, app: c.a }, docId, { passcode });
 }
 
+// ---- The vault: the data key, locked by the pass (kit vault.mjs) ----------------------
+//
+// { op: 'vault', qt, passcode, vault, fresh? }. Kept in the wallet as it
+// comes: only the pass opens it, and the Worker never sees the pass's key or
+// the data key. Set only with the account's own pass (a stolen session can't
+// lock the owner out with a pass of its own, and a mistyped pass is never
+// what locks it). A vault already there is replaced only by itself locked
+// again (a new pass: the same id) or, `fresh`, by a new one when the old
+// can't be opened any more (a lost pass): what it locked is then gone.
+const B64U = /^[A-Za-z0-9_-]+$/;
+export function cleanVault(v) {
+  if (!v || v.v !== 1) return null;
+  const ok = (x, min, max) => typeof x === 'string' && B64U.test(x) && x.length >= min && x.length <= max;
+  if (!ok(v.id, 8, 24) || !ok(v.salt, 16, 32) || !ok(v.iv, 12, 24) || !ok(v.pass, 40, 80)) return null;
+  if (!Number.isInteger(v.rounds) || v.rounds < 100_000 || v.rounds > 5_000_000) return null;
+  return { v: 1, id: v.id, rounds: v.rounds, salt: v.salt, iv: v.iv, pass: v.pass };
+}
+async function ecoVault(ctx) {
+  const { env, headers, deps, body, request } = ctx;
+  const c = await liveSession(ctx);
+  if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
+  if (sessionLimited(`vault:${c.s}`, 6, 60_000, deps.now())) return deps.errorJson('RATE_LIMITED', 429, headers, request);
+  const vault = cleanVault(body.vault);
+  if (!vault) return deps.errorJson('ECO_VAULT_INVALID', 400, headers, request);
+  const passcode = cleanCode(body.passcode);
+  const mine = ECO_PASSCODE_PATTERN.test(passcode) && (await passAccount(env, deps, passcode)) === c.d;
+  if (!mine) return deps.errorJson('INVALID_PASSCODE', 403, headers, request);
+  let clash = null;
+  const result = await updateWallet(env, deps, c.d, w => {
+    clash = w.vault && w.vault.id !== vault.id && !body.fresh ? w.vault : null;
+    return clash ? w : { ...w, vault };
+  });
+  if (clash) return deps.json({ error: { code: 'ECO_VAULT_EXISTS', message: 'ECO_VAULT_EXISTS' }, vault: clash }, 409, headers);
+  return deps.json({ ok: true, vault: result?.wallet?.vault || vault }, 200, headers);
+}
+
 // ---- Orbit Class: a schedule others can copy --------------------------------------
 //
 // The schedule belongs to the pass that made it: only that pass edits it.
@@ -1130,7 +1172,7 @@ async function ecoRotate(ctx) {
 // gets its own copy of the schedule as it is then.
 
 async function shareCreate(ctx) {
-  const { env, headers, deps, request } = ctx;
+  const { env, headers, deps, request, body = {} } = ctx;
   const c = await liveSession(ctx);
   if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
   if (sessionLimited(`sh:${c.s}`, 10, 60_000, deps.now())) return deps.errorJson('RATE_LIMITED', 429, headers, request);
@@ -1138,7 +1180,10 @@ async function shareCreate(ctx) {
   if (!doc.exists) return deps.errorJson('ECO_NOTHING_TO_SHARE', 404, headers, request);
   const key = deps.generateCode(8);
   const exp = deps.now() + SHARE_MS;
-  await deps.fsWrite(env, SHARE_COLLECTION, key, JSON.stringify({ owner: c.d, exp }));
+  // (A timetable locked on the phone (kit vault.mjs) is shared as the copy the phone sends, open on purpose.)
+  const copy = typeof body.payload === 'string' && body.payload.length <= ECO_APPS.orbit.maxPayload && !isSealed(body.payload) ? body.payload : '';
+  if (!copy && isSealed(doc.payload)) return deps.errorJson('ECO_NOTHING_TO_SHARE', 404, headers, request);
+  await deps.fsWrite(env, SHARE_COLLECTION, key, JSON.stringify({ owner: c.d, exp, ...(copy ? { payload: copy } : {}) }));
   return deps.json({ key, exp }, 200, headers);
 }
 
@@ -1156,8 +1201,9 @@ async function shareRedeem(ctx) {
     share = doc.exists ? JSON.parse(doc.payload) : null;
   } catch {}
   if (!share?.owner || !(share.exp > deps.now())) return deps.errorJson('ECO_SHARE_NOT_FOUND', 404, headers, request);
+  if (share.payload) return deps.json({ payload: share.payload, own: share.owner === c.d }, 200, headers);
   const schedule = await deps.fsGet(env, ECO_APPS.orbit.collection, share.owner);
-  if (!schedule.exists) return deps.errorJson('ECO_SHARE_NOT_FOUND', 404, headers, request);
+  if (!schedule.exists || isSealed(schedule.payload)) return deps.errorJson('ECO_SHARE_NOT_FOUND', 404, headers, request);
   return deps.json({ payload: schedule.payload, own: share.owner === c.d }, 200, headers);
 }
 
