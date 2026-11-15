@@ -4142,12 +4142,15 @@ dialog {
   padding-inline: 6px;
   white-space: nowrap;
 }
+/* (A plain layer, not above everything: at the page's highest it left an
+   iPad's pinned glass bars in Orbit's frame unpainted, still answering taps,
+   on the account recording; Jay 11-15.) */
 html.q-recording body::after {
   content: '';
   position: fixed;
   top: calc(env(safe-area-inset-top) + 4px);
   left: 50%;
-  z-index: 2147483647;
+  z-index: 70;
   width: 7px;
   height: 7px;
   margin-left: -3.5px;
@@ -7459,7 +7462,8 @@ html[data-look='native'] :is(.q-reorder-lift, .q-reorder-land) {
 /* ---- 測試工具 (testtools.mjs): the tester's pill and sheet, only once unlocked ---- */
 .q-test-pill {
   position: fixed;
-  z-index: 2147482000;
+  /* (A plain layer: see html.q-recording body::after.) */
+  z-index: 72;
   left: var(--q-mid, 50%);
   top: calc(var(--q-top, env(safe-area-inset-top)) + 4px);
   transform: translateX(-50%);
@@ -7688,6 +7692,29 @@ html.q-tabrail .q-appbar .q-actions > .q-suite .q-suite-btn img {
 }
 html.q-tabrail.q-desk .q-appbar .q-actions > .q-suite .q-suite-btn img {
   --q-sw-i: 32px;
+}
+/* (Its ⌄ a small badge on the icon's corner, not beside it: beside, it pushed
+   this app's icon off the column the others stand in; Jay 11-15 "ugly".) */
+html.q-tabrail .q-appbar .q-actions > .q-suite .q-suite-switch {
+  position: relative;
+}
+html.q-tabrail .q-appbar .q-actions > .q-suite .q-suite-switch .q-suite-chev {
+  position: absolute;
+  left: calc(50% + var(--q-sw-i, 32px) / 2 - 11px);
+  bottom: calc(50% - var(--q-sw-i, 32px) / 2 - 2px);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--q-glass-strong);
+  box-shadow: 0 0 0 1.5px var(--q-page);
+  color: var(--q-label);
+}
+html.q-tabrail .q-appbar .q-actions > .q-suite .q-suite-switch .q-suite-chev svg {
+  width: 8px;
+  height: 8px;
+}
+html.q-tabrail .q-appbar .q-actions > .q-suite .q-suite-switch {
+  --q-sw-i: calc(var(--q-tabrail-face, 36px) - 4px);
 }
 /* (Short of room: forward, then back, kept to the sheet; at the least this
    app beside the account, never over a tab. suite.mjs fit().) */
@@ -8177,3 +8204,4 @@ html.q-tabrail .q-suite-dot {
 html:not(.q-desk) .q-suite-desk {
   display: none;
 }
+

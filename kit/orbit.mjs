@@ -1875,8 +1875,10 @@ function watchScreen() {
   const turned = () => (again(), [150, 450, 1000].forEach(ms => setTimeout(again, ms)));
   globalThis.screen?.orientation?.addEventListener?.('change', turned);
   globalThis.addEventListener?.('orientationchange', turned);
-  // (And whenever the page's own box changes size, however it was told.)
-  if (typeof ResizeObserver === 'function') new ResizeObserver(again).observe(document.documentElement);
+  // (Not on every change of the page's own box: on an iPad in Orbit's frame
+  // that measured, laid out and measured again without end, the tab bar's
+  // entrance restarting, the rail, the account and the switcher invisible yet
+  // answering taps, on every pass; Jay 11-15.)
   // (Shown again: an app in Orbit's window hidden as a tab, or the phone's
   // screen back on. A size change while hidden went unmeasured on an iPad,
   // the app laid out for the old one, its tab bar gone; Jay 11-14.)
@@ -7037,7 +7039,20 @@ function layoutNow() {
     }
   } catch {}
   const mq = q => Boolean(globalThis.matchMedia?.(q).matches);
+  // What is on top where the tab bar's first tab is, in this page and in Orbit's window.
+  const name = e => (e ? `${e.tagName.toLowerCase()}${e.id ? `#${e.id}` : ''}${typeof e.className === 'string' && e.className ? `.${e.className.trim().split(/\s+/).slice(0, 3).join('.')}` : ''}` : '');
+  let onTop = null;
+  try {
+    const t = document.querySelector('.q-tabbar .q-tab')?.getBoundingClientRect();
+    if (t) {
+      const x = t.left + t.width / 2, y = t.top + t.height / 2;
+      const f = globalThis.frameElement?.getBoundingClientRect();
+      const up = f ? globalThis.top.document.elementFromPoint(f.left + x, f.top + y) : null;
+      onTop = { here: name(document.elementFromPoint(x, y)), orbit: f ? name(up) : '', orbitStyle: up && up !== globalThis.frameElement ? (c => `${c.position} z${c.zIndex} bg ${c.backgroundColor} pe ${c.pointerEvents} op ${c.opacity}`)(getComputedStyle(up)) : '' };
+    }
+  } catch {}
   return {
+    onTop,
     cls: document.documentElement.className,
     vv: globalThis.visualViewport ? `${Math.round(visualViewport.width)}x${Math.round(visualViewport.height)}+${Math.round(visualViewport.offsetTop)}` : '',
     pointer: mq('(pointer: coarse)') ? 'coarse' : mq('(pointer: fine)') ? 'fine' : '',
