@@ -1210,8 +1210,59 @@ export async function vaultOfAccount(env, deps, docId) {
   const after = parseWallet((await deps.fsGet(env, WALLET_COLLECTION, docId)).payload);
   return after?.vault ? { id: after.vault.id, key: await keyOfVault(env, after.vault) } : null;
 }
+// Data sealed under a vault the wallet no longer names (Jay 11-15: the
+// wallet's vault replaced after the sweep sealed, every device opening
+// nothing): opened with that vault's recovery copy as a kept version of the
+// wallet holds it (`old`: { id: vault }), sealed again under the wallet's own.
+// Nothing written unless `go`. → [{ app, from, to, size, done | why }].
+export async function rekeyAccount(env, deps, docId, old, go = false) {
+  const w = parseWallet((await deps.fsGet(env, WALLET_COLLECTION, docId)).payload);
+  const now = w?.vault;
+  const to = now?.escrow ? await keyOfVault(env, now) : null;
+  const out = [];
+  for (const [app, { collection }] of Object.entries(ECO_APPS)) {
+    const doc = await deps.fsGet(env, collection, docId).catch(() => null);
+    if (!doc?.exists || !isSealed(doc.payload)) continue;
+    const [, id, iv, data] = doc.payload.split(':');
+    if (id === now?.id) continue;
+    const row = { app, from: id, to: now?.id || null, size: doc.payload.length };
+    out.push(row);
+    const v = old[id];
+    if (!v?.escrow) {
+      row.why = 'no kept copy of that vault';
+      continue;
+    }
+    if (!to) {
+      row.why = 'the wallet has no vault to seal under';
+      continue;
+    }
+    try {
+      const raw = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64u(v.escrow.iv) }, await escrowKey(env), unb64u(v.escrow.key));
+      const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+      const packed = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64u(iv) }, key, unb64u(data)));
+      const plain = new TextDecoder().decode(await new Response(new Blob([packed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+      row.plain = plain.length;
+      if (go) {
+        await deps.fsWrite(env, collection, docId, await sealText(to, now.id, plain), { updateTime: doc.updateTime }, { why: 'rekey' });
+        row.done = true;
+      }
+    } catch (e) {
+      row.why = `not opened: ${String(e?.message || e).slice(0, 80)}`;
+    }
+  }
+  return out;
+}
 // Each app's data of the account sealed, where it isn't yet. → how many.
 export async function sealAccount(env, deps, docId) {
+  // (Never a new vault over data already sealed under one: that data would open
+  // with nothing, Jay 11-15. Left as it is, for rekeyAccount.)
+  const had = parseWallet((await deps.fsGet(env, WALLET_COLLECTION, docId)).payload);
+  if (!had?.vault) {
+    for (const [app, { collection }] of Object.entries(ECO_APPS)) {
+      if (SEAL_PLAIN.has(app)) continue;
+      if (isSealed((await deps.fsGet(env, collection, docId).catch(() => null))?.payload)) return 0;
+    }
+  }
   const v = await vaultOfAccount(env, deps, docId);
   if (!v?.key) return 0;
   let n = 0;

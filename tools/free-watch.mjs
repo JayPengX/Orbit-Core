@@ -134,6 +134,13 @@ async function trace() {
     for (const k of a.kept) console.log(`   kept ${k.join(' ')}`);
   }
 }
+// (REKEY=<account>[:go], a run by hand: ops rekey, eco.js rekeyAccount.)
+async function rekey() {
+  if (!process.env.REKEY || !process.env.DATA_PUSH_SECRET) return;
+  const [acct, go] = process.env.REKEY.split(':');
+  const r = await get(`https://orbit-workers-proxy.pengzjay.workers.dev/ops?check=rekey&acct=${encodeURIComponent(acct)}${go === 'go' ? '&go=1' : ''}`, { json: true, secret: process.env.DATA_PUSH_SECRET });
+  console.log('rekey', JSON.stringify(r?.body ?? r?.text));
+}
 async function aiMoney() {
   const secret = process.env.DATA_PUSH_SECRET;
   if (!secret) return notes.push('AI money: not checked (no DATA_PUSH_SECRET)');
@@ -162,6 +169,7 @@ await beats();
 await aiMoney();
 await vault();
 await trace();
+await rekey();
 
 const out = [`# Orbit on the free plans: ${problems.length ? `${problems.length} problem${problems.length > 1 ? 's' : ''}` : 'all well'}`, '', ...problems.map(p => `- ❌ ${p}`), ...(problems.length ? [''] : []), ...notes.map(n => `- ${n}`)].join('\n');
 console.log(out);

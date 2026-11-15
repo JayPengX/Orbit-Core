@@ -46,7 +46,7 @@ import { handleLawAudio } from './law-audio.js';
 import { handleLawLive } from './law-live.js';
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
-import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, stampLevels, fullSession, sealSweep } from './eco.js';
+import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, stampLevels, fullSession, sealSweep, rekeyAccount } from './eco.js';
 import { aiSpend, aiMay } from './ai-allow.js';
 import { checkStock } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
@@ -1628,7 +1628,7 @@ async function route(request, env, ctx, headers, origin) {
       const since = Date.now() - Math.min(240, Number(new URL(request.url).searchParams.get('hours')) || 24) * 3_600_000;
       const form = p => (typeof p !== 'string' ? typeof p : p.startsWith('e1:') ? `e1:${p.split(':')[1]?.slice(0, 6)}` : p.slice(0, 3));
       const docs = (await env.STORE.prepare('SELECT coll, id, updated, substr(payload, 1, 40) AS head, length(payload) AS size FROM docs WHERE coll IN (' + [WALLET_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)].map(() => '?').join(',') + ')').bind(WALLET_COLLECTION, ...Object.values(ECO_APPS).map(a => a.collection)).all()).results || [];
-      const hist = (await env.STORE.prepare('SELECT coll, id, updated, at, why, substr(payload, 1, 40) AS head, length(payload) AS size FROM history WHERE at > ? ORDER BY at').bind(since).all()).results || [];
+      const hist = (await env.STORE.prepare("SELECT coll, id, updated, at, why, substr(payload, 1, 40) AS head, length(payload) AS size, CASE WHEN coll = ? AND json_valid(payload) THEN json_extract(payload, '$.vault.id') END AS vid FROM history WHERE at > ? ORDER BY at").bind(WALLET_COLLECTION, since).all()).results || [];
       const wallets = Object.fromEntries((await ECO_DEPS.fsList(env, WALLET_COLLECTION, 2000)).map(w => {
         let x = null;
         try { x = JSON.parse(w.payload); } catch {}
@@ -1640,10 +1640,31 @@ async function route(request, env, ctx, headers, origin) {
           created: w?.created, vault: w?.vault ? { id: String(w.vault.id).slice(0, 6), sealed: w.vault.sealed || null, escrow: Boolean(w.vault.escrow), pass: Boolean(w.vault.pass) } : null,
           settings: Object.keys(w?.settings || {}), entries: (w?.entries || []).length, apps: Object.fromEntries(Object.entries(w?.apps || {}).map(([a, x]) => [a, x?.last])), live: Object.fromEntries(Object.entries(w?.live || {}).map(([a, x]) => [a, x?.t])), passkeys: (w?.passkeys?.keys || []).length,
           docs: docs.filter(d => d.id === id).map(d => [d.coll, d.updated, d.size, form(d.head)]),
-          kept: hist.filter(h => h.id === id).map(h => [new Date(h.at).toISOString().slice(5, 19), h.coll, h.why, h.size, form(h.head)])
+          kept: hist.filter(h => h.id === id).map(h => [new Date(h.at).toISOString().slice(5, 19), h.coll, h.why, h.size, form(h.head), ...(h.coll === WALLET_COLLECTION ? [`vault ${String(h.vid || 'none').slice(0, 6)}`] : [])])
         };
       }
       return json(out, 200, headers);
+    }
+    // Data sealed under a vault its wallet no longer names, opened with that vault's kept copy
+    // (a kept version of the wallet) and sealed under the wallet's own (eco.js rekeyAccount).
+    // ?acct=<8 characters>; &go=1 writes (each version replaced kept), else only says what it would do.
+    if (check === 'rekey') {
+      if (!env.STORE) return json({ d1: false }, 200, headers);
+      const sp = new URL(request.url).searchParams;
+      const ref = String(sp.get('acct') || '');
+      const hits = (await ECO_DEPS.fsList(env, WALLET_COLLECTION, 2000)).filter(w => ref.length >= 6 && w.id.startsWith(ref));
+      if (hits.length !== 1) return json({ error: 'one account', found: hits.length }, 200, headers);
+      const id = hits[0].id;
+      const rows = (await env.STORE.prepare('SELECT payload FROM history WHERE coll = ? AND id = ? ORDER BY at DESC LIMIT 400').bind(WALLET_COLLECTION, id).all()).results || [];
+      const old = {};
+      for (const r of rows) {
+        try {
+          const v = JSON.parse(r.payload)?.vault;
+          if (v?.id && v.escrow && !old[v.id]) old[v.id] = v;
+        } catch {}
+      }
+      const done = await rekeyAccount(env, ECO_DEPS, id, old, sp.get('go') === '1');
+      return json({ acct: id.slice(0, 8), vaults: Object.keys(old).map(x => x.slice(0, 6)), done: done.map(d => ({ ...d, from: d.from?.slice(0, 6), to: d.to?.slice(0, 6) })) }, 200, headers);
     }
     // The vault sweep (docs/PRIVACY.md): how many accounts are sealed; ?now=1 runs it first.
     if (check === 'vault') {

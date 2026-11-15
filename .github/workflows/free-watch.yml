@@ -13,6 +13,10 @@ on:
         description: 'Hours of saves to trace (ops trace), empty for none'
         required: false
         default: ''
+      rekey:
+        description: 'An account to rekey (ops rekey): <8 chars>, or <8 chars>:go to write'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -33,3 +37,4 @@ jobs:
         env:
           DATA_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET }}
           TRACE: ${{ inputs.trace }}
+          REKEY: ${{ inputs.rekey }}
