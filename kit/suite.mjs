@@ -755,7 +755,8 @@ const alone = () => {
 // it a one-app Orbit), and once in a few seconds at most, so a broken Orbit
 // page never bounces back and forth.
 export function intoOrbit({ standalone = false, phone = false } = {}) {
-  if (typeof document === 'undefined' || !appAt(location.pathname) || !alone() || (phone && !standalone)) return false;
+  if (typeof document === 'undefined' || !appAt(location.pathname) || !alone() || !standalone) return false;
+  // (A computer's browser stays on the app's own address, its Orbit beside it, Jay 11-15.)
   try {
     if (Date.now() - (Number(sessionStorage.getItem('orbit.into')) || 0) < 8000) return false;
     sessionStorage.setItem('orbit.into', String(Date.now()));

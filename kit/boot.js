@@ -33,8 +33,7 @@
   try {
     var nav = navigator, ua = nav.userAgent || '';
     var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || nav.standalone === true;
-    var phone = /iPhone|iPad|iPod|Android/i.test(ua) || (/Macintosh/.test(ua) && nav.maxTouchPoints > 1);
-    if (window.top !== window || nav.webdriver || /[?&]solo\b/.test(location.search) || (phone && !standalone)) return;
+    if (window.top !== window || nav.webdriver || /[?&]solo\b/.test(location.search) || !standalone) return;
     if (!/^\/(sports|transit|weather|class|money|news|words|beats|law|securities)(\/|$)/i.test(location.pathname)) return;
     if (Date.now() - (Number(sessionStorage.getItem('orbit.into')) || 0) < 8000) return;
     var el = document.documentElement;
