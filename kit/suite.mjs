@@ -696,19 +696,39 @@ function roomIn(el, dy, root) {
   }
   return false;
 }
+// Dragged up past a sheet's foot, what's in it gives a little and comes back,
+// every time (Jay 11-15: in a Sports sheet "the bounce only happen once then
+// stuck": its first drag bounced natively, each one after started at the
+// foot and was held still here). The top's drag is the sheet's own swipe down.
 function sheetHold(root = document) {
   let x = 0;
   let y = 0;
+  let moved = [];
+  const give = dy => 90 * (1 - Math.exp(-dy / 90));
   root.addEventListener('touchstart', e => e.touches.length === 1 && ((x = e.touches[0].clientX), (y = e.touches[0].clientY)), { passive: true });
   root.addEventListener(
     'touchmove',
     e => {
-      if (e.touches.length !== 1 || !e.cancelable || !e.target.closest?.('dialog[open]')) return;
+      if (e.touches.length !== 1 || !e.cancelable) return;
+      const d = e.target.closest?.('dialog[open]');
+      if (!d) return;
       const dy = e.touches[0].clientY - y;
-      if (dy && Math.abs(e.touches[0].clientX - x) <= Math.abs(dy) && !roomIn(e.target, dy, root)) e.preventDefault();
+      if (!dy || Math.abs(e.touches[0].clientX - x) > Math.abs(dy) || roomIn(e.target, dy, root)) return;
+      e.preventDefault();
+      if (dy >= 0 || e.target.closest('input, textarea, select, .leaflet-container')) return;
+      if (!moved.length) moved = [...d.children].filter(c => !c.matches('.q-sheet-head, .q-sheet-foot, .q-sheet-grab, form[method=dialog]'));
+      for (const c of moved) ((c.style.transition = 'none'), (c.style.transform = `translateY(${-Math.round(give(-dy))}px)`));
     },
     { passive: false }
   );
+  const back = () => {
+    const was = moved;
+    moved = [];
+    for (const c of was) ((c.style.transition = 'transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)'), (c.style.transform = ''));
+    setTimeout(() => was.forEach(c => c.style.transform || (c.style.transition = '')), 340);
+  };
+  root.addEventListener('touchend', back, { passive: true });
+  root.addEventListener('touchcancel', back, { passive: true });
 }
 
 // This page is the address Orbit's window put up for the app it showed
@@ -1094,18 +1114,14 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
   // under (Jay 2026-11-14, Law). Put back at once, whatever moved it.
   //
   // Typing in an app (Jay 11-15: Money's 記一筆 and 備註, Law: "the whole UI
-  // breaks … typing will just have the screen flashing"): the keys are seen
-  // by the visible part's height against its height before typing (Safari
-  // keeps the page and slides it; a home-screen app on iOS 26 shrinks the page
-  // but can leave fixed boxes at full height, WebKit 297779), never by
-  // innerHeight alone. With a field in the shown app and the keys up, the
-  // frames get exactly the part left above them, at the top, and iOS's slide
-  // of the window is put back: the app lays itself out to that height and
-  // brings its field into view inside it (orbit.mjs watchKeyboard), so iOS
-  // has nothing left to slide to. Followed instead of put back only past a
-  // few tries for one field (11-14: following every slide, the frame moved,
-  // iOS slid again, and the screen flashed; putting back with the frame left
-  // full height, the field stayed under the keys).
+  // breaks … typing will just have the screen flashing"): the frames keep the
+  // size they had before typing, at the top (shrunk to the room above the keys
+  // they were wider than tall, and an app drew its phone-on-its-side layout,
+  // Jay 11-15 again; a home-screen app on iOS 26 shrinks the page itself), and
+  // iOS's slide of the window is put back, a few times at most for one field.
+  // The app inside reads how far the keys reach up its frame from this window
+  // (orbit.mjs watchKeyboard keysCover) and brings its field above them, so
+  // iOS has nothing left to slide to.
   const vv = globalThis.visualViewport;
   const typingEl = el => Boolean(el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable) && !/^(checkbox|radio|range|button|submit|reset|color|file|hidden|image)$/.test(el.type) && !el.readOnly);
   const frameField = () => {
@@ -1122,7 +1138,8 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
     if (!vv) return;
     const w = globalThis.innerWidth;
     if (w !== baseW) ((baseW = w), (base = 0));
-    const el = frameField();
+    // (A phone's or tablet's keys only: a computer's window resized while typing keeps its frames' fit.)
+    const el = globalThis.matchMedia?.('(pointer: coarse)').matches ? frameField() : null;
     if (!el) base = Math.max(Math.round(vv.height), Math.round(globalThis.innerHeight));
     else base = Math.max(base, globalThis.innerHeight);
     const kb = Boolean(el) && base - vv.height > 80;
@@ -1133,13 +1150,12 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
       globalThis.scrollTo(0, 0);
       if (vv.offsetTop <= 1) return void requestAnimationFrame(fit);
     }
-    const now = kb ? `${backs >= 3 ? Math.round(vv.offsetTop) : 0}/${Math.round(vv.height)}` : '';
+    const now = el ? String(base) : '';
     if (now === was) return;
     was = now;
-    const [t, h] = now.split('/');
-    box.style.top = kb ? `${t}px` : '';
-    box.style.height = kb ? `${h}px` : '';
-    box.style.bottom = kb ? 'auto' : '';
+    box.style.top = el ? '0px' : '';
+    box.style.height = el ? `${base}px` : '';
+    box.style.bottom = el ? 'auto' : '';
   };
   const still = () => {
     if (frameField()) return fit();

@@ -24,7 +24,7 @@ export const HELP = {
         '每個 App 右上角的頭像就是 Orbit Pass 的入口。'
       ]],
       ['install', '加入主畫面', [
-        'iPhone、iPad 用 Safari：點分享鍵（iOS 26 先點網址列旁的 ⋯，再點「分享」），往下滑點「加入主畫面」，再點「加入」。iPhone 上的 Chrome 也可以：網址列右邊的分享鍵 →「加入主畫面」。',
+        'iPhone、iPad 用 Safari：點分享鍵（iOS 26 先點網址列左邊的頁面選單或右邊的 ⋯，再點「分享」），往下滑點「加入主畫面」，再點「加入」。iPhone 上的 Chrome 也可以：網址列右邊的分享鍵 →「加入主畫面」。',
         'Android 用 Chrome：點右上角 ⋮ →「安裝應用程式」或「加到主畫面」，選「安裝」，不要選「建立捷徑」。三星網際網路：右下角 ≡ →「新增頁面至」→「主螢幕」。',
         '在 LINE、Instagram、Facebook 裡點開的連結不能加入主畫面：先點右上角的選單，選「用瀏覽器開啟」，再照上面的步驟。',
         '電腦不用安裝，直接在瀏覽器打開。想要自己的視窗：Chrome、Edge 點網址列右邊的安裝圖示；Mac 的 Safari 選「檔案」→「加入 Dock」。',
@@ -65,7 +65,7 @@ export const HELP = {
         'The avatar at the top right of every app opens the Orbit Pass.'
       ]],
       ['install', 'Adding to the home screen', [
-        'iPhone and iPad, in Safari: tap Share (on iOS 26, tap ⋯ beside the address bar, then “Share”), scroll down to “Add to Home Screen”, then tap “Add”. Chrome on iPhone works too: Share at the right of the address bar → “Add to Home Screen”.',
+        'iPhone and iPad, in Safari: tap Share (on iOS 26, tap the page menu at the left of the address bar or ⋯ at its right, then “Share”), scroll down to “Add to Home Screen”, then tap “Add”. Chrome on iPhone works too: Share at the right of the address bar → “Add to Home Screen”.',
         'Android, in Chrome: tap ⋮ at the top right → “Install app” or “Add to Home screen”, and choose “Install”, not “Create shortcut”. Samsung Internet: ≡ at the bottom right → “Add page to” → “Home screen”.',
         'A link opened inside LINE, Instagram or Facebook can’t be added: tap the menu at the top right, choose “Open in browser”, then follow the steps above.',
         'On a computer there’s nothing to install: just use the browser. For a window of its own: in Chrome or Edge, tap the install icon at the right of the address bar; in Safari on a Mac, choose File → “Add to Dock”.',

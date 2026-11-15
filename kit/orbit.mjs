@@ -4597,7 +4597,9 @@ const GLYPHS = {
   add: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8.5v7M8.5 12h7"/>',
   dots: '<circle cx="6" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
   kebab: '<circle cx="12" cy="6" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="18" r="1.6" fill="currentColor" stroke="none"/>',
-  menu: '<path d="M5 7h14M5 12h14M5 17h14"/>'
+  menu: '<path d="M5 7h14M5 12h14M5 17h14"/>',
+  // (Safari's page menu, at the left of its address field on a newer iOS 26: a piece and two lines.)
+  page: '<rect x="4" y="4.5" width="7" height="5" rx="1.2" fill="currentColor" stroke="none"/><path d="M4 14h15M4 19h11"/>'
 };
 const glyph = (name, cls = 'q-glyph') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${GLYPHS[name]}</svg>`;
 // What each way says: a picture of where the first tap is (`spot` on a
@@ -4617,8 +4619,9 @@ export function installSteps({ way, app, v26 } = {}, name = 'Orbit', en = false)
   switch (way) {
     case 'ios-safari':
       return { spot: 'bottom', tap: 'share', steps: en ? ['Tap Share {share} in the middle of the bar at the bottom.', pickAdd, addSheet, open] : ['點下方工具列中間的分享鍵 {share}。', pickAdd, addSheet, open] };
+    // (Newer iOS 26: the page menu {page} at the address field's left, no ⋯ beside it, Jay 11-15; the first 26 had ⋯ at its right.)
     case 'ios-safari-26':
-      return { spot: 'bottom-right', tap: 'dots', steps: en ? ['Tap {dots} beside the address bar, then “Share” {share}.', pickAdd, addSheet, open] : ['點網址列旁的 {dots}，再點「分享」{share}。', pickAdd, addSheet, open] };
+      return { spot: 'bottom-left', tap: 'page', steps: en ? ['Tap {page} at the left of the address bar (or {dots} at its right), then “Share” {share}.', pickAdd, addSheet, open] : ['點網址列左邊的 {page}（或右邊的 {dots}），再點「分享」{share}。', pickAdd, addSheet, open] };
     case 'ipad-safari':
       return { spot: 'top-right', tap: 'share', steps: en ? ['Tap Share {share} at the top right.', pickAdd, addSheet, open] : ['點右上角的分享鍵 {share}。', pickAdd, addSheet, open] };
     case 'ios-chrome':
@@ -4693,7 +4696,7 @@ const stepItem = text =>
 // bottom, and the button there, ringed.
 function tapPicture(spot, tap) {
   const top = spot === 'top-right';
-  const x = spot === 'bottom' ? 60 : 92;
+  const x = spot === 'bottom' ? 60 : spot === 'bottom-left' ? 30 : 92;
   const y = top ? 36 : 176;
   const bar = top ? '<rect x="18" y="24" width="84" height="24" rx="8" class="q-tap-bar"/>' : '<rect x="18" y="164" width="84" height="24" rx="8" class="q-tap-bar"/>';
   const lines = [64, 82, 100, 118, 136].map((ly, i) => `<rect x="28" y="${top ? ly : ly - 34}" width="${[64, 48, 58, 40, 52][i]}" height="7" rx="3.5" class="q-tap-line"/>`).join('');
@@ -5346,6 +5349,26 @@ function watchKeyboard() {
   globalThis.__orbitKeyboard = true;
   const root = document.documentElement;
   let frame = 0;
+  // Held in Orbit's window (kit suite.mjs): the frame keeps its size while the
+  // keys are up (shrunk to the room above them, it was wider than tall and an
+  // app drew its phone-on-its-side layout, Money's 記一筆 in half its width:
+  // Jay 11-15), and its own visible part never changes; how far the keys
+  // reach up the frame is read from Orbit's window instead: the frame's foot
+  // less the foot of what Orbit's window shows.
+  const hostFrame = () => {
+    try {
+      return globalThis.frameElement && globalThis.top !== globalThis && globalThis.top.location.origin === location.origin && globalThis.top.visualViewport ? globalThis.frameElement : null;
+    } catch {
+      return null;
+    }
+  };
+  const inFrame = () => Boolean(hostFrame());
+  const keysCover = () => {
+    const f = hostFrame();
+    const tv = globalThis.top.visualViewport;
+    return Math.max(0, Math.round(f.getBoundingClientRect().bottom - (tv.offsetTop + tv.height)));
+  };
+  const keysNow = () => (inFrame() ? keysCover() : Math.max(0, Math.round(globalThis.innerHeight - vv.height)));
   // The page's height before any typing, at this width (an iPhone turned resets it).
   let full = 0, fullW = 0;
   const typing = () => {
@@ -5361,8 +5384,9 @@ function watchKeyboard() {
     // The keys' own height, and what they cover at the foot once iOS's slide
     // (vv.offsetTop) is put back, as lift() does. (Less the slide, read
     // mid-slide and held, a sheet stayed 126px low with its button under the
-    // keys: Jay 2026-10-23, 選擇玩法.)
-    const keys = Math.max(0, Math.round(globalThis.innerHeight - vv.height));
+    // keys: Jay 2026-10-23, 選擇玩法.) In Orbit's frame, how far the keys
+    // reach up the frame, read from Orbit's window (keysCover).
+    const keys = keysNow();
     const up = (keys > 80 || shrunk > 80) && now;
     // Held while the same field is typed in: iOS's slide moves as the page
     // answers it, and a sheet lifted by each new reading moved, iOS slid
@@ -5371,7 +5395,7 @@ function watchKeyboard() {
     // that really changed height (more than 60px).
     const el = document.activeElement;
     if (!up) held = null;
-    else if (!held || held.el !== el || Math.abs(held.keys - keys) > 60) held = { el, keys, vvh: Math.round(vv.height), lift: true, backs: 0 };
+    else if (!held || held.el !== el || Math.abs(held.keys - keys) > 60) held = { el, keys, vvh: Math.round(inFrame() ? globalThis.innerHeight - keys : vv.height), lift: true, backs: 0 };
     if (held && held.foot == null) held.foot = keysFoot();
     root.style.setProperty('--q-kb', `${held ? held.keys : 0}px`);
     root.style.setProperty('--q-kb-foot', `${held ? held.foot : 0}px`);
@@ -5407,7 +5431,7 @@ function watchKeyboard() {
     }
   };
   // (How far the keys' top is above the page's own foot: iOS's slide of the page (offsetTop) counted, so a bar fixed at the foot lands on the keys, never above them or under.)
-  const keysFoot = () => Math.max(0, Math.round(globalThis.innerHeight - vv.height - vv.offsetTop));
+  const keysFoot = () => (inFrame() ? keysCover() : Math.max(0, Math.round(globalThis.innerHeight - vv.height - vv.offsetTop)));
   const unslide = () => globalThis.scrollTo?.(globalThis.scrollX, Math.max(0, globalThis.scrollY - vv.offsetTop));
   // (The screen's foot: what the visible part reaches.)
   const footGap = () => {
@@ -5473,10 +5497,11 @@ function watchKeyboard() {
     const el = document.activeElement;
     if (!held || held.el !== el || !typing() || held.settles >= 2) return;
     held.settles = (held.settles || 0) + 1;
-    const keys = Math.max(0, Math.round(globalThis.innerHeight - vv.height));
-    if (Math.abs(keys - held.keys) > 8 || Math.abs(Math.round(vv.height) - held.vvh) > 8) {
+    const keys = keysNow();
+    const vvh = Math.round(inFrame() ? globalThis.innerHeight - keys : vv.height);
+    if (Math.abs(keys - held.keys) > 8 || Math.abs(vvh - held.vvh) > 8) {
       held.keys = keys;
-      held.vvh = Math.round(vv.height);
+      held.vvh = vvh;
       root.style.setProperty('--q-kb', `${keys}px`);
       root.style.setProperty('--q-vvh', `${held.vvh}px`);
     }
@@ -5484,7 +5509,8 @@ function watchKeyboard() {
     root.style.setProperty('--q-kb-foot', `${held.foot}px`);
     if (root.querySelector('.q-kb-docked')?.contains(el)) return;
     const r = el.getBoundingClientRect?.();
-    if (r && r.height && (r.bottom > vv.offsetTop + vv.height - 4 || r.top < vv.offsetTop)) lift(el, held.keys);
+    const seen = inFrame() ? [0, globalThis.innerHeight - held.keys] : [vv.offsetTop, vv.offsetTop + vv.height];
+    if (r && r.height && (r.bottom > seen[1] - 4 || r.top < seen[0])) lift(el, held.keys);
   };
   const soon = () => {
     clearTimeout(settleTimer);
@@ -5493,6 +5519,8 @@ function watchKeyboard() {
   };
   vv.addEventListener('resize', soon);
   vv.addEventListener('scroll', soon);
+  // (In Orbit's frame the keys move Orbit's window, not this one.)
+  if (inFrame()) for (const k of ['resize', 'scroll']) globalThis.top.visualViewport.addEventListener(k, soon);
   globalThis.addEventListener?.('resize', soon);
   document.addEventListener('focusin', () => setTimeout(soon, 60));
   document.addEventListener('focusout', () => setTimeout(soon, 60));

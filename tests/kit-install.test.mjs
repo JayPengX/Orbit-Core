@@ -29,7 +29,7 @@ test('every way has steps in both languages, the same count, and only buttons it
     const en = installSteps({ way, v26: way === 'ios-safari-26' }, 'Orbit Weather', true);
     assert.equal(zh.steps.length, en.steps.length, way);
     assert.ok(zh.steps.length >= 3, way);
-    for (const t of [...zh.steps, ...en.steps]) for (const [, g] of t.matchAll(/\{(\w+)\}/g)) assert.ok(['share', 'add', 'dots', 'kebab', 'menu'].includes(g), `${way}: ${g}`);
+    for (const t of [...zh.steps, ...en.steps]) for (const [, g] of t.matchAll(/\{(\w+)\}/g)) assert.ok(['share', 'add', 'dots', 'kebab', 'menu', 'page'].includes(g), `${way}: ${g}`);
     assert.ok(!/[一-鿿]/.test(en.steps.join('') + (en.lede || '')), `${way} English has no Chinese`);
   }
   // Chrome's "Add to home screen" offers a shortcut, which opens the browser again.

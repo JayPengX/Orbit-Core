@@ -1814,7 +1814,8 @@ dialog.q-sheet.q-full {
   border: 0;
   border-radius: 999px;
   background: var(--q-fill-3);
-  color: var(--q-accent);
+  /* (Graphite ink: the mark is its one colour; the app's colour beside AI's purple clashed, Sports' orange: Jay 11-15.) */
+  color: var(--q-label);
   font: 600 15px/1.25 var(--q-font);
   letter-spacing: -0.01em;
   text-align: center;
@@ -1832,15 +1833,6 @@ dialog.q-sheet.q-full {
 }
 .q-ai-tap > span:last-child {
   min-width: 0;
-}
-/* Dark: its ink lifted toward white, as a chosen chip's (Law's indigo on black). */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .q-ai-tap {
-    color: color-mix(in srgb, var(--q-accent) 62%, #fff);
-  }
-}
-:root[data-theme='dark'] .q-ai-tap {
-  color: color-mix(in srgb, var(--q-accent) 62%, #fff);
 }
 .q-ai-tap.block {
   display: flex;
@@ -5905,6 +5897,10 @@ html.q-kb .q-kb-dock {
 /* A bar fixed at the foot whose field is being typed in (a composer): on the keys. */
 html.q-kb .q-kb-docked {
   bottom: calc(var(--q-kb-foot, var(--q-kb)) + 8px) !important;
+  /* On a band of the page's own colour, the width of the screen, down to the keys: rows scrolled under it
+     never show round its edges (Jay 11-15, 問法律). */
+  box-shadow: 0 0 0 8px var(--q-page), 0 0 0 100vw var(--q-page);
+  clip-path: inset(-8px -100vw -100vh -100vw);
 }
 
 /* A grid of like tiles that never ends on a part row (orbit.mjs fullRows): the tiles past its last full row. */
@@ -7559,7 +7555,9 @@ html.q-own-scroll body {
   box-sizing: border-box;
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior-y: contain;
+  /* Never pulled past its ends, the scroll bar's handle dragged included (Jay 11-15: the side bar pushed the
+     page down, black above); the top's pull is the kit's refresh, the foot's give the kit's (suite.mjs). */
+  overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
 }
 /* ---- Orbit's window (kit/suite.mjs): every app in one home-screen app ----
