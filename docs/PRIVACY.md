@@ -86,6 +86,10 @@ holds no key that opens it.
   (kit `vault.mjs` `sealParts`; the session opens them for the apps,
   `openParts`); the Worker merges by `t` and never reads a value, and the
   sweep locks any left open (`eco.js` `sealWalletParts`, from `PARTS_FROM`).
+- **The owner's own copy** (privacy@'s data request, a verified ask: the
+  recovery email's link or the pass typed) comes unlocked: `privacy-mail.js`
+  `exportOf` opens each locked part with the account's vault (`eco.js`
+  `openText`), and says so in the file. The admin page's download stays locked.
 - **Open on purpose, the minimum the Worker works with:** Securities' data
   (`PLAIN_APPS`: `stock-check.js` fills its orders) and its figures money's
   books count (`SNAP_OPEN`: cash, cost, result and taxes by market), the

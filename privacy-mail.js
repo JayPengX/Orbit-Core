@@ -22,7 +22,7 @@
 
 import { DOMAIN } from './kit/domain.mjs';
 import { accountOfMail, cleanAddr, mailIndexId, mailOf } from './pass-mail.js';
-import { WALLET_COLLECTION, INBOX_COLLECTION, NOW_COLLECTION, FAMILY_SHELF, ECO_APPS, ECO_PASSCODE_PATTERN, shelfId, parseWallet, publicWallet, deleteAccount, updateWallet, mergeWallet, passAccount, ECO_LIMITS } from './eco.js';
+import { WALLET_COLLECTION, INBOX_COLLECTION, NOW_COLLECTION, FAMILY_SHELF, ECO_APPS, ECO_PASSCODE_PATTERN, shelfId, parseWallet, publicWallet, deleteAccount, updateWallet, mergeWallet, passAccount, ECO_LIMITS, openText, isSealed } from './eco.js';
 import { signToken, readToken, tokenSecret } from './orbit-token.js';
 import { BRANDS } from './kit/brand.mjs';
 import * as look from './site/admin/mail-look.mjs';
@@ -267,24 +267,31 @@ function dated(v, key = '') {
 const appName = id => BRANDS[id]?.name || id;
 // What a copy says it is, in the language of the page that asked.
 const ABOUT = {
-  zh: '你的 Orbit Pass 帳戶在下載這一刻存的所有資料。「apps」是每個 App 存的內容（Orbit 存的樣子，已解開成可讀的 JSON）；「account」是帳戶本身；「betweenApps」是 App 之間共用的。使用統計不含帳號，所以不在這裡。',
-  en: 'Everything your Orbit Pass account held when this was downloaded. "apps" is what each app keeps (unpacked from how Orbit stores it into readable JSON); "account" is the account itself; "betweenApps" is what the apps share. Usage stats have no account in them, so there are none here.'
+  zh: '你的 Orbit Pass 帳戶在下載這一刻存的所有資料。「apps」是每個 App 存的內容（Orbit 存的樣子，已解開成可讀的 JSON）；「account」是帳戶本身；「betweenApps」是 App 之間共用的。使用統計不含帳號，所以不在這裡。Orbit 平常把這些資料上鎖存放（只有你的裝置打得開）；這份副本是你本人要求的，所以已替你解開。請像保管密碼一樣保管這個檔案。',
+  en: 'Everything your Orbit Pass account held when this was downloaded. "apps" is what each app keeps (unpacked from how Orbit stores it into readable JSON); "account" is the account itself; "betweenApps" is what the apps share. Usage stats have no account in them, so there are none here. Orbit keeps this data locked (only your devices open it); this copy, asked for by you, is unlocked for you. Keep the file as safe as a password.'
 };
+// (A part locked under a vault the account no longer has: said so, never shown as its locked text.)
+const LOST = { zh: '🔒 已上鎖，無法開啟', en: '🔒 Locked, can’t be opened' };
 
 // Everything the account holds, as one file.
 export async function exportOf(env, deps, docId, now = Date.now(), lang = 'zh') {
+  const wDoc = await deps.fsGet(env, WALLET_COLLECTION, docId);
+  const wallet = wDoc.exists ? parseWallet(wDoc.payload) : null;
+  if (!wallet) return null;
+  const lost = LOST[lang === 'en' ? 'en' : 'zh'];
+  // The owner's own copy, unlocked (Jay 11-15: "give user decrypted ones"): each locked part
+  // opened with the account's vault, here only, for this verified ask.
+  const open = async text => (isSealed(text) ? ((await openText(env, wallet.vault, text)) ?? null) : text);
   const read = async (coll, id) => {
     const doc = await deps.fsGet(env, coll, id).catch(() => ({ exists: false }));
     if (!doc.exists) return null;
-    let v = doc.payload;
+    let v = await open(doc.payload);
+    if (v == null) return lost;
     try {
       v = JSON.parse(v);
     } catch {}
     return unpack(v);
   };
-  const wDoc = await deps.fsGet(env, WALLET_COLLECTION, docId);
-  const wallet = wDoc.exists ? parseWallet(wDoc.payload) : null;
-  if (!wallet) return null;
   const apps = {};
   for (const [app, { collection }] of Object.entries(ECO_APPS)) {
     const v = await read(collection, docId);
@@ -297,7 +304,21 @@ export async function exportOf(env, deps, docId, now = Date.now(), lang = 'zh') 
   }
   const inbox = {};
   for (const ids of Object.values(wallet.inbox || {})) for (const id of ids) inbox[id] = await read(INBOX_COLLECTION, id);
-  const { live, inbox: _, apps: opened, passkeys, mail, ...rest } = publicWallet(wallet);
+  const { live, inbox: _, apps: opened, passkeys, mail, vault: _v, ...rest } = publicWallet(wallet);
+  // (Settings and figures locked as { t, e }: their values.)
+  const part = async (v, snap) => {
+    if (!isSealed(v?.e)) return v;
+    const text = await open(v.e);
+    const { e, ...kept } = v;
+    if (text == null) return { ...kept, value: lost };
+    try {
+      const x = JSON.parse(text);
+      return snap && x && typeof x === 'object' ? { ...x, ...kept } : { ...kept, value: x };
+    } catch {
+      return { ...kept, value: text };
+    }
+  };
+  for (const k of ['settings', 'snap']) if (rest[k]) rest[k] = Object.fromEntries(await Promise.all(Object.entries(rest[k]).map(async ([n, v]) => [n, await part(v, k === 'snap')])));
   const account = {
     id: docId.slice(0, 6),
     recoveryEmail: mailOf(wallet) || null,

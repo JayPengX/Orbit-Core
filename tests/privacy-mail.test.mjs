@@ -177,3 +177,24 @@ test('a copy holds each app unpacked, as it reads', async () => {
   if (n > 0) { out += B91[b % 91]; if (n > 7 || b > 90) out += B91[Math.floor(b / 91)]; }
   assert.deepEqual(await unpack(`[ORBIT]${out}[/ORBIT]`), data);
 });
+
+test('the owner’s own copy comes unlocked: the apps’ data and the wallet’s locked parts opened for the verified ask (Jay 11-15: "give user decrypted ones")', async () => {
+  const { sealSweep, ECO_APPS } = await import('../eco.js');
+  const t = setup();
+  const a = await account(t);
+  await link(t, a.token, 'me2@example.com');
+  const places = { places: [[24.8, 121.0]] };
+  const w = await handleEcoRequest({ method: 'POST', url: 'https://w/eco?app=match', body: { op: 'write', qt: a.token, payload: '{"follow":["LAL"]}', wallet: { settings: { 'fb:transit': { value: places, t: t.now() } } } } }, t.env, {}, '1.1.1.1', t.deps, () => {});
+  assert.equal(w.status, 200, JSON.stringify(w.data));
+  await sealSweep(t.env, t.deps);
+  const stored = [...t.store.entries()].find(([k]) => k.startsWith(`${ECO_APPS.match.collection}/`))[1];
+  assert.match(stored.payload, /^e1:/, 'locked where it is kept');
+  const r = await ask(t, 'me2@example.com');
+  const exp = await t.post({ op: 'privacy', token: tokenOf(r.links, 'export') });
+  assert.equal(exp.status, 200, JSON.stringify(exp.data));
+  const file = exp.data.file;
+  assert.deepEqual(file.apps['Orbit Sports'], { follow: ['LAL'] });
+  assert.deepEqual(file.account.settings['fb:transit'].value, places);
+  assert.ok(!JSON.stringify(file).includes('e1:'), 'nothing locked left in it');
+  assert.equal(file.account.vault, undefined);
+});

@@ -1190,6 +1190,22 @@ async function keyOfVault(env, vault) {
     return null;
   }
 }
+// Locked text opened with the account's vault (its recovery copy): for the
+// owner's own data request only (privacy-mail.js exportOf, a verified ask).
+// → the text, or null (another vault's, or not opened).
+export async function openText(env, vault, text) {
+  if (!vault?.escrow || !isSealed(text)) return null;
+  const [, id, iv, data] = text.split(':');
+  if (id !== vault.id) return null;
+  try {
+    const raw = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64u(vault.escrow.iv) }, await escrowKey(env), unb64u(vault.escrow.key));
+    const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+    const packed = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64u(iv) }, key, unb64u(data)));
+    return new TextDecoder().decode(await new Response(new Blob([packed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+  } catch {
+    return null;
+  }
+}
 export async function sealText(key, id, payload) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const packed = new Uint8Array(await new Response(new Blob([new TextEncoder().encode(payload)]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
