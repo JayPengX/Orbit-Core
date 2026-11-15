@@ -2215,7 +2215,14 @@ function makeSession(app, { lang, heartbeat }) {
         .then(key => V.unlockParts(missing, key, parts))
         .then(() => rawWallet === w && setWallet(w))
         .catch(() => null);
-    w = opened;
+    // (A part still being unlocked keeps what was already open here: the
+    // avatar and frame never drop to the default for the moment the key
+    // takes, Jay 11-15: the picture flashed entering Securities.)
+    if (missing.length && wallet?.settings && opened?.settings) {
+      const settings = { ...opened.settings };
+      for (const [k, v] of Object.entries(settings)) if (v?.locked && wallet.settings[k] && !wallet.settings[k].locked) settings[k] = wallet.settings[k];
+      w = { ...opened, settings };
+    } else w = opened;
     wallet = w;
     cacheWallet(storedAccount(), w);
     // The pass's notice switches (newer here: sent up).
