@@ -4650,7 +4650,9 @@ function startOver() {
 export function inSuite() {
   try {
     if (globalThis.sessionStorage?.getItem('orbit.suite') === '1') return true;
-    return isIOS() && isStandalone() && Boolean(globalThis.localStorage?.getItem('orbit.suite.v1'));
+    if (isIOS() && isStandalone() && Boolean(globalThis.localStorage?.getItem('orbit.suite.v1'))) return true;
+    // (A computer's browser: every app's page is Orbit's, its apps beside it, Jay 11-15; never a tool's browser.)
+    return typeof document !== 'undefined' && globalThis.top === globalThis && !isPhoneOrTablet() && !globalThis.navigator?.webdriver;
   } catch {
     return false;
   }
