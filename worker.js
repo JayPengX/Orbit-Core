@@ -1620,6 +1620,13 @@ async function route(request, env, ctx, headers, origin) {
       const a = await ADMIN_TOOLS.ai({ env, deps });
       return json({ rate: a.rate, money: a.money, today: await providerToday(env) }, 200, headers);
     }
+    // The vault sweep (docs/PRIVACY.md): how many accounts are sealed; ?now=1 runs it first.
+    if (check === 'vault') {
+      const swept = new URL(request.url).searchParams.get('now') ? await sealSweep(env, ECO_DEPS) : null;
+      const ws = await ECO_DEPS.fsList(env, WALLET_COLLECTION, 2000);
+      const of = ws.map(w => { try { return JSON.parse(w.payload)?.vault || null; } catch { return null; } });
+      return json({ swept, accounts: ws.length, sealed: of.filter(v => v?.sealed).length, escrow: of.filter(v => v?.escrow).length }, 200, headers);
+    }
     // Every Gemini call of the last ?days= (30 at most) by day, feature, model and status.
     if (check === 'gemini-use') {
       const sp = new URL(request.url).searchParams;

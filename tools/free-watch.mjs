@@ -111,6 +111,16 @@ export const GOOGLE_BILLED = 25;
 // A low balance is a note, never a failed run (GitHub mails each one; Jay
 // 11-15: "stop me from getting this email"): a maker running out only falls
 // to its backup, and the admin panel shows each balance.
+// Every account's data sealed (docs/PRIVACY.md); one left plain is a failed run.
+async function vault() {
+  const secret = process.env.DATA_PUSH_SECRET;
+  if (!secret) return notes.push('vault: not checked (no DATA_PUSH_SECRET)');
+  const r = await get(`https://orbit-workers-proxy.pengzjay.workers.dev/ops?check=vault&now=1`, { json: true, secret });
+  if (r?.body?.accounts == null) return bad(`ops vault: ${r?.status} ${String(r?.text || '').slice(0, 120)}`);
+  const { accounts, sealed, swept } = r.body;
+  notes.push(`vault: ${sealed} of ${accounts} accounts sealed${swept?.accounts ? ` (${swept.accounts} just now)` : ''}`);
+  if (sealed < accounts) bad(`vault: ${accounts - sealed} account(s) still plain`);
+}
 async function aiMoney() {
   const secret = process.env.DATA_PUSH_SECRET;
   if (!secret) return notes.push('AI money: not checked (no DATA_PUSH_SECRET)');
@@ -137,6 +147,7 @@ const got = await smoke();
 await allowances(got.find(r => r?.body?.caps));
 await beats();
 await aiMoney();
+await vault();
 
 const out = [`# Orbit on the free plans: ${problems.length ? `${problems.length} problem${problems.length > 1 ? 's' : ''}` : 'all well'}`, '', ...problems.map(p => `- ❌ ${p}`), ...(problems.length ? [''] : []), ...notes.map(n => `- ${n}`)].join('\n');
 console.log(out);
