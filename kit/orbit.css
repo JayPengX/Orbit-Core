@@ -7739,6 +7739,16 @@ html.q-tabrail:not(.q-desk) .q-suite.q-suite-lean2 > :is(.q-suite-back, .q-suite
 html.q-tabrail:not(.q-desk) .q-tabbar.q-tabrail-tight .q-tab-label {
   display: none;
 }
+/* (Then the switcher, the account and the buttons under them as small as the
+   tabs' icons, not twice their size: Jay 11-15 "unbalanced size".) */
+html.q-tabrail:not(.q-desk):has(.q-tabbar.q-tabrail-tight) {
+  --q-tabrail-foot: 44px;
+  --q-tabrail-face: 32px;
+}
+html.q-tabrail:not(.q-desk):has(.q-tabbar.q-tabrail-tight) .q-appbar .q-actions > .q-icon-btn svg {
+  width: 24px;
+  height: 24px;
+}
 /* In Orbit's window: the switcher and the apps open a row of their own
    over the account and the buttons (one row ran past the bar's edge, the
    account cut off: Jay 2026-11-14), the tabs' room under them kept. */
