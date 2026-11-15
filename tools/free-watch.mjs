@@ -126,7 +126,13 @@ async function vault() {
 async function trace() {
   if (!process.env.TRACE || !process.env.DATA_PUSH_SECRET) return;
   const r = await get(`https://orbit-workers-proxy.pengzjay.workers.dev/ops?check=trace&hours=${process.env.TRACE}`, { json: true, secret: process.env.DATA_PUSH_SECRET });
-  console.log(JSON.stringify(r?.body ?? r?.text, null, 1));
+  if (!r?.body || typeof r.body !== 'object') return console.log('trace:', r?.status, String(r?.text || '').slice(0, 200));
+  for (const [ref, a] of Object.entries(r.body)) {
+    console.log(`== ${ref} created ${a.created} vault ${JSON.stringify(a.vault)} settings ${a.settings.join(',')} entries ${a.entries} passkeys ${a.passkeys}`);
+    console.log(`   apps ${JSON.stringify(a.apps)} live ${JSON.stringify(a.live)}`);
+    for (const d of a.docs) console.log(`   now  ${d.join(' ')}`);
+    for (const k of a.kept) console.log(`   kept ${k.join(' ')}`);
+  }
 }
 async function aiMoney() {
   const secret = process.env.DATA_PUSH_SECRET;

@@ -1640,7 +1640,7 @@ function watchFlow(f) {
   flowSeen ||= new ResizeObserver(rows => {
     for (const { target: f } of rows) {
       if (!f.isConnected || !f.getClientRects().length) continue;
-      if (flowCount(f.clientWidth, f.classList.contains('q-flow-2')) !== (f.__qFlowN || 1)) flowColumns(f);
+      if (flowCount(f.clientWidth, f.classList.contains('q-flow-2')) !== (f.__qFlowFull || f.__qFlowN || 1)) flowColumns(f);
     }
   });
   if (!f.__qFlowWatched) {
@@ -1666,6 +1666,7 @@ export function flowColumns(root = document) {
     if (!f.getClientRects().length) continue;
     const n = flowCount(f.clientWidth, f.classList.contains('q-flow-2'));
     f.__qFlowN = n;
+    f.__qFlowFull = n;
     const items = f.__qItems?.every(i => i.parentNode?.parentNode === f || i.parentNode === f) ? f.__qItems : [...f.children].flatMap(c => (c.classList.contains('q-flow-col') ? [...c.children] : [c]));
     f.__qItems = items;
     watchFlow(f);
@@ -1690,13 +1691,17 @@ export function flowColumns(root = document) {
       settle();
       continue;
     }
-    f.style.setProperty('--q-flow-n', n);
+    // (Never more columns than sections: two sections on a computer's three
+    // columns left the third empty, Jay 11-15 "so much empty space".)
+    const m = Math.min(n, items.length);
+    f.__qFlowN = m;
+    f.style.setProperty('--q-flow-n', m);
     f.classList.add('q-flow-measure');
     f.replaceChildren(...items);
     f.__qMargins = items.map(i => parseFloat(getComputedStyle(i).marginTop) || 0);
     const hs = items.map((it, i) => it.getBoundingClientRect().height + f.__qMargins[i]);
     f.classList.remove('q-flow-measure');
-    const cols = dealParts(hs, n);
+    const cols = dealParts(hs, m);
     f.replaceChildren(...cols.filter(c => c.kids.length).map(c => h('div', { class: 'q-flow-col' }, c.kids.map(i => items[i]))));
     f.classList.add('q-flow-laid');
     settle();
