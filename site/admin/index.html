@@ -809,6 +809,7 @@ import { DEV, DEV_GROUPS, cleanDev, BRANDS, appIcon, familyMark, pathOf } from '
 import { icons, tileHtml, heroCardHtml, escHtml, toast } from '/Orbit-Core/kit/ui.mjs';
 import { API, DOMAIN } from '/Orbit-Core/kit/domain.mjs';
 import { passkeyName } from '/Orbit-Core/kit/passkey.mjs';
+import { NOTICE_KINDS } from '/Orbit-Core/kit/notice-kinds.mjs';
 import { SOURCES, SOURCE_BY_ID, GROUPS as SOURCE_GROUPS, freshAt, sourceState } from '/Orbit-Core/kit/sources.mjs';
 import { JOBS, restsToday, isLate, errTone, aiTone, realErrors, routeTone, paceTone, usedTop } from './ops-watch.mjs';
 import { MAIL_LOOKS, MAIL_ACCENTS, mailRender } from './mail-look.mjs';
@@ -1470,12 +1471,16 @@ async function decodeDeep(v, depth = 0) {
   return v;
 }
 const whenOf = n => (typeof n === 'number' && n > 1.5e12 && n < 2.2e12 ? new Date(n).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '');
+// The raw tree's names in words, the stored name after it for searching.
+const KEY_NAMES = { wallet: '帳戶', entries: '模擬金紀錄', settings: '設定', apps: 'App', created: '建立', t: '時間', amount: '金額', kind: '種類', id: '代號', app: 'App', note: '備註', value: '內容', passkeys: '通行密鑰', keys: '金鑰', live: '最近連線', sec: '安全', level: '方案', first: '第一次用', last: '最近一次', vault: '資料鎖', sealed: '已上鎖', escrow: '備援鑰匙', inbox: '收件匣', snap: '快照', on: '裝置', via: '存在', used: '最近用', off: '關掉的', sid: '連線代號', user: '使用者代號', v: '版本', v2: '版本 2', notify: '通知', lang: '語言', n: '數量', d: '日期', done: '完成' };
+const keyName = k => (KEY_NAMES[k] ? `${KEY_NAMES[k]}（${k}）` : APPS[k] ? `${APPS[k]}（${k}）` : k);
 function treeOf(v, key = '', depth = 0) {
+  if (v === undefined) return document.createTextNode('');
   if (v && typeof v === 'object') {
-    const entries = Array.isArray(v) ? v.map((x, i) => [String(i), x]) : Object.entries(v);
+    const entries = Array.isArray(v) ? v.map((x, i) => [String(i), x]) : Object.entries(v).filter(([, x]) => x !== undefined);
     const d = el('details', { class: 'xp-node' });
     if (depth < 2) d.open = true;
-    d.append(el('summary', {}, [el('b', { text: key || '帳戶' }), el('span', { class: 'muted', text: Array.isArray(v) ? ` [${v.length}]` : ` {${entries.length}}` })]));
+    d.append(el('summary', {}, [el('b', { text: key ? (/^\d+$/.test(key) ? `第 ${Number(key) + 1} 筆` : keyName(key)) : '全部資料' }), el('span', { class: 'muted', text: ` ${entries.length} 項` })]));
     // (Long lists drawn as they're opened, 200 at a time.)
     let shown = 0;
     const more = () => {
@@ -1488,7 +1493,8 @@ function treeOf(v, key = '', depth = 0) {
     return d;
   }
   const when = whenOf(v);
-  return el('div', { class: 'xp-leaf' }, [el('b', { text: `${key}: ` }), el('span', { text: typeof v === 'string' ? v : JSON.stringify(v) }), when ? el('span', { class: 'muted', text: `  ${when}` }) : null]);
+  const words = v === true ? '是' : v === false ? '否' : v == null ? '（空）' : typeof v === 'string' ? (APPS[v] || v) : typeof v === 'number' && when ? when : String(v);
+  return el('div', { class: 'xp-leaf' }, [el('b', { text: `${/^\d+$/.test(key) ? `第 ${Number(key) + 1} 項` : keyName(key)}：` }), el('span', { text: words }), when && typeof v === 'number' ? el('span', { class: 'muted', text: `  （${v}）` }) : null]);
 }
 // The account in plain words (Jay 11-15: "human readable not a bunch of id,
 // admin panel was design for anyone"): who it is, the apps it used and
@@ -1503,12 +1509,16 @@ async function showExport(ref, raw) {
   const nt = n => (typeof n === 'number' ? `${n < 0 ? '−' : ''}NT$${Math.abs(Math.round(n)).toLocaleString('en-US')}` : '—');
   const sec = (title, body, note) => el('section', { class: 'xp-sec' }, [el('h3', { text: title }), note ? el('p', { class: 'xp-note', text: note }) : null, body]);
   const table = (head, rows) => el('table', { class: 'xp-t' }, [el('tr', {}, head.map(h => el('th', { text: h }))), ...rows.map(r => el('tr', {}, r.map(c => (c instanceof Node ? el('td', {}, [c]) : el('td', { text: c == null ? '' : String(c) })))))]);
-  // (Each notice by its name: kit notice-kinds.mjs.)
-  const NK = await import('/Orbit-Core/kit/notice-kinds.mjs').then(m => m.NOTICE_KINDS, () => ({}));
-  const noticeName = id => {
-    const [app, kind] = String(id).split(':');
-    const row = (NK[app] || []).find(r => r[0] === kind);
-    return row ? `${appName(app)}：${row[1]}` : id;
+  // (Each notice by its name, grouped by app: kit notice-kinds.mjs.)
+  const shortApp = a => appName(a).replace(/^Orbit /, '');
+  const noticesOff = ids => {
+    const by = {};
+    for (const id of ids) {
+      const [app, kind] = String(id).split(':');
+      const row = (NOTICE_KINDS[app] || []).find(r => r[0] === kind);
+      (by[app] ||= []).push(kind === 'all' ? '全部' : row ? row[1] : '其他通知');
+    }
+    return Object.entries(by).map(([app, names]) => `${shortApp(app)}：${names.join('、')}`).join('；');
   };
   // A record as what it was, not its id.
   const what = e => {
@@ -1521,7 +1531,7 @@ async function showExport(ref, raw) {
   };
   // A setting as what it means.
   const SET = {
-    notify: v => ['通知', [v?.on === false ? '系統通知關閉' : '系統通知開啟', v?.off?.length ? `關掉的：${v.off.map(noticeName).join('、')}` : '全部開著'].join('；')],
+    notify: v => ['通知', v?.on === false ? '全部關閉' : v?.off?.length ? `開著，但關掉了 ${noticesOff(v.off)}` : '全部開著'],
     passkeyAsk: v => ['要不要加通行密鑰', { yes: '問過：要', no: '問過：之後再說', never: '不要再問' }[v] || String(v)],
     usageSeen: v => ['看過用量說明', v ? '是' : '否'],
     lang: v => ['語言', { en: 'English', zh: '中文' }[v] || String(v)]
@@ -1545,10 +1555,11 @@ async function showExport(ref, raw) {
   const used = Object.keys(APPS).filter(k => w.apps?.[k] || data.apps?.[k] != null);
   const never = Object.keys(APPS).filter(k => !used.includes(k));
   const settings = Object.entries(w.settings || {}).map(settingRow);
+  const liveRows = Object.entries(w.live || {}).sort((x, y) => (y[1]?.t || 0) - (x[1]?.t || 0)).map(([a, x]) => [appName(a), when(x?.t)]);
   const keys = Array.isArray(w.passkeys?.keys) ? w.passkeys.keys : Array.isArray(w.passkeys) ? w.passkeys : [];
   const VIA = { google: 'Google 密碼管理工具', icloud: 'iCloud 鑰匙圈', apple: 'iCloud 鑰匙圈', '1password': '1Password' };
   const search = el('input', { type: 'search', placeholder: '在原始資料裡找…', class: 'xp-find' });
-  const rawBox = el('div', { class: 'xp-raw' }, [treeOf(data)]);
+  const rawBox = el('div', { class: 'xp-raw' }, [treeOf({ 帳戶編號: data.ref, 匯出時間: data.at, ...data, ref: undefined, at: undefined })]);
   search.addEventListener('input', () => {
     const q = search.value.trim().toLowerCase();
     if (q) for (const n of rawBox.querySelectorAll('details')) n.open = true;
@@ -1567,8 +1578,9 @@ async function showExport(ref, raw) {
       sec(`用過的 App（${used.length}）`, table(['App', '第一次用', '最近一次', '存的資料'], used.map(k => [appName(k), day(w.apps?.[k]?.first), when(w.apps?.[k]?.last), appState(k)])), never.length ? `沒用過：${never.map(appName).join('、')}` : ''),
       sec(`模擬金紀錄（${entries.length} 筆）`, table(['時間', '項目', '金額'], entries.slice().sort((x, y) => (y.t || 0) - (x.t || 0)).slice(0, 200).map(e => [when(e.t), what(e), el('span', { class: e.amount < 0 ? 'xp-out' : 'xp-in', text: `${e.amount > 0 ? '+' : ''}${nt(e.amount)}` })]))),
       sec('設定', settings.length ? table(['項目', '目前', '改於'], settings) : el('p', { class: 'muted', text: '沒改過設定' })),
+      sec('最近在用的 App', liveRows.length ? table(['App', '最近連線'], liveRows) : el('p', { class: 'muted', text: '目前沒有' }), '每個 App 最後一次連上的時間'),
       sec(`通行密鑰（${keys.length}）`, keys.length ? table(['裝置', '存在', '加入', '最近用'], keys.map(k => [k.on || '不明裝置', VIA[k.via] || k.via || '—', when(k.t), k.used ? when(k.used) : '還沒用過'])) : el('p', { class: 'muted', text: '沒有通行密鑰' })),
-      el('details', { class: 'xp-sec' }, [el('summary', { text: '原始資料（除錯用，可搜尋）' }), search, rawBox])
+      el('details', { class: 'xp-sec' }, [el('summary', { text: '全部原始資料（給工程師除錯用，可搜尋）' }), search, rawBox])
     ])
   ]);
   box.addEventListener('close', () => box.remove());
@@ -1645,7 +1657,7 @@ function drawAccount(a) {
   const pushTest = a.pushes.length
     ? action('測試通知', '', [pushApp, pushBtn], async () => {
         const r = await admin('push-test', { wallet: a.ref, app: pushApp.value });
-        // One plain answer per subscription (eco-admin.js pushTestResult): taken by Apple, gone (removed), or failed with its code.
+        // One plain answer per subscription (eco-admin.js pushTestResult): taken by the push service (Apple, Google…: pushServiceOf), gone (removed), or failed with its code.
         if (!r.ok) throw new Error(r.text || `沒送到（${r.result}）`);
         return r.text || '已送出';
       })

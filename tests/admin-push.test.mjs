@@ -49,6 +49,10 @@ test('pushTestResult: accepted by Apple, gone and removed, failed with its statu
   const ok = await pushTestResult('sent', 'web.push.apple.com', rm);
   assert.equal(ok.state, 'sent');
   assert.match(ok.text, /Apple/);
+  // (Not every device is Apple's: Chrome's notices go through Google, Jay 11-15.)
+  const chrome = await pushTestResult('sent', 'fcm.googleapis.com', rm);
+  assert.match(chrome.text, /Google（Chrome/);
+  assert.doesNotMatch(chrome.text, /Apple|iPhone/);
   const gone = await pushTestResult('gone', 'web.push.apple.com', rm);
   assert.equal(gone.state, 'gone');
   assert.equal(removed, 1);

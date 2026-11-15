@@ -3930,7 +3930,8 @@ export async function enablePush(s, force = false) {
     const mark = `${sub.endpoint}|${orbit ? `${orbit.o}:${orbit.apps.join(',')}|` : ''}${new Date().toDateString()}`;
     const storeKey = `orbit.push.sub.${s.app}`;
     if (!force && readStore(storeKey) === mark) return true;
-    if (await pushPost(s, 'subscribe', { sub: sub.toJSON(), lang: s.lang, ...(orbit ? { via: 'orbit', o: orbit.o, apps: orbit.apps } : {}) })) writeStore(storeKey, mark);
+    // (`dev`: which device, so a computer's never takes the phone's: push.js subsOf.)
+    if (await pushPost(s, 'subscribe', { sub: sub.toJSON(), lang: s.lang, dev: deviceName(), ...(orbit ? { via: 'orbit', o: orbit.o, apps: orbit.apps } : {}) })) writeStore(storeKey, mark);
     else rec('push', { k: 'not-taken', host: new URL(sub.endpoint).host });
     return true;
   } catch (e) {

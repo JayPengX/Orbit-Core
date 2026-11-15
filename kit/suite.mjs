@@ -441,16 +441,30 @@ function fit(foot) {
     for (const f of document.querySelectorAll('.q-suite-rowed')) if (f !== foot || !/row/.test(cls)) f.classList.remove('q-suite-rowed');
     if (foot && /row/.test(cls)) foot.classList.add('q-suite-rowed');
   };
+  const root = document.documentElement.style;
+  root.removeProperty('--q-tabrail-tab');
   if (!foot) return set('');
-  let above = 0;
-  for (const e of document.querySelectorAll('.q-tabbar, .q-tab-action')) {
-    const r = e.getBoundingClientRect();
-    if (r.height && getComputedStyle(e).display !== 'none') above = Math.max(above, r.bottom);
-  }
+  const above = () => {
+    let end = 0;
+    for (const e of document.querySelectorAll('.q-tabbar, .q-tab-action')) {
+      const r = e.getBoundingClientRect();
+      if (r.height && getComputedStyle(e).display !== 'none') end = Math.max(end, r.bottom);
+    }
+    return end;
+  };
+  const end = above();
   for (const cls of FITS) {
     set(cls);
-    if (foot.getBoundingClientRect().top >= above + 8) return;
+    if (foot.getBoundingClientRect().top >= end + 8) return;
   }
+  // Still short (a small phone on its side, Jay 11-15: the account's row over
+  // 紀錄): the tabs a little shorter, as far as a tab can go (42), so the row
+  // stands under the last one, never on it.
+  const tab = document.querySelector('.q-tabbar .q-tab');
+  const n = document.querySelectorAll('.q-tabbar .q-tab:not([hidden])').length;
+  if (!tab || !n) return;
+  const short = above() + 8 - foot.getBoundingClientRect().top;
+  root.setProperty('--q-tabrail-tab', `${Math.max(42, Math.floor(tab.getBoundingClientRect().height - short / n))}px`);
 }
 
 let sheetOpen = null;

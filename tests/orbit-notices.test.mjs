@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { handlePush, sendDue, decorate } from '../push.js';
+import { handlePush, sendDue, decorate, subsOf } from '../push.js';
 import { ADMIN_TOOLS } from '../eco-admin.js';
 import { fakeD1 } from './fake-d1.mjs';
 import { WALLET_COLLECTION, emptyWallet } from '../eco.js';
@@ -26,7 +26,7 @@ const memoryKv = () => {
 const world = () => {
   const kv = memoryKv();
   const env = { RATE_LIMIT_KV: kv };
-  const post = (app, path, body) => handlePush(new Request(`https://w${path}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, { d: 'acct', a: app }, path);
+  const post = (app, path, body) => handlePush(new Request(`https://w${path}`, { method: 'POST', body: JSON.stringify({ dev: 'iPhone', ...body }) }), env, {}, { d: 'acct', a: app }, path);
   return { kv, env, post };
 };
 const rec = (kv, app) => JSON.parse(kv.m.get(`push:acct:${app}`) || 'null');
@@ -50,7 +50,7 @@ test('1: one shared endpoint, one record per app; an app switched off never stop
     assert.equal((await post(app, '/push/subscribe', { sub: sub('shared'), ...ORBIT })).status, 200);
     await post(app, '/push/schedule', { items: [{ at: now + 1000, title: `${app} now`, tag: 'a' }] });
   }
-  assert.equal(rec(kv, 'match').sub.endpoint, rec(kv, 'weather').sub.endpoint);
+  assert.equal(subsOf(rec(kv, 'match'))[0].endpoint, subsOf(rec(kv, 'weather'))[0].endpoint);
   assert.equal(rec(kv, 'match').items[0].title, 'match now');
   assert.equal(rec(kv, 'weather').items[0].title, 'weather now');
   // Sports off (its own switch), Weather's still sent.
@@ -103,11 +103,11 @@ test('4: a separate app never takes an app from a live Orbit; an app outside the
   // The separate Sports app (no via) on the same phone, another endpoint: the Orbit's stays.
   const r = await (await post('match', '/push/subscribe', { sub: sub('standalone') })).json();
   assert.equal(r.skipped, 'orbit');
-  assert.equal(rec(kv, 'match').sub.endpoint, sub('orbit').endpoint);
+  assert.deepEqual(subsOf(rec(kv, 'match')).map(x => x.endpoint), [sub('orbit').endpoint]);
   // The other way: Orbit takes over a separate app's.
   await post('weather', '/push/subscribe', { sub: sub('standalone-w') });
   await post('weather', '/push/subscribe', { sub: sub('orbit'), ...ORBIT });
-  assert.equal(rec(kv, 'weather').via, 'orbit');
+  assert.deepEqual(subsOf(rec(kv, 'weather')).map(x => x.via), ['orbit'], 'the separate app’s copy on the phone replaced');
   // Transit isn't in this Orbit's list.
   assert.equal((await post('transit', '/push/subscribe', { sub: sub('orbit'), ...ORBIT })).status, 403);
   assert.equal(rec(kv, 'transit'), null);
@@ -117,6 +117,38 @@ test('4: a separate app never takes an app from a live Orbit; an app outside the
   await post('match', '/push/subscribe', { sub: sub('orbit'), via: 'orbit', o: 'tagA', apps: ['match'] });
   assert.equal(rec(kv, 'weather'), null);
   assert.ok(rec(kv, 'match'));
+});
+
+// 4b: every device gets it, one home-screen app on each (Jay 11-15).
+test('4b: a computer’s subscription never takes the phone’s Orbit’s, and each device gets the notice once', async () => {
+  const { kv, env, post } = world();
+  const now = Date.now();
+  await post('match', '/push/subscribe', { sub: sub('phone-orbit'), ...ORBIT });
+  // The computer's Chrome, the app on its own: kept beside the phone's, not skipped.
+  const r = await (await post('match', '/push/subscribe', { sub: sub('mac-chrome'), dev: 'Mac' })).json();
+  assert.equal(r.skipped, undefined);
+  assert.deepEqual(subsOf(rec(kv, 'match')).map(x => [x.dev, x.via || 'app']), [['Mac', 'app'], ['iPhone', 'orbit']]);
+  // The phone's separate Sports app: the phone's Orbit has it, skipped.
+  assert.equal((await (await post('match', '/push/subscribe', { sub: sub('phone-app') })).json()).skipped, 'orbit');
+  // The iPad's Orbit too: three devices, one each.
+  await post('match', '/push/subscribe', { sub: sub('ipad-orbit'), dev: 'iPad', ...ORBIT });
+  assert.equal(subsOf(rec(kv, 'match')).length, 3);
+  // Sent to all three; one gone (the Mac's), the others kept.
+  await post('match', '/push/schedule', { items: [{ at: now - 1000, title: '開賽', tag: 'g' }] });
+  const real = globalThis.fetch;
+  const hit = [];
+  globalThis.fetch = async url => (hit.push(String(url).split('/').pop()), new Response(null, { status: /mac/.test(url) ? 410 : 201 }));
+  try {
+    assert.equal((await sendDue(env, now)).sent, 1, 'one notice, counted once');
+  } finally {
+    globalThis.fetch = real;
+  }
+  assert.deepEqual(hit.sort(), ['ipad-orbit', 'mac-chrome', 'phone-orbit']);
+  assert.deepEqual(subsOf(rec(kv, 'match')).map(x => x.dev).sort(), ['iPad', 'iPhone']);
+  // A list kept before devices (one `sub`) reads as one device, replaced by the same push service's next.
+  kv.m.set('push:acct:weather', JSON.stringify({ sub: sub('old'), items: [] }));
+  await post('weather', '/push/subscribe', { sub: sub('new'), dev: 'iPhone' });
+  assert.deepEqual(subsOf(rec(kv, 'weather')).map(x => x.endpoint), [sub('new').endpoint]);
 });
 
 // 5: the admin test reports per app.

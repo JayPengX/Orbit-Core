@@ -40,9 +40,17 @@
 // subscription and list (its next notice's time in the key's metadata, `due`:
 // one list of the keys finds what's due, and no one key every phone rewrites
 // loses another's time), `push:prefs:<account>` the switches,
-// `push:vapid` the Worker's own key pair (made on first use). One device a
-// person an app: the one that subscribed last (Orbit runs one live session
-// an account anyway).
+// `push:vapid` the Worker's own key pair (made on first use).
+//
+// Every device of the person, one home-screen app on each (Jay 11-15: "if
+// there is only one app Orbit send it there"): a list's `subs` are its
+// devices (an iPhone, an iPad, a computer: `dev`, the kit's deviceName, else
+// read off the User-Agent), at most MAX_DEVICES, newest first. On one device
+// an Orbit that holds the app outranks the app's own home-screen copy (a
+// separate app's subscribe is skipped while that Orbit's is alive, and the
+// Orbit's replaces it), so a notice shows once a device, never twice; a
+// computer's never takes the phone's away (it did: one device an app, the
+// last to subscribe, and a phone's Orbit outranked the computer's).
 //
 // The message is encrypted for the device (RFC 8291, aes128gcm) and signed
 // for the push service (RFC 8292, VAPID): WebCrypto only, no library.
@@ -233,16 +241,54 @@ export function decorate(app, record, message) {
   const out = { ...message, app };
   const short = BRANDS[app]?.short;
   if (out.tag && !String(out.tag).startsWith(`${app}:`)) out.tag = `${app}:${out.tag}`;
+  // (`record`: the device's subscription, its `via` and `o`.)
   if (record?.via === 'orbit') {
     if (short && !String(out.title || '').includes(short)) out.title = `${short}・${out.title || ''}`.replace(/・$/, '');
     if (record.o) out.o = record.o;
   }
   return out;
 }
-// An Orbit's record outranks a separate app's for the same app while it's alive.
+// An Orbit's subscription outranks a separate app's on the same device while it's alive.
 const ORBIT_FRESH_MS = 35 * 86_400_000;
-// A list kept with when its next notice is due (none: no subscription or nothing on it).
-const dueOf = record => (record.sub && record.items?.length ? record.items[0].at : 0);
+const MAX_DEVICES = 5;
+const DEVICES = new Set(['iPhone', 'iPad', 'Android', 'ChromeOS', 'Windows', 'Mac', 'Linux']);
+// The device a subscription is on: the page's own name for it (an iPad says
+// it's a Mac in its User-Agent), else the User-Agent's.
+export function deviceOf(dev, ua = '') {
+  if (DEVICES.has(dev)) return dev;
+  ua = String(ua || '');
+  if (/iPhone|iPod/.test(ua)) return 'iPhone';
+  if (/iPad/.test(ua)) return 'iPad';
+  if (/Android/.test(ua)) return 'Android';
+  if (/CrOS/.test(ua)) return 'ChromeOS';
+  if (/Windows/.test(ua)) return 'Windows';
+  if (/Macintosh|Mac OS X/.test(ua)) return 'Mac';
+  if (/Linux/.test(ua)) return 'Linux';
+  return '';
+}
+// A list's devices: { endpoint, keys, dev, t, via?, o? }; one kept before
+// devices (`sub`, `via`, `o` on the list) read as one of no known kind.
+export const subsOf = record =>
+  Array.isArray(record?.subs) ? record.subs : record?.sub ? [{ endpoint: record.sub.endpoint, keys: record.sub.keys, dev: '', t: record.kept || 0, ...(record.via === 'orbit' ? { via: 'orbit', o: record.o || '' } : {}) }] : [];
+const setSubs = (record, subs) => {
+  delete record.sub;
+  delete record.via;
+  delete record.o;
+  record.subs = subs;
+};
+const serviceOf = endpoint => {
+  try {
+    return new URL(endpoint).hostname;
+  } catch {
+    return '';
+  }
+};
+// The same device: the same kind; one of no known kind (kept before devices
+// were named) by its push service, and replaced at that device's next daily
+// subscribe.
+const sameDevice = (a, b) => (a.dev && b.dev ? a.dev === b.dev : serviceOf(a.endpoint) === serviceOf(b.endpoint));
+// A list kept with when its next notice is due (none: no device or nothing on it).
+const dueOf = record => (subsOf(record).length && record.items?.length ? record.items[0].at : 0);
 // D1 with KV's few calls (get, put with a ttl and `due`, delete, the due
 // lists): KV's Free plan takes 1,000 writes and 1,000 lists a day, and the
 // notices' cron listed every 2 minutes (720 a day). KV's lists are copied
@@ -342,23 +388,32 @@ export async function handlePush(request, env, headers, session, path) {
     const apps = (Array.isArray(body.apps) ? body.apps : []).filter(a => typeof a === 'string' && BRANDS[a]);
     // An app that isn't in the Orbit's list sends nothing to it.
     if (via && !apps.includes(session.a)) return reply({ error: { message: 'Not in this Orbit' } }, 403);
-    // One notice, not two: a separate app's subscribe doesn't take the app from a live Orbit's.
-    if (!via && record.via === 'orbit' && record.sub && record.sub.endpoint !== sub.endpoint && Date.now() - (record.kept || 0) < ORBIT_FRESH_MS) return reply({ ok: true, skipped: 'orbit', n: record.items?.length || 0 });
-    record.sub = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } };
+    const now = Date.now();
+    const o = via && typeof body.o === 'string' && /^[\w-]{1,300}$/.test(body.o) ? body.o : '';
+    const had = subsOf(record);
+    const same = had.find(x => x.endpoint === sub.endpoint);
+    // (Its time kept a week: the daily subscribe rewrites nothing.)
+    const mine = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth }, dev: deviceOf(body.dev, request.headers.get('User-Agent')), t: same?.t && now - same.t < 7 * 86_400_000 ? same.t : now, ...(via ? { via: 'orbit', o } : {}) };
+    const others = had.filter(x => x.endpoint !== sub.endpoint);
+    // One notice a device, not two: a separate app's subscribe doesn't take the app from that device's live Orbit.
+    if (!via && others.some(x => x.via === 'orbit' && sameDevice(x, mine) && now - (x.t || 0) < ORBIT_FRESH_MS)) return reply({ ok: true, skipped: 'orbit', n: record.items?.length || 0 });
+    setSubs(record, [mine, ...others.filter(x => !sameDevice(x, mine))].slice(0, MAX_DEVICES));
     record.lang = body.lang === 'en' ? 'en' : 'zh';
     if (via) {
-      record.via = 'orbit';
-      record.o = typeof body.o === 'string' && /^[\w-]{1,300}$/.test(body.o) ? body.o : '';
-      // The Orbit's apps changed: the ones it dropped stop here (same Orbit, same phone).
+      // The Orbit's apps changed: the ones it dropped stop on this device (same Orbit, same endpoint).
       for (const k of (await kv.list({ prefix: `push:${session.d}:`, all: true })).keys || []) {
         const other = k.name.slice(k.name.lastIndexOf(':') + 1);
         if (k.name === key || apps.includes(other) || !BRANDS[other]) continue;
         const rec = await kv.get(k.name, 'json').catch(() => null);
-        if (rec?.via === 'orbit' && (rec.o || '') === record.o && rec.sub?.endpoint === sub.endpoint) await kv.delete(k.name);
+        const subs = subsOf(rec);
+        const left = subs.filter(x => !(x.via === 'orbit' && (x.o || '') === o && x.endpoint === sub.endpoint));
+        if (left.length === subs.length) continue;
+        if (!left.length) await kv.delete(k.name);
+        else {
+          setSubs(rec, left);
+          await putRecord(kv, k.name, rec);
+        }
       }
-    } else {
-      delete record.via;
-      delete record.o;
     }
   } else if (path === '/push/schedule') {
     // News that happens once (a game's final score, a price reached) and was
@@ -502,7 +557,9 @@ export async function sendDue(env, now = Date.now()) {
   for (const [key, next] of await dueLists(kv)) {
     if (next > now + 60_000) continue;
     const record = await kv.get(key, 'json');
-    if (!record?.sub) continue;
+    // (Each device, the ones gone dropped as they answer.)
+    let subs = subsOf(record);
+    if (!subs.length) continue;
     const was = JSON.stringify(record);
     const keep = [];
     let gone = false;
@@ -529,11 +586,16 @@ export async function sendDue(env, now = Date.now()) {
         const own = String(item.title || '').replace('{place}', found.place ? `${found.place} ` : '');
         message = { ...message, title: found.title ? found.title.replace('{title}', own) : own, body: (item.body || found.body || '').replace('{result}', found.result || '') };
       }
-      const r = await sendPush(env, record.sub, decorate(app, record, message)).catch(e => `failed ${e?.message || e}`);
+      const answers = await Promise.all(subs.map(x => sendPush(env, x, decorate(app, x, message)).catch(e => `failed ${e?.message || e}`)));
+      const r = answers.includes('sent') ? 'sent' : answers.find(a => a !== 'gone') || 'gone';
       record.last = { at: now, r };
       if (r === 'sent' && item.tag) record.told = { ...Object.fromEntries(Object.entries(record.told || {}).filter(([, at]) => at > now - TOLD_MS)), [toldKey(item)]: now };
-      if (r === 'gone') gone = true;
-      else if (r === 'sent') sent++;
+      if (answers.includes('gone')) {
+        subs = subs.filter((_, i) => answers[i] !== 'gone');
+        setSubs(record, subs);
+      }
+      if (!subs.length) gone = true;
+      if (r === 'sent') sent++;
     }
     if (gone) await kv.delete(key);
     else {
@@ -553,10 +615,18 @@ export async function notifyNow(env, account, app, kind, make) {
   if (!kv) return 'off';
   const key = recordKey(account, app);
   const record = await kv.get(key, 'json');
-  if (!record?.sub) return 'none';
+  const subs = subsOf(record);
+  if (!subs.length) return 'none';
   const prefs = await kv.get(prefsKey(account), 'json').catch(() => null);
   if (!wanted(prefs, app, { kind })) return 'off';
-  const r = await sendPush(env, record.sub, decorate(app, record, make(record.lang)));
-  if (r === 'gone') await kv.delete(key);
-  return r;
+  const answers = await Promise.all(subs.map(x => sendPush(env, x, decorate(app, x, make(record.lang))).catch(e => `failed ${e?.message || e}`)));
+  if (answers.includes('gone')) {
+    const left = subs.filter((_, i) => answers[i] !== 'gone');
+    if (!left.length) await kv.delete(key);
+    else {
+      setSubs(record, left);
+      await putRecord(kv, key, record);
+    }
+  }
+  return answers.includes('sent') ? 'sent' : answers.find(a => a !== 'gone') || 'gone';
 }

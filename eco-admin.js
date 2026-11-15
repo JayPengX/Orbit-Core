@@ -18,7 +18,7 @@ import { REC_WEEKLY, REC_PREFIX } from './rec-weekly.js';
 import { doorReport, doorSet } from './door.js';
 import { systemReport, alertAccount, tell, OPS_DOC, beats } from './ops.js';
 import { passAccount, updateWallet, deleteAccount, ECO_APPS, NOW_COLLECTION, WALLET_COLLECTION, INBOX_COLLECTION, SHARE_COLLECTION, PAIR_COLLECTION, PAIR_MS, ECO_LIMITS, parseWallet, poolBalance, gen, emptyWallet, levelOf, LEVELS, mintPass } from './eco.js';
-import { sendPush, dueLists, pushStore, decorate } from './push.js';
+import { sendPush, dueLists, pushStore, decorate, subsOf } from './push.js';
 import { usage as transitUsage, CAPS as TRANSIT_CAPS, TDX_POINTS, TDX_BOOK, tdxPoints, tdxGuard, tdxUse, tdxPlan } from './transit.js';
 import { aiUse, callsSince } from './gemini-use.js';
 import { moneyLeft, spendOf, healthOf, PROVIDERS, MODELS } from './ai.js';
@@ -427,15 +427,28 @@ export function creditOf(wallet) {
   };
 }
 // The plain words for a push service's answer (sendPush's), the gone one removed.
+// Each service by who runs it and what device it means (Jay 11-15: not every
+// device is Apple's), and where to look when a notice taken doesn't show.
+const PUSH_SERVICES = [
+  [/(^|\.)push\.apple\.com$/, 'Apple', 'iPhone、iPad 或 Mac 的 Safari', '請看裝置的「設定 › 通知」裡這個 App 是否允許通知、是否開著專注模式'],
+  [/(^|\.)googleapis\.com$/, 'Google', 'Chrome 或 Android', '請看瀏覽器或 Android 的通知權限，以及電腦系統是否允許 Chrome 通知'],
+  [/mozilla\.com$/, 'Mozilla', 'Firefox', '請看 Firefox 的網站通知權限，以及電腦系統是否允許 Firefox 通知'],
+  [/notify\.windows\.com$/, 'Microsoft', 'Edge（Windows）', '請看 Edge 的網站通知權限，以及 Windows 的「通知」設定']
+];
+export function pushServiceOf(host) {
+  const hit = PUSH_SERVICES.find(([re]) => re.test(String(host || '')));
+  return hit ? { who: hit[1], device: hit[2], look: hit[3] } : { who: '推播服務', device: '', look: '請看裝置的通知設定' };
+}
 export async function pushTestResult(r, host, remove) {
-  const who = /apple/.test(host) ? 'Apple' : host || '推播服務';
-  if (r === 'sent') return { ok: true, result: r, state: 'sent', host, text: `${who} 已收下通知（送達與否由手機決定；若沒出現，請檢查 iPhone 的通知設定與是否開著主畫面 App）。` };
+  const { who, device, look } = pushServiceOf(host);
+  const by = device ? `${who}（${device}）` : who;
+  if (r === 'sent') return { ok: true, result: r, state: 'sent', host, service: who, device, text: `${by}已收下通知。幾秒內沒出現的話，${look}。` };
   if (r === 'gone') {
     await remove();
-    return { ok: false, result: r, state: 'gone', host, removed: true, text: `${who} 說這個訂閱已失效（404/410），已刪除。請在手機上重新開啟通知。` };
+    return { ok: false, result: r, state: 'gone', host, service: who, device, removed: true, text: `${by}說這個裝置的通知已失效（App 被移除或通知被關掉），已刪除。請本人在裝置上重新開啟通知。` };
   }
   const code = /^failed (\d{3})/.exec(r)?.[1] || '';
-  return { ok: false, result: r, state: 'failed', host, status: code ? Number(code) : null, text: code ? `${who} 拒絕了（狀態碼 ${code}）。` : `送出失敗（${r}）。` };
+  return { ok: false, result: r, state: 'failed', host, service: who, device, status: code ? Number(code) : null, text: code ? `${by}拒絕了（狀態碼 ${code}）。` : `送出失敗（${r}）。` };
 }
 // Push records in D1 (pushStore): push:<account>:<app> ({ sub, items, last, told }).
 async function pushRecords(env, prefix = 'push:') {
@@ -710,8 +723,8 @@ export const ADMIN_TOOLS = {
     return { records: live.length, accounts: new Set(live.map(r => r.account)).size, orphans: records.length - live.length, apps, list, due: next.length, next: next[0] || null };
   },
   // A test notice to one account's device for one app. Answers per subscription:
-  // state 'none' (nothing saved), 'sent' (taken by the push service, Apple's
-  // web.push.apple.com for an iPhone), 'gone' (404/410: removed) or 'failed'
+  // state 'none' (nothing saved), 'sent' (taken by the push service: Apple's
+  // for an iPhone, Google's for Chrome, pushServiceOf), 'gone' (404/410: removed) or 'failed'
   // (its status code).
   async 'push-test'({ env, deps, body }) {
     const hit = await findWallet(env, deps, body.wallet);
@@ -722,35 +735,44 @@ export const ADMIN_TOOLS = {
     const asked = String(body.app || '');
     const apps = asked ? [asked] : (kv ? await pushRecords(env, `push:${hit.id}:`).catch(() => []) : []).map(r => r.app);
     const results = [];
+    // Every device's (push.js subsOf): one answer each, named by the device and the home-screen app on it.
     for (const app of apps) {
       const key = `push:${hit.id}:${app}`;
       const record = kv ? await kv.get(key, 'json').catch(() => null) : null;
       const name = BRANDS[app]?.short || app;
-      if (!record?.sub) {
+      const subs = subsOf(record);
+      if (!subs.length) {
         results.push({ app, name, error: 'ADMIN_NO_PUSH', status: 404, state: 'none', text: `這個帳戶在 ${name} 沒有訂閱通知。` });
         continue;
       }
-      const host = (() => {
-        try {
-          return new URL(record.sub.endpoint).host;
-        } catch {
-          return '';
-        }
-      })();
-      const message = decorate(app, record, { title: 'Orbit 測試通知', body: '這是管理頁送出的測試通知，收到代表通知正常。', tag: `test:${deps.now()}` });
-      const r = String(await sendPush(env, record.sub, message).catch(e => `failed ${String(e?.message || e).slice(0, 120)}`));
-      const done = await pushTestResult(r, host, async () => void (await kv.delete(key).catch(() => {})));
-      results.push({ ...done, app, name, via: record.via === 'orbit' ? 'orbit' : 'app', title: message.title, tag: message.tag });
+      const gone = [];
+      for (const sub of subs) {
+        const host = (() => {
+          try {
+            return new URL(sub.endpoint).host;
+          } catch {
+            return '';
+          }
+        })();
+        const message = decorate(app, sub, { title: 'Orbit 測試通知', body: '這是管理頁送出的測試通知，收到代表通知正常。', tag: `test:${deps.now()}` });
+        const r = String(await sendPush(env, sub, message).catch(e => `failed ${String(e?.message || e).slice(0, 120)}`));
+        const done = await pushTestResult(r, host, async () => void gone.push(sub.endpoint));
+        const via = sub.via === 'orbit' ? 'orbit' : 'app';
+        const where = `${sub.dev || pushServiceOf(host).device || '裝置'}・${via === 'orbit' ? '在 Orbit 裡' : `${name} 自己的 App`}`;
+        results.push({ ...done, app, name, dev: sub.dev || '', via, where, endpoint: sub.endpoint, title: message.title, tag: message.tag });
+      }
+      if (gone.length) {
+        const left = subs.filter(x => !gone.includes(x.endpoint));
+        if (!left.length) await kv.delete(key).catch(() => {});
+        else await kv.put(key, JSON.stringify({ ...record, sub: undefined, via: undefined, o: undefined, subs: left }), { expirationTtl: 60 * 86_400, metadata: { due: record.items?.length ? record.items[0].at : 0 } }).catch(() => {});
+      }
     }
-    // The endpoint is shared when two apps' records have the same address (an Orbit's one worker).
-    if (!asked) {
-      const ends = new Map();
-      for (const app of apps) ends.set(app, (await kv.get(`push:${hit.id}:${app}`, 'json').catch(() => null))?.sub?.endpoint || '');
-      for (const r of results) r.shared = Boolean(ends.get(r.app)) && [...ends.values()].filter(e => e === ends.get(r.app)).length > 1;
-    }
-    if (asked) return results[0];
+    // The endpoint is shared when two apps go to the same address (an Orbit's one worker).
+    for (const r of results) r.shared = Boolean(r.endpoint) && results.filter(x => x.endpoint === r.endpoint).length > 1;
+    for (const r of results) delete r.endpoint;
+    if (asked && results.length === 1) return results[0];
     if (!results.length) return { error: 'ADMIN_NO_PUSH', status: 404, state: 'none', apps: [], text: '這個帳戶沒有任何 App 訂閱通知。' };
-    return { ok: results.every(r => r.ok), apps: results, state: results.every(r => r.state === 'sent') ? 'sent' : 'mixed', text: results.map(r => `${r.name}：${r.text}`).join('\n') };
+    return { ok: results.every(r => r.ok), apps: results, state: results.every(r => r.state === 'sent') ? 'sent' : 'mixed', text: results.map(r => `${r.name}${r.where ? `（${r.where}）` : ''}：${r.text}`).join('\n') };
   },
   // An account gone for good, used or not, at its owner's request or the
   // owner's call: its wallet, every app's data, its inbox, the share keys it
@@ -858,10 +880,11 @@ export const ADMIN_TOOLS = {
       await Promise.all(
         records.slice(i, i + 20).map(async r => {
           const rec = await kv.get(r.key, 'json').catch(() => null);
-          if (!rec?.sub) return;
-          const res = String(await sendPush(env, rec.sub, { title, body: text, tag }).catch(e => String(e?.message || e)));
-          out[res === 'sent' ? 'sent' : res === 'gone' ? 'gone' : 'failed']++;
-          if (res === 'gone') await kv.delete(r.key).catch(() => {});
+          const subs = subsOf(rec);
+          if (!subs.length) return;
+          const answers = await Promise.all(subs.map(x => sendPush(env, x, { title, body: text, tag }).then(String, e => String(e?.message || e))));
+          for (const res of answers) out[res === 'sent' ? 'sent' : res === 'gone' ? 'gone' : 'failed']++;
+          if (answers.every(res => res === 'gone')) await kv.delete(r.key).catch(() => {});
         })
       );
     return { ok: true, asked: records.length, ...out };
