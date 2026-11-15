@@ -258,13 +258,13 @@
   try {
     framed = window.parent !== window && !!window.parent.ORBIT_HOST;
   } catch (e) {}
-  // (A computer's browser: Orbit's too, Jay 11-15, every app's page is Orbit's there.)
-  var computer = false;
+  // (An app's page on its own, in any browser, a phone's too: Orbit's screen as well,
+  // Jay 11-15 "the two logos loading screen"; no app's own loading screen any more.)
+  var alone = false;
   try {
-    var bua = navigator.userAgent || '';
-    computer = window.top === window && !navigator.webdriver && !/iPhone|iPad|iPod|Android/i.test(bua) && !(/Macintosh/.test(bua) && navigator.maxTouchPoints > 1);
+    alone = window.top === window && !navigator.webdriver;
   } catch (e) {}
-  if ((framed || computer) && !launch) {
+  if ((framed || alone) && !launch) {
     logo = '/app/favicon.svg';
     launch = 1;
   }
