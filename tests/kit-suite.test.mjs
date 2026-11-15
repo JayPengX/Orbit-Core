@@ -74,13 +74,17 @@ test('an app opens where it was left, lately; else at its start', () => {
   assert.equal(S.lastApp({}), null);
 });
 
-test('Orbit is only in its own window: the separate apps never turn into it', () => {
+test('every home-screen window is Orbit’s: an old app icon’s window turns into it, never left a separate app', () => {
   const kit = readFileSync(new URL('../kit/orbit.mjs', import.meta.url), 'utf8');
   // iPhone and iPad only by the device's mark (each home-screen app its own storage); elsewhere by the window's own.
   assert.match(kit, /export function inSuite\(\)[\s\S]{0,400}sessionStorage\?\.getItem\('orbit\.suite'\) === '1'[\s\S]{0,200}isIOS\(\) && isStandalone\(\)/);
-  // Its door goes on to an app only in Orbit's own window, never inside another app's.
+  // (Jay 11-15: an old app icon still opened the app alone, no switcher.) Its door marks any
+  // home-screen window Orbit's, and an app page in a window that isn't goes into Orbit (once in a few seconds).
   const door = readFileSync(new URL('../site/app/index.html', import.meta.url), 'utf8');
-  assert.match(door, /ss\.getItem\('orbit\.window'\) && ss\.getItem\('orbit\.suite'\) !== '1'/);
+  assert.doesNotMatch(door, /orbit\.window/);
+  assert.match(kit, /m\.intoOrbit\(\{ standalone: isStandalone\(\), phone: isPhoneOrTablet\(\) \}\)/);
+  const suite = readFileSync(new URL('../kit/suite.mjs', import.meta.url), 'utf8');
+  assert.match(suite, /export function intoOrbit[\s\S]{0,500}orbit\.into[\s\S]{0,300}location\.replace\(`\/app\/\?open=/);
   const manifest = JSON.parse(readFileSync(new URL('../site/app/manifest.webmanifest', import.meta.url), 'utf8'));
   assert.equal(manifest.scope, '/');
   assert.equal(manifest.start_url, '/app/');

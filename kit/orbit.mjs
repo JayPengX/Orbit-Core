@@ -2025,7 +2025,10 @@ function makeSession(app, { lang, heartbeat }) {
     const now = (res.wallet || wallet)?.vault;
     if (now && now.id !== id) return { ...res, payload: '' };
     if (!locked) ((locked = true), emit('locked', true));
-    return res;
+    // (Never a page stuck loading on data it can't read, Jay 11-15: this
+    // device's own last copy shown meanwhile, else nothing; nothing saved
+    // over the locked data till the key comes, write's ECO_PAYLOAD_LOCKED.)
+    return { ...res, payload: cachedPayload(app) ?? '', locked: true };
   }
   // The vault's key for this account on this device, or null: taken from the
   // Worker once where this device has none (eco.js ecoVaultKey: every signed-in
@@ -3776,7 +3779,23 @@ let keyWaiting = false;
 export function keyWait(s) {
   if (keyWaiting || typeof document === 'undefined' || !s?.vaultKey) return;
   keyWaiting = true;
-  const tryNow = () => s.locked && s.vaultKey().then(k => k && location.reload(), () => null);
+  // (Opened again once in a few minutes at most: a key that doesn't open the
+  // data never reloads the page over and over, Jay 11-15 "stuck loading".)
+  const tryNow = () =>
+    s.locked &&
+    s.vaultKey().then(
+      k => {
+        if (!k) return;
+        try {
+          if (Date.now() - (Number(sessionStorage.getItem('orbit.vault.reload')) || 0) < 180_000) return;
+          sessionStorage.setItem('orbit.vault.reload', String(Date.now()));
+        } catch {
+          return;
+        }
+        location.reload();
+      },
+      () => null
+    );
   setInterval(tryNow, 60_000);
   document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && tryNow());
   tryNow();
@@ -7352,5 +7371,10 @@ watchLive();
 if (typeof document !== 'undefined' && inSuite()) {
   import('./suite.mjs')
     .then(m => m.start())
+    .catch(() => {});
+} else if (typeof document !== 'undefined' && globalThis.top === globalThis && !globalThis.navigator?.webdriver) {
+  // (A window that isn't Orbit's: into it, suite.mjs intoOrbit.)
+  import('./suite.mjs')
+    .then(m => m.intoOrbit({ standalone: isStandalone(), phone: isPhoneOrTablet() }))
     .catch(() => {});
 }

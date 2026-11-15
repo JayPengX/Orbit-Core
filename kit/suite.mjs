@@ -748,6 +748,24 @@ const alone = () => {
   }
 };
 
+// An app's page in a window of its own that never learned it's Orbit's (an
+// old home-screen icon of one app keeps storage of its own, Jay 11-15: "still
+// return to the standalone app without the switcher"; a computer's tab):
+// into Orbit's window at that app. Not a phone's browser (installGate makes
+// it a one-app Orbit), and once in a few seconds at most, so a broken Orbit
+// page never bounces back and forth.
+export function intoOrbit({ standalone = false, phone = false } = {}) {
+  if (typeof document === 'undefined' || !appAt(location.pathname) || !alone() || (phone && !standalone)) return false;
+  try {
+    if (Date.now() - (Number(sessionStorage.getItem('orbit.into')) || 0) < 8000) return false;
+    sessionStorage.setItem('orbit.into', String(Date.now()));
+  } catch {
+    return false;
+  }
+  location.replace(`/app/?open=${encodeURIComponent(here())}`);
+  return true;
+}
+
 let started = false;
 export function start() {
   if (started || typeof document === 'undefined') return;
@@ -773,8 +791,13 @@ export function start() {
   // page's frame (the Showcase's demos), nor a browser driven by our tools
   // (preview.mjs, the layout check: navigator.webdriver), nor `?solo`.
   else if (alone()) {
-    location.replace(`/app/?open=${encodeURIComponent(here())}`);
-    return;
+    try {
+      if (Date.now() - (Number(sessionStorage.getItem('orbit.into')) || 0) >= 8000) {
+        sessionStorage.setItem('orbit.into', String(Date.now()));
+        location.replace(`/app/?open=${encodeURIComponent(here())}`);
+        return;
+      }
+    } catch {}
   }
   if (!H) land();
   remember();
