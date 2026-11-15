@@ -40,7 +40,7 @@ import { runNews, newsSite, newsClips } from './news.js';
 import { runFilings } from './filings.js';
 import { runNewsLaws } from './news-laws.js';
 import { runNewsMarkets } from './news-markets.js';
-import { runAi } from './ai.js';
+import { runAi, newsOpenFacts } from './ai.js';
 
 export const WINPROB_HOUR = 23;
 
@@ -76,6 +76,9 @@ export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[ne
   if (job === 'ai' || only === 'filings') await step('filings', () => runFilings({ store, now }));
   if (job === 'news' || only === 'news') {
     await step('news', () => runNews({ store, now }));
+    // (The facts a tap's 重點整理 and 各方怎麼說 are made from, with every news build: a 快訊 only
+    // minutes old wasn't in them till the next 'ai' run, half an hour later, and its tap failed, Jay 11-15.)
+    await step('newsOpen', () => newsOpenFacts({ store }));
     await step('newsSite', () => newsSite({ store, env, now }));
     await step('newsClips', () => newsClips({ store, env, now }));
     await step('newsLaws', () => runNewsLaws({ store, now }));
