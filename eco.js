@@ -1310,7 +1310,7 @@ const openSnap = v => isObj(v) && !isSealed(v.e) && Object.keys(v).some(k => !SN
 export const walletOpenParts = w => Object.values(w?.settings || {}).some(openSetting) || Object.values(w?.snap || {}).some(openSnap);
 // (From a day after the kits that open them went out: a phone on an older kit reads a locked
 // setting as unset.)
-export const PARTS_FROM = Date.parse('2026-11-15T10:30:00Z');
+export const PARTS_FROM = Date.parse('2026-11-15T10:00:00Z');
 export async function sealWalletParts(env, deps, docId, key, id) {
   if (deps.now() < PARTS_FROM) return 0;
   const w = parseWallet((await deps.fsGet(env, WALLET_COLLECTION, docId)).payload);
