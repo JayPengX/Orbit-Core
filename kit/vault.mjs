@@ -100,24 +100,52 @@ export async function unseal(key, payload) {
 // ---- The key on this device (IndexedDB; in memory where there's none) ----
 const DB = 'orbit-vault';
 const mem = new Map();
+// (Never waited on for long: iOS's IndexedDB can leave an open or a transaction
+// unanswered, and the first read of the data waited on it, the loading screen
+// stuck, Jay 11-15. Past `WAIT` it's as if nothing was kept: the key comes from
+// the Worker instead, kept in memory.)
+const WAIT = 1500;
+const inTime = p => Promise.race([p, new Promise(res => setTimeout(() => res(null), WAIT))]);
+let opening = null;
 function db() {
-  if (!globalThis.indexedDB) return null;
-  return new Promise(res => {
-    const r = indexedDB.open(DB, 1);
-    r.onupgradeneeded = () => r.result.createObjectStore('keys');
-    r.onsuccess = () => res(r.result);
-    r.onerror = () => res(null);
+  if (!globalThis.indexedDB) return Promise.resolve(null);
+  opening ||= inTime(
+    new Promise(res => {
+      try {
+        const r = indexedDB.open(DB, 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('keys');
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => res(null);
+        r.onblocked = () => res(null);
+      } catch {
+        res(null);
+      }
+    })
+  ).then(d => {
+    // (Not opened in time: asked again next time.)
+    if (!d) opening = null;
+    else d.onclose = () => (opening = null);
+    return d;
   });
+  return opening;
 }
 const tx = async (mode, fn) => {
   const d = await db();
   if (!d) return null;
-  return new Promise(res => {
-    const t = d.transaction('keys', mode);
-    const req = fn(t.objectStore('keys'));
-    t.oncomplete = () => res(req?.result ?? null);
-    t.onerror = () => res(null);
-  });
+  return inTime(
+    new Promise(res => {
+      try {
+        const t = d.transaction('keys', mode);
+        const req = fn(t.objectStore('keys'));
+        t.oncomplete = () => res(req?.result ?? null);
+        t.onerror = () => res(null);
+        t.onabort = () => res(null);
+      } catch {
+        opening = null;
+        res(null);
+      }
+    })
+  );
 };
 // The key of a vault, by the vault's id (an account's id moves with a new
 // pass; its vault doesn't). → the key or null.

@@ -2537,7 +2537,9 @@ function makeSession(app, { lang, heartbeat }) {
       }
       // (The wallet's own parts locked as they go too, where this device holds the key; else
       // sent open and locked by the Worker's next sweep: eco.js sealWalletParts.)
-      const key = patch && sealable() && wallet?.vault && !locked ? await keyNow() : null;
+      // (Only for a patch that carries them: a save of the data alone never waits on the key twice.)
+      const hasParts = patch && (Object.keys(patch.settings || {}).length || Object.keys(patch.snap || {}).length);
+      const key = hasParts && sealable() && wallet?.vault && !locked ? await keyNow() : null;
       const shut = key ? await V.sealParts(patch, key, wallet.vault.id, parts) : patch;
       return call('POST', qs({ app }), { op: 'write', qt, payload: sent, wallet: shut, w: wallet ? walletAt : '', ...keep });
     }).then(res => {
