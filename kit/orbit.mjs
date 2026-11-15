@@ -2034,7 +2034,7 @@ function makeSession(app, { lang, heartbeat }) {
   // device of the account; nothing to type).
   let asking = null;
   const fetchKey = () =>
-    (asking ||= withToken(qt => ecoCall('POST', '', { op: 'vault-key', qt }))
+    (asking ||= Promise.race([withToken(qt => ecoCall('POST', '', { op: 'vault-key', qt })), new Promise(res => setTimeout(() => res(null), 8_000))])
       .then(async r => {
         if (!r?.key || !r.id) return null;
         const key = await crypto.subtle.importKey('raw', V.unb64(r.key), 'AES-GCM', true, ['encrypt', 'decrypt']);
@@ -2381,7 +2381,10 @@ function makeSession(app, { lang, heartbeat }) {
     const ref = readStore(KEY.refresh);
     if (!ref) return signedOut();
     try {
-      const res = absorb(await call('POST', '', { op: 'refresh', refresh: ref, app, claim, data, inbox: data, w: wallet ? walletAt : '', since: data ? since : '', ...(nowTime != null ? { ns: nowTime } : {}), ...(famTime != null ? { fs: famTime } : {}) }));
+      // (Its token taken in before its data is opened: a device without the key
+      // asks the Worker for it with that token. Opened first, the ask waited on
+      // this very sign-in, forever: Jay 11-15, Weather stuck loading on a computer.)
+      const res = await openReply(absorb(await ecoCall('POST', '', { op: 'refresh', refresh: ref, app, claim, data, inbox: data, w: wallet ? walletAt : '', since: data ? since : '', ...(nowTime != null ? { ns: nowTime } : {}), ...(famTime != null ? { fs: famTime } : {}) })));
       if (data) sawData(res);
       if (res.same) res.wallet = wallet;
       return res;

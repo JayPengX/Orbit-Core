@@ -27,7 +27,7 @@
 //   sessionStorage orbit.suite     '1': this window is Orbit
 //   sessionStorage orbit.suite.trail { list: [{ app, url, y }], i }  the hops, for back and forward
 import { APP_ORDER, BRANDS, appIcon, pathOf } from './brand.mjs';
-import { appsOf, setupOf } from './orbit-mine.mjs';
+import { appsOf, setupOf, encodeSetup } from './orbit-mine.mjs';
 
 export const SUITE_KEY = 'orbit.suite.v1';
 export const SUITE_TAB = 'orbit.suite';
@@ -762,7 +762,10 @@ export function intoOrbit({ standalone = false, phone = false } = {}) {
   } catch {
     return false;
   }
-  location.replace(`/app/?open=${encodeURIComponent(here())}`);
+  // (An app's own old icon, added before Orbit: an Orbit of that app alone,
+  // nothing to switch to, Jay 11-15 "act like you only install one app".)
+  const one = standalone ? encodeSetup({ apps: [appAt(location.pathname)] }) : '';
+  location.replace(`/app/?open=${encodeURIComponent(here())}${one ? `&o=${one}` : ''}`);
   return true;
 }
 

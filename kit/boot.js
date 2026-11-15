@@ -25,6 +25,24 @@
 //   right is dropped or downloaded again. The app says it started with
 //   window.__fxStarted and hides #loading itself (the kit does).
 
+// ---- Into Orbit (kit suite.mjs intoOrbit moves an app's page into Orbit's
+// window once its modules load): the app's own loading screen never shown
+// first, Jay 11-15 "flashes between standalone load page and orbit load page".
+// Shown again after 3 s, should the move not come.
+(function () {
+  try {
+    var nav = navigator, ua = nav.userAgent || '';
+    var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || nav.standalone === true;
+    var phone = /iPhone|iPad|iPod|Android/i.test(ua) || (/Macintosh/.test(ua) && nav.maxTouchPoints > 1);
+    if (window.top !== window || nav.webdriver || /[?&]solo\b/.test(location.search) || (phone && !standalone)) return;
+    if (!/^\/(sports|transit|weather|class|money|news|words|beats|law|securities)(\/|$)/i.test(location.pathname)) return;
+    if (Date.now() - (Number(sessionStorage.getItem('orbit.into')) || 0) < 8000) return;
+    var el = document.documentElement;
+    el.style.visibility = 'hidden';
+    setTimeout(function () { el.style.visibility = ''; }, 3000);
+  } catch (e) {}
+})();
+
 // ---- 測試工具 (the tester's tools, kit testtools.mjs) ----
 // Set on this device only, after the unlock (Orbit Pass › tap 除錯紀錄 seven
 // times): a clock moved (every Date in the page runs from the time picked),
