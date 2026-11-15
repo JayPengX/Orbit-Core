@@ -225,7 +225,6 @@ export const DEV = {
   // 6 hours); the numbers above stay the owner's own, the floor.
   autoScale: { def: false, group: 'scale', zh: '依人數自動調整', en: 'Scale with people', note: '人數預估會超過 Cloudflare 的額度時，上面的即時更新一起放慢（每 6 小時檢查）；有空間就回到上面的設定' },
   // Orbit, every app in one (kit/suite.mjs): offered in the separate apps at a hop to another app.
-  suiteAsk: { def: false, group: 'orbit', zh: '推薦 Orbit（全部 App 合一）', en: 'Suggest Orbit (every app in one)', note: '分開的 App 點到別的 App 時建議改用 Orbit；可以拒絕，同一支手機最多 3 次、隔 14 天，按「不再提醒」就不再問' },
   // Set by the Worker, never in 設定 (no group shown there): whether the Pass's
   // recovery email can mail anyone (pass-mail.js; worker.js devBody).
   passMail: { def: false, group: 'worker', zh: '救援信箱能寄信', en: 'Recovery email can send' },

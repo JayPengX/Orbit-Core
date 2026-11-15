@@ -87,18 +87,6 @@ test('Orbit is only in its own window: the separate apps never turn into it', ()
   assert.equal(manifest.name, 'Orbit');
 });
 
-test('a separate app suggests Orbit at most 3 times, 14 days apart, never after 不再提醒', () => {
-  const now = Date.parse('2026-11-12T12:00:00Z');
-  assert.equal(S.askable(null, now), true);
-  assert.equal(S.askable({ n: 1, t: now - 86_400_000 }, now), false);
-  assert.equal(S.askable({ n: 1, t: now - S.ASK_EVERY }, now), true);
-  assert.equal(S.askable({ n: S.ASK_MAX, t: 0 }, now), false);
-  assert.equal(S.askable({ n: 0, t: 0, never: true }, now), false);
-  // Off until the owner turns it on (admin 開發), and only in a separate app on an iPhone or iPad.
-  const kit = readFileSync(new URL('../kit/orbit.mjs', import.meta.url), 'utf8');
-  assert.match(kit, /isIOS\(\) && isStandalone\(\) && dev\('suiteAsk'\) === true/);
-});
-
 test("back and forward go through the browser's own memory only when the neighbour is right there", () => {
   let n = 0;
   const id = () => `id${++n}`;
@@ -197,20 +185,10 @@ test("the 進行中 tab asks its app, once, for what's under way in full", async
   delete globalThis.sessionStorage;
 });
 
-test('a separate app recommends Orbit once a day at most, never after 不再顯示, opening this screen in Orbit', async () => {
-  const K = await import('../kit/orbit.mjs');
-  const now = Date.parse('2026-11-14T12:00:00Z');
-  assert.equal(K.tipDue({ now }), true);
-  assert.equal(K.tipDue({ at: String(now - 3_600_000), now }), false);
-  assert.equal(K.tipDue({ at: String(now - K.TIP_EVERY), now }), true);
-  assert.equal(K.tipDue({ never: '1', at: null, now }), false);
-  assert.ok(K.TIP_FOR <= 5_000, 'brief, so 不再顯示 is not the only way out');
-  assert.equal(K.orbitTarget('/sports/#game=1'), '/app/?open=%2Fsports%2F%23game%3D1');
-  // (An iPhone's home-screen app: Orbit's page in Safari, where it can be added.)
-  assert.equal(K.orbitTarget('/law/', { iosApp: true, origin: 'https://orbit.jaypengx.com' }), 'x-safari-https://orbit.jaypengx.com/app/');
-  // (A phone adds Orbit to its home screen: its plain page, so the icon doesn't always open this app.)
-  assert.equal(K.orbitTarget('/law/', { install: true }), '/app/');
-  // Never inside Orbit, a frame, a gated page or a tool's browser.
-  const kit = readFileSync(new URL('../kit/orbit.mjs', import.meta.url), 'utf8');
-  assert.match(kit, /if \(inSuite\(\) \|\| installCovered \|\| globalThis\.navigator\?\.webdriver\) return;/);
+test('no separate apps: an app’s page opened on its own goes into Orbit at that app (Jay 11-15), never inside a frame, a tool’s browser or ?solo', () => {
+  const kit = readFileSync(new URL('../kit/suite.mjs', import.meta.url), 'utf8');
+  assert.ok(kit.includes("return globalThis.top === globalThis && !globalThis.navigator?.webdriver && !/[?&]solo\\b/.test(location.search)"));
+  assert.ok(kit.includes('else if (alone()) {'));
+  const orbit = readFileSync(new URL('../kit/orbit.mjs', import.meta.url), 'utf8');
+  assert.ok(!/function orbitTip|function movedGate|suiteAsk/.test(orbit), 'the separate apps’ banner, signed-out screen and offer are gone');
 });

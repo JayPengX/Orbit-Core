@@ -8107,31 +8107,6 @@ html.q-tabrail .q-suite-dot {
   color: var(--q-label-2);
   font: 500 15px/1 var(--q-font);
 }
-.q-suite-offer {
-  display: grid;
-  justify-items: center;
-  gap: 10px;
-  padding: 4px 20px 12px;
-  text-align: center;
-}
-.q-suite-offer-mark {
-  width: 72px;
-  height: 72px;
-  border-radius: 16px;
-}
-.q-suite-offer h3 {
-  margin: 6px 0 0;
-  color: var(--q-label);
-  font: 700 22px/1.25 var(--q-font);
-}
-.q-suite-offer p {
-  margin: 0 0 8px;
-  color: var(--q-label-2);
-  font: 400 15px/1.4 var(--q-font);
-}
-.q-suite-offer .q-btn {
-  width: 100%;
-}
 .q-suite-never {
   margin-top: 2px;
   padding: 10px;

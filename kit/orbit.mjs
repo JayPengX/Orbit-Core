@@ -1955,7 +1955,6 @@ export function orbitSession(app, { lang = detectLang(), heartbeat = 120_000 } =
   if (help && typeof document !== 'undefined') setTimeout(() => !document.querySelector('dialog[open]') && openHelp(made, help[1], help[2] || null), 800);
   made.app ??= app;
   made.on('wallet', () => msTick(made));
-  if (typeof document !== 'undefined') setTimeout(() => orbitTip(made), 3500);
   dataSession = made;
   return made;
 }
@@ -2553,9 +2552,6 @@ function makeSession(app, { lang, heartbeat }) {
       // wallet stands in until the next try.
       first = error?.code === 'ORBIT_FULL' ? await waitInLine(s, error, () => refresh({ claim: true, data })) : { offline: true, error };
     }
-    // (A separate app on its own home-screen icon, signed out: not signed in
-    // again there, Jay 11-14; it's in Orbit now. Signed in, it opens as ever.)
-    if (!first && typeof document !== 'undefined' && APPS[app] && isStandalone() && !inSuite()) return movedGate(app, lang);
     if (!first) first = await signInGate(s);
     // A pass someone handed over: replaced before the app opens (the
     // Worker opens nothing else with it; eco.js freshPass).
@@ -2609,12 +2605,6 @@ function makeSession(app, { lang, heartbeat }) {
     if (inSuite()) {
       try {
         return (await import('./suite.mjs')).go(other, hash);
-      } catch {}
-    }
-    // (A separate app on an iPhone or iPad: Orbit offered now and then, kit suite.mjs offer.)
-    if (isIOS() && isStandalone() && dev('suiteAsk') === true) {
-      try {
-        if ((await (await import('./suite.mjs')).offer({ to: other, lang: s.lang })) === 'stay') return;
       } catch {}
     }
     let target = appUrl(other, hash);
@@ -4205,59 +4195,9 @@ function offerNotices(s) {
   bannerEl = el;
 }
 
-// A separate app (its own page or home-screen icon, not Orbit's window):
-// a quiet banner recommends Orbit, every app in one (Jay 2026-11-14: "push
-// orbit as the main way ... they can turn it off in a one time action").
-// At most once a day on a device, gone by itself after 5 s; 打開 Orbit
-// opens this same screen in Orbit (an iPhone's home-screen app: Orbit's page
-// in Safari, to be added); 不再顯示 is one tap, kept for good. Never inside
-// Orbit, a frame, a gated page, a tool's browser, or over a dialog or banner.
-export const TIP_NEVER = 'orbit.tip.never';
-export const TIP_AT = 'orbit.tip.at';
-export const TIP_EVERY = 86_400_000;
+// How long a quiet banner stays (quietTip): brief, so 不再顯示 is never the only way out.
 export const TIP_FOR = 5_000;
-export function tipDue({ never = null, at = null, now = Date.now() } = {}) {
-  if (never) return false;
-  return !(Number(at) > 0) || now - Number(at) >= TIP_EVERY;
-}
-// (On a phone Orbit is to be added to the home screen: its plain page, so
-// the icon added doesn't open this app every time; an iPhone's home-screen
-// app sends it to Safari, where it can be added. Elsewhere this screen in Orbit.)
-export function orbitTarget(path = '/', { install = false, iosApp = false, origin = '' } = {}) {
-  if (iosApp) return `x-safari-${origin}/app/`;
-  return install ? '/app/' : `/app/?open=${encodeURIComponent(path || '/')}`;
-}
-function orbitTip(s) {
-  if (typeof document === 'undefined' || !document.body || !APPS[s.app]) return;
-  if (inSuite() || installCovered || globalThis.navigator?.webdriver) return;
-  try {
-    if (globalThis.top !== globalThis.self) return;
-  } catch {
-    return;
-  }
-  if (/^\/app\//.test(location.pathname) || /^\/pass\//.test(location.pathname)) return;
-  if (!tipDue({ never: readStore(TIP_NEVER), at: readStore(TIP_AT) })) return;
-  if (document.visibilityState === 'hidden' || document.querySelector('dialog[open]') || bannerEl?.isConnected) return;
-  writeStore(TIP_AT, String(Date.now()));
-  const T = (zh, e) => (s.lang === 'en' ? e : zh);
-  // (Brief, never in the way, so 不再顯示 isn't the only way out: quietTip.
-  // Jay 2026-11-14: "don't just hang there so long".)
-  quietTip({
-    accent: APPS[s.app].color,
-    mark: node('img', { src: `data:image/svg+xml,${encodeURIComponent(familyMark())}`, alt: '' }),
-    label: 'Orbit',
-    title: T('建議用 Orbit 打開', 'Try Orbit instead'),
-    line: T('所有 App 合一，登入一次。', 'Every app in one, signed in once.'),
-    go: T('打開 Orbit', 'Open Orbit'),
-    never: T('不再顯示', 'Don’t show again'),
-    onGo: () => globalThis.location.assign(orbitTarget(`${location.pathname}${location.hash}`, { install: isPhoneOrTablet(), iosApp: isIOS() && isStandalone(), origin: location.origin })),
-    onNever: () => {
-      writeStore(TIP_NEVER, '1');
-      // (The older offer at a hop to another app, kit suite.mjs offer: asked no more either.)
-      writeStore('orbit.suite.ask.v1', JSON.stringify({ n: 3, t: Date.now(), never: true }));
-    }
-  });
-}
+
 
 // A quiet banner that asks for one thing (Orbit recommended, a passkey):
 // its mark, a line, a go button and 不再顯示 under the words. Brief (Jay
@@ -4993,33 +4933,6 @@ export function installGate(app, lang = detectLang(), as = null) {
   document.documentElement.classList.add('q-signing-in');
   document.getElementById('loading')?.setAttribute('hidden', '');
   return true;
-}
-// A separate app on its own icon, signed out (s.start): it isn't signed in
-// there again; Safari adds it as an Orbit of that app (installGate's
-// redirect), where the Pass brings everything back. Never resolves.
-function movedGate(app, lang) {
-  const en = lang === 'en';
-  const name = appName(app);
-  const url = homeOf(app);
-  const ios = isIOS();
-  const go = node('a', { class: 'q-btn primary block', href: ios ? `x-safari-${url}` : url, target: ios ? null : '_blank', rel: 'noopener', 'data-q-quick': '', text: en ? (ios ? 'Open in Safari' : 'Open in the browser') : ios ? '在 Safari 打開' : '用瀏覽器打開' });
-  // (Safari's address from Orbit's own window: iOS ignores it from an app's frame, Jay 11-15.)
-  if (ios) go.addEventListener('click', e => (e.preventDefault(), (outer().location.href = go.href)));
-  const gate = node('dialog', { class: 'q-gate q-install', 'aria-modal': 'true', style: `--q-accent:${APPS[app].color}` }, [
-    node('div', { class: 'q-gate-box' }, [
-      node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),
-      node('p', { class: 'q-gate-brand', text: 'ORBIT' }),
-      node('h1', { class: 'q-gate-title', text: en ? `${name} is in Orbit now` : `${name} 現在在 Orbit 裡` }),
-      node('p', { class: 'q-gate-lede', text: en ? `This icon no longer signs in. Add ${name} again from Safari: it comes as an Orbit of ${name} alone, and signing in there brings everything back.` : `這個圖示不能再登入。從 Safari 重新加入 ${name}，它會是只有 ${name} 的 Orbit，在那裡登入，資料都還在。` }),
-      go,
-      node('ol', { class: 'q-steps q-install-steps' }, (en ? [`Tap “${ios ? 'Open in Safari' : 'Open in the browser'}”.`, 'Follow the steps there to add it to your home screen.', 'Open it from the new icon and sign in.', 'This old icon can then be removed.'] : [`點「${ios ? '在 Safari 打開' : '用瀏覽器打開'}」。`, '照那裡的步驟加入主畫面。', '從新的圖示打開，登入。', '之後這個舊圖示可以刪掉。']).map(stepItem))
-    ])
-  ]);
-  for (const d of document.querySelectorAll('dialog[open]')) if (!onTop.has(d)) d.close();
-  keepOnTop(gate);
-  document.documentElement.classList.add('q-signing-in');
-  document.getElementById('loading')?.setAttribute('hidden', '');
-  return new Promise(() => {});
 }
 function copyButton(url, en, primary = true) {
   const copy = node('button', {
@@ -7102,6 +7015,41 @@ export const recClear = () => {
     localStorage.removeItem(REC_KEY);
   } catch {}
 };
+// How the frame is laid out right now (Jay 11-15: an iPad in Orbit's window
+// kept the rail's room but drew no tabs, account or switcher, and no tool
+// here shows it): the page's marks, its size and what the screen says, the
+// tab bar's and the actions' boxes and how they're drawn, Orbit's frame's.
+function layoutNow() {
+  if (typeof document === 'undefined') return null;
+  const box = sel => {
+    const e = document.querySelector(sel);
+    if (!e) return null;
+    const r = e.getBoundingClientRect();
+    const c = getComputedStyle(e);
+    return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), d: c.display, v: c.visibility, o: c.opacity, t: c.transform === 'none' ? '' : c.transform, p: c.position, z: c.zIndex };
+  };
+  let frame = null;
+  try {
+    const f = globalThis.frameElement;
+    if (f) {
+      const r = f.getBoundingClientRect();
+      frame = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), v: getComputedStyle(f).visibility, top: `${globalThis.top.innerWidth}x${globalThis.top.innerHeight}` };
+    }
+  } catch {}
+  const mq = q => Boolean(globalThis.matchMedia?.(q).matches);
+  return {
+    cls: document.documentElement.className,
+    vv: globalThis.visualViewport ? `${Math.round(visualViewport.width)}x${Math.round(visualViewport.height)}+${Math.round(visualViewport.offsetTop)}` : '',
+    pointer: mq('(pointer: coarse)') ? 'coarse' : mq('(pointer: fine)') ? 'fine' : '',
+    hover: mq('(hover: hover)'),
+    fit: screenNow,
+    tabbar: box('.q-tabbar'),
+    actions: box('#top-actions'),
+    appbar: box('.q-appbar'),
+    scroll: [Math.round(document.body?.scrollTop || 0), Math.round(document.documentElement.scrollTop || 0)],
+    frame
+  };
+}
 // Everything to send: where and what, the last of each kind, and the log.
 export function recDump(app = dataSession?.app || '') {
   const log = recRead();
@@ -7114,6 +7062,7 @@ export function recDump(app = dataSession?.app || '') {
       ua: typeof navigator !== 'undefined' ? navigator.userAgent : '',
       installed: typeof matchMedia !== 'undefined' && matchMedia('(display-mode: standalone)').matches,
       screen: typeof innerWidth !== 'undefined' ? `${innerWidth}x${innerHeight}@${devicePixelRatio}` : '',
+      layout: layoutNow(),
       last: Object.fromEntries([...recLast].filter(([, e]) => !log.some(x => x.at === e.at && x.kind === e.kind))),
       log
     },

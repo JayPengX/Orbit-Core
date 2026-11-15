@@ -715,16 +715,24 @@ function scrollsIn(el, stop) {
   return false;
 }
 
-// This page is the address Orbit's window put up for the app it showed
-// (site/app addressOf, sessionStorage orbit.addr), reloaded in that window
-// (a computer's tab): back into Orbit, there.
-function reloadedInOrbit() {
+// Shown again in Orbit's window: the bars pinned to the screen drawn afresh
+// (Jay 11-15, an iPad: an app shown again kept the rail's room but drew no
+// tabs, account or switcher; Safari can leave a hidden frame's fixed layers
+// unpainted until something lays them out again). Each taken out of the page's
+// layout and put back, in one frame: nothing moves.
+function repaintFixed() {
+  const bars = [...document.querySelectorAll('.q-tabbar, #top-actions, .q-appbar, .q-tab-action, .q-suite-desk')].map(b => [b, b.style.display]);
+  for (const [b] of bars) b.style.display = 'none';
+  void document.body?.offsetHeight;
+  for (const [b, was] of bars) b.style.display = was;
+}
+const alone = () => {
   try {
-    return sessionStorage.getItem('orbit.addr') === location.pathname && globalThis.top === globalThis;
+    return globalThis.top === globalThis && !globalThis.navigator?.webdriver && !/[?&]solo\b/.test(location.search);
   } catch {
     return false;
   }
-}
+};
 
 let started = false;
 export function start() {
@@ -740,13 +748,17 @@ export function start() {
   const H = hostOf();
   // (Held by Orbit's window: it keeps the trail; asked to redraw when shown.)
   if (H) {
-    globalThis.__orbitSuite = { draw: () => draw(), remember: () => remember(), app };
+    globalThis.__orbitSuite = { draw: () => (draw(), repaintFixed()), remember: () => remember(), app };
     if (globalThis.matchMedia?.('(pointer: coarse)').matches) ownScroll();
     sheetHold();
   }
-  // An app page opened as the whole window on a phone (a notice, an old
-  // trail): into Orbit's window, which holds it with the others.
-  else if (globalThis.matchMedia?.('(display-mode: standalone)').matches || globalThis.navigator?.standalone === true || reloadedInOrbit()) {
+  // An app's page opened as a window of its own (a link to orbit.jaypengx.com/
+  // sports/, a notice, an old home-screen icon, a reload): into Orbit's window,
+  // at that app (Jay 11-15: "the link … of individual app should still open
+  // that app in orbit … make standalone app no more"). Not inside another
+  // page's frame (the Showcase's demos), nor a browser driven by our tools
+  // (preview.mjs, the layout check: navigator.webdriver), nor `?solo`.
+  else if (alone()) {
     location.replace(`/app/?open=${encodeURIComponent(here())}`);
     return;
   }
@@ -1189,58 +1201,4 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
     show(first.app, first.url, first.y || 0);
   }
   return api;
-}
-
-// ---- In a separate app: Orbit suggested on a hop to another app ----
-// (Jay 2026-11-12: "recommend user to install it, but user can still decide
-// not to".) An iPhone or iPad's separate app opens another app in a Safari
-// sheet; at such a hop (the kit's s.go) Orbit is offered once in a while:
-// 取得 Orbit opens its page in Safari (to be added to the home screen), 先打開
-// goes on as always, 不再提醒 never asks again. At most 3 times, 14 days
-// apart, on this device; only while the owner's switch is on (DEV suiteAsk).
-export const ASK_KEY = 'orbit.suite.ask.v1';
-export const ASK_EVERY = 14 * 86_400_000;
-export const ASK_MAX = 3;
-export function askable(was, now = Date.now()) {
-  if (!was) return true;
-  if (was.never) return false;
-  return (Number(was.n) || 0) < ASK_MAX && now - (Number(was.t) || 0) >= ASK_EVERY;
-}
-// Resolves 'go' (open the other app as always) or 'stay' (Orbit's page was opened instead).
-export async function offer({ to, lang = 'zh', home = '/app/' } = {}) {
-  const was = readJson('localStorage', ASK_KEY);
-  if (!askable(was)) return 'go';
-  writeJson('localStorage', ASK_KEY, { n: (Number(was?.n) || 0) + 1, t: Date.now(), never: false });
-  const ui = await import('./ui.mjs');
-  const { familyMark } = await import('./brand.mjs');
-  const T = (zh, e) => (lang === 'en' ? e : zh);
-  const name = short(to);
-  return new Promise(done => {
-    let answer = 'go';
-    const pick = a => () => ((answer = a), s.close?.());
-    const mark = el('img', { class: 'q-suite-offer-mark', src: `data:image/svg+xml,${encodeURIComponent(familyMark())}`, alt: '', width: '72', height: '72' });
-    const body = el('div', { class: 'q-suite-offer' }, [
-      mark,
-      el('h3', { text: T('每個 App，都在 Orbit 裡', 'Every app, in Orbit') }),
-      el('p', { text: T('App 之間切換、返回都在原地，登入一次。', 'One icon: switch and go back between apps, signed in once.') }),
-      el('button', { class: 'q-btn primary block', type: 'button', text: T('取得 Orbit', 'Get Orbit'), onclick: pick('orbit') }),
-      el('button', { class: 'q-btn block', type: 'button', text: T(`先打開 ${name}`, `Open ${name} for now`), onclick: pick('go') }),
-      el('button', { class: 'q-suite-never', type: 'button', text: T('不再提醒', 'Don’t ask again'), onclick: pick('never') })
-    ]);
-    const s = ui.sheet({
-      title: '',
-      label: 'Orbit',
-      cls: 'q-suite-sheet',
-      body: [body],
-      onClose: () => {
-        if (answer === 'orbit') {
-          // (Safari itself, where the page can be added to the home screen.)
-          location.href = `x-safari-${new URL(home, location.href).href}`;
-          return done('stay');
-        }
-        if (answer === 'never') writeJson('localStorage', ASK_KEY, { ...(readJson('localStorage', ASK_KEY) || {}), never: true });
-        done('go');
-      }
-    });
-  });
 }
