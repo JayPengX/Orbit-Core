@@ -387,12 +387,49 @@ function drawTabs(H) {
 // put back each time).
 function place() {
   if (!bar) return;
+  deskOrbit();
   const rail = document.documentElement.classList.contains('q-tabrail');
   const into = rail ? document.getElementById('top-actions') : document.querySelector('.q-appbar-inner');
   if (!into) return;
   if (into.firstElementChild !== bar) into.prepend(bar);
   fit(rail && !document.documentElement.classList.contains('q-desk') ? into : null);
 }
+// Orbit on a computer (Jay 11-15: "orbit on computer browser should default
+// to orbit, not individual app"): the side bar is Orbit's, headed by its mark
+// and name, and under the app's tabs this Orbit's apps, the one shown lit, a
+// click away (the ⌄ sheet still there at the foot for what's open).
+let deskList = null;
+let familyIcon = '';
+function deskOrbit() {
+  const H = hostOf();
+  const desk = Boolean(H) && document.documentElement.classList.contains('q-desk');
+  const nav = document.querySelector('.q-tabbar');
+  if (!desk || !nav) return void (deskList?.remove(), (deskList = null));
+  if (!familyIcon) import('./brand.mjs').then(b => ((familyIcon = `url("data:image/svg+xml,${encodeURIComponent(b.familyMark())}")`), deskOrbit()));
+  nav.style.setProperty('--q-desk-name', JSON.stringify('Orbit'));
+  if (familyIcon) nav.style.setProperty('--q-desk-mark', familyIcon);
+  const ids = appsOf().length ? appsOf() : APP_ORDER;
+  const sig = `${ids.join()}|${app}`;
+  if (!deskList || deskList.dataset.sig !== sig) {
+    deskList?.remove();
+    deskList = el('nav', { class: 'q-suite-desk', 'aria-label': W('Orbit 的 App', 'Orbit’s apps') }, [
+      el('p', { class: 'q-suite-desk-h', text: 'App' }),
+      ...ids.map(id =>
+        el('button', { class: `q-suite-desk-a${id === app ? ' now' : ''}`, type: 'button', 'aria-current': id === app ? 'page' : null, onclick: () => id !== app && (remember(), H.go(id)) }, [img(id), el('span', { text: short(id) })])
+      )
+    ]);
+    deskList.dataset.sig = sig;
+    document.body.append(deskList);
+  }
+  // (Under the tabs and the app's action, wherever they end.)
+  let end = 0;
+  for (const e of document.querySelectorAll('.q-tabbar .q-tab, .q-tab-action')) {
+    const r = e.getBoundingClientRect();
+    if (r.height) end = Math.max(end, r.bottom);
+  }
+  deskList.style.top = `${Math.round(end + 18)}px`;
+}
+
 // A rail's foot is short of room on a phone on its side (five tabs and an
 // action leave about a tab's height): never over a tab. The most that fits,
 // in order: this app, back and forward one over the other; without forward;

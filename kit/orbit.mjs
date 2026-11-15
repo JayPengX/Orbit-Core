@@ -1858,7 +1858,15 @@ function watchScreen() {
     frame = requestAnimationFrame(() => ((frame = 0), measureScreen()));
   };
   globalThis.addEventListener?.('resize', again);
-  globalThis.screen?.orientation?.addEventListener?.('change', again);
+  // A turn of the iPad: measured again as it settles (Jay 11-15, an iPad
+  // turned upright in Orbit's window: its app kept the rail's room down the
+  // left and lost its tabs. Safari tells a frame of a resize before the
+  // frame has its new size, so the old one was measured and kept.)
+  const turned = () => (again(), [150, 450, 1000].forEach(ms => setTimeout(again, ms)));
+  globalThis.screen?.orientation?.addEventListener?.('change', turned);
+  globalThis.addEventListener?.('orientationchange', turned);
+  // (And whenever the page's own box changes size, however it was told.)
+  if (typeof ResizeObserver === 'function') new ResizeObserver(again).observe(document.documentElement);
   // (Shown again: an app in Orbit's window hidden as a tab, or the phone's
   // screen back on. A size change while hidden went unmeasured on an iPad,
   // the app laid out for the old one, its tab bar gone; Jay 11-14.)
@@ -3754,8 +3762,11 @@ export async function enablePush(s, force = false) {
     const storeKey = `orbit.push.sub.${s.app}`;
     if (!force && readStore(storeKey) === mark) return true;
     if (await pushPost(s, 'subscribe', { sub: sub.toJSON(), lang: s.lang, ...(orbit ? { via: 'orbit', o: orbit.o, apps: orbit.apps } : {}) })) writeStore(storeKey, mark);
+    else rec('push', { k: 'not-taken', host: new URL(sub.endpoint).host });
     return true;
-  } catch {
+  } catch (e) {
+    // (Why this device takes no notices, in 除錯紀錄: Jay 11-15, a computer that never got the test notice.)
+    rec('push', { k: 'failed', error: String(e?.name || e).slice(0, 40), message: String(e?.message || '').slice(0, 120), inSuite: inSuite() });
     return false;
   }
 }

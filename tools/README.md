@@ -78,8 +78,8 @@ wide screen's page in a narrow band down the middle, one half empty beside a
 full one (`tools/layout-faults.mjs`, also in an open wide sheet), and
 anything wider than the screen or sliding sideways. A shot that can't be
 taken (no network) is skipped, never a failure. `push.sh` runs it for an app
-whose visible files changed, and for every app on a change to the kit's
-CSS or frame. Each shot is taken once its page stops changing (`preview.mjs
+whose visible files changed, and for Sports, Money and Law on a change to the
+kit's CSS or frame (all ten took 14 minutes and never stopped a push, 11-15). Each shot is taken once its page stops changing (`preview.mjs
 --settle`: no loading screen or placeholder, the same elements and height,
 every picture in; 12 s at most) and drawn at 1×, four at a time: the same
 shots in about two thirds of the time. Every run shares one keep of the Workers' answers, 15 minutes

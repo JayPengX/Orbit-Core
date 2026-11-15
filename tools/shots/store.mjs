@@ -50,6 +50,8 @@ const TAIPEI = ['--geo', '25.0478,121.5170'];
 const MORNING = [];
 
 const SCHOOL = ['--clock', '2026-11-04T10:30'];
+// Sports: a Friday evening before a big weekend (the Premier League back after the break, NBA every night).
+const BIG_WEEKEND = ['--clock', '2026-11-21T20:00'];
 // Text typed in a field (found by selector) and sent as input.
 const type = (sel, text) => `js:(i=>{i.focus();i.value=${JSON.stringify(text)};i.dispatchEvent(new Event('input',{bubbles:true}))})(document.querySelector(${JSON.stringify(sel)}))`;
 // The open sheet's scrolled parts back at their top.
@@ -93,9 +95,12 @@ export const STORE = {
   sports: {
     app: 'sports', brand: 'match', show: 'sports', prefix: 'sports', account: 'fan',
     shots: [
-      { zh: '你的比賽，一打開就看到', en: 'Your games, the moment you open it', wait: 14000 },
-      { zh: '台灣轉播的 15 項賽事，全在這', en: 'All 15 competitions on TV in Taiwan', device: 'computer', args: click('#tab-matches', wait(5000), "js:[...document.querySelectorAll('[data-day]')].filter(e=>e.offsetParent&&/^(明天|Tmrw)/.test(e.textContent.trim())).forEach(e=>e.click())", wait(5000)), wait: 8000 },
-      { zh: '每場比賽在哪一台播，一次看', en: 'Every game, and the channel it’s on', page: 'guide', args: click("js:[...document.querySelectorAll('dialog.q-sheet[open] button')].filter(e=>e.offsetParent&&/^(明天|Tmrw)/.test(e.textContent.trim())).pop()?.click()", wait(4000)) },
+      // (Shots 1–3 on next weekend's slate, Jay 11-15: "screenshot should include popular
+      // game/team/player/sport, that's how ads work": the Premier League and a full NBA night,
+      // never an international break's Faroe Islands v Moldova.)
+      { zh: '你的比賽，一打開就看到', en: 'Your games, the moment you open it', wait: 14000, args: BIG_WEEKEND },
+      { zh: '台灣轉播的 15 項賽事，全在這', en: 'All 15 competitions on TV in Taiwan', device: 'computer', args: [...BIG_WEEKEND, ...click('#tab-matches', wait(5000), "js:[...document.querySelectorAll('[data-day]')].filter(e=>e.offsetParent&&/^(明天|Tmrw)/.test(e.textContent.trim())).forEach(e=>e.click())", wait(5000))], wait: 8000 },
+      { zh: '每場比賽在哪一台播，一次看', en: 'Every game, and the channel it’s on', page: 'guide', args: [...BIG_WEEKEND, ...click("js:[...document.querySelectorAll('dialog.q-sheet[open] button')].filter(e=>e.offsetParent&&/^(明天|Tmrw)/.test(e.textContent.trim())).pop()?.click()", wait(4000))] },
       // (never the win chance: it comes from betting prices, and the Showcase shows no betting)
       { zh: '打完的比賽，比分和誰最亮眼', en: 'A finished game: the score and who stood out', args: click('#tab-matches', '[data-league=nba]', wait(2500), yesterday, wait(3000), closeNba, wait(8000), sheetTop, wait(1500)) },
       { zh: '積分榜與爭冠形勢', en: 'The table and the title race', device: 'tablet', page: 'epl-table' },

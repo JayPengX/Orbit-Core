@@ -8146,3 +8146,59 @@ html.q-tabrail .q-suite-dot {
   width: 100%;
   margin: 0;
 }
+
+/* Orbit on a computer (kit suite.mjs deskOrbit): this Orbit's apps in its side
+   bar, under the app's tabs, the one shown lit. */
+.q-suite-desk {
+  position: fixed;
+  /* (over the side bar's own panel, kit .q-tabbar's 60) */
+  z-index: 61;
+  left: 12px;
+  width: calc(var(--q-desk-w) - 24px);
+  bottom: var(--q-desk-foot, 84px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 14px;
+  border-top: 1px solid var(--q-desk-edge);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.q-suite-desk-h {
+  margin: 0 12px 6px;
+  color: var(--q-label-3, var(--q-label-2));
+  font: 600 12px/16px var(--q-font);
+  letter-spacing: 0.02em;
+}
+.q-suite-desk-a {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--q-label);
+  font: 500 15px/20px var(--q-font);
+  text-align: start;
+  cursor: pointer;
+}
+.q-suite-desk-a img {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+.q-suite-desk-a.now {
+  background: color-mix(in srgb, var(--q-label) 8%, transparent);
+  font-weight: 600;
+}
+@media (hover: hover) {
+  .q-suite-desk-a:not(.now):hover {
+    background: color-mix(in srgb, var(--q-label) 6%, transparent);
+  }
+}
+html:not(.q-desk) .q-suite-desk {
+  display: none;
+}

@@ -478,6 +478,10 @@
   main [id] { scroll-margin-top: calc(env(safe-area-inset-top) + 76px); }
   /* Secondary lines (a label, a sub-line, a note) wrap onto a second line on a narrow screen, never cut with an ellipsis; names and figures stay on one line. */
   .tile small, .tile em, .kpi small, .kpi em, .hcell small, .hit small, .stats-strip small, .q-ritem-text > small { white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+.xp{width:min(920px,94vw);max-height:88vh;padding:0;border:0;border-radius:16px;background:var(--q-card,#1c1c1e);color:inherit}
+.xp-head{position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:inherit;border-bottom:1px solid rgba(127,127,127,.25)}
+.xp-body{padding:10px 18px 18px;overflow:auto;max-height:calc(88vh - 60px);font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}
+.xp-node{margin-left:14px}.xp-body>.xp-node{margin-left:0}.xp-node>summary{cursor:pointer}.xp-leaf{margin-left:28px;word-break:break-all}
 </style>
 </head>
 <body>
@@ -1415,6 +1419,71 @@ const sayOn = () => {
   if (b) (toast(b.querySelector('.ok').textContent), (b.saidAt = 0));
 };
 dialog.addEventListener('close', sayOn);
+// An account's export, decoded and laid out: each App's packed data (a
+// prefix like m1: or gz1:, then gzip in base64) unpacked, times as dates,
+// every level folded, the first two open.
+async function unpackAny(v) {
+  if (typeof v !== 'string') return v;
+  const m = /^([a-z]+\d*):([A-Za-z0-9+/=]+)$/.exec(v);
+  if (m && m[2].length > 16 && typeof DecompressionStream !== 'undefined') {
+    try {
+      const bin = Uint8Array.from(atob(m[2]), c => c.charCodeAt(0));
+      const text = await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+      try {
+        return { [`(${m[1]} 解開)`]: JSON.parse(text) };
+      } catch {
+        return text;
+      }
+    } catch {}
+  }
+  if (/^[[{]/.test(v)) try { return JSON.parse(v); } catch {}
+  return v;
+}
+async function decodeDeep(v, depth = 0) {
+  if (depth > 12) return v;
+  if (typeof v === 'string') {
+    const u = await unpackAny(v);
+    return u === v ? v : decodeDeep(u, depth + 1);
+  }
+  if (Array.isArray(v)) return Promise.all(v.map(x => decodeDeep(x, depth + 1)));
+  if (v && typeof v === 'object') {
+    const out = {};
+    for (const [k, x] of Object.entries(v)) out[k] = await decodeDeep(x, depth + 1);
+    return out;
+  }
+  return v;
+}
+const whenOf = n => (typeof n === 'number' && n > 1.5e12 && n < 2.2e12 ? new Date(n).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '');
+function treeOf(v, key = '', depth = 0) {
+  if (v && typeof v === 'object') {
+    const entries = Array.isArray(v) ? v.map((x, i) => [String(i), x]) : Object.entries(v);
+    const d = el('details', { class: 'xp-node' });
+    if (depth < 2) d.open = true;
+    d.append(el('summary', {}, [el('b', { text: key || '帳戶' }), el('span', { class: 'muted', text: Array.isArray(v) ? ` [${v.length}]` : ` {${entries.length}}` })]));
+    // (Long lists drawn as they're opened, 200 at a time.)
+    let shown = 0;
+    const more = () => {
+      for (const [k, x] of entries.slice(shown, shown + 200)) d.append(treeOf(x, k, depth + 1));
+      shown += 200;
+      if (shown < entries.length) d.append(el('button', { text: `再 ${entries.length - shown} 項`, onclick: e => (e.target.remove(), more()) }));
+    };
+    if (d.open) more();
+    else d.addEventListener('toggle', () => d.open && !shown && more(), { once: true });
+    return d;
+  }
+  const when = whenOf(v);
+  return el('div', { class: 'xp-leaf' }, [el('b', { text: `${key}: ` }), el('span', { text: typeof v === 'string' ? v : JSON.stringify(v) }), when ? el('span', { class: 'muted', text: `  ${when}` }) : null]);
+}
+async function showExport(ref, raw) {
+  const data = await decodeDeep(raw);
+  const d = el('dialog', { class: 'xp' }, [
+    el('div', { class: 'xp-head' }, [el('strong', { text: `帳戶 ${ref} 的資料（解開後）` }), el('button', { text: '關閉', onclick: () => d.close() })]),
+    el('div', { class: 'xp-body' }, [treeOf(data)])
+  ]);
+  d.addEventListener('close', () => d.remove());
+  document.body.append(d);
+  d.showModal();
+}
 async function openAccount(ref) {
   sayOn();
   $('acct-title').textContent = `帳戶 ${ref}`;
@@ -1538,12 +1607,17 @@ function drawAccount(a) {
     : null;
   if (clear) clearBtn.onclick = () => clear.run(clearBtn);
   const exportBtn = el('button', { class: 'primary', text: '下載 JSON' });
-  const exporter = action('匯出', '錢包和每個 App 的資料，原樣存成一個檔。', [exportBtn], async () => {
+  const exporter = action('匯出', '錢包和每個 App 的資料：存成一個檔，或解開了在這裡看。', [exportBtn], async view => {
     const r = await admin('export', { wallet: a.ref });
+    if (view === true) return void showExport(a.ref, r) || '已打開';
     el('a', { href: URL.createObjectURL(new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' })), download: `Orbit 帳戶 ${a.ref} ${new Date().toISOString().slice(0, 10)}.json` }).click();
     return '已下載';
   });
   exportBtn.onclick = () => exporter.run(exportBtn);
+  // (Read here, decoded: Jay 11-15, "make data export not just export but I can just view the decoded formatted version directly".)
+  const viewBtn = el('button', { text: '在這裡看' });
+  viewBtn.onclick = () => exporter.run(viewBtn, true);
+  exportBtn.after(viewBtn);
   const confirmRef = el('input', { class: 'grow', autocomplete: 'off', placeholder: `輸入 ${a.ref} 確認` });
   const delBtn = el('button', { class: 'danger', text: '刪除' });
   const del = action('刪除帳戶', 'Pass、錢包、所有 App 的資料和通知都刪掉。無法復原，建議先匯出。', [confirmRef, delBtn], async () => {

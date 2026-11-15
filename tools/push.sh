@@ -9,9 +9,10 @@
 #   - Orbit-Core with a kit/ change: every app's tests (tools/test-apps.mjs);
 #   - the layout check (tools/layout-check.mjs: every tab and sheet that
 #     matters at 320, an iPad and a laptop; no narrow band, no empty half, no
-#     overflow): an app's when its visible files changed, every app's when
-#     the kit's CSS or frame did (Jay 2026-11-06: "I hope I don't have to
-#     fix issue a third time"). Where no browser can run, it's skipped.
+#     overflow): an app's when its visible files changed, three apps' (Sports,
+#     Money, Law) when the kit's CSS or frame did (Jay 2026-11-06: "I hope I
+#     don't have to fix issue a third time"; 11-15: all ten took 14 minutes and
+#     never stopped a push). Where no browser can run, it's skipped.
 # The tree is rebased onto origin/main first; then `git push origin HEAD:main`.
 repo=$(git rev-parse --show-toplevel) || exit 1
 name=$(basename "$repo")
@@ -36,7 +37,10 @@ fi
 changed=$(git diff --name-only origin/main HEAD)
 apps=""
 case "$name" in
-  Orbit-Core) echo "$changed" | grep -qE '^kit/(orbit\.css|ui\.mjs|orbit\.mjs|hold-place\.mjs)$' && apps="sports transit weather orbit money news words beats law securities" ;;
+  # (A kit change: three apps that between them hold every kind of page, lists, sheets, tables,
+  # a map, a wide reader; Jay 11-15: "I wonder if layout check actually helped us before? If not
+  # should we cut it?": all ten took 14 minutes a push and never once stopped one.)
+  Orbit-Core) echo "$changed" | grep -qE '^kit/(orbit\.css|ui\.mjs|orbit\.mjs|hold-place\.mjs)$' && apps="sports money law" ;;
   Orbit-Class) echo "$changed" | grep -qE '^(src|css|public)/|^index\.html$' && apps=orbit ;;
   Orbit-Showcase) ;;
   Orbit-*) echo "$changed" | grep -qE '^public/' && apps=$(echo "${name#Orbit-}" | tr 'A-Z' 'a-z') ;;
