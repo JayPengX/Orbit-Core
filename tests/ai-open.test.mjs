@@ -115,3 +115,9 @@ test("a 'free' pass (eco.js levelOf) never has one made: refused without a call;
   assert.equal(kept.kept, true);
   assert.equal(env.calls(), 1);
 });
+
+test('a game with nothing worth telling is an answer, kept, never "the AI didn’t answer" (Jay 11-15, 看點)', async () => {
+  const { OPEN } = await import('../ai-open.js');
+  assert.deepEqual(OPEN['sports-preview'].out({ points: [] }, 'nba:1', { people: [] }), { points: [], who: {} });
+  assert.equal(OPEN['sports-preview'].out(null, 'nba:1', { people: [] }), null);
+});

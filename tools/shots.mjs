@@ -33,6 +33,7 @@
 // <out>/changes.png (with a comparison: each changed shot as before | after | diff),
 // <out>/manifest.json, and prints each shot's faults (wraps, cut, scrolls sideways,
 // wider than the screen, console errors). Exit code 1 when a shot has a fault.
+import './fonts.mjs';
 import { execFile, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';

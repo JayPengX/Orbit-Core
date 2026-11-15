@@ -39,7 +39,11 @@ export async function handleLawAudio(request, headers, fetcher = fetch) {
   const r = await fetcher(`https://drive.usercontent.google.com/download?id=${encodeURIComponent(id)}&export=download&confirm=t`, {
     method: request.method,
     headers: range ? { Range: range } : {},
-    redirect: 'follow'
+    redirect: 'follow',
+    // Kept at the edge a week (Jay 11-15: "the audio is loading super slowly and frequently just failed"): each
+    // range Drive answers takes ~1.7 s, and Safari asks for many (the start, the end where an .m4a keeps its
+    // index, each seek); once the edge has the file, every later one is answered from it.
+    cf: { cacheEverything: true, cacheTtl: 604800 }
   });
   if (r.status !== 200 && r.status !== 206) return fail(r.status === 416 ? 416 : 502, 'drive');
   const type = audioType(r.headers.get('Content-Disposition'), r.headers.get('Content-Type'));

@@ -4260,7 +4260,7 @@ export function adoptLinkWay(wallet) {
   writeStore(LINKS_KEY, JSON.stringify({ way: held.value === 'safari' ? 'safari' : 'quick', t: Number(held.t) }));
   return true;
 }
-const APP_LINKS = [/(^|\.)youtube\.com$/, /^youtu\.be$/, /^(apps|maps|music|podcasts|books)\.apple\.com$/, /^maps\.google\.[a-z.]+$/, /^maps\.app\.goo\.gl$/, /(^|\.)thsrc\.com\.tw$/, /(^|\.)eltaott\.tv$/];
+const APP_LINKS = [/^tv\.apple\.com$/, /(^|\.)youtube\.com$/, /^youtu\.be$/, /^(apps|maps|music|podcasts|books)\.apple\.com$/, /^maps\.google\.[a-z.]+$/, /^maps\.app\.goo\.gl$/, /(^|\.)thsrc\.com\.tw$/, /(^|\.)eltaott\.tv$/];
 export function opensApp(href) {
   let u;
   try {
@@ -4788,6 +4788,8 @@ function movedGate(app, lang) {
   const url = homeOf(app);
   const ios = isIOS();
   const go = node('a', { class: 'q-btn primary block', href: ios ? `x-safari-${url}` : url, target: ios ? null : '_blank', rel: 'noopener', 'data-q-quick': '', text: en ? (ios ? 'Open in Safari' : 'Open in the browser') : ios ? '在 Safari 打開' : '用瀏覽器打開' });
+  // (Safari's address from Orbit's own window: iOS ignores it from an app's frame, Jay 11-15.)
+  if (ios) go.addEventListener('click', e => (e.preventDefault(), (outer().location.href = go.href)));
   const gate = node('dialog', { class: 'q-gate q-install', 'aria-modal': 'true', style: `--q-accent:${APPS[app].color}` }, [
     node('div', { class: 'q-gate-box' }, [
       node('img', { class: 'q-gate-icon', src: './favicon.svg', alt: '', width: '72', height: '72' }),

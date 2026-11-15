@@ -14,6 +14,7 @@
 // Shots are real: live data, made-up accounts only (tools/shots/accounts).
 // A shot with a fault (text wrapping, cut, sideways scroll) is printed; look
 // at sheet.png before --apply. --out dir (default /tmp/orbit-store), --jobs 3, --clock (below).
+import './fonts.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync, renameSync, copyFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';

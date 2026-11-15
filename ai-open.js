@@ -98,7 +98,9 @@ export const OPEN = {
       return f ? { input: { facts: f.facts }, key: `v2:${start - now < 6 * 3_600_000 ? 'near' : 'far'}`, people: f.people } : null;
     },
     keep: 2 * DAY_S,
-    out: (out, id, f) => (out?.points?.length ? { points: out.points, who: whoIn(f.people, out.points.map(p => `${p.zh} ${p.en}`).join(' ')) } : null)
+    // (No points is an answer, kept like any: "nothing worth telling" for a game with thin facts was taken for a
+    // failure, a second model asked, and the phone said the AI didn't answer, each tap paying twice, Jay 11-15.)
+    out: (out, id, f) => (Array.isArray(out?.points) ? { points: out.points, who: out.points.length ? whoIn(f.people, out.points.map(p => `${p.zh} ${p.en}`).join(' ')) : {} } : null)
   }
 };
 

@@ -58,6 +58,7 @@ jobs:
           DISABLE_TELEMETRY: '1'
         run: |
           case "$TASK" in *[!A-Za-z0-9-]*|'') echo "bad task"; exit 1 ;; esac
+          sudo apt-get install -y -qq fonts-noto-cjk >/dev/null 2>&1 || true
           npm i -g --no-audit --no-fund @anthropic-ai/claude-code >/dev/null
           rules="You run unattended in GitHub Actions. Every Orbit repo is checked out beside this one (../Orbit-News, ../Orbit-Showcase, ...). Read CLAUDE.md and docs/RULEBOOK.md first, then only what the task needs. Commit your work in each repo you change (plain commit messages, no pushing: there are no push credentials, the patches are collected after you finish). Run the repo's npm test before each commit and do not commit red tests; skip the layout check and screenshots. Never print or use any secret. End with a short plain report: what you changed per repo, what you checked, and what is left."
           claude -p "$rules

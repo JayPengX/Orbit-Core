@@ -5,6 +5,7 @@
 // (kit/brand.mjs). Needs Playwright's Chromium:
 //   node brand/generate.mjs            everything
 //   node brand/generate.mjs match site  only those (looks: Orbit's alone)
+import '../tools/fonts.mjs';
 import { writeFile, readFile, mkdir, rm, access } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { existsSync } from 'node:fs';

@@ -9,6 +9,7 @@
 //
 // Retake after an app's screens change (a tab redrawn, a tab added): the
 // stops are the tour's (TOURS in kit/help.mjs); how each is reached is here.
+import './fonts.mjs';
 import { execFile, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';

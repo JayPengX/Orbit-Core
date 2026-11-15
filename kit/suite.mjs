@@ -419,6 +419,14 @@ function fit(foot) {
 let sheetOpen = null;
 // (An app's own button for it, where the top line is hidden: Transit's trip bar while navigating.)
 export const openSwitcher = () => switcher();
+// Orbit's own window, where this page is held in it (same origin), else this one.
+const topWin = () => {
+  try {
+    return globalThis.top !== globalThis && globalThis.top.location.origin === location.origin ? globalThis.top : globalThis;
+  } catch {
+    return globalThis;
+  }
+};
 // An Orbit of one app in its switcher: the app, then the way to the others.
 function soloCard(id) {
   const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -431,7 +439,8 @@ function soloCard(id) {
     el('div', { class: 'q-sw-solo-more' }, [
       el('strong', { text: W('想用其他 App？', 'Want other apps?') }),
       el('p', { text: W('在 Safari 打開 Orbit，選好 App，再加入主畫面。主畫面可以放好幾個 Orbit，這個照樣留著。', 'Open Orbit in Safari, pick the apps and add it to your home screen. A home screen holds several Orbits; this one stays.') }),
-      el('a', { class: 'q-btn block', href: ios ? `x-safari-${page}` : page, target: ios ? null : '_blank', rel: 'noopener', 'data-q-quick': '', text: W(ios ? '在 Safari 設定新的 Orbit' : '設定新的 Orbit', ios ? 'Set up a new Orbit in Safari' : 'Set up a new Orbit') })
+      // (Safari's address from Orbit's own window: from the app's frame, where this sheet is, iOS did nothing, Jay 11-15.)
+      el('a', { class: 'q-btn block', href: ios ? `x-safari-${page}` : page, target: ios ? null : '_blank', rel: 'noopener', 'data-q-quick': '', text: W(ios ? '在 Safari 設定新的 Orbit' : '設定新的 Orbit', ios ? 'Set up a new Orbit in Safari' : 'Set up a new Orbit'), onclick: ios ? e => (e.preventDefault(), (topWin().location.href = `x-safari-${page}`)) : null })
     ])
   ]);
 }
@@ -622,8 +631,13 @@ function ownScroll(w = globalThis, d = document) {
   // again): the body's scroll made afresh, where it was. An iPhone kept the old
   // one's measure, its scroll bar longer than the page and deaf to a hold
   // (Jay 11-14, News and family-wide).
+  // (Only after really being away: a "back on screen" told by the code (a pull to refresh, Orbit's window
+  // passing its own on) touched nothing, so a fling or a place being read was never cut short.)
+  let away = false;
   const anew = () => {
-    if (d.visibilityState !== 'visible') return;
+    if (d.visibilityState === 'hidden') return void (away = true);
+    if (!away) return;
+    away = false;
     const y = b.scrollTop;
     b.style.overflowY = 'hidden';
     void b.offsetHeight;
@@ -631,9 +645,10 @@ function ownScroll(w = globalThis, d = document) {
     b.scrollTop = y;
   };
   d.addEventListener('visibilitychange', anew);
+  w.addEventListener('pagehide', () => (away = true));
   w.addEventListener('pageshow', anew);
   try {
-    w.top.document.addEventListener('visibilitychange', () => w.top.document.visibilityState === 'visible' && setTimeout(anew, 0));
+    w.top.document.addEventListener('visibilitychange', () => (w.top.document.visibilityState === 'hidden' ? (away = true) : setTimeout(anew, 0)));
   } catch {}  // Dragged up past the foot: the page gives a little and comes back, the
   // same every time (Jay 11-15: "it only bounce once then it no longer
   // bounce"). A body already at its end hands an iPhone's drag to the frame

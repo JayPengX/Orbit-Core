@@ -14,6 +14,7 @@
 // Needs the app repos beside this one (as tools/test-apps.mjs), Chromium
 // (Playwright's), openssl, and port 443 free (it serves every host there:
 // Chromium maps every name to a loopback address of its own, one per run).
+import './fonts.mjs';
 import { createRequire } from 'node:module';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';

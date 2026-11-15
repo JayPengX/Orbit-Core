@@ -2,6 +2,8 @@
 
 On the owner's Mac: Node 22 in `~/.local/opt/node`, Playwright (WebKit and
 Chromium) in `~/.local/opt/playwright`; `preview.mjs` finds them itself.
+On Linux (the cloud, Actions) every tool that starts a browser imports `fonts.mjs` first: Chinese is
+drawn in Noto Sans CJK TC (`apt-get install fonts-noto-cjk`), never the JP fallback's shapes.
 
 ## `node tools/shots.mjs <app> [page…]`: every screenshot a change needs
 

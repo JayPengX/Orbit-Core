@@ -15,6 +15,7 @@
 // A shot that can't be taken (no network, the live data down) is said and
 // skipped, never a failure: the check is about the layout, not the day's
 // data. Exits 1 when a shot has one of the faults above.
+import './fonts.mjs';
 import { execFile } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';

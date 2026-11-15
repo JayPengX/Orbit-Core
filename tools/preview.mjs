@@ -59,6 +59,7 @@
 //   - writes <out>/<app>-<hash>[-en][-<click>].png and prints the page's console errors.
 //
 // Needs Playwright (global in the container: /opt/node22/lib/node_modules).
+import './fonts.mjs';
 import { siteReader } from '../kit/data-pack.mjs';
 import { layoutFaults } from './layout-faults.mjs';
 import { createServer } from 'node:http';

@@ -46,6 +46,7 @@
 // four live refreshes untouched: the page stays where it was put. No game on
 // anywhere: said, and skipped. --live-only: just that.
 // (The kit's hold-place.mjs is what holds it; this checks it still does.)
+import './fonts.mjs';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
