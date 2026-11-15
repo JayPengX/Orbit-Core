@@ -480,7 +480,9 @@
   .tile small, .tile em, .kpi small, .kpi em, .hcell small, .hit small, .stats-strip small, .q-ritem-text > small { white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
 .xp{width:min(920px,94vw);max-height:88vh;padding:0;border:0;border-radius:16px;background:var(--q-card,#1c1c1e);color:inherit}
 .xp-head{position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:inherit;border-bottom:1px solid rgba(127,127,127,.25)}
-.xp-body{padding:10px 18px 18px;overflow:auto;max-height:calc(88vh - 60px);font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}
+.xp-body{padding:10px 18px 18px;overflow:auto;max-height:calc(88vh - 60px);font:13px/1.5 system-ui}
+.xp-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:6px 0 14px}.xp-card{padding:10px 12px;border-radius:12px;background:rgba(127,127,127,.12);display:grid;gap:2px}.xp-card small{opacity:.65;font:12px system-ui}.xp-card b{font:600 16px system-ui}
+.xp-sec{margin:0 0 16px}.xp-sec h3,.xp-sec>summary{font:600 15px system-ui;margin:0 0 6px;cursor:pointer}.xp-t{width:100%;border-collapse:collapse;font:13px system-ui}.xp-t th{text-align:left;opacity:.6;font-weight:500;padding:4px 6px;border-bottom:1px solid rgba(127,127,127,.3)}.xp-t td{padding:5px 6px;border-bottom:1px solid rgba(127,127,127,.12);word-break:break-word}.xp-find{width:100%;margin:6px 0 8px;padding:8px 10px;border-radius:10px;border:1px solid rgba(127,127,127,.35);background:transparent;color:inherit;font:14px system-ui}.xp-raw{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}
 .xp-node{margin-left:14px}.xp-body>.xp-node{margin-left:0}.xp-node>summary{cursor:pointer}.xp-leaf{margin-left:28px;word-break:break-all}
 </style>
 </head>
@@ -1487,11 +1489,49 @@ function treeOf(v, key = '', depth = 0) {
   const when = whenOf(v);
   return el('div', { class: 'xp-leaf' }, [el('b', { text: `${key}: ` }), el('span', { text: typeof v === 'string' ? v : JSON.stringify(v) }), when ? el('span', { class: 'muted', text: `  ${when}` }) : null]);
 }
+// The account, laid out to read (Jay 11-15: "not a proper UI"): who it is,
+// its money's entries as a table, its settings, each app's last use and its
+// data (🔒 sealed: only the account's devices open it, PRIVACY.md), its
+// passkeys; the rest decoded and searchable under 全部資料.
 async function showExport(ref, raw) {
   const data = await decodeDeep(raw);
+  const w = data.wallet || {};
+  const when = t => whenOf(Number(t)) || (t ? String(t) : '—');
+  const nt = n => (typeof n === 'number' ? `NT$${Math.round(n).toLocaleString('en-US')}` : '—');
+  const sec = (title, body) => el('section', { class: 'xp-sec' }, [el('h3', { text: title }), body]);
+  const table = (head, rows) => el('table', { class: 'xp-t' }, [el('tr', {}, head.map(h => el('th', { text: h }))), ...rows.map(r => el('tr', {}, r.map(c => el('td', { text: c == null ? '' : String(c) }))))]);
+  const entries = Array.isArray(w.entries) ? w.entries : [];
+  const balance = entries.reduce((n, e) => n + (Number(e.amount) || 0), 0);
+  const appRows = Object.keys(APPS).map(k => {
+    const used = w.apps?.[k];
+    const d = data.apps?.[k] ?? data.apps?.[appName(k)];
+    const state = d == null ? '沒有資料' : typeof d === 'string' && d.startsWith('🔒') ? '🔒 已上鎖' : '可讀（未上鎖）';
+    return [appName(k), used ? when(used.last) : '—', used ? when(used.first) : '—', state];
+  });
+  const settings = Object.entries(w.settings || {}).map(([k, v]) => [k, typeof v?.value === 'object' ? JSON.stringify(v.value) : String(v?.value ?? ''), when(v?.t)]);
+  const keys = Array.isArray(w.passkeys?.keys) ? w.passkeys.keys : Array.isArray(w.passkeys) ? w.passkeys : [];
+  const search = el('input', { type: 'search', placeholder: '在全部資料裡找…', class: 'xp-find' });
+  const rawBox = el('div', { class: 'xp-raw' }, [treeOf(data)]);
+  search.addEventListener('input', () => {
+    const q = search.value.trim().toLowerCase();
+    if (q) for (const n of rawBox.querySelectorAll('details')) n.open = true;
+    for (const n of rawBox.querySelectorAll('.xp-leaf')) n.hidden = Boolean(q) && !n.textContent.toLowerCase().includes(q);
+  });
   const d = el('dialog', { class: 'xp' }, [
-    el('div', { class: 'xp-head' }, [el('strong', { text: `帳戶 ${ref} 的資料（解開後）` }), el('button', { text: '關閉', onclick: () => d.close() })]),
-    el('div', { class: 'xp-body' }, [treeOf(data)])
+    el('div', { class: 'xp-head' }, [el('strong', { text: `帳戶 ${ref}` }), el('button', { text: '關閉', onclick: () => d.close() })]),
+    el('div', { class: 'xp-body' }, [
+      el('div', { class: 'xp-cards' }, [
+        ['建立', when(w.created)],
+        ['等級', w.sec?.level || '—'],
+        ['模擬金', nt(balance)],
+        ['資料', w.vault ? `🔒 ${w.vault.sealed ? '全部上鎖' : '上鎖中'}` : '還沒上鎖']
+      ].map(([k, v]) => el('div', { class: 'xp-card' }, [el('small', { text: k }), el('b', { text: v })]))),
+      sec('每個 App', table(['App', '最後使用', '第一次', '資料'], appRows)),
+      sec(`模擬金紀錄（${entries.length}）`, table(['時間', '種類', 'App', '金額', '說明'], entries.slice().sort((x, y) => (y.t || 0) - (x.t || 0)).slice(0, 200).map(e => [when(e.t), e.kind || '', e.app || '', nt(e.amount), e.note || e.name || e.id || '']))),
+      sec(`設定（${settings.length}）`, table(['項目', '值', '改於'], settings)),
+      sec(`通行金鑰（${keys.length}）`, table(['裝置', '來源', '加入', '用過'], keys.map(k => [k.on || k.device || '', k.via || '', when(k.t), String(k.used ?? '')]))),
+      el('details', { class: 'xp-sec' }, [el('summary', { text: '全部資料（解開後，可搜尋）' }), search, rawBox])
+    ])
   ]);
   d.addEventListener('close', () => d.remove());
   document.body.append(d);
