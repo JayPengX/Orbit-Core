@@ -1419,6 +1419,17 @@ const sayOn = () => {
   if (b) (toast(b.querySelector('.ok').textContent), (b.saidAt = 0));
 };
 dialog.addEventListener('close', sayOn);
+async function openAccount(ref) {
+  sayOn();
+  $('acct-title').textContent = `帳戶 ${ref}`;
+  $('acct-body').replaceChildren(el('p', { class: 'muted', text: '載入中…' }));
+  if (!dialog.open) dialog.showModal();
+  try {
+    drawAccount(await admin('wallet', { wallet: ref }));
+  } catch (e) {
+    $('acct-body').replaceChildren(el('p', { class: 'error', text: e.message }));
+  }
+}
 // An account's export, decoded and laid out: each App's packed data (a
 // prefix like m1: or gz1:, then gzip in base64) unpacked, times as dates,
 // every level folded, the first two open.
@@ -1483,17 +1494,6 @@ async function showExport(ref, raw) {
   d.addEventListener('close', () => d.remove());
   document.body.append(d);
   d.showModal();
-}
-async function openAccount(ref) {
-  sayOn();
-  $('acct-title').textContent = `帳戶 ${ref}`;
-  $('acct-body').replaceChildren(el('p', { class: 'muted', text: '載入中…' }));
-  if (!dialog.open) dialog.showModal();
-  try {
-    drawAccount(await admin('wallet', { wallet: ref }));
-  } catch (e) {
-    $('acct-body').replaceChildren(el('p', { class: 'error', text: e.message }));
-  }
 }
 function action(title, text, controls, run) {
   const err = el('p', { class: 'error' });
