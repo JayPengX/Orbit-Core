@@ -315,6 +315,9 @@ export function mergeWallet(a, b) {
     ...(base.sec ? { sec: base.sec } : {}),
     ...(base.passkeys ? { passkeys: base.passkeys } : {}),
     ...(base.mail ? { mail: base.mail } : {}),
+    // (The data's vault: dropped here, every save after the sweep took it, and the
+    // next sweep made another; the data sealed under the first opened with nothing, Jay 11-15.)
+    ...(base.vault ? { vault: base.vault } : {}),
     ...(base.merged ? { merged: base.merged } : {}),
     // (A giveaway's account: when it was claimed; the giveaway, gift.js, is gone since 11-14.)
     ...(base.gift ? { gift: base.gift } : {})
@@ -1250,6 +1253,33 @@ export async function rekeyAccount(env, deps, docId, old, go = false) {
       row.why = `not opened: ${String(e?.message || e).slice(0, 80)}`;
     }
   }
+  return out;
+}
+// Data sealed under a vault that's gone for good (no kept copy of its key):
+// its last open version put back (`plainOf(collection)`, from doc-store's
+// history), when nothing was saved after it was sealed; the sweep seals it
+// again under the wallet's own vault. Nothing written unless `go`.
+export async function restorePlain(env, deps, docId, plainOf, go = false) {
+  const w = parseWallet((await deps.fsGet(env, WALLET_COLLECTION, docId)).payload);
+  const out = [];
+  for (const [app, { collection }] of Object.entries(ECO_APPS)) {
+    const doc = await deps.fsGet(env, collection, docId).catch(() => null);
+    if (!doc?.exists || !isSealed(doc.payload)) continue;
+    const id = doc.payload.split(':')[1];
+    if (w?.vault && id === w.vault.id) continue;
+    const kept = await plainOf(collection);
+    const row = { app, from: id, size: doc.payload.length, sealedAt: doc.updateTime, kept: kept ? { at: kept.at, size: kept.payload.length } : null };
+    out.push(row);
+    if (!kept) {
+      row.why = 'no open version kept';
+      continue;
+    }
+    if (go) {
+      await deps.fsWrite(env, collection, docId, kept.payload, { updateTime: doc.updateTime }, { why: 'restore' });
+      row.done = true;
+    }
+  }
+  if (go && out.some(r => r.done)) await updateWallet(env, deps, docId, x => (x.vault?.sealed ? { ...x, vault: { ...x.vault, sealed: null } } : x));
   return out;
 }
 // Each app's data of the account sealed, where it isn't yet. → how many.

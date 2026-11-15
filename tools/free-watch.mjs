@@ -137,8 +137,9 @@ async function trace() {
 // (REKEY=<account>[:go], a run by hand: ops rekey, eco.js rekeyAccount.)
 async function rekey() {
   if (!process.env.REKEY || !process.env.DATA_PUSH_SECRET) return;
-  const [acct, go] = process.env.REKEY.split(':');
-  const r = await get(`https://orbit-workers-proxy.pengzjay.workers.dev/ops?check=rekey&acct=${encodeURIComponent(acct)}${go === 'go' ? '&go=1' : ''}`, { json: true, secret: process.env.DATA_PUSH_SECRET });
+  // (<acct>[:plain][:go]: plain puts back the last open versions, eco.js restorePlain.)
+  const [acct, ...flags] = process.env.REKEY.split(':');
+  const r = await get(`https://orbit-workers-proxy.pengzjay.workers.dev/ops?check=rekey&acct=${encodeURIComponent(acct)}${flags.includes('plain') ? '&plain=1' : ''}${flags.includes('go') ? '&go=1' : ''}`, { json: true, secret: process.env.DATA_PUSH_SECRET });
   console.log('rekey', JSON.stringify(r?.body ?? r?.text));
 }
 async function aiMoney() {

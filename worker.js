@@ -46,7 +46,7 @@ import { handleLawAudio } from './law-audio.js';
 import { handleLawLive } from './law-live.js';
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
-import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, stampLevels, fullSession, sealSweep, rekeyAccount } from './eco.js';
+import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, stampLevels, fullSession, sealSweep, rekeyAccount, restorePlain } from './eco.js';
 import { aiSpend, aiMay } from './ai-allow.js';
 import { checkStock } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
@@ -1662,6 +1662,12 @@ async function route(request, env, ctx, headers, origin) {
           const v = JSON.parse(r.payload)?.vault;
           if (v?.id && v.escrow && !old[v.id]) old[v.id] = v;
         } catch {}
+      }
+      // (No kept copy of the vault: its data's last open version instead, eco.js restorePlain.)
+      if (sp.get('plain') === '1') {
+        const plainOf = async coll => (await env.STORE.prepare("SELECT payload, at FROM history WHERE coll = ? AND id = ? AND substr(payload, 1, 3) <> 'e1:' ORDER BY at DESC LIMIT 1").bind(coll, id).first()) || null;
+        const rows = await restorePlain(env, ECO_DEPS, id, plainOf, sp.get('go') === '1');
+        return json({ acct: id.slice(0, 8), plain: rows.map(r => ({ ...r, from: r.from?.slice(0, 6), kept: r.kept && { ...r.kept, at: new Date(r.kept.at).toISOString() } })) }, 200, headers);
       }
       const done = await rekeyAccount(env, ECO_DEPS, id, old, sp.get('go') === '1');
       return json({ acct: id.slice(0, 8), vaults: Object.keys(old).map(x => x.slice(0, 6)), done: done.map(d => ({ ...d, from: d.from?.slice(0, 6), to: d.to?.slice(0, 6) })) }, 200, headers);

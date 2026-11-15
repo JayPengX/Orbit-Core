@@ -288,3 +288,14 @@ test('a vault a phone made before the Worker kept its key: a signed-in device ho
   assert.equal(gave.data.vault.escrow, true);
   assert.equal((await t.call('POST', '?app=orbit', { op: 'vault-key', qt: a.token })).data.key, raw, 'every device takes it now');
 });
+
+test('a save keeps the wallet’s vault: merged with a patch, the vault and its recovery copy stay (Jay 11-15: every save dropped it)', async () => {
+  const { mergeWallet, emptyWallet } = await import('../eco.js');
+  const vault = { v: 1, id: 'abc123def', escrow: { iv: 'i', key: 'k' }, sealed: 5 };
+  const w = { ...emptyWallet(1), vault };
+  const out = mergeWallet(w, { entries: [], snap: {}, settings: { lang: { value: 'zh', t: 2 } } });
+  assert.deepEqual(out.vault, vault);
+  // Every field the Worker keeps survives a merge, whatever it's called.
+  const own = Object.keys(w).filter(k => !['v', 'created', 'entries', 'snap', 'settings', 'apps', 'inbox'].includes(k));
+  for (const k of own) assert.ok(k in out, `${k} kept`);
+});
