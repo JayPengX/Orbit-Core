@@ -250,25 +250,25 @@ test('the vault: set only with the account’s own pass, replaced only by itself
   assert.equal((await t.call('POST', '?app=orbit', { op: 'share-redeem', qt: b.token, key: made.data.key })).data.payload, '{"days":[2]}');
 });
 
-test('the vault’s recovery copy: sealed by the Worker’s secret, never shown to a device, opened once for a session a recovery email started', async () => {
+test('the vault’s key: kept only sealed by the Worker’s secret, never shown in the wallet, handed to a signed-in device of the account; every account’s existing data sealed in place, Securities’ left open (Jay 11-15)', async () => {
+  const { sealSweep } = await import('../eco.js');
   const t = setup();
   const a = await newPass(t, 'orbit');
-  const v = { v: 1, id: 'AbCdEfGhIjKl', rounds: 600000, salt: 'A'.repeat(22), iv: 'B'.repeat(16), pass: 'C'.repeat(64) };
-  const key = 'k'.repeat(43);
-  assert.equal((await t.call('POST', '?app=orbit', { op: 'vault', qt: a.token, passcode: a.passcode, vault: v, key })).status, 200);
-  const stored = wallet(t).vault;
-  assert.ok(stored.escrow?.key && !JSON.stringify(stored.escrow).includes(key), 'sealed, not as given');
+  assert.equal((await t.call('PATCH', `${t.qt(a.token)}&app=orbit`, { payload: '{"days":[1]}' })).status, 200);
+  const done = await sealSweep(t.env, t.deps);
+  assert.equal(done.accounts >= 1 && done.docs >= 1, true);
+  const w = wallet(t);
+  assert.ok(w.vault?.id && w.vault.escrow?.key && w.vault.sealed);
+  const stored = [...t.store.entries()].find(([k]) => k.startsWith(`${ECO_APPS.orbit.collection}/`))[1].payload;
+  assert.match(stored, /^e1:/);
+  assert.ok(!stored.includes('days'));
   const read = await t.call('GET', `${t.qt(a.token)}&app=orbit`);
   assert.equal(read.data.wallet.vault.escrow, true, 'a device sees only that there is one');
-  // Locked again by a new pass (the same vault): the copy stays.
-  await t.call('POST', '?app=orbit', { op: 'vault', qt: a.token, passcode: a.passcode, vault: { ...v, pass: 'D'.repeat(64) } });
-  assert.deepEqual(wallet(t).vault.escrow, stored.escrow);
-  // Not for any session: only one a recovery email started, once.
-  assert.equal((await t.call('POST', '?app=orbit', { op: 'vault-key', qt: a.token })).data.error.code, 'ECO_VAULT_NO_RECOVERY');
-  const [k] = [...t.store.keys()].filter(x => x.startsWith(`${WALLET_COLLECTION}/`));
-  const w = JSON.parse(t.store.get(k).payload);
-  t.store.set(k, { ...t.store.get(k), payload: JSON.stringify({ ...w, sec: { ...w.sec, recovered: Date.now() + 1e12 } }) });
   const got = await t.call('POST', '?app=orbit', { op: 'vault-key', qt: a.token });
-  assert.deepEqual(got.data, { id: v.id, key });
-  assert.equal((await t.call('POST', '?app=orbit', { op: 'vault-key', qt: a.token })).data.error.code, 'ECO_VAULT_NO_RECOVERY', 'once');
+  assert.equal(got.data.id, w.vault.id);
+  // The key opens what was sealed, as the phone's vault.mjs does.
+  const V = await import('../kit/vault.mjs');
+  const key = await crypto.subtle.importKey('raw', V.unb64(got.data.key), 'AES-GCM', true, ['encrypt', 'decrypt']);
+  assert.equal(await V.unseal(key, stored), '{"days":[1]}');
+  assert.equal((await t.call('POST', '?app=orbit', { op: 'vault-key', qt: 'nope' })).status, 401);
 });

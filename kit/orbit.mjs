@@ -2017,7 +2017,7 @@ function makeSession(app, { lang, heartbeat }) {
   async function openReply(res) {
     if (!res || typeof res.payload !== 'string' || !V.isLocked(res.payload) || !sealable()) return res;
     const id = V.vaultOf(res.payload);
-    const key = await V.heldKey(id);
+    const key = await keyFor(id);
     const open = key ? await V.unseal(key, res.payload) : null;
     if (open != null) return { ...res, payload: open };
     // (Locked under a vault the account no longer has, a lost pass's: gone, read as nothing.)
@@ -2026,11 +2026,22 @@ function makeSession(app, { lang, heartbeat }) {
     if (!locked) ((locked = true), emit('locked', true));
     return res;
   }
-  // The vault's key for this account on this device, or null.
-  const keyNow = async () => {
-    const v = wallet?.vault;
-    return v ? V.heldKey(v.id) : null;
-  };
+  // The vault's key for this account on this device, or null: taken from the
+  // Worker once where this device has none (eco.js ecoVaultKey: every signed-in
+  // device of the account; nothing to type).
+  let asking = null;
+  const fetchKey = () =>
+    (asking ||= withToken(qt => ecoCall('POST', '', { op: 'vault-key', qt }))
+      .then(async r => {
+        if (!r?.key || !r.id) return null;
+        const key = await crypto.subtle.importKey('raw', V.unb64(r.key), 'AES-GCM', true, ['encrypt', 'decrypt']);
+        await V.holdKey(r.id, key);
+        return { id: r.id, key };
+      })
+      .catch(() => null)
+      .finally(() => setTimeout(() => (asking = null), 30_000)));
+  const keyFor = async id => (id ? (await V.heldKey(id)) || (await fetchKey().then(k => (k?.id === id ? k.key : null))) : null);
+  const keyNow = async () => keyFor(wallet?.vault?.id);
   // (`key`: the data key itself, for the recovery copy the Worker seals with
   // a secret of its own, opened only for a recovery email's session: eco.js
   // ecoVaultKey. Its vault as it is, without the copy: given once more.)
@@ -2056,7 +2067,7 @@ function makeSession(app, { lang, heartbeat }) {
           unlocked();
           return 'open';
         }
-        const held = await V.heldKey(v.id);
+        const held = await keyNow();
         if (held) return void (await postVault(pass, await V.relock(held, v, pass), false, held)) || 'open';
         // (Its own vault sent back, unchanged: is the pass the account's?)
         return (await postVault(pass, v).then(() => 'old', e => (e?.code === 'INVALID_PASSCODE' ? 'wrong' : '')));
@@ -3742,27 +3753,14 @@ function passkeyRows(s, note) {
 export const KEY_TIP_AT = 'orbit.keytip.at';
 export const KEY_TIP_EVERY = 3 * 86_400_000;
 // The vault on this device (kit vault.mjs; Jay 11-15): the app's data was
-// sent locked and this device holds no key (signed in with a passkey or a
-// device code, or the vault made on another device): the Orbit Pass, once,
-// opens it here. No vault yet (an account from before, signed in): offered
-// once every 3 days, the Pass locks it. Securities' stays open.
+// sent locked and the Worker had no key to give this device (a vault made by
+// a phone before the Worker kept one): the Orbit Pass, once, opens it here.
+// Securities' stays open.
 export async function vaultAsk(s) {
   if (typeof document === 'undefined' || !V.supported() || V.PLAIN_APPS.has(s?.app) || !s?.vault) return;
   if (document.querySelector('dialog[open]')) return void setTimeout(() => vaultAsk(s), 8000);
   if (s.locked) return vaultSheet(s, { locked: true });
-  if (s.hasVault() || !storedAccount()) return;
-  const KEY_AT = 'orbit.vault.offered';
-  if (Date.now() - Number(readStore(KEY_AT) || 0) < 3 * 86_400_000) return;
-  const T = (zh, e) => (s.lang === 'en' ? e : zh);
-  const shown = quietTip({
-    mark: node('span', { class: 'q-tip-mark', html: icons.lock || icons.shield || '' }),
-    label: T('鎖起你的資料', 'Lock your data'),
-    title: T('把你的資料鎖起來', 'Lock your data'),
-    line: T('用 Orbit Pass 鎖住，連 Orbit 也看不到你的帳、課表和行程。', 'Locked with your Orbit Pass: not even Orbit can read your books, timetable or trips.'),
-    go: T('鎖起來', 'Lock it'),
-    onGo: () => vaultSheet(s, { locked: false })
-  });
-  if (shown) writeStore(KEY_AT, String(Date.now()));
+  // (No vault yet: the Worker seals every account by itself, eco.js sealSweep; nothing to ask.)
 }
 export function vaultSheet(s, { locked }) {
   const T = (zh, e) => (s.lang === 'en' ? e : zh);

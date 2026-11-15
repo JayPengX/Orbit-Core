@@ -38,7 +38,7 @@ into absolutes; push back when a rule makes things worse.
 
 **Shipping.**
 - 11-01 Only `main` exists in every repo: no branches, no PRs, never the session's `claude/...` branch even when a session's setup asks. Push with `sh ../Orbit-Core/tools/push.sh` (in Orbit-Core `sh tools/push.sh`) and nothing else (10-21, 10-22: never ask before pushing, kit included).
-- 11-03 No "run failed" emails: `push.sh` rebases onto `origin/main` (10-21: never push a tree from an old checkout; a stale push once wiped Law's 裁判), runs what the deploy runs (the repo's tests against main's kit, Class's build, every app's tests on a kit change, the layout check) and pushes only when they pass.
+- 11-03 No "run failed" emails: `push.sh` rebases onto `origin/main` (10-21: never push a tree from an old checkout; a stale push once wiped Law's 裁判), runs what the deploy runs (the repo's tests against main's kit, Class's build) and pushes only when they pass. Nothing more (11-15, Jay: "I want fast pushing that things go live as fast as it could"): every app's tests and the layout check are run by hand when wanted.
 - 10-22 Kit order: Orbit-Core first, wait for `pages.yml`, then the apps; never a cancelling `concurrency:` in a workflow (copy the `queue` job); builds check out main's tip.
 - 10-22 Orbit-Securities: after a push, confirm its deploy started; if not, run `deploy.yml` by hand. Every thread confirms its deploy went green.
 - 10-19 No separate test step and no Mac gate: check your own cloud screenshots (WebKit), push, Jay tests on his phone.

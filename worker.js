@@ -46,7 +46,7 @@ import { handleLawAudio } from './law-audio.js';
 import { handleLawLive } from './law-live.js';
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
-import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, stampLevels, fullSession } from './eco.js';
+import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, stampLevels, fullSession, sealSweep } from './eco.js';
 import { aiSpend, aiMay } from './ai-allow.js';
 import { checkStock } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
@@ -1926,6 +1926,8 @@ async function cronTick(event, env, ctx, part) {
     if (min === 42 && tick.getUTCHours() % 6 === 0) run('kept-sweep', async () => ({ kept: await sweepKept(env), files: await sweepDataFiles(env) }));
     // The free plans' watch (free-watch.yml) started every 3 hours, on an even minute (the odd ones run F1 only): GitHub's own timer ran it none of the first 6 (2026-11-13).
     if (min === 18 && tick.getUTCHours() % 3 === 0) run('free-watch', () => startFreeWatch(env));
+    // Every account's app data sealed (eco.js sealSweep), a few accounts a run, till none is left open.
+    if (event.cron !== ODD_CRON && min % 10 === 4 && storeReady(env)) run('vault-sweep', () => sealSweep(env, ECO_DEPS), r => (r.accounts ? r : null));
 }
 
 // The Runner (runner.js): heavy routes and the crons' work, 30 s of CPU each.

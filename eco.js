@@ -1149,14 +1149,12 @@ export function cleanVault(v) {
   if (!Number.isInteger(v.rounds) || v.rounds < 100_000 || v.rounds > 5_000_000) return null;
   return { v: 1, id: v.id, rounds: v.rounds, salt: v.salt, iv: v.iv, pass: v.pass };
 }
-// The recovery copy (Jay 11-15: email recovery "seamless … no data locked or
-// missing", the data "still not readable server side"): the data key, as
-// the phone gives it, sealed by a key made from ECO_TOKEN_SECRET (HKDF; a
-// Worker secret, never in the database): the database, its backups and the
-// admin page can't open it. Opened once, by the Worker alone, for a session
-// a recovery email's code started (`sec.recovered`, VAULT_RECOVER_MS), and
-// handed to that device, which locks it again by its new pass.
-export const VAULT_RECOVER_MS = 15 * 60_000;
+// The account's data key's one copy on the Worker (Jay 11-15: email recovery
+// "seamless … no data locked or missing", every account sealed, the data
+// "still not readable server side"): sealed by a key made from
+// ECO_TOKEN_SECRET (HKDF; a Worker secret, never in the database), so the
+// database, its backups and the admin page can't open it. Handed only to a
+// signed-in device of the account (`vault-key`), which then opens its data.
 const te8 = t => new TextEncoder().encode(t);
 async function escrowKey(env) {
   const base = await crypto.subtle.importKey('raw', te8(env.ECO_TOKEN_SECRET || ''), 'HKDF', false, ['deriveKey']);
@@ -1168,19 +1166,87 @@ async function escrowOf(env, raw) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   return { iv: b64u(iv), key: b64u(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await escrowKey(env), unb64u(raw))) };
 }
+// ---- Every account sealed (Jay 11-15: "it should apply now to everyone
+// including existing data") -------------------------------------------------
+// The Worker makes an account's data key where it has none (kept only as the
+// recovery copy, sealed by ECO_TOKEN_SECRET) and seals each app's data in
+// place (all but Securities': it reads that one), in kit vault.mjs's form:
+// e1:<vault id>:<nonce>:<gzip, AES-GCM>. A signed-in device takes the key
+// with `vault-key`. Run on its own by the cron (sealSweep), a few accounts a
+// run, and for an account the moment it is read or written (sealAccount).
+const SEAL_PLAIN = new Set(['stock']);
+async function keyOfVault(env, vault) {
+  if (!vault?.escrow) return null;
+  try {
+    const raw = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64u(vault.escrow.iv) }, await escrowKey(env), unb64u(vault.escrow.key));
+    return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt']);
+  } catch {
+    return null;
+  }
+}
+export async function sealText(key, id, payload) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const packed = new Uint8Array(await new Response(new Blob([new TextEncoder().encode(payload)]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+  return `e1:${id}:${b64u(iv)}:${b64u(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, packed))}`;
+}
+// → the account's { id, key } (made if it has no vault), or null (a vault from a
+// phone without the recovery copy: sealed by the phones only).
+export async function vaultOfAccount(env, deps, docId) {
+  let made = null;
+  const result = await updateWallet(env, deps, docId, w => {
+    if (w.vault) return w;
+    const raw = crypto.getRandomValues(new Uint8Array(32));
+    made = { raw, id: b64u(crypto.getRandomValues(new Uint8Array(9))) };
+    return w;
+  });
+  const wallet = result?.wallet;
+  if (!wallet) return null;
+  if (wallet.vault) return { id: wallet.vault.id, key: await keyOfVault(env, wallet.vault) };
+  if (!made) return null;
+  const escrow = await escrowOf(env, b64u(made.raw));
+  let id = made.id;
+  await updateWallet(env, deps, docId, w => (w.vault ? ((id = w.vault.id), w) : { ...w, vault: { v: 1, id, escrow } }));
+  const after = parseWallet((await deps.fsGet(env, WALLET_COLLECTION, docId)).payload);
+  return after?.vault ? { id: after.vault.id, key: await keyOfVault(env, after.vault) } : null;
+}
+// Each app's data of the account sealed, where it isn't yet. → how many.
+export async function sealAccount(env, deps, docId) {
+  const v = await vaultOfAccount(env, deps, docId);
+  if (!v?.key) return 0;
+  let n = 0;
+  for (const [app, { collection }] of Object.entries(ECO_APPS)) {
+    if (SEAL_PLAIN.has(app)) continue;
+    const doc = await deps.fsGet(env, collection, docId);
+    if (!doc.exists || !doc.payload || isSealed(doc.payload)) continue;
+    // (Only over the copy read: a device's save meanwhile wins, and is sealed next time.)
+    await deps.fsWrite(env, collection, docId, await sealText(v.key, v.id, doc.payload), { updateTime: doc.updateTime }).then(() => n++, () => null);
+  }
+  return n;
+}
+// The cron's: up to `most` accounts with no vault yet, or with data left open.
+export async function sealSweep(env, deps, most = 25) {
+  if (!env.ECO_TOKEN_SECRET || !deps.fsList) return { sealed: 0 };
+  const wallets = await deps.fsList(env, WALLET_COLLECTION, 2000);
+  let accounts = 0, docs = 0;
+  for (const w of wallets) {
+    if (accounts >= most) break;
+    const wallet = parseWallet(w.payload);
+    if (!wallet || (wallet.vault && wallet.vault.sealed)) continue;
+    accounts++;
+    docs += await sealAccount(env, deps, w.id);
+    if (wallet.vault?.escrow || !wallet.vault) await updateWallet(env, deps, w.id, x => (x.vault && !x.vault.sealed ? { ...x, vault: { ...x.vault, sealed: deps.now() } } : x));
+  }
+  return { accounts, docs };
+}
 async function ecoVaultKey(ctx) {
   const { env, headers, deps, request } = ctx;
   const c = await liveSession(ctx, { fresh: true });
   if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
-  let out = null;
-  await updateWallet(env, deps, c.d, w => {
-    out = null;
-    if (!(w.sec?.recovered > deps.now() - VAULT_RECOVER_MS) || !w.vault?.escrow) return w;
-    out = { id: w.vault.id, escrow: w.vault.escrow };
-    // (Once: the mark goes as it's used.)
-    const { recovered, ...sec } = w.sec;
-    return { ...w, sec };
-  });
+  if (sessionLimited(`vkey:${c.s}`, 6, 60_000, deps.now())) return deps.errorJson('RATE_LIMITED', 429, headers, request);
+  // (Any signed-in device of the account, a recovery email's too: the data is
+  // sealed from the database and anyone reading it, not from its owner's devices.)
+  const w = parseWallet((await deps.fsGet(env, WALLET_COLLECTION, c.d)).payload);
+  const out = w?.vault?.escrow ? { id: w.vault.id, escrow: w.vault.escrow } : null;
   if (!out) return deps.errorJson('ECO_VAULT_NO_RECOVERY', 403, headers, request);
   try {
     const raw = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64u(out.escrow.iv) }, await escrowKey(env), unb64u(out.escrow.key));
@@ -1205,7 +1271,8 @@ async function ecoVault(ctx) {
   const result = await updateWallet(env, deps, c.d, w => {
     clash = w.vault && w.vault.id !== vault.id && !body.fresh ? w.vault : null;
     const kept = w.vault?.id === vault.id ? w.vault.escrow : null;
-    return clash ? w : { ...w, vault: { ...vault, ...(escrow || kept ? { escrow: escrow || kept } : {}) } };
+    const sealed = w.vault?.id === vault.id ? w.vault.sealed : undefined;
+    return clash ? w : { ...w, vault: { ...vault, ...(escrow || kept ? { escrow: escrow || kept } : {}), ...(sealed ? { sealed } : {}) } };
   });
   if (clash) return deps.json({ error: { code: 'ECO_VAULT_EXISTS', message: 'ECO_VAULT_EXISTS' }, vault: publicVault(clash) }, 409, headers);
   return deps.json({ ok: true, vault: publicVault(result?.wallet?.vault || vault) }, 200, headers);

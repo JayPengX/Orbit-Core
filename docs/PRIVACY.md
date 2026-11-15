@@ -6,7 +6,21 @@ privacy policy. The code: `kit/vault.mjs` (its header), `kit/orbit.mjs`
 (`makeSession`: `openReply`, `vaultPass`, `vaultSheet`), `eco.js` (`ecoVault`,
 `overSealed`).
 
-## Locked on the phone (end to end)
+## Every account sealed (11-15, Jay: "it should apply now to everyone including existing data")
+
+The Worker gives every account a data key (`vaultOfAccount`) and seals each
+app's data in place but Securities' (`sealAccount`; the cron's `vault-sweep`
+every 10 minutes, `sealSweep`, 25 accounts a run, marked `vault.sealed`). The
+key is kept only as the recovery copy below, sealed by `ECO_TOKEN_SECRET`; a
+signed-in device of the account takes it with `vault-key` (`fetchKey` in the
+session) and opens its data with nothing to type. So: the database, its
+backups and the admin page see only locked data; the Worker's code, holding
+its secret, can open it, and gives it only to the account's own devices.
+Older copies kept before 11-15 (D1 `history`, the nightly R2 copies) are
+plain until they age out (history 30 days, nightly copies 14 nights and the
+monthly ones a year).
+
+## Locked on the phone
 
 
 Since 2026-11-15 (Jay: "prevent from our cloud be able to read the detail";

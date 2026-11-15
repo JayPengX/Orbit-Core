@@ -38,7 +38,7 @@ or run Orbit.
   No legacy forwards or back-compat (RULEBOOK §1).
 - **Push** with `sh ../Orbit-Core/tools/push.sh` (here `sh tools/push.sh`):
   `main` only, never a branch or a PR. It rebases, runs what the deploy runs
-  (and every app's tests on a kit change) and pushes only if they pass.
+  and pushes only if they pass (a couple of minutes: fast, Jay 11-15).
   A kit change is one push here (`pages.yml`); Workers deploy from `main`
   (`deploy.yml`).
 - **Same push:** the `MAP.md` your change made wrong (an architecture change:

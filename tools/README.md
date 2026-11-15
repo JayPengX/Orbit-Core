@@ -77,9 +77,8 @@ iPad on its side (touch) and a laptop (a mouse), dark, live data. Fails on a
 wide screen's page in a narrow band down the middle, one half empty beside a
 full one (`tools/layout-faults.mjs`, also in an open wide sheet), and
 anything wider than the screen or sliding sideways. A shot that can't be
-taken (no network) is skipped, never a failure. `push.sh` runs it for an app
-whose visible files changed, and for Sports, Money and Law on a change to the
-kit's CSS or frame (all ten took 14 minutes and never stopped a push, 11-15). Each shot is taken once its page stops changing (`preview.mjs
+taken (no network) is skipped, never a failure. Run by hand (push.sh no longer
+runs it: 11-15, pushes fast). Each shot is taken once its page stops changing (`preview.mjs
 --settle`: no loading screen or placeholder, the same elements and height,
 every picture in; 12 s at most) and drawn at 1×, four at a time: the same
 shots in about two thirds of the time. Every run shares one keep of the Workers' answers, 15 minutes
@@ -272,7 +271,7 @@ importScripts('../Orbit-Core/kit/sw.js');
 | Tool | What |
 | --- | --- |
 | `node tools/kit-find.mjs [--css] [--apps] <word…>` | What the kit already has: its exports and `orbit.css` classes and tokens whose name or comment has every word; `--apps` adds the apps' own definitions of that name (a copy to move into the kit). Run it before writing a helper, a component or a style |
-| `sh tools/push.sh` (from an app: `sh ../Orbit-Core/tools/push.sh`) | The one way to push: rebases onto origin/main, runs what the deploy runs (`npm test` against main's kit, Class's build, every app's tests on a kit change) and pushes main only if it all passes, so no deploy goes red and mails Jay |
+| `sh tools/push.sh` (from an app: `sh ../Orbit-Core/tools/push.sh`) | The one way to push: rebases onto origin/main, runs what the deploy runs (`npm test` against main's kit, Class's build) and pushes main only if it passes, so no deploy goes red and mails Jay; fast on purpose (Jay 11-15) |
 | `node tools/test-apps.mjs [app…]` | Every app's tests (checkouts beside this one) against this kit; run before pushing a kit change, since each app's deploy tests against main's kit and a break mails Jay |
 | `node tools/picks-backtest.mjs [sports stock law beats] [--root <dir>] [--seeds 5] [--why]` | Every app's picks replayed day by day on real data (Sports' season packs, Securities' catalog, Law's index and rulings, Beats' grooves) with made-up people, the app's own ranking code and the kit's engine as the app wires them: opened, best (against the best they could have shown), first, wrong 常看. Before and after: a checkout of main in `--root <dir>` (with `Orbit-Core`, `Orbit-<App>` in it), then here. Sports' seasons are read once into `/tmp/orbit-seasons` (`--data`) |
 | `node tools/accent-css.mjs` | Write each app's accent colours (`kit/brand.mjs`) into `kit/orbit.css`; run after changing a brand colour |
