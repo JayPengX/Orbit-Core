@@ -299,3 +299,54 @@ test('a save keeps the wallet’s vault: merged with a patch, the vault and its 
   const own = Object.keys(w).filter(k => !['v', 'created', 'entries', 'snap', 'settings', 'apps', 'inbox'].includes(k));
   for (const k of own) assert.ok(k in out, `${k} kept`);
 });
+
+test('the wallet’s own parts locked too: every setting’s value and an app’s figures but money’s, by the phone or by the sweep; the key opens them, a locked one sent merges by its time (Jay 11-15: "encrypted as much as possible, only keep minimum")', async () => {
+  const { sealSweep, PARTS_FROM } = await import('../eco.js');
+  const V = await import('../kit/vault.mjs');
+  const t = setup();
+  const now = PARTS_FROM + 60_000;
+  t.deps.now = () => now;
+  const a = await newPass(t, 'orbit');
+  const places = { places: [[24.8177, 121.0159, 'home']] };
+  assert.equal((await t.call('PATCH', `${t.qt(a.token)}&app=orbit`, { payload: '{"days":[1]}', wallet: { settings: { 'fb:transit': { value: places, t: now - 5 } }, snap: { orbit: { lessons: 12, t: now - 5 } } } })).status, 200);
+  assert.deepEqual(wallet(t).settings['fb:transit'].value, places, 'sent open by an older kit');
+  await sealSweep(t.env, t.deps);
+  const w = wallet(t);
+  assert.ok(!JSON.stringify(w.settings).includes('24.8177'), 'no place left open');
+  assert.match(w.settings['fb:transit'].e, /^e1:/);
+  assert.equal(w.settings['fb:transit'].t, now - 5, 'its time kept, for merging');
+  assert.equal(w.snap.orbit.lessons, undefined);
+  // The key opens them as the kit does.
+  const got = await t.call('POST', '?app=orbit', { op: 'vault-key', qt: a.token });
+  const key = await crypto.subtle.importKey('raw', V.unb64(got.data.key), 'AES-GCM', true, ['encrypt', 'decrypt']);
+  const known = new Map();
+  const first = V.openParts(w, known);
+  assert.equal(first.wallet.settings['fb:transit'].value, undefined, 'unset until opened, never a locked string');
+  assert.equal(first.wallet.settings['fb:transit'].t, now - 5);
+  await V.unlockParts(first.missing, key, known);
+  const opened = V.openParts(w, known).wallet;
+  assert.deepEqual(opened.settings['fb:transit'].value, places);
+  assert.equal(opened.snap.orbit.lessons, 12);
+  // A phone's own locked setting, newer, merges by its time; the vault stays.
+  const mine = await V.sealParts({ settings: { 'fb:transit': { value: { places: [] }, t: now - 1 } }, snap: { stock: { cash: 5, holdings: 9, t: now } } }, key, w.vault.id);
+  assert.equal(mine.snap.stock.cash, 5, 'money’s figure stays open');
+  assert.equal(mine.snap.stock.holdings, undefined);
+  assert.equal((await t.call('PATCH', `${t.qt(a.token)}&app=orbit`, { wallet: { settings: mine.settings } })).status, 200);
+  const after = wallet(t);
+  assert.equal(after.settings['fb:transit'].e, mine.settings['fb:transit'].e);
+  assert.equal(after.vault.id, w.vault.id);
+});
+
+test('kit vault: a part that doesn’t open reads as unset and isn’t asked again', async () => {
+  const V = await import('../kit/vault.mjs');
+  const k1 = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+  const k2 = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+  const p = await V.sealParts({ settings: { x: { value: 1, t: 3 } } }, k1, 'id1');
+  const w = { settings: p.settings, snap: {} };
+  const known = new Map();
+  const { missing } = V.openParts(w, known);
+  await V.unlockParts(missing, k2, known);
+  const again = V.openParts(w, known);
+  assert.equal(again.missing.length, 0);
+  assert.deepEqual(again.wallet.settings.x, { t: 3, locked: true });
+});

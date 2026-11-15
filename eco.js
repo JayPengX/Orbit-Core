@@ -229,7 +229,9 @@ function cleanStamped(map, maxKeys, maxValue) {
   if (!isObj(map)) return out;
   for (const [k, v] of Object.entries(map).slice(0, maxKeys)) {
     if (k.length > 96 || !isObj(v) || finite(v.t) == null) continue;
-    if (JSON.stringify(v).length > maxValue) continue;
+    // (A value locked on the phone, { t, e: 'e1:…' } (kit vault.mjs sealParts): packed and
+    // base64'd it takes more room than it did open.)
+    if (JSON.stringify(v).length > (isSealed(v.e) ? maxValue * 2 + 200 : maxValue)) continue;
     out[k] = v;
   }
   return out;
@@ -1282,6 +1284,38 @@ export async function restorePlain(env, deps, docId, plainOf, go = false) {
   if (go && out.some(r => r.done)) await updateWallet(env, deps, docId, x => (x.vault?.sealed ? { ...x, vault: { ...x.vault, sealed: null } } : x));
   return out;
 }
+// The wallet's own parts locked as the phones lock them (kit vault.mjs
+// sealParts, the same e1: form): every setting's value, and each app's
+// figures but those money.js counts with (SNAP_OPEN). For a wallet written
+// open (an older kit, a device without the key).
+const SNAP_OPEN = new Set(['t', 'cash', 'held', 'opened', 'pl', 'gov']);
+const openSetting = v => isObj(v) && 'value' in v && !isSealed(v.e);
+const openSnap = v => isObj(v) && !isSealed(v.e) && Object.keys(v).some(k => !SNAP_OPEN.has(k));
+export const walletOpenParts = w => Object.values(w?.settings || {}).some(openSetting) || Object.values(w?.snap || {}).some(openSnap);
+// (From a day after the kits that open them went out: a phone on an older kit reads a locked
+// setting as unset.)
+export const PARTS_FROM = Date.parse('2026-11-16T12:00:00Z');
+export async function sealWalletParts(env, deps, docId, key, id) {
+  if (deps.now() < PARTS_FROM) return 0;
+  const w = parseWallet((await deps.fsGet(env, WALLET_COLLECTION, docId)).payload);
+  if (!w || !walletOpenParts(w)) return 0;
+  const settings = {};
+  for (const [k, v] of Object.entries(w.settings || {})) if (openSetting(v)) settings[k] = { t: v.t, e: await sealText(key, id, JSON.stringify(v.value ?? null)) };
+  const snap = {};
+  for (const [app, v] of Object.entries(w.snap || {}))
+    if (openSnap(v)) {
+      const shut = Object.fromEntries(Object.entries(v).filter(([k]) => !SNAP_OPEN.has(k)));
+      snap[app] = { ...Object.fromEntries(Object.entries(v).filter(([k]) => SNAP_OPEN.has(k))), e: await sealText(key, id, JSON.stringify(shut)) };
+    }
+  // (Only over what was read: a part changed meanwhile, newer, stays and is locked next time.)
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  await updateWallet(env, deps, docId, x => ({
+    ...x,
+    settings: Object.fromEntries(Object.entries(x.settings || {}).map(([k, v]) => [k, settings[k] && same(v, w.settings[k]) ? settings[k] : v])),
+    snap: Object.fromEntries(Object.entries(x.snap || {}).map(([k, v]) => [k, snap[k] && same(v, w.snap[k]) ? snap[k] : v]))
+  }));
+  return Object.keys(settings).length + Object.keys(snap).length;
+}
 // Each app's data of the account sealed, where it isn't yet. → how many.
 export async function sealAccount(env, deps, docId) {
   // (Never a new vault over data already sealed under one: that data would open
@@ -1295,7 +1329,7 @@ export async function sealAccount(env, deps, docId) {
   }
   const v = await vaultOfAccount(env, deps, docId);
   if (!v?.key) return 0;
-  let n = 0;
+  let n = await sealWalletParts(env, deps, docId, v.key, v.id).catch(() => 0);
   for (const [app, { collection }] of Object.entries(ECO_APPS)) {
     if (SEAL_PLAIN.has(app)) continue;
     const doc = await deps.fsGet(env, collection, docId);
@@ -1313,7 +1347,7 @@ export async function sealSweep(env, deps, most = 25) {
   for (const w of wallets) {
     if (accounts >= most) break;
     const wallet = parseWallet(w.payload);
-    if (!wallet || (wallet.vault && wallet.vault.sealed)) continue;
+    if (!wallet || (wallet.vault && wallet.vault.sealed && !(deps.now() >= PARTS_FROM && walletOpenParts(wallet)))) continue;
     accounts++;
     docs += await sealAccount(env, deps, w.id);
     if (wallet.vault?.escrow || !wallet.vault) await updateWallet(env, deps, w.id, x => (x.vault && !x.vault.sealed ? { ...x, vault: { ...x.vault, sealed: deps.now() } } : x));

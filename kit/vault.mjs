@@ -138,3 +138,92 @@ export async function forgetKeys() {
   mem.clear();
   await tx('readwrite', s => s.clear()).catch(() => null);
 }
+
+// ---- The account's own parts, locked as the apps' data is (Jay 11-15: "encrypted
+// as much as possible, only keep minimum") ----
+// Every setting's value (places, interests, follows, links, Orbits…) goes up as
+// { t, e: 'e1:…' }: the Worker merges by `t` alone and never reads a value. An
+// app's figures (`snap`) keep only what the Worker counts with in the open
+// (Securities' cash and its cost, its result and taxes by market: money.js's
+// books); the rest in `e`.
+export const SNAP_OPEN = new Set(['t', 'cash', 'held', 'opened', 'pl', 'gov']);
+const sealedPart = v => typeof v?.e === 'string' && isLocked(v.e);
+// A patch's settings and figures locked under `key` (vault `id`); `known` (a Map) remembers each
+// locked string's value, so the reply's wallet opens without unlocking it again.
+export async function sealParts(patch, key, id, known = null) {
+  if (!patch || typeof patch !== 'object') return patch;
+  const out = { ...patch };
+  if (patch.settings && typeof patch.settings === 'object') {
+    out.settings = {};
+    for (const [k, v] of Object.entries(patch.settings)) {
+      if (!v || typeof v !== 'object' || sealedPart(v) || !('value' in v)) {
+        out.settings[k] = v;
+        continue;
+      }
+      const e = await seal(key, id, JSON.stringify(v.value ?? null));
+      known?.set(e, v.value ?? null);
+      out.settings[k] = { t: v.t, e };
+    }
+  }
+  if (patch.snap && typeof patch.snap === 'object') {
+    out.snap = {};
+    for (const [app, v] of Object.entries(patch.snap)) {
+      if (!v || typeof v !== 'object' || sealedPart(v)) {
+        out.snap[app] = v;
+        continue;
+      }
+      const shut = Object.fromEntries(Object.entries(v).filter(([k]) => !SNAP_OPEN.has(k)));
+      const open = Object.fromEntries(Object.entries(v).filter(([k]) => SNAP_OPEN.has(k)));
+      if (!Object.keys(shut).length) {
+        out.snap[app] = v;
+        continue;
+      }
+      const e = await seal(key, id, JSON.stringify(shut));
+      known?.set(e, shut);
+      out.snap[app] = { ...open, e };
+    }
+  }
+  return out;
+}
+// The wallet as the apps read it: each locked part's value from `known` (a
+// setting not opened yet reads as unset, its `t` kept, so nothing newer is
+// assumed); `missing`: the locked strings still to open (openParts).
+export function openParts(wallet, known) {
+  if (!wallet || typeof wallet !== 'object') return { wallet, missing: [] };
+  const missing = [];
+  const look = e => {
+    // (One that didn't open reads as unset, and isn't asked again.)
+    if (known.has(e)) return known.get(e) ?? undefined;
+    missing.push(e);
+    return undefined;
+  };
+  const settings = {};
+  for (const [k, v] of Object.entries(wallet.settings || {})) {
+    if (!sealedPart(v)) settings[k] = v;
+    else {
+      const value = look(v.e);
+      settings[k] = value === undefined ? { t: v.t, locked: true } : { t: v.t, value };
+    }
+  }
+  const snap = {};
+  for (const [app, v] of Object.entries(wallet.snap || {})) {
+    if (!sealedPart(v)) snap[app] = v;
+    else {
+      const { e, ...open } = v;
+      const shut = look(e);
+      snap[app] = shut && typeof shut === 'object' ? { ...shut, ...open } : open;
+    }
+  }
+  return { wallet: { ...wallet, settings, snap }, missing };
+}
+// Each of `strings` unlocked with `key` into `known` (one that doesn't open: null, never asked again).
+export async function unlockParts(strings, key, known) {
+  for (const e of new Set(strings)) {
+    const text = key ? await unseal(key, e) : null;
+    let v = null;
+    try {
+      v = text == null ? null : JSON.parse(text);
+    } catch {}
+    known.set(e, v);
+  }
+}

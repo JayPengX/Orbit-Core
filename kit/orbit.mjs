@@ -2197,8 +2197,20 @@ function makeSession(app, { lang, heartbeat }) {
     }
   };
 
+  // The wallet's own parts (settings, figures) locked as the data is: opened
+  // here for the apps (kit vault.mjs openParts), each locked string once.
+  const parts = new Map();
+  let rawWallet = null;
   function setWallet(w) {
     if (!w) return;
+    rawWallet = w;
+    const { wallet: opened, missing } = V.openParts(w, parts);
+    if (missing.length && sealable())
+      keyNow()
+        .then(key => V.unlockParts(missing, key, parts))
+        .then(() => rawWallet === w && setWallet(w))
+        .catch(() => null);
+    w = opened;
     wallet = w;
     cacheWallet(storedAccount(), w);
     // The pass's notice switches (newer here: sent up).
@@ -2234,6 +2246,8 @@ function makeSession(app, { lang, heartbeat }) {
     if (data.wallet) {
       walletAt = data.walletTime || '';
       setWallet(data.wallet);
+      // (The reply's wallet as the apps read it: its locked parts opened.)
+      data.wallet = wallet;
     }
     if ((data.level === 'free' || data.level === 'full') && data.level !== passLevel()) {
       writeStore(KEY.level, JSON.stringify({ account: storedAccount(), level: data.level }));
@@ -2521,7 +2535,11 @@ function makeSession(app, { lang, heartbeat }) {
         }
         sent = await V.seal(key, wallet.vault.id, payload);
       }
-      return call('POST', qs({ app }), { op: 'write', qt, payload: sent, wallet: patch, w: wallet ? walletAt : '', ...keep });
+      // (The wallet's own parts locked as they go too, where this device holds the key; else
+      // sent open and locked by the Worker's next sweep: eco.js sealWalletParts.)
+      const key = patch && sealable() && wallet?.vault && !locked ? await keyNow() : null;
+      const shut = key ? await V.sealParts(patch, key, wallet.vault.id, parts) : patch;
+      return call('POST', qs({ app }), { op: 'write', qt, payload: sent, wallet: shut, w: wallet ? walletAt : '', ...keep });
     }).then(res => {
       if (typeof payload === 'string') {
         cachePayload(app, storedAccount(), payload);

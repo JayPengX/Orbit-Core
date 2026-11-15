@@ -80,9 +80,18 @@ holds no key that opens it.
   keeps its key (`wipeDevice` `keepKeys`); signed out by the person, it
   forgets it. With no pass, no recovery email and no device: the sheet says
   the data stays locked and offers to start over (`fresh`).
-- **Open on purpose**, because the Worker must read them: Securities
-  (`PLAIN_APPS`: `stock-check.js` fills its orders), the wallet (pay, relief,
-  levels), notices to send (`/push`), and a Class timetable shared
+- **The wallet's own parts locked too** (Jay 11-15: "encrypted as much as
+  possible, only keep minimum"): every setting's value (places, interests,
+  follows, links, Orbits, looks) and an app's figures go up as `{ t, e }`
+  (kit `vault.mjs` `sealParts`; the session opens them for the apps,
+  `openParts`); the Worker merges by `t` and never reads a value, and the
+  sweep locks any left open (`eco.js` `sealWalletParts`, from `PARTS_FROM`).
+- **Open on purpose, the minimum the Worker works with:** Securities' data
+  (`PLAIN_APPS`: `stock-check.js` fills its orders) and its figures money's
+  books count (`SNAP_OPEN`: cash, cost, result and taxes by market), the
+  play money's entries (pay, overdraft, levels), the apps' first and last
+  use and live sessions (sign-in), the recovery email (the mail sent to it),
+  notices to send (`/push`, their switches), and a Class timetable shared
   (`share-create` takes the copy the phone sends). The admin page shows
   locked data as 🔒 (its 匯出 › 在這裡看 decodes the rest).
 - **Not yet:** a passkey unlocking it (WebAuthn PRF), and a merge of two

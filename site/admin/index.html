@@ -1537,6 +1537,8 @@ async function showExport(ref, raw) {
     lang: v => ['語言', { en: 'English', zh: '中文' }[v] || String(v)]
   };
   const settingRow = ([k, x]) => {
+    // (Locked on the owner's devices: docs/PRIVACY.md.)
+    if (typeof x?.e === 'string') return [SET[k] ? SET[k](undefined)[0] : k.startsWith('ms.') ? `里程碑・${appName(k.slice(3))}` : k, '🔒 已上鎖：只有本人的裝置打得開', when(x?.t)];
     const v = x?.value;
     if (SET[k]) return [...SET[k](v), when(x?.t)];
     if (k.startsWith('ms.')) return [`里程碑・${appName(k.slice(3))}`, `進度 ${v?.n ?? 0}${v?.d ? `（算到 ${v.d}）` : ''}${v?.t ? `，第 ${v.t} 級` : ''}`, when(x?.t)];
