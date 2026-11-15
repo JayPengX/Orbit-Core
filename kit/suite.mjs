@@ -434,15 +434,13 @@ function deskOrbit() {
 // action leave about a tab's height): never over a tab. The most that fits,
 // in order: this app, back and forward one over the other; without forward;
 // this app alone; this app beside the account. (The rest in the sheet.)
-const FITS = ['', 'q-suite-lean1', 'q-suite-lean2', 'q-suite-lean2 q-suite-row'];
+// (Never side by side, Jay 11-15: "never put the app switcher sideway"; the tabs shorter instead, below.)
+const FITS = ['', 'q-suite-lean1', 'q-suite-lean2'];
 function fit(foot) {
-  const set = cls => {
-    bar.className = `q-suite ${cls}`.trim();
-    for (const f of document.querySelectorAll('.q-suite-rowed')) if (f !== foot || !/row/.test(cls)) f.classList.remove('q-suite-rowed');
-    if (foot && /row/.test(cls)) foot.classList.add('q-suite-rowed');
-  };
+  const set = cls => (bar.className = `q-suite ${cls}`.trim());
   const root = document.documentElement.style;
   root.removeProperty('--q-tabrail-tab');
+  document.documentElement.classList.remove('q-tabrail-tight');
   if (!foot) return set('');
   const above = () => {
     let end = 0;
@@ -458,13 +456,16 @@ function fit(foot) {
     if (foot.getBoundingClientRect().top >= end + 8) return;
   }
   // Still short (a small phone on its side, Jay 11-15: the account's row over
-  // 紀錄): the tabs a little shorter, as far as a tab can go (42), so the row
+  // 紀錄): the tabs a little shorter, as far as a tab can go (34), so the row
   // stands under the last one, never on it.
   const tab = document.querySelector('.q-tabbar .q-tab');
   const n = document.querySelectorAll('.q-tabbar .q-tab:not([hidden])').length;
   if (!tab || !n) return;
   const short = above() + 8 - foot.getBoundingClientRect().top;
-  root.setProperty('--q-tabrail-tab', `${Math.max(42, Math.floor(tab.getBoundingClientRect().height - short / n))}px`);
+  const h = Math.max(34, Math.floor(tab.getBoundingClientRect().height - short / n));
+  root.setProperty('--q-tabrail-tab', `${h}px`);
+  // (Too short for a name under its icon: the icon alone.)
+  if (h < 50) document.documentElement.classList.add('q-tabrail-tight');
 }
 
 let sheetOpen = null;
