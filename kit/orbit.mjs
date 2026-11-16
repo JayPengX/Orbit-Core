@@ -1477,9 +1477,16 @@ function segThumbs() {
     const now = seg.style.getPropertyValue('--q-seg-i');
     if (now === String(i)) return;
     if (was != null && was !== i && !now && seg.isConnected) {
+      // (Put where it was with no slide, that place taken, then slid once:
+      // a redraw that had it laid out already (a sheet keeping its scroll)
+      // had it slide back to where it was and then forward again, a shake
+      // at Low Power Mode's 30 frames, Jay 11-16.)
+      seg.classList.add('q-seg-set');
       seg.style.setProperty('--q-seg-i', String(was));
-      requestAnimationFrame(() => requestAnimationFrame(() => seg.style.setProperty('--q-seg-i', String(i))));
-    } else seg.style.setProperty('--q-seg-i', String(i));
+      void getComputedStyle(seg, '::before').transform;
+      seg.classList.remove('q-seg-set');
+    }
+    seg.style.setProperty('--q-seg-i', String(i));
   };
   const scan = root => {
     if (root.nodeType !== 1) return;

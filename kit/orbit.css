@@ -2416,6 +2416,10 @@ dialog.q-sheet.q-full {
 .q-seg:has(> :nth-child(7):is([aria-pressed='true'], [aria-selected='true'])) {
   --q-seg-i: 6;
 }
+/* (Put in place by kit segThumbs before it slides: no slide there.) */
+.q-seg.q-seg-set::before {
+  transition: none;
+}
 .q-seg > button {
   min-width: 0;
   min-height: 32px;
