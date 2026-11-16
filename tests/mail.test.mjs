@@ -49,7 +49,7 @@ test('alerts: night waits for 7 AM (unless quiet is off); at most DAY_MAX a day,
   assert.equal(run({ day: '2026-11-16', n: 1, last: T0 - 10 * 60_000, open: { [job.id]: { group: 'fast', seen: 5, sent: 0, need: 2 } } }, [job], T0).mail, null);
 });
 
-test('alerts: amber turned red is mailed again; what was mailed and is gone is said fixed, then all clear', () => {
+test('alerts: amber turned red is mailed again; what was mailed and is gone rides along with the next mail, never one of its own', () => {
   const warn = { id: 'ai-money:anthropic', group: 'slow', tone: 'warn', mail: true, title: 'Claude 剩 22%' };
   let r = run(null, [warn], T0, ['slow']);
   let s = send(r, T0);
@@ -57,15 +57,35 @@ test('alerts: amber turned red is mailed again; what was mailed and is gone is s
   assert.equal(r.mail.issues[0].tone, 'bad');
   assert.equal(r.mail.issues[0].again, false);
   s = send(r, T0 + H);
-  // Gone twice (only counted when its check ran): fixed, alone → all clear.
   r = run(s, [], T0 + 2 * H, ['fast']);
   assert.equal(r.mail, null, 'its check didn’t run: not gone');
   r = run(r.state, [], T0 + 3 * H, ['slow']);
-  assert.equal(r.mail, null, 'gone once');
   r = run(r.state, [], T0 + 4 * H, ['slow']);
-  assert.deepEqual(r.mail, { issues: [], fixed: [{ id: 'ai-money:anthropic', title: 'Claude 剩 8%' }] });
-  s = send(r, T0 + 4 * H);
-  assert.equal(run(s, [], T0 + 5 * H, ['slow']).mail, null, 'said once');
+  assert.equal(r.mail, null, 'fixed alone: no 全部恢復正常');
+  r = run(r.state, [job], T0 + 5 * H);
+  r = run(r.state, [job], T0 + 5 * H + 10 * 60_000);
+  assert.deepEqual(r.mail.fixed, [{ id: 'ai-money:anthropic', title: 'Claude 剩 8%' }]);
+});
+
+test('alerts: an outside source is mailed only broken 6 hours straight, its mending never (Jay 11-16)', () => {
+  const src = { id: 'src:thb', group: 'mid', tone: 'bad', confirm: 12, quiet: true, title: '公路局 壞了' };
+  let s = null;
+  // Broken an hour, fine half an hour, broken again: never 6 hours in a row.
+  for (let k = 0; k < 24; k++) {
+    const r = run(s, k % 4 === 3 ? [] : [src], T0 + k * 30 * 60_000, ['mid']);
+    assert.equal(r.mail, null, `flapping, tick ${k}`);
+    s = r.state;
+  }
+  s = null;
+  let r;
+  for (let k = 0; k < 12; k++) r = run(s, [src], T0 + k * 30 * 60_000, ['mid']), (s = r.state);
+  assert.deepEqual(r.mail.issues.map(i => i.id), ['src:thb'], '6 hours straight: mailed');
+  s = send(r, T0 + 6 * H);
+  r = run(s, [], T0 + 7 * H, ['mid']);
+  r = run(r.state, [], T0 + 7.5 * H, ['mid']);
+  r = run(r.state, [job], T0 + 8 * H);
+  r = run(r.state, [job], T0 + 8 * H + 10 * 60_000);
+  assert.deepEqual(r.mail.fixed, [], 'its mending never said');
 });
 
 test('alerts: a failed send waits 6 hours before trying again', () => {

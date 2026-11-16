@@ -23,7 +23,9 @@
 // everything due goes in one mail; at most 6 a Taiwan day and one each 30
 // minutes (a stopped proxy goes at once); 00:00–07:00 Taiwan waits for 7 AM
 // (the panel's 安靜時段, on unless turned off); what was mailed and is fixed
-// goes in the next mail, or one 全部恢復正常 when everything mailed is.
+// goes in the next mail, never one of its own (Jay 11-16). An outside source
+// (公路局, a city's buses, YouBike) mends itself: mailed only when broken 6
+// hours straight, its mending never.
 // A failed send is tried again 6 hours later. State: kept `mail:alerts`.
 
 import { keptRead, keptPut } from './kept-store.js';
@@ -100,7 +102,10 @@ async function mid(env, deps, now) {
     for (const s of SOURCES) {
       if (sourceState(s, src.rows?.[s.id], freshAt(s, src), src.at) !== 'bad') continue;
       const r = src.rows?.[s.id];
-      out.push({ id: `src:${s.id}`, tone: 'bad', confirm: 2, title: `${s.zh.replace(/（.*）/, '')} 壞了`, detail: [s.feeds, r?.err ? `最後的錯誤：${String(r.err).slice(0, 100)}` : ''].filter(Boolean).join(' · '), go: 'health' });
+      // (An outside source mends itself, nothing for Jay to do: mailed only
+      // when broken 6 hours straight, its mending never, Jay 11-16: "boomed
+      // by these emails every day".)
+      out.push({ id: `src:${s.id}`, tone: 'bad', confirm: 12, quiet: true, title: `${s.zh.replace(/（.*）/, '')} 壞了`, detail: [s.feeds, r?.err ? `最後的錯誤：${String(r.err).slice(0, 100)}` : ''].filter(Boolean).join(' · '), go: 'health' });
     }
   for (const [name, w] of Object.entries(errs?.workers?.workers || {}))
     if (errTone(w) === 'bad') out.push({ id: `err:${name}`, tone: 'bad', title: `${name} 的錯誤變多`, detail: `24 小時 ${realErrors(w).toLocaleString()} / ${w.requests.toLocaleString()} 次失敗（${pct(errRate(w))}）`, go: 'health' });
@@ -147,18 +152,20 @@ export function plan(prev, seen, ran, now, { quiet = true } = {}) {
   // Gone: twice in a row (for a check that ran this time); mailed ones are said to be fixed.
   for (const [id, r] of Object.entries(s.open)) {
     if (ids.has(id) || !ran.includes(r.group)) continue;
+    // (Not seen: "in a row" starts again.)
+    r.seen = 0;
     if (++r.miss < 2) continue;
     delete s.open[id];
-    if (r.sent) s.fixed.push({ id, title: r.title });
+    if (r.sent && !r.quiet) s.fixed.push({ id, title: r.title });
   }
   for (const i of seen) {
     const r = (s.open[i.id] ||= { seen: 0, sent: 0 });
-    Object.assign(r, { group: i.group, tone: i.tone, title: i.title, detail: i.detail || '', go: i.go || '', now: !!i.now, miss: 0, seen: r.seen + 1, need: i.now ? 1 : i.confirm || CONFIRM[i.group] || 2 });
+    Object.assign(r, { group: i.group, tone: i.tone, title: i.title, detail: i.detail || '', go: i.go || '', now: !!i.now, quiet: !!i.quiet, miss: 0, seen: r.seen + 1, need: i.now ? 1 : i.confirm || CONFIRM[i.group] || 2 });
   }
   const worse = r => r.sentTone === 'warn' && r.tone === 'bad';
   const due = Object.entries(s.open).filter(([, r]) => r.seen >= r.need && (!r.sent || worse(r) || now - r.sent >= AGAIN));
-  const allClear = !Object.values(s.open).some(r => r.sent) && s.fixed.length;
-  if (!due.length && !allClear) return { state: s, mail: null };
+  // (What's fixed rides along with the next mail, never a mail of its own.)
+  if (!due.length) return { state: s, mail: null };
   const urgent = due.some(([, r]) => r.now && !r.sent);
   if (s.day !== twDay(now)) Object.assign(s, { day: twDay(now), n: 0 });
   const hold = !urgent && ((quiet && twHour(now) < 7) || s.n >= DAY_MAX || now - s.last < GAP || now - s.failAt < RETRY);
