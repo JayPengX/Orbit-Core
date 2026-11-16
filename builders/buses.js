@@ -17,8 +17,8 @@
 // built, cities: { City: { routes, bytes, built } }, squares, shapes,
 // stations: { City: { stations, tiles, built } } }). A pack: { v, city, built,
 // stops: { uid: [name, lat, lon] }, routes: [{ uid, name, ways: [[sub,
-// subName, dir, [stopUid…]]], sched: [[sub, dir, [stopUid…], trips, freq]] }] }
-// where a trip is [days (7 bits, bit 0 Sunday), times, special?].
+// subName, dir, [stopUid…]]], sched: [[sub, dir, [stopUid…], trips, freq]],
+// fare? (新北's, ntpc.js fareOf) }] } where a trip is [days (7 bits, bit 0 Sunday), times, special?].
 
 import { tdxBody, tallyTdx } from '../transit.js';
 import { fillNewTaipei } from './ntpc.js';

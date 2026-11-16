@@ -202,6 +202,26 @@ test('新北: a way TDX has no timetable for, filled from 新北’s own list (i
   assert.equal(fillMissing(pack, rows), 0, 'a way timed is never filled again');
 });
 
+// Jay 11-16: 988 往新市站's one 23:40 in TDX, beside the list's 22 a
+// weekday, showed tonight's 23:40 as the next bus at 02:00; its 四段票 was
+// one section at NT$15 in TDX.
+test('新北: a way TDX has only a few runs of takes the list’s instead; each route’s fare by the list (its sections and lines)', async () => {
+  const { parseCsv, fillMissing, fareOf, fillFares } = await import('../builders/ntpc.js');
+  const head = 'namezh,gofirstbustime,backfirstbustime,golastbustime,backlastbustime,bustimedesc,headwaydesc,segmentbufferzh,ticketpricedescriptionzh';
+  const rows = parseCsv(`${head}\n988,0530,0640,2230,2340,,"988新北板橋公車站班表:0640 0740 0830 0850 0910 1010 2340",淡江大橋、台64,四段票\n`);
+  const pack = { stops: { X: ['新市站'], B: ['新北板橋公車站'] }, routes: [{ uid: 'N', name: '988', ways: [['S', '988', 0, ['X', 'B']], ['S', '988', 1, ['B', 'X']]], sched: [['S', 0, ['X'], [[62, 330], [62, 390]], []], ['S', 1, ['B'], [[62, 1420]], []]] }] };
+  assert.equal(fillMissing(pack, rows), 1);
+  assert.deepEqual(pack.routes[0].sched.filter(s => s[1] === 1).map(s => s[3].length), [7], 'the list’s seven, TDX’s one gone');
+  assert.equal(fillMissing(pack, rows), 0, 'and never again');
+  assert.equal(fillFares(pack, rows), 1);
+  assert.deepEqual(pack.routes[0].fare, [4, [['淡江大橋'], ['台64']], [['淡江大橋'], ['台64']]]);
+  assert.deepEqual(fareOf({ ticketpricedescriptionzh: '二段票', segmentbufferzh: '往程:新泰路口-捷運迴龍站 返程:迴龍派出所-新泰中正路口' }), [2, [['新泰路口', '捷運迴龍站']], [['迴龍派出所', '新泰中正路口']]]);
+  assert.deepEqual(fareOf({ ticketpricedescriptionzh: '二段票', segmentbufferzh: '(去)三洋-五谷王廟、(返)五谷王廟-三洋(建福路)' }), [2, [['三洋', '五谷王廟']], [['五谷王廟', '三洋(建福路)']]]);
+  assert.deepEqual(fareOf({ ticketpricedescriptionzh: '三段票', segmentbufferzh: '1. 媽祖田-捷運永寧站 2. 公館' })[1], [['媽祖田', '捷運永寧站'], ['公館']]);
+  assert.deepEqual(fareOf({ ticketpricedescriptionzh: '免費' }), [0, [], []]);
+  assert.equal(fareOf({ ticketpricedescriptionzh: '一段票' }), null);
+});
+
 test("the weekly bus build started from the proxy's cron when GitHub's own timer didn't run it in a week", async () => {
   const { kickBuses } = await import('../builders/buses.js');
   const NOW = Date.parse('2026-11-14T19:22:00Z');

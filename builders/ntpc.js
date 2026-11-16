@@ -84,9 +84,11 @@ export function fillMissing(pack, rows) {
   for (const route of pack.routes || []) {
     const row = byName.get(route.name);
     if (!row) continue;
-    const timed = new Set(route.sched.map(s => s[1]));
+    // (Runs TDX has a way: none, or a few beside the list's, 988 往新市站's
+    // one 23:40 to its 22 a weekday, Jay 11-16: the list's instead.)
+    const runs = dir => route.sched.filter(x => x[1] === dir).reduce((n, x) => n + x[3].length + x[4].length * 10, 0);
     for (const dir of [...new Set(route.ways.map(w => w[2]))]) {
-      if (timed.has(dir)) continue;
+      const had = runs(dir);
       // (TDX's 0 the way out, 1 the way back, as the list's go and back.)
       const ways = route.ways.filter(w => w[2] === dir && w[3].length);
       if (!ways.length) continue;
@@ -111,6 +113,9 @@ export function fillMissing(pack, rows) {
         } else freq.push([bits, ...d.freq]);
       }
       if (!trips.size && !freq.length) continue;
+      const listed = [...trips.values()].reduce((n, x) => n + x.list.length, 0);
+      if (had && (!listed || had * 3 >= listed)) continue;
+      if (had) route.sched = route.sched.filter(x => x[1] !== dir);
       for (const { way, list } of trips.values()) route.sched.push([way[0], dir, [way[3][0]], list, []]);
       if (freq.length) route.sched.push([main[0], dir, [main[3][0]], [], freq]);
       filled++;
@@ -119,10 +124,52 @@ export function fillMissing(pack, rows) {
   return filled;
 }
 
+// A route's fare as the list says it: 「四段票」 → its sections (免費: 0),
+// and its lines between sections (分段緩衝), each the stops of its buffer
+// zone, one stop's name or a place's (「萬大國小-中和國稅局」, 「高公局」,
+// 「淡江大橋」), per way when they differ (「往程:A-B 返程:C-D」).
+// TDX's fares have no lines for 477 of 新北's 637 routes; 988 is a 四段票
+// TDX has as one section (Jay 11-16). → [sections, [go lines], [back lines]] | null
+const COUNT = { 一: 1, 二: 2, 兩: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
+export function fareOf(row) {
+  const t = String(row?.ticketpricedescriptionzh || '');
+  if (/免費/.test(t)) return [0, [], []];
+  const m = /([一二兩三四五六七八九十]|\d+)\s*段/.exec(t);
+  const n = m ? COUNT[m[1]] || Number(m[1]) : 0;
+  if (!(n > 1)) return null;
+  const text = String(row.segmentbufferzh || '').trim();
+  // (Lines apart by 、 or a space, or numbered: 「1. 媽祖田-捷運永寧站 2. 公館」.)
+  const lines = part => part.replace(/(?:^|\s)\d+\.\s*/g, '、').replace(/\s+(?![^()（）]*[)）])/g, '、').split(/[、，,；;]/).map(x => x.replace(/^\s*(?:去程|往程|返程|回程)\s*[:：]?\s*/, '').trim()).filter(Boolean).map(x => x.split(/\s*[-－–~～]\s*/).filter(Boolean).slice(0, 2));
+  const go = /(?:去程|往程)\s*[:：]?\s*(.*?)(?=(?:返程|回程)|$)/.exec(text);
+  const back = /(?:返程|回程)\s*[:：]?\s*(.*)$/.exec(text);
+  if (go && back) return [n, lines(go[1]), lines(back[1])];
+  // (Each line marked its way: 「(去)三洋-五谷王廟、(返)五谷王廟-三洋(建福路)」.)
+  const parts = text.split(/[、，,；;]/).map(x => x.trim()).filter(Boolean);
+  if (parts.some(x => /^[(（][去返][)）]/.test(x))) {
+    const of = k => lines(parts.filter(x => !/^[(（][去返][)）]/.test(x) || x[1] === k).map(x => x.replace(/^[(（][去返][)）]\s*/, '')).join('、'));
+    return [n, of('去'), of('返')];
+  }
+  const both = lines(text);
+  return [n, both, both];
+}
+// Each route's fare from the list onto the pack (route.fare), where the list says one.
+export function fillFares(pack, rows) {
+  const byName = new Map();
+  for (const r of rows) if (r.namezh && !byName.has(r.namezh)) byName.set(r.namezh, r);
+  let n = 0;
+  for (const route of pack.routes || []) {
+    const f = fareOf(byName.get(route.name));
+    if (f) (route.fare = f), n++;
+  }
+  return n;
+}
+
 // New Taipei's pack filled from the list, read now (a week's build, one
 // read). Failing, the pack stays as TDX has it. → how many ways were filled.
 export async function fillNewTaipei(pack, get = fetch) {
   const r = await get(NTPC_ROUTES, { signal: AbortSignal.timeout?.(20_000) });
   if (!r.ok) return 0;
-  return fillMissing(pack, parseCsv(await r.text()));
+  const rows = parseCsv(await r.text());
+  fillFares(pack, rows);
+  return fillMissing(pack, rows);
 }
