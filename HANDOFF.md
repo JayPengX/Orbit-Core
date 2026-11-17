@@ -175,21 +175,23 @@ days without a commit: re-enable them in each repo's Actions tab.
 | Orbit-Sports `deploy.yml` | every 6 hours | Rebuilds the site's data |
 | Orbit-Showcase `deploy.yml` | 10:17 | Re-records the live demos |
 
-## 5. Where the work stands (2026-11-14)
+## 5. Where the work stands (2026-11-17)
 
-- **The plan Jay approved on 11-12:** features stop Sunday 11-15 at night;
-  Monday and Tuesday are fixes only, with every automated check run again;
-  stable by Wednesday 11-18. 418 bugs were fixed in the 11-13 round.
-- **Under way on 11-14:** reopening public Pass sign-up with levels (a pass
-  someone makes for themselves gets no AI or anything billable, enforced by
-  the server; only passes the admin issues get AI); the Pass's recovery email
-  (built, off until a mail sender is set up); sending mail from the domain;
-  usage analytics and a privacy policy; setting up an Orbit before adding it
-  to the home screen (several Orbits, single-app ones too); Orbit's tabs,
-  live-trip pill and loading; smooth loading and scrolling; a security
-  audit; the Pass site and homepage redesign; Showcase as the flagship site;
-  Law's 代表會 pages, votes, bills and rulings (rulings read through the
-  Taiwan relay; confirm the early-morning run).
+- **Stable, not growing:** features stopped 11-15; on 11-17 Orbit was made
+  "ultra stable" by cutting, not adding. Gone for good: every AI answer made
+  ahead for everyone (News' titles, 重點整理, 各方怎麼說 and sports links;
+  Sports' 看點 and 賽後看點; F1 stories; Words' cards; Law's minutes),
+  News' 預測市場 and 單邊, Orbit News inside Sports, Words inside News,
+  Class's 拍聯絡簿, 讀書計畫 and 加到行事曆, Beats' 專注音樂, and the
+  問 Orbit links between apps. The only AI still made ahead: Mondays' admin
+  除錯紀錄週報 and Law's 法案週報. Every other AI answers only what a
+  person asks, checked by code (RULEBOOK 11-14, 11-17).
+- **Built and live:** public Pass sign-up with levels (a pass someone makes
+  for themselves gets no AI or anything billable, enforced by the server);
+  mail from the domain; usage analytics and the privacy policy; several
+  Orbits, single-app ones too; each app's data locked on the phone (11-15).
+- **To check by hand now and then:** `node tools/layout-check.mjs <app…>`,
+  `node tools/test-apps.mjs`, and the admin's 健康 tab.
 - **Dates to watch:** 11-15 the Gemini bill (still high would mean a leaked
   key: make a new one); 12-01 TDX's free tier starts (check Transit on
   12-02); 12-05 the Firebase key goes; 12-31 Gemini Flash's price doubles;

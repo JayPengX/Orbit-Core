@@ -185,7 +185,7 @@ App rules: each app's `MAP.md` › Rules.
 
 ## 6. Replaced rules (kept so nobody brings them back)
 
-Gone for good, never revived: Longshot (shut down 10-31: Worker, data and secrets deleted; only a notice at `longshot.jaypengx.com`; its repo left for Jay) and with it Orbit Play, Slips, scratch cards, betting, VIP and free bets; Orbit Plus; Per-User-Display; StillFeed. Folder-Link (a Windows tool, 10-18: same-drive check strict, merges overwrite after the warning) has its own notes.
+Gone for good, never revived: Longshot (shut down 10-31: Worker, data and secrets deleted; only a notice at `longshot.jaypengx.com`; its repo left for Jay) and with it Orbit Play, Slips, scratch cards, betting, VIP and free bets; Orbit Plus; Per-User-Display; StillFeed. Folder-Link (a Windows tool, 10-18: same-drive check strict, merges overwrite after the warning) has its own notes. Cut 11-17 to make Orbit stable before the subscription ended (Jay: stabilize by cutting, not adding): 問 Orbit's links between apps (`#ask=`), News' 預測市場 (code alone matched about 1 in 5 wrong) and 單邊, Orbit News inside Sports, Words inside News, Class's 拍聯絡簿, 讀書計畫 and 加到行事曆, Beats' 專注音樂, and every AI answer made ahead (above).
 
 | Old rule | Replaced by | When |
 |---|---|---|
