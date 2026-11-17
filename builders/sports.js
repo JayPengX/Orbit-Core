@@ -87,13 +87,18 @@ export function firstUnsettled(old, year, now = Date.now()) {
   return first;
 }
 
+// (ESPN answering an empty object or an error's JSON with a 200 is a failed
+// read: the year stays as last night's, never written as a season of no games.)
+const notScoreboard = url => new Error(`${url}: not a scoreboard`);
 async function leagueYear(page, espn, year, old = null, now = Date.now()) {
   const head = await page(`${SITE}/${espn}/scoreboard?dates=${year}&limit=1`);
+  if (!Array.isArray(head?.leagues) && !Array.isArray(head?.events)) throw notScoreboard(espn);
   const seen = new Map();
   const from = firstUnsettled(old, year, now);
   for (let m = from; m <= 12; m++) {
     const data = await page(`${SITE}/${espn}/scoreboard?dates=${year}${String(m).padStart(2, '0')}&limit=1000`);
-    for (const e of data.events || []) if (!seen.has(e.id)) seen.set(e.id, slim(e));
+    if (!Array.isArray(data?.events)) throw notScoreboard(`${espn} ${year}-${m}`);
+    for (const e of data.events) if (!seen.has(e.id)) seen.set(e.id, slim(e));
   }
   // The months before, as last night (a day's grace past the first month read:
   // a late game there is on its US day's page, the month before's).
@@ -102,6 +107,8 @@ async function leagueYear(page, espn, year, old = null, now = Date.now()) {
   // (Slimmed again: a pack from before a field was dropped sheds it too; slim(slim(e)) is slim(e).)
   if (from > 1) for (const e of old.events) if (!seen.has(e.id) && Date.parse(e.date) < carryTo) seen.set(e.id, slim(e)), carried++;
   const events = [...seen.values()].filter(e => String(e.date || '').startsWith(String(year)) || !e.date).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  // (A year that had games read as none at all: ESPN's pages emptied, not the season. Last night's stays.)
+  if (!events.length && old?.events?.length) throw new Error(`${espn} ${year}: read as no games`);
   return { leagues: slim((head.leagues || []).slice(0, 1)), events, carried, read: Math.max(0, 13 - from) };
 }
 

@@ -70,6 +70,28 @@ test('an answer that is not the source\'s shape (`valid`) is a failed read: the 
   await assert.rejects(kit.packJson('news/never.json', { valid }), e => e.status === 0);
 });
 
+test('a read that failed and answered the copy says how old that copy is (staleSince) until a read succeeds', async () => {
+  const url = 'https://example.test/prices.json';
+  answer = () => new Response('{"p":1}');
+  await kit.proxyJson(url, { ttl: 1, alone: true });
+  assert.equal(kit.staleSince(url), 0);
+  await new Promise(r => setTimeout(r, 20));
+  answer = () => new Response('', { status: 503 });
+  assert.deepEqual(await kit.proxyJson(url, { ttl: 1, alone: true }), { p: 1 });
+  assert.ok(kit.staleSince(url) > 0 && kit.staleSince(url) <= Date.now());
+  await new Promise(r => setTimeout(r, 20));
+  answer = () => new Response('{"p":2}');
+  // (A failed read is held a moment: past its hold, read again.)
+  const now = Date.now;
+  Date.now = () => now() + 20_000;
+  try {
+    assert.deepEqual(await kit.proxyJson(url, { ttl: 1, alone: true }), { p: 2 });
+  } finally {
+    Date.now = now;
+  }
+  assert.equal(kit.staleSince(url), 0);
+});
+
 test('a failed read with nothing kept is a failure, never an empty answer, and nothing is saved', async () => {
   const url = 'https://example.test/never.json';
   const before = kept().length;

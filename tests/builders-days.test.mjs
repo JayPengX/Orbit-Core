@@ -40,3 +40,24 @@ test('season packs on R2: the months over kept from the last pack, ESPN read onl
   assert.ok((await store.json('sports/index.json')).leagues.mlb.years['2026']);
   assert.ok((await store.json('sports/mlb/days.json')).days.includes('2026-10-13'));
 });
+
+test("ESPN answering an empty object (or nothing at all) for a season's months: the year stays as last night's, never a season of no games", async () => {
+  const { runSports } = await import('../builders/sports.js');
+  const { r2Store } = await import('../builders/store.js');
+  const { memoryBucket } = await import('./fixtures/bucket.mjs');
+  const now = Date.parse('2026-10-13T16:17:00Z');
+  const ev = (id, date, state) => ({ id, date, status: { type: { state, completed: state === 'post' } }, competitions: [{ date, competitors: [] }] });
+  const kept = { leagues: [], events: [ev('1', '2026-04-02T23:00Z', 'post'), ev('3', '2026-10-12T23:00Z', 'post'), ev('4', '2026-10-20T23:00Z', 'pre')] };
+  for (const month of [{}, { events: [] }]) {
+    const store = r2Store(memoryBucket({ 'sports/mlb/2026.json': kept }));
+    const get = async url => {
+      const dates = new URL(String(url)).searchParams.get('dates') || '';
+      if (!dates) return new Response(JSON.stringify({ leagues: [{ season: { year: 2026, startDate: '2026-02-20T08:00Z', endDate: '2026-11-10T08:00Z' } }] }));
+      if (dates === '2026') return new Response(JSON.stringify({ leagues: [{ id: '10', calendar: [] }] }));
+      return new Response(JSON.stringify(month));
+    };
+    const r = await runSports({ store, get, now, only: ['mlb'], sleep: async () => {} });
+    if (!month.events) assert.ok(r.failed.includes('mlb 2026'), JSON.stringify(r));
+    assert.deepEqual((await store.json('sports/mlb/2026.json')).events.map(e => e.id), month.events ? ['1'] : ['1', '3', '4'], JSON.stringify(month));
+  }
+});
