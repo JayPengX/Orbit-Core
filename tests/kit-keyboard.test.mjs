@@ -153,7 +153,7 @@ test("typing in Orbit on an iPhone: the field 12 px off the keys whatever their 
       const r = await app.evaluate(() => {
         const d = document.querySelector('dialog[open]');
         const g = getComputedStyle(d, '::before');
-        return { head: getComputedStyle(d.querySelector('.q-sheet-head')).display, grabber: d.getBoundingClientRect().top + parseFloat(g.marginTop) + parseFloat(g.height), first: d.querySelector('p.hint').getBoundingClientRect().top };
+        return { head: getComputedStyle(d.querySelector('.q-sheet-head')).display, grabber: d.getBoundingClientRect().top + parseFloat(getComputedStyle(d).borderTopWidth) + parseFloat(getComputedStyle(d).paddingTop) + parseFloat(g.marginTop) + parseFloat(g.height), first: d.querySelector('p.hint').getBoundingClientRect().top };
       });
       assert.equal(r.head, 'none', 'a short phone: the title waits behind the keys');
       assert.ok(r.first >= r.grabber + 6, `a short phone: the first line ${Math.round(r.first - r.grabber)} px under the grabber, not under it`);
