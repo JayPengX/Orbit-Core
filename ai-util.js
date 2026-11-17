@@ -48,14 +48,16 @@ const OPS = {
 };
 export const CALC = arr(obj({ n: N, op: { type: 'string', enum: Object.keys(OPS) }, of: arr(N) }));
 export const CALC_RULE =
-  'You may work out a number the facts don’t give (a share as a percentage, a total of several rows, the gap between two, an average): use only the facts’ own numbers, round a percentage to a whole number, and list each in calc as { n: the result, op: sum | diff | pct | avg | ratio | times, of: the facts’ numbers it is made from, in order (pct: the part, then the whole) }; the app checks every one. calc is [] when nothing was worked out.';
+  'You may work out a number the facts don’t give (a share as a percentage, a total of several rows, the gap between two, an average): use only the facts’ own numbers (or one worked out above it in calc), round a percentage to a whole number, and list each in calc as { n: the result, op: sum | diff | pct | avg | ratio | times, of: the facts’ numbers it is made from, in order (pct: the part, then the whole) }; the app checks every one. calc is [] when nothing was worked out.';
 export function worked(calc, given) {
   const have = new Set(nums(given).map(Number));
   const out = [];
   for (const c of list(calc, 8)) {
     const f = OPS[c?.op];
     const of = list(c?.of, 40).map(Number);
-    if (!f || !of.length || !of.every(x => Number.isFinite(x) && have.has(x))) continue;
+    // (An operand is the input's own or a result worked out before it: a total, then its share.)
+    const known = x => Number.isFinite(x) && (have.has(x) || out.some(w => Math.abs(w - x) <= 0.5));
+    if (!f || !of.length || !of.every(known)) continue;
     const exact = f(of);
     if (Number.isFinite(exact)) out.push(exact);
   }

@@ -66,6 +66,7 @@ export const EXAMPLES = {
     { name: 'how it was paid', input: { question: '這個月的錢都怎麼付出去的', facts: MONEY_FACTS } },
     { name: 'card or cash', input: { question: '我用信用卡刷了多少', facts: MONEY_FACTS } },
     { name: 'food this month', input: { question: '這個月吃飯花多少？', facts: MONEY_FACTS } },
+    { name: 'food share', input: { question: '我這個月吃飯花多少錢佔多少比例', facts: MONEY_FACTS } },
     { name: 'up on last month', input: { question: '比上個月多花在哪？', facts: MONEY_FACTS } },
     { name: 'budget', input: { question: '預算還剩多少？', facts: MONEY_FACTS } },
     { name: 'not in the facts', input: { question: '我去年花最多的是哪個月？', facts: MONEY_FACTS } },

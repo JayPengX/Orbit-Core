@@ -16,6 +16,9 @@ test('a share, a total and a gap worked from the facts pass; a made-up one fails
   assert.ok(!numbersWorked('佔63%', facts, []));
   // (An operand not in the facts: the calc is dropped.)
   assert.ok(!numbersWorked('佔50%', facts, [{ n: 50, op: 'pct', of: [2910, 5820] }]));
+  // (A total worked out first, then a share of it.)
+  const chain = [{ n: 2137, op: 'sum', of: [2081, 45, 11] }, { n: 37, op: 'pct', of: [2137, 5820] }];
+  assert.ok(numbersWorked('其他佔37%', facts, chain));
 });
 
 test('money-ask keeps a worked share and drops a guessed one', () => {
