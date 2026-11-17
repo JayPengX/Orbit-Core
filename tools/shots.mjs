@@ -185,7 +185,7 @@ async function buildClass(dir) {
 }
 
 // ---- One preview.mjs run: one page, one screen ----
-const FAULTS = /^(wraps|cut|scrolls sideways|console errors|layout):/;
+const FAULTS = /^(wraps|cut|scrolls sideways|console errors|layout|stuck|chinese):/;
 function readFaults(text) {
   const faults = [];
   let block = null;

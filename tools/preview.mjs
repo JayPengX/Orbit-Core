@@ -1689,7 +1689,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
     };
     for (const el of document.querySelectorAll('body *')) {
       // (Decoration hidden from readers, aria-hidden, isn't text a person reads: Weather's failure screen's art.)
-      if (el.closest('[hidden], [aria-hidden="true"], svg, .leaflet-container, .maplibregl-map') || !el.textContent.trim()) continue;
+      if (el.closest('[hidden], [aria-hidden="true"], svg, .leaflet-container, .maplibregl-map, .gm-style') || el.querySelector('.gm-style, .maplibregl-map, .leaflet-container') || !el.textContent.trim()) continue;
       const r = el.getBoundingClientRect();
       if (!r.width || r.bottom < 0 || r.top > innerHeight * 6) continue;
       const cs = getComputedStyle(el);
@@ -1730,6 +1730,41 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
   // same way inside itself. (tools/layout-check.mjs blocks a push on these.)
   const layout = await page.evaluate(layoutFaults);
   if (layout.length) console.log(`layout:\n  ${layout.join('\n  ')}`);
+  // Still loading when the shot is taken (the family's most-repeated fault,
+  // 10-21 → 11-15: an update that held the opening, a game page on its
+  // skeleton, a sheet gone blank, never past the key's read): the loading
+  // screen up, or a placeholder in sight.
+  const stuck = await page.evaluate(() => {
+    const seen = el => { const r = el.getBoundingClientRect(); if (!r.width || !r.height || r.bottom < 0 || r.top > innerHeight) return false; for (let p = el; p && p !== document.body; p = p.parentElement) { const cs = getComputedStyle(p); if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity === 0) return false; } return true; };
+    const out = [];
+    const boot = document.getElementById('loading');
+    if (boot && seen(boot)) out.push('the loading screen');
+    const skel = [...document.querySelectorAll('.q-skel, .q-skel-line')].filter(seen);
+    if (skel.length) out.push(`${skel.length} placeholder${skel.length > 1 ? 's' : ''} (${[...new Set(skel.map(s => s.parentElement?.className || s.className))].slice(0, 3).join(' · ').slice(0, 120)})`);
+    return out;
+  });
+  if (stuck.length) console.log(`stuck:\n  ${stuck.join('\n  ')}`);
+  // English, yet Chinese on screen (One language, Jay 11-13): text a person
+  // reads that has Han characters and no English beside it in its element.
+  if (lang === 'en') {
+    const han = await page.evaluate(() => {
+      const out = new Set();
+      const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      for (let n; (n = walk.nextNode()); ) {
+        const t = n.textContent.trim();
+        if (!/\p{Script=Han}/u.test(t) || /[A-Za-z]{3}/.test(t)) continue;
+        const el = n.parentElement;
+        if (!el || el.closest('[hidden], [aria-hidden="true"], svg, script, style, [lang^="zh"], .leaflet-container, .maplibregl-map')) continue;
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height || r.bottom < 0 || r.top > innerHeight) continue;
+        const cs = getComputedStyle(el);
+        if (cs.visibility === 'hidden' || +cs.opacity === 0) continue;
+        out.add(`${el.tagName.toLowerCase()}${[...el.classList].slice(0, 2).map(c => `.${c}`).join('')} "${t.slice(0, 30)}"`);
+      }
+      return [...out].slice(0, 15);
+    });
+    if (han.length) console.log(`chinese:\n  ${han.join('\n  ')}`);
+  }
   if (flakyNow.on) console.log(`  ${flakyNow.failed} answers failed on purpose`);
   flakyNow.failed = 0;
   console.log(file, wide.length ? `| wider than the screen: ${wide.join(', ')}` : '', sideways ? `| PAGE ${sideways}` : '');
