@@ -105,5 +105,8 @@ holds no key that opens it.
   `keep`), the admin's 登出, 重設 and 復原 none; signing in as someone else
   takes the device off every other account's lists (`unclaim`). Signed out
   offline, it stays until one of those or until its subscription ends.
+- **A link never changes who is signed in** (kit `takeHandoff`, `sitePage`, 11-17): a sign-in handed over in
+  an address (`#qh=`) is used only by a device with no sign-in of its own, and an Orbit link (`/app/?open=`)
+  opens only Orbit's own pages, never another site's page or a script.
 - **Not yet:** a passkey unlocking it (WebAuthn PRF), and a merge of two
   passes (`merge`) keeps only the target's locked data.

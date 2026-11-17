@@ -2745,7 +2745,9 @@ export function appUrl(app, hash = '') {
 
 // A sign-in handed over in the address (#qh=<sealed>): taken out of the
 // address at once and traded for this device's own sign-in. null if none.
-async function takeHandoff(app) {
+// Never over a sign-in the device already has: a link made with someone else's hand-over put their account
+// on this device in place of its own, with nothing said, and what the apps keep here went on under it (11-17).
+export async function takeHandoff(app) {
   const loc = globalThis.location;
   if (!loc?.hash) return null;
   const parts = loc.hash.slice(1).split('&');
@@ -2759,7 +2761,7 @@ async function takeHandoff(app) {
   try {
     sessionStorage.setItem('orbit.visit', '1');
   } catch {}
-  if (k !== 'qh') return null;
+  if (k !== 'qh' || storedAccount()) return null;
   try {
     return await call('POST', '', { op: 'redeem', handoff: v, app, inbox: true });
   } catch {
