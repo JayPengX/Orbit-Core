@@ -191,7 +191,6 @@ w;dur=`, noted by the 除錯紀錄 when slow, and `LOCKED` (never runs as a page
 | `/news-tr`, `/tr` | `builders/news-tr.js`, `translate.js` | One language, Google (`TR_PAID`), on-screen titles only: `news/tr/<id>.json`, `tr/<id>.json`; kit `translateMarked`. New ones only for a 完整 pass; D1 `tr_day` caps a day |
 | `/class-news` | `class-news.js` | Class's 學校公告: a school's boards read via the relay, kept 45 days, new titles worded once; R2 |
 | `/money-read` | `money-read.js` | Money's 拍照記帳: a picture → `{ buys, left }`, read by Gemini, checked; on a tap; 30 a day a Pass, 300 in all |
-| `/cal` | `cal.js` | Class's 加到行事曆: its phone's calendar, served (KV `cal:*`) |
 | `/flight` | `flight.js`, `kit/flight.mjs` | Class's 專注飛行: real planes landing in about N minutes; pool: R2 `flight/` (§5.5) |
 | `/orbit-manifest` | `orbit-manifest.js` | An Orbit's manifest, from its tag |
 | `/showcase/pass` | `showcase.js` | The showcase's pass: demos' reads, 問 Orbit (`showcase-ask`); capped per address a day |

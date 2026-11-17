@@ -138,7 +138,7 @@ worker.js            the proxy's router; each route's work in its own file:
 ├── stock-fill.js, stock-check.js, fund-nav.js, taifex.js   Securities
 ├── money.js, money-read.js                 Money
 ├── law.js, law-chat.js, law-ground.js, law-more.js, law-page.js, law-hosts.js
-├── cal.js (Class's calendar), gift.js (公開領取), showcase.js (the showcase's pass)
+├── showcase.js (the showcase's pass)
 ├── runner.js (heavy routes and crons in a Durable Object), door.js, sources.js
 └── data.js, http.js, capacity.js, pace.js, ops.js, doc-store.js, store-backup.js
 gemini-relay.js      Gemini, pinned to Taiwan

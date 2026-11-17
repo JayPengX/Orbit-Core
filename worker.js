@@ -75,7 +75,6 @@ import { handleStock, moveBook } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
 import { docStore, storeReady } from './doc-store.js';
 import { handleMoneyRead } from './money-read.js';
-import { handleCal } from './cal.js';
 import { handleAiOpen, OPEN } from './ai-open.js';
 import { logCall, callsSince, reliability, spendOf, lastFailed, providerCapped, providerToday } from './gemini-use.js';
 import { handleAi, handleAiBuild, aiTry } from './ai.js';
@@ -1469,9 +1468,7 @@ async function route(request, env, ctx, headers, origin) {
     if (takeUsage(body)) flushUsage(env, ctx, { soon: true });
     return new Response(null, { status: 204, headers });
   }
-  // Orbit Class's 加到行事曆 (cal.js): the calendar its phone made, kept and handed to the Calendar app.
-  if (path === '/cal' || path.startsWith('/cal/')) return handleCal(request, env, headers, path === '/cal' ? await sessionOf(request, env) : null, path);
-  // …and its 讀圖: a picture of purchases read by Gemini, on a tap only (money-read.js).
+  // Orbit Money's 讀圖: a picture of purchases read by Gemini, on a tap only (money-read.js).
   // The family's AI door (ai.js): every app's AI taps by feature name, each with its fixed prompt and caps.
   // …and a build's built-once asks (Orbit Law's nightly build: 會議紀錄變表格, 法案週報), with its key.
   // …and a story's AI part made the first time anyone opens it (ai-open.js: 重點整理, 各方怎麼說), kept for everyone.

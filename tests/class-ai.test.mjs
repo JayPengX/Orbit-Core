@@ -1,54 +1,12 @@
-// Orbit Class's three AI features (ai-features.js class-book, class-plan,
-// class-news) and the school reader they stand on (class-news.js): what an
+// Orbit Class's 學校公告 (ai-features.js class-news) and the school reader they stand on (class-news.js): what an
 // answer may keep, and how a school's own list is read by code.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FEATURES, cleanBook, spanOf } from '../ai-features.js';
+import { FEATURES } from '../ai-features.js';
 import { schoolSite, schoolRead, dateIn, feedItems, ischoolItems, pageItems, pageLeads, settle, readSchool, mergeWorded, schoolNews, handleClassNews } from '../class-news.js';
 
 const ev = o => `event: ${o.type}\ndata: ${JSON.stringify(o)}\n\n`;
 const sse = obj => new Response([{ type: 'message_start', message: { usage: { input_tokens: 100 } } }, { type: 'content_block_delta', delta: { type: 'text_delta', text: JSON.stringify(obj) } }, { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 20 } }].map(ev).join(''));
-
-test('拍聯絡簿: a subject only from their own list, a due day near, a kind always', () => {
-  const out = cleanBook(
-    {
-      items: [
-        { kind: 'hw', subject: '數', text: '習作 p.32-35', due: '2026-11-12', next: false },
-        { kind: 'test', subject: '英', text: 'L3 單字', due: '', next: true },
-        { kind: 'nope', subject: '化學', text: '帶實驗衣', due: '2027-09-01', next: false },
-        { kind: 'hw', subject: '數學', text: '習作 p.32-35', due: '2026-11-12' },
-        { kind: 'do', subject: '', text: '', due: '' }
-      ]
-    },
-    { today: '2026-11-11', subjects: ['數學', '英文', '國文'] }
-  );
-  assert.deepEqual(out.items, [
-    { kind: 'hw', subject: '數學', text: '習作 p.32-35', due: '2026-11-12', next: false },
-    { kind: 'test', subject: '英文', text: 'L3 單字', due: '', next: true },
-    { kind: 'do', subject: '', text: '帶實驗衣', due: '', next: false }
-  ]);
-  const f = FEATURES['class-book'];
-  assert.equal(f.app, 'orbit');
-  assert.equal(f.input({ image: { mime_type: 'image/gif', data: 'x'.repeat(2000) }, today: '2026-11-11' }), null, 'a picture only as JPEG, PNG or WebP');
-  const input = f.input({ image: { mime_type: 'image/jpeg', data: 'A'.repeat(2000) }, today: '2026-11-11', subjects: ['數學', '數學', '英文'] });
-  assert.deepEqual(input.subjects, ['數學', '英文']);
-  assert.match(f.parts(input)[0].text, /數學、英文/);
-  assert.match(f.parts(input)[0].text, /2026-11-11 \(三\)/, 'today with its weekday, for 週五 and 明天');
-});
-
-test('讀書計畫: every task a session of theirs, numbers only from the scope typed', () => {
-  const f = FEATURES['class-plan'];
-  const input = f.input({ today: '2026-11-11', exam: '第二次段考', subjects: [{ name: '數學', scope: '2-1~3-2', n: 3, exam: '2026-11-26' }, { name: '英文', scope: '', n: 2, exam: '2026-11-27' }, { name: '', n: 2, exam: '2026-11-27' }] });
-  assert.equal(input.subjects.length, 2);
-  const out = f.clean({ plans: [{ subject: '數學', tasks: ['2-1、2-2 課本例題', '2-3 到 3-2 習作', '總複習：錯題重做', 'extra'] }, { subject: '英文', tasks: ['L5 課文', '總複習'] }] }, input);
-  assert.deepEqual(out.plans['數學'], ['2-1、2-2 課本例題', '2-3 到 3-2 習作', '總複習：錯題重做']);
-  assert.deepEqual(out.plans['英文'], ['', '總複習'], 'a lesson the scope never named is dropped (the phone writes its own)');
-  assert.equal(f.clean({ plans: [] }, input), null);
-  assert.equal(spanOf('L4-L6'), 'L4-L6 5', 'a range names what’s inside it');
-  const two = f.input({ today: '2026-11-11', subjects: [{ name: '英文', scope: 'L4-L6', n: 3, exam: '2026-11-26' }] });
-  assert.deepEqual(f.clean({ plans: [{ subject: '英文', tasks: ['L4 課文', 'L5 課文', 'L7 課文'] }] }, two).plans['英文'], ['L4 課文', 'L5 課文', '']);
-  assert.ok(f.parts(input)[0].text.includes('數學: n 3, exam 2026-11-26, scope: 2-1~3-2'));
-});
 
 test('學校公告: who it’s for, a line and a deadline only from the title', () => {
   const f = FEATURES['class-news'];
