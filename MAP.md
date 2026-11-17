@@ -395,7 +395,7 @@ Broker rules (`stock-access.mjs`, `-credit`): Securities' MAP.md.
 ## 8. Notices (`/push`)
 
 Apps hand the Worker coming notices (`schedulePush`), sent by
-Web Push, some checked first (a final, a price, rain). Each device once (its Orbit, else the app: `subsOf`); each kind in `NOTICE_KINDS` can be off; in class they wait for the break (`classHold`).
+Web Push, some checked first (`runCheck`). Each device once (its Orbit, else the app: `subsOf`), signed in (`keepDevices`); each kind in `NOTICE_KINDS` can be off; in class they wait for the break (`classHold`).
 
 ## 9. Speeds, capacity and the bill
 

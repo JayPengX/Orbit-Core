@@ -14,6 +14,8 @@
 //                                      notice switches (kit notifyPrefs): a kind
 //                                      turned off (or notices off) in any app is
 //                                      dropped from every app's list when due
+//   POST /push/forget?qt=<session>     { endpoints: [...] } this device signed out
+//                                      (kit s.signOut): it is sent nothing more
 //   scheduled (cron, every 5 minutes)  sends what's due
 //
 // A notice: { at: ms, title, body, tag, url, kind } and, for news that isn't known
@@ -51,6 +53,14 @@
 // Orbit's replaces it), so a notice shows once a device, never twice; a
 // computer's never takes the phone's away (it did: one device an app, the
 // last to subscribe, and a phone's Orbit outranked the computer's).
+//
+// Only while signed in: a device is sent an account's notices only while that
+// account is signed in on it. Signed out there (/push/forget), signed out by
+// the Pass (登出其他所有裝置, a new pass, the admin's 登出: keepDevices), or
+// signed in as someone else (subscribe: the endpoint leaves every other
+// account), it is off the lists. It stayed on them: a phone signed out, lost
+// or handed on went on showing the account's notices, and one signed in as
+// someone else showed both people's.
 //
 // The message is encrypted for the device (RFC 8291, aes128gcm) and signed
 // for the push service (RFC 8292, VAPID): WebCrypto only, no library.
@@ -336,6 +346,12 @@ export function pushStore(env) {
       await ready();
       await db.prepare('DELETE FROM push_kv WHERE key = ?1').bind(key).run();
     },
+    // (The lists that hold `text`, a device's endpoint: one read.)
+    async find(text) {
+      await ready();
+      const { results } = await db.prepare("SELECT key, value FROM push_kv WHERE substr(key, 1, 5) = 'push:' AND instr(value, ?1) > 0").bind(String(text)).all();
+      return (results || []).map(r => ({ name: r.key, value: r.value }));
+    },
     // (Only lists with a notice due, all dueLists reads; `all` with a
     // `prefix`: every key under it, what the admin page reads.)
     async list(o = {}) {
@@ -352,6 +368,48 @@ export function pushStore(env) {
   };
 }
 const putRecord = (kv, key, record) => kv.put(key, JSON.stringify(record), { expirationTtl: 60 * 86_400, metadata: { due: dueOf(record) } });
+// A list with only these devices left on it (none: the list goes; a device that signs in again gives its own anew).
+async function leave(kv, name, record, left) {
+  if (!left.length) return kv.delete(name);
+  setSubs(record, left);
+  await putRecord(kv, name, record);
+}
+const cleanEndpoints = list => [...new Set((Array.isArray(list) ? list : []).filter(e => typeof e === 'string' && e.length <= 2000))].slice(0, 40);
+// An account's lists with only the devices `stays(sub)` says: → how many devices went.
+async function pruneDevices(kv, account, stays) {
+  let went = 0;
+  for (const k of (await kv.list({ prefix: `push:${account}:`, all: true })).keys || []) {
+    const record = await kv.get(k.name, 'json').catch(() => null);
+    const subs = subsOf(record);
+    const left = subs.filter(stays);
+    if (left.length === subs.length) continue;
+    went += subs.length - left.length;
+    await leave(kv, k.name, record, left);
+  }
+  return went;
+}
+// Every device but these signed out by the Pass (eco.js: 登出其他所有裝置 and a new pass, `keep` the asking
+// device's own endpoints; the admin's 登出 and 重設, none): the others are sent nothing more.
+export async function keepDevices(env, account, keep) {
+  const kv = pushStore(env);
+  if (!kv?.list || !account) return 0;
+  const mine = new Set(cleanEndpoints(keep));
+  return pruneDevices(kv, account, x => mine.has(x.endpoint));
+}
+// A device is one account's at a time: signed in as someone else, its endpoint leaves every other account's lists.
+async function unclaim(kv, endpoint, account) {
+  if (!kv.find) return;
+  for (const { name, value } of await kv.find(endpoint)) {
+    if (name.startsWith(`push:${account}:`)) continue;
+    let record = null;
+    try {
+      record = JSON.parse(value);
+    } catch {}
+    const subs = subsOf(record);
+    const left = subs.filter(x => x.endpoint !== endpoint);
+    if (left.length !== subs.length) await leave(kv, name, record, left);
+  }
+}
 // An account's lists and switches under the id it has now (a new pass, eco.js
 // ecoRotate): left under the old id they were still sent, and the app's next
 // opening made the same list again under the new one, so each notice came twice.
@@ -412,6 +470,10 @@ export async function handlePush(request, env, headers, session, path) {
     if ((await kv.get(prefsKey(session.d))) !== JSON.stringify(prefs)) await kv.put(prefsKey(session.d), JSON.stringify(prefs), { expirationTtl: 400 * 86_400 });
     return reply({ ok: true, ...prefs });
   }
+  if (path === '/push/forget') {
+    const gone = new Set(cleanEndpoints(body?.endpoints));
+    return reply({ ok: true, n: gone.size ? await pruneDevices(kv, session.d, x => !gone.has(x.endpoint)) : 0 });
+  }
   const key = recordKey(session.d, session.a);
   const record = (await kv.get(key, 'json')) || { items: [] };
   const was = JSON.stringify(record);
@@ -429,6 +491,8 @@ export async function handlePush(request, env, headers, session, path) {
     // (Its time kept a week: the daily subscribe rewrites nothing.)
     const mine = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth }, dev: deviceOf(body.dev, request.headers.get('User-Agent')), t: same?.t && now - same.t < 7 * 86_400_000 ? same.t : now, ...(via ? { via: 'orbit', o } : {}) };
     const others = had.filter(x => x.endpoint !== sub.endpoint);
+    // (New to this account's list: whoever was signed in on this device before is sent nothing more on it.)
+    if (!same) await unclaim(kv, sub.endpoint, session.d);
     // One notice a device, not two: a separate app's subscribe doesn't take the app from that device's live Orbit.
     if (!via && others.some(x => x.via === 'orbit' && sameDevice(x, mine) && now - (x.t || 0) < ORBIT_FRESH_MS)) return reply({ ok: true, skipped: 'orbit', n: record.items?.length || 0 });
     setSubs(record, [mine, ...others.filter(x => !sameDevice(x, mine))].slice(0, MAX_DEVICES));
@@ -441,12 +505,7 @@ export async function handlePush(request, env, headers, session, path) {
         const rec = await kv.get(k.name, 'json').catch(() => null);
         const subs = subsOf(rec);
         const left = subs.filter(x => !(x.via === 'orbit' && (x.o || '') === o && x.endpoint === sub.endpoint));
-        if (left.length === subs.length) continue;
-        if (!left.length) await kv.delete(k.name);
-        else {
-          setSubs(rec, left);
-          await putRecord(kv, k.name, rec);
-        }
+        if (left.length !== subs.length) await leave(kv, k.name, rec, left);
       }
     }
   } else if (path === '/push/schedule') {
@@ -630,6 +689,9 @@ export async function sendDue(env, now = Date.now()) {
       }
       if (!subs.length) gone = true;
       if (r === 'sent') sent++;
+      // The push service faltered (its own error, too many at once, no answer in time): tried again at the next
+      // two runs, not lost. (What it refuses outright, a 4xx, it would refuse again.)
+      else if (/^failed (429|5\d\d|\D)/.test(r) && subs.length && (item.tries || 0) < 2) keep.push({ ...item, tries: (item.tries || 0) + 1 });
     }
     if (gone) await kv.delete(key);
     else {
@@ -655,12 +717,7 @@ export async function notifyNow(env, account, app, kind, make) {
   if (!wanted(prefs, app, { kind })) return 'off';
   const answers = await Promise.all(subs.map(x => sendPush(env, x, decorate(app, x, make(record.lang))).catch(e => `failed ${e?.message || e}`)));
   if (answers.includes('gone')) {
-    const left = subs.filter((_, i) => answers[i] !== 'gone');
-    if (!left.length) await kv.delete(key);
-    else {
-      setSubs(record, left);
-      await putRecord(kv, key, record);
-    }
+    await leave(kv, key, record, subs.filter((_, i) => answers[i] !== 'gone'));
   }
   return answers.includes('sent') ? 'sent' : answers.find(a => a !== 'gone') || 'gone';
 }

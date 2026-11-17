@@ -250,6 +250,8 @@ export async function handleAdmin({ env, deps, headers, request, ip, body, secre
       for (const id of wallet.inbox?.[app] || []) if (id.startsWith(`${docId}-`)) await deps.fsDelete(env, INBOX_COLLECTION, id);
     }
     await deps.fsWrite(env, WALLET_COLLECTION, docId, JSON.stringify(fresh));
+    // (Every device is signed out: none is sent its notices until it signs in again, push.js keepDevices.)
+    await deps.keepDevices?.(env, docId, []).catch(() => {});
     return deps.json({ reset: true, gone, kept: [...keep], settings: Object.keys(fresh.settings) }, 200, headers);
   }
   const plan = await planClean(env, deps);
@@ -687,6 +689,8 @@ export const ADMIN_TOOLS = {
     const hit = await findWallet(env, deps, body.wallet);
     if (!hit) return notFound;
     const res = await updateWallet(env, deps, hit.id, w => ({ ...w, sec: { ...(w.sec || {}), gen: gen(w) + 1 }, live: null }));
+    // (…and sent none of its notices until it signs in again: a lost phone showed them on, push.js keepDevices.)
+    await deps.keepDevices?.(env, hit.id, []).catch(() => {});
     return { ok: true, gen: gen(res.wallet) };
   },
   // One passkey taken off (a lost phone): the pass and its other keys still sign in.
@@ -1168,6 +1172,8 @@ async function putBack(env, deps, id, coll, payload) {
     for (const k of Object.keys(own)) if (own[k] === undefined) delete next[k];
     return next;
   });
+  // (Every device signs in again: none is sent its notices until it has, push.js keepDevices.)
+  await deps.keepDevices?.(env, id, []).catch(() => {});
   return { restored: true, ref: id.slice(0, 8), app: appOfColl()[coll], updateTime };
 }
 Object.assign(ADMIN_TOOLS, {

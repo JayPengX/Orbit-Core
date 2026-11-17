@@ -98,5 +98,12 @@ holds no key that opens it.
   notices to send (`/push`, their switches), and a Class timetable shared
   (`share-create` takes the copy the phone sends). The admin page shows
   locked data as 🔒 (its 匯出 › 在這裡看 decodes the rest).
+- **Notices only while signed in** (`push.js`, 11-17): a device is on an
+  account's notice lists only while that account is signed in on it. Signing
+  out there takes it off (`/push/forget`, before the wipe); 登出其他所有裝置
+  and a new pass keep only the device that asked (`keepDevices`, the kit's
+  `keep`), the admin's 登出, 重設 and 復原 none; signing in as someone else
+  takes the device off every other account's lists (`unclaim`). Signed out
+  offline, it stays until one of those or until its subscription ends.
 - **Not yet:** a passkey unlocking it (WebAuthn PRF), and a merge of two
   passes (`merge`) keeps only the target's locked data.

@@ -51,7 +51,7 @@ import { aiSpend, aiMay, aiBack, moveUse } from './ai-allow.js';
 import { checkStock, VERIFIED_COLLECTION } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
 import { handleShowcasePass, showcaseOf, SHOW_PER_MIN } from './showcase.js';
-import { handlePush, sendDue, movePushes, forgetPushes } from './push.js';
+import { handlePush, sendDue, movePushes, forgetPushes, keepDevices } from './push.js';
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
 import { radarCron } from './weather-radar.js';
@@ -1292,6 +1292,8 @@ const ECO_DEPS = {
   },
   // An account gone: its notices with it (push.js forgetPushes).
   dropRecords: (env, id) => forgetPushes(env, id),
+  // Devices signed out by the Pass: only `keep` (the asking device's own) are sent its notices from now on (push.js keepDevices).
+  keepDevices: (env, id, keep) => keepDevices(env, id, keep),
   // A new pass: the account's kept versions under its new id (doc-store.js moveKept).
   moveKept: (env, from, to) => DOCS.moveKept(env, from, to)
 };

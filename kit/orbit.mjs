@@ -2482,9 +2482,14 @@ function makeSession(app, { lang, heartbeat }) {
   s.vaultKey = keyNow;
   // ({ data, since }: the app's data in the same request, as for read.)
   s.claim = ({ data = false, since = '' } = {}) => refresh({ claim: true, data, since });
-  s.signOut = () => signedOut({ chosen: true });
+  // (This device's notices stop with the sign-out: the Worker told while the session still runs, 2.5 s at most.)
+  s.signOut = async () => {
+    await Promise.race([forgetPush(s), new Promise(done => setTimeout(done, 2500))]).catch(() => {});
+    signedOut({ chosen: true });
+  };
   // Every other device signed out; this one stays signed in.
-  s.signOutEverywhere = () => withToken(qt => call('POST', '', { op: 'signout-all', qt })).then(absorb);
+  // (`keep`: this device's own push endpoints: the others are sent no more of the account's notices, push.js keepDevices.)
+  s.signOutEverywhere = () => withToken(qt => call('POST', '', { op: 'signout-all', qt, keep: pushEndpoints() })).then(absorb);
   // A new pass for the account: shown once, the old one stops working.
   // (`full`: the whole sign-in reply, the new pass in it: freshGate's.)
   s.rotate = ({ full = false } = {}) =>
@@ -2495,7 +2500,7 @@ function makeSession(app, { lang, heartbeat }) {
         error.code = 'ECO_VAULT_LOCKED';
         throw error;
       }
-      return withToken(qt => call('POST', '', { op: 'rotate', qt })).then(async res => {
+      return withToken(qt => call('POST', '', { op: 'rotate', qt, keep: pushEndpoints() })).then(async res => {
         absorb(res);
         if (res?.passcode) await vaultPass(res.passcode);
         return full ? res : res.passcode;
@@ -3650,7 +3655,7 @@ export function passAccount(s, { extra = null, close = () => {}, looks = () => {
         text: T('登出', 'Sign out'),
         onclick: async () => {
           if (!(await ask({ lang: s.lang, icon: 'signout', tint: 'var(--q-red)', title: T('在這台裝置登出？', 'Sign out on this device?'), body: T('這台裝置上的資料會清除，都還留在 Orbit Pass。', 'This device is wiped; everything stays on your Orbit Pass.'), ok: T('登出', 'Sign out') }))) return;
-          s.signOut();
+          await s.signOut();
           startOver();
         }
       })
@@ -3965,6 +3970,17 @@ async function pushPost(s, path, body) {
   return fetch(`${PUSH_URL}/${path}?qt=${encodeURIComponent(token)}`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) })
     .then(r => (r.ok ? r.json() : null))
     .catch(() => null);
+}
+// This device's push endpoints, as given to the Worker (enablePush's marks, one an app; in Orbit all the same).
+function pushEndpoints() {
+  const marks = Object.keys(APPS).map(app => readStore(`orbit.push.sub.${app}`) || '');
+  return [...new Set(marks.map(m => m.slice(0, Math.max(0, m.indexOf('|')))).filter(Boolean))];
+}
+// Signed out here by the person: the Worker drops this device from the account's lists (push.js /push/forget),
+// or it went on showing the account's notices, signed out, and beside the next person's signed in on it.
+async function forgetPush(s) {
+  const endpoints = pushEndpoints();
+  if (endpoints.length) await pushPost(s, 'forget', { endpoints });
 }
 const keyBytes = text => Uint8Array.from(atob(text.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((text.length + 3) % 4)), c => c.charCodeAt(0));
 // This device's push subscription, given to the Worker (again each day, or

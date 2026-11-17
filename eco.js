@@ -1082,6 +1082,9 @@ async function ecoSignOutAll(ctx) {
   if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
   if (sessionLimited(`so:${c.s}`, 5, 60_000, deps.now())) return deps.errorJson('RATE_LIMITED', 429, headers, request);
   await updateWallet(env, deps, c.d, w => (gen(w) !== c.g ? w : { ...w, sec: { ...(w.sec || {}), gen: gen(w) + 1 }, live: null }));
+  // (The devices signed out are sent no more of its notices: only this one's, `keep`, its own push endpoints. A kit
+  // from before 11-17 sends none: left as they were.)
+  if (Array.isArray(ctx.body.keep)) await deps.keepDevices?.(env, c.d, ctx.body.keep).catch(() => {});
   // (Its own sign-in is spent by now: never turned away at the door, or this device was signed out with the rest.)
   const res = await signIn({ ...ctx, app: c.a }, c.d, { seat: true });
   return res || deps.errorJson('ECO_SIGNED_OUT', 401, headers, request);
@@ -1197,6 +1200,8 @@ async function ecoRotate(ctx) {
     // What this Worker keeps under the account's id (worker.js moveRecords: Securities' order book and checked
     // events, its notices, its Orbit AI count, its kept versions) is the new pass's from now on.
     await deps.moveRecords?.(env, c.d, docId, deps.now(), { whole: true });
+    // (Every other device is signed out: only this one, `keep`, is sent its notices, as signout-all's.)
+    if (Array.isArray(ctx.body.keep)) await deps.keepDevices?.(env, docId, ctx.body.keep).catch(() => {});
     await deleteAccount(env, deps, c.d);
     // (After the old id's documents went, each kept as it goes: those too.)
     await deps.moveKept?.(env, c.d, docId);
