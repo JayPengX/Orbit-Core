@@ -96,7 +96,7 @@ export const STORE = {
       { zh: '每個車站的下一班，即時', en: 'Every station’s next train, live', device: 'computer', args: click(search('板橋'), wait(8000), firstStation, wait(9000)) },
       { zh: '兩站之間，每一班車', en: 'Every train between two stations', args: [...MORNING, ...TAIPEI, ...click('#tab-times', wait(3000), station('from', '臺北'), wait(1500), station('to', '花蓮'), wait(7000))] },
       { zh: '公車還要等幾分鐘', en: 'Minutes until your bus', args: [...TAIPEI, ...click('#tab-times', wait(2500), busRoute('307'), wait(6000))] },
-      { zh: '全台捷運，照真的路線畫', en: 'Every metro, drawn true to its lines', device: 'tablet', page: 'metro-full', wait: 8000 },
+      { zh: '全台捷運，照真的路線畫', en: 'Every metro, drawn true to its lines', device: 'tablet', page: 'metro-full', wait: 8000, dark: false },
       { zh: 'YouBike 車位，即時', en: 'YouBike docks, live', args: ['--geo', '25.0330,121.5434', ...click(wait(6000), bikeDock, "js:(e=>{if(!e)return;for(const t of ['pointerdown','mousedown','pointerup','mouseup','click'])e.dispatchEvent(new MouseEvent(t,{bubbles:true}))})(document.getElementById('shot-target'))", wait(4000))] }
     ]
   },
@@ -112,7 +112,7 @@ export const STORE = {
       { zh: '每場比賽在哪一台播，一次看', en: 'Every game, and the channel it’s on', page: 'guide', args: [...BIG_WEEKEND, ...click("js:[...document.querySelectorAll('dialog.q-sheet[open] button')].filter(e=>e.offsetParent&&/^(明天|Tmrw)/.test(e.textContent.trim())).pop()?.click()", wait(4000))] },
       // (never the win chance: it comes from betting prices, and the Showcase shows no betting)
       { zh: '打完的比賽，比分和誰最亮眼', en: 'A finished game: the score and who stood out', args: click('#tab-matches', '[data-league=nba]', wait(2500), yesterday, wait(3000), closeNba, wait(8000), sheetTop, wait(1500)) },
-      { zh: '積分榜與爭冠形勢', en: 'The table and the title race', device: 'tablet', page: 'epl-table' },
+      { zh: '比賽一結束，積分榜馬上更新', en: 'The table updates the moment a game ends', device: 'tablet', page: 'epl-table', dark: false },
       { zh: '每位球員的數據，一頁看完', en: 'Every player’s numbers on one page', page: 'player-ohtani-overview', wait: 10000 }
     ]
   },
@@ -121,10 +121,10 @@ export const STORE = {
     app: 'weather', brand: 'weather', show: 'weather', prefix: 'weather', account: 'pins',
     shots: [
       { zh: '你所在的鄉鎮，天氣一眼看完', en: 'Your township’s weather, in one look', wait: 16000 },
-      { zh: '在電腦上，一整天一頁看完', en: 'On a computer, the whole day on one page', device: 'computer', wait: 16000 },
+      { zh: '幾個來源合成，比只看一家準', en: 'Several sources blended, closer than any one', device: 'computer', wait: 16000 },
       { zh: '穿什麼、帶不帶傘，直接說', en: 'What to wear, umbrella or not', args: click(wait(2500), toTop("document.querySelector('.ot-advice')", 70), wait(1000)), wait: 9000 },
       { zh: '未來十天，哪天會下雨', en: 'Which of the next ten days it rains', page: 'rain', wait: 9000 },
-      { zh: '每小時的溫度與降雨', en: 'Every hour’s temperature and rain', device: 'tablet', page: 'day', wait: 16000 },
+      { zh: '每小時的溫度和雨，一眼看懂', en: 'Every hour’s temperature and rain, at a glance', device: 'tablet', wait: 16000, dark: false, args: click(wait(2000), "js:(()=>{const p=e=>+((/(\\d+)%/.exec(e.getAttribute('aria-label')||'')||[0,0])[1]);[...document.querySelectorAll('.ot-sk')].slice(1,4).sort((a,b)=>p(b)-p(a))[0]?.click()})()", wait(1500)) },
       { zh: '空氣品質，每小時都看得到', en: 'Air quality, hour by hour', page: 'air', wait: 9000 }
     ]
   },
@@ -137,7 +137,7 @@ export const STORE = {
       { zh: '整週課表，單雙週都對', en: 'Your whole week, odd and even weeks', device: 'computer', hash: 'week', args: SCHOOL },
       { zh: '點一科，下次幾點上、一週幾節', en: 'Tap a class: when it’s next, how many a week', page: 'class', args: SCHOOL },
       { zh: '調課，幾秒完成', en: 'Swap a class in seconds', page: 'swap', args: SCHOOL },
-      { zh: '跟著一班真的飛機專注', en: 'Focus along a real flight', device: 'tablet', page: 'flight', args: click('.cx-fl-pick', wait(10000)), wait: 8000 },
+      { zh: '專心讀書，跟著一班真的飛機', en: 'Study along with a real flight in the sky', device: 'tablet', page: 'flight', args: click('.cx-fl-pick', wait(10000)), wait: 8000, dark: false },
       { zh: '待辦和作業，跟課表放一起', en: 'To-dos and homework, beside your timetable', args: { zh: TODOS('zh'), en: TODOS('en') } }
     ]
   },
@@ -149,7 +149,7 @@ export const STORE = {
       { zh: '錢花到哪裡，一圈看懂', en: 'Where the money went', device: 'computer', page: 'stats' },
       { zh: '幾秒記一筆，分類自動猜好', en: 'Log in seconds, category guessed', page: 'entry-typed' },
       { zh: '銀行、信用卡、悠遊卡，全都管', en: 'Banks, cards and EasyCard, all in one', hash: 'accts' },
-      { zh: '一整年，每個月比一比', en: 'The whole year, month by month', device: 'tablet', page: 'stats-year' },
+      { zh: '一整年，每個月比一比', en: 'The whole year, month by month', device: 'tablet', page: 'stats-year', dark: false },
       { zh: '問你的帳，答案畫成圖', en: 'Ask your books, see the answer', hash: { zh: 'ask=這個月吃飯花了多少？', en: 'ask=How much did I spend on food this month?' }, ai: [['feature:money-ask', 'money-ask']], args: click(wait(1500), sheetTop, wait(600)), wait: 9000 }
     ]
   },
@@ -159,9 +159,9 @@ export const STORE = {
     shots: [
       { zh: '每則新聞，各家怎麼報一次看', en: 'Every story, as every outlet tells it', wait: 18000 },
       { zh: '同一件事，偏綠、中間、偏藍怎麼下標', en: 'One story, each side’s headline', device: 'computer', args: click("js:[...document.querySelectorAll('.nw-card')].filter(e=>e.offsetParent)[0]?.click()", wait(3000), toTop("[...document.querySelectorAll('dialog[open] .nw-spec')].pop()", 70), wait(1000)), wait: 9000 },
-      { zh: '各家的影音新聞，一頁看', en: 'Every outlet’s video news, in one place', hash: 'intl', args: click(wait(2500), tap('影音|Video'), wait(1500)), wait: 14000 },
-      { zh: '國際大事，台灣媒體怎麼報', en: 'World news, and how Taiwan reports it', hash: 'intl', args: click(tap('能源|Energy'), wait(2500)), wait: 18000 },
-      { zh: '118 家媒體，立場都有出處', en: '118 outlets, each place sourced', device: 'tablet', hash: 'outlets', args: click(toTop("[...document.querySelectorAll('h2,h3,.q-section-head,header')].find(e=>e.offsetParent&&/^(台灣媒體|Taiwan’s outlets)/.test(e.textContent.trim()))", 40), wait(800)), wait: 9000 },
+      { zh: '各家的影音新聞，一頁看', en: 'Every outlet’s video news, in one place', hash: { zh: 'tw', en: 'intl' }, args: click(wait(2500), tap('影音|Video'), wait(1500)), wait: 14000 },
+      { zh: '搜尋任何公司、人物，所有媒體一起找', en: 'Search any company or person, across every outlet', hash: 'q=台積電', wait: 18000 },
+      { zh: '118 家媒體，立場都有出處', en: '118 outlets, each place sourced', device: 'tablet', dark: false, hash: 'outlets', args: click(toTop("[...document.querySelectorAll('h2,h3,.q-section-head,header')].find(e=>e.offsetParent&&/^(台灣媒體|Taiwan’s outlets)/.test(e.textContent.trim()))", 40), wait(800)), wait: 9000 },
       { zh: '14 個主題，照重要程度排', en: '14 topics, ranked by importance', hash: 'tw', args: click(tap('科學|Science'), wait(2500)), wait: 18000 }
     ]
   },
@@ -173,7 +173,7 @@ export const STORE = {
       { zh: '6,169 個大考單字，真人發音', en: '6,169 exam words, each in a real voice', device: 'computer', page: 'word', wait: 7000 },
       { zh: '新字一張一張背，真人唸給你聽', en: 'New words one card at a time, read aloud', page: 'study', wait: 7000 },
       { zh: '句子填空，在句子裡記字', en: 'Fill in sentences: words in context', page: 'sentence', wait: 7000 },
-      { zh: '8 種練習方式，記得更牢', en: '8 ways to practise', device: 'tablet', page: 'modes', wait: 7000 },
+      { zh: '8 種練習方式，記得更牢', en: '8 ways to practise', device: 'tablet', page: 'modes', wait: 7000, dark: false },
       { zh: '搞混過的字，下次直接提醒你', en: 'Your mix-ups, shown to you next time', page: 'flash', wait: 7000 }
     ]
   },
@@ -182,10 +182,10 @@ export const STORE = {
     app: 'beats', brand: 'beats', show: 'beats', prefix: 'beats',
     shots: [
       { zh: '手機現做的音樂，首首不重複', en: 'Endless music, made on your phone', page: 'now-playing' },
-      { zh: '在樂器室做節拍', en: 'Make beats in the studio', device: 'computer', page: 'studio' },
-      { zh: '49 種曲風，說想聽什麼就換', en: '49 styles: say what you want to hear', args: { zh: ask('讀書用的 lo-fi'), en: ask('lo-fi to study') } },
+      { zh: '49 種曲風，說想聽什麼就換', en: '49 styles: say what you want to hear', device: 'computer', args: { zh: ask('讀書用的 lo-fi'), en: ask('lo-fi to study') } },
+      { zh: '在樂器室，做你自己的節拍', en: 'Make your own beats in the studio', page: 'studio' },
       { zh: '16 個打擊墊，隨手即興', en: '16 pads to jam on', page: 'jam' },
-      { zh: '喜歡就收藏，首首都有封面', en: 'Keep favorites, each with its own cover', device: 'tablet', page: 'library-kept' },
+      { zh: '喜歡就收藏，首首都有封面', en: 'Keep favorites, each with its own cover', device: 'tablet', page: 'library-kept', dark: false },
       { zh: '每首歌都能玩節奏遊戲', en: 'A rhythm game for any song', page: 'game', args: click(wait(14000)) }
     ]
   },
@@ -197,7 +197,7 @@ export const STORE = {
       { zh: '每部法律，連到修法、判決和釋憲', en: 'Every law linked to its bills and rulings', device: 'computer', hash: 'law=T0020001', wait: 9000 },
       { zh: '4.7 萬則判決，憲法法庭到各級法院', en: '47,000 rulings, from the top court down', hash: 'tab=rulings', wait: 9000 },
       { zh: '白話問，答案附上條文', en: 'Ask in plain words, every point cited', hash: { zh: 'tab=ask&q=網購的東西不想要了，七天內可以退嗎？', en: 'tab=ask&q=Can I return something I bought online within seven days?' }, ai: [['law-chat', 'law-return']], wait: 9000 },
-      { zh: '立法院近 8 千案，走到哪一步', en: 'Nearly 8,000 bills, each one’s stage', device: 'tablet', hash: 'tab=bills', wait: 8000 },
+      { zh: '立法院近 8 千案，走到哪一步', en: 'Nearly 8,000 bills, each one’s stage', device: 'tablet', hash: 'tab=bills', wait: 8000, dark: false },
       { zh: '22 縣市議會和代表會，影音都在', en: 'Every council, down to the townships', hash: 'tab=bills&f=council', args: council('hsq'), wait: 9000 }
     ]
   },
@@ -205,11 +205,11 @@ export const STORE = {
   securities: {
     app: 'securities', brand: 'stock', show: 'securities', prefix: 'securities', account: 'demo',
     shots: [
-      { zh: '你的總資產，一眼看', en: 'Everything you own, at a glance', wait: 12000 },
+      { zh: '不花真錢，照真的行情投資', en: 'Real markets, no real money', wait: 12000 },
       { zh: '真實報價與 K 線', en: 'Real prices, real charts', device: 'computer', page: 'stock', wait: 12000 },
       { zh: '全世界的市場，一個帳戶買', en: 'Every market, one account', args: click('#tab-markets', wait(4000)), wait: 10000 },
       { zh: '市價、限價、停損，像真的券商', en: 'Market, limit and stop orders', args: click(wait(3000), "js:[...document.querySelectorAll('[data-action=open][data-symbol^=\"BTC\"]')].find(e => e.offsetParent)?.click()", wait(3000), '[data-action=trade][data-side=sell]', wait(1500), '[data-action=side][data-side=sell]', wait(800), press('限價|Limit'), wait(1200), press('一半|Half'), wait(1500)), wait: 12000 },
-      { zh: '換匯照銀行牌價', en: 'Exchange at the bank’s rates', device: 'tablet', page: 'rates', wait: 12000 },
+      { zh: '換匯照銀行牌價', en: 'Exchange at the bank’s rates', device: 'tablet', page: 'rates', wait: 12000, dark: false },
       { zh: '今天誰漲誰跌，一頁看完', en: 'Today’s movers, on one page', page: 'home-lower', wait: 12000 }
     ]
   }

@@ -4,6 +4,7 @@
 //
 //   node tools/store-shots.mjs sports            shoot every shot, zh and en → sheet.png to look at
 //   node tools/store-shots.mjs sports 2 5        only shots 2 and 5 (the rest kept from the last run)
+//   node tools/store-shots.mjs sports 2 5 --apply  put only shots 2 and 5 in place (the rest kept)
 //   node tools/store-shots.mjs sports --apply    put the last run in place:
 //       Orbit-Showcase public/shots/<app>/N.webp + N.zh.webp (unframed, 750×1624),
 //       its public/lib/apps.mjs `shots` list (the captions),
@@ -124,7 +125,9 @@ if (!apply) {
 const brand = set.brand === 'family' ? { ...FAMILY, repo: 'Orbit-Core' } : BRANDS[set.brand];
 const repo = join(ROOT, brand.repo);
 const show = join(ROOT, 'Orbit-Showcase', 'public');
-const missing = set.shots.flatMap((_, i) => langs.map(l => join(dir, `${i + 1}.${l}.png`))).filter(f => !existsSync(f));
+// (--only n…: put just those shots in place, the others' posters kept as they are)
+const onlyShots = only.length ? new Set(pick) : null;
+const missing = set.shots.flatMap((_, i) => (onlyShots && !onlyShots.has(i + 1) ? [] : langs.map(l => join(dir, `${i + 1}.${l}.png`)))).filter(f => !existsSync(f));
 if (missing.length) { console.error(`missing shots, run without --apply first:\n${missing.join('\n')}`); process.exit(1); }
 const b = await chromium.launch();
 const encode = async (src, dest, w, h, frame) => {
@@ -134,9 +137,9 @@ const encode = async (src, dest, w, h, frame) => {
   // The poster (Jay 11-15: "align the text on the shots and design it better"): the app's name
   // and the headline at one place on every poster, left-aligned, the headline at most two
   // lines; the device at one height under it, the same size on every phone poster; a tablet
-  // and a computer as large as the poster lets them be (a computer's screen bleeding off the
-  // right edge, its left side, where an app's rail and lists start, whole; a browser window, so
-  // it can be as tall as the poster).
+  // and a computer as large as the poster lets them be, every edge of them inside it (Jay
+  // 11-14: nothing cut off; 11-17 a computer's window bled off the right edge and an iPad's
+  // frame off both: now whole, the window 840 wide, the iPad 800 with its frame).
   await p.setContent(frame
     ? `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;width:${w}px;height:${h}px;overflow:hidden}
       body{background:radial-gradient(90% 55% at 15% 0%,${hi}55 0%,transparent 65%),linear-gradient(170deg,${mid} 0%,${lo} 100%);font-family:'Inter Display','Inter','PingFang TC','Noto Sans TC','Noto Sans CJK TC','WenQuanYi Zen Hei',sans-serif;-webkit-font-smoothing:antialiased;color:#fff}
@@ -147,13 +150,12 @@ const encode = async (src, dest, w, h, frame) => {
       .dv{position:absolute;background:#0b0b0f;box-shadow:0 50px 120px rgba(0,0,0,.38),0 0 0 3px rgba(255,255,255,.14)}
       .dv img{display:block}
       .phone{top:420px;left:150px;width:600px;padding:18px;border-radius:92px}.phone img{width:600px;border-radius:74px}
-      .tablet{top:420px;left:80px;width:800px;padding:22px;border-radius:58px}.tablet img{width:800px;border-radius:38px}
-      
-      .computer{top:420px;left:80px;width:1000px;padding:0;border-radius:24px 0 0 24px;overflow:hidden;background:#1c1c20}
-      .computer img{width:1000px}
-      .bar{display:flex;align-items:center;gap:12px;height:52px;padding:0 22px;background:#26262b}
-      .bar b{width:16px;height:16px;border-radius:50%;background:#ff5f57}.bar b+b{background:#febc2e}.bar b+b+b{background:#28c840}
-      .bar span{margin-left:28px;padding:8px 26px;border-radius:12px;background:#1a1a1e;color:#a1a1aa;font-size:20px}</style>
+      .tablet{top:420px;left:70px;width:760px;padding:20px;border-radius:54px}.tablet img{width:760px;border-radius:36px}
+      .computer{top:420px;left:30px;width:840px;padding:0;border-radius:22px;overflow:hidden;background:#1c1c20}
+      .computer img{width:840px}
+      .bar{display:flex;align-items:center;gap:11px;height:46px;padding:0 20px;background:#26262b}
+      .bar b{width:14px;height:14px;border-radius:50%;background:#ff5f57}.bar b+b{background:#febc2e}.bar b+b+b{background:#28c840}
+      .bar span{margin-left:24px;padding:7px 22px;border-radius:10px;background:#1a1a1e;color:#a1a1aa;font-size:18px}</style>
       <div class="hd"><p class="k"><i></i>${frame.name}</p><h1>${frame.zh ? frame.title.replace(/，/, '，<br>') : frame.title}</h1></div><div class="dv ${frame.device || 'phone'}">${frame.device === 'computer' ? '<div class="bar"><b></b><b></b><b></b><span>orbit.jaypengx.com</span></div>' : ''}<img src="${pic}"></div>`
     : `<!doctype html><style>html,body{margin:0}img{display:block;width:${w}px;height:${h}px}</style><img src="${pic}">`);
   await p.waitForTimeout(150);
@@ -174,6 +176,7 @@ if (shotsDir) for (const f of readdirSync(shotsDir)) if (/^\d+(\.zh)?\.webp$/.te
 for (const f of readdirSync(docs)) if (new RegExp(`^${set.prefix}-\\d+(\\.zh)?\\.webp$`).test(f) && Number(f.match(/-(\d+)/)[1]) > set.shots.length) rmSync(join(docs, f));
 for (const [i, s] of set.shots.entries()) {
   const n = i + 1;
+  if (onlyShots && !onlyShots.has(n)) continue;
   for (const l of langs) {
     const suf = l === 'zh' ? '.zh' : '';
     const [w, h] = DEVICES[s.device || 'phone'];
