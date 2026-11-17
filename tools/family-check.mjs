@@ -11,7 +11,7 @@
 //   chinese         English, yet Chinese on screen (One language, Jay 11-13)
 //   cut             text cut short (the 176 layout-and-wording fixes' commonest)
 //
-//   node tools/family-check.mjs [app…] [--langs zh,en] [--out dir] [--read]
+//   node tools/family-check.mjs [app…] [--langs zh,en] [--screens 390,ipad,laptop] [--themes light,dark] [--engines chromium,webkit] [--out dir] [--read]
 //
 // A shot that can't be taken is said, never a failure. Exits 1 on a fault.
 import './fonts.mjs';
@@ -31,6 +31,10 @@ const opt = (name, fallback) => {
   return v;
 };
 const langs = opt('langs', 'zh,en').split(',');
+// (The rest of the matrix, as shots.mjs takes it: --screens 390,ipad,laptop --themes light,dark --engines chromium,webkit.)
+const screens = opt('screens', '390');
+const themes = opt('themes', 'light');
+const engines = opt('engines', 'chromium');
 const out = opt('out', join(tmpdir(), 'orbit-family-check'));
 // (--read: the last run's shots read again, none taken.)
 const readOnly = args.includes('--read') && args.splice(args.indexOf('--read'), 1);
@@ -69,7 +73,7 @@ const checkApp = async (app, lang) => {
   const accName = ACCOUNT[app] && [`${key}-${ACCOUNT[app]}.${lang}.txt`, `${key}-${ACCOUNT[app]}.txt`].find(f => existsSync(join(HERE, 'shots/accounts', f)));
   // (The account in the page's language where it has one: Class's English timetable.)
   const acc = accName ? ['--account', join(HERE, 'shots/accounts', accName)] : [];
-  const r = readOnly ? { text: '' } : await run([join(HERE, 'shots.mjs'), key, ...pages, '--screens', '390', '--themes', 'light', '--engines', 'chromium', '--lang', lang, '--jobs', process.env.ORBIT_CHECK_JOBS || '4', ...acc, '--out', dir, '--', '--settle', '--scale', '1', '--wait', '12000']);
+  const r = readOnly ? { text: '' } : await run([join(HERE, 'shots.mjs'), key, ...pages, '--screens', screens, '--themes', themes, '--engines', engines, '--lang', lang, '--jobs', process.env.ORBIT_CHECK_JOBS || '4', ...acc, '--out', dir, '--', '--settle', '--scale', '1', '--wait', '12000']);
   const file = join(dir, 'manifest.json');
   if (!existsSync(file)) return { lines: [`${app} ${lang}: no shots (${r.text.trim().split('\n').slice(-2).join(' ')}), skipped`], bad: 0 };
   const { cells } = JSON.parse(readFileSync(file, 'utf8'));
@@ -83,7 +87,7 @@ const checkApp = async (app, lang) => {
       .filter(f => KINDS.has(f.kind) && !(f.kind === 'chinese' && lang !== 'en'))
       .map(f => (f.kind === 'chinese' ? { ...f, items: f.items.filter(i => !theirs(i)) } : f.kind === 'console errors' ? { ...f, items: f.items.filter(i => !noise(i)) } : f))
       .filter(f => f.items.length)
-      .map(f => `${c.page}: ${f.kind}: ${f.items.slice(0, 3).join(' · ')}`)
+      .map(f => `${c.page}${screens.includes(',') || themes.includes(',') || engines.includes(',') ? ` (${c.width} ${c.theme || ''} ${c.engine || ''})`.replace(/ +\)/, ')') : ''}: ${f.kind}: ${f.items.slice(0, 3).join(' · ')}`)
   );
   return { bad: faults.length, lines: [`${app} ${lang}: ${cells.length - skipped.length} pages, ${faults.length ? `${faults.length} faults` : 'clean'}${skipped.length ? `, ${skipped.length} not taken` : ''}  ${join(dir, 'index.html')}`, ...faults.map(f => `  ${f}`)] };
 };
