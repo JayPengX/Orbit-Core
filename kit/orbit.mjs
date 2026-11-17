@@ -1905,7 +1905,20 @@ function watchScreen() {
   // turned upright in Orbit's window: its app kept the rail's room down the
   // left and lost its tabs. Safari tells a frame of a resize before the
   // frame has its new size, so the old one was measured and kept.)
-  const turned = () => (again(), [150, 450, 1000].forEach(ms => setTimeout(again, ms)));
+  // (In 除錯紀錄, a second after a turn: every size the phone gives then, Jay 11-17: turned on its side and back
+  // upright, the page sank below the screen's foot on an iPhone, never in Chromium.)
+  const sizes = () => {
+    if (!recOn()) return;
+    const vv = globalThis.visualViewport;
+    let frame = '';
+    try {
+      const r = globalThis.frameElement?.getBoundingClientRect();
+      if (r) frame = `${Math.round(r.width)}x${Math.round(r.height)}@${Math.round(r.top)}`;
+    } catch {}
+    const root = document.documentElement;
+    rec('turn', { inner: `${innerWidth}x${innerHeight}`, client: `${root.clientWidth}x${root.clientHeight}`, vv: vv ? `${Math.round(vv.width)}x${Math.round(vv.height)}@${Math.round(vv.offsetTop)} s${vv.scale}` : '', scroll: Math.round(globalThis.scrollY || 0), page: root.scrollHeight, screen: `${screen.width}x${screen.height}`, safeBottom: getComputedStyle(root).getPropertyValue('--q-safe-bottom'), frame });
+  };
+  const turned = () => (again(), [150, 450, 1000].forEach(ms => setTimeout(again, ms)), setTimeout(sizes, 1000));
   globalThis.screen?.orientation?.addEventListener?.('change', turned);
   globalThis.addEventListener?.('orientationchange', turned);
   // (Not on every change of the page's own box: on an iPad in Orbit's frame
