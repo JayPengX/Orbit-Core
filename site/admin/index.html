@@ -2041,6 +2041,159 @@ async function loadMoney() {
 }
 
 // ---- 通知與來源 ----
+// ---- 郵件 (mail.js, mail-alerts.js): where the alert mails go, their switches, what's open; 寫信 ----
+let mailNow = null;
+const VIA = { cloudflare: 'Cloudflare', resend: 'Resend' };
+const KIND = { alert: '警示', test: '測試', try: '試寄', compose: '寫信' };
+function drawMail(m) {
+  mailNow = m;
+  const s = m.settings;
+  if (document.activeElement !== $('mail-to')) $('mail-to').value = s.to || '';
+  $('mail-on').setAttribute('aria-checked', String(s.on));
+  $('mail-quiet').setAttribute('aria-checked', String(s.quiet));
+  const a = m.alerts || {};
+  const today = a.day === new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10) ? a.n : 0;
+  $('mail-state').textContent = !s.to ? '還沒設定信箱：輸入你的信箱，按「寄測試信」看看收不收得到。' : !s.on ? '警示信關了。' : [a.open?.length ? `${a.open.length} 件事在看著` : '沒有要處理的事', `今天寄了 ${today} 封（最多 6 封）`, a.last ? `上次 ${ago(a.last)}` : '', a.failAt ? `上次沒寄出（${ago(a.failAt)}），6 小時後再試` : ''].filter(Boolean).join(' · ');
+  $('mail-open').replaceChildren(...(a.open || []).map(o => el('li', { class: o.tone }, [el('i'), el('span', { text: o.title }), el('small', { text: o.sent ? `寄過 ${ago(o.sent)}` : '確認中' })])));
+  const log = m.log || [];
+  $('mail-log-sum').textContent = `最近寄出（${log.length}）`;
+  $('mail-log').tBodies[0].replaceChildren(...(log.length ? log.map(r => el('tr', {}, [el('td', { text: fmtShort(r.at) }), el('td', { text: `${KIND[r.kind] ? `${KIND[r.kind]}・` : ''}${r.subject}` }), el('td', { class: 'wide mono', text: r.to }), el('td', { class: 'right', text: VIA[r.via] || r.via })])) : [el('tr', {}, [el('td', { colspan: '4', class: 'muted', text: '還沒寄過' })])]));
+  const c = m.counts;
+  $('mail-room').textContent = m.resend ? `經由 Resend（免費方案）：今天還能寄 ${Math.max(0, c.dayMax - c.dayN)} 封、這個月 ${Math.max(0, c.monthMax - c.monthN).toLocaleString()} 封；用完或 Resend 出問題時，改由 Cloudflare 寄（只寄得到在 Cloudflare 驗證過的信箱）。` : '還沒有 Resend 金鑰：只能經由 Cloudflare 寄給在那裡驗證過的信箱。';
+}
+async function loadMail() {
+  try {
+    drawMail(await admin('mail'));
+  } catch (e) {
+    $('mail-error').textContent = e.message;
+  }
+}
+async function mailSet(extra) {
+  $('mail-error').textContent = $('mail-ok').textContent = '';
+  try {
+    await admin('mail-set', extra);
+    await loadMail();
+    return true;
+  } catch (e) {
+    $('mail-error').textContent = e.message;
+  }
+}
+$('mail-save').onclick = () => busy($('mail-save'), async () => (await mailSet({ to: $('mail-to').value.trim() })) && ($('mail-ok').textContent = $('mail-to').value.trim() ? '已儲存' : '已清掉信箱：不寄警示信'));
+for (const id of ['mail-on', 'mail-quiet'])
+  $(id).onclick = () => {
+    const on = $(id).getAttribute('aria-checked') !== 'true';
+    $(id).setAttribute('aria-checked', String(on));
+    mailSet({ [id === 'mail-on' ? 'on' : 'quiet']: on });
+  };
+const NEEDS_VERIFY = '先到 Cloudflare 驗證這個信箱：jaypengx.com › Email › Email Routing › 目的地地址 › 新增，再按信裡的連結。';
+$('mail-test').onclick = () =>
+  busy($('mail-test'), async () => {
+    $('mail-error').textContent = $('mail-ok').textContent = '';
+    try {
+      const to = $('mail-to').value.trim();
+      if (to && to !== mailNow?.settings?.to && !(await mailSet({ to }))) return;
+      const r = await admin('mail-test');
+      if (r.sent) $('mail-ok').textContent = `已寄出（${VIA[r.sent.via]}）：看看 ${r.to} 的收件匣，沒看到的話也看看垃圾郵件。`;
+      else $('mail-error').textContent = `沒寄出：${r.failed}${r.needsResend ? `。${NEEDS_VERIFY}` : ''}`;
+      loadMail();
+    } catch (e) {
+      $('mail-error').textContent = e.message;
+    }
+  });
+$('mail-check').onclick = () =>
+  busy($('mail-check'), async () => {
+    $('mail-error').textContent = $('mail-ok').textContent = '';
+    try {
+      const r = await admin('mail-check');
+      $('mail-ok').textContent = r.issues.length ? `現在會寄的：${r.issues.map(i => i.title).join('、')}（同一件事看到兩次才寄）` : '現在沒有要寄的事。';
+    } catch (e) {
+      $('mail-error').textContent = e.message;
+    }
+  });
+
+// 寫信: the form is the mail; mail-look.mjs draws the preview exactly as mail.js will send it.
+const compose = $('compose');
+const CM = ['to', 'name', 'subject', 'headline', 'body', 'code', 'button', 'link', 'sign'];
+const DRAFT = 'orbit.admin.mail-draft.v1';
+let cm = { look: 'announce', accent: 'orbit', lang: 'zh' };
+try {
+  Object.assign(cm, JSON.parse(localStorage.getItem(DRAFT) || '{}'));
+} catch {}
+const cmFields = () => ({ ...cm, ...Object.fromEntries(CM.map(k => [k, $(`cm-${k}`).value])) });
+$('cm-looks').innerHTML = Object.entries(MAIL_LOOKS).map(([k, l]) => `<button type="button" data-look="${k}" title="${escHtml(l.about.zh)}"><span class="look-pic ${k}" style="--c:#4f46e5"><b></b><u></u></span>${escHtml(l.zh)}</button>`).join('');
+$('cm-colors').innerHTML = MAIL_ACCENTS.map(a => `<button type="button" data-accent="${a.id}" style="--c:${a.color}" title="${escHtml(a.zh)}" aria-label="${escHtml(a.zh)}"></button>`).join('');
+let cmTimer = 0;
+function cmDraw() {
+  const f = cmFields();
+  const look = MAIL_LOOKS[f.look] || MAIL_LOOKS.announce;
+  const color = (MAIL_ACCENTS.find(a => a.id === f.accent) || MAIL_ACCENTS[0]).color;
+  for (const b of $('cm-looks').children) (b.setAttribute('aria-pressed', String(b.dataset.look === f.look)), b.querySelector('.look-pic').style.setProperty('--c', color));
+  for (const b of $('cm-colors').children) b.setAttribute('aria-pressed', String(b.dataset.accent === f.accent));
+  for (const b of $('cm-lang').children) b.setAttribute('aria-pressed', String(b.dataset.lang === f.lang));
+  for (const n of compose.querySelectorAll('[data-f]')) n.hidden = !look.fields.includes(n.dataset.f);
+  $('cm-digest-hint').hidden = f.look !== 'digest';
+  const m = mailRender(f);
+  $('cm-v-subject').textContent = m.subject || '（沒有主旨）';
+  $('cm-v-from').textContent = `${f.name || mailNow?.settings?.name || 'Orbit'} <hello@${DOMAIN}>${mailNow?.settings?.to ? ` · 回信寄到 ${mailNow.settings.to}` : ''}`;
+  $('cm-frame').srcdoc = m.html.replace('<head>', '<head><base target="_blank">');
+  try {
+    localStorage.setItem(DRAFT, JSON.stringify(f));
+  } catch {}
+}
+const cmSoon = () => (clearTimeout(cmTimer), (cmTimer = setTimeout(cmDraw, 150)));
+function cmSample(force) {
+  const s = MAIL_LOOKS[cm.look].sample[cm.lang];
+  for (const k of ['subject', 'headline', 'body', 'button', 'link', 'code', 'sign']) if (force || !$(`cm-${k}`).value.trim()) $(`cm-${k}`).value = s[k] || '';
+  cmDraw();
+}
+$('cm-looks').onclick = e => {
+  const b = e.target.closest('[data-look]');
+  if (!b) return;
+  // (Words still the last look's sample follow the new look; words typed stay.)
+  const was = MAIL_LOOKS[cm.look].sample[cm.lang];
+  const same = ['subject', 'headline', 'body', 'button', 'link', 'sign'].every(k => !$(`cm-${k}`).value.trim() || $(`cm-${k}`).value === (was[k] || ''));
+  cm = { ...cmFields(), look: b.dataset.look };
+  cmSample(same);
+};
+$('cm-colors').onclick = e => {
+  const b = e.target.closest('[data-accent]');
+  if (b) ((cm = { ...cmFields(), accent: b.dataset.accent }), cmDraw());
+};
+$('cm-lang').onclick = e => {
+  const b = e.target.closest('[data-lang]');
+  if (b) ((cm = { ...cmFields(), lang: b.dataset.lang }), cmDraw());
+};
+compose.addEventListener('input', cmSoon);
+$('cm-sample').onclick = () => cmSample(true);
+$('compose-close').onclick = () => compose.close();
+$('mail-write').onclick = () => {
+  for (const k of CM) $(`cm-${k}`).value = cm[k] ?? '';
+  if (!$('cm-name').value) $('cm-name').value = mailNow?.settings?.name || 'Orbit';
+  $('cm-error').textContent = $('cm-ok').textContent = '';
+  if (!$('cm-body').value.trim()) cmSample(false);
+  else cmDraw();
+  compose.showModal();
+};
+// (As mail.js addressesOf reads them: `Name <a@b>` is its address.)
+const toList = raw => [...new Set(String(raw).replace(/[^,;\n，；<]*<([^>]+)>/g, ' $1 ').split(/[\s,;，；]+/).map(a => a.trim().toLowerCase()).filter(Boolean))];
+async function cmSend(test) {
+  $('cm-error').textContent = $('cm-ok').textContent = '';
+  const f = cmFields();
+  const to = test ? [] : toList(f.to);
+  if (test && !mailNow?.settings?.to) throw new Error('先在 郵件 存好你的信箱，才能寄給自己看看。');
+  if (!test && !to.length) throw new Error(WHY.MAIL_NO_TO);
+  if (!test && to.length > (mailNow?.maxTo || 20)) throw new Error(WHY.MAIL_TOO_MANY);
+  if (!test && !(await sure(`寄給 ${to.length} 個人？`, { body: `「${mailRender(f).subject}」，一人一封，寄出就收不回來。${to.slice(0, 5).join('、')}${to.length > 5 ? ` 等 ${to.length} 個` : ''}`, ok: '寄出' }))) return;
+  const r = await admin('mail-send', { ...f, to: to.join(','), test });
+  const ok = r.sent.length, bad = r.failed;
+  $('cm-ok').textContent = ok ? (test ? `已寄到 ${mailNow.settings.to}，看看收件匣。` : `已寄出 ${ok} 封。`) : '';
+  $('cm-error').textContent = bad.length ? `${bad.length} 封沒寄出：${bad.map(b => `${b.to}（${b.why}）`).join('、')}${bad.some(b => /驗證/.test(b.why)) ? '。寄給別人要用 Resend（免費）：在 resend.com 加入 jaypengx.com，把 API 金鑰放進 GitHub 的 RESEND_API_KEY。' : ''}` : '';
+  if (ok) toast(test ? '已寄給自己' : `已寄出 ${ok} 封`);
+  loadMail();
+}
+$('cm-try').onclick = () => busy($('cm-try'), () => cmSend(true).catch(e => ($('cm-error').textContent = e.message)));
+$('cm-send').onclick = () => busy($('cm-send'), () => cmSend(false).catch(e => ($('cm-error').textContent = e.message)));
+
 // ---- 邀請 QR code: Orbit's sign-up (/app/?join opens 建立新的 Orbit Pass) ----
 const INVITE_URL = `https://orbit.${DOMAIN}/app/?join`;
 $('invite-url').textContent = INVITE_URL;

@@ -1027,7 +1027,7 @@ if (key === 'admin') {
     day('host:api.example.org', 'worker', 1, { from: 3 });
     await flushSources(env, null, { force: true });
     for (const job of ['build:news', 'radar', 'build:daily', 'build:watch']) await beat(env, job, async () => (job === 'build:news' ? { items: 812, fresh: 40, failed: ['nypost: 403'] } : { ok: 1 }));
-    env.DATA = { head: async () => ({ uploaded: new Date(now - 2 * DAY) }) };
+    env.DATA = { head: async () => ({ uploaded: new Date(now - 2 * DAY) }), get: async () => null, list: async () => ({ objects: [] }) };
     const part = (h, n) => ({ built: now - h * H, n });
     useLawSite({ fetch: async () => new Response(JSON.stringify({ built: now - 9 * H, parts: { laws: part(9, 11843), bills: part(9, 3120), notices: part(9, 64), ly: part(9, 113), agenda: part(9, 40), councils: part(57, 22), agency: part(9, 18400), local: part(9, 9120), rulings: part(9, 2400), cons: part(9, 830), gov: part(9, 310) } })) });
   }
