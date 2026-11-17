@@ -48,7 +48,7 @@
 import { keptRead, keptPut } from './kept-store.js';
 import { radarAt } from './weather-radar.js';
 import { STATIONS } from './weather-stations.js';
-import { twDay } from './kit/format.mjs';
+import { twDay, placeEn } from './kit/format.mjs';
 import { rainNow, rainWord } from './kit/rain-now.mjs';
 import { COUNTIES, readTyphoon, readDgpa, readSeatRain, dayOffFor, closuresFor, tradeClosed, stampSeen } from './typhoon.js';
 import { lineAnswer } from './http.js';
@@ -1164,6 +1164,12 @@ export function headline(resp, now) {
 const UV_EN = { 低: 'low', 中: 'moderate', 高: 'high', 過量: 'very high', 危險: 'extreme' };
 const AQI_EN = { 良好: 'good', 普通: 'moderate', 對敏感族群不健康: 'unhealthy for sensitive groups', 對所有族群不健康: 'unhealthy', 非常不健康: 'very unhealthy', 危害: 'hazardous' };
 const WEAR_EN = { coat: 'wear a coat', jacket: 'bring a light jacket', sleeves: 'long or short sleeves', light: 'light short sleeves' };
+// Where a notice is about, in its reader's language: the township's English name for an English
+// reader (the kit's, format.mjs; "信義區  Rain from 3 PM" on an English phone, 11-18).
+export const noticePlace = (resp, lang = 'zh') => {
+  const town = resp?.place?.town || '';
+  return lang === 'en' ? placeEn(town) || town : town;
+};
 export function briefText(resp, now, lang = 'zh') {
   const tz = resp.tz;
   const en = lang === 'en';
@@ -1177,7 +1183,7 @@ export function briefText(resp, now, lang = 'zh') {
   if (resp.air?.level) parts.push(en ? (AQI_EN[resp.air.level] ? `air ${AQI_EN[resp.air.level]}` : resp.air.aqi != null ? `AQI ${resp.air.aqi}` : '') : `空氣${resp.air.level}`);
   const wear = resp.advice?.find(a => a.kind === 'wear');
   if (wear) parts.push(en ? `${WEAR_EN[wear.level] || ''}${wear.why?.layers ? `${WEAR_EN[wear.level] ? ', ' : ''}layers for morning and evening` : ''}` : wear.text.replace(/^穿著：/, ''));
-  return { title: `{title}${temps ? ` ${temps}` : ''}`, body: parts.filter(Boolean).join(en ? '; ' : '，'), place: resp.place?.town || '' };
+  return { title: `{title}${temps ? ` ${temps}` : ''}`, body: parts.filter(Boolean).join(en ? '; ' : '，'), place: noticePlace(resp, lang) };
 }
 
 // A notice's check (push.js): { weather: { lat, lon, kind: 'brief' | 'rain' } }.
@@ -1210,7 +1216,7 @@ export async function weatherCheck(env, w, { fetchFn = fetch, now = Date.now(), 
   }
   const rain = rainNow(await radarAt(env, w.lat, w.lon, now).catch(() => null), now);
   await Promise.all(jobs);
-  const place = resp.place?.town || '';
+  const place = noticePlace(resp, lang);
   const said = radarNotice(rain, now, resp.tz, lang);
   if (said) return { ...said, place };
   const seen = rain?.kind === 'dry' ? Math.min(rain.until, now + HOUR) : rain ? Infinity : now;

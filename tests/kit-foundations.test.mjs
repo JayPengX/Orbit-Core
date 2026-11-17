@@ -176,6 +176,20 @@ test('pickSeg: a few as the capsule (aria-pressed, thumb from the last pick), mo
   assert.equal(ui.segHtml([['a', 'A']], 'a', { pressed: true, cls: 'small' }), '<div class="q-seg small" role="group" style="--q-seg-n:1;--q-seg-i:0" data-to="0"><button type="button" aria-pressed="true" >A</button></div>');
 });
 
+test('places in English: one list for the pages and the Worker, in a file with nothing of the page in it', () => {
+  // (The list sat in lang.mjs, which reads the page's language from orbit.mjs: the Worker couldn't read it,
+  // and a weather notice to an English reader named its place in Chinese, 11-18.)
+  const { placeEn } = fmt;
+  const src = readFileSync(new URL('../kit/format.mjs', import.meta.url), 'utf8');
+  assert.ok(!/^\s*import\s/m.test(src), 'it imports nothing: the Worker bundles it as it is');
+  assert.equal(lang.placeEn, placeEn, 'the pages read the same one through lang.mjs');
+  assert.equal(placeEn('信義區'), 'Xinyi');
+  assert.equal(placeEn('台北市'), 'Taipei', '台 as 臺');
+  assert.equal(placeEn('東區'), 'East District');
+  assert.equal(placeEn('竹東高中'), undefined, 'a name it doesn’t know');
+  assert.equal(lang.place('信義區'), '信義區', 'a page in Chinese keeps the name');
+});
+
 test('toast over a sheet that draws itself again: put back while it is up, never once replaced or gone', () => {
   const real = globalThis.setTimeout;
   const realClear = globalThis.clearTimeout;

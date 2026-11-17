@@ -633,6 +633,19 @@ export function overNow(comp, espn) {
   return overByRule(parseStatus(comp.status), side('away'), side('home'), league).state === 'post';
 }
 
+// "{place}" in the app's title, for a notice about wherever the phone is: the place its check found, with a
+// space where the words need one and never two ("{place} today" was "信義區  today" on an English phone, and
+// "Rain soon at {place}" ended in a space, 11-18). Nowhere found (the phone abroad): the word leading to it
+// goes too, "Rain soon at {place}" is "Rain soon" and "{place} today" is "Today".
+export function placedTitle(title, place = '') {
+  const t = String(title || '');
+  if (!t.includes('{place}')) return t;
+  const tidy = s => s.replace(/\s{2,}/g, ' ').trim();
+  if (place) return tidy(t.replace('{place}', ` ${place} `));
+  const rest = tidy(t.replace(/(?:\s(?:at|in))?\s*\{place\}/, ' '));
+  return t.trimStart().startsWith('{place}') ? rest.replace(/^[a-z]/, c => c.toUpperCase()) : rest;
+}
+
 // What's due, sent: each list's notices up to now (a check that has no
 // answer yet waits 15 minutes more), and the lists' next times.
 export async function sendDue(env, now = Date.now()) {
@@ -675,8 +688,7 @@ export async function sendDue(env, now = Date.now()) {
           continue;
         }
         // (A check's title can hold the app's own: "{title} 31° / 25°" keeps "家 今天天氣".)
-        // ("{place}" in the app's title: where it is, for a notice about wherever the phone is.)
-        const own = String(item.title || '').replace('{place}', found.place ? `${found.place} ` : '');
+        const own = placedTitle(item.title, found.place);
         message = { ...message, title: found.title ? found.title.replace('{title}', own) : own, body: (item.body || found.body || '').replace('{result}', found.result || '') };
       }
       const answers = await Promise.all(subs.map(x => sendPush(env, x, decorate(app, x, message)).catch(e => `failed ${e?.message || e}`)));

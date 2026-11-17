@@ -2,7 +2,7 @@
 // notice lists the Worker keeps.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { encryptPush, cleanItems, sendDue, handlePush, runCheck, pushEndpoint, overNow } from '../push.js';
+import { encryptPush, cleanItems, sendDue, handlePush, runCheck, pushEndpoint, overNow, placedTitle } from '../push.js';
 
 const unb64u = t => Buffer.from(t, 'base64url');
 async function pairFrom(priv, pub) {
@@ -21,6 +21,22 @@ test('encrypts as RFC 8291 section 5 does', async () => {
     Buffer.from(out).toString('base64url'),
     'DGv6ra1nlYgDCS1FRnbzlwAAEABBBP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A_yl95bQpu6cVPTpK4Mqgkf1CXztLVBSt2Ks3oZwbuwXPXLWyouBWLVWGNWQexSgSxsj_Qulcy4a-fN'
   );
+});
+
+test('a notice about wherever the phone is: its place goes into the app’s title with one space, and the words around it go when nowhere is found', () => {
+  // (Weather's four titles, pins.mjs. An English phone showed "信義區  today" and "Rain soon at 信義區  · …", 11-18.)
+  assert.equal(placedTitle('{place}今天天氣', '信義區'), '信義區 今天天氣');
+  assert.equal(placedTitle('{place} today', 'Xinyi'), 'Xinyi today');
+  assert.equal(placedTitle('{place}快下雨了', '信義區'), '信義區 快下雨了');
+  assert.equal(placedTitle('Rain soon at {place}', 'Xinyi'), 'Rain soon at Xinyi');
+  // Nowhere found (abroad, no township): never a leading space, a small first letter or "at" left hanging.
+  assert.equal(placedTitle('{place}今天天氣', ''), '今天天氣');
+  assert.equal(placedTitle('{place} today', ''), 'Today');
+  assert.equal(placedTitle('{place}快下雨了'), '快下雨了');
+  assert.equal(placedTitle('Rain soon at {place}', ''), 'Rain soon');
+  // A title that names no place is the app's own, as it is.
+  assert.equal(placedTitle('iPad lab  today', 'Xinyi'), 'iPad lab  today');
+  assert.equal(placedTitle('', 'Xinyi'), '');
 });
 
 test('notice lists keep only sane items, in time order', () => {

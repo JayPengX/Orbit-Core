@@ -2,6 +2,7 @@
 // the cell cache and the key check, on real answers saved in
 // tests/fixtures/weather/ (Taipei 101, 2026-10-02 evening), without network.
 import test from 'node:test';
+import { placedTitle } from '../push.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
@@ -524,9 +525,10 @@ test('one sentence and the morning brief, from the numbers', async () => {
   assert.equal(rainPhrase([{ t: t(8), pop: 10 }, { t: t(10), pop: 35 }], t(8)), '10 點前後 35% 會下雨');
   assert.equal(rainPhrase([{ t: t(8), pop: 10 }], t(8)), '未來 12 小時不太會下雨');
   assert.equal(rainPhrase([{ t: t(8), pop: 80 }], t(8) + 600_000), '正在或即將下雨（80%）');
-  // An English subscriber's brief is in English (no Chinese in it but the place's name).
+  // An English subscriber's brief is in English, the place's name too (it was 信義區, 11-18).
   const en = briefText(resp, morning, 'en');
   assert.match(en.title, /^\{title\} \d+° \/ \d+°$/);
+  assert.equal(en.place, 'Xinyi');
   assert.ok(en.body && !/[\u4e00-\u9fff]/.test(en.body), en.body);
   assert.equal(rainPhrase([{ t: t(8), pop: 10 }, { t: t(15), pop: 70 }], t(8), 12, undefined, 'en'), 'Rain likely from 15:00 (70%)');
 });
@@ -545,8 +547,13 @@ test('the rain alert answers only when the next 2 hours turn wet', async () => {
   const alert = await weatherCheck(e, { lat: 25.034, lon: 121.565, kind: 'rain' }, { fetchFn: upstream(), now: at });
   assert.equal(alert.title, '{title} · 13:00');
   assert.match(alert.body, /^降雨機率 75%/);
+  assert.equal(alert.place, '信義區');
   const alertEn = await weatherCheck(e, { lat: 25.034, lon: 121.565, kind: 'rain' }, { fetchFn: upstream(), now: at, lang: 'en' });
   assert.match(alertEn.body, /^75% chance of rain/);
+  // The notice as the phone shows it (push.js fills the app's own title, Weather's pins.mjs): no Chinese, one space.
+  assert.equal(alertEn.place, 'Xinyi');
+  assert.equal(alertEn.title.replace('{title}', placedTitle('Rain soon at {place}', alertEn.place)), 'Rain soon at Xinyi · 13:00');
+  assert.equal(alert.title.replace('{title}', placedTitle('{place}快下雨了', alert.place)), '信義區 快下雨了 · 13:00');
   // A fresh radar frame with nothing coming for two hours: the wet hour within the hour waits (Jay 2026-11-10).
   const still = btoa(String.fromCharCode(...new Uint8Array(2 * 14 * 18)));
   const DATA = { get: async (k, o) => ({ customMetadata: { at: String(at - 10 * 60_000), motion: still }, arrayBuffer: async () => new ArrayBuffer(o.range.length) }) };

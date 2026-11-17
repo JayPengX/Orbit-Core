@@ -101,9 +101,9 @@ modules for modulepreload.
 | `notice-kinds.mjs` | Notice kinds |
 | `orbit-mine.mjs` | An Orbit's setup (name, apps, look) as its icon's tag (`/app/?o=`), manifest, apps changed (Pass `orbits`) |
 | `vault.mjs` | Data sealed (§5.3) |
-| `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write, never an older copy over a newer one); Weather, Words, Money, Law, Beats |
+| `pass-sync.mjs` | An app's payload kept in step with the Pass's copy (`passSync`: read and merged before any write); Weather, Words, Money, Law, Beats |
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs`: qrcode-generator 2.0.4 (MIT), vendored |
-| `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays` |
+| `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays`, `placeEn` (the Worker's too) |
 | `feedback.mjs` | Every app's picks, one engine: `shown`, `picked`, `passed`, `did` → weights per key (30-day half-life); `scorer`, `lifter`, `chance`, `whyOf` (常看), `hitRate`; on the Pass: `fb:<app>` |
 | `holidays.mjs`, `dayoff.mjs`, `rain-now.mjs` | Taiwan's days off (the years 人事行政總處 has published, then the holiday law's own rules on the lunar dates to 2036, so no yearly chore); typhoon days off (停班停課) by who decides them; `radar` as rain (`rainNow`) |
 | `catalog.mjs`, `logos.mjs`, `names.mjs`, `photos.mjs`, `photo-urls.mjs` | Sports' leagues once; logos (ESPN, TheSportsDB, flags, F1, old names); teams in Chinese; studio headshots; photos' addresses alone |
