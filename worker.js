@@ -150,9 +150,17 @@ function errorJson(code, status, headers, request) {
   return json({ error: { code, message } }, status, headers);
 }
 
+// A body with an object where text belongs that names its own toString or valueOf ({"toString":null}, which
+// JSON allows): String() of it throws. The caller's mistake, never the Worker failing: a 400, and not counted.
+// (It was a 500 or 502 from /eco, /ai and /push for anyone who sent one, no sign-in needed; a route's 100 of
+// those in a day turn the admin's 錯誤 red and mail the owner.)
+const badShape = error => error instanceof TypeError && /Cannot convert object to primitive value/.test(error.message || '');
+const badShapeAnswer = headers => json({ error: { code: 'INVALID_JSON', message: zhTW.INVALID_JSON } }, 400, headers);
+
 // The one error whose message is dynamic (the upstream's own error text),
 // so it can't come from ERROR_MESSAGES.
 function upstreamFailed(error, headers) {
+  if (badShape(error)) return badShapeAnswer(headers);
   return json({ error: { code: 'UPSTREAM_FAILED', message: error.message || 'Upstream request failed' } }, 502, headers);
 }
 
@@ -1966,6 +1974,7 @@ async function handle(request, env, ctx) {
       if (res.status >= 500 && !res.headers.get('X-Data-Off')) countError(env, ctx, request);
       return timed(res, t0);
     } catch (error) {
+      if (badShape(error)) return timed(badShapeAnswer(headers), t0);
       console.log('route failed', new URL(request.url).pathname, String(error?.message || error).slice(0, 200));
       countError(env, ctx, request);
       return timed(errorJson('WORKER_FAILED', 500, headers, request), t0);
