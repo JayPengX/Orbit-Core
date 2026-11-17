@@ -4622,6 +4622,8 @@ export function goNotice(url) {
     host = (globalThis.parent !== globalThis ? globalThis.parent.ORBIT_HOST : null) || globalThis.ORBIT_HOST || null;
   } catch {}
   if (host?.open && to.origin === location.origin) return void host.open(`${to.pathname}${to.search}${to.hash}`);
+  // (A page's address only, never a script's.)
+  if (!/^https?:$/.test(to.protocol)) return;
   if (to.origin !== location.origin || to.pathname !== location.pathname) return void location.assign(to.href);
   if (to.hash && to.hash !== location.hash) return void (location.hash = to.hash);
   if (to.hash) globalThis.dispatchEvent?.(new HashChangeEvent('hashchange', { oldURL: location.href, newURL: location.href }));

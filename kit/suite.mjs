@@ -47,6 +47,23 @@ export function appAt(pathname, paths = Object.fromEntries(APP_ORDER.map(id => [
   for (const [id, path] of Object.entries(paths)) if (p === path || p.startsWith(path) || `${p}/` === path) return id;
   return null;
 }
+// An address as a page of this site, { pathname, url } (the url by its path), or null: Orbit's window holds
+// nothing else. An address handed in (a link's ?open=, a notice's) was framed whatever it was: another site's
+// page under Orbit's address, or a script run as Orbit (11-17).
+export function sitePage(url, base = globalThis.location?.href) {
+  try {
+    const to = new URL(url, base);
+    return /^https?:$/.test(to.protocol) && to.origin === new URL(base).origin ? { pathname: to.pathname, url: `${to.pathname}${to.search}${to.hash}` } : null;
+  } catch {
+    return null;
+  }
+}
+// …and as an app's own page there, { app, url }, or null.
+export function ownPage(url, base = globalThis.location?.href, paths = undefined) {
+  const to = sitePage(url, base);
+  const app = to ? appAt(to.pathname, paths) : null;
+  return app ? { app, url: to.url } : null;
+}
 // An address worth going back to: one-shot parts taken out (a sign-in handed
 // over, a question asked once).
 const ONCE = /^(qh|ask)=/;
@@ -1075,6 +1092,8 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
   };
   const show = (id, url = null, y = 0) => {
     if (!BRANDS[id]) return;
+    // (A page of this site, or where the app was left: sitePage.)
+    url = (url && sitePage(url)?.url) || null;
     let f = frames.get(id);
     if (!f) f = make(id, url, y);
     else if (url) {
@@ -1155,8 +1174,8 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
     },
     // An address (a notice's): its app shown there.
     open(url) {
-      const id = appAt(new URL(url, location.href).pathname);
-      if (id) api.go(id, url);
+      const to = ownPage(url);
+      if (to) api.go(to.app, to.url);
     },
     // (The safe area as written into the frames: a test sets a phone's.)
     insets(v) {

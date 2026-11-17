@@ -108,8 +108,10 @@
     s.on = 1;
     s.t = s.t || Date.now();
     ls.setItem('orbit.suite.v1', JSON.stringify(s));
-    var open = /[?&]open=([^&#]+)/.exec(location.search);
-    if (open) window.ORBIT_FIRST = { url: decodeURIComponent(open[1]), y: 0 };
+    // (Only a page of this site, kept by its path: any address was taken as it came, so a link could show
+    // another site's page in Orbit's window under Orbit's address, or run a script as Orbit, 11-17.)
+    var open = /[?&]open=([^&#]+)/.exec(location.search), to = open ? new URL(decodeURIComponent(open[1]), location.origin) : null;
+    if (to && to.origin === location.origin) window.ORBIT_FIRST = { url: to.pathname + to.search + to.hash, y: 0 };
   } catch (e) {}
 }();
 </script>
@@ -266,9 +268,12 @@
     document.documentElement.classList.add('q-suite-host');
     // (Should the phone move it anyway, as a field is focused: put back.)
     addEventListener('scroll', () => (scrollX || scrollY) && scrollTo(0, 0), { passive: true });
-    const app = suite.appAt?.(new URL(first.url, location.href).pathname);
-    // (An older kit without the host: on to the app as before.)
-    if (!suite.host || !app) return void location.assign(first.url);
+    // (This site's own pages only, whoever asked: never another site's in Orbit's window, never a script.)
+    const to = new URL(first.url, location.href);
+    if (to.origin !== location.origin) return void (showList(), addressOf(null));
+    const app = suite.appAt?.(to.pathname);
+    // (No app's page, the admin's from a notice: opened as it is.)
+    if (!suite.host || !app) return void location.assign(to.href);
     if (held) return void held.go(app, first.url);
     try {
       sessionStorage.setItem('orbit.launch', String(Date.now()));
