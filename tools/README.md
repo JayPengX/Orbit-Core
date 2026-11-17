@@ -235,6 +235,7 @@ node tools/preview.mjs sports --live --width 375
 | `--upgrade <date\|ref>` | The old version, then today's, in one storage |
 | `--upgrade <date> --deploy-at ms [--cdn-lag ms] [--hidden-for ms] [--relaunch-after ms] [--kit-only] [--old-kit-local] [--tap sel]` | A deploy landing while the old app is open: each load, what the loading screen said, whether it ended up running. `--cdn-lag`: the CDN still answers the old files that long; `--old-kit-local`: the old kit is this one with a line changed (to try a change to the update path itself) |
 | `--flaky <share>`, `--net offline\|slow[:ms]` | Failing or missing network |
+| `--fail 'text[=503\|timeout\|empty\|list\|blank\|html]'` | One source down, hanging or answering garbage (repeatable; a batch's item alone) |
 | `--shuffle` | What moved after the loading screen lifted |
 | `--timing`, `--requests`, `--profile`, `--latency ms`, `--version-latency ms`, `--h2`, `--root dir` | Speed: when it opened, every call, the CPU profile, a phone's latency, a deploy's build |
 | `--clock ISO`, `--fixture host/path=file` | A made-up time (Taipei unless it ends in Z or ±hh:mm) or answer |

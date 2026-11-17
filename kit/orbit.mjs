@@ -1118,13 +1118,15 @@ function proxyOrSelf(url, timeout, ask) {
 const DEVICE_FIRST = new Set(['site.api.espn.com', 'site.web.api.espn.com', 'statsapi.mlb.com', 'clob.polymarket.com', 'api.openf1.org', 'api.open-meteo.com', 'piceltaott-elta.cdn.hinet.net']);
 const proxyUntil = new Map();
 const deviceOk = new Set();
-async function deviceFirst(url, timeout, ask) {
+async function deviceFirst(url, timeout, ask, valid = null) {
   const host = hostOf(url);
   if ((proxyUntil.get(host) || 0) > Date.now()) return ask();
   try {
     const text = await fetchDirect(url, deviceOk.has(host) ? timeout : Math.min(timeout, 6_000));
     // (A captive portal's page or a block page, not JSON: not the source's answer.)
     if (!/^\s*[[{]/.test(text.slice(0, 64)) || !/[\]}]\s*$/.test(text.slice(-64))) throw new Error('not JSON');
+    // (Nor one without the source's shape: the proxy's copy may be whole.)
+    if (valid && !valid(JSON.parse(text))) throw new Error('not the source’s shape');
     deviceOk.add(host);
     return text;
   } catch (error) {
@@ -1135,9 +1137,12 @@ async function deviceFirst(url, timeout, ask) {
     return ask();
   }
 }
-export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, timeout = 20_000, mirror = true, alone = false } = {}) {
+// `valid(data)`: the source's shape, when an answer can look fine and hold
+// nothing (an empty object, an error's JSON, a list gone): one that isn't is
+// a failed read (the device's copy answers; nothing saved over it).
+export function proxyJson(url, { ttl = 60_000, trim = '', persist: keep = true, timeout = 20_000, mirror = true, alone = false, valid = null } = {}) {
   const ask = () => (!mirror ? fetchOne(url, trim, timeout, '&mirror=0') : alone ? fetchOne(url, trim, timeout) : enqueue(url, trim, timeout));
-  return keptJson(url, dataKey(url, trim), { ttl, keep }, () => (isDirect(url) ? fetchDirect(url, timeout) : !trim && DEVICE_FIRST.has(hostOf(url)) ? deviceFirst(url, timeout, ask) : proxyOrSelf(url, timeout, ask)));
+  return keptJson(url, dataKey(url, trim), { ttl, keep, valid }, () => (isDirect(url) ? fetchDirect(url, timeout) : !trim && DEVICE_FIRST.has(hostOf(url)) ? deviceFirst(url, timeout, ask, valid) : proxyOrSelf(url, timeout, ask)));
 }
 // The family's data (the proxy's /data/, kept in R2 on Cloudflare; built at
 // night and through the day): what doesn't change in a day (a league's
@@ -1148,9 +1153,9 @@ export const PACKS_URL = `${API}/data/`;
 // A pack's last copy on the device, of any age ({ at, data } or null): to
 // paint at once while packJson reads it again (as peekJson for proxyJson).
 export const peekPack = path => persistedSoon(dataKey(`${PACKS_URL}${path}`, ''));
-export function packJson(path, { ttl = 3 * 3_600_000, timeout = 30_000 } = {}) {
+export function packJson(path, { ttl = 3 * 3_600_000, timeout = 30_000, valid = null } = {}) {
   const url = `${PACKS_URL}${path}`;
-  return keptJson(url, dataKey(url, ''), { ttl, keep: true }, async () => {
+  return keptJson(url, dataKey(url, ''), { ttl, keep: true, valid }, async () => {
     const wait = patient(timeout);
     // (Asked of the server each time: the domain hands a browser 4 hours
     // (Cloudflare's Browser Cache TTL) where a pack says 2 minutes, so the
@@ -1167,7 +1172,7 @@ const keptAt = new Map(); // key → when it was last written to the device
 // A read on its way this long is taken for lost (a network that swallowed it,
 // a body that never ended): asked anew, never waited on by every later ask.
 const PENDING_MAX_MS = 45_000;
-function keptJson(url, key, { ttl, keep }, read) {
+function keptJson(url, key, { ttl, keep, valid = null }, read) {
   const hit = memory.get(key);
   const lost = hit?.pending && !hit.waiting && Date.now() - hit.at >= PENDING_MAX_MS;
   if (hit && !lost && Date.now() - hit.at < (hit.failed ? Math.min(ttl, hit.hold) : hit.stale ? Math.min(ttl, RETRY_MS) : ttl)) return hit.promise;
@@ -1201,6 +1206,8 @@ function keptJson(url, key, { ttl, keep }, read) {
       // (An answer that isn't JSON, cut off or a captive portal's page, is a
       // failed read like any other: the device's copy answers, nothing saved.)
       data = typeof got === 'string' ? JSON.parse(got) : got;
+      // (Nor is one that isn't the source's shape: `valid`.)
+      if (valid && !valid(data)) throw Object.assign(new Error('not the source’s shape'), { status: 0 });
     } catch (error) {
       // A fresh read failed: the copy this device has (of any age) is the
       // answer, and it's asked again soon. A league that read fine an hour

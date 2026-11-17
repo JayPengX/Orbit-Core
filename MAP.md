@@ -283,7 +283,9 @@ A read (`kit proxyJson`) goes down these until one answers:
   any age) and draws the fresh one when it lands.
 - Reads within a few ms go to the proxy as one batch.
 - A failed read is a failure, never "nothing there": the device's copy of
-  any age answers, asked again soon; a failed batch item fails alone.
+  any age answers, asked again soon; a failed batch item fails alone. So is
+  an answer that isn't the source's shape (`valid`: an empty object, an
+  error's JSON, a list gone empty), never saved over the good copy.
 - The phone reads some sources itself, no Worker request: ESPN's core
   API always (it refuses the proxy); ESPN's site API, MLB, Polymarket's
   lines, OpenF1, Open-Meteo, ELTA's list untrimmed (`DEVICE_FIRST`;

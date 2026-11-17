@@ -166,3 +166,19 @@ test('加權指數 live from TWSE while open: 台指期 moves with it, not 20 mi
     useQuotesReader(null);
   }
 });
+
+test("Yahoo answering an empty object or an error's JSON is quotes failing (報價暫時無法取得), never a list of no prices", async () => {
+  const { fetchQuotes, useQuotesReader } = await import('../kit/stock-quotes.mjs');
+  const opts = [];
+  try {
+    for (const bad of [{}, { error: 'upstream' }, { spark: { result: null, error: { code: 'Bad Request' } } }]) {
+      useQuotesReader(async (url, o) => (opts.push(o), bad));
+      await assert.rejects(fetchQuotes(['AAPL']), /quotes unavailable/, JSON.stringify(bad));
+    }
+    // (The phone's reader is told the shape, so such an answer is never kept over the last good one.)
+    assert.equal(opts[0].valid({ spark: { result: [] } }), true);
+    assert.equal(opts[0].valid({}), false);
+  } finally {
+    useQuotesReader(null);
+  }
+});

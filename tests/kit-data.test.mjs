@@ -49,6 +49,27 @@ test('a good read is kept on the device; a fresh read that fails answers that co
   }
 });
 
+test('an answer that is not the source\'s shape (`valid`) is a failed read: the good copy answers and is never saved over', async () => {
+  const url = 'https://example.test/stories.json';
+  const valid = d => Array.isArray(d?.stories) && d.stories.length > 0;
+  answer = () => new Response(JSON.stringify({ stories: [1, 2] }));
+  assert.deepEqual(await kit.proxyJson(url, { ttl: 1, alone: true, valid }), { stories: [1, 2] });
+  const own = k => k.includes(encodeURIComponent(url));
+  await until(() => kept().some(own));
+  // An empty object, an empty list, an error's JSON, the list gone empty: each the kept copy.
+  for (const bad of ['{}', '[]', '{"error":"upstream"}', '{"stories":[]}']) {
+    await new Promise(r => setTimeout(r, 20));
+    answer = () => new Response(bad);
+    assert.deepEqual(await kit.proxyJson(url, { ttl: 1, alone: true, valid }), { stories: [1, 2] }, bad);
+    await settle();
+    const copy = await (await caches.open('orbit-data-v1')).match(kept().find(own));
+    assert.deepEqual(await copy.json(), { stories: [1, 2] }, 'never saved over');
+  }
+  // Nothing kept: a failure, as any failed read (a pack too).
+  answer = () => new Response('{}');
+  await assert.rejects(kit.packJson('news/never.json', { valid }), e => e.status === 0);
+});
+
 test('a failed read with nothing kept is a failure, never an empty answer, and nothing is saved', async () => {
   const url = 'https://example.test/never.json';
   const before = kept().length;
@@ -222,6 +243,13 @@ test("ESPN's site API and MLB's are read from the device; the proxy only for a t
     assert.deepEqual(asked.length, 1);
     assert.ok(asked[0].includes(encodeURIComponent(next)) && !asked[0].startsWith(`https://${host}/`), 'the proxy at once');
   }
+  // The source answering without its shape (`valid`: an empty object): the proxy's copy, as if blocked.
+  const f1 = 'https://api.openf1.org/v1/sessions?year=2026';
+  asked.length = 0;
+  answer = u => (u.startsWith('https://api.openf1.org/') ? new Response('{}') : new Response('{"events":[]}'));
+  assert.deepEqual(await kit.proxyJson(f1, { ttl: 1, alone: true, valid: j => Array.isArray(j?.events) }), { events: [] });
+  assert.equal(asked[0], f1, 'the device first');
+  assert.ok(asked[1].includes(encodeURIComponent(f1)), 'then the proxy');
 });
 
 test("a big answer still coming on a slow link is read to its end; one that has gone quiet fails in its time", async () => {

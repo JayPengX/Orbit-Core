@@ -32,6 +32,8 @@
 //                          [--google-map]  (with --live, Orbit Transit: Google's map, as on the site)
 //                          [--fake-yahoo]  (made-up Yahoo prices: spark and chart answers
 //                          for any symbol, for when Yahoo answers 429)
+//                          [--fail 'text-in-url[=503|timeout|empty|list|blank|html]']  (repeatable: a source down,
+//                          hanging or answering garbage; a data-proxy batch's item alone)
 //
 //   app   sports | securities | words | orbit | weather | transit | beats | law | money | news (or the repo's folder name)
 //         | admin [overview accounts use money health usage dev tools]  (the admin panel, made-up accounts, --people n of them; money: the 證券的錢 sheet)
@@ -242,6 +244,30 @@ const relaunchAfter = Number(opt('relaunch-after', 0));
 // first opening (every opening without --reopen / --upgrade): a phone on a
 // poor connection. Whatever the app saved from a failed read shows on the next.
 const flaky = Number(opt('flaky', 0));
+// --fail 'text[=how]' (repeatable): every request whose address holds the
+// text (an upstream inside the data proxy's ?url= too) answers that way:
+// a status (503, the default), `timeout` (no answer for 90 s, then dropped),
+// `empty` (200 and {}), `list` (200 and []), `blank` (200 and nothing) or
+// `html` (200 and an error page): a source down, slow or answering garbage.
+// In a data-proxy batch (without --live) only that item fails. With
+// --reopen, the second opening only: the app opens on what it kept.
+const FAIL_HOW = /^(\d{3}|timeout|empty|list|blank|html)$/;
+const fails = [];
+for (let f = opt('fail', ''); f; f = opt('fail', '')) {
+  const i = f.lastIndexOf('=');
+  fails.push(i > 0 && FAIL_HOW.test(f.slice(i + 1)) ? [f.slice(0, i), f.slice(i + 1)] : [f, '503']);
+}
+const failNow = { on: true };
+const failOf = url => {
+  if (!fails.length || !url || !failNow.on) return '';
+  let plain = url;
+  try {
+    plain = decodeURIComponent(url);
+  } catch {}
+  return fails.find(([text]) => url.includes(text) || plain.includes(text))?.[1] || '';
+};
+const FAIL_BODY = { empty: '{}', list: '[]', blank: '', html: '<!doctype html><html><head><title>503 Service Temporarily Unavailable</title></head><body><h1>Service Temporarily Unavailable</h1></body></html>' };
+const failAnswer = how => (how === 'timeout' ? new Promise(r => setTimeout(() => r({ status: 504, body: '' }), 90_000)) : Promise.resolve(/^\d+$/.test(how) ? { status: Number(how), body: '' } : { status: 200, body: FAIL_BODY[how] }));
 // --net offline | slow[:ms]: the second opening (implies --reopen) with no
 // connection at all (as a phone in airplane mode: navigator.onLine false,
 // every request failing) or a poor one (every request that reaches the
@@ -363,7 +389,9 @@ if (!existsSync(dir)) throw new Error(`${dir} missing${key === 'orbit' ? ' (run 
 // What's served: the current repos, or --upgrade's old ones for the first opening.
 const served = { root: ROOT, dir };
 let lagUntil = 0;
-const oldRoot = upgrade ? await snapshotRoot(upgrade, [[repo, [key === 'orbit' ? 'dist' : 'public', ...(key === 'orbit' ? [] : ['scripts', 'package.json'])]], ['Orbit-Core', ['kit']]]) : null;
+// (--suite: Orbit's own page, Orbit-Core's site/, as it was too.)
+const coreParts = suite ? ['kit', 'site'] : ['kit'];
+const oldRoot = upgrade ? await snapshotRoot(upgrade, [[repo, [key === 'orbit' ? 'dist' : 'public', ...(key === 'orbit' ? [] : ['scripts', 'package.json'])]], ['Orbit-Core', coreParts]]) : null;
 // Both stamped as a deploy is (the app's ?v= files and version.json, the
 // kit's): unstamped, a page says it's 'dev' and never updates, so an
 // installed app's update (the old page finding the new one, its service
@@ -393,7 +421,7 @@ if (oldRoot) {
   await stampRoot(oldRoot, 'old');
   newRoot = await mkdtemp(join(tmpdir(), 'orbit-new-'));
   for (const part of [key === 'orbit' ? 'dist' : 'public', ...(key === 'orbit' ? [] : ['scripts', 'package.json'])]) if (existsSync(join(ROOT, repo, part))) await cp(join(ROOT, repo, part), join(newRoot, repo, part), { recursive: true });
-  await cp(join(ROOT, 'Orbit-Core/kit'), join(newRoot, 'Orbit-Core/kit'), { recursive: true });
+  for (const part of coreParts) await cp(join(ROOT, 'Orbit-Core', part), join(newRoot, 'Orbit-Core', part), { recursive: true });
   await stampRoot(newRoot, 'new');
 }
 
@@ -567,6 +595,7 @@ const pageTrim = (url, r) => {
 const flakyNow = { on: false, failed: 0 };
 const upstream = url => {
   if (flakyNow.on && Math.random() < flaky) return (flakyNow.failed++, Promise.resolve({ status: 502, body: '' }));
+  if (failOf(url)) return failAnswer(failOf(url));
   if (fakeYahoo && url.includes('finance.yahoo.com')) return Promise.resolve(fakeYahooAnswer(url));
   const fixture = fixtures.find(([text]) => url.includes(text));
   if (fixture) return readFile(fixture[1], 'utf8').then(body => ({ status: 200, body }));
@@ -1260,6 +1289,16 @@ if (net && !serve)
     if (netNow.slow) await new Promise(r => setTimeout(r, netNow.slow));
     return route.fallback();
   });
+// --fail: registered last, so it runs first (a data-proxy batch's items fail one by one in upstream()).
+if (fails.length && !serve)
+  await context.route('**/*', async route => {
+    const url = route.request().url();
+    const how = url.startsWith(base) || (!live && SPORTS.test(url)) ? '' : failOf(url);
+    if (!how) return route.fallback();
+    const x = await failAnswer(how);
+    if (how === 'timeout') return route.abort('timedout').catch(() => {});
+    return route.fulfill({ status: x.status, contentType: how === 'html' ? 'text/html' : 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: x.body }).catch(() => {});
+  });
 
 if (serve) {
   console.log(`serving ${repo}, signed in with a made-up account: ${base}  (Ctrl-C to stop)`);
@@ -1341,6 +1380,7 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
   const at = first && oldRoot ? oldRoot : newRoot;
   Object.assign(served, at ? { root: at, dir: join(at, repo, key === 'orbit' ? 'dist' : 'public') } : { root: ROOT, dir });
   flakyNow.on = Boolean(flaky) && (first || !reopen);
+  failNow.on = !reopen || !first;
   Object.assign(netNow, { offline: !first && net === 'offline', slow: first ? 0 : netSlow });
   if (net && !serve) await context.setOffline(netNow.offline);
   if (reopen) console.log(first ? `first opening${oldRoot ? ` (the app as of ${upgrade})` : ''}${flaky ? `, ${Math.round(flaky * 100)}% of answers failing` : ''}` : `second opening (storage kept)${netNow.offline ? ', offline' : netNow.slow ? `, every request ${netNow.slow} ms late` : ''}`);

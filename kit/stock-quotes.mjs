@@ -37,8 +37,12 @@ export const useQuotesReader = fn => void (reader = fn);
 const getJson = url => {
   if (!reader) throw new Error('quotes: no reader');
   const ttl = ttlFor(url);
-  return reader(url, { ttl, persist: ttl > 60_000 || url.includes('/v8/finance/chart/'), timeout: 15_000 });
+  return reader(url, { ttl, persist: ttl > 60_000 || url.includes('/v8/finance/chart/'), timeout: 15_000, valid: shapeOf(url) });
 };
+// Yahoo's shape for a spark or a chart (its result a list): an empty object
+// or an error's JSON is a failed read, never "no price" (nor kept over the last).
+const sparkShaped = j => Array.isArray(j?.spark?.result);
+const shapeOf = url => (url.includes('/v7/finance/spark') ? sparkShaped : url.includes('/v8/finance/chart/') ? j => Array.isArray(j?.chart?.result) : null);
 
 // Taiwan's funds' NAVs (境內基金): the proxy's copy of SITCA's daily list
 // (fund-nav.js), by 基金統編, FUND_BATCH to a request. A fund is
@@ -528,7 +532,7 @@ export async function fetchQuotes(symbols, { range = '1d', interval = '5m' } = {
   let failed = 0;
   let asked = batches.length;
   for (const r of results) {
-    if (r.status === 'fulfilled') for (const [k, v] of parseSpark(r.value)) out.set(k, v);
+    if (r.status === 'fulfilled' && sparkShaped(r.value)) for (const [k, v] of parseSpark(r.value)) out.set(k, v);
     else failed++;
   }
   if (misRead) {
