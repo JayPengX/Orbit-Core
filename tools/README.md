@@ -70,6 +70,19 @@ warm for it, and past half a point a Taiwan day (`transit.js DEV_TDX_DAY`)
 gives it copies only (`DEV_TDX_CAP` where there's none). `npm test` reaches
 nothing off the machine (`kit/no-net.mjs`).
 
+## `node tools/family-check.mjs [app…] [--langs zh,en] [--screens 390,ipad,laptop] [--themes light,dark] [--engines chromium,webkit] [--read]`: does it work
+
+What went wrong most across the family (git history, 10-15 → 11-17, and the 419 fixes of
+11-13), on every app at once: each tab and its `check` pages, live data, Chinese and
+English (390, light, Chromium by default). Faults: `console errors` (an uncaught error,
+a failed module or a 4xx/5xx read: a kit part removed and still called, a TDZ), `stuck`
+(the loading screen or a placeholder still up once the page settled, inside an open sheet
+only), `chinese` (English, yet Chinese the app wrote; what the demo account's person
+wrote is left), `cut`. Not counted: the cloud browser reaching no other site directly
+(YouBike's from the phone), a file the deploy makes (a 404 here, 200 live). `--read`
+reads the last run again. Run it after a change that touches many screens, and before a
+long time away.
+
 ## `node tools/layout-check.mjs <app…> [--screens 320,ipad,laptop]`: the layout a push must pass
 
 Every tab and the app's `check` pages (`tools/shots/pages.mjs`) at 320, an
