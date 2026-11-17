@@ -50,7 +50,7 @@ import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLEC
 import { aiSpend, aiMay } from './ai-allow.js';
 import { checkStock } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
-import { handleShowcasePass, showcaseOf, SHOW_PER_MIN, SHOWCASE_ORIGINS } from './showcase.js';
+import { handleShowcasePass, showcaseOf, SHOW_PER_MIN } from './showcase.js';
 import { handlePush, sendDue } from './push.js';
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
@@ -75,7 +75,6 @@ import { handleStock, moveBook } from './stock-fill.js';
 import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
 import { docStore, storeReady } from './doc-store.js';
 import { handleMoneyRead } from './money-read.js';
-import { handleAiOpen, OPEN } from './ai-open.js';
 import { logCall, callsSince, reliability, spendOf, lastFailed, providerCapped, providerToday } from './gemini-use.js';
 import { handleAi, handleAiBuild, aiTry } from './ai.js';
 import { storyTr, batchTr } from './builders/news-tr.js';
@@ -1470,13 +1469,7 @@ async function route(request, env, ctx, headers, origin) {
   }
   // Orbit Money's 讀圖: a picture of purchases read by Gemini, on a tap only (money-read.js).
   // The family's AI door (ai.js): every app's AI taps by feature name, each with its fixed prompt and caps.
-  // …and a build's built-once asks (Orbit Law's nightly build: 會議紀錄變表格, 法案週報), with its key.
-  // …and a story's AI part made the first time anyone opens it (ai-open.js: 重點整理, 各方怎麼說), kept for everyone.
-  if (path === '/ai/open') {
-    const feature = new URL(request.url).searchParams.get('f') || '';
-    const session = await sessionOf(request, env);
-    return handleAiOpen(request, env, ctx, headers, { ip: ipBucket(ip), cap: OPEN[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai'), spend: spendFor(session) });
-  }
+  // …and a build's built-once asks (Orbit Law's weekly build: 法案週報), with its key.
   if (path === '/ai/build') {
     let feature = '';
     try {

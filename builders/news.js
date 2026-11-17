@@ -51,7 +51,6 @@
 
 import { OUTLETS, TOPICS, SECOND, sideOf, partiesIn, topicsOf, SPORTS_OUTLETS } from '../kit/news-outlets.mjs';
 import { enOf, NAMES } from './news-words.js';
-import { SPORT_PATH, SPORT_VERSION, SPORT_MS, storyKind, sportText, sportsIn } from '../kit/news-sport.mjs';
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
 export const NEWS_PATH = 'news/index.json';
@@ -68,8 +67,6 @@ const TOP = { tw: 180, intl: 140 };
 const PAST_TOP = { tw: 400, intl: 300 };
 export const NOW_MS = 72 * HOUR;
 export const NEWS_PAST = 'news/past.json';
-// The family's AI's reading of each sports story (builders/ai.js sportWho).
-export const SPORT_WHO = 'news/sport-who.json';
 // A story is kept by how wide it went: carried by 6 outlets or more, 30
 // days after its last headline; by 4, 14 days; else 3. It takes new
 // headlines for 21 days from its first (then a new one starts), and keeps
@@ -229,10 +226,9 @@ export const FEEDS = {
   straits: [['https://www.straitstimes.com/news/asia/rss.xml', 'rss', S6]],
   // (11-13, Jay: "if orbit news can't support sport news well enough then it
   // should": the sports desks of the outlets above, and CBS Sports' for the
-  // leagues Orbit Sports shows, once an hour (the others' every 2 hours): the
-  // injuries, moves and coaches Sports' pages link to, often one outlet's
-  // report: news/sport.json. Each its own turn, `at`, set where the other
-  // feeds and the channels leave a build lightest (under 100 calls a build).)
+  // leagues Orbit Sports shows, once an hour (the others' every 2 hours), for
+  // 運動. Each its own turn, `at`, set where the other feeds and the
+  // channels leave a build lightest (under 100 calls a build).)
   cbssports: [['nba', 3], ['mlb', 1], ['soccer', 5]].map(([l, at]) => [`https://www.cbssports.com/rss/headlines/${l}/`, 'rss', S6, at]),
   // (11-13, Jay: "you really should include sport outlet not using existing
   // outlet to get sport news": the sports outlets themselves, each feed once
@@ -1378,7 +1374,7 @@ function matchClips(vids, sized, vecOf, lang) {
 // carry it and it has a topic. recs: the stories kept, [{ id, r, first,
 // last, peak, items }]. → { tw, intl } (the front: heard of in NOW_MS,
 // ranked), past: { tw, intl } (older, by importance), recs (to keep).
-export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} } = {}) {
+export function deskOf(items, recs = [], now, { pages = {}, vids = [] } = {}) {
   // (A kept headline read again takes the feed's picture as it is now: a
   // larger one, once the build asks for it.)
   const fresh = new Map(items.filter(it => it.img).map(it => [it.u, it.img]));
@@ -1387,7 +1383,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
   const every = new Map();
   for (const it of [...live.flatMap(r => r.items), ...items]) every.set(it.u, it);
   const same = sameOf(pages, [...every.values()]);
-  const out = { tw: [], intl: [], past: { tw: [], intl: [] }, recs: live, sport: { tw: [], intl: [] } };
+  const out = { tw: [], intl: [], past: { tw: [], intl: [] }, recs: live };
   for (const region of ['tw', 'intl']) {
     const lang = region === 'tw' ? 'zh' : 'en';
     const mine = items.filter(it => OUTLETS[it.o]?.region === region && now - (it.at || now) <= WINDOW[region] && !fillerOf(it, lang));
@@ -1434,7 +1430,6 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
     // (Which kept stories each piece is in: a group is weighed against those only.)
     const daysBy = new Map();
     for (const x of lastDays) for (const k of x.v.keys()) (daysBy.get(k) || daysBy.set(k, []).get(k)).push(x);
-    const loose = [];
     // A new story from a group, if it has a topic and enough outlets carry it.
     const startOf = g => {
       const sp = g.sp;
@@ -1444,12 +1439,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
       // (A kind past the sides, health, science, sport…, needs only two:
       // its tab isn't empty, and there's no side to weigh, Jay 11-10.)
       const outlets = new Set(g.map(it => it.o));
-      if (!enough(outlets, region) && !(outlets.size >= 2 && TOPIC[kinds[0]]?.spectrum === false)) {
-        // (Sports' one-outlet reports, an injury, a move, aren't a story on
-        // News' pages, but are what Orbit Sports links to: news/sport.json.)
-        if (kinds.includes('sport')) loose.push(g);
-        return null;
-      }
+      if (!enough(outlets, region) && !(outlets.size >= 2 && TOPIC[kinds[0]]?.spectrum === false)) return null;
       const firstIt = g.reduce((a, b) => ((a.at || 0) <= (b.at || 0) ? a : b));
       const rec = { id: freeId(firstIt.u, live), r: region, first: firstIt.at || now, last: firstIt.at || now, peak: 0, items: [], sp };
       live.push(rec);
@@ -1554,7 +1544,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
     const clipSized = wholeOf === vecOf ? sized : sized.map(x => (vs => (c => ({ ...x, vs, c, cn: norm(c) }))(sumOf(vs)))(x.r.items.map(wholeOf)));
     const clipsOf = matchClips(clipVids, clipSized, wholeOf, lang);
     // (The world's stories: Taiwan's outlets' on each, from Taiwan's front.)
-    const twOn = region === 'intl' ? taiwanOn(out.tw, sized, vecOf, who) : new Map();
+    const twOn = region === 'intl' ? taiwanOn(out.tw, sized, vecOf) : new Map();
     for (const { r, vs, c, cn } of sized) {
       const s = storyOf(r.items.map((it, i) => ({ ...it, near: cosine(vs[i], norm(vs[i]), c, cn) })), region, now, { pages, same, vids: clipsOf.get(r) || [] });
       r.first = s.first;
@@ -1569,14 +1559,7 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
         for (const t of twOn.get(r)) t.world = s.id;
       }
       (now - s.at <= NOW_MS ? out[region] : out.past[region]).push(s);
-      if (s.topics.includes('sport') && now - s.at <= SPORT_MS) out.sport[region].push(s);
     }
-    // (Each one-outlet sports report a story of its own, as the builder would make it.)
-    for (const g of loose) {
-      const s = storyOf(g.map(it => ({ ...it, near: 0 })), region, now, { pages, same });
-      if (s.topics.includes('sport') && s.light < 0.5 && now - s.at <= SPORT_MS) out.sport[region].push(s);
-    }
-    out.sport[region] = sportDesk(out.sport[region], SPORT_TOP[region], { only: region === 'intl' });
     out[region] = frontOf(out[region], TOP[region]).map(({ score, light, ...s }) => s);
     // (單邊 weighed against the front's coverage, the past's by the same.)
     const one = oneSidedOf(out[region], region);
@@ -1590,33 +1573,6 @@ export function deskOf(items, recs = [], now, { pages = {}, vids = [], who = {} 
   // (A story whose headlines were all let go is kept no more.)
   out.recs = out.recs.filter(r => r.items.length);
   return out;
-}
-
-// Orbit Sports' links to the news (news/sport.json, kit news-sport.mjs): the
-// sports stories of the last three days, a one-outlet report too, newest
-// first, `top` a region; each with its kind (storyKind, from its headline: 傷病, 禁賽, 換帥, 轉隊),
-// and those of a sport Sports never shows (the NFL, hockey, colleges) left
-// out. A story is News' own (News opens it from a link), lighter: no clips'
-// pictures past its first, no score.
-// The world's (`only`): those plainly of a sport Sports shows (NBA, MLB,
-// football, F1) and nothing else: high-school football, golf and the NFL
-// from Yahoo Sports and SI had filled its 260 with nine hours, every NBA
-// game's page left to Taiwan's outlets (Jay 11-14).
-export const SPORT_TOP = { tw: 260, intl: 420 };
-const SHOWN = ['basketball', 'baseball', 'soccer', 'racing'];
-export function sportDesk(stories, top, { only = false } = {}) {
-  const seen = new Set();
-  return stories
-    .filter(s => !seen.has(s.id) && seen.add(s.id))
-    .map(s => ({ s, text: sportText(s) }))
-    .filter(({ text }) => {
-      const sp = sportsIn(text);
-      if (only) return SHOWN.some(k => sp.has(k));
-      return !(sp.has('other') && sp.size === 1);
-    })
-    .sort((a, b) => b.s.at - a.s.at)
-    .slice(0, top)
-    .map(({ s: { score, light, alts, ...s }, text }) => ({ ...s, clips: (s.clips || []).slice(0, 2), k: storyKind(s) }));
 }
 
 // 單邊 (Jay 11-14: "most news there is just less notable news"; "if just
@@ -1701,7 +1657,7 @@ export function frontOf(stories, top) {
 // and two more words shared (or a name and one, nearer), within a day of it. → Map(world rec → [Taiwan's stories]).
 export const TW_NEAR = 0.4;
 const NAME_KEYS = new Set(Object.values(NAMES).flatMap(v => piecesOf(v, 'en')));
-function taiwanOn(twStories, sized, vecOf, who = {}) {
+function taiwanOn(twStories, sized, vecOf) {
   const index = new Map();
   for (const z of sized) for (const k of z.c.keys()) (index.get(k) || index.set(k, []).get(k)).push(z);
   const out = new Map();
@@ -1713,12 +1669,8 @@ function taiwanOn(twStories, sized, vecOf, who = {}) {
       const en = enOf(it[1]);
       if (en) for (const [k, w] of vecOf({ t: en })) add(v, k, w);
     }
-    // (A sports story: the AI's English title and its players' and teams'
-    // names, a name each, the way the world's headlines put them.)
-    const sw = s.topics.includes('sport') && who[s.id];
-    const names = new Set(sw ? [...(sw.p || []), ...(sw.t || [])].flatMap(n => piecesOf(n, 'en')) : []);
-    if (sw?.en) for (const [k, w] of vecOf({ t: `${sw.en} ${[...(sw.p || []), ...(sw.t || [])].join(' ')}` })) add(v, k, w);
     if (v.size < 2) continue;
+    const sw = s.topics.includes('sport');
     const vn = norm(v);
     const shared = new Map();
     for (const k of v.keys()) for (const z of index.get(k) || []) (shared.get(z) || shared.set(z, []).get(z)).push(k);
@@ -1726,7 +1678,7 @@ function taiwanOn(twStories, sized, vecOf, who = {}) {
     let bestSim = 0;
     for (const [z, keys] of shared) {
       // (A name shared, a place, a person, a body abroad, and a word more.)
-      if (keys.length < 2 || !keys.some(k => NAME_KEYS.has(k) || names.has(k)) || s.at < z.first - GAP || s.first > z.last + GAP) continue;
+      if (keys.length < 2 || !keys.some(k => NAME_KEYS.has(k)) || s.at < z.first - GAP || s.first > z.last + GAP) continue;
       // (A game joins a game: Taiwan's U23 team facing South Korea isn't Korea's news.)
       if (sw && !isSport(z)) continue;
       const sim = cosine(v, vn, z.c, z.cn);
@@ -1853,11 +1805,7 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
     if (!p) (unread[o] ||= []).push(whyNot[u] || '?');
     pages[u] = p ? { ...p, y: p.y.filter(id => !(shorts[id] < 0)) } : { i: '', y: [] };
   });
-  // (The AI's reading of Taiwan's sports stories, English title and names, so
-  // 柯瑞's injury finds the world's story on Curry: Jay 11-13 "why is this
-  // Taiwan outlet only".)
-  const who = (await store.json(SPORT_WHO).catch(() => null))?.who || {};
-  const out = deskOf(items, recs, now, { pages, vids: clips, who });
+  const out = deskOf(items, recs, now, { pages, vids: clips });
   const keep = new Set([...items, ...out.recs.flatMap(r => r.items)].map(it => it.u));
   for (const u of Object.keys(pages)) if (!keep.has(u)) delete pages[u];
   await store.put(NEWS_STATE, { items, etag, pages, recs: out.recs, vids: clips, shorts });
@@ -1866,20 +1814,13 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
     await store.put(NEWS_PATH, { built: now, tw: out.tw, intl: out.intl });
     await store.put(NEWS_PAST, { built: now, ...out.past });
   }
-  // Orbit Sports' links: the sports stories, each with the family's AI's
-  // reading of its names and its title in the other language (builders/ai.js
-  // sportWho → news/sport-who.json), where it has made one yet.
-  if (out.sport.tw.length || out.sport.intl.length) {
-    const withWho = list => list.map(s => (who[s.id] ? { ...s, who: { p: who[s.id].p || [], t: who[s.id].t || [], ...(Array.isArray(who[s.id].a) ? { a: who[s.id].a } : {}) }, ...(who[s.id].zh ? { zh: who[s.id].zh } : {}), ...(who[s.id].en ? { en: who[s.id].en } : {}) } : s));
-    await store.put(SPORT_PATH, { v: SPORT_VERSION, built: now, tw: withWho(out.sport.tw), intl: withWho(out.sport.intl) });
-  }
   // (A few feeds missing is a normal build. Only half or more of the stories' feeds asked
   // failing is the build's failure, what the beat and the panel's 外部來源 call broken.)
   // (Channels' clips apart: YouTube's feeds can all 404 for a day (11-11, every channel from
   // everywhere) while the stories build fine; the clips kept 48 hours carry them.)
   const storyFails = failed.filter(f => !/ clips: /.test(f)).length;
   const missed = failed.length && storyFails * 2 < feedsNow.length ? failed.slice(0, 12) : null;
-  return { items: items.length, fresh, clips: clips.length, pages: want.length, ...(Object.keys(unread).length ? { unread } : {}), ...(ask.length ? { asked: ask.length, shorts: isShort.filter(Boolean).length } : {}), kept: out.recs.length, tw: out.tw.length, intl: out.intl.length, sport: out.sport.tw.length + out.sport.intl.length, past: out.past.tw.length + out.past.intl.length, ...(missed ? { missed } : { failed }) };
+  return { items: items.length, fresh, clips: clips.length, pages: want.length, ...(Object.keys(unread).length ? { unread } : {}), ...(ask.length ? { asked: ask.length, shorts: isShort.filter(Boolean).length } : {}), kept: out.recs.length, tw: out.tw.length, intl: out.intl.length, past: out.past.tw.length + out.past.intl.length, ...(missed ? { missed } : { failed }) };
 }
 
 // Outlets whose article pages carry the story's own clip, most often first

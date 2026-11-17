@@ -1,7 +1,7 @@
 // ---- kit/act.mjs: what a person tells an app to do, read by code (Jay 11-14) ----
 // The apps' ask boxes also take a command, not only a question:
 // 「開始專注飛行 50 分鐘」 starts Class's focus, 「加段考倒數 11/30」 adds a
-// countdown, 「追蹤湖人」 follows a team, 「背 10 個單字」 starts a round.
+// countdown, 「追蹤湖人」 follows a team.
 // Code reads them for nothing (RULEBOOK §AI: code first, AI only on what
 // code can't read), so a command costs no AI call. Each app does the act
 // itself, and only the way its own buttons do: a step the person confirms
@@ -12,7 +12,6 @@
 //   { app: 'orbit', act: 'focus', minutes }              專注飛行 (minutes null: the last chosen)
 //   { app: 'orbit', act: 'countdown', name, start, end }  a countdown (YYYY-MM-DD; end '' for one day)
 //   { app: 'match', act: 'follow', name }                 follow a team (the app finds it)
-//   { app: 'vocab', act: 'practice', size }               a round of words (size null: the app's own)
 
 const ZH_DIGIT = { 零: 0, 〇: 0, 一: 1, 二: 2, 兩: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
 
@@ -84,7 +83,6 @@ const FOCUS = /專注飛行|專注|專心|focus|讀書|念書|唸書|study/i;
 const FOCUS_NOT = /計畫|計劃|plan|配樂|音樂|music/i;
 const COUNTDOWN = /倒數|countdown/i;
 const FOLLOW = /^(?:幫我|請)?\s*(?:追蹤|關注|follow)\s*(.{1,24}?)\s*(?:這隊|這支球隊|球隊|吧|好了)?[。!！]?$/i;
-const PRACTICE = /(?:練習|背|複習|考我|測驗|來|開始|練).{0,6}單字|^(?:背|練|複習)\s*(?:\d+|[一二兩三四五六七八九十]+)\s*個|practi[cs]e (?:my )?words|quiz me|start (?:a )?(?:round|review)/i;
 
 export function readAct(text, { now = new Date() } = {}) {
   const t = String(text || '').trim().slice(0, 200);
@@ -110,10 +108,5 @@ export function readAct(text, { now = new Date() } = {}) {
   }
   const f = FOLLOW.exec(t);
   if (f && f[1]) return { app: 'match', act: 'follow', name: f[1].trim() };
-  if (PRACTICE.test(t)) {
-    const m = new RegExp(`(${NUM})\\s*(?:個|words?)`, 'i').exec(t);
-    const n = m ? zhNumber(m[1]) : NaN;
-    return { app: 'vocab', act: 'practice', size: Number.isFinite(n) && n >= 1 && n <= 100 ? Math.round(n) : null };
-  }
   return null;
 }

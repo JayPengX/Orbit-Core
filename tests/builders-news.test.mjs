@@ -504,7 +504,7 @@ test('運動 keeps more past the cap, a national team\'s game abroad counted as 
 });
 
 
-test('Taiwan’s sports story finds the world’s by the AI’s English names, a game only a game (Jay 11-13: 柯瑞, "why is this Taiwan outlet only")', () => {
+test('a Taiwan sports story joins only a game abroad: Taiwan’s game with South Korea isn’t Korea’s news (Jay 11-13)', () => {
   const items = [
     item('ap', 'Stephen Curry injury: Warriors star to miss at least two weeks with oblique tear', NOW - 6 * H),
     item('usatoday', 'Steph Curry injury update: Warriors star suffers oblique tear', NOW - 5 * H),
@@ -523,12 +523,7 @@ test('Taiwan’s sports story finds the world’s by the AI’s English names, a
   const u23 = first.tw.find(s => /U23/.test(s.title));
   assert.ok(curry && u23);
   assert.ok(!first.intl.find(s => /Curry/.test(s.title)).tw, 'no English word in 柯瑞');
-  const who = { [curry.id]: { p: ['Stephen Curry'], t: ['Golden State Warriors'], en: 'Stephen Curry out at least a month with oblique tear' }, [u23.id]: { p: [], t: ['Chinese Taipei', 'South Korea'], en: 'Chinese Taipei face South Korea in U23 World Cup Super Round' } };
-  const out = deskOf(items, first.recs, NOW, { who });
-  const world = out.intl.find(s => /Curry/.test(s.title));
-  assert.ok(world.tw?.n >= 2);
-  assert.equal(out.tw.find(s => /柯瑞/.test(s.title)).world, world.id);
-  assert.ok(!out.intl.find(s => /Korea/.test(s.title))?.tw, 'Taiwan’s game with South Korea isn’t Korea’s news');
+  assert.ok(!first.intl.find(s => /Korea/.test(s.title))?.tw, 'Taiwan’s game with South Korea isn’t Korea’s news');
 });
 
 test('Taiwan’s outlets on a world story: joined by the names and words they share, never by a lookalike (Jay 11-10)', () => {
@@ -878,7 +873,7 @@ test('sports and the rest are two desks; one game is one story; betting and boil
   assert.equal(gameOf(game[2].t, 'zh'), '76人|暴龍', '七六人 and 76人 one team');
   assert.equal(gameOf('NBA 11/13賽程》詹皇、恩比德出戰成疑 七六人戰暴龍', 'zh'), '', 'a preview names no game');
   const tw = deskOf(game, [], NOW);
-  assert.equal(tw.sport.tw.filter(s => s.n >= 4).length, 1, 'one story of four outlets');
+  assert.equal([...tw.tw, ...tw.past.tw].filter(s => s.n >= 4).length, 1, 'one story of four outlets');
   // A sports outlet's report on the games a ground stop held up stays out of the ground stop's story.
   const faa = ['ap', 'reuters', 'nyt', 'cnn'].map((o, i) => item(o, `FAA orders nationwide ground stop of all departing flights ${i}`, NOW - H - i * 60_000, { img: `https://${o}.example/faa.jpg` }));
   const si = item('si', 'Texas Longhorns cleared for new takeoff time after FAA lifts nationwide ground stop of flights', NOW - 30 * 60_000, { img: 'https://si.example/longhorns.jpg' });

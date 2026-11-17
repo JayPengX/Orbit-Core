@@ -42,13 +42,10 @@ test('act: a countdown added', () => {
   assert.equal(datesIn('2/30', now), null);
 });
 
-test('act: a team followed, a round of words', () => {
+test('act: a team followed', () => {
   assert.deepEqual(readAct('追蹤湖人', { now }), { app: 'match', act: 'follow', name: '湖人' });
   assert.deepEqual(readAct('幫我追蹤 洋基 這隊', { now }), { app: 'match', act: 'follow', name: '洋基' });
   assert.deepEqual(readAct('follow the Lakers', { now }), { app: 'match', act: 'follow', name: 'the Lakers' });
-  assert.deepEqual(readAct('背 10 個單字', { now }), { app: 'vocab', act: 'practice', size: 10 });
-  assert.deepEqual(readAct('開始練習單字', { now }), { app: 'vocab', act: 'practice', size: null });
-  assert.equal(readAct('考我五個單字', { now }).size, 5);
   assert.equal(readAct('abandon 是什麼意思', { now }), null);
   assert.equal(readAct('add a Competition countdown on 12/1', { now }).name, 'Competition');
 });

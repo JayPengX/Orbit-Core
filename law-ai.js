@@ -6,15 +6,11 @@
 //   law-contract       step 2 (a tap): each clause read against the articles
 //                      code picked for its kind and words (Orbit Law's own
 //                      copy of the law), every flag citing them. Sonnet judges.
-//   law-minutes        會議紀錄變表格 (Law's nightly build, through /ai/build):
-//                      a 代表會's minutes code couldn't split, or a scan, into
-//                      rows: the proposal, who, the vote, the result. Flash-Lite.
 //   law-weekly         你追蹤的法案週報's lines (the nightly build): what a bill
 //                      that moved this week, or a law just amended, changes,
 //                      one plain line each, made once and shared. Haiku.
 //
-// Code first: the clauses of a pasted contract, the minutes code can read
-// (竹北's, every proposal form with its 議決) and the week itself (what
+// Code first: the clauses of a pasted contract and the week itself (what
 // moved, from Law's own data) never reach a model.
 import { readLaw } from './law.js';
 import { readGround, matchFacts } from './law-ground.js';
@@ -123,7 +119,6 @@ export async function articleTexts(keys, read = readLaw) {
 
 const clauseList = clauses => clauses.map(c => `[${c.id}] ${c.n ? `${c.n} ` : ''}${c.text}`).join('\n');
 const LEVELS = ['void', 'unfair', 'check'];
-export const RESULTS = ['通過', '修正通過', '保留', '不通過', '撤回', '退回', '擇日再議', '未議決'];
 
 export const LAW_FEATURES = {
   'law-contract-read': {
@@ -259,36 +254,6 @@ export const LAW_FEATURES = {
     }
   },
 
-  // 會議紀錄變表格: only what Law's build couldn't read itself (lib/minutes.mjs
-  // in Orbit Law: 竹北's sittings, every proposal form with its 議決).
-  'law-minutes': {
-    build: 'law',
-    models: ['lite', 'luna'],
-    effort: 'low',
-    timeoutMs: 120_000,
-    maxIn: 42_000,
-    input(raw) {
-      const t = String(raw?.text ?? '').slice(0, 40_000);
-      const pdf = fileOf(raw?.pdf, /^application\/pdf$/, 9_000_000);
-      if (t.replace(/\s/g, '').length < 200 && !pdf) return null;
-      return { town: str(raw?.town, 30), session: str(raw?.session, 40), text: pdf ? '' : t, pdf, cut: !pdf && String(raw?.text ?? '').length > 40_000 };
-    },
-    parts: ({ town, session, text: t, pdf, cut }) => [
-      {
-        text: [
-          `These are the minutes (議事錄) of ${town || 'a township council (代表會) in Taiwan'}${session ? `, ${session}` : ''}${pdf ? ' (a scanned PDF)' : ', as text: code cut the speeches and some lines, so a 案由 or 辦法 may stop mid-sentence'}${cut ? '; the text also stops before the end of the minutes, so a proposal whose result is past the end is 未議決' : ''}.`,
-          'List every proposal (提案, 議案, 臨時動議) the council decided or discussed, in order:',
-          'no: its number as written (鎮長提案第1號, 代表提案第3號, 臨時動議第1號, 甲字第2號), "" when none; kind: its 類別 (民政, 建設…) or ""; by: who proposed it as written (鄉長蔣煙燈 → 蔣煙燈; several joined by 、), "" when not said; what: its 案由 in the minutes’ own words, at most 60 字 (count them; keep in this order the project or place, what is asked, the total amount; drop the 補助/自籌 split first when it won’t fit; drop 敬請貴會…, 提請審議); copy every figure exactly as written: when a figure or the 案由 itself is cut off (「合計新台幣467」 and the line ends), stop at the last whole phrase before the cut and leave the cut figure out, keeping the 補助 and 自籌 figures in their own words (彰化縣政府補助257萬2,350元、本所需自籌配合款210萬4,650元); never add words this 案由 does not have (no 請同意先行墊付 taken from its 辦法 or from another proposal); never complete, round or add up figures (never 「467萬餘元」);',
-          'result: one of 通過, 修正通過, 保留, 不通過, 撤回, 退回, 擇日再議, 未議決 (照案通過, 照原案通過 are 通過; 照審查意見通過 is 通過 only when the 審查意見 keeps the case as proposed, else 修正通過 with the change, e.g. 刪減50萬元, in note; when the 審查意見 is not in the text, 通過 with note 照審查意見通過; 保留 = held for later in this session, 擇日再議 = moved to another day, 退回 = sent back to the 公所); note: how it was amended or why held, in the minutes’ words or plain Taiwan Traditional Chinese with 全形標點, ≤ 30 字, else ""; vote: the count if a vote was taken (贊成 7 票、反對 2 票), else ""; d: the day it was decided, YYYY-MM-DD (西元 = 民國 + 1911, so 民國 114 年 = 2025), only when the proposal sits under a dated 次會 heading (a line of its own, e.g. 第三次會議 114年1月15日上午10時), a date is written next to it, or the minutes cover a single day (時間：中華民國114年3月5日); never take it from the agenda (日程) list, whose lines list several items (1月15日（星期三）：第三次會：討論提案、臨時動議…), even when such a line sits right above the proposal; when the meeting spans several days and this proposal’s day isn’t shown, "".',
-          'Only what the minutes say. Never guess a result: when the minutes don’t say, 未議決. A proposal taken up again later (保留 on one day, decided on another) is one item with its last result and the day of that result. Speeches, reports (工作報告) and questions (質詢) are not proposals; when there is no proposal, items is []. by and no: keep the characters exactly as written (黄 stays 黄).'
-        ].join('\n')
-      },
-      pdf ? { inlineData: { mimeType: 'application/pdf', data: pdf.data } } : { text: t }
-    ],
-    schema: obj({ items: arr(obj({ no: S, kind: S, by: S, what: S, result: { type: 'string', enum: RESULTS }, note: S, vote: S, d: S })) }),
-    clean: (raw, input) => cleanMinutes(raw, input)
-  },
-
   // 你追蹤的法案週報: Law's build sends the week's moved bills and amended
   // laws (their purpose and changed articles, code-cut); each gets one line.
   'law-weekly': {
@@ -329,40 +294,3 @@ export const LAW_FEATURES = {
     }
   }
 };
-
-// ---- 會議紀錄變表格: what may be kept -----------------------------------------------
-
-const HAN = /[㐀-鿿]/;
-const pairsOf = t => {
-  const s = [...String(t).replace(/[^㐀-鿿A-Za-z0-9]/g, '')];
-  const out = new Set();
-  for (let i = 0; i + 1 < s.length; i++) out.add(s[i] + s[i + 1]);
-  return out;
-};
-// A row stays when its words are the minutes' own: each proposer named in
-// them, most of the 案由's character pairs found there, its numbers theirs.
-// (A scan has no text to check against: its rows keep only what's well formed.)
-export function cleanMinutes(raw, { text: t = '', pdf = null } = {}) {
-  const src = String(t);
-  const flat = src.replace(/\s/g, '');
-  const have = pdf ? null : pairsOf(src);
-  const out = [];
-  for (const it of list(raw?.items, 120)) {
-    const what = str(it?.what, 90);
-    const result = RESULTS.includes(it?.result) ? it.result : '';
-    if (!what || !result || !HAN.test(what)) continue;
-    if (have) {
-      const p = [...pairsOf(what)];
-      if (!p.length || p.filter(x => have.has(x)).length / p.length < 0.7 || !numbersFrom(what, src)) continue;
-    }
-    const by = str(it?.by, 40)
-      .split(/[、,，及和]/)
-      .map(x => x.trim())
-      .filter(x => x && (pdf || flat.includes(x)))
-      .join('、');
-    const d = /^\d{4}-\d{2}-\d{2}$/.test(it?.d || '') ? it.d : '';
-    const vote = str(it?.vote, 30);
-    out.push({ no: str(it?.no, 24).replace(/\s/g, ''), kind: str(it?.kind, 12), by, what, result, note: str(it?.note, 50), vote: !pdf && vote && !numbersFrom(vote, src) ? '' : vote, d });
-  }
-  return { items: out };
-}

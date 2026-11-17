@@ -1,9 +1,9 @@
 // Orbit Law's AI (law-ai.js): the articles a contract is read against, what
-// a contract check, a council's minutes and the weekly lines may keep, and
+// a contract check and the weekly lines may keep, and
 // the build door (/ai/build) that Law's nightly build calls.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { articlesFor, articleTexts, contractKind, cleanMinutes, LAW_FEATURES } from '../law-ai.js';
+import { articlesFor, articleTexts, contractKind, LAW_FEATURES } from '../law-ai.js';
 import { handleAiBuild } from '../ai.js';
 import { EXAMPLES } from '../ai-fixtures.js';
 
@@ -78,26 +78,6 @@ test('the contract tap\'s inputs: pictures or one PDF, clauses capped', () => {
   assert.ok(check.clauses.length <= 35 && check.clauses.every((c, i) => c.id === i + 1));
 });
 
-test('minutes: rows in the minutes\' own words, proposers named there, results from the list', () => {
-  const src = EXAMPLES['law-minutes'][0].input.text;
-  const out = cleanMinutes(
-    {
-      items: [
-        { no: '公所第1號', kind: '社政', by: '黄永欽', what: '辦理伸港鄉海尾社區活動中心廁所及關懷據點簡易廚房新建工程，合計1,070萬1,186元先行墊付', result: '通過', note: '', vote: '', d: '2026-01-15' },
-        { no: '公所第2號', kind: '環保', by: '黄永欽、王大明', what: '補助本所垃圾車及資源回收車各1輛', result: '通過', note: '', vote: '贊成 9 票', d: '' },
-        { no: '代表提案第9號', kind: '', by: '', what: '興建全鄉免費停車場與溫水游泳池', result: '通過' },
-        { no: '公所第3號', by: '黄永欽', what: '老人文康中心屋頂防水修繕，合計999萬元', result: '通過' },
-        { no: '公所第3號', by: '黄永欽', what: '老人文康中心屋頂防水修繕及牆面粉刷工程', result: '大概通過' }
-      ]
-    },
-    { text: src }
-  );
-  assert.deepEqual(out.items.map(x => x.no), ['公所第1號', '公所第2號']);
-  assert.equal(out.items[1].by, '黄永欽', 'a proposer not in the minutes is left out');
-  assert.equal(out.items[1].vote, '', 'a count not in the minutes is left out');
-  assert.equal(LAW_FEATURES['law-minutes'].input({ text: '太短' }), null);
-});
-
 test('weekly lines: one an item asked, its numbers its own, never cut', () => {
   const f = LAW_FEATURES['law-weekly'];
   const input = f.input(EXAMPLES['law-weekly'][0].input);
@@ -128,7 +108,7 @@ test('the build door: Law\'s key, a build feature, the day\'s cap', async () => 
   const ask = (feature, key = KEY, input = EXAMPLES['law-weekly'][0].input) => new Request('https://w/ai/build', { method: 'POST', headers: { 'X-Build-Key': key }, body: JSON.stringify({ feature, input }) });
   const call = (req, cap = 2) => handleAiBuild(req, env, {}, {}, { cap }).then(async r => ({ status: r.status, ...(await r.json()) }));
   assert.equal((await call(ask('law-contract'))).error, 'feature', 'a tap never goes through the build door');
-  assert.equal((await call(ask('news-lines'))).error, 'feature', 'another builder\'s job neither');
+  assert.equal((await call(ask('rec-weekly'))).error, 'feature', 'another builder\'s job neither');
   assert.equal((await call(ask('law-weekly', 'x'.repeat(32)))).error, 'key');
   assert.equal((await call(ask('law-weekly', KEY, { items: [] }))).error, 'input');
   assert.equal((await call(ask('law-weekly'), 0)).error, 'cap', 'a cap of 0 pauses it');

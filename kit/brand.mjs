@@ -243,13 +243,12 @@ export const DEV = {
   aiMoneyRead: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['money-read'], zh: '拍照記帳（Money）', en: 'Money photo entries', note: '0 = 暫停' },
   // The AI door's features (ai.js, ai-features.js), one count an app's (taps and builds together).
   aiMoneyMore: { def: 600, min: 0, max: 5000, unit: '次', group: 'ai', ai: ['money-say', 'money-ask', 'money-month'], zh: '記帳 AI（Money）', en: 'Money AI', note: '用說的記帳、問我的帳、每月回顧；0 = 暫停' },
-  aiWords: { def: 1500, min: 0, max: 10000, unit: '次', group: 'ai', ai: ['words-check', 'words-cards', 'words-photo', 'words-chat'], zh: '單字 AI（Words）', en: 'Words AI', note: '檢查句子、例句與記憶法、拍照、用新字聊天；0 = 暫停' },
-  aiSports: { def: 600, min: 0, max: 5000, unit: '次', group: 'ai', ai: ['sports-recap', 'sports-preview', 'f1-story', 'sports-ask'], zh: '比賽 AI（Sports）', en: 'Sports AI', note: '賽前看點、賽後三句話、F1 賽後故事、問比賽；0 = 暫停' },
+  aiWords: { def: 1500, min: 0, max: 10000, unit: '次', group: 'ai', ai: ['words-check', 'words-photo', 'words-chat'], zh: '單字 AI（Words）', en: 'Words AI', note: '檢查句子、拍照、用新字聊天；0 = 暫停' },
+  aiSports: { def: 600, min: 0, max: 5000, unit: '次', group: 'ai', ai: ['sports-ask'], zh: '比賽 AI（Sports）', en: 'Sports AI', note: '問比賽；0 = 暫停' },
   aiTransit: { def: 400, min: 0, max: 5000, unit: '次', group: 'ai', ai: ['transit-say'], zh: '交通 AI（Transit）', en: 'Transit AI', note: '用說的查路線；0 = 暫停' },
-  aiNews: { def: 600, min: 0, max: 5000, unit: '次', group: 'ai', ai: ['news-lines', 'news-sides', 'news-markets', 'news-brief', 'news-sport'], zh: '新聞 AI（News）', en: 'News AI', note: '雙語標題、各方怎麼說、重點整理、預測市場配對、運動新聞的人名與球隊（每次一批）；0 = 暫停' },
   aiWeather: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['weather-ask'], zh: '天氣 AI（Weather）', en: 'Weather AI', note: '問天氣（程式讀不懂時）；0 = 暫停' },
   aiClassMore: { def: 400, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['class-ask', 'class-news'], zh: '課表 AI 其他（Class）', en: 'Class AI, more', note: '問課表、學校公告；0 = 暫停' },
-  aiLawMore: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['law-contract-read', 'law-contract', 'law-minutes', 'law-weekly'], zh: '法律 AI 其他（Law）', en: 'Law AI, more', note: '拍合約（讀和檢查各算一次）、會議紀錄變表格、法案週報；0 = 暫停' },
+  aiLawMore: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['law-contract-read', 'law-contract', 'law-weekly'], zh: '法律 AI 其他（Law）', en: 'Law AI, more', note: '拍合約（讀和檢查各算一次）、法案週報；0 = 暫停' },
   aiSecurities: { def: 400, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['sec-filing', 'sec-lesson'], zh: '證券 AI（Securities）', en: 'Securities AI', note: '重大訊息白話、交易學到什麼；0 = 暫停' },
   aiBeats: { def: 200, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['beats-say'], zh: '節奏 AI（Beats）', en: 'Beats AI', note: '用說的做節奏（程式讀不懂時）；0 = 暫停' },
   aiFamily: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['showcase-ask', 'rec-weekly'], zh: '全家 AI', en: 'Family AI', note: 'Showcase 問答、除錯週報；0 = 暫停' }

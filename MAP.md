@@ -94,8 +94,8 @@ modules for modulepreload.
 | `brand.mjs` | Families, names, colours, marks, repos, slugs, `APP_ORDER`, `DEV` (speeds, §9) |
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); each app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
 | `passkey.mjs`, `pass-mail.mjs` | Passkeys in the browser (`passkeyHere()`); the recovery email's screens |
-| `news-outlets.mjs`, `news-sport.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); `TOPICS`; `sideOf`, `partiesIn`, `topicsOf`, `namesRe`; Sports' 相關新聞 matching |
-| `ai.mjs`, `family.mjs`, `today.mjs`, `ask-orbit.mjs` | AI (mark `icons.ai`, `--q-ai`; `.q-ai-ref` a name chip): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer`, `aiAnswerWait` (answers drawn); the family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天; an app's `#ask=` by `takeAsk` (retiring); `act.mjs` `readAct`: a command said (start a focus, add a countdown, follow a team, a round of words) read by code, no AI call |
+| `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); `TOPICS`; `sideOf`, `partiesIn`, `topicsOf`, `namesRe` |
+| `ai.mjs`, `family.mjs`, `today.mjs`, `act.mjs` | AI (mark `icons.ai`, `--q-ai`; `.q-ai-ref` a name chip): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer`, `aiAnswerWait` (answers drawn); the family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天; `act.mjs` `readAct`: a command said in an app's ask box (start a focus, add a countdown, follow a team) read by code, no AI call |
 | `testtools.mjs` | 測試工具, hidden until unlocked (seven taps on 除錯紀錄 in 4 s): a moved or fast clock, a place, a trip's fixes played back (`playTrip`), the network off/slow/failing (`boot.js`, `orbit.tester`), test notices (`pushTest`), each app's switches (`ORBIT_TEST_TOOLS`, `ORBIT_TEST?.flags?.x`), versions; a pill while anything is on |
 | `suite.mjs` | Orbit (`site/app/`; `inSuite()`): each app a frame of `host`, kept running (`toClose`), tabs, the ⌄ switcher; behaviour: `docs/ORBIT.md` |
 | `notice-kinds.mjs` | Notice kinds |
@@ -183,7 +183,7 @@ w;dur=`, noted by the 除錯紀錄 when slow, and `LOCKED` (never runs as a page
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
 | `/ai` | `ai.js`, `ai-features.js`, `law-ai.js`, `ai-util.js`, `ai-fixtures.js` | Every app's AI by name: fixed prompt, models in turn, lean input (`maxIn`), caps, asks back (`clarify`, `pick`); builders' `aiOnce`; ops `ai-try` (`site/ai-try/`) |
-| `/ai/build`, `/ai/open` | `ai.js`, `ai-open.js` | A build's `build:` features (Law's key); News' 重點整理, 各方怎麼說, Sports' 賽後/賽前 lines made on the first tap of their AI button (nothing ahead), kept |
+| `/ai/build` | `ai.js` | A build's `build:` features (Law's key: 法案週報) |
 | `/law-ask` | `law.js`, `law-ruling.js`, `law-town.js`, `law-ground.js` | Law's questions on 1–8 articles, each point cited, checked, kept in KV (or Law's `data/ai/`); modes `bill`, `diff`, `ruling`, `town`, `paper`; 40 Gemini calls a day a Pass, 300 in all with `/law-chat`'s (D1 `law_day`) |
 | `/law-chat` | `law-chat.js`, `ai-other.js` | 問法律: a plan (Flash-Lite), up to 14 articles (and delegated ones) from Law's index, answered from those by Sonnet (failing: Sol), cites checked; grounded by `law-ground.js`, `law-more.js`, `law-local.js` (councils); 16 turns back; 30 a day a Pass |
 | `/law-page` | `law-page.js`, `law-hosts.js` | A gov.tw/edu.tw page in Law, cleaned, edge-cached, via Taiwan (build key: any gov.tw, `file=1` raw, `/law-judicial` 司法院's API); 500 a day a Pass; `/law-audio` (`law-audio.js`): a 代表會's Drive recording, its true type |
@@ -358,11 +358,10 @@ writing a file only when it changed (`builders/store.js`):
 | `asia.js`, `cpbl.js` | CPBL's month and standings | daily 15:00 |
 | `f1kept.js` | each finished F1 session's 數據 and laps, kept early (via the proxy) | :06, :26, :46 |
 | `kept.js` | wipes kept copies (`mirror/`) before a league's first askable day | daily 17:00 |
-| `news.js`, `news-words.js`, `news-laws.js` | `news/index.json` (3 days), `past.json` (weeks): stories by weight, topic, side, 快訊 (`live`: many outlets in 2 h, ranked up); `sport.json` (Sports' 相關新聞); `laws.json`: laws named | every 10 min |
-| `news-markets.js` | `news/markets.json`: Polymarket's open markets beside the stories they're about (code finds, AI `news-markets` confirms; no Taiwan vote's in its 10 quiet days) | :14 :44 |
+| `news.js`, `news-words.js`, `news-laws.js` | `news/index.json` (3 days), `past.json` (weeks): stories by weight, topic, side, 快訊 (`live`: many outlets in 2 h, ranked up); `laws.json`: laws named | every 10 min |
 | `tools/flight-pool.mjs` (`flight.yml`) | `flight/` | 10 min |
 | `tools/news-clips.mjs` (`news-clips.yml`) | `news/clips.json`: the clips in Taiwan's articles (those outlets refuse Cloudflare), taken into the stories by `news.js` | started by `newsClips` (15 min) |
-| `ai.js` (+ `words-hooks.mjs`, hooks fixed by hand), `recaps.js`, `previews.js`, `f1story.js`; `filings.js` | AI made ahead, paused 11-14 (`BULK_PAUSED`): `news/lines.json`, `sides.json`, `briefs.json`, `sport-who.json`; `private/news/open/` (facts for `/ai/open`), `words/cards/`, `sports/` (`recaps/`, `previews/`, `f1/stories/`); 重大訊息 as rows: `stock/filings/` | :04 :34 |
+| `filings.js`; `ai.js` | 重大訊息 as rows: `stock/filings/`; Mondays the admin's 除錯紀錄週報 (`rec-weekly`, the only AI made ahead). Words' cards (`words/cards/`) were made once and are kept as they are | :04 :34 |
 
 A season is kept until the next one's first game.
 

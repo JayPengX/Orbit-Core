@@ -75,19 +75,9 @@ test('ask back: one short question with options, the answers sent again, three r
   assert.deepEqual(withAsk([{ text: 'p' }], FEATURES['money-say'].schema, [], false, ['cat', 'pay']).schema.properties.ask.properties.field.enum, ['', 'cat', 'pay']);
 });
 
-test('what an answer may keep: numbers from the facts, words the notice wrote, cards for words asked', async () => {
+test('what an answer may keep: numbers from the facts', async () => {
   assert.equal(numbersFrom('洋基 7 比 3 擊敗紅襪', '7-3 洋基'), true);
   assert.equal(numbersFrom('第 9 局逆轉', '7-3'), false);
-  const facts = 'Teams: {t:1} = home\n{t:1} ahead for good: inning 8, on {p:5} play\nPlayers: {p:5} = Aaron Judge';
-  const recap = FEATURES['sports-recap'].clean({ zh: '{p:5} 第 9 局再見全壘打', en: '{p:5} walked it off in the 9th' }, { facts });
-  assert.equal(recap, null, 'a number the facts never gave');
-  assert.equal(FEATURES['sports-recap'].clean({ zh: '賈吉第 8 局', en: 'Judge in the 8th' }, { facts }), null, 'a player typed out, not his token');
-  assert.ok(FEATURES['sports-recap'].clean({ zh: '{p:5} 第 8 局超前', en: '{p:5} put {t:1} ahead in the 8th' }, { facts }));
-  assert.deepEqual(FEATURES['sports-recap'].clean({ zh: '', en: '' }, { facts }), { zh: '', en: '' }, 'nothing to tell: no line');
-  const cards = FEATURES['words-cards'].clean({ cards: [{ w: 'Abandon', ex: [{ en: 'They abandoned the car.', zh: '他們棄車。' }, { en: 'No word here.', zh: '無' }], hook: 'a-band-on', confuse: ['abandon', 'abundant'] }, { w: 'extra', ex: [{ en: 'extra', zh: 'x' }] }] }, { words: [{ w: 'abandon', zh: '放棄' }] });
-  assert.deepEqual(Object.keys(cards), ['abandon']);
-  assert.equal(cards.abandon.ex.length, 1, 'an example without the word dropped');
-  assert.deepEqual(cards.abandon.confuse, ['abundant']);
   assert.deepEqual(jsonOf('```json\n{"a":1}\n```'), { a: 1 });
 });
 
@@ -145,77 +135,18 @@ test('a model\'s simplified characters are written as Taiwan\'s, and only those 
 });
 
 // Every prompt fits its own maxIn at its inputs' longest (11-12: 11-11's
-// longer prompts passed it, so 賽後三句話 and 賽前看點 threw on every real
-// game, each throw spending the day's count): a tap's input at its own caps,
-// a builder's facts at their builder's cut (recaps 2,400, previews 2,600, F1 2,400).
+// longer prompts passed it, so a feature threw on every real input, each
+// throw spending the day's count): a tap's input at its own caps.
 test('every feature’s prompt fits its maxIn with its input at its longest', async () => {
   const { EXAMPLES } = await import('../ai-fixtures.js');
   const long = v => (typeof v === 'string' ? v.repeat(Math.ceil(4000 / Math.max(1, v.length))).slice(0, 4000) : Array.isArray(v) ? v.map(long) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, long(x)])) : v);
-  const built = { 'sports-recap': 2400, 'sports-preview': 2600, 'f1-story': 2400 };
   for (const [name, f] of Object.entries(FEATURES)) {
     for (const x of EXAMPLES[name] || []) {
       let input = f.tap ? f.input?.(long(x.input)) : x.input;
-      if (built[name]) input = { ...x.input, facts: x.input.facts.repeat(4).slice(0, built[name]) };
       if (!input) continue;
       const parts = await f.parts(input, {});
       const size = parts.reduce((n, p) => n + (p.text?.length || 0), 0);
       assert.ok(size <= (f.maxIn || 12_000), `${name} (${x.name}): ${size} chars, maxIn ${f.maxIn}`);
     }
   }
-});
-
-// 重點整理 (News, builders/ai.js newsBriefs): our own words, the outlets' numbers only.
-test('a story’s points keep only their own words and the material’s numbers', () => {
-  const stories = [{ id: 'a', heads: ['寶林茶室案一審宣判 負責人遭判1年10月'], sums: ['寶林茶室食物中毒案釀6人死亡，台北地方法院一審依過失致死罪判處負責人1年10月'] }];
-  const clean = raw => FEATURES['news-brief'].clean(raw, { stories });
-  const ok = { zh: '北院一審判負責人1年10月徒刑', en: 'The Taipei court gave the owner 1 year and 10 months.' };
-  const out = clean({ items: [{ id: 'a', points: [ok, { zh: '食物中毒案造成6人死亡', en: 'The food poisoning killed 6 people.' }] }] });
-  assert.equal(out.a.length, 2);
-  // (A number the material lacks, a copied run of the summary, Simplified Chinese: each point dropped; one left is too few.)
-  assert.equal(clean({ items: [{ id: 'a', points: [ok, { zh: '共有9人送醫', en: '9 were hospitalised.' }] }] }).a, undefined);
-  assert.equal(clean({ items: [{ id: 'a', points: [ok, { zh: '台北地方法院一審依過失致死罪判處負責人', en: 'Judged.' }] }] }).a, undefined);
-  assert.equal(clean({ items: [{ id: 'a', points: [ok, { zh: '负责人将上诉', en: 'The owner will appeal.' }] }] }).a, undefined);
-});
-
-test('news-markets: a question says when it settles, unless its rows each show a deadline', () => {
-  const clean = FEATURES['news-markets'].clean;
-  const market = { q: 'Jensen Huang resigned or removed & Nvidia above $4T end of 2026?', about: '', kind: 'pick', ends: '2026-12-31', options: ['Resigned/removed; Over $4T', 'Resigned/removed; Under $4T'] };
-  const ask = (m, zh, en) => clean({ items: [{ k: 'a|1', match: true, zh, en, options: [] }] }, { pairs: [{ k: 'a|1', story: [], market: m }] })['a|1'];
-  assert.equal(ask(market, '黃仁勳已宣布去職，輝達2026年底市值會達4兆美元嗎？', 'With Jensen Huang’s exit announced, will Nvidia be worth $4T at the end of 2026?').zh, '黃仁勳已宣布去職，輝達2026年底市值會達4兆美元嗎？');
-  assert.equal(ask(market, '輝達2027年底市值會達4兆美元嗎？', 'Will Nvidia be worth $4T at the end of 2027?'), undefined, 'a year the market lacks');
-  assert.equal(ask({ ...market, kind: 'dates', ends: undefined }, '黃仁勳2026年底前會卸任嗎？', 'Will Jensen Huang step down by the end of 2026?'), undefined, 'a ladder’s rows say the dates');
-});
-
-test('news-markets: a person’s Chinese name only as the story’s headlines write it, never a guessed one', () => {
-  const pairs = [{ k: 'a|1', story: ['輝達財務長克瑞斯接任臨時CEO'], market: { q: 'Next CEO of NVIDIA?', about: '', kind: 'pick', options: ['Ian Buck', 'Colette Kress'] } }];
-  const out = FEATURES['news-markets'].clean({ items: [{ k: 'a|1', match: true, zh: '誰將接任輝達執行長？', en: 'Who will be Nvidia’s next CEO?', options: [
-    { o: 'Ian Buck', who: true, zh: '巴克', en: 'Ian Buck' },
-    { o: 'Colette Kress', who: true, zh: '克瑞斯', en: 'Colette Kress' }
-  ] }] }, { pairs });
-  assert.deepEqual(out['a|1'].labels, { 'Ian Buck': { en: 'Ian Buck', who: 1 }, 'Colette Kress': { zh: '克瑞斯', en: 'Colette Kress', who: 1 } });
-});
-
-test('news-markets: a Taiwan race’s candidates by their own names; a kept name stays in English in the question', () => {
-  const clean = FEATURES['news-markets'].clean;
-  const race = [{ k: 'a|1', story: ['基隆市長選戰升溫'], market: { q: 'Keelung Mayor Election Winner', about: '', kind: 'pick', tw: true, options: ['Hsieh Kuo-liang'] } }];
-  assert.deepEqual(clean({ items: [{ k: 'a|1', match: true, zh: '誰會當選基隆市長？', en: 'Who will win Keelung mayor?', options: [{ o: 'Hsieh Kuo-liang', who: true, zh: '謝國樑', en: 'Hsieh Kuo-liang' }] }] }, { pairs: race })['a|1'].labels, { 'Hsieh Kuo-liang': { zh: '謝國樑', en: 'Hsieh Kuo-liang', who: 1 } });
-  const alice = [{ k: 'a|1', story: ['黃仁勳女兒'], market: { q: 'Alice Huang arrested by...?', about: '', kind: 'dates', keep: ['Alice Huang'], options: [] } }];
-  assert.equal(clean({ items: [{ k: 'a|1', match: true, zh: '黃樂會被逮捕嗎？', en: 'Will Alice Huang be arrested?', options: [] }] }, { pairs: alice })['a|1'], undefined);
-  assert.equal(clean({ items: [{ k: 'a|1', match: true, zh: 'Alice Huang會被逮捕嗎？', en: 'Will Alice Huang be arrested?', options: [] }] }, { pairs: alice })['a|1'].zh, 'Alice Huang會被逮捕嗎？');
-});
-
-test('news-markets: each option’s short label, Chinese without Latin or a number it lacks, never two alike', () => {
-  const pairs = [{ k: 'a|1', story: ['輝達董事會討論黃仁勳去留'], market: { q: 'Jensen Huang out + Nvidia market cap', about: '', options: ['Resigned/removed; Over $4T', 'Resigned/removed; Under $4T', 'Rene Haas', 'Ian Buck'] } }];
-  const out = FEATURES['news-markets'].clean({ items: [{ k: 'a|1', match: true, zh: '黃仁勳去職時，輝達市值會在4兆美元以上嗎？', en: 'If Jensen Huang leaves, will Nvidia be worth over $4 trillion?', options: [
-    { o: 'Resigned/removed; Over $4T', zh: '4兆美元以上', en: 'Over $4T' },
-    { o: 'Resigned/removed; Under $4T', zh: '5兆美元以下', en: 'Under $4T' },
-    { o: 'Rene Haas', zh: 'Haas', en: 'Rene Haas' },
-    { o: 'Ian Buck', zh: '巴克', en: 'Rene Haas' },
-    { o: 'Nobody', zh: '沒有人', en: 'Nobody' }
-  ] }] }, { pairs });
-  assert.deepEqual(out['a|1'].labels, {
-    'Resigned/removed; Over $4T': { zh: '4兆美元以上', en: 'Over $4T' },
-    'Resigned/removed; Under $4T': { en: 'Under $4T' },
-    'Ian Buck': { zh: '巴克' }
-  });
 });

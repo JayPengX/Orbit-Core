@@ -425,9 +425,6 @@ export const HELP = {
         '每家媒體在藍綠和統獨上的位置，依學術研究定：TEDS 調查裡各家觀眾的政黨傾向（Chiang & Shih）、報紙的研究（Kao、Chang & Fang 等）；比較新的網路媒體，依擁有者和公開立場判斷，標成「依據較弱」。國際媒體用 AllSides 的評等；它沒評的，不放進左中右。',
         '「媒體」分頁看得到每一家的位置和依據。位置說的是一家媒體整體的傾向，不是每一篇報導。'
       ]],
-      ['oneside', '單邊', [
-        '夠重要、八家以上在報，一邊報得多、另一邊沒報或只有一兩家的新聞（已扣掉那一邊平常就比較多家的差距），重要的在前。每則寫出兩邊各幾家、哪幾家報了。不一定是誰刻意不報，但值得看看另一邊少看到了什麼。'
-      ]],
       ['read', '我的閱讀', [
         '你點開過哪些媒體，依偏綠、中間、偏藍算成一條，看自己平常讀的是不是都在同一邊。只記哪一家、哪一天，不記哪一篇；存在你的 Orbit Pass 裡。'
       ]],
@@ -442,9 +439,6 @@ export const HELP = {
       ['sides', 'How outlets are placed', [
         'Each Taiwanese outlet’s place on blue–green and on unification–independence comes from research: its audience’s party in the TEDS surveys (Chiang & Shih), studies of the papers (Kao; Chang & Fang); newer web outlets by owner and stated stance, marked as weaker. English outlets use AllSides’ ratings; ones it hasn’t rated stay out of left, centre and right.',
         'The Outlets tab shows each one’s place and why. A place is an outlet’s lean as a whole, not each report’s.'
-      ]],
-      ['oneside', 'One side', [
-        'Important stories eight or more outlets carry, where one side carries it widely and the other not at all or only once or twice (past the gap there is on any day between how many outlets each side has), the most important first. Each says how many of each side carry it, and which. Not always a choice to leave it out, but worth seeing what the other side’s readers miss.'
       ]],
       ['read', 'Your reading', [
         'The outlets you opened, counted by side into one bar, to see whether what you read sits on one side. Only which outlet and which day, never which article; kept on your Orbit Pass.'
@@ -736,15 +730,13 @@ export const TOURS = {
   },
   news: {
     zh: [
-      ['top', '頭條', ['今天的頭條：最重要的幾則左右滑，有照片的、影片、國際和各主題，和只有一邊在報的。每則看得到幾家報、偏綠中間偏藍各幾家，點開是各家的標題並排。']],
+      ['top', '頭條', ['今天的頭條：最重要的幾則左右滑，有照片的、影片、國際和各主題。每則看得到幾家報、偏綠中間偏藍各幾家，點開是各家的標題並排。']],
       ['tw', '台灣', ['台灣的每一則，重要的在前，依主題分（左右滑換主題）。國際分頁一樣，位置是偏左、中間、偏右。']],
-      ['side', '單邊', ['重要的新聞裡，一邊報得多、另一邊沒報或只有一兩家的，重要的在前，每則寫出兩邊各幾家。']],
       ['outlets', '媒體', ['我的閱讀：近 30 天你點開的新聞，依媒體的位置算成一條；下面是每家媒體的位置，點一家看擁有者和依據。']]
     ],
     en: [
-      ['top', 'Top', ['Today’s front page: the lead stories swiped sideways, then pictures, clips, the world’s, each topic’s and the one-sided ones. Each shows how many outlets carry it and how many lean green, centre or blue; open one for every headline side by side.']],
+      ['top', 'Top', ['Today’s front page: the lead stories swiped sideways, then pictures, clips, the world’s and each topic’s. Each shows how many outlets carry it and how many lean green, centre or blue; open one for every headline side by side.']],
       ['tw', 'Taiwan', ['Every Taiwan story, most important first, by topic (swipe for the next). World is the same, placed left, centre or right.']],
-      ['side', 'One side', ['Important stories one side carries widely and the other not at all or only once or twice, the most important first, each with how many of each side carry it.']],
       ['outlets', 'Outlets', ['Your reading: what you opened in 30 days, counted by where each outlet stands; below, every outlet’s place, a tap for its owner and why.']]
     ]
   },
