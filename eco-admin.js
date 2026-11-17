@@ -26,6 +26,7 @@ import { FEATURES } from './ai-features.js';
 import { twDate, googleToday, GOOGLE_MONTH_CALLS } from './weather.js';
 import { cleanDev, DEV } from './kit/devconfig.mjs';
 import { BRANDS } from './kit/brand.mjs';
+import { GH_OWNER, GH_REPOS } from './github-keep.js';
 import { SITE } from './kit/domain.mjs';
 import { sidesOf, addSides, LEDGER } from './money.js';
 import { plan as capacityPlan, usersFrom } from './capacity.js';
@@ -1200,8 +1201,7 @@ Object.assign(ADMIN_TOOLS, {
 // GitHub: a workflow started on main, or a failed run's failed jobs again,
 // with GH_ACTIONS_TOKEN (a fine-grained token: Actions read and write on the
 // family's repos, never Longshot's). Its value is never shown or sent back.
-const GH_OWNER = 'JayPengX';
-export const GH_REPOS = ['Orbit-Core', ...Object.values(BRANDS).map(b => b.repo), 'Orbit-Showcase'];
+// (The repos: github-keep.js, which keeps their schedules on with it.)
 async function ghPost(env, path, body) {
   const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${path}`, {
     method: 'POST',

@@ -13,7 +13,9 @@
 //     server errors in a Taiwan day;
 //   - AI: a feature at its day cap (someone was refused), a maker's
 //     balance at 25% (10% red);
-//   - TDX's month past 80% (95% red).
+//   - TDX's month past 80% (95% red);
+//   - GitHub's token (GH_ACTIONS_TOKEN) failing, or ending within 21 days
+//     (github-keep.js keeps the family's GitHub schedules on with it).
 // Amber in the panel that fixes itself (a slow source, a late job) is never
 // mailed: only what's red, and the few ambers above that cost money.
 //
@@ -32,6 +34,7 @@ import { keptRead, keptPut } from './kept-store.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
 import { paceOf } from './pace.js';
 import { beats, SECRETS, BINDINGS } from './ops.js';
+import { GH_KEEP, keepIssues } from './github-keep.js';
 import { ADMIN_TOOLS, readDev } from './eco-admin.js';
 import { callsSince } from './gemini-use.js';
 import { moneyLeft, PROVIDERS } from './ai.js';
@@ -126,19 +129,24 @@ async function mid(env, deps, now) {
   return out;
 }
 async function slow(env, deps, now) {
+  // (GitHub's token failing or ending soon: github-keep.js.)
+  const keep = keepIssues(await keptRead(env, GH_KEEP).catch(() => null), now);
   const doc = await deps.fsGet(env, 'orbit-config', 'ai-money').catch(() => null);
   let saved = {};
   try {
     if (doc?.exists) saved = JSON.parse(doc.payload);
   } catch {}
   const typed = PROVIDERS.filter(p => saved[p]?.at);
-  if (!typed.length) return [];
+  if (!typed.length) return keep;
   const calls = await callsSince(env, Math.max(now - 70 * 86_400_000, Math.min(now - 7 * 86_400_000, ...typed.map(p => saved[p].at)))).catch(() => null);
-  if (!calls) return [];
+  if (!calls) return keep;
   const left = moneyLeft(saved, calls, now);
-  return typed
-    .filter(p => left[p].tone)
-    .map(p => ({ id: `ai-money:${p}`, tone: left[p].tone, mail: true, title: `${PROV[p]} 的預付餘額剩 ${pct(left[p].left / saved[p].usd)}`, detail: `約 US$${Math.max(0, left[p].left).toFixed(2)}${left[p].days != null ? `，照最近 7 天的速度約 ${left[p].days} 天用完` : ''}。`, go: 'usage' }));
+  return [
+    ...keep,
+    ...typed
+      .filter(p => left[p].tone)
+      .map(p => ({ id: `ai-money:${p}`, tone: left[p].tone, mail: true, title: `${PROV[p]} 的預付餘額剩 ${pct(left[p].left / saved[p].usd)}`, detail: `約 US$${Math.max(0, left[p].left).toFixed(2)}${left[p].days != null ? `，照最近 7 天的速度約 ${left[p].days} 天用完` : ''}。`, go: 'usage' }))
+  ];
 }
 const CHECKS = { fast, mid, slow };
 const CONFIRM = { fast: 2, mid: 1, slow: 1 };

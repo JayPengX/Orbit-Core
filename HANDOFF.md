@@ -98,8 +98,10 @@ Values are never written anywhere else. The admin panel's system report and
   rebuilt): `GEMINI_API_KEY`, `GOOGLE_MAPS_KEY`, `GOOGLE_MAPS_BROWSER_KEY`,
   `GOOGLE_WEATHER_KEY`, `GOOGLE_TRANSLATE_KEY` (falls back to the weather
   key), `CWA_KEY`, `MOENV_KEY`, `TDX_CLIENT_ID`, `TDX_CLIENT_SECRET`,
-  `GH_ACTIONS_TOKEN` (a GitHub token so the admin panel's 部署 and the cron
-  can start workflows), `FIREBASE_PRIVATE_KEY` (until 12-05),
+  `GH_ACTIONS_TOKEN` (a GitHub fine-grained token, Actions read and write on the
+  family's repos, so the admin panel's 部署 and the cron can start workflows
+  and keep GitHub's schedules on, github-keep.js; it has an end date: Jay is
+  mailed 21 days before, then makes a new one and types it in), `FIREBASE_PRIVATE_KEY` (until 12-05),
   `RESEND_API_KEY` (when mail is set up).
 
 **Never change `ECO_TOKEN_SECRET`.** Every pass is stored hashed with a

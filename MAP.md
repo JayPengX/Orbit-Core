@@ -427,6 +427,10 @@ Web Push, some checked first (a final, a price, rain). Each device once (its Orb
   - `news-clips.yml`: the clips in Taiwan's articles, started by `newsClips`;
   - every app repo's deploy workflow: its site, to Cloudflare.
 - Every 3 hours: `free-watch.yml` (`tools/free-watch.mjs`, started by the cron's `startFreeWatch`): pages, routes, crons, free amounts; a failure mails Jay.
+- GitHub turns a public repo's scheduled workflows off after 60 days with no
+  commit: `github-keep.js` (the cron, :12 each hour, one repo in turn) turns
+  them on again and refreshes them weekly with `GH_ACTIONS_TOKEN`, keeps the
+  token's end date, and `mail-alerts.js` mails Jay 21 days before it ends.
 - By hand: `build.yml` (a builder, a check), `tail.yml` (logs),
   `audit.yml` (secrets, store counts), `zone-speed.yml` (speed), `credit.yml` (`tools/credit/`), `agent.yml` (a task).
 - Never a cancelling `concurrency:` (a cancel mails Jay): copy the `queue`

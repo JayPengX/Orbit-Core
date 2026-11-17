@@ -62,6 +62,7 @@ import { MAIL_COLLECTION, mailReady, mailPage } from './pass-mail.js';
 import { backupStore } from './store-backup.js';
 import { paceOf } from './pace.js';
 import { beat, tellOwner, systemReport, countFolders, FOLDERS_KEY, startFreeWatch } from './ops.js';
+import { keepWorkflows } from './github-keep.js';
 import { mailAlerts, gather as alertsNow } from './mail-alerts.js';
 import { mailSettings, sendMail } from './mail.js';
 import { sweepKept, keptText } from './kept-store.js';
@@ -1977,6 +1978,8 @@ async function cronTick(event, env, ctx, part) {
     if (min === 42 && tick.getUTCHours() % 6 === 0) run('kept-sweep', async () => ({ kept: await sweepKept(env), files: await sweepDataFiles(env) }));
     // The free plans' watch (free-watch.yml) started every 3 hours, on an even minute (the odd ones run F1 only): GitHub's own timer ran it none of the first 6 (2026-11-13).
     if (min === 18 && tick.getUTCHours() % 3 === 0) run('free-watch', () => startFreeWatch(env));
+    // The family's GitHub schedules kept on with nobody committing (github-keep.js): one repo an hour, in turn.
+    if (min === 12) run('github-keep', () => keepWorkflows(env, tick.getTime()), r => (r.revived || r.failed ? r : null));
     // Every account's app data sealed (eco.js sealSweep), a few accounts a run, till none is left open.
     if (event.cron !== ODD_CRON && min % 10 === 4 && storeReady(env)) run('vault-sweep', () => sealSweep(env, ECO_DEPS), r => (r.accounts ? r : null));
 }
