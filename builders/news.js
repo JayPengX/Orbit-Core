@@ -1014,7 +1014,8 @@ export function groupStories(items, lang, { join = JOIN[lang], merge = MERGE[lan
 export const THUMB_PIC = /^https?:\/\/(?:i\d?\.ytimg\.com|img\.youtube\.com)\//;
 const STEADY = new Set(['gov', 'public']);
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t.id, t]));
-const twDay = at => new Date(at + 8 * HOUR).toISOString().slice(5, 10);
+// (Its day in Taiwan, the year with it: sorted by it, 12-31 comes before 01-01.)
+const twDay = at => new Date(at + 8 * HOUR).toISOString().slice(0, 10);
 const ANGLE = /^(?:why|how|what|who|whom|when|where|is|are|can|should|will|could|would|does|do|did|has|have|opinion|analysis|commentary|explainer|column|editorial|letters?|the case for|inside)\b|^[^:：]{0,24}[:：]\s*(?:why|how|what)\b|\?\s*$|？\s*$|觀點|社論|評論|專欄|^[^／/]{0,8}[／/]?(?:為何|為什麼|如何|怎麼)/i;
 export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, items), vids = [] } = {}) {
   const lang = region === 'tw' ? 'zh' : 'en';
@@ -1142,7 +1143,7 @@ export function storyOf(items, region, now, { pages = {}, same = sameOf(pages, i
     first,
     n,
     m,
-    days: [...days].sort((x, y) => (x[0] < y[0] ? -1 : 1)),
+    days: [...days].sort((x, y) => (x[0] < y[0] ? -1 : 1)).map(([d, k]) => [d.slice(5), k]),
     sides,
     blind,
     parties,

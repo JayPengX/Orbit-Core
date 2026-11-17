@@ -29,3 +29,11 @@ test('the page: stories by id, and each bill’s stories for Law', () => {
   assert.deepEqual(Object.keys(p.stories), ['a']);
   assert.deepEqual(p.bills['11:01139'], [['a', '勞基法修正草案今付委', 2]]);
 });
+
+// 11-17: the English sheet named every law in Chinese; the MOJ's English
+// name is carried where it has one.
+test('a law’s English name, where the ministry has one', () => {
+  const en = { N0030001: 'Labor Standards Act' };
+  const p = lawsPage([{ id: 'a', title: '勞基法修正草案 反滲透法', at: 2, items: [] }], items, 5, c => en[c] || '');
+  assert.deepEqual(p.stories.a.map(l => [l.n, l.ne]), [['勞動基準法', 'Labor Standards Act'], ['反滲透法', undefined]]);
+});

@@ -1024,3 +1024,17 @@ test('a question, an essay or a column never leads a story when the news itself 
   ];
   assert.match(storyOf(items, 'intl', NOW).title, /^Colette Kress/);
 });
+
+// 11-17: a story's days were sorted as 'MM-DD' text, so one running over New
+// Year drew 01-01 and 01-02 before 12-30 and 12-31.
+test('a story’s days over New Year in the order they came', () => {
+  const at = s => Date.parse(s);
+  const mk = (o, t, when) => ({ o, t, u: `https://example.com/${o}/${encodeURIComponent(t)}`, d: '', at: at(when), img: '' });
+  const s = storyOf([
+    mk('ltn', '立法院跨年加開臨時會審預算', '2026-12-30T10:00:00+08:00'),
+    mk('udn', '立法院臨時會審預算 朝野協商破局', '2026-12-31T11:00:00+08:00'),
+    mk('cna', '立法院臨時會審預算 三讀通過', '2027-01-01T09:00:00+08:00'),
+    mk('tvbs', '立法院臨時會審預算 行政院回應', '2027-01-02T09:00:00+08:00')
+  ], 'tw', at('2027-01-02T12:00:00+08:00'));
+  assert.deepEqual(s.days.map(d => d[0]), ['12-30', '12-31', '01-01', '01-02']);
+});

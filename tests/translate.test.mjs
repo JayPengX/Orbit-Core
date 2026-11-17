@@ -97,6 +97,10 @@ test('a day alone is this month’s (the one before when it’s still ahead); a 
   const at = Date.parse('2026-11-13T04:00:00Z');
   assert.equal(withMonth('衛生所12日實施，3日起報名，2026年11月1日公告', at), '衛生所11月12日實施，11月3日起報名，2026年11月1日公告');
   assert.equal(withMonth('28日發生', at), '10月28日發生');
+  // (Days counted, never a date: 11-17, 連3日 went to the translator as 連11月3日.)
+  for (const t of ['台股連3日下跌', '颱風最快2日內登陸', '花蓮1日遊行程', '總統出訪第2日抵達瓜地馬拉', '近7日確診', '5日均線'])
+    assert.equal(withMonth(t, at), t);
+  assert.equal(withMonth('立法院17日三讀，3日起報名', at), '立法院10月17日三讀，11月3日起報名');
   const fetchImpl = async (u, init) => new Response(JSON.stringify({ data: { translations: JSON.parse(init.body).q.map(() => ({ translatedText: '沒有談判。' })) } }));
   const out = await translate(env, memStore(), ['No talks underway', 'Talks ended.'], 'zh-TW', { fetchImpl });
   assert.deepEqual(out, { 'No talks underway': '沒有談判', 'Talks ended.': '沒有談判。' });

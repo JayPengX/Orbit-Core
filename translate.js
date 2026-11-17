@@ -236,10 +236,11 @@ export function unshield(html, to) {
 // A Chinese report's day alone (12日) is this month's, as Taiwan's press
 // writes it; a translator guesses another month (11-13: 12日 → December
 // 12th). The month put in from when it was reported (Taiwan's), the
-// month before when the day is still ahead of it.
+// month before when the day is still ahead of it. Days counted are no date
+// (連3日, 第2日, 近7日, 2日內, 1日遊, 5日均: they were made 連11月3日).
 export function withMonth(text, at = Date.now()) {
   const d = new Date(at + 8 * 3_600_000);
-  return String(text).replace(/(?<![月\d])(\d{1,2})日/g, (all, day) => {
+  return String(text).replace(/(?<![月\d連第近每前逾共約達首頭])(\d{1,2})日(?![內内遊游均間])/g, (all, day) => {
     const n = +day;
     if (n < 1 || n > 31) return all;
     const m = n > d.getUTCDate() + 1 ? ((d.getUTCMonth() + 11) % 12) + 1 : d.getUTCMonth() + 1;

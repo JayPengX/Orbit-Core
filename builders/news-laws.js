@@ -3,10 +3,12 @@
 // so a story's sheet in Orbit News opens the law in Law, or its bill when a
 // headline speaks of changing it (修法, 草案, 三讀…). Code only: a law's
 // full name as written, or the short name the press uses (勞基法). Writes
-// news/laws.json: { built, stories: { id: [{ n, p, k, bill, open, passed }] },
-// bills: { k: [[id, title, at]] } } (the second for Law's bill page).
+// news/laws.json: { built, stories: { id: [{ n, p, k, bill, open, passed, ne }] },
+// bills: { k: [[id, title, at]] } } (the second for Law's bill page). `ne`:
+// the law's English name where the ministry has one (Law's index.json), for
+// the English sheet.
 
-import { dataReader } from '../law.js';
+import { dataReader, readList } from '../law.js';
 let hourly = null;
 const readHour = path => (hourly ||= dataReader(3600))(path);
 import { NEWS_PATH } from './news.js';
@@ -60,13 +62,14 @@ export function lawsOf(story, names, most = 3) {
     .map(({ hits, ...l }) => l);
 }
 
-export function lawsPage(stories = [], items = [], now = Date.now()) {
+// `enOf(p)`: a law's English name by its code ('' for none).
+export function lawsPage(stories = [], items = [], now = Date.now(), enOf = () => '') {
   const names = lawNames(items);
   const out = { built: now, stories: {}, bills: {} };
   for (const s of stories) {
     const laws = lawsOf(s, names);
     if (!laws.length) continue;
-    out.stories[s.id] = laws;
+    out.stories[s.id] = laws.map(l => (enOf(l.p) ? { ...l, ne: enOf(l.p) } : l));
     for (const l of laws) if (l.bill) (out.bills[l.k] ||= []).push([s.id, s.title, s.at]);
   }
   for (const k of Object.keys(out.bills)) out.bills[k] = out.bills[k].sort((a, b) => b[2] - a[2]).slice(0, 8);
@@ -78,7 +81,14 @@ export async function runNewsLaws({ store, now = Date.now() }) {
   if (!page?.tw) return { skipped: 'no stories' };
   const items = await readHour('bills/items.json');
   if (!items) throw new Error('law items 404');
-  const out = lawsPage(page.tw, items.items || [], now);
+  // (The English names: Law's list of laws, the MOJ's for about 2,000 of
+  // them. Not read, the English sheet names them as written.)
+  const list = await readList('index.json', now).catch(() => null);
+  const enOf = p => {
+    const ne = list?.byP.has(p) ? list.rows[list.byP.get(p)][6] : '';
+    return typeof ne === 'string' ? ne : '';
+  };
+  const out = lawsPage(page.tw, items.items || [], now, enOf);
   // (Written only when a story's laws changed: the time alone isn't a change.)
   const was = await store.json(LAWS_PATH).catch(() => null);
   if (was && JSON.stringify(was.stories) === JSON.stringify(out.stories)) return { same: Object.keys(out.stories).length };
