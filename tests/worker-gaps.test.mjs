@@ -90,3 +90,50 @@ test("odd minutes: the Runner woken for F1 only while the even minute's look fou
   await f1Mark(e, null);
   assert.equal(kv.get(F1_LIVE_KEY), '1');
 });
+
+test('/gemini with Gemini failing (out of credit, down): Claude\'s Haiku reads the photo instead, then GPT\'s Luna (Jay 11-17: keeping all three)', async () => {
+  const was = globalThis.fetch;
+  const asked = [];
+  const out = { ok: true };
+  let claudeStatus = 200;
+  globalThis.fetch = async (url, init) => {
+    const u = String(url);
+    if (u.includes('generativelanguage')) return asked.push(`gemini ${u.match(/models\/([^:]+):/)[1]}`), new Response(JSON.stringify({ error: { message: 'out of credit' } }), { status: 429 });
+    const sent = JSON.parse(init.body);
+    if (u.startsWith('https://api.anthropic.com/')) {
+      asked.push(`claude ${sent.model} ${sent.messages[0].content.some(c => c.type === 'image') ? 'with photo' : 'no photo'}`);
+      if (claudeStatus !== 200) return new Response(JSON.stringify({ type: 'error', error: { message: 'credit balance too low' } }), { status: claudeStatus });
+      const t = JSON.stringify(out);
+      if (!sent.stream) return new Response(JSON.stringify({ content: [{ type: 'text', text: t }], stop_reason: 'end_turn', usage: { input_tokens: 10, output_tokens: 5 } }));
+      const ev = o => `event: ${o.type}\ndata: ${JSON.stringify(o)}\n\n`;
+      return new Response(ev({ type: 'message_start', message: { usage: { input_tokens: 10, output_tokens: 1 } } }) + ev({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } }) + ev({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: t } }) + ev({ type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 5 } }) + ev({ type: 'message_stop' }));
+    }
+    if (u.startsWith('https://api.openai.com/')) {
+      asked.push(`openai ${sent.model}`);
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(out) }, finish_reason: 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 5 } }));
+    }
+    return was(url, init);
+  };
+  const keyed = { ...env, GEMINI_API_KEY: 'g', ANTHROPIC_API_KEY: 'a', OPENAI_API_KEY: 'o', STORE: fakeD1('', { fullPasses: true }) };
+  const go = async () => {
+    const qt = await signToken(keyed.ECO_TOKEN_SECRET, { k: 'ses', d: 'doc1', a: 'orbit', s: `s-${Math.random()}`, e: Date.now() + 600_000 });
+    const r = await worker.fetch(new Request(`https://api.jaypengx.com/gemini?qt=${encodeURIComponent(qt)}`, { method: 'POST', headers: { Origin: 'https://orbit.jaypengx.com', 'Content-Type': 'application/json', 'CF-Connecting-IP': '9.9.9.8' }, body: JSON.stringify({ model: 'gemini-3.6-flash', files: [file] }) }), keyed, ctx);
+    return { status: r.status, text: await r.text() };
+  };
+  try {
+    const a = await go();
+    assert.equal(a.status, 200, a.text);
+    assert.ok(asked.some(x => x.startsWith('gemini ')));
+    assert.ok(asked.includes('claude claude-haiku-5-5 with photo'), asked.join(' | '));
+    assert.ok(!asked.some(x => x.startsWith('openai')));
+    assert.match(a.text, /ok/);
+    // Claude out of credit too: GPT's Luna.
+    asked.length = 0;
+    claudeStatus = 400;
+    const b = await go();
+    assert.equal(b.status, 200, b.text);
+    assert.ok(asked.includes('openai gpt-6-luna'), asked.join(' | '));
+  } finally {
+    globalThis.fetch = was;
+  }
+});
