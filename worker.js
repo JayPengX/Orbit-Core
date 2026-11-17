@@ -61,7 +61,7 @@ import { PASSKEY_COLLECTION } from './passkey.js';
 import { MAIL_COLLECTION, mailReady, mailPage } from './pass-mail.js';
 import { backupStore } from './store-backup.js';
 import { paceOf } from './pace.js';
-import { beat, tellOwner, systemReport, countFolders, FOLDERS_KEY, startFreeWatch } from './ops.js';
+import { beat, tellOwner, systemReport, countFolders, FOLDERS_KEY, startFreeWatch, moveAlertAccount } from './ops.js';
 import { keepWorkflows } from './github-keep.js';
 import { mailAlerts, gather as alertsNow } from './mail-alerts.js';
 import { mailSettings, sendMail } from './mail.js';
@@ -1282,13 +1282,14 @@ const ECO_DEPS = {
   // Securities' money counted here (stock-check.js), its market data read as the apps read it.
   checkStock: (env, docId, payload, wallet) => checkStock(env, docId, payload, wallet, { read: url => stockReads(env)(url), fsGet: DOCS.get, fsWrite: DOCS.write }, LOCK_SINCE),
   // What this Worker keeps under an account's id beside its documents, to the id it goes on under. A pass merged
-  // into another: Securities' order book (the fills it issued). A new pass for the same account (`whole`, eco.js
+  // into another: Securities' order book (the fills it issued), and the bill's notices if they go to it (ops.js). A new pass for the same account (`whole`, eco.js
   // ecoRotate): also Securities' checked events (without both, every trade was counted again as one this Worker
   // never issued, at the worst price since), the account's notices and their switches, and its Orbit AI count.
   // Each can be done again: a second ask of the same rotate goes over them.
   moveRecords: async (env, from, to, now, { whole = false } = {}) => {
     const deps = { fsGet: DOCS.get, fsWrite: DOCS.write, fsDelete: DOCS.delete, fsList: DOCS.list, now: () => Date.now() };
     await moveBook(env, deps, from, to, now);
+    await moveAlertAccount(env, deps, from, to);
     if (!whole) return;
     const checked = await DOCS.get(env, VERIFIED_COLLECTION, from);
     if (checked.exists) {

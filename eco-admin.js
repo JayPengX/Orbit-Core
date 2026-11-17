@@ -465,8 +465,11 @@ async function pushRecords(env, prefix = 'push:') {
     const page = await kv.list({ prefix, cursor, all: true });
     for (const k of page.keys) {
       const rest = k.name.slice(5);
-      if (k.name === 'push:due' || rest.startsWith('prefs:')) continue;
       const cut = rest.lastIndexOf(':');
+      // (Only an account's lists, `push:<account>:<app>`: never the switches, nor the Worker's own key pair,
+      // `push:vapid`. It was listed as a list of nobody's and 資料整理 deleted it: its copy in D1 only, but
+      // with the lists in KV the pair itself, and a new pair matches no device's subscription, 11-17.)
+      if (cut < 1 || rest.startsWith('prefs:')) continue;
       out.push({ key: k.name, account: rest.slice(0, cut), app: rest.slice(cut + 1) });
     }
     if (page.list_complete || !page.cursor) break;
@@ -852,6 +855,8 @@ export const ADMIN_TOOLS = {
       const settings = Object.fromEntries(Object.entries(w.settings || {}).filter(([k]) => !k.startsWith(app) && k !== `aff:${app}`));
       return { ...w, apps, inbox, settings, sec: { ...(w.sec || {}), gen: gen(w) + 1 }, live: null };
     });
+    // (The notices it had waiting go with it, and no device is sent the account's others until it signs in again: push.js keepDevices.)
+    await deps.keepDevices?.(env, hit.id, []).catch(() => {});
     return { ok: true, apps: appsOf(res.wallet).map(a => a.app) };
   },
   // Everything stored for an account, as it's stored (a copy to keep or to
@@ -884,14 +889,25 @@ export const ADMIN_TOOLS = {
     const records = (await pushRecords(env)).filter(r => app === 'all' || r.app === app).slice(0, 500);
     const out = { sent: 0, failed: 0, gone: 0 };
     const tag = `admin:${deps.now()}`;
+    // Each device once: an Orbit's apps share the phone's one address, a list an app (所有 App rang it once an app, 11-17).
+    const asked = new Map();
+    const once = x => {
+      if (!asked.has(x.endpoint))
+        asked.set(
+          x.endpoint,
+          sendPush(env, x, { title, body: text, tag })
+            .then(String, e => String(e?.message || e))
+            .then(res => (out[res === 'sent' ? 'sent' : res === 'gone' ? 'gone' : 'failed']++, res))
+        );
+      return asked.get(x.endpoint);
+    };
     for (let i = 0; i < records.length; i += 20)
       await Promise.all(
         records.slice(i, i + 20).map(async r => {
           const rec = await kv.get(r.key, 'json').catch(() => null);
           const subs = subsOf(rec);
           if (!subs.length) return;
-          const answers = await Promise.all(subs.map(x => sendPush(env, x, { title, body: text, tag }).then(String, e => String(e?.message || e))));
-          for (const res of answers) out[res === 'sent' ? 'sent' : res === 'gone' ? 'gone' : 'failed']++;
+          const answers = await Promise.all(subs.map(once));
           if (answers.every(res => res === 'gone')) await kv.delete(r.key).catch(() => {});
         })
       );

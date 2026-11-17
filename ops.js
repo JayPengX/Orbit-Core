@@ -118,6 +118,13 @@ export async function alertAccount(env, deps) {
     return '';
   }
 }
+// The account under a new id (a new pass, a merge: worker.js moveRecords): the bill's notices follow it
+// (they named the old id and reached nobody, with nothing on the page to say so).
+export async function moveAlertAccount(env, deps, from, to) {
+  if (!from || !to || (await alertAccount(env, deps)) !== from) return false;
+  await deps.fsWrite(env, ...OPS_DOC, JSON.stringify({ alertAccount: to, at: deps.now() }));
+  return true;
+}
 // The account's first app with notices on: told there. 'sent', 'none' (no
 // device), 'off'.
 export async function tell(env, account, message) {
