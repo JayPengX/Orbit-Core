@@ -560,3 +560,27 @@ test('sheet(): a subtitle under the title, before the ✕; none by default', () 
   assert.equal(ui.sheet({ title: 'T' }).head.children.length, 3);
 });
 
+
+test('a finger on a sheet’s scroll bar is the bar’s, never the sheet’s swipe down (Jay 2026-11-17)', () => {
+  const box = (parent, { scrolls = false, right = 390 } = {}) => {
+    const n = { nodeType: 1, parentElement: parent, scrollHeight: scrolls ? 2000 : 500, clientHeight: 500, getBoundingClientRect: () => ({ right }), contains: x => { for (; x; x = x.parentElement) if (x === n) return true; return false; } };
+    return n;
+  };
+  globalThis.getComputedStyle = () => ({ overflowY: 'auto' });
+  // A sheet that scrolls: its right edge strip is the bar's, its middle swipes it down.
+  const sheet = box(null, { scrolls: true });
+  const row = box(box(sheet));
+  assert.equal(orbit.onScrollBar(row, 380, sheet), true);
+  assert.equal(orbit.onScrollBar(row, 200, sheet), false);
+  // One that fits has no bar: its edge swipes it down as anywhere.
+  const still = box(null);
+  assert.equal(orbit.onScrollBar(box(still), 380, still), false);
+  // A box inside that scrolls (Class's sheets): its own edge, not the sheet's.
+  const outer = box(null, { right: 600 });
+  const list = box(outer, { scrolls: true, right: 400 });
+  assert.equal(orbit.onScrollBar(box(list), 390, outer), true);
+  assert.equal(orbit.onScrollBar(box(outer), 590, outer), false, 'beside the list: the sheet, which fits, swipes down');
+  // A finger outside the sheet: never.
+  assert.equal(orbit.onScrollBar(box(null), 380, sheet), false);
+  delete globalThis.getComputedStyle;
+});

@@ -1357,6 +1357,23 @@ export function sheetVerdict({ dy = 0, raw = 0, speed = 0, detent = '', expandab
   return 'settle';
 }
 
+// A finger in the strip down a sheet's right edge where iOS's scroll bar
+// sits, on a sheet with more to scroll: the bar's, never the sheet's swipe
+// down (Jay 2026-11-17: held at a sheet's top and dragged down, the bar
+// couldn't be grabbed; the sheet took it for a swipe and the scroll was stopped).
+// node: what the finger landed on; stop: the sheet (or its scrolling body),
+// as far as it looks; true when the first box from there up that scrolls up
+// and down has the finger within SCROLL_BAR_EDGE of its right edge.
+export const SCROLL_BAR_EDGE = 24;
+export function onScrollBar(node, x, stop) {
+  if (!stop?.contains?.(node)) return false;
+  for (let n = node; n && n.nodeType === 1; n = n.parentElement) {
+    if (n.scrollHeight > n.clientHeight + 1 && (n === stop || /auto|scroll/.test(globalThis.getComputedStyle?.(n).overflowY || ''))) return x > n.getBoundingClientRect().right - SCROLL_BAR_EDGE;
+    if (n === stop) break;
+  }
+  return false;
+}
+
 // A sheet swiped down from its top closes, as on iOS (a phone's bottom
 // sheets, dialog.q-sheet: on a wide screen it couldn't be swiped away
 // there, the owner 2026-10-18): it follows the finger and closes past 120 px or
@@ -1383,6 +1400,7 @@ function sheetSwipe() {
       sheet = null;
       if (!s || e.touches.length !== 1 || s.scrollTop > 0 || s.classList.contains('q-leaving')) return;
       if (e.target.closest('input, textarea, select, [contenteditable], .q-chips, .ot-scroll-chips, .leaflet-container, [data-no-sheet-swipe]')) return;
+      if (onScrollBar(e.target, e.touches[0].clientX, s)) return;
       // A box inside the sheet that scrolls (a list, a timeline): the finger is its, not the sheet's.
       for (let n = e.target; n && n !== s; n = n.parentElement) {
         if (n.scrollTop > 0) return;

@@ -45,6 +45,7 @@ To remove a feature on purpose, delete its line here in the same commit and say 
 - Data requests by mail to privacy@ answered by code: a 24-hour link to download a copy (once in 30 days), delete the Pass or stop stats; the recovery email proves it, else the pass — `privacy-mail.js`, `site/privacy/request/index.html`: `export async function privacyMail`, `export async function privacyDo`, `PRIVACY_EXPORT_WAIT`, `export function mailLang`, `export async function unpack`
 - The data copy: each app unpacked into readable JSON under its name, times as dates, and a readable web-page copy on the download page — `privacy-mail.js`, `site/privacy/request/index.html`: `betweenApps`, `const readable`
 - Every notice banner one kind: the same time on screen, swiped away up or sideways — `kit/orbit.mjs`: `export function noticeLife`
+- A sheet's scroll bar can always be grabbed: a finger along its right edge scrolls it, never swipes the sheet down — `kit/orbit.mjs`: `export function onScrollBar`
 - A swipe between days slides only the page's content, never its head, switches or chip rows; two fingers on a trackpad step once a gesture, the empty space too, and a scroll up or down never drags the page sideways — `kit/ui.mjs`: `export function daySwipe`
 - A typhoon day off acts like a holiday — `kit/dayoff.mjs`: `dayOffOn`, `loadDayOff`
 - Law's 代表會 recordings play on iPhone — `law-audio.js`: `handleLawAudio`, `audioType`
