@@ -4933,8 +4933,6 @@ export function installGate(app, lang = detectLang(), as = null) {
       node('p', { class: 'q-gate-brand', text: 'ORBIT' }),
       node('h1', { class: 'q-gate-title', text: en ? `Add ${name} to your home screen` : `把 ${name} 加入主畫面` }),
       lede ? node('p', { class: 'q-gate-lede', text: lede }) : null,
-      // (A separate app: Orbit, every app in one, recommended first; Jay 2026-11-14.)
-      as ? null : node('a', { class: 'q-gate-orbit', href: orbitTarget('', { install: true }), text: en ? `Recommended: add Orbit instead, every app in one ›` : `推薦：改加入 Orbit，所有 App 合一 ›` }),
       action,
       // (Orbit's own: its setup, before it's added. Optional: the steps work as they are.)
       as?.more || null,

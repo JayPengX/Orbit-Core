@@ -3525,12 +3525,6 @@ dialog.q-moved::backdrop {
 .q-gate-error:empty {
   display: none;
 }
-.q-gate-orbit {
-  margin: 0 0 4px;
-  color: var(--q-accent);
-  font: 600 14px/1.4 var(--q-font);
-  text-decoration: none;
-}
 /* 建立新的 Orbit Pass: under the sign-in, quieter than 登入. */
 .q-gate-make {
   margin-top: 8px;
