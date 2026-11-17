@@ -1,8 +1,10 @@
 # Orbit Class's 專注飛行: every routed airliner in the air, built here (the
-# plane sources turn Cloudflare away) every ten minutes and written to R2
-# flight/pool.json, which the proxy's /flight?pool=1 answers with
-# (tools/flight-pool.mjs). Runs may overlap: each writes a whole pool, so no
-# concurrency group (a cancel mails Jay).
+# plane sources turn Cloudflare away) and written to R2 flight/pool.json,
+# which the proxy's /flight?pool=1 answers with (tools/flight-pool.mjs).
+# Started by the proxy's cron when the pool is 10 minutes old (flight.js
+# keepPool); GitHub's own timer is a backup only (it ran every 4 to 9 hours).
+# Runs may overlap: each writes a whole pool, so no concurrency group (a
+# cancel mails Jay).
 name: Flight pool
 on:
   schedule:

@@ -83,7 +83,7 @@ import { handleTr } from './translate.js';
 import { r2Store } from './builders/store.js';
 import { handleClassNews, classNewsTry, classNewsPeek, classNewsRead } from './class-news.js';
 import { FEATURES } from './ai-features.js';
-import { handleFlight } from './flight.js';
+import { handleFlight, keepPool } from './flight.js';
 import { STATE_KEY as GUARD_STATE } from './guard.js';
 // The F1 lap log's Durable Object (f1-live.js), bound as F1_LOG.
 export { F1Log } from './f1-live.js';
@@ -1998,6 +1998,8 @@ async function cronTick(event, env, ctx, part) {
     if (min === 18 && tick.getUTCHours() % 3 === 0) run('free-watch', () => startFreeWatch(env));
     // The family's GitHub schedules kept on with nobody committing (github-keep.js): one repo an hour, in turn.
     if (min === 12) run('github-keep', () => keepWorkflows(env, tick.getTime()), r => (r.revived || r.failed ? r : null));
+    // Class's 專注飛行: flight.yml started when R2's pool is 10 minutes old (flight.js keepPool; GitHub's own timer ran every 4–9 hours).
+    if (min % 10 === 6) run('flight-keep', () => keepPool(env, tick.getTime()), r => (r.failed ? r : null));
     // Every account's app data sealed (eco.js sealSweep), a few accounts a run, till none is left open.
     if (event.cron !== ODD_CRON && min % 10 === 4 && storeReady(env)) run('vault-sweep', () => sealSweep(env, ECO_DEPS), r => (r.accounts ? r : null));
 }

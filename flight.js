@@ -14,13 +14,16 @@
 // The pool is built off Cloudflare (2026-11-11): adsb.lol allows an address
 // 500 asks a day and Cloudflare's addresses are shared, so from Workers it
 // answers 429; adsb.fi refuses Workers (403); and neither lets a phone read it
-// (no CORS). So GitHub Actions builds it every ten minutes
-// (tools/flight-pool.mjs, flight.yml) into R2 `flight/pool.json`; the proxy
+// (no CORS). So GitHub Actions builds it (tools/flight-pool.mjs, flight.yml)
+// into R2 `flight/pool.json`, started by the proxy's cron whenever the pool
+// is 10 minutes old (keepPool: GitHub's own ten-minute timer ran every 4 to
+// 9 hours, and past four hours 專注飛行 said 讀不到航班, 2026-11-17); the proxy
 // answers with that copy, builds one itself only when it is old, and when that
 // fails too answers the old copy (its planes still in the air: the phone flies
 // each on from its fix). A plane followed (?hex=) is the proxy's ask: when it
 // fails the phone flies it on from its last fix.
 import { json } from './http.js';
+import { keptRead, keptPut } from './kept-store.js';
 import { distKm, etaMin, onRoute, choose } from './kit/flight.mjs';
 
 // Where planes are read: busy airports, 250 nautical miles round each.
@@ -308,4 +311,26 @@ export async function handleFlight(request, headers, { session, limited, fetchFn
   if (!(minutes >= LIMITS.minMin && minutes <= LIMITS.maxMin)) return json({ error: { code: 'BAD_MINUTES' } }, 400, headers);
   const flights = await pickFlights(minutes, { fetchFn, ctx, data });
   return flights ? json({ flights, at: Date.now() }, 200, headers) : json({ error: { code: 'UPSTREAM' } }, 502, headers);
+}
+
+// The cron (worker.js, every 10 minutes): flight.yml started when R2's pool
+// is 10 minutes old and none was started in the last 10, so it's never more
+// than about 20 minutes old (GitHub's own timer is a backup only).
+export const POOL_RUN = 'flight:run';
+const KEEP_EVERY_MS = 10 * 60_000;
+export async function keepPool(env, now = Date.now(), fetchImpl = fetch) {
+  if (!env?.GH_ACTIONS_TOKEN || !env.DATA) return { off: env?.GH_ACTIONS_TOKEN ? 'no R2' : 'no token' };
+  const head = await env.DATA.head('flight/pool.json').catch(() => null);
+  const age = now - (head?.uploaded ? new Date(head.uploaded).getTime() : 0);
+  const ran = await keptRead(env, POOL_RUN).catch(() => null);
+  if (age < KEEP_EVERY_MS || now - (ran?.at || 0) < KEEP_EVERY_MS) return { age: Math.round(age / 60_000) };
+  const go = await fetchImpl('https://api.github.com/repos/JayPengX/Orbit-Core/actions/workflows/flight.yml/dispatches', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.GH_ACTIONS_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'orbit-flight', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ref: 'main' }),
+    signal: AbortSignal.timeout(10_000)
+  });
+  if (!go.ok) return { failed: `start: HTTP ${go.status}` };
+  await keptPut(env, POOL_RUN, { at: now }, 86_400).catch(() => {});
+  return { started: true, age: Math.round(age / 60_000) };
 }

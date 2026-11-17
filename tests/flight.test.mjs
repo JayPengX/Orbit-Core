@@ -183,3 +183,26 @@ test('?pool=1 answers the R2 copy when every source fails', async () => {
   assert.equal(res.status, 200);
   assert.deepEqual((await res.json()).flights.map(f => f.hex), ['aaaaaa']);
 });
+
+test('the pool kept fresh: flight.yml started when R2\'s pool is 10 minutes old, never twice in 10 minutes (GitHub\'s own timer ran every 4–9 hours)', async () => {
+  const { keepPool } = await import('../flight.js');
+  const m = new Map();
+  let uploaded = null;
+  const env = { GH_ACTIONS_TOKEN: 't', RATE_LIMIT_KV: { get: async k => m.get(k) ?? null, put: async (k, v) => void m.set(k, v) }, DATA: { head: async () => (uploaded ? { uploaded: new Date(uploaded) } : null) } };
+  const calls = [];
+  const gh = async (url, init) => (calls.push([init.method, url.replace('https://api.github.com/repos/JayPengX/', '')]), new Response(null, { status: 204 }));
+  const now = Date.parse('2026-11-17T08:00:00Z');
+  uploaded = now - 5 * 60_000;
+  assert.deepEqual(await keepPool(env, now, gh), { age: 5 });
+  assert.equal(calls.length, 0);
+  uploaded = now - 4 * 3_600_000;
+  assert.deepEqual(await keepPool(env, now, gh), { started: true, age: 240 });
+  assert.deepEqual(calls, [['POST', 'Orbit-Core/actions/workflows/flight.yml/dispatches']]);
+  // Ten minutes on, the run still on its way: not started again until 10 minutes have passed.
+  assert.deepEqual(await keepPool(env, now + 5 * 60_000, gh), { age: 245 });
+  assert.equal((await keepPool(env, now + 10 * 60_000, gh)).started, true);
+  // No pool at all: started too.
+  uploaded = null;
+  assert.equal((await keepPool(env, now + 30 * 60_000, gh)).started, true);
+  assert.deepEqual(await keepPool({}, now, gh), { off: 'no token' });
+});
