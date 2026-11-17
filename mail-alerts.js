@@ -25,7 +25,8 @@
 // everything due goes in one mail; at most 6 a Taiwan day and one each 30
 // minutes (a stopped proxy goes at once); 00:00–07:00 Taiwan waits for 7 AM
 // (the panel's 安靜時段, on unless turned off); what was mailed and is fixed
-// goes in the next mail, never one of its own (Jay 11-16). An outside source
+// goes in the next mail, never one of its own (Jay 11-16), and not at all
+// once it is back. An outside source
 // (公路局, a city's buses, YouBike) mends itself: mailed only when broken 6
 // hours straight, its mending never.
 // A failed send is tried again 6 hours later. State: kept `mail:alerts`.
@@ -186,6 +187,10 @@ export function plan(prev, seen, ran, now, { quiet = true } = {}) {
     const r = (s.open[i.id] ||= { seen: 0, sent: 0 });
     Object.assign(r, { group: i.group, tone: i.tone, title: i.title, detail: i.detail || '', go: i.go || '', now: !!i.now, quiet: !!i.quiet, miss: 0, seen: r.seen + 1, need: i.now ? 1 : i.confirm || CONFIRM[i.group] || 2 });
   }
+  // (Back again before its mending was told: the mending isn't told. An AI cap reached two days running,
+  // its count starting again at midnight, was mailed as the day's problem with 已恢復 for the same line
+  // under it, 11-18.)
+  s.fixed = s.fixed.filter(f => !ids.has(f.id));
   const worse = r => r.sentTone === 'warn' && r.tone === 'bad';
   const due = Object.entries(s.open).filter(([, r]) => r.seen >= r.need && (!r.sent || worse(r) || now - r.sent >= AGAIN));
   // (What's fixed rides along with the next mail, never a mail of its own.)

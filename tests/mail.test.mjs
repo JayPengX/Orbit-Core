@@ -67,6 +67,19 @@ test('alerts: amber turned red is mailed again; what was mailed and is gone ride
   assert.deepEqual(r.mail.fixed, [{ id: 'ai-money:anthropic', title: 'Claude 剩 8%' }]);
 });
 
+test('alerts: a problem back again before its mending was told is mailed as the problem alone, never as mended beside it', () => {
+  // (An AI cap reached two days running: its count starts again at midnight, so it is "gone" until reached again.)
+  const cap = { id: 'ai-cap:lawAsk', group: 'mid', tone: 'warn', mail: true, title: 'AI「問法律」今天的上限用完了' };
+  let r = run(null, [cap], T0, ['mid']);
+  const s = send(r, T0);
+  r = run(s, [], T0 + 14 * H, ['mid']);
+  r = run(r.state, [], T0 + 14.5 * H, ['mid']);
+  assert.deepEqual(r.state.fixed.map(f => f.id), ['ai-cap:lawAsk'], 'midnight: gone, its mending waits for the next mail');
+  r = run(r.state, [cap], T0 + 26 * H, ['mid']);
+  assert.deepEqual(r.mail.issues.map(i => [i.id, i.again]), [['ai-cap:lawAsk', false]], 'reached again the next day: told');
+  assert.deepEqual(r.mail.fixed, [], 'and not said to be mended in the same mail');
+});
+
 test('alerts: an outside source is mailed only broken 6 hours straight, its mending never (Jay 11-16)', () => {
   const src = { id: 'src:thb', group: 'mid', tone: 'bad', confirm: 12, quiet: true, title: '公路局 壞了' };
   let s = null;
