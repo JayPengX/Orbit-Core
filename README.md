@@ -69,7 +69,7 @@ The family page is at [orbit.jaypengx.com](https://orbit.jaypengx.com/); how it'
 
 - **The proxy** (`api.jaypengx.com`): one Cloudflare Worker for every live read the apps make (sports, transit, weather, markets, law, Class's planes in the air, 立法院's live sittings), answering at each app's own address (`orbit.jaypengx.com/api`, so no cross-site calls), with the apps' AI features behind it, so no key ever reaches a phone.
 - **Orbit AI, one door for every app** (`/ai`): each feature named, its prompt fixed on the server, its input lean, its answer's shape checked, a cap a day; when something is missing it asks back with options. Code first: what code can read or add up, it does, and the AI gets a small digest and writes a line; answers are drawn (logos, faces, tiles, bars) under Orbit AI's mark, never a paragraph. Each model is backed by one of its class from another maker (Claude, GPT, Gemini), and AI runs only when someone asks: nothing is spent on what nobody opens.
-- **The family notebook** (`kit/family.mjs`, on the phone only): apps tell each other what helps (Weather where rain is due, Class the next classes, Securities the names held, Words the words being learned), so Transit avoids rain, News leads with what you follow, and the Pass's 今天 sums up the day.
+- **The family notebook** (`kit/family.mjs`, on the phone only): apps tell each other what helps (Weather where rain is due, Class the next classes, Securities the names held, Sports the teams followed, Words the words due), so Transit avoids rain, News leads with what you follow, and the Pass's 今天 sums up the day.
 - **The Orbit Pass:** one sign-in and one wallet for every app, with each app's saved data, kept in Cloudflare D1.
 - **Notices** that reach a phone while the app is closed: game starts, class reminders, bus arrivals, rain, price alerts.
 - **Data builds** on the proxy's cron into Cloudflare R2: seasons, game days, bus routes and shapes, photos, highlights, the news stories and CWA's rain radar.
@@ -113,7 +113,6 @@ orbit-workers-proxy (one Worker)
    /ai            every app's AI by feature name (Claude, GPT, Gemini via gemini-relay)
    /gemini, /nl-edit, /law-ask, /law-chat   Class's import, Law's questions
    /data          the family's data in R2, built by builders/ on the cron (News's stories too)
-   /cal           Class's timetable as a calendar subscription
    /showcase/pass a short read-only pass for the showcase's live demos
 quota-guard   reads the use every 5 minutes; paces the proxy through the Free plan's day
 orbit-<app>   each app's static files at orbit.jaypengx.com/<app>/ (orbit-pass: the kit and the root's pages, orbit-home: jaypengx.com)

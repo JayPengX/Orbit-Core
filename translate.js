@@ -1,8 +1,8 @@
 // Plain translation, off the AI (Jay 11-13: "a full Traditional Chinese
 // experience and a full English experience"; "using AI for translation is
 // costly"). Only for text the AI never writes: an outlet's own headline or
-// summary. What the AI writes (titles, 重點整理, 各方怎麼說) it writes in the
-// reader's language itself, never run through here (no double translation).
+// summary. What the AI writes (an answer to a tap) it writes in the reader's
+// language itself, never run through here (no double translation).
 //
 // Google Cloud Translation (Basic, v2) on the server key, free for 500,000
 // characters a month and billed past them: a hard month's cap under that

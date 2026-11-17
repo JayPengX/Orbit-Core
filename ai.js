@@ -166,7 +166,7 @@ export const twChars = v =>
 // A feature's answer: each of its models in turn until one answers JSON
 // its check keeps (null from `clean`: nothing usable, the next model tried).
 const SICK_MS = 15 * 60_000;
-export async function runFeature(env, ctx, name, input, { gemini = null, answers = [], open = false, need = null } = {}) {
+export async function runFeature(env, ctx, name, input, { gemini = null, answers = [] } = {}) {
   const f = FEATURES[name];
   let parts = await f.parts(input, env);
   // (Lean input, Jay 11-10: code picks the facts; a feature's prompt past its size is a bug, never sent.)
@@ -184,11 +184,10 @@ export async function runFeature(env, ctx, name, input, { gemini = null, answers
       // (A tap gives up on a model silent for 20 s, a person waits; a build waits its whole time:
       // a long answer's thinking passed 20 s and every such call was paid for twice, 11-11's words cards 177 times.)
       const timeoutMs = f.timeoutMs || 30_000;
-      const raw = twChars(await askModel(env, ctx, name, model, parts, schema, { effort: effortFor(f, m), gemini, timeoutMs, firstMs: f.tap || open ? Math.min(timeoutMs, 20_000) : timeoutMs }));
+      const raw = twChars(await askModel(env, ctx, name, model, parts, schema, { effort: effortFor(f, m), gemini, timeoutMs, firstMs: f.tap ? Math.min(timeoutMs, 20_000) : timeoutMs }));
       const ask = f.clarify ? askOf(raw, answers, Object.fromEntries((f.pick || []).map(k => [k, input?.[`${k}s`] || []]))) : null;
       const out = await f.clean(raw, input);
-      // (need: what the caller must have of it, else the next model: /ai/open's one story.)
-      if ((out != null && (!need || need(out))) || ask) return { out, ask, model };
+      if (out != null || ask) return { out, ask, model };
       last = new Error(`${model}: nothing usable`);
     } catch (e) {
       last = e;

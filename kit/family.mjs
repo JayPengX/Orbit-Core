@@ -23,11 +23,9 @@
 //   class.days      { 'YYYY-MM-DD': [{ n, name, from: 'HH:MM', to, out }] } the next two weeks' periods as held
 //                   (單/雙週, holidays, typhoon days and 調課 applied: Class's own); a day not in it, the week's
 //   class.week      { 1..7: [{ n, name, from: 'HH:MM', to, out }] } the week's periods by weekday (1 Monday)
-//   class.school    { name } the school's name
 //   sports.follows  [{ league, id, name, zh, short, athlete }] the teams and players followed
 //   stock.holds     [{ code, symbol, name, en, market }] what the account holds (names only, never money)
 //   vocab.due       { day, n } words due for review today
-//   transit.trips   [{ name, from: { lat, lon, name } or null (from here), to: {…} }] saved trips
 //   transit.ride    { id, at, name, fare, modes } the latest planned trip with a fare (Money's 車資記帳)
 //   weather.today   { day, word, lines: [{ kind: umbrella|pe|wear, level, text }] } 我的行程's advice for the day
 //   sports.next     [{ at, title, hash }] followed games starting within a day (their start notices')
