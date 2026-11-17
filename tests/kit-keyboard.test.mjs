@@ -46,7 +46,7 @@ tabBar({ tabs: ['home', 'list', 'more'].map(id => ({ id, label: id, icon: 'home'
 globalThis.ask = () => {
   const bar = aiBar({ placeholder: '問你的帳…' });
   const foot = h('div', { class: 'q-sheet-foot mn-ask-foot' }, [bar]);
-  sheet({ title: '問我的帳', detent: 'large', body: [h('p', { text: '從你的帳算' }), ...Array.from({ length: 12 }, (_, i) => h('p', { style: 'height:50px', text: 'answer ' + i }))], foot });
+  sheet({ title: '問我的帳', detent: 'large', body: [h('p', { class: 'hint', style: 'margin:0', text: '從你的帳算' }), ...Array.from({ length: 12 }, (_, i) => h('p', { style: 'height:50px', text: 'answer ' + i }))], foot });
   bar.input.focus();
 };
 // 記一筆: a sheet as tall as what's in it, a field in its body, a button in its foot.
@@ -134,6 +134,29 @@ test("typing in Orbit on an iPhone: the field 12 px off the keys whatever their 
         return { open: Boolean(d.querySelector('dialog[open]')), up: d.documentElement.classList.contains('q-kb'), tabs: getComputedStyle(tabs).visibility, bottom: Math.round(fr.getBoundingClientRect().bottom) };
       });
       assert.deepEqual(shut, { open: false, up: false, tabs: 'visible', bottom: H }, `${which}: closed while typing`);
+      await ctx.close();
+    }
+    // A short phone (320×548): the title and ✕ wait behind the keys, and the
+    // first line starts clear of the grabber (it lay across 從你的帳算).
+    {
+      const [w, h, k] = [320, 548, 253];
+      const ctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: true, isMobile: true });
+      await ctx.route(/^https?:\/\/(?!localhost)/, r => r.abort());
+      const page = await ctx.newPage();
+      await page.goto(`http://localhost:${server.address().port}/app/`);
+      await page.waitForFunction(() => document.querySelector('.q-suite-frame')?.contentWindow?.ready);
+      const app = page.frames().find(f => f.url().endsWith('/money/'));
+      await app.evaluate(() => globalThis.ask());
+      await wait(600);
+      await page.setViewportSize({ width: w, height: h - k });
+      await wait(400);
+      const r = await app.evaluate(() => {
+        const d = document.querySelector('dialog[open]');
+        const g = getComputedStyle(d, '::before');
+        return { head: getComputedStyle(d.querySelector('.q-sheet-head')).display, grabber: d.getBoundingClientRect().top + parseFloat(g.marginTop) + parseFloat(g.height), first: d.querySelector('p.hint').getBoundingClientRect().top };
+      });
+      assert.equal(r.head, 'none', 'a short phone: the title waits behind the keys');
+      assert.ok(r.first >= r.grabber + 6, `a short phone: the first line ${Math.round(r.first - r.grabber)} px under the grabber, not under it`);
       await ctx.close();
     }
   } finally {

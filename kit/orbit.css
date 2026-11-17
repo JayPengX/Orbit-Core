@@ -5842,13 +5842,14 @@ html.q-kb dialog.q-sheet[open] > .q-sheet-foot {
   padding-bottom: 12px;
 }
 /* (A short phone, 320×548: its title and ✕ wait behind the keys too, or the
-   button went under them.) */
+   button went under them. Its first line starts under the grabber's 11 px,
+   not across it: 8 px laid the grabber over 從你的帳算, 11-17.) */
 @media (max-height: 600px) {
   html.q-kb dialog.q-sheet[open]:focus-within > .q-sheet-head:not(:focus-within) {
     display: none;
   }
   html.q-kb dialog.q-sheet[open]:focus-within:has(> .q-sheet-head) {
-    padding-top: 8px;
+    padding-top: 20px;
   }
 }
 /* The sign-in screen (and the new pass) with the keys up: from the top,
