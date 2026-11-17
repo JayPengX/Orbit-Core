@@ -256,7 +256,9 @@ function dayReveal(s) {
 // A swipe across a page or a sheet's days (not across a row that scrolls
 // sideways, a field or the strip): step(+1 | -1) goes a day either way and
 // says whether it did; the page follows the finger and the new day slides
-// in (.q-day-swipe; the strip, a sheet's head and a .q-day-still stay put).
+// in (.q-day-swipe; the strip, a sheet's head, a page's head, its
+// switches and chip rows, and a .q-day-still stay put: Jay 2026-11-17, the
+// whole page sliding with them "look weird and ugly").
 // `can(dir)`: is there anything that way now (false: the page never follows
 // the finger, a drag that leads nowhere; Jay 2026-11-11, Law's 議會: "it can
 // swipe left and right but it does nothing"); `page: false`: only a finger on
@@ -328,42 +330,49 @@ export function daySwipe(panel, step, { can = null, page = true } = {}) {
   // Two fingers sideways on a trackpad (a Mac's, a PC's precision one: a
   // wheel going sideways) do what a finger's swipe does (Jay 2026-11-14:
   // "let's support it"): the page follows, then the day or place beside, one
-  // step a gesture, its glide after it never a second step. Up and down stays
-  // the page's scroll; a row that scrolls sideways keeps its own; with
-  // nothing beside, the browser's own back swipe is left alone.
-  const W = { acc: 0, done: false, timer: 0 };
+  // step a gesture, its glide after it never a second step. A gesture is
+  // judged once, by its first few events, as a finger's is: one that starts
+  // up or down stays the page's scroll to its end (its sideways jitter never
+  // drags the page), and its empty space swipes too (Jay 2026-11-17: "kind
+  // of shit"). A row that scrolls sideways keeps its own; with nothing
+  // beside, the browser's own back swipe is left alone.
+  const W = { x: 0, y: 0, lock: null, done: false, timer: 0 };
   const wheelEnd = () => {
-    if (!W.done) settle(true);
-    W.acc = 0;
-    W.done = false;
+    if (W.lock === 'x' && !W.done) settle(true);
+    Object.assign(W, { x: 0, y: 0, lock: null, done: false });
   };
-  panel.addEventListener(
-    'wheel',
-    ev => {
-      if (ev.ctrlKey || Math.abs(ev.deltaX) <= Math.abs(ev.deltaY) * 1.5) return;
+  const wheel = ev => {
+    if (ev.ctrlKey) return;
+    clearTimeout(W.timer);
+    W.timer = setTimeout(wheelEnd, 180);
+    if (W.lock === 'y') return;
+    const k = ev.deltaMode === 1 ? 16 : 1;
+    if (W.lock == null) {
+      W.x += ev.deltaX * k;
+      W.y += ev.deltaY * k;
       const over = [...document.querySelectorAll('dialog[open]')].some(d => !d.contains(panel));
       const box = over ? true : sideways(ev.target);
-      const dir = ev.deltaX > 0 ? 1 : -1;
-      if (box === true || (box && canScroll(box, -ev.deltaX)) || (can && !can(dir) && !W.acc)) return;
-      ev.preventDefault();
-      clearTimeout(W.timer);
-      W.timer = setTimeout(wheelEnd, 180);
-      if (W.done) return;
-      W.acc += ev.deltaX * (ev.deltaMode === 1 ? 16 : 1);
-      if (Math.abs(W.acc) >= 110) {
-        W.done = true;
-        const d = W.acc > 0 ? 1 : -1;
-        if (!step(d)) return settle(true);
-        settle();
-        return slideIn(panel, d);
-      }
-      if (!panel.classList.contains('swiping')) stopSlide(panel);
-      panel.classList.remove('swipe-back');
-      panel.classList.add('swiping');
-      panel.style.setProperty('--swipe', `${Math.round(-W.acc * 0.45)}px`);
-    },
-    { passive: false }
-  );
+      const x = Math.abs(W.x) > Math.abs(W.y) * 1.5 && box !== true && !(box && canScroll(box, -W.x)) && (!can || can(W.x > 0 ? 1 : -1));
+      // (Not judged yet: a sideways start is kept from the browser's own back swipe meanwhile.)
+      if (Math.hypot(W.x, W.y) < 8) return x && ev.preventDefault();
+      W.lock = x ? 'x' : 'y';
+      if (!x) return;
+    } else W.x += ev.deltaX * k;
+    ev.preventDefault();
+    if (W.done) return;
+    if (Math.abs(W.x) >= 110) {
+      W.done = true;
+      const d = W.x > 0 ? 1 : -1;
+      if (!step(d)) return settle(true);
+      settle();
+      return slideIn(panel, d);
+    }
+    if (!panel.classList.contains('swiping')) stopSlide(panel);
+    panel.classList.remove('swipe-back');
+    panel.classList.add('swiping');
+    panel.style.setProperty('--swipe', `${Math.round(-W.x * 0.45)}px`);
+  };
+  panel.addEventListener('wheel', wheel, { passive: false });
   // The page's empty space swipes too, not only what's drawn on it (Jay
   // 2026-11-06, Sports on an iPad: below a short day, nothing moved): a
   // finger on what holds the panel (the page, its main) while the panel
@@ -381,12 +390,21 @@ export function daySwipe(panel, step, { can = null, page = true } = {}) {
   const pageMove = ev => start?.src === 'page' && move(ev);
   const pageEnd = ev => start?.src === 'page' && end(ev);
   const pageCancel = () => start?.src === 'page' && ((start = null), settle(true));
+  // (A wheel on the page outside the panel: the same gesture, judged the same way.)
+  const pageWheel = ev => {
+    if (!panel.isConnected) return seen && off();
+    const t = ev.target;
+    if (panel.contains(t) || !t?.contains?.(panel) || panel.closest('dialog, [hidden]') || !panel.getClientRects().length) return;
+    wheel(ev);
+  };
   const off = () => {
+    document.removeEventListener('wheel', pageWheel);
     document.removeEventListener('touchstart', onPage);
     document.removeEventListener('touchmove', pageMove);
     document.removeEventListener('touchend', pageEnd);
     document.removeEventListener('touchcancel', pageCancel);
   };
+  document.addEventListener('wheel', pageWheel, { passive: false });
   document.addEventListener('touchstart', onPage, { passive: true });
   document.addEventListener('touchmove', pageMove, { passive: false });
   document.addEventListener('touchend', pageEnd, { passive: true });
@@ -398,7 +416,7 @@ export function daySwipe(panel, step, { can = null, page = true } = {}) {
 // of starting over, and parts drawn after it stand still.
 export const SWIPE_IN_MS = 280;
 export const SWIPE_BACK_MS = 240;
-const DAY_STILL = '.q-day-bar, .q-sheet-head, .q-day-still';
+const DAY_STILL = '.q-day-bar, .q-sheet-head, .q-day-still, .q-page-head, .q-seg, .q-chips';
 function stopSlide(panel) {
   panel.slideStop?.();
   for (const a of panel.slides || []) a.cancel?.();

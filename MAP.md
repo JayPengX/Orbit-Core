@@ -126,7 +126,7 @@ the app's (a pitch, a map, a chart). How each should look: `docs/DESIGN.md`.
 | The top line | `topActions`, `accountButton` (the account pill and at most one action) |
 | A tab's title | `navTitle` / `navTitleHtml` + `wireNavTitles` (the 34 pt large title), `pageHead` |
 | Switching a view | `view()` (cross-faded with View Transitions); `segmented` / `segHtml` + `settleSegs` for a whole tab's view (at most 4); a single-choice filter row is `.q-chips.q-texttabs` (text tabs) |
-| A day | `dayBar` + `dayStrip` + `daySwipe` (`dayStep`, `dayList`, `dayTop`, `dayNum`, `dayToday`): the one date selector (a week at most on a wide page); a swipe anywhere on the page, its empty space too, outside a sheet |
+| A day | `dayBar` + `dayStrip` + `daySwipe` (`dayStep`, `dayList`, `dayTop`, `dayNum`, `dayToday`): the one date selector (≤ a week when wide); a swipe or trackpad outside a sheet moves all but the head, `.q-seg`, `.q-chips` |
 | Going back | `edgeBack({ target, back })`: a swipe from the left edge |
 | A page on top | `sheet({ detent, foot, lead, trailing })`, `bindSheet`, `setSheetDetent`; `closeSheet` (orbit.mjs) slides it out; `sheetHero`, `sheetFoot` / `.q-sheet-foot`; a whole page (a game, a team, a law) in `.q-sheet-wide` with `.q-sheet-cols` / `.q-sheet-pair` |
 | Typing | Nothing to call (`watchKeyboard`, `landField`); a sheet opened to be typed in focuses its field in the opening tap, never a frame or timer later (iOS raises its keys only then). In Orbit a phone's frames keep the whole screen (suite `fit`); `--q-inset-bottom` is 0 with keys up |

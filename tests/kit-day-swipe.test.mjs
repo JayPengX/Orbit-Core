@@ -257,3 +257,52 @@ test('page: false: only a finger on the panel, never the page around it', () => 
   assert.equal((docListeners.touchstart || []).length, n);
   assert.ok(panel.listeners.touchstart, 'its own still swipes');
 });
+
+test('a page’s head, its switches and chip rows stay put; only what’s under them slides (Jay 2026-11-17: "look weird and ugly")', () => {
+  const panel = new El();
+  const still = ['q-page-head', 'q-chips', 'q-seg'].map(c => new El(c));
+  const part = new El('part');
+  panel.append(...still, part);
+  daySwipe(panel, () => true);
+  drag(panel, -200);
+  for (const s of still) assert.equal(s.anims.length, 0, s.cls);
+  assert.equal(part.anims.length, 1);
+  for (const c of ['q-page-head', 'q-seg', 'q-chips']) assert.match(css, new RegExp(`\\.q-day-swipe\\.swiping > :not\\([^)]*\\.${c}`), `${c} not dragged`);
+});
+
+test('two fingers on a trackpad: sideways steps once a gesture, its empty space too; a scroll up or down never drags the page', () => {
+  const root = new El('root');
+  const main = new El('page');
+  const panel = new El();
+  const part = new El('part');
+  panel.append(part);
+  main.append(panel);
+  root.append(main);
+  const steps = [];
+  daySwipe(panel, dir => (steps.push(dir), true));
+  const gesture = (target, dx, dy, n = 12) => {
+    let stopped = 0;
+    for (let i = 0; i < n; i++) {
+      fire('wheel', { target, deltaX: dx, deltaY: dy, deltaMode: 0, preventDefault: () => stopped++ });
+      run(16);
+    }
+    run(300);
+    return stopped;
+  };
+  // Mostly down, a little sideways now and then: the page's scroll, never a drag.
+  let dragged = false;
+  for (let i = 0; i < 12; i++) {
+    fire('wheel', { target: part, deltaX: i % 3 === 2 ? 14 : 0, deltaY: i % 3 === 2 ? 2 : 20, deltaMode: 0, preventDefault() {} });
+    dragged ||= panel.classList.contains('swiping');
+    run(16);
+  }
+  run(300);
+  assert.ok(!dragged, 'never followed sideways');
+  assert.deepEqual(steps, []);
+  // Sideways on what's drawn: one step, however long the glide after it.
+  assert.ok(gesture(part, 20, 1, 40) > 0);
+  assert.deepEqual(steps, [1]);
+  // Sideways on the page's empty space beside the panel: the day before.
+  gesture(main, -20, 0);
+  assert.deepEqual(steps, [1, -1]);
+});
