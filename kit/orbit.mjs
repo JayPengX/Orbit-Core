@@ -1172,11 +1172,6 @@ const keptAt = new Map(); // key → when it was last written to the device
 // A read on its way this long is taken for lost (a network that swallowed it,
 // a body that never ended): asked anew, never waited on by every later ask.
 const PENDING_MAX_MS = 45_000;
-// A read that failed and answered the device's copy: url → when that copy
-// is from, until a read of it succeeds (`staleSince`: a price list, say, that
-// says it couldn't be read rather than pass an old one off as now).
-const staleFrom = new Map();
-export const staleSince = url => staleFrom.get(url) || 0;
 function keptJson(url, key, { ttl, keep, valid = null }, read) {
   const hit = memory.get(key);
   const lost = hit?.pending && !hit.waiting && Date.now() - hit.at >= PENDING_MAX_MS;
@@ -1219,8 +1214,6 @@ function keptJson(url, key, { ttl, keep, valid = null }, read) {
       // ago never turns into "no data" for a refused minute.
       if (!saved) throw error;
       recFail(url, error);
-      staleFrom.set(url, saved.at);
-      if (staleFrom.size > 500) staleFrom.delete(staleFrom.keys().next().value);
       entry.stale = true;
       entry.data = saved.data;
       entry.dataAt = saved.at;
@@ -1228,7 +1221,6 @@ function keptJson(url, key, { ttl, keep, valid = null }, read) {
     }
     entry.data = data;
     entry.dataAt = Date.now();
-    staleFrom.delete(url);
     // Kept on the device off the critical path (a live one once a minute).
     if (keep && (ttl >= LIVE_KEEP_MS || !(Date.now() - (keptAt.get(key) || 0) < LIVE_KEEP_MS))) {
       keptAt.set(key, Date.now());
