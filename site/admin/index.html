@@ -3008,7 +3008,8 @@ async function loadSystem() {
     $('d1-sum').textContent = r.store?.error ? '讀不到' : `${colls.reduce((n, [, v]) => n + v, 0)} 份文件`;
     $('d1').replaceChildren(...colls.map(([k, v]) => checkRow('', k, '', v.toLocaleString())));
     $('secrets').replaceChildren(
-      ...SECRET_GROUPS.flatMap(([group, names]) => names.map(n => checkRow(r.secrets[n] ? '' : 'bad', n, group, r.secrets[n] ? '已設定' : '沒設定'))),
+      // (The retiring key, removed on 12-06 by the deploy, is no fault once gone.)
+      ...SECRET_GROUPS.flatMap(([group, names]) => names.map(n => (r.secrets[n] ? checkRow('', n, group, '已設定') : n === 'FIREBASE_PRIVATE_KEY' ? checkRow('', n, '已退場，不再需要', '已移除') : checkRow('bad', n, group, '沒設定')))),
       ...Object.entries(r.bindings).map(([n, on]) => checkRow(on ? '' : 'bad', n, BIND_WORD[n] || '綁定', on ? '已綁定' : '沒綁定')),
       checkRow('', 'GitHub：Orbit-Core', 'CLOUDFLARE_API_TOKEN（部署）、CF_GUARD_TOKEN（帳單保護）、DATA_PUSH_SECRET、ECO_TOKEN_SECRET、ECO_ADMIN_TOKEN', '5 個')
     );
