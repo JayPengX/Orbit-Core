@@ -883,6 +883,39 @@ test('the first hours start from the station and fade back to the blend by ANCHO
   assert.equal(anchorHours(odd, null, now), 0);
 });
 
+test("a place's usual error comes off the hours, fading in over ANCHOR_H, never past BIAS_MAX", async () => {
+  const { biasHours, ANCHOR_H, BIAS_MAX } = await import('../weather.js');
+  const H = 3_600_000;
+  const now = Date.parse('2026-11-17T10:20:00+08:00');
+  const t0 = now - 20 * 60_000;
+  const make = () => Array.from({ length: 10 }, (_, i) => ({ t: t0 + i * H, temp: 20, feels: 19 }));
+  const hours = make();
+  assert.equal(biasHours(hours, { v: 1.2, n: 30 }, now), 1.2);
+  assert.equal(hours[0].temp, 20, 'the hour under way is the station\'s');
+  assert.ok(hours[1].temp < 20 && hours[1].temp > 18.8, 'fading in');
+  for (let i = ANCHOR_H + 1; i < 10; i++) assert.equal(hours[i].temp, 18.8, `${i} h on: the whole correction`);
+  assert.equal(hours[9].feels, 17.8);
+  for (const bias of [{ v: 1.2, n: 10 }, { v: BIAS_MAX + 0.5, n: 99 }, null, { v: 'x', n: 99 }]) {
+    const h = make();
+    assert.equal(biasHours(h, bias, now), 0, JSON.stringify(bias));
+    assert.ok(h.every(x => x.temp === 20));
+  }
+});
+
+test('a whole cell takes its place\'s correction off the hours shown, never off the hours scored', async () => {
+  const { kvPut, cellOf } = await import('../weather.js');
+  const lat = 25.034;
+  const lon = 121.565;
+  const plain = await buildCell({ ...env, RATE_LIMIT_KV: memKv() }, lat, lon, { fetchFn: upstream(), now: NOW });
+  const e = { ...env, RATE_LIMIT_KV: memKv() };
+  await kvPut(e, `weather:skill:${cellOf(lat, lon)}`, { snaps: [], days: {}, bias: { v: 1, n: 40 } }, 3600);
+  const fixed = await buildCell(e, lat, lon, { fetchFn: upstream(), now: NOW });
+  const far = plain.resp.hours.findIndex(h => h.t > NOW + 7 * 3_600_000 && h.temp != null);
+  assert.ok(far > 0);
+  assert.equal(fixed.resp.hours[far].temp, Math.round((plain.resp.hours[far].temp - 1) * 10) / 10);
+  assert.deepEqual(fixed.bySource.hours.map(h => h.out), plain.bySource.hours.map(h => h.out), 'scored before the correction');
+});
+
 test('a whole cell: the hours carry the measured "now", today holds it, the served hours are kept for scoring', async () => {
   const e = { ...env, RATE_LIMIT_KV: memKv() };
   const { resp, bySource } = await buildCell(e, 25.034, 121.565, { fetchFn: upstream(), now: NOW });

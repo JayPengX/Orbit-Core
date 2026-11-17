@@ -937,6 +937,24 @@ export function tempAt(hours, now) {
   if (b && b.t - now < HOUR) return b.temp;
   return null;
 }
+// A place's usual error past the anchor's hours (weather-skill.js learns it,
+// `sk.bias`, from the hours served less the station's reading): taken off
+// each hour, fading in as the anchor fades out. Scored in the shadow from
+// 11-14; on the same hours 11-17 it cut the error 0.86° → 0.59° past 6 hours
+// and 0.58° → 0.51° before. Past BIAS_MAX it's a station's oddity: left alone.
+export const BIAS_MAX = 3;
+export const BIAS_MIN_N = 24;
+export function biasHours(hours, bias, now) {
+  const v = bias?.n >= BIAS_MIN_N ? Number(bias.v) : NaN;
+  if (!Number.isFinite(v) || Math.abs(v) < 0.05 || Math.abs(v) > BIAS_MAX) return 0;
+  for (const h of hours) {
+    const w = h.t <= now ? 0 : Math.min(1, (h.t - now) / (ANCHOR_H * HOUR));
+    if (!w) continue;
+    if (h.temp != null) h.temp = r1(h.temp - v * w);
+    if (h.feels != null) h.feels = r1(h.feels - v * w);
+  }
+  return v;
+}
 export function anchorHours(hours, measured, now) {
   if (measured == null || !hours?.length) return 0;
   const f = tempAt(hours, now);
@@ -953,7 +971,7 @@ export function anchorHours(hours, measured, now) {
 }
 
 // → { resp: the one-truth answer, bySource: each source's values (KV only) }.
-export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFAULT_WEIGHTS, partial = false }) {
+export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFAULT_WEIGHTS, partial = false, bias = null }) {
   const bySource = { hours: [], days: [], now: null };
   const [cLat, cLon] = String(cell || '').split(',').map(Number);
   const sun = t => (Number.isFinite(cLat) && Number.isFinite(cLon) ? sunUp(cLat, cLon, t) : null);
@@ -1044,7 +1062,10 @@ export function assemble({ cell, now, google, cwa, air, warnings, weights = DEFA
   // first hours and faded out (`anchorHours`), so the hour track's first dot
   // is the big number and the day turns from there.
   anchorHours(hours, measured, now);
+  // `out` (scored as `served`) is taken before the place's correction, so
+  // the correction keeps learning from the blend and never from itself.
   bySource.hours.forEach((x, i) => (x.out = hours[i]?.temp ?? null));
+  biasHours(hours, bias, now);
   const today = twDay(now);
   const d0 = days.find(d => d.date === today);
   if (d0 && measured != null) {
@@ -1535,7 +1556,7 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
   const justBuilt = gFc && prev?.quick && now - prev.at < GOOGLE_FC_MS;
   // Asked under FRESH_MS ago (this cell or another in its square): as it is.
   const gFresh = prev?.parts?.google?.v && now - prev.parts.google.at < FRESH_MS && !wantFar ? prev.parts.google : null;
-  const [google, cwa, aqi, aqf, warn, weights, aqiHist, gairRes] = await Promise.all([
+  const [google, cwa, aqi, aqf, warn, weights, aqiHist, gairRes, skill] = await Promise.all([
     !env.GOOGLE_WEATHER_KEY ? { state: 'off', v: null } : gFresh ? { state: 'ok', ...gFresh } : justBuilt && wantFar ? ((await googleAllowed(env, now, 10, defer, true)) ? farOnly() : { state: 'ok', ...gFc }) : gFc && !wantFar ? ((await googleAllowed(env, now, 1, defer, true)) ? googleNowOnly() : { state: 'ok', ...gFc }) : (await googleAllowed(env, now, wantFar ? 12 : 4, defer, wantFar)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan, wantFar)) : wantFar && (await googleAllowed(env, now, 4, defer)) ? settle('google', () => fetchGoogle(env, lat, lon, fetchFn, !inTaiwan)) : keep('google') ? { state: 'stale', ...keep('google') } : { state: 'capped', v: null },
     env.CWA_KEY && inTaiwan ? settle('cwa', () => fetchCwa(env, lat, lon, fetchFn)) : { state: inTaiwan ? 'off' : 'n/a', v: null },
     env.MOENV_KEY && inTaiwan ? airSites(env, fetchFn, now, defer) : null,
@@ -1543,7 +1564,8 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
     env.CWA_KEY && inTaiwan ? shared(env, 'weather:cwa:warn', 30 * MIN, () => getJson(fetchFn, cwaUrl(env, 'W-C0033-001'), env), now, defer) : null,
     kvJson(env, 'weather:weights'),
     inTaiwan ? kvJson(env, 'weather:aqi:hist') : null,
-    gairJob
+    gairJob,
+    kvJson(env, `weather:skill:${cell}`).catch(() => null)
   ]);
   const gair = gairRes?.ok && gairRes.v ? { at: now, v: gairRes.v } : gairPrev;
   const county = cwa.v?.county || null;
@@ -1574,7 +1596,7 @@ export async function buildCell(env, lat, lon, { fetchFn = fetch, now = Date.now
     moenv: aqi ? aqi.state : env.MOENV_KEY ? 'n/a' : 'off'
   };
   const partial = Object.values(sources).some(v => v === 'error' || v === 'stale');
-  const { resp, bySource } = assemble({ cell, now, google: googleV, cwa: cwa.v, air, warnings: warn?.data && county ? parseCwaWarnings(warn.data, county) : [], weights: weights || DEFAULT_WEIGHTS, partial });
+  const { resp, bySource } = assemble({ cell, now, google: googleV, cwa: cwa.v, air, warnings: warn?.data && county ? parseCwaWarnings(warn.data, county) : [], weights: weights || DEFAULT_WEIGHTS, partial, bias: skill?.bias });
   // Today's hours before the first one (the forecast starts at the hour
   // now): kept from the cell's last answer, so a day's graph late in the
   // evening still draws the whole day (`past`, read by the day sheet only).
