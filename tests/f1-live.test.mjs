@@ -290,3 +290,16 @@ test("yellowSectors: each marshal sector's last word since the track was clear, 
   );
   assert.deepEqual(yellowSectors([m('YELLOW IN TRACK SECTOR 4'), m('CHEQUERED FLAG', 'CHEQUERED')]), []);
 });
+
+test('a circuit MultiViewer has not drawn (Madring, Sepang in 2026) is an outline with no points, never a 502', async () => {
+  const { f1LiveResponse } = await import('../f1-live.js');
+  const was = globalThis.fetch;
+  globalThis.fetch = async () => new Response('Not found', { status: 404 });
+  try {
+    const res = await f1LiveResponse(new URL('https://f1-live.orbit/circuit.json?key=153&year=2026'));
+    assert.equal(res.status, 200);
+    assert.deepEqual((await res.json()).x, []);
+  } finally {
+    globalThis.fetch = was;
+  }
+});

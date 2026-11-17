@@ -782,6 +782,9 @@ async function archiveLaps(start, log) {
 // and what a stop in the pits costs there.
 async function circuit(key, year) {
   const res = await fetch(`https://api.multiviewer.app/api/v1/circuits/${Number(key)}/${Number(year)}`, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(TIMEOUT) });
+  // (A circuit MultiViewer hasn't drawn (2026's new Madring, the Bahrain GP at Sepang): no outline, an
+  // answer kept as any other, never a 502 each time a weekend's page is opened.)
+  if (res.status === 404) return { name: '', rotation: 0, x: [], y: [], mini: [], times: [], corners: [], pitLoss: { normal: 0, sc: 0, vsc: 0 } };
   if (!res.ok) throw new Error(`circuit ${res.status}`);
   const c = await res.json();
   return {
