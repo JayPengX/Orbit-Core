@@ -461,15 +461,15 @@ function fit(foot) {
     if (foot.getBoundingClientRect().top >= end + 8) return;
   }
   // Still short (a small phone on its side, Jay 11-15: the account's row over
-  // 紀錄): the tabs a little shorter, as far as a tab can go (34), so the row
-  // stands under the last one, never on it.
+  // 紀錄): the tabs a little shorter, as far as a tab can go with its name
+  // (36), so the row stands under the last one, never on it.
   const tab = document.querySelector('.q-tabbar .q-tab');
   const n = document.querySelectorAll('.q-tabbar .q-tab:not([hidden])').length;
   if (!tab || !n) return;
   const short = above() + 8 - foot.getBoundingClientRect().top;
-  const h = Math.max(34, Math.floor(tab.getBoundingClientRect().height - short / n));
+  const h = Math.max(36, Math.floor(tab.getBoundingClientRect().height - short / n));
   root.setProperty('--q-tabrail-tab', `${h}px`);
-  // (Too short for a name under its icon: the icon alone.)
+  // (Short: a smaller mark and name, never the mark alone, Jay 11-17.)
   if (h < 50) tabs?.classList.add('q-tabrail-tight');
 }
 

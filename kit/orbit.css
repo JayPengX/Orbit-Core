@@ -7739,9 +7739,20 @@ html.q-tabrail:not(.q-desk) .q-suite.q-suite-lean2 > :is(.q-suite-back, .q-suite
   display: none;
 }
 /* (The tabs shortened to fit the switcher and the account under them, never
-   beside each other: at the shortest, each tab its icon alone. suite.mjs fit().) */
-html.q-tabrail:not(.q-desk) .q-tabbar.q-tabrail-tight .q-tab-label {
-  display: none;
+   beside each other: a smaller mark and name, the name always kept, Jay
+   11-17: "I don't like the no text side bar". suite.mjs fit().) */
+html.q-tabrail:not(.q-desk) .q-tabbar.q-tabrail-tight .q-tab {
+  padding: 1px 2px 2px;
+  gap: 1px;
+  font-size: 9.5px;
+  line-height: 11px;
+}
+html.q-tabrail:not(.q-desk) .q-tabbar.q-tabrail-tight .q-tab-icon {
+  height: 20px;
+}
+html.q-tabrail:not(.q-desk) .q-tabbar.q-tabrail-tight .q-tab svg {
+  width: 19px;
+  height: 19px;
 }
 /* (Then the switcher, the account and the buttons under them as small as the
    tabs' icons, not twice their size: Jay 11-15 "unbalanced size".) */
