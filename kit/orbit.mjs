@@ -32,7 +32,7 @@
 
 import { BRANDS, APP_ORDER, FAMILY, pathOf, homeOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
-import { encodeSetup, startOf, newId, mineSaved, mergeMine, MINE_KEY, appsOf, whichTag } from './orbit-mine.mjs';
+import { encodeSetup, startOf, newId, mineSaved, mergeMine, MINE_KEY, WHICH_KEY, appsOf, whichTag } from './orbit-mine.mjs';
 import { API, SITE as HOME, isApi } from './domain.mjs';
 import { passkeyHere, passkeyName, deviceName, makePasskey, usePasskey, forgetPasskey, cancelled } from './passkey.mjs';
 import { icons, tile, cell, pullToRefresh, setSheetDetent, toast, sheet, h as node } from './ui.mjs';
@@ -748,6 +748,11 @@ export function clearData() {
 // account a person, Jay 11-14.)
 export const HAD_KEY = 'orbit.had';
 const DEVICE_KEYS = new Set(['orbit.lang', 'orbit.safeBottom', 'orbit.kit', 'orbit.kitFiles', HAD_KEY]);
+// (This window's own, sessionStorage: which Orbit it is (its tag, kit orbit-mine.mjs) and that it is Orbit's
+// window. They are the home-screen icon's, not the account's, and the address no longer says them once Orbit
+// is open: wiped with the rest, a sign-out inside an Orbit of a few apps opened the plain Orbit of every app,
+// or an Orbit of the one app in view, until the icon was tapped again, 11-17.)
+const WINDOW_KEYS = new Set([WHICH_KEY, 'orbit.suite']);
 // `keepKeys`: signed out by the Pass, not by the person (a new pass made
 // elsewhere, the recovery email, 登出所有裝置): the data keys stay (kit
 // vault.mjs), so signing in here again with the new pass brings the data
@@ -758,7 +763,7 @@ export function wipeDevice({ keepKeys = false } = {}) {
     try {
       const keys = [];
       for (let i = 0; i < store.length; i++) keys.push(store.key(i));
-      for (const k of keys) if (!(store === globalThis.localStorage && DEVICE_KEYS.has(k))) store.removeItem(k);
+      for (const k of keys) if (!(store === globalThis.localStorage ? DEVICE_KEYS : WINDOW_KEYS).has(k)) store.removeItem(k);
     } catch {}
   }
   clearData();
