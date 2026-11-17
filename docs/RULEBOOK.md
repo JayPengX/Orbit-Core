@@ -18,7 +18,8 @@ people use the apps too, so polish matters for strangers. His complaints are a c
 (11-03): find the cause and design what's best, never take his words as specs or stretch them
 into absolutes; push back when a rule makes things worse.
 
-**How to work.**
+**How to work.** The steps of a task, in order, with the commands: `WORKFLOW.md`.
+- 11-17 Every task ends with screenshots Jay sees (Jay: "you kind of always show me a screenshot at the end"): the live result, before and after when something changed, attached to the reply (`WORKFLOW.md` §6); and the report names what only his iPhone can show and any rule overridden (§7).
 - 10-18 Fully automatic: build fixes and features without approval, then report in plain words. Decide, then tell (one line, so he can reverse it); ask only when a choice is truly his.
 - 10-18 Never idle: never wait on another thread, a check or a merge; start the next independent item. Threads keep working overnight; a morning summary is not a stopping point (11-11).
 - 10-18 Only what the task needs in context; helpers get only the files and checks they need and return short reports.
@@ -152,6 +153,7 @@ How to apply these: `DESIGN.md`. The rules:
 - 11-06 Only the domain is paid: Workers Free (heavy routes and crons' work in the Runner DO), TDX free tier, Google free tiers; everything runs by itself. 11-10 AI is the one exception: billing on for Anthropic, OpenAI and Gemini, prepaid as a hard stop where offered; a blind side-by-side test picks the model. Tests and our tools count against the same free amounts.
 - 11-05 Never billed past what's included, and slowed only for real: the guard paces only once a count's real share passes 60/75/85% and the rate would reach the stop; a forecast is a warning in admin, never a slow-down; at 85% the basics first (sign-in, sync, notices) and nobody new let in. Paid outside APIs stop inside their free amounts (Maps at 90% of each SKU, Google Weather under its month).
 - 11-06 Save quota hard, never at the person's cost: every request, CPU ms, KV/R2/D1 op and outside call cut wherever the person sees the same thing as fast; measured; phone data counts too. 11-10 Phone first: whatever a phone can read itself (open to browsers, no key, no form session) the phone reads, the Worker only its fallback; the Worker keeps keyed sources, sites closed to browsers or abroad, form sessions, and pages one Worker read serves to everyone.
+- 11-14 Our own work on a model (a batch job, a headless agent task) runs only on `ANTHROPIC_CREDIT_KEY`, the free credit (`tools/credit/`, `agent.yml`); every other Anthropic key is the apps' real money and never used for it.
 - 11-10 Scraping is allowed: an operator's own site or app is a source like any API; dig for one before saying there's none.
 - 10-27 Gemini is reliable, only costly: replace it only where a free path is as reliable; otherwise make calls cheaper. Every AI route has a global daily cap (D1); Google Weather is shared per 0.05° square.
 - New Cron Triggers don't run: use the proxy's even/odd-minute crons or a Durable Object alarm.

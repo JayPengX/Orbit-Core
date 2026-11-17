@@ -27,8 +27,9 @@ a secret or a schedule does (update it in the same push).
    > You're taking over Orbit, a family of home-screen web apps for Taiwan.
    > Read `Orbit-Core/CLAUDE.md` first (what to read for which task; it is
    > written for any agent, not only Claude), then `Orbit-Core/docs/RULEBOOK.md`
-   > (every rule the owner, Jay, has set) and `Orbit-Core/HANDOFF.md` §5 (where
-   > the work stands). Follow the rulebook as standing instructions: push
+   > (every rule the owner, Jay, has set), `Orbit-Core/docs/WORKFLOW.md` (the
+   > steps of every task, ending with screenshots for Jay) and
+   > `Orbit-Core/HANDOFF.md` §5 (where the work stands). Follow the rulebook as standing instructions: push
    > straight to `main` with `sh ../Orbit-Core/tools/push.sh`, never a branch
    > or a PR. Talk to Jay in plain words; he doesn't read code.
 4. **Nothing else is needed to work:** no key ever sits on the agent's
@@ -46,7 +47,7 @@ use no Claude-only feature; where they say "thread" or "decision card", read
 
 ## 2. How Jay works with the agent
 
-All of it is in `docs/RULEBOOK.md` §1. The parts the old project's tooling
+All of it is in `docs/RULEBOOK.md` §1 and, step by step, `docs/WORKFLOW.md`. The parts the old project's tooling
 carried, kept here so a new one can copy them:
 
 - Jay sends asks, screenshots from his iPhone and iPad, and 除錯紀錄 from the

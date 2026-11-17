@@ -12,7 +12,7 @@ the tools and the family's docs. Every repo is checked out side by side
 
 | When | Read |
 | --- | --- |
-| Every task | this file and `docs/RULEBOOK.md` (how to work, every family rule) |
+| Every task | this file, `docs/RULEBOOK.md` (every family rule) and `docs/WORKFLOW.md` (the steps, ask to screenshots) |
 | Working in an app | that repo's `MAP.md` (its rules, its code, run and test) |
 | A visible change | `docs/DESIGN.md`, and `MAP.md` §3.3 (the kit's components) |
 | The kit, a Worker, a route, data or sync | `MAP.md` (this repo's: §3 kit, §4 routes, §5 data, §10 deploy) |
@@ -22,9 +22,9 @@ the tools and the family's docs. Every repo is checked out side by side
 | A tool (screenshots, preview, speed) | `tools/README.md` |
 | A new workspace or agent, or what lives outside git | `HANDOFF.md` |
 
-Each fact has one home: family rules in `docs/RULEBOOK.md`, an app's rules in
-its `MAP.md`, the architecture in this repo's `MAP.md`, the look in
-`docs/DESIGN.md`. Elsewhere, link; never copy. A repo's `README.md` is its
+Each fact has one home: family rules in `docs/RULEBOOK.md`, the steps of a
+task in `docs/WORKFLOW.md`, an app's rules in its `MAP.md`, the architecture
+in this repo's `MAP.md`, the look in `docs/DESIGN.md`. Elsewhere, link; never copy. A repo's `README.md` is its
 public front page. Notes, reports and screenshots for Jay live in the
 project's shared folder, never in a repo; nothing there is needed to build
 or run Orbit.
