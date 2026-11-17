@@ -869,9 +869,12 @@ function playing(w) {
 // padding the frame instead stacks on the app's own gap (Jay 2026-11-13: the
 // tabs sat higher than in the separate app). So the frame fills the screen
 // and each env(safe-area-inset-*) in the app's style sheets is written as
-// this window's own value, kept up as the phone turns.
+// this window's own value, kept up as the phone turns. The foot's is written
+// as a variable, --q-inset-bottom, that orbit.css puts at 0 while the keys
+// are up (html.q-kb): they cover the home bar, so nothing above them keeps
+// its gap (a sheet's foot stood 34 px off the keys, Jay 11-17, 問我的帳).
 const INSET = /env\(\s*safe-area-inset-(top|right|bottom|left)\s*(?:,(?:[^()]|\([^()]*\))*)?\)/g;
-export const withInsets = (css, ins) => css.replace(INSET, (m, side) => `${Math.round(ins[side] || 0)}px`);
+export const withInsets = (css, ins) => css.replace(INSET, (m, side) => (side === 'bottom' ? `var(--q-inset-bottom, ${Math.round(ins.bottom || 0)}px)` : `${Math.round(ins[side] || 0)}px`));
 function insetsNow() {
   const p = document.createElement('div');
   p.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)';
@@ -907,14 +910,25 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
   const frames = new Map();
   let shown = null;
   const top = document;
-  let ins = insetsNow();
+  // (The foot's inset is the most seen this way up: iOS can report none after
+  // a resume, as orbit.mjs steadyTabBar knows, and the tab bar sat on the home bar.)
+  const most = { p: 0, l: 0 };
+  const read = () => {
+    const v = insetsNow();
+    const k = /landscape/.test(globalThis.screen?.orientation?.type || '') ? 'l' : 'p';
+    if (v.bottom < 80) most[k] = Math.max(most[k], v.bottom);
+    return { ...v, bottom: Math.max(v.bottom, most[k]) };
+  };
+  let ins = read();
   const inset = f => {
     try {
       tellInsets(f.el.contentDocument, ins);
     } catch {}
   };
   globalThis.addEventListener('resize', () => {
-    ins = insetsNow();
+    const v = read();
+    if (['top', 'right', 'bottom', 'left'].every(k => v[k] === ins[k])) return;
+    ins = v;
     for (const f of frames.values()) inset(f);
   });
   // Hidden to the app inside: shown only while this one is (and the phone's screen is).
@@ -1157,15 +1171,21 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
   // scrolled the window itself, the app shown and its tab bar with it, black
   // under (Jay 2026-11-14, Law). Put back at once, whatever moved it.
   //
-  // Typing in an app (Jay 11-15: Money's 記一筆 and 備註, Law: "the whole UI
-  // breaks … typing will just have the screen flashing"): the frames keep the
-  // size they had before typing, at the top (shrunk to the room above the keys
-  // they were wider than tall, and an app drew its phone-on-its-side layout,
-  // Jay 11-15 again; a home-screen app on iOS 26 shrinks the page itself), and
-  // iOS's slide of the window is put back, a few times at most for one field.
-  // The app inside reads how far the keys reach up its frame from this window
-  // (orbit.mjs watchKeyboard keysCover) and brings its field above them, so
-  // iOS has nothing left to slide to.
+  // On a phone or a tablet the frames are always the screen's whole height
+  // (the most this window has been at this width), never the window's height
+  // of the moment. A home-screen app on iOS 26/27 shrinks the window to the
+  // room above the keys while they're up, gives it back only as they finish
+  // going (late), and at times not all of it (WebKit's viewport left short
+  // after the keys). Following it, the frame shrank as the field was let go,
+  // the app drew itself into the top half and the bottom half was this
+  // window's black, or a black band stayed at the foot (Jay 11-17, 問我的帳:
+  // "when you close it it's black blank empty"); shrunk while typing, the
+  // frame was wider than tall and an app drew its phone-on-its-side layout
+  // (Money's 記一筆, Jay 11-15). The app inside reads how far the keys reach
+  // up its frame from this window (orbit.mjs watchKeyboard keysCover) and
+  // brings its field above them, so iOS has nothing left to slide to; a
+  // slide it makes anyway is put back, a few times at most for one field, and
+  // once the keys are gone too (the visible part left slid down: WebKit 297779).
   const vv = globalThis.visualViewport;
   const typingEl = el => Boolean(el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable) && !/^(checkbox|radio|range|button|submit|reset|color|file|hidden|image)$/.test(el.type) && !el.readOnly);
   const frameField = () => {
@@ -1177,29 +1197,34 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
       return null;
     }
   };
-  let base = 0, baseW = 0, was = '', backs = 0, field = null;
+  let full = 0, fullW = 0, was = '', backs = 0, after = 0, field = null;
   const fit = () => {
     if (!vv) return;
     const w = globalThis.innerWidth;
-    if (w !== baseW) ((baseW = w), (base = 0));
-    // (A phone's or tablet's keys only: a computer's window resized while typing keeps its frames' fit.)
-    const el = globalThis.matchMedia?.('(pointer: coarse)').matches ? frameField() : null;
-    if (!el) base = Math.max(Math.round(vv.height), Math.round(globalThis.innerHeight));
-    else base = Math.max(base, globalThis.innerHeight);
-    const kb = Boolean(el) && base - vv.height > 80;
+    if (w !== fullW) ((fullW = w), (full = 0));
+    // (A phone's or tablet's keys only: a computer's window is its frames' size, resized or not.)
+    const touch = Boolean(globalThis.matchMedia?.('(pointer: coarse)').matches);
+    const el = touch ? frameField() : null;
+    full = Math.max(full, Math.round(globalThis.innerHeight), el ? 0 : Math.round(vv.height));
+    const kb = Boolean(el) && full - vv.height > 80;
     if (!kb || el !== field) backs = 0;
+    if (el) after = 0;
     field = kb ? el : null;
-    if (kb && (vv.offsetTop > 1 || globalThis.scrollY > 1) && backs < 3) {
+    const slid = vv.offsetTop > 1 || globalThis.scrollY > 1;
+    if (kb && slid && backs < 3) {
       backs++;
       globalThis.scrollTo(0, 0);
       if (vv.offsetTop <= 1) return void requestAnimationFrame(fit);
+    } else if (!el && slid && after < 3 && touch && !(vv.scale > 1.01)) {
+      after++;
+      globalThis.scrollTo(0, 0);
     }
-    const now = el ? String(base) : '';
+    const now = touch ? String(full) : '';
     if (now === was) return;
     was = now;
-    box.style.top = el ? '0px' : '';
-    box.style.height = el ? `${base}px` : '';
-    box.style.bottom = el ? 'auto' : '';
+    box.style.top = touch ? '0px' : '';
+    box.style.height = touch ? `${full}px` : '';
+    box.style.bottom = touch ? 'auto' : '';
   };
   const still = () => {
     if (frameField()) return fit();
@@ -1211,6 +1236,7 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
   if (vv) {
     vv.addEventListener('resize', fit, { passive: true });
     vv.addEventListener('scroll', fit, { passive: true });
+    globalThis.addEventListener('resize', fit, { passive: true });
     // (A field taken or left in the app: its frame tells, focus never reaching this window.)
     globalThis.__orbitFit = fit;
     fit();

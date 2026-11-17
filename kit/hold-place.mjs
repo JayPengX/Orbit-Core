@@ -327,7 +327,8 @@ export const letGo = () => void (tap = null);
 // ---- A sheet keeps its height while open ----
 // The tallest it has been (--q-sheet-floor, its min-height in orbit.css,
 // never past the screen); a sheet with a detent has its own height. Reset
-// when the screen changes size (turned, the keyboard).
+// when the screen changes size (turned, the keyboard); not taken while the
+// keys are up (in Orbit's frame the screen keeps its size for them).
 const floored = new WeakSet();
 function floorSheet(d) {
   if (floored.has(d) || typeof ResizeObserver === 'undefined') return;
@@ -339,7 +340,9 @@ function floorSheet(d) {
       d.style.removeProperty('--q-sheet-floor');
       return;
     }
-    if (d.hasAttribute('data-detent') || d.classList.contains('q-leaving')) return;
+    // (Nor while the keys are up: the sheet then runs on under them, and that
+    // height, kept, left it a screen tall and empty once they went: Jay 11-17.)
+    if (d.hasAttribute('data-detent') || d.classList.contains('q-leaving') || document.documentElement.classList.contains('q-kb')) return;
     const h = d.offsetHeight;
     if (h > (d.__qFloor || 0) + 0.5) {
       d.__qFloor = h;

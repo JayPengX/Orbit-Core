@@ -5535,6 +5535,14 @@ function watchKeyboard() {
     const el = document.activeElement;
     if (!up) held = null;
     else if (!held || held.el !== el || Math.abs(held.keys - keys) > 60) held = { el, keys, vvh: Math.round(inFrame() ? globalThis.innerHeight - keys : vv.height), lift: true, backs: 0 };
+    else if (inFrame() && Math.abs(held.keys - keys) > 2) {
+      // In Orbit's frame the keys are followed to the pixel: the frame never
+      // moves for them, so nothing here makes iOS slide again. (Held, keys
+      // that changed by less than 60 px, the emoji keys, the suggestions row,
+      // another language's, left the sheet's field that far off them, or
+      // under them: Jay 11-17, "it still leaves a gap sometimes".)
+      Object.assign(held, { keys, vvh: Math.round(globalThis.innerHeight - keys), foot: null, settles: 0 });
+    }
     if (held && held.foot == null) held.foot = keysFoot();
     root.style.setProperty('--q-kb', `${held ? held.keys : 0}px`);
     root.style.setProperty('--q-kb-foot', `${held ? held.foot : 0}px`);

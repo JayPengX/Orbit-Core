@@ -170,8 +170,9 @@ test('Orbit opens, with something live, on the app looked at last (the live one 
 test("an app held in Orbit's window gets the phone's safe area written in (a frame is told none)", async () => {
   const { withInsets } = await import('../kit/suite.mjs');
   const ins = { top: 59, bottom: 34, left: 0, right: 0 };
-  assert.equal(withInsets('--q-bar-gap: max(calc(env(safe-area-inset-bottom) - 14px), 12px);', ins), '--q-bar-gap: max(calc(34px - 14px), 12px);');
-  assert.equal(withInsets('bottom: max(12px, env(safe-area-inset-bottom, 0px)); top: env( safe-area-inset-top , var(--x, 4px))', ins), 'bottom: max(12px, 34px); top: 59px');
+  // (The foot's as a variable: 0 while the keys are up, orbit.css html.q-kb.)
+  assert.equal(withInsets('--q-bar-gap: max(calc(env(safe-area-inset-bottom) - 14px), 12px);', ins), '--q-bar-gap: max(calc(var(--q-inset-bottom, 34px) - 14px), 12px);');
+  assert.equal(withInsets('bottom: max(12px, env(safe-area-inset-bottom, 0px)); top: env( safe-area-inset-top , var(--x, 4px))', ins), 'bottom: max(12px, var(--q-inset-bottom, 34px)); top: 59px');
   assert.equal(withInsets('padding: 0', ins), 'padding: 0');
 });
 

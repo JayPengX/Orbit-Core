@@ -15,11 +15,11 @@ test('the keys\' height above the page foot counts iOS\'s slide, and docked bars
   assert.match(css, /html\.q-kb \.q-kb-docked \{\s*bottom: calc\(var\(--q-kb-foot, var\(--q-kb\)\) \+ 8px\) !important/);
 });
 
-test('typing in an app inside Orbit: frames keep their size at the top (never wider than tall: Money in half its width), the slide put back a few times at most, the app reads the keys from Orbit\'s window (Jay 11-15)', () => {
+test('typing in an app inside Orbit: on a phone the frames are always the screen\'s whole height (wider than tall while typing, Jay 11-15; black under as the keys went, Jay 11-17), the slide put back a few times at most, the app reads the keys from Orbit\'s window', () => {
   const js = read('suite.mjs');
-  assert.match(js, /box\.style\.height = el \? `\$\{base\}px`/);
+  assert.match(js, /box\.style\.height = touch \? `\$\{full\}px`/);
   assert.match(read('orbit.mjs'), /f\.getBoundingClientRect\(\)\.bottom - \(tv\.offsetTop \+ tv\.height\)/);
-  assert.match(js, /const kb = Boolean\(el\) && base - vv\.height > 80/);
+  assert.match(js, /const kb = Boolean\(el\) && full - vv\.height > 80/);
   assert.match(js, /backs < 3\) \{\s*backs\+\+;\s*globalThis\.scrollTo\(0, 0\)/);
   assert.match(js, /if \(frameField\(\)\) return fit\(\)/);
   assert.match(js, /__orbitFit\?\.\(\)/);
