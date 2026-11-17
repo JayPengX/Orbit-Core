@@ -31,6 +31,47 @@ export function numbersFrom(out, given) {
   return nums(out).every(n => have.has(n));
 }
 
+// Numbers a model worked out from the input (Jay 11-17: an answer that gave
+// 3,683 of 5,820 but not the share asked for is "kind of stupid"): each
+// `{ n, op, of }` in its `calc` is done again here from the input's own
+// numbers, and an answer may write it (rounded as it likes: 63.3 or 63).
+// op: sum, diff (the gap between two), pct (the first as a share of the
+// second), avg, ratio, times. A calc that doesn't hold is dropped, and an
+// answer leaning on it fails numbersFrom as before.
+const OPS = {
+  sum: v => v.reduce((a, b) => a + b, 0),
+  diff: v => (v.length === 2 ? Math.abs(v[0] - v[1]) : NaN),
+  pct: v => (v.length === 2 && v[1] ? (v[0] / v[1]) * 100 : NaN),
+  avg: v => v.reduce((a, b) => a + b, 0) / v.length,
+  ratio: v => (v.length === 2 && v[1] ? v[0] / v[1] : NaN),
+  times: v => (v.length === 2 ? v[0] * v[1] : NaN)
+};
+export const CALC = arr(obj({ n: N, op: { type: 'string', enum: Object.keys(OPS) }, of: arr(N) }));
+export const CALC_RULE =
+  'You may work out a number the facts don’t give (a share as a percentage, a total of several rows, the gap between two, an average): use only the facts’ own numbers, round a percentage to a whole number, and list each in calc as { n: the result, op: sum | diff | pct | avg | ratio | times, of: the facts’ numbers it is made from, in order (pct: the part, then the whole) }; the app checks every one. calc is [] when nothing was worked out.';
+export function worked(calc, given) {
+  const have = new Set(nums(given).map(Number));
+  const out = [];
+  for (const c of list(calc, 8)) {
+    const f = OPS[c?.op];
+    const of = list(c?.of, 40).map(Number);
+    if (!f || !of.length || !of.every(x => Number.isFinite(x) && have.has(x))) continue;
+    const exact = f(of);
+    if (Number.isFinite(exact)) out.push(exact);
+  }
+  return out;
+}
+// numbersFrom with the worked numbers: one written may be any rounding of them.
+export function numbersWorked(out, given, calc) {
+  const have = new Set([...nums(given), ...cnNums(given)]);
+  const done = worked(calc, given);
+  return nums(out).every(n => {
+    if (have.has(n)) return true;
+    const places = (n.split('.')[1] || '').length;
+    return done.some(w => Math.abs(Number(n) - w) <= 0.5 * 10 ** -places + 1e-9);
+  });
+}
+
 // A file for a model to read (a photo, a PDF), as the phone sends it: { mime_type, data } (base64),
 // or null. `types`: the kinds allowed.
 export function fileOf(f, types = /^image\/(jpeg|png|webp)$/, max = 2_400_000) {

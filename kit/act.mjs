@@ -1,5 +1,5 @@
 // ---- kit/act.mjs: what a person tells an app to do, read by code (Jay 11-14) ----
-// The apps' ask boxes and 問 Orbit also take a command, not only a question:
+// The apps' ask boxes also take a command, not only a question:
 // 「開始專注飛行 50 分鐘」 starts Class's focus, 「加段考倒數 11/30」 adds a
 // countdown, 「追蹤湖人」 follows a team, 「背 10 個單字」 starts a round.
 // Code reads them for nothing (RULEBOOK §AI: code first, AI only on what

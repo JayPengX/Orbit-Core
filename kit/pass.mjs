@@ -3,7 +3,7 @@
 // the family, never money (money lives in Securities). Four tabs:
 //   Pass   this account: sign-in and security, notices, general
 //   外觀   an avatar and a frame, free for everyone
-//   App    問 Orbit, 今天, every app: when it was last used, a way in
+//   App    今天, every app: when it was last used, a way in
 //   說明   every app's guide (help.mjs)
 import { APPS, AVATARS, FRAMES, MILESTONES, TIERS, DEFAULT_AVATAR, milestoneOf, avatarSrc, settingPatch, passAccount, appIcon, closeSheet, el as node } from '#kit/orbit.mjs';
 // The guides (80 KB) only for the 說明 tab: fetched after the sheet's own
@@ -13,7 +13,6 @@ let helpLoad = null;
 export const loadHelp = () => (helpLoad ||= import('./help.mjs').then(m => (helpMod = m)).catch(e => ((helpLoad = null), Promise.reject(e))));
 import { sheet, section, list, cell, toast, icons } from './ui.mjs';
 import { todayRows } from './today.mjs';
-import { askOrbitCard } from './ask-orbit.mjs';
 import { homeOf } from './brand.mjs';
 
 export const STRINGS = {
@@ -213,19 +212,9 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
       return put(body, ...account.nodes);
     }
     if (state.tab === 'looks') return put(body, looksSection(ctx));
-    // (問 Orbit and 今天 open another app: they sit over every app, not over the account.)
-    if (state.tab === 'apps') return renderApps(body, ctx, [askCard(), todayCard()]);
+    // (今天 opens another app: it sits over every app, not over the account.)
+    if (state.tab === 'apps') return renderApps(body, ctx, [todayCard()]);
     renderHelp(body, ctx, state.help);
-  }
-  // 問 Orbit (ask-orbit.mjs): a question opens the app that answers it, with the question in its ask.
-  function askCard() {
-    const goTo = (app, hash) => {
-      if (app !== s.app) return void s.go?.(app, hash);
-      close();
-      location.hash = hash;
-    };
-    const apps = Object.fromEntries(Object.entries(APPS).map(([id, a]) => [id, { name: a.short || a.name, icon: el('img', { src: svgUrl(appIcon(id, { crisp: true })), alt: '', width: 29, height: 29 }) }]));
-    return askOrbitCard({ go: goTo, apps });
   }
   // 今天 (today.mjs): what each app told the phone's family notebook for
   // today, a row an app, each opening its app there (this one: closes the sheet).
@@ -434,7 +423,7 @@ const ago = (t, then) => {
 };
 // Every app, a row each (as the Pass tab's): its icon, what it's for and
 // when it was last used; a tap opens it, its share button its link and QR
-// code. (Its guide: the 說明 tab.) `top`: 問 Orbit and 今天, over the list.
+// code. (Its guide: the 說明 tab.) `top`: 今天, over the list.
 function renderApps(box, { q, t, locale, state }, top = []) {
   const w = state.wallet;
   const en = locale === 'en';

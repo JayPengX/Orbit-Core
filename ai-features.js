@@ -16,7 +16,7 @@
 import { cleanBuys } from './money-read.js';
 import { sidesRecap } from './kit/news-outlets.mjs';
 import { KNOWN } from './translate.js';
-import { str, list, S, N, B, obj, arr, text, nums, numbersFrom, fileOf } from './ai-util.js';
+import { str, list, S, N, B, obj, arr, text, nums, numbersFrom, numbersWorked, CALC, CALC_RULE, fileOf } from './ai-util.js';
 import { LAW_FEATURES } from './law-ai.js';
 
 export { numbersFrom };
@@ -145,7 +145,7 @@ export const FEATURES = {
     tap: true,
     models: ['haiku', 'luna'],
     effort: { luna: 'low' },
-    maxIn: 7400,
+    maxIn: 7900,
     perPass: 40,
     perMinute: 10,
     input(raw) {
@@ -160,17 +160,17 @@ export const FEATURES = {
           'You answer a question about a person’s own money book (NT$, Taiwan). The facts below are their real entries, already added up by the app.',
           'Each fact line starting [id] is a table the app draws as rows and bars under your answer. First read what is asked: where the money went (by category, cat0…), how it was paid (by card, cash, LINE Pay, account: pay0…), inside a category (sub0.<cat>), income, places, the largest, against last month (vs), by month, this week, the budget.',
           'show: the ids of the one or two tables that answer it, the best first ([] when none does). line: ONE short sentence (zh at most 40 字, en at most 22 words): first the one number asked, then at most one thing the tables don’t make plain at a glance (how many times, the single entry behind it, the same row last month), taken from the facts. Do not walk down the rows (name at most two), repeat the month total, or restate all the budget figures: the tables under your line already show them. A bare number is not enough when the facts hold one useful extra (for the budget: the single big entry behind 已花, or this week against last). zh over 40 字 (digits count) is too long: cut the extra, never the number. mark: 1 to 3 rows your line names (never a row it doesn\'t name, except the other parts in the sum case above), from the tables in show, written as the label alone without its amount or "(n times)" (e.g. 國泰CUBE •8812, not 國泰CUBE •8812 4523 (6 times)).',
-          'Every number in line must appear in the facts exactly (no new sums or differences, no percentages they don’t give, no thousands commas). If the answer needs a sum the facts don’t give (e.g. all credit cards together), don’t add, and don’t say you can’t (no 無法合計): give the biggest part with its number, then say the others are marked (e.g. 其他卡已標出) and mark them; count only rows whose name shows they are cards (•1234, a card name like CUBE, or that card’s Apple Pay); bank accounts (Richart), LINE Pay, cash and 悠遊卡 are not cards. A row "X (was 0)" means nothing was recorded for X in that same stretch last month (the dates in the table\'s title): say 上個月同期沒記; never say "more", 多出來, 新開始 or first time, because other tables (cat1, cat2) may show X before. If every vs row says (was 0), the same-stretch comparison is empty: say so, and if a cat0 row is already above the same row for all of last month in cat1, name that one with both figures (no difference). The tables cover only the months they name, and the book may start earlier (Book starts): never call one the most of the whole book, the year or 記錄期間; say the range instead (e.g. 9到11月裡). A period before Book starts has no entries: say the book starts on that date. If the facts can’t answer it, line says so and gives the nearest thing they do show, with that table in show ([] when nothing is near).',
+          `Every number in line must be one of the facts’ own or one you worked out in calc (no thousands commas). Answer what is asked: a share (佔多少、比例、幾成) is a percentage, a total of several rows is their sum, a change is the gap, a daily or per-time figure is an average. ${CALC_RULE} For all credit cards together, add only rows whose name shows they are cards (•1234, a card name like CUBE, or that card’s Apple Pay) and mark them; bank accounts (Richart), LINE Pay, cash and 悠遊卡 are not cards. A row "X (was 0)" means nothing was recorded for X in that same stretch last month (the dates in the table\'s title): say 上個月同期沒記; never say "more", 多出來, 新開始 or first time, because other tables (cat1, cat2) may show X before. If every vs row says (was 0), the same-stretch comparison is empty: say so, and if a cat0 row is already above the same row for all of last month in cat1, name that one with both figures (no difference). The tables cover only the months they name, and the book may start earlier (Book starts): never call one the most of the whole book, the year or 記錄期間; say the range instead (e.g. 9到11月裡). A period before Book starts has no entries: say the book starts on that date. If the facts can’t answer it, line says so and gives the nearest thing they do show, with that table in show ([] when nothing is near).`,
           `Write line in ${en ? 'English' : 'Traditional Chinese (台灣用語, 全形標點)'}, plain words, no markdown. Never advise investing or borrowing.`,
           'Facts:',
           facts,
           `Question: ${q}`
         ].join('\n')
       ),
-    schema: obj({ line: S, show: arr(S), mark: arr(S) }),
+    schema: obj({ line: S, show: arr(S), mark: arr(S), calc: CALC }),
     clean: (raw, { facts }) => {
       const a = str(raw?.line ?? raw?.answer, 200);
-      if (!a || !numbersFrom(a, facts)) return null;
+      if (!a || !numbersWorked(a, facts, raw?.calc)) return null;
       const ids = new Set([...facts.matchAll(/^\[([a-z0-9.]+)\]/gm)].map(m => m[1]));
       const show = [...new Set(list(raw?.show, 4).map(x => str(x, 40)).filter(x => ids.has(x)))].slice(0, 2);
       // (A mark is a row's label as the app draws it: its figures, if written, taken off.)
@@ -858,17 +858,17 @@ export const FEATURES = {
           'Tables: mine (their teams’ places), next (their teams’ next games, Taiwan time), last (their teams’ last results), table.<league> (a league’s table, top first), today (today’s games in their leagues).',
           'show: the ids of the one or two tables that answer it, the best first ([] only when no table is related). mark: the labels of the rows your line is about (the teams or games it names, at most 3), from the shown tables, copied exactly as in the facts (the part before the first comma); never mark every row just to fill it.',
           'line: ONE short sentence, zh at most 40 字, en at most 22 words. The tables are drawn right under it with every row’s date, time, score and place, so never walk through the rows or repeat each score, record or place one by one. Answer the thing asked first in plain words: say the day as 今天/明天/昨天 (today/tomorrow/yesterday) counted from the Today line instead of the date; say 今晚/tonight only for a time 18:00 or later, and 上午/morning (今天上午, 明天上午) for a time before 12:00; when the question is about several games, the day words alone answer it, since the times are on the rows, 贏了/輸了 instead of the score, and keep only the one figure the question asks for. Then, if room, add one thing no single row shows, by linking two rows or tables. Never restate a row’s own place, time, score or status (like 已結束), and never give the place of a team the question didn’t ask about. Links to look for: the next opponent is the team they just beat or lost to, two teams share a record, their team plays today, who sits right above or below them. When several of their teams are asked about, cover all of them as one pattern (like A隊和B隊都贏了，只有C隊輸球, using the real names from the facts), not a list. Their teams are every team in mine, next and last. A team with no row for what is asked (no place in mine, no game in next) gets a few words saying the app has none for it; never leave it out silently.',
-          'Every number in line must appear in the facts exactly (places, dates, times, scores, records). Never work out new ones: no differences, games behind, point margins, or counts of games or wins (not in digits, not as 兩/三), no odds. A team that is in any table (e.g. a league table) can be answered even if they don’t follow it. Only when no line of the facts has it (a team or league in no table, a stat not given, who will win), line says in a few words that the app doesn’t have it and names the closest thing it does have, nothing more (no advice like 你可以先看…); show that closest table ([] if none) and mark [].',
+          `Every number in line must be one of the facts’ own (places, dates, times, scores, records) or one you worked out in calc: a gap in points or wins between two teams, a margin, a total, a share. ${CALC_RULE} No odds. A team that is in any table (e.g. a league table) can be answered even if they don’t follow it. Only when no line of the facts has it (a team or league in no table, a stat not given, who will win), line says in a few words that the app doesn’t have it and names the closest thing it does have, nothing more (no advice like 你可以先看…); show that closest table ([] if none) and mark [].`,
           `Write line in ${en ? 'English; give a team its common English name only when you are sure of it (Lakers for 湖人), otherwise keep the name as the facts write it; mark always stays exactly as in the facts' : 'Traditional Chinese as Taiwan writes it (台灣用語, 全形標點), team names as the facts write them, say 你 not 您'}, plain words a high-school student uses, no markdown. Never about betting, odds or who will win.`,
           'Facts:',
           facts,
           `Question: ${q}`
         ].join('\n')
       ),
-    schema: obj({ line: S, show: arr(S), mark: arr(S) }),
+    schema: obj({ line: S, show: arr(S), mark: arr(S), calc: CALC }),
     clean: (raw, { facts, en }) => {
       const a = str(raw?.line ?? raw?.answer, 200);
-      if (!a || a.length > (en ? 170 : 70) || !numbersFrom(a, facts)) return null;
+      if (!a || a.length > (en ? 170 : 70) || !numbersWorked(a, facts, raw?.calc)) return null;
       const ids = new Set([...facts.matchAll(/^\[([a-z0-9.]+)\]/gm)].map(m => m[1]));
       const show = [...new Set(list(raw?.show, 4).map(x => str(x, 40)).filter(x => ids.has(x)))].slice(0, 2);
       // (A row's label: the part of a row before its first comma.)
@@ -948,58 +948,6 @@ export const FEATURES = {
       if (!line || !filingNumbers(line, facts)) return null;
       const ids = new Set([...facts.matchAll(/\[([a-z]+)\]/g)].map(m => m[1]));
       return { line, mark: [...new Set(list(raw?.mark, 4).map(x => str(x, 10)).filter(x => ids.has(x)))].slice(0, 2) };
-    }
-  },
-
-  // Orbit 助理 (kit ask-orbit.mjs, on the Pass sheet's 問 Orbit): a question
-  // about the person's day ("今天要注意什麼", "明天要準備什麼") or one no rule
-  // knows. Code gathers the facts the person's apps told the family notebook
-  // on this phone (kit today.mjs `dayFacts`: classes, the weather's lines,
-  // words due, games, trips, days off), each with an id; the model only picks
-  // the ones that answer, says it in a line, and names an app when the
-  // question is really for one. Sonnet: telling what matters is judgment.
-  'orbit-ask': {
-    app: '*',
-    tap: true,
-    models: ['sonnet', 'sol'],
-    // (Low, measured 11-11 on its examples, judged blind by Opus: as good as Sonnet's default high, a fifth cheaper.)
-    effort: { sonnet: 'low', sol: 'low' },
-    perPass: 30,
-    perMinute: 6,
-    maxIn: 6000,
-    input(raw) {
-      const q = str(raw?.q, 200);
-      const now = str(raw?.now, 40);
-      if (!q || !now) return null;
-      const facts = list(raw?.facts, 40)
-        .map(f => ({ id: str(f?.id, 12), app: str(f?.app, 12), text: str(f?.text, 160) }))
-        .filter(f => f.id && f.text);
-      const apps = list(raw?.apps, 12).map(a => str(a, 12)).filter(Boolean);
-      return { q, now, facts, apps, en: raw?.lang === 'en' };
-    },
-    parts: ({ q, now, facts, apps, en }) =>
-      text(
-        [
-          'You are Orbit, the assistant of a family of phone apps a student in Taiwan uses (orbit = Class: timetable and school; weather; transit; match = Sports; vocab = Words; money; stock = Securities; news; law; beats = music).',
-          `Now: ${now} (Asia/Taipei).`,
-          'Below are facts the person\'s own apps keep on this phone, each with an id. Answer the question from them only.',
-          `line: ${en ? 'in English only, at most 30 words, speaking to the person as "you"; translate every Chinese name (class, team, place) into English' : '繁體中文（台灣用語，全形標點），最多 60 字，用「你」稱呼對方'}. The app already shows each chosen fact as a row under the line, so never copy facts one by one; say in one or two short sentences the takeaway that links them (what clashes, what to bring, what changes). Lead with what matters most for the question (rain on a day with 體育課, a game during class, words due). Write every number, date and time exactly as the facts write it (14時 stays 14時, 13:10 stays 13:10; never 下午2點 or 2 PM, never count days or add numbers up); a line with any other number is thrown away. Never invent a class, a game, a plan or advice the facts don\'t support. If the facts don\'t answer it, leave ids empty and write one short line with no apology, no advice and no 我: if an app below can work it out, point to it (e.g. 「路線要用交通查。」); otherwise say the phone doesn\'t have it (e.g. 「手機上還沒有下週考試的資料。」).`,
-          'ids: only the ids of facts that directly answer the question, most important first, usually 1 to 3, at most 5 (the app shows them as rows the person can tap). Leave out facts about another day (a 今天 fact does not answer a 明天 question) and facts that only share a topic (the usual school route does not answer a route elsewhere).',
-          `app: "" by default. Only when the question needs something one app works out itself and the facts don't hold it (a route or trip → transit, a live score → match, a law → law, a stock price → stock, money spent → money), that app's id from: ${apps.join(', ')}. Questions about a day, plans or what to watch out for are "" even if most facts come from one app.`,
-          `Question: ${q}`,
-          'Facts:',
-          facts.length ? facts.map(f => `${f.id} [${f.app}] ${f.text}`).join('\n') : '(none: the apps have told nothing on this phone yet)'
-        ].join('\n')
-      ),
-    schema: obj({ line: S, ids: arr(S), app: S }),
-    clean(raw, { q, facts, apps, en }) {
-      const line = str(raw?.line, en ? 260 : 90);
-      if (!line) return null;
-      const given = new Set(facts.map(f => f.id));
-      const ids = [...new Set(list(raw?.ids, 8).map(x => String(x || '')).filter(x => given.has(x)))].slice(0, 5);
-      // (A number the facts or the question don't hold: the line is not shown.)
-      if (!numbersFrom(line, `${q} ${facts.map(f => f.text).join(' ')}`)) return { line: '', ids, app: apps.includes(raw?.app) ? raw.app : '' };
-      return { line, ids, app: apps.includes(raw?.app) ? raw.app : '' };
     }
   },
 

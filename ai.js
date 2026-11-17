@@ -48,7 +48,7 @@ export const priceOf = model => PRICES[model] || (providerOf(model) === 'google'
 export const twDay = (now = Date.now()) => new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
 
 // The Pass behind an app's session, or null.
-// ('*': any app's, Orbit 助理 on the Pass sheet; 'showcase': the showcase's
+// ('*': any app's; 'showcase': the showcase's
 // own pass, counted by the address it was given to: showcase.js.)
 const passIn = (session, app) =>
   app === 'showcase' ? (session?.showcase && session.s ? session.s : null) : (app === '*' || session?.a === app) && typeof session?.d === 'string' && session.d ? session.d : null;

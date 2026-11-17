@@ -37,7 +37,7 @@ Words used below:
 | 11 | A trip or timer ends | Its 進行中 goes within 15 seconds. The tab stays as a plain tab. |
 | 12 | A tab closed with ✕ in the ⌄ switcher | It's gone. If it was showing: the latest other tab, or home if none. A live app has no ✕: it's ended in its own app. |
 | 13 | More than 3 quiet tabs | The one used longest ago closes quietly. Tapped later, it opens again where it was left (a short load). Live and playing apps are never closed. |
-| 14 | A notice, link or cross-app action (今天, 問 Orbit, 去球場 …) | That app opens as a tab, on that screen. The app it came from stays a tab. |
+| 14 | A notice, link or cross-app action (今天, 去球場 …) | That app opens as a tab, on that screen. The app it came from stays a tab. |
 | 15 | The page of an app scrolled to its top or foot | It bounces natively (on a phone the app's page scrolls in its body, so the bounce moves the page only), and the app's tab bar never moves, nor does Orbit's window (not even by the scroll bar's handle). Pull-to-refresh at the top still works. |
 | 16 | An app's own address or home-screen icon (orbit.jaypengx.com/sports/, an old separate app) | Opens Orbit at that app (Jay 11-15: no separate apps); on a phone's browser, Orbit's add page. |
 | 17 | Loading (Orbit or an app) | Orbit's own loading screen: its mark and colour, with the app's name (Orbit at launch). An app switched to comes up over the one left only once it has painted, so never a white flash, in dark mode too. |

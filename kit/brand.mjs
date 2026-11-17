@@ -252,7 +252,7 @@ export const DEV = {
   aiLawMore: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['law-contract-read', 'law-contract', 'law-minutes', 'law-weekly'], zh: '法律 AI 其他（Law）', en: 'Law AI, more', note: '拍合約（讀和檢查各算一次）、會議紀錄變表格、法案週報；0 = 暫停' },
   aiSecurities: { def: 400, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['sec-filing', 'sec-lesson'], zh: '證券 AI（Securities）', en: 'Securities AI', note: '重大訊息白話、交易學到什麼；0 = 暫停' },
   aiBeats: { def: 200, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['beats-say'], zh: '節奏 AI（Beats）', en: 'Beats AI', note: '用說的做節奏（程式讀不懂時）；0 = 暫停' },
-  aiFamily: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['orbit-ask', 'showcase-ask', 'rec-weekly'], zh: '全家 AI', en: 'Family AI', note: 'Orbit 助理、Showcase 問答、除錯週報；0 = 暫停' }
+  aiFamily: { def: 300, min: 0, max: 3000, unit: '次', group: 'ai', ai: ['showcase-ask', 'rec-weekly'], zh: '全家 AI', en: 'Family AI', note: 'Showcase 問答、除錯週報；0 = 暫停' }
 };
 export const DEV_GROUPS = { proxy: '代理（sports-proxy）', sports: 'Orbit Sports', f1: 'F1', transit: 'Orbit Transit（TDX）', scale: '容量', data: '資料', orbit: 'Orbit（全部 App 合一）', pass: 'Orbit Pass', ai: 'AI 每天上限（全部人一起）' };
 // The setting that caps a Gemini feature ('law-chat' → 'aiLaw').

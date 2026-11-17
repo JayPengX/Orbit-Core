@@ -2167,37 +2167,6 @@ dialog.q-sheet.q-full {
   border-radius: 0;
   object-fit: contain;
 }
-/* 問 Orbit on the Pass tab (ask-orbit.mjs): the ask bar, then (words no rule knows) the apps as taps. */
-.q-ask-orbit {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
-  margin: 4px 0 16px;
-}
-.q-ask-orbit-q {
-  margin: 0 4px;
-  color: var(--q-label-2);
-  font: var(--q-t-footnote);
-}
-.q-ask-orbit-apps {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
-  gap: 8px;
-}
-.q-ask-orbit-app {
-  display: grid;
-  justify-items: center;
-  gap: 4px;
-  padding: 8px 4px;
-  border: 0;
-  border-radius: var(--q-r-cell, 12px);
-  background: var(--nv-card, var(--q-fill-4));
-  color: var(--q-label);
-  font: var(--q-t-caption);
-}
-.q-ask-orbit-app img {
-  border-radius: 7px;
-}
 /* A head on a smart thing: the Orbit AI mark before its title (ui.mjs { ai: true }). */
 .q-h-ai {
   display: flex;
