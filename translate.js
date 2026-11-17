@@ -17,7 +17,7 @@
 
 import { keptText, keptPut } from './kept-store.js';
 import { r2Store } from './builders/store.js';
-import { sha256Hex } from './http.js';
+import { sha256Hex, bodyText } from './http.js';
 
 export const TR_MONTH = 480_000;
 export const TR_METER = 'private/tr-meter.json';
@@ -49,27 +49,46 @@ export async function readMeter(store, now = Date.now(), { strict = false } = {}
   return freshMeter(await (strict ? store.json(TR_METER) : store.json(TR_METER).catch(() => null)), now);
 }
 
-// ---- The hard day: Google's characters a Taiwan day, one row in D1 ----
+// ---- The hard day and month: Google's characters, a row a Taiwan day in D1 ----
 // The meter above is a file each caller reads and writes back, so callers at
-// once can each spend the same room. This is the backstop it can't lose:
-// each batch's characters added in one statement before Google is asked
-// (and given back if it's over, or the call fails). Unreadable: nothing.
+// once can each spend the same room, and the last to write loses the others'
+// counts: an English reader's phone asks several at once (a list's titles, a
+// story, an app's own words), so the month's count ran behind what Google
+// had billed, and its cap with it. This is the backstop it can't lose:
+// each batch's characters added in one statement before Google is asked,
+// only while the day and the month have room (given back if the call fails).
+// The month is its days' rows added up; `before`: what the meter had for the
+// month's earlier days when these rows began (its own row, `<month>-00`,
+// made once). Unreadable: nothing.
 export const TR_DAY_MAX = 40_000;
 const trReady = new WeakSet();
-export async function reserveDay(env, day, n, max = TR_DAY_MAX) {
+export async function reserveDay(env, day, n, max = TR_DAY_MAX, { month = TR_MONTH, before = 0 } = {}) {
   if (!env?.STORE) return true;
   try {
+    const first = `${day.slice(0, 7)}-00`;
     if (!trReady.has(env.STORE)) {
       await env.STORE.prepare('CREATE TABLE IF NOT EXISTS tr_day (day TEXT PRIMARY KEY, n INTEGER NOT NULL)').run();
-      await env.STORE.prepare('DELETE FROM tr_day WHERE day < ?1').bind(day).run();
+      await env.STORE.prepare('DELETE FROM tr_day WHERE day < ?1').bind(first).run();
       trReady.add(env.STORE);
     }
-    const row = await env.STORE.prepare('INSERT INTO tr_day (day, n) VALUES (?1, ?2) ON CONFLICT (day) DO UPDATE SET n = n + ?2 RETURNING n').bind(day, n).first();
-    if (Number(row?.n) <= max) return true;
-    await giveBack(env, day, n);
-    return false;
+    await env.STORE.prepare('INSERT OR IGNORE INTO tr_day (day, n) VALUES (?1, ?2), (?3, 0)').bind(first, Math.max(0, Math.round(before) || 0), day).run();
+    // (Taken only while the day and the month both have room for all of it: one statement, so callers at once can't each take the last of it.)
+    const row = await env.STORE.prepare('UPDATE tr_day SET n = n + ?2 WHERE day = ?1 AND n + ?2 <= ?3 AND (SELECT COALESCE(SUM(n), 0) FROM tr_day WHERE day >= ?4) + ?2 <= ?5 RETURNING n')
+      .bind(day, n, max, first, month)
+      .first();
+    return Boolean(row);
   } catch {
     return false;
+  }
+}
+// What those rows hold for the month and for the day (null: none yet, or unreadable).
+async function counted(env, day) {
+  if (!env?.STORE) return null;
+  try {
+    const row = await env.STORE.prepare('SELECT SUM(n) AS month, SUM(CASE WHEN day = ?1 THEN n ELSE 0 END) AS today FROM tr_day WHERE day >= ?2').bind(day, `${day.slice(0, 7)}-00`).first();
+    return row?.month == null ? null : { month: Number(row.month) || 0, today: Number(row.today) || 0 };
+  } catch {
+    return null;
   }
 }
 async function giveBack(env, day, n) {
@@ -258,6 +277,10 @@ export async function translate(env, store, texts, to, { people = [], now = Date
   if (!want.length || !googleKey(env) || env?.TR_PAID === 'off') return {};
   const meter = await readMeter(store, now, { strict: true }).catch(() => null);
   if (!meter) return {};
+  // (What the meter lost to callers writing at once, put back from the rows that can't lose it: the day's share,
+  // and the admin's count, are of what was really sent.)
+  const real = await counted(env, twDayOf(now));
+  if (real) Object.assign(meter, { chars: Math.max(meter.chars, real.month), today: Math.max(meter.today || 0, real.today) });
   // (`force`: a run by hand asks at once, a key just turned on.)
   if (meter.off && meter.off > now && !force) return {};
   let left = Math.min(dayLeft(meter, now, cap), max);
@@ -276,7 +299,7 @@ export async function translate(env, store, texts, to, { people = [], now = Date
       const part = pick.slice(i, i + 100);
       const asked = part.map(t => (zh ? shielded(prep(t), typeof people === 'function' ? people(t) : people) : shieldedEn(prep(t))));
       const size = asked.reduce((n, a) => n + a.length, 0);
-      if (!(await reserveDay(env, twDayOf(now), size))) break;
+      if (!(await reserveDay(env, twDayOf(now), size, TR_DAY_MAX, { month: cap, before: meter.chars - (meter.today || 0) }))) break;
       const got = await google(env, asked, to, { fetchImpl, html: true }).catch(async e => {
         await giveBack(env, twDayOf(now), size);
         throw e;
@@ -317,7 +340,8 @@ export async function handleTr(request, env, headers, session, { fetchImpl = fet
   if (!session) return out({ error: 'pass' }, 401);
   let body = {};
   try {
-    body = JSON.parse(await request.text());
+    // (40 short texts: never a body read whole whatever its size.)
+    body = JSON.parse(await bodyText(request, 100_000)) || {};
   } catch {}
   const to = body.to === 'zh-TW' ? 'zh-TW' : body.to === 'en' ? 'en' : '';
   if (!to) return out({ error: 'to' }, 400);

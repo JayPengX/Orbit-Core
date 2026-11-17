@@ -176,3 +176,35 @@ test('no new translation without a live session (the dev door, a session run out
   assert.deepEqual(o.tr, {});
   assert.equal(asks, 0);
 });
+
+// The month's cap holds though callers race (2026-11-17): the meter is a file each caller reads and
+// writes back, so calls at once (an English reader's phone asks several) each saw the same room, and
+// the last to write lost the others' counts: the month's count ran behind Google's, and never stopped.
+test('the month’s cap holds when callers race: counted in D1, a day’s row each, never by the meter alone', async () => {
+  const { fakeD1 } = await import('./fake-d1.mjs');
+  const { TR_METER } = await import('../translate.js');
+  const d1 = { ...env, STORE: fakeD1() };
+  const store = memStore();
+  let chars = 0;
+  // (Google takes a moment: the calls overlap.)
+  const fetchImpl = async (u, init) => {
+    const q = JSON.parse(init.body).q;
+    chars += q.reduce((n, t) => n + t.length, 0);
+    await new Promise(r => setTimeout(r, 5));
+    return new Response(JSON.stringify({ data: { translations: q.map(t => ({ translatedText: `T${t}` })) } }));
+  };
+  // The month's last day (all that's left may go today), a month of 100 characters, 30 a call.
+  const now = Date.UTC(2026, 10, 30, 4);
+  for (let round = 0; round < 3; round++) await Promise.all(Array.from({ length: 10 }, (_, i) => translate(d1, store, [`${String.fromCharCode(97 + round)}${i}`.padEnd(30, 'x')], 'zh-TW', { fetchImpl, now, cap: 100 })));
+  assert.ok(chars <= 100, `Google was sent ${chars} characters of a 100-character month`);
+  assert.ok(chars >= 90, 'and what fits was sent');
+  // (…and the meter, which the admin reads, has what was really sent: the next call puts back what the race lost.)
+  await translate(d1, store, ['one more'], 'zh-TW', { fetchImpl, now, cap: 100 });
+  assert.equal(store.m.has(TR_METER) && JSON.parse(store.m.get(TR_METER)).chars, chars);
+  // What the meter had for earlier days counts too, though these rows began today.
+  const later = { ...env, STORE: fakeD1() };
+  const kept = memStore({ [TR_METER]: { month: '2026-11', chars: 80, n: 3, fail: 0, day: '2026-11-29', today: 0 } });
+  chars = 0;
+  await Promise.all(Array.from({ length: 5 }, (_, i) => translate(later, kept, [`z${i}`.padEnd(15, 'x')], 'zh-TW', { fetchImpl, now, cap: 100 })));
+  assert.ok(chars <= 20, `80 spent before: ${chars} more of a 100-character month`);
+});
