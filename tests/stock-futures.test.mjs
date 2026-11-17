@@ -112,6 +112,13 @@ test('a Taiwan stock while the market is open: TWSE’s last trade over Yahoo’
   assert.equal(q.name, 'TSMC', "Yahoo's own figures stay");
   assert.deepEqual(q.line.at(-1), [live.marketTime, 2250]);
   assert.equal(liveTw(yahoo, { ...live, marketTime: yahoo.marketTime - 1 }), yahoo, 'an older trade changes nothing');
+  // (…but its reference price wins: Yahoo's 加權指數 closed 43,675 the day before for TWSE's 41,040, 2026-11-17.)
+  const idx = misQuote('^TWII', { c: 't00', ex: 'tse', n: '發行量加權股價指數', z: '40092.11', y: '41040.08', h: '41533.84', l: '39786.45', d: '20261117', t: '13:33:00' });
+  const yIdx = { symbol: '^TWII', price: 40092.11, prev: 43675.1, change: 40092.11 - 43675.1, pct: 40092.11 / 43675.1 - 1, marketTime: Date.parse('2026-11-17T13:33:15+08:00'), line: [] };
+  const fixed = liveTw(yIdx, idx);
+  assert.equal(fixed.price, 40092.11);
+  assert.equal(fixed.prev, 41040.08);
+  assert.equal(Math.round(fixed.pct * 10000) / 100, -2.31);
   assert.equal(liveTw(yahoo, { ...live, traded: false }), yahoo);
   // Open: Monday to Friday 09:00–13:40, Taipei.
   assert.equal(twOpen(Date.parse('2026-11-10T10:00:00+08:00')), true);

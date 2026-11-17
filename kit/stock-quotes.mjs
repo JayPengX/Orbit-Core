@@ -140,12 +140,19 @@ export function twOpen(now = Date.now()) {
   const min = t.getUTCHours() * 60 + t.getUTCMinutes();
   return t.getUTCDay() >= 1 && t.getUTCDay() <= 5 && min >= 9 * 60 && min <= 13 * 60 + 40;
 }
+// A weekday in Taipei from the open on (MIS keeps the day's last figures after the close).
+export function twWeekday(now = Date.now()) {
+  const t = new Date(now + 8 * 3_600_000);
+  return t.getUTCDay() >= 1 && t.getUTCDay() <= 5 && t.getUTCHours() >= 9;
+}
 // Yahoo's quote moved on to TWSE's last trade (when newer): the price, the
 // change on TWSE's reference price, the day's range, the line's last point.
+// (An older trade still brings TWSE's reference price: Yahoo's own was days old
+// for 加權指數 on 2026-11-17, 43,675 for 41,040, so 首頁 said 台股 ▼8.20%, not ▼2.31%.)
 export function liveTw(y, m) {
   if (!m?.traded || !(m.price > 0)) return y;
   if (!y) return m;
-  if (!(m.marketTime > (y.marketTime || 0))) return y;
+  if (!(m.marketTime > (y.marketTime || 0))) return m.prev > 0 && y.price > 0 && Math.abs(m.prev - y.prev) > m.prev * 1e-6 ? { ...y, prev: m.prev, change: y.price - m.prev, pct: y.price / m.prev - 1 } : y;
   const prev = m.prev > 0 ? m.prev : y.prev;
   const hi = [y.dayHigh, m.dayHigh, m.price].filter(x => x > 0);
   const lo = [y.dayLow, m.dayLow, m.price].filter(x => x > 0);
@@ -520,8 +527,9 @@ export async function fetchQuotes(symbols, { range = '1d', interval = '5m' } = {
   const futRead = futs.length || opts.length ? readTaifex().catch(() => null) : null;
   const batches = [];
   for (let i = 0; i < wanted.length; i += SPARK_BATCH) batches.push(wanted.slice(i, i + SPARK_BATCH));
-  // (Today's quotes while Taiwan's market is open: TWSE's live beside Yahoo's late ones.)
-  const listed = range === '1d' && twOpen() ? wanted.filter(x => isTwListed(x) || isWarrant(x) || MIS_INDEX[x]) : [];
+  // (Today's quotes while Taiwan's market is open: TWSE's live beside Yahoo's late ones;
+  // the two indexes the rest of a weekday too, for TWSE's own reference price.)
+  const listed = range === '1d' ? wanted.filter(x => (twOpen() && (isTwListed(x) || isWarrant(x))) || (MIS_INDEX[x] && twWeekday())) : [];
   const misRead = listed.length ? fetchMisQuotes(listed).catch(() => new Map()) : null;
   const results = await Promise.allSettled(
     batches.map(batch =>
