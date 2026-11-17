@@ -157,7 +157,7 @@ test('spending holds when the meter is lost or callers race: an unreadable meter
   assert.ok(many.filter(o => Object.keys(o).length).length <= 4);
 });
 
-test('a new translation only for a 完整 pass: anyone else gets the kept ones, and Google is never asked', async () => {
+test('no new translation without a live session (the dev door, a session run out): the kept ones, and Google is never asked', async () => {
   const { handleTr } = await import('../translate.js');
   const r2 = new Map();
   const env2 = {

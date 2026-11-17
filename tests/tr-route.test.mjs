@@ -30,3 +30,23 @@ test('/news-tr and /tr answer a signed-in reader of either level (never a thrown
     assert.ok(tr.status < 500 || tr.status === 503, `/tr ${d}: ${tr.status}`);
   }
 });
+
+test('a 基本 pass gets a new translation too (Jay 11-17: English readers saw Chinese headlines and stops)', async () => {
+  const db = fakeD1(SCHEMA);
+  await db.prepare('INSERT INTO docs (coll, id, payload, updated) VALUES (?1, ?2, ?3, ?4)').bind(WALLET_COLLECTION, 'basic1', JSON.stringify({ v: 1, created: 1, entries: [], sec: { level: 'free' } }), 'v1').run();
+  const objects = new Map();
+  const DATA = { get: async k => (objects.has(k) ? { text: async () => objects.get(k), json: async () => JSON.parse(objects.get(k)), arrayBuffer: async () => new TextEncoder().encode(objects.get(k)).buffer, customMetadata: {} } : null), put: async (k, v) => void objects.set(k, typeof v === 'string' ? v : new TextDecoder().decode(v)), head: async () => null, list: async () => ({ objects: [] }) };
+  const env = { ECO_TOKEN_SECRET: 'tr-secret', STORE: db, DATA, GOOGLE_WEATHER_KEY: 'k', TR_PAID: 'on' };
+  const was = globalThis.fetch;
+  let asked = 0;
+  globalThis.fetch = async (u, init) => (String(u).includes('translation.googleapis.com') ? (asked++, new Response(JSON.stringify({ data: { translations: JSON.parse(init.body).q.map(() => ({ translatedText: 'Taipei Main Station' })) } }))) : was(u, init));
+  try {
+    const qt = await signToken('tr-secret', { k: 'ses', d: 'basic1', a: 'transit', s: 's-basic1', e: Date.now() + 600_000 });
+    const res = await worker.fetch(new Request(`https://api.jaypengx.com/tr?qt=${encodeURIComponent(qt)}`, { method: 'POST', headers: { Origin: 'https://orbit.jaypengx.com', 'Content-Type': 'application/json', 'CF-Connecting-IP': '9.9.9.8' }, body: JSON.stringify({ to: 'en', texts: ['台北車站'] }) }), env, { waitUntil() {}, passThroughOnException() {} });
+    const body = await res.json();
+    assert.equal(asked, 1, JSON.stringify(body));
+    assert.equal(body.tr['台北車站'], 'Taipei Main Station');
+  } finally {
+    globalThis.fetch = was;
+  }
+});

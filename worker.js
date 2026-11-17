@@ -46,7 +46,7 @@ import { handleLawAudio } from './law-audio.js';
 import { handleLawLive } from './law-live.js';
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
-import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, stampLevels, fullSession, sealSweep, rekeyAccount, restorePlain } from './eco.js';
+import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, stampLevels, sealSweep, rekeyAccount, restorePlain } from './eco.js';
 import { aiSpend, aiMay } from './ai-allow.js';
 import { checkStock } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
@@ -1380,8 +1380,10 @@ async function route(request, env, ctx, headers, origin) {
   // An answer already kept for everyone is free; mayAsk only looks.)
   const spendFor = session => () => (session ? aiSpend(env, ECO_DEPS, session) : Promise.resolve('level'));
   const mayAsk = async session => Boolean(session) && (await aiMay(env, ECO_DEPS, session)) === true;
-  // (Google's translations, billed past the free month: only a 完整 pass's session makes new ones.)
-  const maySpend = session => fullSession(env, ECO_DEPS, session);
+  // (Google's translations: any signed-in pass's live session makes new ones, Jay
+  // 11-17: an English reader on a 基本 pass saw Chinese headlines, bills and stops.
+  // The month's cap, under Google's free 500,000 characters (translate.js TR_MONTH,
+  // TR_DAY_MAX), keeps it NT$0 whoever asks.)
   const refused = why => json({ error: why }, why === 'used' ? 429 : 403, headers);
 
   // Orbit Class's AI features need a Orbit Pass session (`qt=`).
@@ -1493,17 +1495,17 @@ async function route(request, env, ctx, headers, origin) {
   // (Kept ones to anyone; a new one, which Google bills, only for a 完整 pass's session.)
   if (path === '/news-tr' && request.method === 'POST') {
     const live = await sessionOf(request, env);
-    return handleNewsTr(request, env, headers, Boolean(live) && (await maySpend(live)));
+    return handleNewsTr(request, env, headers, Boolean(live));
   }
   // Any app's own words in the reader's language (translate.js handleTr): a Pass's, short, each kept a month.
   // (A Pass session, or the dev door as Transit's, a few a minute: a localhost preview sees the English it will get.)
   if (path === '/tr') {
     const signed = await sessionOf(request, env, READ_GRACE_MS);
     const dev = !signed && LOCAL_ORIGIN.test(origin) && !sessionLimited(`tr:dev:${ip}`, 20);
-    // (Kept ones to any Pass and the dev door, whose Origin anyone can send; a new one, which
-    // Google bills, only for a 完整 pass's live session.)
+    // (Kept ones to any Pass and the dev door, whose Origin anyone can send; a new one
+    // for any Pass's live session, within the free month's cap.)
     const live = signed && (await sessionOf(request, env));
-    return handleTr(request, env, headers, signed || (dev ? { s: 'dev' } : null), { make: Boolean(live) && (await maySpend(live)) });
+    return handleTr(request, env, headers, signed || (dev ? { s: 'dev' } : null), { make: Boolean(live) });
   }
   if (path === '/class-news') {
     const session = await sessionOf(request, env);
