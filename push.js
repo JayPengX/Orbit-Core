@@ -635,8 +635,8 @@ export function overNow(comp, espn) {
 
 // "{place}" in the app's title, for a notice about wherever the phone is: the place its check found, with a
 // space where the words need one and never two ("{place} today" was "信義區  today" on an English phone, and
-// "Rain soon at {place}" ended in a space, 11-18). Nowhere found (the phone abroad): the word leading to it
-// goes too, "Rain soon at {place}" is "Rain soon" and "{place} today" is "Today".
+// "Rain soon in {place}" ended in a space, 11-18). Nowhere found (the phone abroad): the word leading to it
+// goes too, "Rain soon in {place}" is "Rain soon" and "{place} today" is "Today".
 export function placedTitle(title, place = '') {
   const t = String(title || '');
   if (!t.includes('{place}')) return t;

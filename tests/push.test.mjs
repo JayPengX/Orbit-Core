@@ -28,11 +28,13 @@ test('a notice about wherever the phone is: its place goes into the app’s titl
   assert.equal(placedTitle('{place}今天天氣', '信義區'), '信義區 今天天氣');
   assert.equal(placedTitle('{place} today', 'Xinyi'), 'Xinyi today');
   assert.equal(placedTitle('{place}快下雨了', '信義區'), '信義區 快下雨了');
-  assert.equal(placedTitle('Rain soon at {place}', 'Xinyi'), 'Rain soon at Xinyi');
+  assert.equal(placedTitle('Rain soon in {place}', 'Xinyi'), 'Rain soon in Xinyi');
+  assert.equal(placedTitle('Rain soon at {place}', 'Xinyi'), 'Rain soon at Xinyi', 'the title a phone saved before 11-18, until it next opens Weather');
   // Nowhere found (abroad, no township): never a leading space, a small first letter or "at" left hanging.
   assert.equal(placedTitle('{place}今天天氣', ''), '今天天氣');
   assert.equal(placedTitle('{place} today', ''), 'Today');
   assert.equal(placedTitle('{place}快下雨了'), '快下雨了');
+  assert.equal(placedTitle('Rain soon in {place}', ''), 'Rain soon');
   assert.equal(placedTitle('Rain soon at {place}', ''), 'Rain soon');
   // A title that names no place is the app's own, as it is.
   assert.equal(placedTitle('iPad lab  today', 'Xinyi'), 'iPad lab  today');

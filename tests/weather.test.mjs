@@ -552,7 +552,7 @@ test('the rain alert answers only when the next 2 hours turn wet', async () => {
   assert.match(alertEn.body, /^75% chance of rain/);
   // The notice as the phone shows it (push.js fills the app's own title, Weather's pins.mjs): no Chinese, one space.
   assert.equal(alertEn.place, 'Xinyi');
-  assert.equal(alertEn.title.replace('{title}', placedTitle('Rain soon at {place}', alertEn.place)), 'Rain soon at Xinyi · 13:00');
+  assert.equal(alertEn.title.replace('{title}', placedTitle('Rain soon in {place}', alertEn.place)), 'Rain soon in Xinyi · 13:00');
   assert.equal(alert.title.replace('{title}', placedTitle('{place}快下雨了', alert.place)), '信義區 快下雨了 · 13:00');
   // A fresh radar frame with nothing coming for two hours: the wet hour within the hour waits (Jay 2026-11-10).
   const still = btoa(String.fromCharCode(...new Uint8Array(2 * 14 * 18)));
