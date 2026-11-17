@@ -196,7 +196,7 @@ test('the pool kept fresh: flight.yml started when R2\'s pool is 10 minutes old,
   assert.deepEqual(await keepPool(env, now, gh), { age: 5 });
   assert.equal(calls.length, 0);
   uploaded = now - 4 * 3_600_000;
-  assert.deepEqual(await keepPool(env, now, gh), { started: true, age: 240 });
+  assert.deepEqual(await keepPool(env, now, gh), { started: true, age: 240, pool: { failed: '240 min old' } });
   assert.deepEqual(calls, [['POST', 'Orbit-Core/actions/workflows/flight.yml/dispatches']]);
   // Ten minutes on, the run still on its way: not started again until 10 minutes have passed.
   assert.deepEqual(await keepPool(env, now + 5 * 60_000, gh), { age: 245 });
@@ -204,5 +204,8 @@ test('the pool kept fresh: flight.yml started when R2\'s pool is 10 minutes old,
   // No pool at all: started too.
   uploaded = null;
   assert.equal((await keepPool(env, now + 30 * 60_000, gh)).started, true);
+  // Twenty minutes old: started, nothing wrong said (past an hour, the admin's jobs say the runs fail).
+  uploaded = now + 40 * 60_000;
+  assert.deepEqual(await keepPool(env, now + 60 * 60_000, gh), { started: true, age: 20 });
   assert.deepEqual(await keepPool({}, now, gh), { off: 'no token' });
 });

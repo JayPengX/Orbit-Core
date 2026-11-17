@@ -318,6 +318,7 @@ export async function handleFlight(request, headers, { session, limited, fetchFn
 // than about 20 minutes old (GitHub's own timer is a backup only).
 export const POOL_RUN = 'flight:run';
 const KEEP_EVERY_MS = 10 * 60_000;
+const STALE_MS = 60 * 60_000;
 export async function keepPool(env, now = Date.now(), fetchImpl = fetch) {
   if (!env?.GH_ACTIONS_TOKEN || !env.DATA) return { off: env?.GH_ACTIONS_TOKEN ? 'no R2' : 'no token' };
   const head = await env.DATA.head('flight/pool.json').catch(() => null);
@@ -332,5 +333,8 @@ export async function keepPool(env, now = Date.now(), fetchImpl = fetch) {
   });
   if (!go.ok) return { failed: `start: HTTP ${go.status}` };
   await keptPut(env, POOL_RUN, { at: now }, 86_400).catch(() => {});
-  return { started: true, age: Math.round(age / 60_000) };
+  // (A pool an hour old: the runs are failing. Said here, once in the admin's
+  // jobs, since flight.yml itself ends green rather than mail Jay every run.)
+  const min = Math.round(age / 60_000);
+  return { started: true, age: min, ...(age > STALE_MS ? { pool: { failed: `${min} min old` } } : {}) };
 }
