@@ -1739,7 +1739,9 @@ for (const hash of (hashes.length ? hashes : ['']).flatMap(h => Array(per).fill(
     const out = [];
     const boot = document.getElementById('loading');
     if (boot && seen(boot)) out.push('the loading screen');
-    const skel = [...document.querySelectorAll('.q-skel, .q-skel-line')].filter(seen);
+    // (An open sheet: only what's in it; the page under it may wait to be seen.)
+    const sheet = [...document.querySelectorAll('dialog[open]')].filter(d => d.getBoundingClientRect().width > 0).at(-1);
+    const skel = [...(sheet || document).querySelectorAll('.q-skel, .q-skel-line')].filter(seen);
     if (skel.length) out.push(`${skel.length} placeholder${skel.length > 1 ? 's' : ''} (${[...new Set(skel.map(s => s.parentElement?.className || s.className))].slice(0, 3).join(' · ').slice(0, 120)})`);
     return out;
   });
