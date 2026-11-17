@@ -5539,7 +5539,8 @@ function watchKeyboard() {
       // that changed by less than 60 px, the emoji keys, the suggestions row,
       // another language's, left the sheet's field that far off them, or
       // under them: Jay 11-17, "it still leaves a gap sometimes".)
-      Object.assign(held, { keys, vvh: Math.round(globalThis.innerHeight - keys), foot: null, settles: 0 });
+      // (And the field brought above them again: taller keys left a sheet's field under its foot.)
+      Object.assign(held, { keys, vvh: Math.round(globalThis.innerHeight - keys), foot: null, settles: 0, lift: true });
     }
     if (held && held.foot == null) held.foot = keysFoot();
     root.style.setProperty('--q-kb', `${held ? held.keys : 0}px`);

@@ -90,7 +90,10 @@ test("typing in Orbit on an iPhone: the field 12 px off the keys whatever their 
           const low = d.querySelector('dialog[open] .q-ai-bar, dialog[open] .q-sheet-foot .q-btn')?.getBoundingClientRect();
           const s = d.querySelector('dialog[open]')?.getBoundingClientRect();
           const inset = parseFloat(fr.contentWindow.getComputedStyle(d.querySelector('.probe')).paddingBottom);
-          return { keys: Math.round(visualViewport.offsetTop + visualViewport.height), frame: [Math.round(f.top), Math.round(f.bottom)], low: Math.round(low.bottom + f.top), sheet: Math.round(s.height), inset };
+          // (Right above the keys: the foot's own colour, never what scrolled under it.)
+          const under = d.elementFromPoint(20, visualViewport.height - 4 - f.top);
+          const bare = Boolean(d.querySelector('dialog[open] > .q-sheet-foot')) && document.documentElement.clientHeight < innerHeight + 1 && visualViewport.height < f.height - 80 && !under?.closest('.q-sheet-foot');
+          return { keys: Math.round(visualViewport.offsetTop + visualViewport.height), frame: [Math.round(f.top), Math.round(f.bottom)], low: Math.round(low.bottom + f.top), sheet: Math.round(s.height), inset, bare, under: under?.className || under?.tagName };
         });
       const keys = async h => (await page.setViewportSize({ width: W, height: h }), await wait(300));
       await app.evaluate(w => globalThis[w](), which);
@@ -103,6 +106,7 @@ test("typing in Orbit on an iPhone: the field 12 px off the keys whatever their 
         assert.deepEqual(r.frame, [0, H], `${which}, keys ${k}: the app keeps the whole screen`);
         assert.ok(r.low <= r.keys - 8 && r.low >= r.keys - 16, `${which}, keys ${k}: its foot 8-16 px off the keys, not ${r.keys - r.low}`);
         assert.equal(r.inset, 0, `${which}, keys ${k}: no gap for the home bar under the keys`);
+        assert.equal(r.bare, false, `${which}, keys ${k}: between the foot and the keys, ${r.under} showed`);
       }
       // ✓: the field let go, the window given back late (and then once 59 px short).
       for (const back of [H, H - 59]) {
@@ -118,6 +122,18 @@ test("typing in Orbit on an iPhone: the field 12 px off the keys whatever their 
         await app.evaluate(() => document.querySelector('dialog[open] :is(textarea, input)').focus());
         await keys(H - K);
       }
+      // ✕ with the keys up: the sheet gone, the page and its tab bar back whole.
+      await app.evaluate(() => document.querySelector('dialog[open] [data-q-close]').click());
+      await wait(150);
+      await keys(H);
+      await wait(400);
+      const shut = await page.evaluate(() => {
+        const fr = document.querySelector('.q-suite-frame');
+        const d = fr.contentDocument;
+        const tabs = d.getElementById('tabs');
+        return { open: Boolean(d.querySelector('dialog[open]')), up: d.documentElement.classList.contains('q-kb'), tabs: getComputedStyle(tabs).visibility, bottom: Math.round(fr.getBoundingClientRect().bottom) };
+      });
+      assert.deepEqual(shut, { open: false, up: false, tabs: 'visible', bottom: H }, `${which}: closed while typing`);
       await ctx.close();
     }
   } finally {
@@ -129,5 +145,6 @@ test("typing in Orbit on an iPhone: the field 12 px off the keys whatever their 
 test('the keys cover the home bar: in a frame its inset is 0 while they are up', () => {
   const css = readFileSync(join(ROOT, 'kit/orbit.css'), 'utf8');
   assert.match(css, /html\.q-kb \{\s*--q-inset-bottom: 0px;/);
-  assert.match(css, /html\.q-kb dialog\.q-sheet\[open\] > \.q-sheet-foot \{\s*padding-bottom: 0;/);
+  assert.match(css, /html\.q-kb dialog\.q-sheet\[open\]:has\(> \.q-sheet-foot\) \{\s*padding-bottom: var\(--q-kb\);/);
+  assert.match(css, /html\.q-kb dialog\.q-sheet\[open\] > \.q-sheet-foot \{\s*padding-bottom: 12px;/);
 });

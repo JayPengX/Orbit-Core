@@ -5827,14 +5827,19 @@ html.q-kb dialog.q-sheet[open] {
 }
 /* The keys cover the home bar: nothing above them keeps its gap for it. In
    Orbit's frames every app's env(safe-area-inset-bottom) is this variable
-   (kit suite.mjs withInsets); a sheet's foot sits 12 px off the keys, the
-   sheet's own room under it, not 12 + 12 + the home bar's 34 (Jay 11-17,
-   問我的帳: a band of empty sheet between the field and the keys). */
+   (kit suite.mjs withInsets); a sheet's foot sits 12 px off the keys, not
+   12 + 12 + the home bar's 34 (Jay 11-17, 問我的帳: a band of empty sheet
+   between the field and the keys). */
 html.q-kb {
   --q-inset-bottom: 0px;
 }
+html.q-kb dialog.q-sheet[open]:has(> .q-sheet-foot) {
+  padding-bottom: var(--q-kb);
+}
+/* (The 12 px in the foot, on its own colour: under the sheet's, what scrolled
+   beneath the foot showed in the strip between it and the keys.) */
 html.q-kb dialog.q-sheet[open] > .q-sheet-foot {
-  padding-bottom: 0;
+  padding-bottom: 12px;
 }
 /* (A short phone, 320×548: its title and ✕ wait behind the keys too, or the
    button went under them.) */
