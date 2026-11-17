@@ -1197,11 +1197,11 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
       return null;
     }
   };
-  let full = 0, fullW = 0, was = '', backs = 0, after = 0, field = null;
+  let full = 0, fullW = 0, widthAt = 0, was = '', backs = 0, after = 0, field = null;
   const fit = () => {
     if (!vv) return;
     const w = globalThis.innerWidth;
-    if (w !== fullW) ((fullW = w), (full = 0));
+    if (w !== fullW) ((fullW = w), (full = 0), (widthAt = Date.now()));
     // (A phone's or tablet's keys only: a computer's window is its frames' size, resized or not.)
     const touch = Boolean(globalThis.matchMedia?.('(pointer: coarse)').matches);
     const el = touch ? frameField() : null;
@@ -1237,6 +1237,17 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
     vv.addEventListener('resize', fit, { passive: true });
     vv.addEventListener('scroll', fit, { passive: true });
     globalThis.addEventListener('resize', fit, { passive: true });
+    // A turn of the phone: the most seen is forgotten and the window measured again as the turn settles (Jay
+    // 11-17: on its side and back upright, the app sank below the screen's foot until opened again). On its side
+    // an iPhone hides the status bar; turning back, it gives the whole screen's height (852) for a moment before
+    // the bar takes its room (793), and that moment's height, kept as the most seen, left the frame 59 px taller
+    // than the window. Measured afresh once the turn is over, it's the window's own. (Only a real turn, its
+    // width changed just now: the keys going, the window short a moment longer, is never one.)
+    const turned = () => {
+      for (const ms of [300, 800, 1500]) setTimeout(() => (frameField() || Date.now() - widthAt > 2500 || ((full = 0), (was = '')), fit()), ms);
+    };
+    globalThis.screen?.orientation?.addEventListener?.('change', turned);
+    globalThis.addEventListener('orientationchange', turned);
     // (A field taken or left in the app: its frame tells, focus never reaching this window.)
     globalThis.__orbitFit = fit;
     fit();
