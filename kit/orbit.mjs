@@ -4194,9 +4194,11 @@ export function adoptNotifyPrefs(wallet) {
 }
 export async function syncPrefs(s) {
   if (!s?.wallet || syncingPrefs) return;
+  let at = 0;
   syncingPrefs = (async () => {
     adoptNotifyPrefs(s.wallet);
     const mine = notifyPrefs();
+    at = mine.t;
     const held = s.wallet.settings?.notify;
     const heldPrefs = held?.value ? cleanPrefs(held.value) : null;
     const worth = mine.on !== undefined || mine.off.length;
@@ -4209,7 +4211,13 @@ export async function syncPrefs(s) {
     const now = notifyPrefs();
     const text = JSON.stringify({ on: now.on !== false, off: now.off });
     if (readStore('orbit.push.prefs') !== text && (await pushPost(s, 'prefs', JSON.parse(text)))) writeStore('orbit.push.prefs', text);
-  })().finally(() => (syncingPrefs = null));
+  })().finally(() => {
+    syncingPrefs = null;
+    // (A switch moved while this was on its way, several turned off in a row: it goes up too. The last ones
+    // stayed on this device until the app was next opened: the Pass and the Worker, which sends the notices
+    // while the app is closed, still had them on, 11-17.)
+    if (notifyPrefs().t !== at) syncPrefs(s);
+  });
   return syncingPrefs;
 }
 
