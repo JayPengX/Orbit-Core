@@ -11,6 +11,9 @@ const tr = lang => (zh, en) => (lang === 'en' ? en : zh);
 const WAIT_S = 60;
 const looksLikeAddr = v => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
 export const mailOf = s => (s.wallet?.mail?.shown ? s.wallet.mail : null);
+// The code as typed: its six digits, full-width ones too (１２３ as a 注音 keyboard types them: they were
+// taken out, and the right code was never used).
+export const codeTyped = text => String(text ?? '').normalize('NFKC').replace(/\D/g, '').slice(0, 6);
 
 // Address, then the code mailed to it: one small form, in the sheet or on the
 // sign-in screen (`gate`: its big fields). begin(addr) mails the code;
@@ -65,7 +68,7 @@ function twoStep({ lang, gate = false, begin, finish, sent, go, addr: start = ''
     }
   };
   const use = async () => {
-    const c = code.value.replace(/\D/g, '');
+    const c = codeTyped(code.value);
     error.textContent = '';
     if (c.length !== 6) return void (error.textContent = errorText({ code: 'ECO_MAIL_CODE_WRONG' }, lang));
     busy(true, okBtn, code);
@@ -81,7 +84,7 @@ function twoStep({ lang, gate = false, begin, finish, sent, go, addr: start = ''
   stepB.addEventListener('submit', e => (e.preventDefault(), use()));
   // (Six digits typed or filled in from the mail: used at once.)
   code.addEventListener('input', () => {
-    code.value = code.value.replace(/\D/g, '').slice(0, 6);
+    code.value = codeTyped(code.value);
     if (code.value.length === 6 && !okBtn.disabled) use();
   });
   again.addEventListener('click', mail);

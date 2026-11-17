@@ -1881,6 +1881,14 @@ const stakeNum = (n, dp) => {
   return dp ? (x > 0 && Number.isFinite(x) ? Math.floor(x * 10 ** dp + 1e-7) / 10 ** dp : 0) : Math.max(0, Math.floor(x || 0));
 };
 const stakeText = (n, dp) => (dp ? n.toFixed(dp) : String(n));
+// What was typed, as an amount: digits (full-width ones too, １２３ as a 注音 keyboard types them: they were
+// taken out, the amount 0) and, with decimals, one point and at most that many places.
+export function stakeTyped(text, dp = 0) {
+  const s = String(text ?? '').normalize('NFKC');
+  if (!dp) return s.replace(/\D/g, '');
+  const [whole, ...frac] = s.replace(/[^\d.]/g, '').split('.');
+  return frac.length ? `${whole}.${frac.join('').slice(0, dp)}` : whole;
+}
 const stakeLabel = (p, dp) => Number(p).toLocaleString('en-US', dp ? { maximumFractionDigits: dp } : {});
 export function stakeInput({ value = 0, presets = [], onChange = () => {}, currency = 'NT$', decimals = 0 } = {}) {
   const dp = stakeDp(decimals);
@@ -1895,11 +1903,9 @@ export function stakeInput({ value = 0, presets = [], onChange = () => {}, curre
     onChange(cur);
   };
   input.addEventListener('input', () => {
-    if (!dp) return set(input.value.replace(/\D/g, ''));
-    // Digits and one point, at most `decimals` places; what is typed stays (a "0." too).
-    const [whole, ...frac] = input.value.replace(/[^\d.]/g, '').split('.');
-    const text = frac.length ? `${whole}.${frac.join('').slice(0, dp)}` : whole;
-    if (text !== input.value) input.value = text;
+    const text = stakeTyped(input.value, dp);
+    // (With decimals what is typed stays as cleaned, a "0." too.)
+    if (dp && text !== input.value) input.value = text;
     set(text);
   });
   const root = h('div', { class: 'q-stake' }, [h('label', { class: 'q-stake-amt' }, [h('small', { text: currency }), input]), btns.length ? h('div', { class: 'q-stake-presets' }, btns) : null]);

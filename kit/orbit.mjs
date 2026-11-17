@@ -374,8 +374,10 @@ export const pick = (lang, zh, en) => (lang === 'en' ? en : zh);
 
 export const PASS_PATTERN = /^[2-9A-HJ-NP-Z]{10}$/;
 export const DEVICE_CODE_PATTERN = /^[2-9A-HJ-NP-Z]{8}$/;
+// (Full-width letters and digits, ＡＢ２３ as a 注音 keyboard types them, are the same code: they made a right pass wrong.)
 export function cleanCode(text) {
   return String(text || '')
+    .normalize('NFKC')
     .toUpperCase()
     .replace(/[\s-]/g, '');
 }
@@ -3931,7 +3933,7 @@ export function showNewPass(s, passcode) {
   const en = s.lang === 'en';
   const T = (zh, e) => (en ? e : zh);
   const shown = formatPass(passcode);
-  const tail = String(passcode).replace(/[^0-9A-Za-z]/g, '').slice(-5).toUpperCase();
+  const tail = V.cleanPass(passcode).slice(-5);
   return new Promise(resolve => {
     for (const d of document.querySelectorAll('dialog[open]')) d.close();
     const ok = node('button', { class: 'q-btn primary block', type: 'button', text: T('我已經記下來了', 'I’ve saved it'), disabled: true });
@@ -3944,7 +3946,7 @@ export function showNewPass(s, passcode) {
     const hint = node('small', { class: 'q-newpass-hint' });
     const check = node('input', { class: 'q-pass-input q-newpass-check num', type: 'text', inputmode: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', maxlength: '5', placeholder: '•••••', 'aria-label': T('通行碼最後 5 個字', 'The last 5 characters of your pass') });
     check.addEventListener('input', () => {
-      const typed = check.value.replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+      const typed = V.cleanPass(check.value);
       ok.disabled = typed !== tail;
       hint.textContent = typed.length === 5 && typed !== tail ? T('不對：請對照上面的通行碼。', 'That doesn’t match: check the pass above.') : '';
     });

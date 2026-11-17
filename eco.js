@@ -200,8 +200,10 @@ export { WEEK };
 const isObj = v => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : undefined);
 const finite = v => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+// (Full-width letters and digits, ＡＢ２３, are the same code: a phone on an older kit sends them as typed.)
 const cleanCode = v =>
   String(v || '')
+    .normalize('NFKC')
     .trim()
     .toUpperCase()
     .replace(/[\s-]/g, '');

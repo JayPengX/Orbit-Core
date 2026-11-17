@@ -49,8 +49,8 @@ export const isLocked = payload => typeof payload === 'string' && payload.starts
 export const vaultOf = payload => (isLocked(payload) ? payload.split(':')[1] || '' : '');
 export const supported = () => Boolean(subtle() && typeof CompressionStream !== 'undefined');
 
-// The key that locks the data key, from the pass (as typed: spaces and case don't matter).
-export const cleanPass = pass => String(pass || '').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+// The key that locks the data key, from the pass (as typed: spaces, case and full-width letters, ＡＢ２３, don't matter).
+export const cleanPass = pass => String(pass || '').normalize('NFKC').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
 async function passKey(pass, salt, rounds = PASS_ROUNDS) {
   const base = await subtle().importKey('raw', te.encode(cleanPass(pass)), 'PBKDF2', false, ['deriveKey']);
   return subtle().deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: rounds }, base, { name: 'AES-GCM', length: 256 }, false, ['wrapKey', 'unwrapKey']);
