@@ -108,3 +108,8 @@ test('a rule that sets what an article leaves to a ministry comes first: 起徵�
   assert.equal(matchRules(rows, '起徵點是多少？', [])[0].id, 'MOF:FL006090');
   assert.ok(!matchRules(rows, '起徵點是多少？', ['G0340080:26']).some(r => r.id === 'MOF:GL1'), 'a rule on another article of the same law stays out');
 });
+
+test('a vote’s topic from votes.json as it is ({ 議程編號: 案由 })', () => {
+  const data = { agendas: { 'rec-11-6-6-i4': '老年農民福利津貼暫行條例' } };
+  assert.equal(voteTopic(['rec-11-6-6-4', '2026-11-06', '討論事項第四案復議案不予通過', 'rec-11-6-6-i4'], data), '老年農民福利津貼暫行條例：討論事項第四案復議案不予通過');
+});

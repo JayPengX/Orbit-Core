@@ -21,7 +21,9 @@ test('town: the ask is a township, its session file, a government PDF and a ques
   const ok = { mode: 'town', tc: '10004010', file: 't10-8r', url: 'https://www.zhubei.gov.tw/admin/upload/twgov_file_1.pdf', n: 0 };
   assert.equal(townAsk(ok), true);
   assert.deepEqual(readAsk(ok), { mode: 'town', tc: '10004010', file: 't10-8r', url: ok.url, n: 0, lang: 'zh' });
-  for (const bad of [{ tc: '1' }, { file: '../x' }, { url: 'https://evil.com/a.pdf' }, { url: 'https://www.zhubei.gov.tw/a.html' }, { n: -1 }, { n: 1.5 }]) assert.equal(readAsk({ ...ok, ...bad }), 'town', JSON.stringify(bad));
+  for (const bad of [{ tc: '1' }, { file: '../x' }, { url: 'https://evil.com/a.pdf' }, { url: 'http://www.zhubei.gov.tw/a.pdf' }, { url: 'https://gov.tw.evil.com/a.pdf' }, { n: -1 }, { n: 1.5 }]) assert.equal(readAsk({ ...ok, ...bad }), 'town', JSON.stringify(bad));
+  // (The papers some towns post on Google Drive, a county's 施政報告 page: as the data holds them.)
+  for (const url of ['https://drive.google.com/file/d/1KMmP8scLCErpjxOg93hB40lexfhIGdFX/view', 'https://www.pthg.gov.tw/News_Content.aspx?n=1&s=2']) assert.equal(townAsk({ ...ok, url }), true, url);
 });
 
 test('town: one member’s turns, numbered; a point stays only on turns it was given', () => {

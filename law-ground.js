@@ -28,10 +28,15 @@ const files = new Map();
 let hourly = null;
 const readHour = path => (hourly ||= dataReader(3600))(path);
 export const forgetGround = () => files.clear();
+// (A read that failed isn't kept: 問法律 went an hour without rulings or
+// votes after one bad moment.)
 export function readGround(path, now = Date.now()) {
   const had = files.get(path);
   if (had && now - had.at < HOUR_MS) return had.p;
-  const p = readHour(path).catch(() => null);
+  const p = readHour(path).catch(() => {
+    if (files.get(path)?.p === p) files.delete(path);
+    return null;
+  });
   files.set(path, { at: now, p });
   return p;
 }

@@ -125,6 +125,13 @@ test("the proxy reads Law's packed data as files (readData, readGround), the lis
     assert.deepEqual(await readGround('law/b/c/0.json'), JSON.parse(files['law/b/c/0.json']));
     assert.deepEqual(new Set(asked.filter(([p]) => p === PACKS).map(a => a[1])), new Set([60]));
     assert.ok(asked.filter(([p]) => isPack(p)).every(a => a[1] === 30 * 86_400));
+    // A read that failed (the site down a moment) is tried again, never kept an hour as nothing.
+    forgetGround();
+    let down = true;
+    useLawSite({ fetch: async url => (down ? Promise.reject(new Error('down')) : Response.json(await fromDir(dir)(url.slice(DATA.length)))) });
+    assert.equal(await readGround('law/big.json'), null);
+    down = false;
+    assert.deepEqual(await readGround('law/big.json'), JSON.parse(files['law/big.json']));
   } finally {
     useLawSite(null);
   }

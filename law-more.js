@@ -191,8 +191,10 @@ export function matchVotes(data, text, ps, people, partyOf = new Map()) {
 }
 
 // What a vote was on: its 議案's title (the 議事錄's, its ─完成三讀─ dropped) before its 議題 (討論事項第二十四案 全案表決 alone says nothing).
+// (votes.json keeps them as { 議程編號: 案由 }; pairs read too.)
 export function voteTopic(v, data) {
-  const ag = (Array.isArray(data?.agendas) ? data.agendas : []).find(a => Array.isArray(a) && a[0] === v[3])?.[1];
+  const list = data?.agendas;
+  const ag = Array.isArray(list) ? list.find(a => Array.isArray(a) && a[0] === v[3])?.[1] : list && typeof list === 'object' ? list[v[3]] : '';
   const t = String(ag || '').replace(/─[^─]*─/g, '').replace(/[（(]前接.*$/, '').trim();
   return t && !String(v[2]).includes(t.slice(0, 8)) ? `${cut(t, 80)}：${v[2]}` : String(v[2] || '');
 }

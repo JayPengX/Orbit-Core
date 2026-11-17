@@ -12,7 +12,12 @@ export const TOWN_LIMITS = { chars: 30_000, quote: 220, points: 5 };
 const TOWN_TTL_S = 365 * 86_400;
 
 // The ask's own fields, checked: a township's code, its session file, a paper's address, a question's number.
-export const townAsk = b => /^\d{8}$/.test(String(b?.tc)) && /^t\d{1,2}-\d{1,3}[re]$/.test(String(b?.file)) && typeof b?.url === 'string' && (/^https:\/\/[\w.-]+\.gov\.tw\/[^\s"<>]{1,300}\.pdf$/i.test(b.url) || /^asr:[\w-]{12,80}$/.test(b.url)) && Number.isInteger(b?.n) && b.n >= 0 && b.n < 400;
+// A paper's address, only ever a key into Law's own file (papers[url]), never
+// read from here: a government site's (a PDF or not), or the Google Drive some
+// towns post theirs on (a .gov.tw PDF alone turned away 7 members' 總質詢 and
+// 屏東縣政府's 施政報告).
+const TOWN_URL = /^https:\/\/(?:[\w.-]+\.gov\.tw|drive\.google\.com)\/[^\s"<>]{1,300}$/;
+export const townAsk = b => /^\d{8}$/.test(String(b?.tc)) && /^t\d{1,2}-\d{1,3}[re]$/.test(String(b?.file)) && typeof b?.url === 'string' && (TOWN_URL.test(b.url) || /^asr:[\w-]{12,80}$/.test(b.url)) && Number.isInteger(b?.n) && b.n >= 0 && b.n < 400;
 
 // The turns of one member's questions, numbered from 1, as many as the prompt holds.
 export function townTurns(paper, n, max = TOWN_LIMITS.chars) {
@@ -101,7 +106,7 @@ export async function townJob(ask, { fail }) {
 // office's 工作報告, 致詞: papers[url].text, its characters from … to, the part as Law's lib/town-paper.mjs splits it).
 // Gemini sums up that part only, on a person's tap, kept a year: the first reader's tap answers everyone after.
 export const PAPER_LIMITS = { chars: 12_000, points: 6 };
-export const paperAsk = b => /^\d{8}$/.test(String(b?.tc)) && /^t\d{1,2}-\d{1,3}[re]$/.test(String(b?.file)) && typeof b?.url === 'string' && /^https:\/\/[\w.-]+\.gov\.tw\/[^\s"<>]{1,300}\.pdf$/i.test(b.url) && Number.isInteger(b?.from) && Number.isInteger(b?.to) && b.from >= 0 && b.to > b.from && b.to - b.from <= 60_000;
+export const paperAsk = b => /^\d{8}$/.test(String(b?.tc)) && /^t\d{1,2}-\d{1,3}[re]$/.test(String(b?.file)) && typeof b?.url === 'string' && TOWN_URL.test(b.url) && Number.isInteger(b?.from) && Number.isInteger(b?.to) && b.from >= 0 && b.to > b.from && b.to - b.from <= 60_000;
 
 export function paperPrompt(where, kind, text, lang) {
   return `Below is part of a paper from a Taiwanese township council's session (${where}): ${kind}, as read from its PDF (table columns may run together). Return JSON matching the schema.
