@@ -2,7 +2,7 @@
 // plan/settle: never spam, never miss) and the looks (site/admin/mail-look.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { plan, settle, groupsAt, DAY_MAX } from '../mail-alerts.js';
+import { plan, settle, groupsAt, DAY_MAX, modelIssues } from '../mail-alerts.js';
 import { addressesOf, isAddress, sendMail } from '../mail.js';
 import { mailRender, alertMail, blocksOf, MAIL_LOOKS } from '../site/admin/mail-look.mjs';
 
@@ -154,4 +154,16 @@ test('red means people feel it: a forecast is amber, a phone leaving early is no
   assert.equal(routeTone({ today: 25, yesterday: 30 }), '');
   assert.equal(routeTone({ today: 25, yesterday: 5 }), 'slow');
   assert.equal(routeTone({ today: 150, yesterday: 20 }), 'bad');
+});
+
+test('alerts: a model failing every call today is told (the next maker answers meanwhile); one that answered once, or failed only a few times, is not', () => {
+  const calls = [
+    ...Array.from({ length: 7 }, () => ({ model: 'claude-haiku-5-5', status: 400 })),
+    ...Array.from({ length: 9 }, () => ({ model: 'gpt-6-luna', status: 503 })),
+    { model: 'gpt-6-luna', status: 200 },
+    ...Array.from({ length: 3 }, () => ({ model: 'gemini-3.6-flash', status: 404 }))
+  ];
+  assert.deepEqual(modelIssues(calls).map(i => [i.id, i.tone, i.mail]), [['ai-model:claude-haiku-5-5', 'warn', true]]);
+  assert.match(modelIssues(calls)[0].title, /^Claude /);
+  assert.deepEqual(modelIssues(null), []);
 });

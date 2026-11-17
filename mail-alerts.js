@@ -12,7 +12,7 @@
 //   - errors: a Worker failing more than 5% of requests, a route's 100
 //     server errors in a Taiwan day;
 //   - AI: a feature at its day cap (someone was refused), a maker's
-//     balance at 25% (10% red);
+//     balance at 25% (10% red), a model failing every call today;
 //   - TDX's month past 80% (95% red);
 //   - GitHub's token (GH_ACTIONS_TOKEN) failing, or ending within 21 days
 //     (github-keep.js keeps the family's GitHub schedules on with it).
@@ -38,6 +38,7 @@ import { GH_KEEP, keepIssues } from './github-keep.js';
 import { ADMIN_TOOLS, readDev } from './eco-admin.js';
 import { callsSince } from './gemini-use.js';
 import { moneyLeft, PROVIDERS } from './ai.js';
+import { makerOf } from './ai-other.js';
 import { DEV } from './kit/devconfig.mjs';
 import { tdxUse, tdxPoints, tdxPlan } from './transit.js';
 import { SOURCES, freshAt, sourceState } from './kit/sources.mjs';
@@ -122,6 +123,7 @@ async function mid(env, deps, now) {
       if (n >= dev[key]) out.push({ id: `ai-cap:${key}`, tone: 'warn', mail: true, title: `AI「${String(d.zh || key).replace(/（.*）/, '')}」今天的上限用完了`, detail: `${n} / ${dev[key]} 次，之後的人今天用不到。用量突然變多的話，看看是誰在用。`, go: 'usage' });
     }
   }
+  out.push(...modelIssues(calls));
   if (tdx) {
     const share = tdxPoints(tdx, now).month / tdxPlan(now).month;
     if (share >= 0.8) out.push({ id: 'tdx', tone: share >= 0.95 ? 'bad' : 'warn', mail: true, title: `TDX 這個月的點數用了 ${pct(share)}`, detail: '用完之後公車與鐵路的即時資料會停到下個月。', go: 'usage' });
@@ -147,6 +149,20 @@ async function slow(env, deps, now) {
       .filter(p => left[p].tone)
       .map(p => ({ id: `ai-money:${p}`, tone: left[p].tone, mail: true, title: `${PROV[p]} 的預付餘額剩 ${pct(left[p].left / saved[p].usd)}`, detail: `約 US$${Math.max(0, left[p].left).toFixed(2)}${left[p].days != null ? `，照最近 7 天的速度約 ${left[p].days} 天用完` : ''}。`, go: 'usage' }))
   ];
+}
+// A model failing every call today, 6 or more (its maker's balance at zero,
+// the model retired, its key revoked): the next maker answers and nothing
+// stops (Jay 11-17: keeping all three), but the owner hears it.
+export function modelIssues(calls) {
+  const by = {};
+  for (const c of calls || []) {
+    const m = (by[c.model] ||= { ok: 0, bad: 0, status: 0 });
+    if (c.status === 200) m.ok++;
+    else (m.bad++, (m.status = c.status));
+  }
+  return Object.entries(by)
+    .filter(([, m]) => !m.ok && m.bad >= 6)
+    .map(([model, m]) => ({ id: `ai-model:${model}`, tone: 'warn', mail: true, title: `${PROV[makerOf(model) || 'google']} 的 ${model} 今天每次都失敗`, detail: `${m.bad} 次，最後是 HTTP ${m.status}。另外兩家在接手，功能沒停。402/400 多半是預付餘額用完（要用就儲值）；404 是這個模型下架了（ai.js 的 MODELS 換成新的名字）；401 是金鑰失效。`, go: 'usage' }));
 }
 const CHECKS = { fast, mid, slow };
 const CONFIRM = { fast: 2, mid: 1, slow: 1 };
