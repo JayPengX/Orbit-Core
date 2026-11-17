@@ -4,7 +4,7 @@ How to pick Orbit up somewhere new (another Claude account or project, Claude
 Code on a computer, or another AI agent) with nothing but these repos and the
 accounts in §3. Everything needed to build, run and change Orbit is in GitHub;
 this page lists what isn't and how to start. Written 2026-11-14; §5 is the
-state that day and goes stale, everything else changes only when an account,
+state on its date and goes stale, everything else changes only when an account,
 a secret or a schedule does (update it in the same push).
 
 ## 1. Start a new agent
@@ -35,6 +35,10 @@ a secret or a schedule does (update it in the same push).
    machine. Deploys run in GitHub Actions with the secrets in §3.2; Workers
    and data live in Cloudflare. `node tools/preview.mjs <app> --live` reads
    real data through the Workers' open dev doors, no secret.
+5. **A task without any agent at hand:** Orbit-Core's `agent.yml` (Actions ›
+   Run a task on the API credit, by hand) runs headless Claude Code on
+   `ANTHROPIC_CREDIT_KEY` with a dollar cap and leaves its work as patches on
+   an `agent/…` branch for someone to check and ship with `tools/push.sh`.
 
 **Other AI agents:** `AGENTS.md` points here. `CLAUDE.md` and the rulebook
 use no Claude-only feature; where they say "thread" or "decision card", read
@@ -74,7 +78,7 @@ carried, kept here so a new one can copy them:
 | **TDX** (運輸資料流通服務) | `TDX_CLIENT_ID`, `TDX_CLIENT_SECRET`: buses, trains, bikes (free tier from 2026-12-01) | Transit |
 | **司法院 open data** | `JDOC_USER`, `JDOC_PASS` (Orbit-Law's secrets): court rulings | Law's 裁判 |
 | **Firebase** (old) | `FIREBASE_PRIVATE_KEY`, kept only until 2026-12-05 for sign-ins older than 2026-10-05 | Nothing after 12-05: then delete the key and the Firebase project |
-| **Resend** (domain jaypengx.com verified 2026-11-14) | `RESEND_API_KEY` (on the proxy): all mail from the domain (`mail.js`): admin alert mails, 寫信, the Pass's recovery email; free plan, 90 a day kept | Mail falls back to Cloudflare below |
+| **Resend** (domain jaypengx.com verified 2026-11-14) | `RESEND_API_KEY` (a GitHub secret, copied to the proxy): all mail from the domain (`mail.js`): admin alert mails, 寫信, the Pass's recovery email; free plan, 90 a day kept | Mail falls back to Cloudflare below |
 | **Cloudflare Email Routing** (in the Cloudflare account) | Binding `MAIL`: mail when Resend fails, only to verified destination addresses; free | No fallback |
 | **Jay's inbox** | Where GitHub's failed-run mails and the admin alerts go | Missed alerts |
 | **Jay's Apple devices** | The admin pass and passkeys (iCloud Keychain) | Sign in with the admin pass, add passkeys again |
@@ -88,7 +92,8 @@ Values are never written anywhere else. The admin panel's system report and
   `CLOUDFLARE_API_TOKEN` (deploys; needs Workers, D1 and the zone's DNS Edit),
   `CF_GUARD_TOKEN` (the guard reads the bill), `ECO_TOKEN_SECRET`,
   `ECO_ADMIN_TOKEN`, `DATA_PUSH_SECRET`, `LAW_BUILD_KEY`,
-  `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_CREDIT_KEY`.
+  `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `RESEND_API_KEY`, `ANTHROPIC_CREDIT_KEY`
+  (batch jobs and `agent.yml` only).
   `deploy.yml` and `deploy-guard.yml` copy the Worker ones into the Workers.
   The free plans' watch (`free-watch.yml`, 3-hourly) fails, and GitHub mails
   Jay, when either Cloudflare token is refused or ends within 21 days.
@@ -103,8 +108,7 @@ Values are never written anywhere else. The admin panel's system report and
   `GH_ACTIONS_TOKEN` (a GitHub fine-grained token, Actions read and write on the
   family's repos, so the admin panel's 部署 and the cron can start workflows
   and keep GitHub's schedules on, github-keep.js; it has an end date: Jay is
-  mailed 21 days before, then makes a new one and types it in), `FIREBASE_PRIVATE_KEY` (until 12-05),
-  `RESEND_API_KEY` (when mail is set up).
+  mailed 21 days before, then makes a new one and types it in), `FIREBASE_PRIVATE_KEY` (until 12-05).
 
 **Never change `ECO_TOKEN_SECRET`.** Every pass is stored hashed with a
 pepper made from it: a new value locks every account out, and the recovery
@@ -145,9 +149,11 @@ then run each repo's deploy. The KV ids in `wrangler.toml` and
 ### 3.5 If the GitHub owner changes
 
 31 files name `JayPengX` (workflows that start each other, the builders'
-GitHub reads, `kit/apps.mjs`): `grep -rl JayPengX` in every repo and change
-them together. GitHub turns off a public repo's scheduled workflows after 60
-days without a commit: re-enable them in each repo's Actions tab.
+GitHub reads, `kit/apps.mjs`, `github-keep.js`): `grep -rl JayPengX` in every
+repo and change them together. GitHub turns off a public repo's scheduled
+workflows after 60 days without a commit; the proxy's cron turns them back on
+(`github-keep.js`, with `GH_ACTIONS_TOKEN`). If that token has run out, turn
+them on by hand in each repo's Actions tab.
 
 ## 4. What the old Claude project held (not needed to build or run)
 
@@ -166,7 +172,7 @@ days without a commit: re-enable them in each repo's Actions tab.
 
 | Where | When | What |
 | --- | --- | --- |
-| Proxy Worker crons | every minute (even and odd) | Live sports, builders, backups at 04:30, the Runner's work |
+| Proxy Worker crons | every minute (even and odd) | Live sports, builders, backups at 04:30, the Runner's work, alert mails, keeping GitHub's schedules on |
 | `quota-guard` cron | every 5 minutes | Reads the bill, paces, warns at 50/75/90% |
 | Orbit-Core `free-watch.yml` | every 3 hours | Pages, routes, crons, free amounts, AI balances; a failure mails Jay |
 | Orbit-Core `flight.yml` | every 10 minutes | 專注飛行's flight pool |
