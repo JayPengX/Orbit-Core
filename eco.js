@@ -61,7 +61,7 @@ import { cleanReport, REC_PREFIX } from './rec-weekly.js';
 import { retire } from './money.js';
 import { storeReady, stamp } from './doc-store.js';
 import { tokenSecret, signToken, readToken, seal, unseal, sessionLimited, SESSION_MS, REFRESH_MS, HANDOFF_MS } from './orbit-token.js';
-import { admit, seenNow, limitOf, fullBody } from './door.js';
+import { admit, seenNow, limitOf, fullBody, doorShut } from './door.js';
 import { handleAdmin, readDev } from './eco-admin.js';
 import { passkeyBegin, passkeyLogin, passkeyAddBegin, passkeyAdd, passkeyRemove, passkeySummary, pointPasskeys, dropIndex, passkeyIds } from './passkey.js';
 import { mailBegin, mailConfirm, mailRemove, mailRecoverBegin, mailRecover, signupMailBegin, signupMailProve, mailSummary, mailOf, pointMail, dropMailIndex, mailReady, claimMail } from './pass-mail.js';
@@ -607,7 +607,7 @@ export async function handleEcoRequest(request, env, headers, ip, deps, waitUnti
       const stored = hasPayload ? await deps.fsGet(env, coll, docId) : null;
       if (hasPayload && !savable(stored, body.payload)) return errorJson('ECO_PAYLOAD_INVALID', 400, headers, request);
       if (hasPayload && overSealed(stored, body.payload)) return errorJson('ECO_PAYLOAD_LOCKED', 409, headers, request);
-      const base = str(body.base, 64);
+      const base = hasPayload ? str(body.base, 64) : '';
       if (base && base !== stored.updateTime) return json({ error: { code: 'ECO_DATA_CHANGED', message: 'ECO_DATA_CHANGED' }, updateTime: stored.updateTime }, 409, headers);
       const now = deps.now();
       let refused = null;
@@ -749,8 +749,9 @@ export async function stampLevels(env, { dry = false } = {}) {
 }
 // Through the door (door.js) before a session is handed out: { ok: true },
 // or the 503 to send with the place in line.
-async function doorFor(ctx, id, wallet) {
-  const out = await admit(ctx.env, { id, pri: priorityPass(wallet), waitUntil: ctx.waitUntil });
+// (`seat`, `from`: door.js ask's: never turned away; the seat of the id the account had before.)
+async function doorFor(ctx, id, wallet, { seat = false, from = '' } = {}) {
+  const out = await admit(ctx.env, { id, pri: priorityPass(wallet), waitUntil: ctx.waitUntil, seat, from });
   return out.ok ? null : ctx.deps.json(fullBody(out), 503, ctx.headers);
 }
 
@@ -775,17 +776,27 @@ const refreshToken = (secret, c, now) => signToken(secret, { k: 'ref', d: c.d, s
 // session for the app, the wallet and the app's data). `fresh`: this session
 // takes only `rotate` though the pass isn't fresh (signed in by the recovery
 // email: the lost pass is replaced first, pass-mail.js).
-export async function signIn(ctx, docId, { passcode = null, fresh = false } = {}) {
+// `seat`: let in by something spent that can't be asked for again (a mailed
+// code, a device code), as a pass made or renamed by this very request
+// (`passcode`) is: seated whatever the room (door.js ask). `from`: the id the
+// account had until now (rotate), whose seat this is.
+export async function signIn(ctx, docId, { passcode = null, fresh = false, seat = false, from = '' } = {}) {
   const { env, headers, deps, secret, body, app } = ctx;
   if (!ECO_APPS[app]) return deps.errorJson('ECO_UNKNOWN_APP', 400, headers, ctx.request);
   const now = deps.now();
   const sid = deps.generateCode(12);
+  // The door before anything is written: someone turned away took the app's
+  // live seat from the device using it (which then said 已在別處開啟) for a
+  // session that was never handed out.
+  const had = await deps.fsGet(env, WALLET_COLLECTION, docId);
+  const before = had.exists ? parseWallet(had.payload) : null;
+  if (!before) return null;
+  const turned = await doorFor(ctx, docId, before, { seat: Boolean(passcode || seat), from });
+  if (turned) return turned;
   // (A pass shown here to its maker is theirs alone; any other first sign-in
   // on a pass never used marks it fresh before the app's use is noted.)
   const result = await updateWallet(env, deps, docId, w => goLive(touchApp(mergeWallet(passcode ? w : markFresh(w), { entries: paydayEntries(w, now) }), app, now), app, sid, now));
   if (!result) return null;
-  const turned = await doorFor(ctx, docId, result.wallet);
-  if (turned) return turned;
   const c = { d: docId, s: sid, a: app, g: gen(result.wallet), f: fresh || freshPass(result.wallet), p: priorityPass(result.wallet) };
   const out = await sessionReply(env, deps, secret, result, c, now, { app: c.f ? '' : app, inbox: !c.f && body.inbox, shelves: {} });
   out.refresh = await refreshToken(secret, c, now);
@@ -851,6 +862,8 @@ async function createOpen(ctx) {
   if (!ECO_APPS[app]) return deps.errorJson('ECO_UNKNOWN_APP', 400, headers, request);
   const most = (await readDev(env, deps).catch(() => null))?.passNewDay ?? 0;
   if (!(most > 0) || !mailReady(env)) return deps.errorJson('ECO_CREATE_CLOSED', 403, headers, request);
+  // (Full: said now, before a code is mailed or spent. Once the pass is made it is handed over whatever the room.)
+  if (await doorShut(env)) return deps.json(fullBody(), 503, headers);
   return { most };
 }
 async function ecoCreateStart(ctx) {
@@ -915,6 +928,8 @@ async function ecoRefresh(ctx) {
   let result = { wallet, updateTime: doc.updateTime };
   if (!live || paydayEntries(wallet, now).length) {
     result = await updateWallet(env, deps, c.d, w => goLive(touchApp(mergeWallet(w, { entries: paydayEntries(w, now) }), app, now), app, c.s, now));
+    // (Gone between the read and the write, a new pass or a delete on another device: signed out, never a 502.)
+    if (!result) return errorJson('ECO_SIGNED_OUT', 401, headers, request);
   }
   const out = sameWallet(await sessionReply(env, deps, secret, result, claims, now, { app: body.data && !claims.f ? app : '', inbox: !claims.f && body.inbox, since: str(body.since, 100), shelves: { ns: str(body.ns, 100), fs: str(body.fs, 100) } }), w);
   out.refresh = await refreshToken(secret, claims, now);
@@ -1033,7 +1048,8 @@ async function pairRedeem(ctx) {
   if (!pair || !(pair.exp > deps.now())) return deps.errorJson('ECO_PAIR_NOT_FOUND', 404, headers, request);
   const w = await deps.fsGet(env, WALLET_COLLECTION, pair.d);
   if (!w.exists || gen(parseWallet(w.payload)) !== pair.g) return deps.errorJson('ECO_PAIR_NOT_FOUND', 404, headers, request);
-  const res = await signIn(ctx, pair.d);
+  // (The code is spent: never turned away at the door.)
+  const res = await signIn(ctx, pair.d, { seat: true });
   return res || deps.errorJson('ECO_PAIR_NOT_FOUND', 404, headers, request);
 }
 
@@ -1066,7 +1082,8 @@ async function ecoSignOutAll(ctx) {
   if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
   if (sessionLimited(`so:${c.s}`, 5, 60_000, deps.now())) return deps.errorJson('RATE_LIMITED', 429, headers, request);
   await updateWallet(env, deps, c.d, w => (gen(w) !== c.g ? w : { ...w, sec: { ...(w.sec || {}), gen: gen(w) + 1 }, live: null }));
-  const res = await signIn({ ...ctx, app: c.a }, c.d);
+  // (Its own sign-in is spent by now: never turned away at the door, or this device was signed out with the rest.)
+  const res = await signIn({ ...ctx, app: c.a }, c.d, { seat: true });
   return res || deps.errorJson('ECO_SIGNED_OUT', 401, headers, request);
 }
 
@@ -1090,37 +1107,103 @@ async function ecoBug(ctx) {
 // A new pass for the same account (the old one leaked, say): everything
 // moves to the new pass, the old one stops working, every other device is
 // signed out, and this one comes back signed in with the new pass.
+//
+// The new pass is shown once, in this answer, so the answer must not be
+// losable: a rotate asked twice (the kit sends a call again when the first
+// had no answer in 5 s; a reply lost in a tunnel and the button tapped again)
+// found the account gone the second time, the device was signed out, and the
+// new pass was never seen by anyone. So:
+//   - the new pass is worked out from the session that asks (rotatedPass),
+//     never drawn: asked again, it is the same pass;
+//   - every step can be done again (a copy never over one made already), so
+//     a second ask goes on from wherever the first stopped, beside it if it
+//     still runs;
+//   - done already: answered again with the same pass, while the session's
+//     token would still have run (20 minutes) and nobody signed the new
+//     account's devices out since.
+// The work goes on though the phone hangs up (waitUntil).
+const PASS_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+async function rotatedPass(env, deps, secret, c) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  // (As good as drawn: 50 bits of an HMAC nobody without the token secret can work out, over an id, a generation and a session id used once.)
+  const mac = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`orbit-rotate:v1:${c.d}:${c.g}:${c.s}`)));
+  const passcode = Array.from(mac.slice(0, ECO_PASSCODE_LENGTH), b => PASS_ALPHABET[b & 31]).join('');
+  return { passcode, docId: (await passKey(env, passcode)) || (await deps.sha256Hex(passcode)) };
+}
+// A document copied to its place under the new pass, never over one already there.
+async function copyOnce(env, deps, collection, from, to) {
+  const d = await deps.fsGet(env, collection, from);
+  if (!d.exists) return false;
+  try {
+    await deps.fsWrite(env, collection, to, d.payload, { exists: false });
+  } catch (error) {
+    if (!error.precondition) throw error;
+  }
+  return true;
+}
 async function ecoRotate(ctx) {
-  const { env, headers, deps, request } = ctx;
-  const c = await liveSession(ctx, { fresh: true });
+  const { env, headers, deps, request, secret } = ctx;
+  const c = await sessionFor(ctx, { fresh: true });
   if (!c) return deps.errorJson('ECO_TOKEN_INVALID', 401, headers, request);
   if (sessionLimited(`rot:${c.s}`, 5, 60_000, deps.now())) return deps.errorJson('RATE_LIMITED', 429, headers, request);
+  const { passcode, docId } = await rotatedPass(env, deps, secret, c);
+  const read = async () => {
+    const d = await deps.fsGet(env, WALLET_COLLECTION, c.d);
+    return d.exists ? parseWallet(d.payload) : null;
+  };
+  let held = await read();
   // Taken first (every device out): two rotates at once make one new pass,
   // never two each holding the money.
-  const wallet = await claimAccount(env, deps, c.d, c.g);
-  if (!wallet) return deps.errorJson('ECO_SIGNED_OUT', 401, headers, request);
-  const { passcode, docId } = await newPasscode(env, deps);
-  for (const { collection } of Object.values(ECO_APPS)) {
-    const d = await deps.fsGet(env, collection, c.d);
-    if (d.exists) await deps.fsWrite(env, collection, docId, d.payload);
-  }
-  const inbox = {};
-  for (const [app, ids] of Object.entries(wallet.inbox || {}))
-    for (const id of ids) {
-      const d = await deps.fsGet(env, INBOX_COLLECTION, id);
-      if (!d.exists) continue;
-      const next = `${docId}-${app}-${deps.generateCode(8)}`;
-      await deps.fsWrite(env, INBOX_COLLECTION, next, d.payload);
-      (inbox[app] ||= []).push(next);
+  const mine = Boolean(held && gen(held) === c.g);
+  let wallet = mine ? await claimAccount(env, deps, c.d, c.g, c.s) : null;
+  if (!wallet) {
+    // (Another ask took it a moment before: this session's own, or another device's.)
+    if (mine) held = await read();
+    // Taken by this very ask before (it stopped part way, or still runs): gone on with.
+    if (held && gen(held) === c.g + 1 && held.sec?.by === c.s) wallet = held;
+    else {
+      // Done by this very ask before: the same pass again.
+      const made = held ? null : await deps.fsGet(env, WALLET_COLLECTION, docId);
+      const next = made?.exists ? parseWallet(made.payload) : null;
+      if (!next || next.sec?.rot !== c.s || gen(next) !== c.g + 1) return deps.errorJson(mine ? 'ECO_SIGNED_OUT' : 'ECO_TOKEN_INVALID', 401, headers, request);
+      return signIn({ ...ctx, app: c.a }, docId, { passcode });
     }
-  // (What the owner set goes along: its level and priority; `fresh` and `taken` stay behind.)
-  const kept = { ...(wallet.sec?.level ? { level: wallet.sec.level } : {}), ...(wallet.sec?.priority ? { priority: true } : {}) };
-  await deps.fsWrite(env, WALLET_COLLECTION, docId, JSON.stringify({ ...wallet, inbox, sec: { gen: gen(wallet), ...kept }, live: null }), { exists: false });
-  // (The passkeys and the recovery email come along: they sign in to the new pass.)
-  await pointPasskeys(env, deps, docId, wallet);
-  await pointMail(env, deps, ctx.secret, docId, wallet);
-  await deleteAccount(env, deps, c.d);
-  return signIn({ ...ctx, app: c.a }, docId, { passcode });
+  }
+  const work = (async () => {
+    for (const { collection } of Object.values(ECO_APPS)) await copyOnce(env, deps, collection, c.d, docId);
+    // (What's under way and the family's notebook: eco-now.)
+    for (const name of [...Object.keys(ECO_APPS), FAMILY_SHELF]) await copyOnce(env, deps, NOW_COLLECTION, shelfId(c.d, name), shelfId(docId, name));
+    const inbox = {};
+    for (const [app, ids] of Object.entries(wallet.inbox || {}))
+      for (const id of ids) {
+        // (Named after the one it copies: asked again, the same copy.)
+        const next = `${docId}-${app}-${String(id).slice(-8)}`;
+        if (await copyOnce(env, deps, INBOX_COLLECTION, id, next)) (inbox[app] ||= []).push(next);
+      }
+    // (Everything the owner set goes along: its level, priority and Orbit AI allowance. Only `fresh`, and the marks of this taking, stay behind.)
+    // (`rot`: the session whose ask made it: only that ask is answered with its pass again.)
+    const { fresh, taken, by, rot, ...kept } = wallet.sec || {};
+    try {
+      await deps.fsWrite(env, WALLET_COLLECTION, docId, JSON.stringify({ ...wallet, inbox, sec: { ...kept, gen: gen(wallet), rot: c.s }, live: null }), { exists: false });
+    } catch (error) {
+      if (!error.precondition) throw error;
+    }
+    // (Never anyone else's account: nothing is pointed at it, or deleted, unless it is this ask's own.)
+    const made = await deps.fsGet(env, WALLET_COLLECTION, docId);
+    if ((made.exists ? parseWallet(made.payload) : null)?.sec?.rot !== c.s) throw new Error('rotate: the new pass is taken');
+    // (The passkeys and the recovery email come along: they sign in to the new pass.)
+    await pointPasskeys(env, deps, docId, wallet);
+    await pointMail(env, deps, secret, docId, wallet);
+    // What this Worker keeps under the account's id (worker.js moveRecords: Securities' order book and checked
+    // events, its notices, its Orbit AI count, its kept versions) is the new pass's from now on.
+    await deps.moveRecords?.(env, c.d, docId, deps.now(), { whole: true });
+    await deleteAccount(env, deps, c.d);
+    // (After the old id's documents went, each kept as it goes: those too.)
+    await deps.moveKept?.(env, c.d, docId);
+    return signIn({ ...ctx, app: c.a }, docId, { passcode, from: c.d });
+  })();
+  ctx.waitUntil?.(work.catch(() => {}));
+  return work;
 }
 
 // ---- The vault: the data key, locked by the pass (kit vault.mjs) ----------------------
@@ -1484,13 +1567,16 @@ async function shareRedeem(ctx) {
 // wallet as taken, or null when another request took it first.
 // (`taken`: when, so a second merge that reads it just after can't take it
 // again at the generation it now has.)
+// (`by`: the session that took it, for a rotate: asked again by that session, it goes on, ecoRotate.)
 const TAKEN_MS = 60_000;
-async function claimAccount(env, deps, docId, g) {
+async function claimAccount(env, deps, docId, g, by = '') {
   let took = false;
   const now = deps.now();
   const result = await updateWallet(env, deps, docId, w => {
     took = gen(w) === g && !(w.sec?.taken > now - TAKEN_MS);
-    return took ? { ...w, sec: { ...(w.sec || {}), gen: g + 1, taken: now }, live: null } : w;
+    if (!took) return w;
+    const { by: _, ...sec } = w.sec || {};
+    return { ...w, sec: { ...sec, gen: g + 1, taken: now, ...(by ? { by } : {}) }, live: null };
   });
   return took && result ? result.wallet : null;
 }
@@ -1530,6 +1616,9 @@ export async function deleteAccount(env, deps, docId, { retire: gone = false } =
   for (const name of [...Object.keys(ECO_APPS), FAMILY_SHELF]) await deps.fsDelete(env, NOW_COLLECTION, shelfId(docId, name));
   await dropIndex(env, deps, docId, passkeyIds(wallet));
   await dropMailIndex(env, deps, await tokenSecret(env), docId, mailOf(wallet));
+  // Its notices and their switches (worker.js dropRecords) go with it: left behind, a deleted account's phone
+  // went on being sent them, and a pass changed had each one twice.
+  await deps.dropRecords?.(env, docId).catch(() => {});
   await deps.fsDelete(env, WALLET_COLLECTION, docId);
 }
 

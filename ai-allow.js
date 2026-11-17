@@ -114,6 +114,24 @@ async function takeOne(env, k, most, e) {
   return cap > 0 && row ? Number(row.n) : 0;
 }
 
+// An account's counts under the id it has now (a new pass, eco.js ecoRotate): what it used
+// this day or month still counts (a new pass was a full allowance again).
+export async function moveUse(env, from, to) {
+  if (!from || !to || from === to) return;
+  if (!env.STORE?.prepare) {
+    for (const [k, n] of [...memory]) {
+      if (!k.startsWith(`${from}|`)) continue;
+      const next = `${to}|${k.slice(from.length + 1)}`;
+      if (!memory.has(next)) memory.set(next, n);
+      memory.delete(k);
+    }
+    return;
+  }
+  await table(env, Date.now());
+  await env.STORE.prepare("UPDATE OR IGNORE ai_use SET k = ?2 || substr(k, length(?1) + 1) WHERE substr(k, 1, length(?1) + 1) = ?1 || '|'").bind(from, to).run();
+  await env.STORE.prepare("DELETE FROM ai_use WHERE substr(k, 1, length(?1) + 1) = ?1 || '|'").bind(from).run();
+}
+
 // The account behind a session ('ses' token, already checked), signed in still.
 async function walletOf(env, deps, c) {
   if (!c || typeof c.d !== 'string' || !c.d) return null;
@@ -156,6 +174,20 @@ export async function aiSpend(env, deps, c) {
     // (The count can't be read: no call started.)
     return 'used';
   }
+}
+
+// One given back: a call that made nothing (refused as it came, the day's cap, every model
+// down) isn't the person's to pay for (worker.js route).
+export async function aiBack(env, deps, c) {
+  if (c && OWNER_SESSIONS.has(c.d) && c.s === c.d) return;
+  const wallet = await walletOf(env, deps, c);
+  if (!wallet) return;
+  const now = deps.now();
+  const rule = ruleOf(wallet, await levelRules(env, deps, now), now);
+  if (rule.n === 0) return;
+  const k = `${c.d}|${periodOf(rule, now).p}`;
+  if (!env.STORE?.prepare) return void (memory.get(k) > 0 && memory.set(k, memory.get(k) - 1));
+  await env.STORE.prepare('UPDATE ai_use SET n = n - 1 WHERE k = ?1 AND n > 0').bind(k).run();
 }
 
 // For the phone (eco.js sessionReply): what's left, plainly. null: no AI.

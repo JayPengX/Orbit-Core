@@ -167,13 +167,17 @@ test('/eco: full, a newcomer is turned away with a place in line; someone alread
   forgetPace();
   const t = setup();
   const first = await newPass(t.call, t.deps, 'stock');
+  // (A second pass, made while there was room, its seat since gone: a newcomer with a pass.)
+  const other = await newPass(t.call, t.deps, 'stock');
   await t.settle();
+  const otherId = (await readToken('test-secret', other.data.token, 'ses')).d;
+  delete t.door.book.seats[otherId];
   t.door.book.max = 1;
   // The door tells KV it's full (at its next answer); isolates read it.
   await t.door.fetch(new Request('https://door/now'));
   assert.equal(JSON.parse(t.env.RATE_LIMIT_KV.m.get(DOOR_STATE_KEY)).state, 'full');
   forgetDoor();
-  const second = await newPass(t.call, t.deps, 'stock');
+  const second = await t.call({ op: 'login', app: 'stock', passcode: other.data.passcode });
   assert.equal(second.status, 503);
   assert.equal(second.data.error.code, 'ORBIT_FULL');
   assert.equal(second.data.error.place, 1);
@@ -185,6 +189,117 @@ test('/eco: full, a newcomer is turned away with a place in line; someone alread
   assert.equal(list.priority.length, 0);
   assert.equal(list.door.max, 1);
   assert.equal(list.door.line, 1);
+});
+
+// Turned away after the wallet was written, a sign-in that never happened had
+// taken the app's live seat: the device using the app was told 已在別處開啟.
+test('/eco: someone turned away at the door takes nothing from the device already using the app', async () => {
+  forgetDoor();
+  forgetPace();
+  const t = setup();
+  const a = await newPass(t.call, t.deps, 'stock');
+  await t.settle();
+  const id = (await readToken('test-secret', a.data.token, 'ses')).d;
+  // Full, and this account's seat run out (its phone asleep past 15 minutes).
+  t.door.book.max = 1;
+  t.door.book.seats = { someone: Date.now() + 3_600_000 };
+  await t.door.fetch(new Request('https://door/now'));
+  forgetDoor();
+  const before = t.deps.fsGet(t.env, 'eco-wallets', id);
+  const turned = await t.call({ op: 'login', app: 'stock', passcode: a.data.passcode });
+  assert.equal(turned.status, 503);
+  assert.equal((await t.deps.fsGet(t.env, 'eco-wallets', id)).updateTime, (await before).updateTime, 'the wallet is as it was: the first device is still the live one');
+});
+
+// A new pass is shown once, in the answer that makes it: full, the answer was
+// a 503 and the pass (made, its code spent) was never seen. Now a pass can't be
+// begun while full, and one made is always handed over.
+test('/eco: full, a new pass is refused before its code is mailed, never after the pass is made', async () => {
+  forgetDoor();
+  forgetPace();
+  const t = setup();
+  await newPass(t.call, t.deps, 'stock');
+  await t.settle();
+  t.door.book.max = 1;
+  await t.door.fetch(new Request('https://door/now'));
+  forgetDoor();
+  const mails = [];
+  const { sendMail } = t.deps;
+  t.deps.sendMail = async (env, m) => void mails.push(m);
+  t.deps.mailReady = () => true;
+  const start = await t.call({ op: 'create-start', app: 'stock', addr: 'late@example.com' });
+  assert.equal(start.status, 503);
+  assert.equal(start.data.error.code, 'ORBIT_FULL');
+  assert.equal(mails.length, 0, 'no code mailed');
+  t.deps.sendMail = sendMail;
+});
+test('/eco: a pass made a moment before the door filled is still handed over', async () => {
+  forgetDoor();
+  forgetPace();
+  const t = setup();
+  await newPass(t.call, t.deps, 'stock');
+  await t.settle();
+  const mails = [];
+  t.deps.sendMail = async (env, m) => void mails.push(m);
+  t.deps.mailReady = () => true;
+  assert.equal((await t.call({ op: 'create-start', app: 'stock', addr: 'intime@example.com' })).status, 200);
+  // Full between the code and the pass, the isolate not yet told (its copy of the door's state up to a minute old).
+  t.door.book.max = 1;
+  const made = await t.call({ op: 'create', app: 'stock', addr: 'intime@example.com', code: mails.at(-1).code });
+  assert.equal(made.status, 200);
+  assert.match(made.data.passcode, /^[2-9A-HJ-NP-Z]{10}$/);
+});
+
+// 更換通行碼 gives the account a new id: its seat goes with it (asked as a newcomer, a full door answered 503
+// and the new pass, the old one already dead, was never shown).
+test('/eco: a new pass keeps its seat while the door is full, and the old id gives its seat up', async () => {
+  forgetDoor();
+  forgetPace();
+  const t = setup();
+  const a = await newPass(t.call, t.deps, 'stock');
+  await t.settle();
+  const oldId = (await readToken('test-secret', a.data.token, 'ses')).d;
+  t.door.book.max = 1;
+  await t.door.fetch(new Request('https://door/now'));
+  forgetDoor();
+  const r = await t.call({ op: 'rotate', qt: a.data.token });
+  assert.equal(r.status, 200);
+  assert.match(r.data.passcode, /^[2-9A-HJ-NP-Z]{10}$/);
+  await t.settle();
+  const newId = (await readToken('test-secret', r.data.token, 'ses')).d;
+  assert.notEqual(newId, oldId);
+  assert.deepEqual(Object.keys(t.door.book.seats), [newId]);
+});
+
+// A device code and a mailed code are spent as they're used: never turned away after.
+test('/eco: a device code signs in while the door is full (the code is spent, there is no asking again)', async () => {
+  forgetDoor();
+  forgetPace();
+  const t = setup();
+  const a = await newPass(t.call, t.deps, 'stock');
+  await t.settle();
+  const id = (await readToken('test-secret', a.data.token, 'ses')).d;
+  const pair = await t.call({ op: 'pair-create', qt: a.data.token });
+  assert.equal(pair.status, 200);
+  t.door.book.max = 1;
+  t.door.book.seats = { someone: Date.now() + 3_600_000 };
+  await t.door.fetch(new Request('https://door/now'));
+  forgetDoor();
+  const b = await t.call({ op: 'pair-redeem', app: 'stock', code: pair.data.code });
+  assert.equal(b.status, 200);
+  assert.ok(b.data.token);
+  assert.ok(t.door.book.seats[id]);
+});
+
+test('the door: a seat asked for with `seat` is given whatever the room, and `from` gives the old one up', () => {
+  const b = newBook();
+  b.max = 1;
+  ask(b, { id: 'a', now: T });
+  assert.equal(ask(b, { id: 'x', now: T }).ok, false);
+  assert.deepEqual(ask(b, { id: 'x', seat: true, now: T }), { ok: true });
+  assert.equal(b.line.length, 0, 'out of the line it stood in');
+  assert.deepEqual(ask(b, { id: 'a2', seat: true, from: 'a', now: T }), { ok: true });
+  assert.deepEqual(Object.keys(b.seats).sort(), ['a2', 'x']);
 });
 
 test('/eco: a priority pass signs in with p in its session while the door is full', async () => {

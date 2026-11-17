@@ -382,7 +382,7 @@ A season is kept until the next one's first game.
 - **Devices never keep the pass** (a 60-day refresh and a short session
   token, `orbit-token.js`) **nor the admin key** (a 14-day `adm` token).
 - **Ops:** login, refresh, read/patch/delete, device codes (`eco-pairs`),
-  `#qh=`, sign out everywhere, rotate, merge (`eco-inbox`), share keys (`eco-shares`), `vault`, admin.
+  `#qh=`, sign out everywhere, rotate (`moveRecords`, `moveKept`), merge (`eco-inbox`), share keys (`eco-shares`), `vault`, admin.
 
 ## 7. The economy
 

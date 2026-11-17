@@ -267,14 +267,30 @@ function slowReads(t) {
   };
 }
 
-test('rotate twice at once: one new pass holds the money, never two', async () => {
+test('rotate twice at once from two devices: one new pass holds the money, never two', async () => {
   const t = setup();
   const acct = await newPass(t);
+  const other = await t.call('POST', '', { op: 'login', passcode: acct.passcode, app: 'vocab' });
   slowReads(t);
-  const [r1, r2] = await Promise.all([t.call('POST', '', { op: 'rotate', qt: acct.token }), t.call('POST', '', { op: 'rotate', qt: acct.token })]);
+  const [r1, r2] = await Promise.all([t.call('POST', '', { op: 'rotate', qt: acct.token }), t.call('POST', '', { op: 'rotate', qt: other.data.token })]);
   assert.deepEqual([r1.status, r2.status].sort(), [200, 401]);
   const wallets = [...t.store.keys()].filter(k => k.startsWith(`${WALLET_COLLECTION}/`));
   assert.equal(wallets.length, 1, 'one account left');
+});
+
+// The same session's ask twice (the kit sends a call again when the first had no answer in 5 s):
+// the second was refused and the device signed out, its new pass never shown. One pass, to both.
+test('the same rotate asked twice at once: both answered with the one new pass', async () => {
+  const t = setup();
+  const acct = await newPass(t);
+  await t.call('PATCH', `${t.qt(acct.token)}&app=stock`, { payload: 'gz1:mine' });
+  slowReads(t);
+  const [r1, r2] = await Promise.all([t.call('POST', '', { op: 'rotate', qt: acct.token }), t.call('POST', '', { op: 'rotate', qt: acct.token })]);
+  assert.deepEqual([r1.status, r2.status], [200, 200]);
+  assert.equal(r1.data.passcode, r2.data.passcode);
+  const wallets = [...t.store.keys()].filter(k => k.startsWith(`${WALLET_COLLECTION}/`));
+  assert.equal(wallets.length, 1, 'one account left');
+  assert.equal((await t.call('POST', '', { op: 'login', passcode: r1.data.passcode, app: 'stock' })).data.payload, 'gz1:mine');
 });
 
 test('one pass merged into two at once: its money lands once', async () => {

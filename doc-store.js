@@ -140,6 +140,15 @@ export function d1Store(raw, { keep = () => false, now = Date.now } = {}) {
       const row = await db.prepare('SELECT payload FROM history WHERE coll = ? AND id = ? AND updated = ?').bind(collection, id, updated).first();
       return row ? row.payload : null;
     },
+    // An account's kept versions under the id it has now (a new pass, eco.js
+    // ecoRotate: its wallet and every app's data share its id): what was kept
+    // before the change can still be put back, and the old id isn't listed as
+    // an account deleted (put back, it was a second copy of the account under
+    // the pass its owner had just replaced).
+    async moveKept(from, to) {
+      await db.prepare('UPDATE OR IGNORE history SET id = ?2 WHERE id = ?1').bind(from, to).run();
+      await db.prepare('DELETE FROM history WHERE id = ?1').bind(from).run();
+    },
     // A kept version made the document again (the one it replaces kept
     // too). Its new updateTime, or null without such a version.
     async restore(collection, id, updated, payload = null) {
@@ -187,6 +196,7 @@ export function docStore({ keep = new Set() } = {}) {
     kept: (env, c, o) => d1(env).kept(c, o),
     version: (env, c, id, updated) => d1(env).version(c, id, updated),
     restore: (env, c, id, updated, payload) => d1(env).restore(c, id, updated, payload),
+    moveKept: (env, from, to) => d1(env).moveKept(from, to),
     prune: env => d1(env).prune(),
     page: (env, from, size) => d1(env).page(from, size),
     list: (env, c, pageSize, o) => d1(env).list(c, pageSize, o),

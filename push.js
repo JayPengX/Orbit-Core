@@ -352,6 +352,40 @@ export function pushStore(env) {
   };
 }
 const putRecord = (kv, key, record) => kv.put(key, JSON.stringify(record), { expirationTtl: 60 * 86_400, metadata: { due: dueOf(record) } });
+// An account's lists and switches under the id it has now (a new pass, eco.js
+// ecoRotate): left under the old id they were still sent, and the app's next
+// opening made the same list again under the new one, so each notice came twice.
+export async function movePushes(env, from, to) {
+  const kv = pushStore(env);
+  if (!kv?.list || !from || !to || from === to) return 0;
+  let moved = 0;
+  for (const k of (await kv.list({ prefix: `push:${from}:`, all: true })).keys || []) {
+    const app = k.name.slice(k.name.lastIndexOf(':') + 1);
+    const record = await kv.get(k.name, 'json').catch(() => null);
+    // (One already there, the app opened on the new pass meanwhile, stands.)
+    if (record && !(await kv.get(recordKey(to, app)))) {
+      await putRecord(kv, recordKey(to, app), record);
+      moved++;
+    }
+    await kv.delete(k.name);
+  }
+  const prefs = await kv.get(prefsKey(from));
+  if (prefs != null) {
+    if ((await kv.get(prefsKey(to))) == null) await kv.put(prefsKey(to), prefs, { expirationTtl: 400 * 86_400 });
+    await kv.delete(prefsKey(from));
+  }
+  return moved;
+}
+// An account gone (eco.js deleteAccount): its lists and switches with it, or
+// its phone went on being sent what was waiting.
+export async function forgetPushes(env, account) {
+  const kv = pushStore(env);
+  if (!kv?.list || !account) return 0;
+  const keys = ((await kv.list({ prefix: `push:${account}:`, all: true })).keys || []).map(k => k.name);
+  for (const name of keys) await kv.delete(name);
+  await kv.delete(prefsKey(account));
+  return keys.length;
+}
 // Each list and its due time, from the keys' metadata (`push:prefs:` and the Worker's own skipped).
 export async function dueLists(kv) {
   const out = [];

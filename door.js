@@ -72,13 +72,23 @@ const twDay = now => new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
 
 // Someone asks to come in: { ok: true } or { ok: false, place, of }.
 // `closed`: the guard lets no newcomers in now.
-export function ask(book, { id, pri = false, closed = false, now }) {
+// `seat`: never turned away, whatever the room: an account this very request
+// made or renamed (a new pass shown once, eco.js create and rotate) or let in
+// by something spent that can't be asked for again (a mailed code, a device
+// code). Turned away, the new pass was never shown and the code was gone.
+// `from`: the id the account had until now (a new pass): its seat goes with it.
+export function ask(book, { id, pri = false, closed = false, seat = false, from = '', now }) {
   prune(book, now);
   if (twDay(now) !== book.day) Object.assign(book, { day: twDay(now), peak: { n: 0, at: 0 }, turned: 0 });
   const seated = () => Object.keys(book.seats).length;
   // The guard closed the door: the seats are the people in now.
   if (closed && !book.cap) book.cap = Math.max(1, seated());
   if (!closed) book.cap = 0;
+  if (from && from !== id) {
+    delete book.seats[from];
+    delete book.pri[from];
+    book.line = book.line.filter(w => w.id !== from);
+  }
   if (pri) {
     book.pri[id] = now;
     delete book.seats[id];
@@ -87,6 +97,13 @@ export function ask(book, { id, pri = false, closed = false, now }) {
   }
   if (book.seats[id]) {
     book.seats[id] = now;
+    return { ok: true };
+  }
+  if (seat) {
+    book.line = book.line.filter(w => w.id !== id);
+    book.seats[id] = now;
+    const n = seated();
+    if (n > book.peak.n) book.peak = { n, at: now };
     return { ok: true };
   }
   const seats = seatsOf(book);
@@ -171,7 +188,7 @@ export class Door {
     const url = new URL(request.url);
     const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
     let out;
-    if (url.pathname === '/ask') out = ask(book, { id: String(body.id || ''), pri: Boolean(body.pri), closed: Boolean(body.closed), now });
+    if (url.pathname === '/ask') out = ask(book, { id: String(body.id || ''), pri: Boolean(body.pri), closed: Boolean(body.closed), seat: Boolean(body.seat), from: String(body.from || ''), now });
     else if (url.pathname === '/seen') {
       seen(book, { id: String(body.id || ''), pri: Boolean(body.pri), now });
       out = { ok: true };
@@ -211,14 +228,23 @@ export const forgetDoor = () => {
 // without it: not at the leanest level).
 export const newcomersOk = pace => (pace?.newcomers === undefined ? !(pace?.pace >= 3) : pace.newcomers !== false);
 
+// Whether a newcomer would be turned away now (full, or the guard letting none
+// in): asked before a new pass is begun (eco.js createOpen), so nobody is
+// mailed a code, or spends it, for a pass that can't be handed over.
+export async function doorShut(env) {
+  if (!env?.DOOR) return false;
+  return !newcomersOk(await paceOf(env)) || (await doorOf(env)).state === 'full';
+}
+
 // Someone is handed a session (eco.js): { ok: true } or { ok: false, place, of }.
 // `waitUntil`: the request's, for the ask behind the answer while the door is open.
-export async function admit(env, { id, pri = false, waitUntil = null } = {}) {
+// `seat`, `from`: ask()'s (never turned away; the seat of the id it had before).
+export async function admit(env, { id, pri = false, waitUntil = null, seat = false, from = '' } = {}) {
   if (!env?.DOOR || !id) return { ok: true };
   const closed = !newcomersOk(await paceOf(env));
   const { state } = await doorOf(env);
-  const asking = post(env, '/ask', { id, pri, closed });
-  if (pri || (state === 'open' && !closed)) {
+  const asking = post(env, '/ask', { id, pri, closed, ...(seat ? { seat: true } : {}), ...(from ? { from } : {}) });
+  if (pri || seat || (state === 'open' && !closed)) {
     pinged.set(id, Date.now());
     const quiet = asking.catch(() => {});
     if (waitUntil) waitUntil(quiet);

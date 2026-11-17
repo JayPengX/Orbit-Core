@@ -47,11 +47,11 @@ import { handleLawLive } from './law-live.js';
 import en from './locales/en.js';
 import zhTW from './locales/zh-TW.js';
 import { handleEcoRequest, LOCK_SINCE, ECO_APPS, WALLET_COLLECTION, INBOX_COLLECTION, stampLevels, sealSweep, rekeyAccount, restorePlain } from './eco.js';
-import { aiSpend, aiMay } from './ai-allow.js';
-import { checkStock } from './stock-check.js';
+import { aiSpend, aiMay, aiBack, moveUse } from './ai-allow.js';
+import { checkStock, VERIFIED_COLLECTION } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
 import { handleShowcasePass, showcaseOf, SHOW_PER_MIN } from './showcase.js';
-import { handlePush, sendDue } from './push.js';
+import { handlePush, sendDue, movePushes, forgetPushes } from './push.js';
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
 import { radarCron } from './weather-radar.js';
@@ -1273,11 +1273,27 @@ const ECO_DEPS = {
   build: (env, job) => runBuilders(env, { proxy: builderProxy(env), aiCap: builderCap(env), now: Date.now(), ...(job === 'watch-full' ? { job: 'watch', full: true } : ['watch', 'cutouts', 'buses'].includes(job) ? { job } : { only: job }), log: () => {} }),
   // Securities' money counted here (stock-check.js), its market data read as the apps read it.
   checkStock: (env, docId, payload, wallet) => checkStock(env, docId, payload, wallet, { read: url => stockReads(env)(url), fsGet: DOCS.get, fsWrite: DOCS.write }, LOCK_SINCE),
-  // A pass merged into another: what this Worker watches for it moves too.
-  moveRecords: async (env, from, to, now) => {
+  // What this Worker keeps under an account's id beside its documents, to the id it goes on under. A pass merged
+  // into another: Securities' order book (the fills it issued). A new pass for the same account (`whole`, eco.js
+  // ecoRotate): also Securities' checked events (without both, every trade was counted again as one this Worker
+  // never issued, at the worst price since), the account's notices and their switches, and its Orbit AI count.
+  // Each can be done again: a second ask of the same rotate goes over them.
+  moveRecords: async (env, from, to, now, { whole = false } = {}) => {
     const deps = { fsGet: DOCS.get, fsWrite: DOCS.write, fsDelete: DOCS.delete, fsList: DOCS.list, now: () => Date.now() };
     await moveBook(env, deps, from, to, now);
-  }
+    if (!whole) return;
+    const checked = await DOCS.get(env, VERIFIED_COLLECTION, from);
+    if (checked.exists) {
+      await DOCS.write(env, VERIFIED_COLLECTION, to, checked.payload, { exists: false }).catch(e => (e.precondition ? null : Promise.reject(e)));
+      await DOCS.delete(env, VERIFIED_COLLECTION, from);
+    }
+    await movePushes(env, from, to);
+    await moveUse(env, from, to);
+  },
+  // An account gone: its notices with it (push.js forgetPushes).
+  dropRecords: (env, id) => forgetPushes(env, id),
+  // A new pass: the account's kept versions under its new id (doc-store.js moveKept).
+  moveKept: (env, from, to) => DOCS.moveKept(env, from, to)
 };
 
 // (One short session of this Worker's own per app it reads for.)
@@ -1397,7 +1413,23 @@ async function route(request, env, ctx, headers, origin) {
   // (Each AI call started for a person takes one of the account's Orbit AI
   // allowance, ai-allow.js: true | 'level' (none) | 'used' (none left now).
   // An answer already kept for everyone is free; mayAsk only looks.)
-  const spendFor = session => () => (session ? aiSpend(env, ECO_DEPS, session) : Promise.resolve('level'));
+  // (`took`: one was taken, for `paidFor` below.)
+  const spendFor = session => {
+    const spend = async () => {
+      const why = session ? await aiSpend(env, ECO_DEPS, session) : 'level';
+      if (why === true) spend.took = (spend.took || 0) + 1;
+      return why;
+    };
+    return spend;
+  };
+  // A call that came to nothing isn't the person's to pay for: refused as it came (a picture too
+  // big, the minute's limit), the day's cap, every model down. What was taken for it is given back.
+  // (The allowance was taken before the request was even read: a 基本 pass's five a month went on five refusals.)
+  const paidFor = async (session, spend, answer) => {
+    const res = await answer;
+    if (spend.took && res && !res.ok) ctx.waitUntil(Promise.all(Array.from({ length: spend.took }, () => aiBack(env, ECO_DEPS, session))).catch(() => {}));
+    return res;
+  };
   const mayAsk = async session => Boolean(session) && (await aiMay(env, ECO_DEPS, session)) === true;
   // (Google's translations: any signed-in pass's live session makes new ones, Jay
   // 11-17: an English reader on a 基本 pass saw Chinese headlines, bills and stops.
@@ -1408,9 +1440,10 @@ async function route(request, env, ctx, headers, origin) {
   // Orbit Class's AI features need a Orbit Pass session (`qt=`).
   if (path === '/gemini' || path === '/nl-edit') {
     const session = await sessionOf(request, env);
-    const why = request.method === 'POST' && session ? await spendFor(session)() : true;
+    const spend = spendFor(session);
+    const why = request.method === 'POST' && session ? await spend() : true;
     if (why !== true) return errorJson(why === 'used' ? 'AI_USED' : 'PASS_LEVEL', why === 'used' ? 429 : 403, headers, request);
-    return path === '/gemini' ? handleGeminiRequest(request, env, headers, ip, ctx, session) : handleNlEditRequest(request, env, headers, ip, ctx, session);
+    return paidFor(session, spend, path === '/gemini' ? handleGeminiRequest(request, env, headers, ip, ctx, session) : handleNlEditRequest(request, env, headers, ip, ctx, session));
   }
   // One Orbit's manifest, read from its tag (orbit-manifest.js): its name and icon at Add to Home Screen.
   if (path === '/orbit-manifest') return handleOrbitManifest(request, headers);
@@ -1444,12 +1477,13 @@ async function route(request, env, ctx, headers, origin) {
   };
   if (path === '/law-ask' || path === '/law-chat') {
     const session = await sessionOf(request, env);
+    const spend = spendFor(session);
     // (問法律's every turn asks a model: taken here. A quick question may be kept: taken only when it isn't.)
     if (path === '/law-chat' && request.method === 'POST' && session) {
-      const why = await spendFor(session)();
+      const why = await spend();
       if (why !== true) return refused(why);
     }
-    return path === '/law-ask' ? handleLawAsk(request, env, ctx, headers, session, lawGemini('law-ask'), await aiCap(env, ctx, 'law-ask'), spendFor(session)) : handleLawChat(request, env, ctx, headers, session, lawGemini('law-chat'), await aiCap(env, ctx, 'law-chat'));
+    return paidFor(session, spend, path === '/law-ask' ? handleLawAsk(request, env, ctx, headers, session, lawGemini('law-ask'), await aiCap(env, ctx, 'law-ask'), spend) : handleLawChat(request, env, ctx, headers, session, lawGemini('law-chat'), await aiCap(env, ctx, 'law-chat')));
   }
   // …and government pages read inside the app (law-page.js): the same Pass, gov.tw only, nothing stored.
   if (path === '/law-page') return handleLawPage(request, env, ctx, headers, await sessionOf(request, env));
@@ -1507,7 +1541,7 @@ async function route(request, env, ctx, headers, origin) {
     const show = FEATURES[feature]?.app === 'showcase';
     const session = show ? await showcaseOf(request, env, { ip, origin }) : await sessionOf(request, env);
     const spend = show ? async () => (session ? true : 'level') : spendFor(session);
-    return handleAi(request, env, ctx, headers, session, { cap: FEATURES[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai', { backups: [] }), spend });
+    return paidFor(session, spend, handleAi(request, env, ctx, headers, session, { cap: FEATURES[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai', { backups: [] }), spend }));
   }
   // Orbit Class's 學校公告摘要 (class-news.js): a school's list read by code, worded once an hour by the AI, kept in R2.
   // Orbit News in one language: a story's own headlines and summary in the reader's, as it's opened (builders/news-tr.js).
@@ -1532,11 +1566,12 @@ async function route(request, env, ctx, headers, origin) {
   }
   if (path === '/money-read') {
     const session = await sessionOf(request, env);
+    const spend = spendFor(session);
     if (session && request.method === 'POST') {
-      const why = await spendFor(session)();
+      const why = await spend();
       if (why !== true) return refused(why);
     }
-    return handleMoneyRead(request, env, headers, session, lawGemini('money-read'), await aiCap(env, ctx, 'money-read'));
+    return paidFor(session, spend, handleMoneyRead(request, env, headers, session, lawGemini('money-read'), await aiCap(env, ctx, 'money-read')));
   }
   // The bill's guard (guard.js), as it last read the bill: armed or not,
   // each count's share of the $5 plan, stopped or not. No key or token.

@@ -381,7 +381,8 @@ export async function mailRecover(ctx) {
   const doc = index?.d === row.d ? await deps.fsGet(env, WALLET_COLLECTION, row.d) : { exists: false };
   if (!doc.exists || mailOf(parseWallet(doc.payload)) !== addr) return bad(ctx, 'ECO_MAIL_CODE_WRONG', 401);
   // A session that takes only `rotate`: the lost pass is replaced first.
-  const res = await signIn(ctx, row.d, { fresh: true });
+  // (The mailed code is spent: never turned away at the door.)
+  const res = await signIn(ctx, row.d, { fresh: true, seat: true });
   return res || bad(ctx, 'ECO_MAIL_CODE_WRONG', 401);
 }
 

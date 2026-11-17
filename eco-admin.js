@@ -238,7 +238,9 @@ export async function handleAdmin({ env, deps, headers, request, ip, body, secre
       inbox: Object.fromEntries(Object.entries(wallet.inbox || {}).filter(([a]) => keep.has(a))),
       // (Its passkeys and recovery email stay, as the pass does: they're how its owner signs in.)
       ...(wallet.passkeys ? { passkeys: wallet.passkeys } : {}),
-      ...(wallet.mail ? { mail: wallet.mail } : {})
+      ...(wallet.mail ? { mail: wallet.mail } : {}),
+      // (And the vault: the kept apps' data and settings are locked under its key. Without it they stayed, unreadable for good.)
+      ...(wallet.vault ? { vault: wallet.vault } : {})
     };
     const gone = [];
     for (const [app, { collection }] of Object.entries(ECO_APPS)) {
@@ -784,6 +786,9 @@ export const ADMIN_TOOLS = {
     if (!hit) return notFound;
     if (String(body.confirm || '').trim() !== hit.id.slice(0, 8)) return { error: 'ADMIN_CONFIRM', status: 400 };
     const balance = poolBalance(hit.wallet);
+    // (Its notices go with the account, eco.js deleteAccount: counted first, for the panel's line.)
+    const kv = pushStore(env);
+    const pushes = kv ? (await pushRecords(env, `push:${hit.id}:`).catch(() => [])).length : 0;
     await deleteAccount(env, deps, hit.id, { retire: true });
     let shares = 0;
     for (const name of [SHARE_COLLECTION, PAIR_COLLECTION]) {
@@ -798,12 +803,9 @@ export const ADMIN_TOOLS = {
         }
       }
     }
-    const kv = pushStore(env);
-    let pushes = 0;
     if (kv) {
-      const records = await pushRecords(env, `push:${hit.id}:`).catch(() => []);
-      for (const r of records) await kv.delete(r.key);
-      pushes = records.length;
+      // (Under a store without the Worker's own hooks, a test's: taken off here.)
+      for (const r of await pushRecords(env, `push:${hit.id}:`).catch(() => [])) await kv.delete(r.key);
       await kv.delete(`push:prefs:${hit.id}`).catch(() => {});
     }
     return { ok: true, ref: hit.id.slice(0, 8), balance, apps: appsOf(hit.wallet).map(a => a.app), shares, pushes };
@@ -1149,13 +1151,23 @@ async function accountId(env, deps, ref) {
   return gone.length === 1 ? gone[0].id : null;
 }
 const appOfColl = () => ({ [WALLET_COLLECTION]: 'wallet', ...Object.fromEntries(Object.entries(ECO_APPS).map(([a, x]) => [x.collection, a])) });
+// (A wallet put back over one still there brings back its money, settings and apps only. How the account
+// is signed in to and what the owner set for it stay as they are now: its vault (the apps' data is locked
+// under today's key: an older wallet's vault, or none, left all of it unreadable), its passkeys and recovery
+// email (their finders point here as they are now), its level, priority and Orbit AI allowance.)
 async function putBack(env, deps, id, coll, payload) {
   if (payload == null) return notFound;
   if (coll === WALLET_COLLECTION && !parseWallet(payload)) return { error: 'ECO_PAYLOAD_INVALID', status: 400 };
   const was = await deps.fsGet(env, WALLET_COLLECTION, id);
-  const before = was.exists ? gen(parseWallet(was.payload)) : 0;
+  const live = was.exists ? parseWallet(was.payload) : null;
+  const before = live ? gen(live) : 0;
   const { updateTime } = await deps.store.restore(env, coll, id, '', payload);
-  await updateWallet(env, deps, id, w => ({ ...w, sec: { ...(w.sec || {}), gen: Math.max(gen(w), before) + 1 }, live: null }));
+  await updateWallet(env, deps, id, w => {
+    const own = coll === WALLET_COLLECTION && live ? Object.fromEntries(['vault', 'passkeys', 'mail'].map(k => [k, live[k]])) : {};
+    const next = { ...w, ...own, sec: { ...((coll === WALLET_COLLECTION && live ? live.sec : w.sec) || {}), gen: Math.max(gen(w), before) + 1 }, live: null };
+    for (const k of Object.keys(own)) if (own[k] === undefined) delete next[k];
+    return next;
+  });
   return { restored: true, ref: id.slice(0, 8), app: appOfColl()[coll], updateTime };
 }
 Object.assign(ADMIN_TOOLS, {
