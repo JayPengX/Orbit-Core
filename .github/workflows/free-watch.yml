@@ -36,5 +36,7 @@ jobs:
         run: node tools/free-watch.mjs
         env:
           DATA_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_GUARD_TOKEN: ${{ secrets.CF_GUARD_TOKEN }}
           TRACE: ${{ inputs.trace }}
           REKEY: ${{ inputs.rekey }}

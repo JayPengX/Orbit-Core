@@ -164,6 +164,43 @@ async function aiMoney() {
   notes.push(`AI money: ${said.join(', ')}; today ${Object.entries(r.body.today || {}).map(([p, t]) => `${p} ${t.n}/${t.cap}`).join(', ')}`);
 }
 
+// Cloudflare's tokens' end dates: the deploys' (CLOUDFLARE_API_TOKEN: every
+// app's site, Law's data, the Showcase's demos) and the guard's (CF_GUARD_TOKEN).
+// One ending within 21 days, or refused, fails the run (GitHub mails it); a
+// token with no end date is fine for good. A new one: Cloudflare › My Profile ›
+// API Tokens, the same rights, typed into GitHub (Orbit-Core › Settings › Secrets).
+const TOKEN_DAYS = 21;
+function tokenSay(name, verify, now = Date.now()) {
+  const r = verify?.result;
+  if (!verify?.success || r?.status !== 'active') return { bad: `${name}: Cloudflare refuses it (${verify?.errors?.[0]?.message || r?.status || 'no answer'}): make a new one` };
+  if (!r.expires_on) return { note: `${name}: no end date` };
+  const days = Math.floor((Date.parse(r.expires_on) - now) / 86_400_000);
+  return days < TOKEN_DAYS ? { bad: `${name} ends in ${days} days (${r.expires_on.slice(0, 10)}): make a new one before then` } : { note: `${name}: ends ${r.expires_on.slice(0, 10)}` };
+}
+async function cfTokens() {
+  const api = 'https://api.cloudflare.com/client/v4';
+  for (const name of ['CLOUDFLARE_API_TOKEN', 'CF_GUARD_TOKEN']) {
+    const token = process.env[name];
+    if (!token) continue;
+    const ask = path => fetch(`${api}${path}`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15_000) }).then(r => r.json()).catch(() => null);
+    // (A user's token answers here; an account's at its account's own.)
+    let v = await ask('/user/tokens/verify');
+    if (!v?.success) {
+      const acct = (await ask('/accounts'))?.result?.[0]?.id;
+      const w = acct ? await ask(`/accounts/${acct}/tokens/verify`) : null;
+      // (Neither answering is no verdict: a deploy that fails says it plainly.)
+      if (!w) {
+        notes.push(`${name}: end date not checked (Cloudflare didn't say)`);
+        continue;
+      }
+      v = w;
+    }
+    const said = tokenSay(name, v);
+    if (said.bad) bad(said.bad);
+    else notes.push(said.note);
+  }
+}
+
 const got = await smoke();
 await allowances(got.find(r => r?.body?.caps));
 await beats();
@@ -171,6 +208,7 @@ await aiMoney();
 await vault();
 await trace();
 await rekey();
+await cfTokens();
 
 const out = [`# Orbit on the free plans: ${problems.length ? `${problems.length} problem${problems.length > 1 ? 's' : ''}` : 'all well'}`, '', ...problems.map(p => `- ❌ ${p}`), ...(problems.length ? [''] : []), ...notes.map(n => `- ${n}`)].join('\n');
 console.log(out);
