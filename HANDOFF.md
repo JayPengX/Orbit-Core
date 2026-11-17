@@ -196,10 +196,23 @@ days without a commit: re-enable them in each repo's Actions tab.
   Orbits, single-app ones too; each app's data locked on the phone (11-15).
 - **To check by hand now and then:** `node tools/layout-check.mjs <app…>`,
   `node tools/test-apps.mjs`, and the admin's 健康 tab.
-- **Dates to watch:** 11-15 the Gemini bill (still high would mean a leaked
-  key: make a new one); 12-01 TDX's free tier starts (check Transit on
-  12-02); 12-05 the Firebase key goes; 12-31 Gemini Flash's price doubles;
-  the domain's renewal (Cloudflare › Domain Registration).
+- **Dates to watch:** 12-01 TDX's free tier starts (Transit switches by
+  date; check it 12-02); 12-05 the Firebase key goes; 12-24 the 3-month US
+  bill matures (Securities); 12-25 the 代表會 term ends (Law's 104 town
+  sites keep the old term until each `term` in `public/lib/town-site.mjs`
+  is raised by 1 and `ends: '2030-12-25'`, once the sites post the new one);
+  about 12 TWSE's 2027 calendar (compare with `kit/stock-holidays.mjs`'s
+  derived one); 2027-01-01 Gemini Flash's price doubles (the bill counts it);
+  spring 2027 the 117 學測 (Class's `DEFAULT_COUNTDOWN_EVENTS`); March 2027
+  the F1 grid (`kit/logos.mjs`) and ELTA's rights (`kit/sports-broadcast.mjs`);
+  by 2027-09-28 Anthropic's model ids (`ai.js` `MODELS`); the domain is paid
+  to 2028-10-27 (Cloudflare › Domain Registration, auto-renew).
+- **Running alone (11-17):** every AI feature a person taps ends on the third
+  maker; a model failing every call for a day is mailed (`mail-alerts.js`);
+  GitHub's schedules are kept on (`github-keep.js`, GH_ACTIONS_TOKEN's end
+  mailed 21 days ahead); `free-watch` fails 21 days before a Cloudflare token
+  ends (both had none on 11-17); a source answering 200 with nothing never
+  replaces the phone's good copy (kit `valid`, MAP §5.1).
 - **AI money:** prepaid balances are small (the Anthropic credit key's
   balance was empty on 11-14); `free-watch` notes a low one in its report
   (never a failed run: no mail, Jay 11-15). Re-type balances with `build.yml` job `ai-money`.
