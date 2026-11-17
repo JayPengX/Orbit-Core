@@ -112,7 +112,8 @@ test('a place that runs 2° warm: its usual error learned past the anchor hours,
   }
   assert.ok(sk.bias.n >= BIAS_MIN);
   assert.ok(Math.abs(sk.bias.v - 2) < 0.01, String(sk.bias.v));
-  const { byLead } = summarize([sk]);
+  const { byLead, shadow } = summarize([sk]);
+  assert.ok(shadow.long.n > 0 && shadow.long.served === 2 && shadow.long.biased < 0.2, JSON.stringify(shadow));
   assert.ok(byLead.long.biased < 0.2 && byLead.long.served === 2, JSON.stringify(byLead.long));
   assert.ok(byLead.short.biased < byLead.short.served, 'faded in over the first 6 hours');
 });

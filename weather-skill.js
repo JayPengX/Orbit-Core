@@ -129,12 +129,21 @@ export function summarize(skills) {
   // The temperature by lead (short: under 6 hours), only where `served` was
   // scored too: the three side by side over the same hours.
   const paired = {};
+  // The shadow against what was shown, only in the cell-days where both
+  // scored the very same hours (equal counts): { short: { served, biased, n } }.
+  const shadow = {};
   const dates = new Set();
   for (const sk of skills) {
     for (const [date, d] of Object.entries(sk?.days || {})) {
       dates.add(date);
       for (const [lead, bucket] of Object.entries(d.temp || {})) {
         if (!bucket.served) continue;
+        if (bucket.biased && bucket.biased[1] === bucket.served[1]) {
+          const t = (shadow[lead] ||= { served: 0, biased: 0, n: 0 });
+          t.served += bucket.served[0];
+          t.biased += bucket.biased[0];
+          t.n += bucket.served[1];
+        }
         for (const [src, [sum, n]] of Object.entries(bucket)) {
           const t = ((paired[lead] ||= {})[src] ||= [0, 0]);
           t[0] += sum;
@@ -155,7 +164,9 @@ export function summarize(skills) {
   const mean = o => Object.fromEntries(Object.entries(o).map(([s, [sum, n]]) => [s, n ? Math.round((sum / n) * 1e4) / 1e4 : null]));
   const count = o => Object.fromEntries(Object.entries(o).map(([s, [, n]]) => [s, n]));
   const byLead = Object.fromEntries(Object.entries(paired).map(([lead, o]) => [lead, { ...mean(o), n: count(o) }]));
-  return { pop: mean(sums.pop), temp: mean(sums.temp), n: { pop: count(sums.pop), temp: count(sums.temp) }, days: dates.size, byLead };
+  const r4 = x => Math.round(x * 1e4) / 1e4;
+  const shadowOut = Object.fromEntries(Object.entries(shadow).map(([lead, t]) => [lead, { served: r4(t.served / t.n), biased: r4(t.biased / t.n), n: t.n }]));
+  return { pop: mean(sums.pop), temp: mean(sums.temp), n: { pop: count(sums.pop), temp: count(sums.temp) }, days: dates.size, byLead, shadow: shadowOut };
 }
 
 // Where the weights go from `prev` given the scores (lower is better).
