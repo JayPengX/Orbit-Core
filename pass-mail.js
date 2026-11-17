@@ -244,7 +244,8 @@ async function useCode(ctx, id, code) {
   // (Spent, its day's count kept: the rate stays counted; another's write meanwhile and it isn't ours.)
   return (await write({ ...row, h: '', n: MAIL_TRIES }, tried.updateTime)) ? row : null;
 }
-const cleanCodeIn = v => (typeof v === 'string' ? v.replace(/\D/g, '').slice(0, 6) : '');
+// (Full-width digits count: １２３４５６ is 123456.)
+const cleanCodeIn = v => (typeof v === 'string' ? v.normalize('NFKC').replace(/\D/g, '').slice(0, 6) : '');
 
 // A code to a new address (a link's, a sign-up's): taken from the day's
 // budget and the address's, then sent. Not sent: the row's code dropped, its

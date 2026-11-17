@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { handleEcoRequest, WALLET_COLLECTION, newPasscode, updateWallet } from '../eco.js';
 import { accountOfMail } from '../pass-mail.js';
-import { privacyMail, mailLang, unpack, EXPORT_EVERY_MS, REPLIES_A_DAY } from '../privacy-mail.js';
+import { privacyMail, mailLang, unpack, EXPORT_EVERY_MS, EXPORT_TRIES, REPLIES_A_DAY } from '../privacy-mail.js';
 import { gzipSync, deflateRawSync } from 'node:zlib';
 import { DOMAIN } from '../kit/domain.mjs';
 
@@ -103,8 +103,10 @@ test('from the recovery email the link alone does it; a copy once in 30 days', a
   assert.equal(exp.status, 200, JSON.stringify(exp.data));
   assert.equal(exp.data.file.account.recoveryEmail, 'me@example.com');
   assert.match(exp.data.file.downloadedAt, /^\d{4}-\d\d-\d\dT/);
-  const again = await t.post({ op: 'privacy', token: tokenOf(r.links, 'export') });
-  assert.equal(again.data.error.code, 'PRIVACY_EXPORT_WAIT');
+  // (Another mail's link inside the 30 days: none.)
+  t.advance(3_600_000);
+  const soon = await ask(t, 'me@example.com');
+  assert.equal((await t.post({ op: 'privacy', token: tokenOf(soon.links, 'export') })).data.error.code, 'PRIVACY_EXPORT_WAIT');
   t.advance(EXPORT_EVERY_MS + 1);
   const later = await ask(t, 'me@example.com');
   assert.equal((await t.post({ op: 'privacy', token: tokenOf(later.links, 'export') })).status, 200);
@@ -197,4 +199,35 @@ test('the owner’s own copy comes unlocked: the apps’ data and the wallet’s
   assert.deepEqual(file.account.settings['fb:transit'].value, places);
   assert.ok(!JSON.stringify(file).includes('e1:'), 'nothing locked left in it');
   assert.equal(file.account.vault, undefined);
+});
+
+// A copy that never arrived isn't 30 days' wait (2026-11-17): the count was kept before the file was on its
+// way, so a connection that dropped, or a mail app's own browser that saves no file, left the person without
+// their data and a link that said 30 天內下載過了. The same link works EXPORT_TRIES times in all.
+test('the same link downloads the copy again, three times in all; the 30 days run from the first', async () => {
+  const t = setup();
+  const a = await account(t);
+  await link(t, a.token, 'again@example.com');
+  const r = await ask(t, 'again@example.com');
+  const get = () => t.post({ op: 'privacy', token: tokenOf(r.links, 'export') });
+  const first = t.now();
+  for (let i = 0; i < EXPORT_TRIES; i++) assert.equal((await get()).status, 200, `try ${i + 1}`);
+  const fourth = await get();
+  assert.equal(fourth.data.error.code, 'PRIVACY_EXPORT_WAIT');
+  assert.ok(Math.abs(fourth.data.error.next - (first + EXPORT_EVERY_MS)) < 60_000, 'counted from the first download');
+});
+
+// Full-width letters and digits (a 注音 keyboard's) at the Worker too (2026-11-17): the pass typed on the
+// confirm page went as typed and was called wrong, and a mailed code sent as typed was never used.
+const wide = text => String(text).replace(/[!-~]/g, c => String.fromCharCode(c.charCodeAt(0) + 0xfee0));
+test('a pass typed full-width on the confirm page, and a mailed code sent full-width, count', async () => {
+  const t = setup();
+  const a = await account(t);
+  const r = await ask(t, 'stranger2@example.com');
+  const stop = await t.post({ op: 'privacy', token: tokenOf(r.links, 'stop'), passcode: wide(a.passcode) });
+  assert.equal(stop.data.stopped, true, JSON.stringify(stop.data));
+  assert.equal((await t.post({ op: 'mail-begin', qt: a.token, addr: 'wide@example.com' })).status, 200);
+  await t.settle();
+  const code = t.sent.at(-1).text.match(/\b(\d{6})\b/)[1];
+  assert.equal((await t.post({ op: 'mail-confirm', qt: a.token, code: wide(code) })).status, 200);
 });

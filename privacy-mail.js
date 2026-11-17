@@ -16,7 +16,8 @@
 //      `/eco { op: 'privacy', token, passcode? }` (privacyDo) once tapped.
 //
 // Limits: replies to one address 3 a day (D1 docs `eco-privacy`, by the
-// address's HMAC); a copy once in 30 days an account; deletion always (a
+// address's HMAC); a copy once in 30 days an account (the same link again,
+// EXPORT_TRIES in all, for a copy that never arrived); deletion always (a
 // right); a pass typed on the page as a sign-in is (ECO_LIMITS.login an hour).
 // Nothing reaches Jay's inbox.
 
@@ -31,6 +32,7 @@ export const PRIVACY_USER = 'privacy';
 export const PRIVACY_COLLECTION = 'eco-privacy';
 export const LINK_MS = 24 * 3_600_000;
 export const EXPORT_EVERY_MS = 30 * 86_400_000;
+export const EXPORT_TRIES = 3;
 export const REPLIES_A_DAY = 3;
 export const KINDS = ['export', 'delete', 'stop'];
 const DAY = 86_400_000;
@@ -345,7 +347,9 @@ export async function privacyDo(ctx) {
   if (!c || !KINDS.includes(c.w)) return bad('PRIVACY_LINK_OLD', 400);
   let docId = typeof c.d === 'string' ? c.d : '';
   if (!docId) {
+    // (Full-width letters and digits, as a 注音 keyboard types them, count: the right pass was called wrong, 11-17.)
     const passcode = String(body.passcode || '')
+      .normalize('NFKC')
       .toUpperCase()
       .replace(/[^0-9A-Z]/g, '');
     if (!passcode) return bad('PRIVACY_NEEDS_PASS', 401);
@@ -360,14 +364,19 @@ export async function privacyDo(ctx) {
   if (!w.exists) return bad('PRIVACY_NO_ACCOUNT', 404);
   if (c.w === 'export') {
     const doc = await deps.fsGet(env, PRIVACY_COLLECTION, `a-${docId}`).catch(() => ({ exists: false }));
-    let last = 0;
+    let was = {};
     try {
-      last = doc.exists ? Number(JSON.parse(doc.payload).export) || 0 : 0;
+      was = (doc.exists && JSON.parse(doc.payload)) || {};
     } catch {}
-    if (last && now - last < EXPORT_EVERY_MS) return bad('PRIVACY_EXPORT_WAIT', 429, { next: last + EXPORT_EVERY_MS });
+    const last = Number(was.export) || 0;
+    // (The same link again (told by its end, `e`), EXPORT_TRIES in all: the count was kept before the copy
+    // was on its way, so one that never arrived (the connection dropped, a mail app's own browser that
+    // saves no file) was 30 days' wait for a person's own data, 11-17.)
+    const again = last > 0 && was.link === c.e && (Number(was.n) || 1) < EXPORT_TRIES;
+    if (last && now - last < EXPORT_EVERY_MS && !again) return bad('PRIVACY_EXPORT_WAIT', 429, { next: last + EXPORT_EVERY_MS });
     const file = await exportOf(env, deps, docId, now, body.lang);
     if (!file) return bad('PRIVACY_NO_ACCOUNT', 404);
-    await deps.fsWrite(env, PRIVACY_COLLECTION, `a-${docId}`, JSON.stringify({ export: now }));
+    await deps.fsWrite(env, PRIVACY_COLLECTION, `a-${docId}`, JSON.stringify(again ? { ...was, n: (Number(was.n) || 1) + 1 } : { export: now, link: c.e, n: 1 }));
     return deps.json({ file }, 200, headers);
   }
   if (c.w === 'delete') {
