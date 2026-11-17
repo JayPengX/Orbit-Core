@@ -4,13 +4,17 @@
 //   - rule-based calendars (fixed dates, Easter, "the third Monday"...) for
 //     the US, UK, Europe, Switzerland, Denmark, Canada, Australia and Japan,
 //     good for any year;
-//   - listed dates for the markets that follow the lunar calendar or a
-//     yearly government announcement (Taiwan, Hong Kong, China, Korea,
+//   - Taiwan's from the country's own days off (holidays.mjs: 人事行政總處's
+//     calendar, worked out by its rules past the years it has published),
+//     and the two days before Lunar New Year the exchange only settles;
+//   - listed dates for the other markets that follow the lunar calendar or
+//     a yearly government announcement (Hong Kong, China, Korea,
 //     Singapore), from each exchange's published calendar for 2026 and
 //     2027. Past those years they fall back to weekdays only.
 // Dates are the exchange's local calendar days, 'YYYY-MM-DD'.
 
 import { dayOffOn, TWSE } from '#kit/dayoff.mjs';
+import { twHoliday, lunarNewYearOff } from '#kit/holidays.mjs';
 
 const pad = n => String(n).padStart(2, '0');
 const ymd = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
@@ -120,12 +124,35 @@ const RULES = {
   }
 };
 
+// Taiwan's exchange (TWSE, TPEx, TAIFEX): shut on every weekday the country
+// is off, and on the two weekdays before the Lunar New Year's days off, when
+// it only settles (市場無交易，僅辦理結算交割: TWSE's calendars, 2022 to 2026;
+// its 2026 one, 115年有價證券集中交易市場開休市日期, comes out the same this way).
+const settling = new Map();
+export function twseSettleOnly(y) {
+  if (settling.has(y)) return [...settling.get(y)];
+  const first = lunarNewYearOff(y);
+  const out = [];
+  for (let t = Date.parse(`${first}T00:00:00Z`) - 86_400_000; first && out.length < 2; t -= 86_400_000) {
+    const d = new Date(t).toISOString().slice(0, 10);
+    if (![0, 6].includes(new Date(t).getUTCDay()) && !twHoliday(d)) out.unshift(d);
+  }
+  settling.set(y, out);
+  return [...out];
+}
+function twseYear(y) {
+  const out = twseSettleOnly(y);
+  for (let t = Date.UTC(y, 0, 1); t < Date.UTC(y + 1, 0, 1); t += 86_400_000) {
+    const d = new Date(t).toISOString().slice(0, 10);
+    if (![0, 6].includes(new Date(t).getUTCDay()) && twHoliday(d)) out.push(d);
+  }
+  return out.sort();
+}
+// A day the market doesn't trade but still settles.
+export const settleOnly = (market, day) => market === 'TW' && twseSettleOnly(Number(day.slice(0, 4))).includes(day);
+
 // Announced calendars (market-closed weekdays).
 const LISTED = {
-  TW: {
-    2026: ['01-01', '02-12', '02-13', '02-16', '02-17', '02-18', '02-19', '02-20', '02-27', '04-03', '04-06', '05-01', '06-19', '09-25', '09-28', '10-09', '10-26', '12-25'],
-    2027: ['01-01', '02-03', '02-04', '02-05', '02-08', '02-09', '02-10', '03-01', '04-05', '04-30', '06-09', '09-15', '09-28', '10-11', '10-25', '12-24']
-  },
   HK: {
     2026: ['01-01', '02-17', '02-18', '02-19', '04-03', '04-06', '04-07', '05-01', '05-25', '06-19', '07-01', '10-01', '10-19', '12-25'],
     2027: ['01-01', '02-08', '02-09', '03-26', '03-29', '04-05', '05-13', '06-09', '07-01', '09-16', '10-01', '10-08', '12-27']
@@ -171,7 +198,7 @@ const cache = new Map();
 function holidaySet(cal, y) {
   const id = `${cal}:${y}`;
   if (!cache.has(id)) {
-    const days = RULES[cal] ? RULES[cal](y).map(key) : (LISTED[cal]?.[y] || []).map(md => `${y}-${md}`);
+    const days = RULES[cal] ? RULES[cal](y).map(key) : cal === 'TW' ? twseYear(y) : (LISTED[cal]?.[y] || []).map(md => `${y}-${md}`);
     cache.set(id, new Set(days));
   }
   return cache.get(id);

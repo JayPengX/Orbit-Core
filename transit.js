@@ -947,9 +947,10 @@ function paced(env, now) {
 const turn = { next: 0 };
 export const resetTurns = () => (turn.next = 0);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-async function myTurn(env) {
-  // (The free tier counts a minute, not a second: none from 2026-12-01.)
-  const perSec = tdxPlan(Date.now()).paid ? Number(env.TDX_PER_SEC) || 0 : 0;
+async function myTurn(env, now = Date.now()) {
+  // (The free tier counts a minute, not a second: none from 2026-12-01. The
+  // plan by the caller's clock, as paced()'s: a test's day, not the real one.)
+  const perSec = tdxPlan(now).paid ? Number(env.TDX_PER_SEC) || 0 : 0;
   if (!perSec) return true;
   const t = Date.now();
   const at = Math.max(t, turn.next);
@@ -1186,7 +1187,7 @@ export async function tdxGet(env, raw, { fetchFn = fetch, cache = globalThis.cac
       let res, read;
       // Another isolate may share the second: a 429 waits a moment and asks again (twice).
       for (let tries = 0; ; tries++) {
-        if (!(await myTurn(env))) return { status: 429, state: 'busy' };
+        if (!(await myTurn(env, now))) return { status: 429, state: 'busy' };
         // TDX sometimes hangs or answers 5xx for a moment: 12 s at most, and
         // one more try (the app said 暫時無法取得資料 for these).
         res = await fetchFn(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Accept-Encoding': 'br, gzip' }, signal: timeout(12_000) }).catch(err => ({ ok: false, status: 504, text: async () => String(err?.name || err) }));
@@ -1828,7 +1829,7 @@ async function routes(env, q, { fetchFn, ctx, now, cache, by: who }) {
       return (async () => {
         if (who === 'dev' && !(await devTdxRoom(env, now))) return ((sources[key] = 'devcap'), []);
         if (!paced(env, now)) return ((sources[key] = 'busy'), []);
-        if (!(await myTurn(env))) return ((sources[key] = 'busy'), []);
+        if (!(await myTurn(env, now))) return ((sources[key] = 'busy'), []);
         const token = await tdxAccess(env, fetchFn, now);
         if (!token) return ((sources[key] = 'nokey'), []);
         const r = await fetchFn(`${TDX_BASE}maas/routing?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Accept-Encoding': 'br, gzip' }, signal: timeout(15_000) });
@@ -1904,7 +1905,7 @@ async function statusSample(env, name, dependencies) {
     const token = await tdxAccess(env, deps.fetchFn, deps.now);
     if (!token) return { name, status: 503, body: 'no TDX key' };
     if (deps.by === 'dev' && !(await devTdxRoom(env, deps.now))) return { name, status: 429, body: 'DEV_TDX_CAP' };
-    if (!paced(env, deps.now) || !(await myTurn(env))) return { name, status: 429, body: 'busy' };
+    if (!paced(env, deps.now) || !(await myTurn(env, deps.now))) return { name, status: 429, body: 'busy' };
     // maas-local: across Hsinchu (新竹車站 → 竹北 光明六路), where buses do the work.
     const to = name === 'maas' ? TO : { lat: 24.839, lon: 121.008 };
     // transit=: which of TDX's transit codes to allow (to learn what each one is).

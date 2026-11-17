@@ -34,7 +34,7 @@ import { buildKeyOk } from './law-hosts.js';
 // keeping all three: nothing dies when one balance hits zero): Flash-Lite
 // behind Haiku and Luna, Luna or Sol behind a picture, Flash behind Sol.
 export const MODELS = { sonnet: 'claude-sonnet-5-5', sol: 'gpt-6.1-sol', haiku: 'claude-haiku-5-5', luna: 'gpt-6-luna', flash: 'gemini-3.6-flash', lite: 'gemini-3.5-flash-lite' };
-// US$ per 1M tokens (11-10; Flash doubles 2027-01-01): what aiBill counts spend by.
+// US$ per 1M tokens (11-10): what aiBill counts spend by.
 export const PRICES = {
   'claude-sonnet-5-5': { in: 2, cached: 0.1, out: 10 },
   'claude-haiku-5-5': { in: 0.1, cached: 0.01, out: 0.5 },
@@ -45,7 +45,15 @@ export const PRICES = {
   'gemini-3.5-flash-lite': { in: 0.3, cached: 0.03, out: 2.5 }
 };
 export const providerOf = model => makerOf(model) || (/^gemini-/.test(model) ? 'google' : null);
-export const priceOf = model => PRICES[model] || (providerOf(model) === 'google' ? PRICES['gemini-3.6-flash'] : providerOf(model) === 'anthropic' ? PRICES['claude-sonnet-5-5'] : PRICES['gpt-6.1-sol']);
+// Google's main model doubles its price on 2027-01-01 (US$0.75 in and 3.75
+// out through 2026-12-31, then 1.50 and 7.50, cached 0.15), so a call is
+// counted at the price of its own day, never the whole month at one.
+const DOUBLED = { in: 1.5, cached: 0.15, out: 7.5 };
+export const PRICES_FROM = [[Date.parse('2027-01-01T00:00:00-08:00'), Object.fromEntries(Object.keys(PRICES).filter(m => m.endsWith('-flash')).map(m => [m, DOUBLED]))]];
+export const priceOf = (model, at = Date.now()) =>
+  PRICES_FROM.filter(([from]) => at >= from).reduce((p, [, later]) => later[model] || p, null) ||
+  PRICES[model] ||
+  (providerOf(model) === 'google' ? priceOf(MODELS.flash, at) : providerOf(model) === 'anthropic' ? PRICES['claude-sonnet-5-5'] : PRICES['gpt-6.1-sol']);
 
 export const twDay = (now = Date.now()) => new Date(now + 8 * 3_600_000).toISOString().slice(0, 10);
 
@@ -292,7 +300,7 @@ export function spendOf(calls) {
   const providers = {}, features = {}, models = {};
   for (const c of calls) {
     if (c.status !== 200) continue;
-    const p = priceOf(c.model);
+    const p = priceOf(c.model, c.at);
     const usd = (c.tin * p.in + c.cached * (p.cached ?? p.in) + c.tout * p.out) / 1e6;
     const prov = providerOf(c.model) || 'google';
     providers[prov] = (providers[prov] || 0) + usd;

@@ -19,6 +19,38 @@ test("Taiwan's days off: the holidays, the days in lieu, weekends; TWSE's own cl
   assert.equal(twHoliday('2030-10-10').zh, '國慶日');
 });
 
+test("days off past the published years come from the rules, which give both published years exactly", async () => {
+  const { rulesYear, lunarNewYearOff } = await import('../kit/holidays.mjs');
+  // 人事行政總處's 115 and 116 calendars (every day off, weekends' holidays too), by the rules on that year's lunar dates.
+  const days = (y, lunar) => Object.keys(rulesYear(y, lunar)).join(' ');
+  assert.equal(days(2026, ['02-17', '04-05', '06-19', '09-25']), '01-01 02-15 02-16 02-17 02-18 02-19 02-20 02-27 02-28 04-03 04-04 04-05 04-06 05-01 06-19 09-25 09-28 10-09 10-10 10-25 10-26 12-25');
+  assert.equal(days(2027, ['02-06', '04-05', '06-09', '09-15']), '01-01 02-04 02-05 02-06 02-07 02-08 02-09 02-10 02-28 03-01 04-04 04-05 04-06 04-30 05-01 06-09 09-15 09-28 10-10 10-11 10-25 12-24 12-25 12-31');
+  // 2027's listed: 兒童節 on a Sunday is given after 清明 (04-06); 2028's New Year's Day, a Saturday, on 2027-12-31.
+  assert.equal(twHoliday('2027-04-06').zh, '兒童節補假');
+  assert.equal(twHoliday('2027-12-31').zh, '元旦補假');
+  assert.equal(twWorkday('2027-12-30'), true);
+  // 2028 by the rules: Lunar New Year 01-24 to 01-28 (no weekend in it, nothing in lieu), 兒童節 on 清明's day the day before, 端午 on a Sunday the Monday after.
+  assert.deepEqual(['2028-01-24', '2028-01-28', '2028-01-31', '2028-04-03', '2028-04-04', '2028-05-29'].map(d => twHoliday(d)?.zh || null), ['小年夜', '春節', null, '兒童節補假', '清明節', '端午節補假']);
+  assert.equal(lunarNewYearOff(2027), '2027-02-04');
+  // 2032: both on a Sunday: the Friday before and the Monday after.
+  assert.deepEqual(['2032-04-02', '2032-04-05'].map(d => twDayOff(d)), [true, true]);
+});
+
+test("Taiwan's exchange from the country's days off and its two settling days before Lunar New Year: TWSE's 2026 calendar exactly", async () => {
+  const { isHoliday, twseSettleOnly, settleOnly } = await import('../kit/stock-holidays.mjs');
+  const shut = y => {
+    const out = [];
+    for (let t = Date.UTC(y, 0, 1); t < Date.UTC(y + 1, 0, 1); t += 86_400_000) if (isHoliday('TW', new Date(t).toISOString().slice(0, 10))) out.push(new Date(t).toISOString().slice(5, 10));
+    return out.join(' ');
+  };
+  // 115年有價證券集中交易市場開(休)市日期表.
+  assert.equal(shut(2026), '01-01 02-12 02-13 02-16 02-17 02-18 02-19 02-20 02-27 04-03 04-06 05-01 06-19 09-25 09-28 10-09 10-26 12-25');
+  assert.equal(shut(2027), '01-01 02-02 02-03 02-04 02-05 02-08 02-09 02-10 03-01 04-05 04-06 04-30 06-09 09-15 09-28 10-11 10-25 12-24 12-31');
+  assert.deepEqual(twseSettleOnly(2027), ['2027-02-02', '2027-02-03']);
+  assert.equal(settleOnly('TW', '2026-02-13'), true);
+  assert.equal(settleOnly('US', '2026-02-13'), false);
+});
+
 test("MLB's postseason: rounds by name, a game found by its round, number and sides; a finished series' game gone", async () => {
   const list = mlbPostseason(JSON.parse(await readFile(new URL('./fixtures/mlb-postseason-2026-10-10.json', import.meta.url))));
   assert.equal(roundKey('ALDS - Game 5 If Necessary'), 'ALDS');

@@ -72,9 +72,10 @@ test('a track map, a race’s results days on, a past F1 season and a past MLB d
   const race = (date, n = 20) => body({ MRData: { total: String(n ? 1 : 0), RaceTable: { Races: n ? [{ date, time: '19:00:00Z', Results: Array(n).fill({}) }] : [] } } });
   const round = u('https://api.jolpi.ca/ergast/f1/2026/18/results.json?limit=40');
   assert.equal(settled(round, race('2026-10-01')), true);
-  // Stewards may still change it; a race to come has none.
-  assert.equal(settled(round, race(new Date().toISOString().slice(0, 10))), false);
-  assert.equal(settled(round, race('', 0)), false);
+  // Stewards may still change it; a race to come has none (this season's round: a past season's is over whatever it says).
+  const thisRound = u(`https://api.jolpi.ca/ergast/f1/${new Date().getUTCFullYear()}/18/results.json?limit=40`);
+  assert.equal(settled(thisRound, race(new Date().toISOString().slice(0, 10))), false);
+  assert.equal(settled(thisRound, race('', 0)), false);
   // `current` moves to the next season: never.
   assert.equal(settled(u('https://api.jolpi.ca/ergast/f1/current/results.json?limit=100'), race('2026-03-08')), false);
   assert.equal(settled(u('https://api.jolpi.ca/ergast/f1/2025/driverstandings.json'), body({ MRData: { total: '1' } })), true);

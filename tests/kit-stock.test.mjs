@@ -105,6 +105,8 @@ test("settlement: n of the market's own business days, at the end of that day in
   // TWSE's days before Lunar New Year (2026-02-12, 13) trade nothing but
   // still settle (市場無交易，僅辦理結算交割): Feb 11's trades settle Feb 13.
   assert.equal(iso(at(['TW', '2026-02-11T03:00:00Z'])), '2026-02-13T15:59:59.000Z');
+  // 2027's, by the rule (02-02, 03 before 小年夜 02-04): Feb 1's settle Feb 3.
+  assert.equal(iso(at(['TW', '2027-02-01T03:00:00Z'])), '2027-02-03T15:59:59.000Z');
   // The US T+1 over Thanksgiving, in EST.
   assert.equal(iso(at(['US', '2026-11-25T15:00:00Z'])), '2026-11-28T04:59:59.000Z');
   // Across the end of daylight saving (the US's 2026-11-01, the UK's 2026-10-25).

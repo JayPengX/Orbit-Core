@@ -2,7 +2,7 @@
 // model, ask-back options, what an answer may keep, and the AI tab's money.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { handleAi, runFeature, moneyLeft, spendOf, healthOf, withAsk, askOf, answersOf, MAX_ROUNDS, jsonOf } from '../ai.js';
+import { handleAi, runFeature, moneyLeft, spendOf, healthOf, withAsk, askOf, answersOf, MAX_ROUNDS, jsonOf, MODELS } from '../ai.js';
 import { FEATURES, numbersFrom } from '../ai-features.js';
 
 const ev = o => `event: ${o.type}\ndata: ${JSON.stringify(o)}\n\n`;
@@ -99,6 +99,9 @@ test('the AI tab: spend by provider, money left from the balance typed, speed an
   assert.equal(m.openai.left, null, 'never typed');
   assert.equal(m.anthropic.days, 4, 'US$3 in 7 days: 2 lasts 4 more');
   assert.equal(moneyLeft({ anthropic: { usd: 3.2, at: now - 7_200_000 } }, calls, now).anthropic.tone, 'bad');
+  // Google's main model at its price on the call's day: twice as much from 2027-01-01.
+  const flash = at => spendOf([{ at, feature: 'x', model: MODELS.flash, status: 200, tin: 1_000_000, cached: 0, tout: 0 }]).providers.google;
+  assert.deepEqual([flash(Date.parse('2026-12-31T12:00:00Z')), flash(Date.parse('2027-01-02T00:00:00Z'))], [0.75, 1.5]);
   const h = healthOf(calls, { 'money-say': 'gpt-6-luna' }, now);
   assert.equal(h['money-say'].backup, 1, 'Haiku answered for Luna once');
   assert.equal(h['money-say'].models['claude-haiku-5-5'], 1, 'which model answered, counted');

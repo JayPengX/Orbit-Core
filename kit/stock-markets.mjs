@@ -5,7 +5,7 @@
 // Wallet currencies. `spread`: what a Taiwan bank's online FX desk keeps on
 // each exchange, as a share of the amount (the gap between its buy and sell
 // rates, halved). `loanRate`: yearly interest on money borrowed in it.
-import { isTradingDay, earlyClose } from '#kit/stock-holidays.mjs';
+import { isTradingDay, earlyClose, settleOnly } from '#kit/stock-holidays.mjs';
 import { dayOffOn, TWSE } from '#kit/dayoff.mjs';
 import { HK_LOT_TABLE } from '#kit/stock-hk-lots.mjs';
 import { TOPIX500, JP_ETF_UNITS } from '#kit/stock-jp-lists.mjs';
@@ -565,8 +565,7 @@ export const settleDays = (market, t = Date.now()) => (EUROPE_T1.has(market) && 
 const tradingDay = (market, day) => isTradingDay(market, day);
 // The moment a trade at `t` settles: n of the market's business days later,
 // at the end of that day in the market's own time.
-// Days a market doesn't trade but still settles (TWSE: 市場無交易，僅辦理結算交割).
-const SETTLE_ONLY = { TW: new Set(['2026-02-12', '2026-02-13']) };
+// (Days a market doesn't trade but still settles, TWSE's before Lunar New Year: stock-holidays.mjs settleOnly.)
 export function settleDate(market, t) {
   let n = settleDays(market, t);
   if (!n) return t;
@@ -578,7 +577,7 @@ export function settleDate(market, t) {
     [y, m, d] = [next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate()];
     day = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const w = next.getUTCDay();
-    if (w !== 0 && w !== 6 && (tradingDay(market, day) || SETTLE_ONLY[market]?.has(day))) n--;
+    if (w !== 0 && w !== 6 && (tradingDay(market, day) || settleOnly(market, day))) n--;
   }
   return zonedTime(y, m, d, 23, 59, 59, tz);
 }
