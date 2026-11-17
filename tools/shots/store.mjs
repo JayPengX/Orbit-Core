@@ -50,6 +50,15 @@ const TAIPEI = ['--geo', '25.0478,121.5170'];
 const MORNING = [];
 
 const SCHOOL = ['--clock', '2026-11-04T10:30'];
+// 待辦 typed in through its own sheet (新增: kind, what, when), then 今天 at the list. (The run's account
+// keeps what the app writes, or the next sync hands back the account without them: --keep-account.)
+const todo = (kind, text, due) => `js:(async()=>{const z=ms=>new Promise(r=>setTimeout(r,ms));document.querySelector('.cx-todo-add').click();await z(1000);const d=[...document.querySelectorAll('dialog[open]')].pop();d.querySelectorAll('.cx-kind-chips .q-chip')[${['hw', 'test', 'bring', 'do'].indexOf(kind)}].click();await z(200);const i=d.querySelector('.cx-todo-form input.cx-input:not(.cx-date)');i.value=${JSON.stringify(text)};i.dispatchEvent(new Event('input',{bubbles:true}));const t=d.querySelector('.cx-date');t.value='${due}';t.dispatchEvent(new Event('change',{bubbles:true}));await z(200);d.querySelector('.q-sheet-foot button').click();await z(1000)})()`;
+const TODOS = lang => [...SCHOOL, '--keep-account', `/tmp/orbit-store-keep/class-${lang}.txt`, ...click(wait(2500), ...[
+  ['bring', ['體育服和水壺', 'PE kit and a water bottle'], '2026-11-04'],
+  ['hw', ['數學習作 p.32-35', 'Maths workbook p.32-35'], '2026-11-05'],
+  ['test', ['英文單字小考 Unit 5', 'English vocab quiz, Unit 5'], '2026-11-06'],
+  ['do', ['繳回校外教學回條', 'Hand in the field trip slip'], '2026-11-09']
+].map(([k, t, d]) => todo(k, t[lang === 'zh' ? 0 : 1], d)), wait(800), toTop("document.querySelector('#cx-todos')", 150), wait(800))];
 // Sports: a Friday evening before a big weekend (the Premier League back after the break, NBA every night).
 const BIG_WEEKEND = ['--clock', '2026-11-21T20:00'];
 // Text typed in a field (found by selector) and sent as input.
@@ -83,7 +92,7 @@ export const STORE = {
   transit: {
     app: 'transit', brand: 'transit', show: 'transit', prefix: 'transit', args: ['--google-map'],
     shots: [
-      { zh: '火車、公車、YouBike，一次排好', en: 'Train, bus and YouBike in one plan', args: [...MORNING, ...click(...trip('高雄車站'), toTop("[...document.querySelectorAll('h1,h2,h3,header *')].find(b=>b.offsetParent&&/^(路線|Directions)$/.test(b.textContent.trim()))", 20), wait(1000))] },
+      { zh: '捷運、公車、YouBike，一次排好', en: 'Metro, bus and YouBike in one plan', args: [...MORNING, '--geo', '25.0330,121.5434', ...click(...trip('松山機場'), toTop("[...document.querySelectorAll('h1,h2,h3,header *')].find(b=>b.offsetParent&&/^(路線|Directions)$/.test(b.textContent.trim()))", 20), wait(1000))] },
       { zh: '每個車站的下一班，即時', en: 'Every station’s next train, live', device: 'computer', args: click(search('板橋'), wait(8000), firstStation, wait(9000)) },
       { zh: '兩站之間，每一班車', en: 'Every train between two stations', args: [...MORNING, ...TAIPEI, ...click('#tab-times', wait(3000), station('from', '臺北'), wait(1500), station('to', '花蓮'), wait(7000))] },
       { zh: '公車還要等幾分鐘', en: 'Minutes until your bus', args: [...TAIPEI, ...click('#tab-times', wait(2500), busRoute('307'), wait(6000))] },
@@ -119,17 +128,17 @@ export const STORE = {
       { zh: '空氣品質，每小時都看得到', en: 'Air quality, hour by hour', page: 'air', wait: 9000 }
     ]
   },
-  // Your school day, live: what's on now, time left, 調課, your own school's notices.
+  // Your school day, live: what's on now, time left, 調課, every class in its own colour, 待辦 beside it.
   class: {
     app: 'orbit', brand: 'orbit', show: 'class', prefix: 'class', account: 'week',
     // Mid-morning on a school day; the flight on the real clock (planes flying now).
     shots: [
       { zh: '現在上什麼、還剩幾分鐘', en: 'What’s on now, and how long is left', args: SCHOOL },
       { zh: '整週課表，單雙週都對', en: 'Your whole week, odd and even weeks', device: 'computer', hash: 'week', args: SCHOOL },
-      { zh: '考前讀書計畫，照範圍排好', en: 'A study plan for every exam', page: 'study', args: SCHOOL },
+      { zh: '點一科，下次幾點上、一週幾節', en: 'Tap a class: when it’s next, how many a week', page: 'class', args: SCHOOL },
       { zh: '調課，幾秒完成', en: 'Swap a class in seconds', page: 'swap', args: SCHOOL },
       { zh: '跟著一班真的飛機專注', en: 'Focus along a real flight', device: 'tablet', page: 'flight', args: click('.cx-fl-pick', wait(10000)), wait: 8000 },
-      { zh: '待辦和作業，跟課表放一起', en: 'To-dos and homework, beside your timetable', page: 'todos', args: SCHOOL }
+      { zh: '待辦和作業，跟課表放一起', en: 'To-dos and homework, beside your timetable', args: { zh: TODOS('zh'), en: TODOS('en') } }
     ]
   },
   // Logging takes seconds and learns your habits; Taiwan's cards and EasyCard built in.
