@@ -3931,6 +3931,8 @@ dialog {
 .q-pass p, .q-pass h3 { margin: 0; }
 /* The Pass tab's section labels and notes keep the sheet's spacing (the reset above took it: a label sat 4 px under the card before it, 11-12). */
 .q-pass-body > .q-sheet-h { margin: 20px 16px 3px; }
+/* Every tab starts the same 24 px under the segments: a label or a section first kept its own space above too (App with no 今天 44 px, 外觀 38 px, 11-17). */
+.q-pass-body > .q-sheet-h:first-child, .q-pass-body > :first-child > .q-section:first-child { margin-top: 0; }
 .q-pass-body > .q-sheet-sub, .q-pass-body > .q-notice-note { margin: 4px 16px 0; }
 /* The Pass tab's groups (orbit.mjs passAccount), as iOS's Settings: one card
    of rows each, every row its icon, a hairline between rows from the text's

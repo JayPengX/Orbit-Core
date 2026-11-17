@@ -51,3 +51,37 @@ test('Pass tab labels sit with the card under them', async t => {
     await browser.close();
   }
 });
+
+// Every tab starts the same distance under the segments (2026-11-17: the App
+// tab with no 今天 rows began with its label 44 px under them and 外觀 with its
+// section 38 px, the Pass tab and 說明 24 px).
+test('every Pass tab starts the same distance under the tabs', async t => {
+  if (!chromium || !existsSync(chromium.executablePath())) return t.skip('no Chromium here');
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 800 } });
+    const rows = '<div class="q-rows q-pass-group"><div class="q-cell" style="height:52px">row</div></div>';
+    const tabs = {
+      pass: `<div class="q-rows q-pass-group q-pass-me" id="first"><div class="q-cell" style="height:52px">me</div></div><h3 class="q-sheet-h">登入與安全</h3>${rows}`,
+      looks: `<div><section class="q-section"><div class="q-section-head"><h2 id="first">里程碑</h2></div>${rows}</section><section class="q-section" id="second"><div class="q-section-head"><h2>頭像與頭像框</h2></div>${rows}</section></div>`,
+      apps: `<h3 class="q-sheet-h" id="first">所有 App</h3>${rows}`,
+      appsToday: `<section class="q-list-group"><h3 class="q-list-head" id="first">今天</h3><div class="q-list" id="today"><div class="q-cell" style="height:52px">row</div></div></section><h3 class="q-sheet-h" id="second">所有 App</h3>${rows}`
+    };
+    const gaps = {};
+    for (const [name, body] of Object.entries(tabs)) {
+      await page.setContent(`<style>${css}</style><body><dialog class="q-sheet q-pass" style="height:700px"><div class="q-sheet-head"><strong>Orbit Pass</strong></div><div class="q-pass-tabs"><div class="q-seg"><button>Pass</button></div></div><div class="q-pass-body">${body}</div></dialog></body>`);
+      await page.evaluate(() => document.querySelector('dialog').showModal());
+      gaps[name] = await page.evaluate(() => {
+        const b = id => document.getElementById(id)?.getBoundingClientRect();
+        const prev = document.getElementById('second')?.previousElementSibling?.getBoundingClientRect();
+        return { first: Math.round(b('first').top - document.querySelector('.q-seg').getBoundingClientRect().bottom), second: prev ? Math.round(b('second').top - prev.bottom) : null };
+      });
+    }
+    for (const name of ['looks', 'apps', 'appsToday']) assert.equal(gaps[name].first, gaps.pass.first, `${name} starts ${gaps[name].first} px under the tabs, Pass ${gaps.pass.first}`);
+    // (Only the first: a later label or section keeps its space from the card before it.)
+    assert.ok(gaps.looks.second >= 14, `外觀's second section ${gaps.looks.second} px under the first`);
+    assert.ok(gaps.appsToday.second >= 20, `所有 App ${gaps.appsToday.second} px under 今天's card`);
+  } finally {
+    await browser.close();
+  }
+});
