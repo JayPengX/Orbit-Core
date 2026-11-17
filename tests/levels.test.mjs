@@ -5,7 +5,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { handleEcoRequest, fullSession, levelOf, stampLevels, WALLET_COLLECTION } from '../eco.js';
+import { handleEcoRequest, levelOf, stampLevels, WALLET_COLLECTION } from '../eco.js';
+import { aiMay } from '../ai-allow.js';
 import { signToken, readToken } from '../orbit-token.js';
 import { fakeD1 } from './fake-d1.mjs';
 import { SCHEMA } from '../doc-store.js';
@@ -56,7 +57,7 @@ function setup({ dayCount = null } = {}) {
     const c = await readToken('test-secret', qt, 'ses', 0);
     return JSON.parse(store.get(key(WALLET_COLLECTION, c.d)).payload);
   };
-  const may = async qt => fullSession(env, deps, await readToken('test-secret', qt, 'ses', 0));
+  const may = async qt => (await aiMay(env, deps, await readToken('test-secret', qt, 'ses', 0))) === true;
   return { store, deps, env, call, admin, walletOf, may };
 }
 const signedIn = async (t, code) => {
@@ -109,14 +110,14 @@ test("a forged, another account's or signed-out token may not spend; nor the Wor
   const full = await signedIn(t, code);
   assert.equal(await t.may(full.token), true);
   const c = await readToken('test-secret', full.token, 'ses', 0);
-  assert.equal(await fullSession(t.env, t.deps, { ...c, d: 'someone-else' }), false);
-  assert.equal(await fullSession(t.env, t.deps, { k: 'ses', d: 'worker', s: 'worker:stock' }), false);
-  assert.equal(await fullSession(t.env, t.deps, { k: 'ses', d: 'ops-shots', s: 'x' }), false);
-  assert.equal(await fullSession(t.env, t.deps, { k: 'ses', d: 'ops-shots', s: 'ops-shots' }), true);
-  assert.equal(await fullSession(t.env, t.deps, null), false);
+  assert.equal((await aiMay(t.env, t.deps, { ...c, d: 'someone-else' })) === true, false);
+  assert.equal((await aiMay(t.env, t.deps, { k: 'ses', d: 'worker', s: 'worker:stock' })) === true, false);
+  assert.equal((await aiMay(t.env, t.deps, { k: 'ses', d: 'ops-shots', s: 'x' })) === true, false);
+  assert.equal((await aiMay(t.env, t.deps, { k: 'ses', d: 'ops-shots', s: 'ops-shots' })) === true, true);
+  assert.equal((await aiMay(t.env, t.deps, null)) === true, false);
   // Every device signed out: its old token may no longer.
   await t.call({ op: 'signout-all', qt: full.token });
-  assert.equal(await fullSession(t.env, t.deps, c), false);
+  assert.equal((await aiMay(t.env, t.deps, c)) === true, false);
 });
 
 test("the panel sets it, and it holds at the next ask (no new sign-in)", async () => {

@@ -726,7 +726,7 @@ export const priorityPass = w => Boolean(w?.sec?.priority);
 // there by hand: Orbit AI too. Kept in the wallet's `sec`, which only this
 // Worker writes (a patch, a merge or a restore from a phone never carries
 // it); anything without it is 'free'. Read from the account itself at each
-// AI ask (fullSession), never from the phone or a token, so a change in
+// AI ask (ai-allow.js aiMay), never from the phone or a token, so a change in
 // the panel holds at once and nothing a phone sends can lift it.
 export const LEVELS = ['free', 'full'];
 export const levelOf = w => (w?.sec?.level === 'full' ? 'full' : 'free');
@@ -746,19 +746,6 @@ export async function stampLevels(env, { dry = false } = {}) {
     .bind(WALLET_COLLECTION, stamp())
     .run();
   return { full: res?.meta?.changes ?? 0, giveawayFree: Number(gifts?.n) || 0 };
-}
-// The Worker's own sessions for the owner's tools (worker.js /ops as-phone,
-// behind its secret): the only ones with no account behind them that may ask.
-const OWNER_SESSIONS = new Set(['ops-shots']);
-// May session `c` (a 'ses' token, already checked) start an AI call or
-// anything else that costs money? Only when its account stands at the
-// token's generation (not signed out) and is 'full'.
-export async function fullSession(env, deps, c) {
-  if (!c || typeof c.d !== 'string' || !c.d) return false;
-  if (OWNER_SESSIONS.has(c.d) && c.s === c.d) return true;
-  const doc = await deps.fsGet(env, WALLET_COLLECTION, c.d).catch(() => null);
-  const wallet = doc?.exists ? parseWallet(doc.payload) : null;
-  return Boolean(wallet && gen(wallet) === (c.g || 0) && levelOf(wallet) === 'full');
 }
 // Through the door (door.js) before a session is handed out: { ok: true },
 // or the 503 to send with the place in line.

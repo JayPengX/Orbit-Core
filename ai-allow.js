@@ -24,7 +24,8 @@ export const AI_DEFAULTS = { full: { n: 50, per: 'day', until: 0, at: 0 }, free:
 export const ALLOW_DOC = ['orbit-config', 'ai-allow'];
 export const MAX_N = 100_000;
 const DAY_MS = 86_400_000;
-// The Worker's own sessions for the owner's tools (eco.js fullSession): no limit.
+// The Worker's own sessions for the owner's tools (worker.js /ops as-phone,
+// behind its secret): the only ones with no account behind them; no limit.
 const OWNER_SESSIONS = new Set(['ops-shots']);
 
 // A rule as typed (admin), or null when it isn't one.
