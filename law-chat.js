@@ -44,6 +44,8 @@ export const ANSWER_MODEL = 'claude-sonnet-5-5';
 // ended in 9.3–16.5 s; 'medium' 3.4–4.3 s and 9.0–10.3 s, as quick as 'low' and thinking more.)
 export const ANSWER_EFFORT = 'medium';
 export const ANSWER_BACKUP = 'gpt-6.1-sol';
+// (The third maker, only when both are out: Gemini's Flash.)
+export const ANSWER_LAST = 'gemini-3.6-flash';
 const CITE = /^([A-Z]\d{7}):(\d{1,4}(?:-\d{1,3})?)$/;
 
 // ---- The ask --------------------------------------------------------------------
@@ -623,11 +625,13 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
         );
         return json({ compared: true }, 200, headers);
       }
-      // (Sonnet failing, refusing or cut short: GPT's Sol answers; each JSON
-      // that doesn't parse is a failure too.)
+      // (Sonnet failing, refusing or cut short: GPT's Sol answers; both
+      // failing, out of credit (Jay 11-17: nothing dies when a balance hits
+      // zero), Gemini's Flash. Each JSON that doesn't parse is a failure too.)
       const ask = (model, thinking = tune.answer) => modelJson((parts, schema) => gemini(parts, schema, model, { onText, thinking }), prompt, ANSWER);
       const raw = await ask(answerModel, tune.answer ?? (answerModel === ANSWER_MODEL ? ANSWER_EFFORT : null))
-        .catch(e => (answerModel && answerModel !== ANSWER_BACKUP ? ask(ANSWER_BACKUP, null) : Promise.reject(e)));
+        .catch(e => (answerModel && answerModel !== ANSWER_BACKUP ? ask(ANSWER_BACKUP, null) : Promise.reject(e)))
+        .catch(e => (answerModel && answerModel !== ANSWER_LAST ? ask(ANSWER_LAST, null) : Promise.reject(e)));
       out = checkChat(raw, articles, chat.lang, grounded, others, ly);
     }
     mark('answer');

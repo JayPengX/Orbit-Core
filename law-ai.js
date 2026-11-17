@@ -124,7 +124,7 @@ export const LAW_FEATURES = {
   'law-contract-read': {
     app: 'law',
     tap: true,
-    models: ['flash', 'sonnet'],
+    models: ['flash', 'sonnet', 'sol'],
     effort: { flash: 'low', sonnet: 'low' },
     timeoutMs: 60_000,
     maxIn: 3000,
@@ -167,7 +167,7 @@ export const LAW_FEATURES = {
   'law-contract': {
     app: 'law',
     tap: true,
-    models: ['sonnet', 'sol'],
+    models: ['sonnet', 'sol', 'flash'],
     effort: { sonnet: 'medium', flash: 'low' },
     timeoutMs: 90_000,
     maxIn: 30_000,
@@ -258,7 +258,7 @@ export const LAW_FEATURES = {
   // laws (their purpose and changed articles, code-cut); each gets one line.
   'law-weekly': {
     build: 'law',
-    models: ['haiku', 'luna'],
+    models: ['haiku', 'luna', 'lite'],
     effort: { luna: 'low' },
     timeoutMs: 60_000,
     maxIn: 20_000,

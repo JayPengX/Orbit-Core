@@ -41,7 +41,7 @@ export const FEATURES = {
     tap: true,
     clarify: true,
     pick: ['cat', 'pay'],
-    models: ['luna', 'haiku'],
+    models: ['luna', 'haiku', 'lite'],
     effort: { luna: 'low' },
     perPass: 60,
     perMinute: 20,
@@ -85,7 +85,7 @@ export const FEATURES = {
   'money-ask': {
     app: 'money',
     tap: true,
-    models: ['haiku', 'luna'],
+    models: ['haiku', 'luna', 'lite'],
     effort: { luna: 'low' },
     maxIn: 7900,
     perPass: 40,
@@ -133,7 +133,7 @@ export const FEATURES = {
   'class-ask': {
     app: 'orbit',
     tap: true,
-    models: ['haiku', 'luna'],
+    models: ['haiku', 'luna', 'lite'],
     effort: { luna: 'low' },
     maxIn: 7000,
     perPass: 40,
@@ -185,7 +185,7 @@ export const FEATURES = {
   // student: one line, which students it's for, what to do, by when. Every
   // number and date it writes is the title's.
   'class-news': {
-    models: ['haiku', 'luna'],
+    models: ['haiku', 'luna', 'lite'],
     effort: { luna: 'low' },
     timeoutMs: 60_000,
     maxIn: 12_000,
@@ -237,7 +237,7 @@ export const FEATURES = {
   'beats-say': {
     app: 'beats',
     tap: true,
-    models: ['luna', 'haiku'],
+    models: ['luna', 'haiku', 'lite'],
     effort: { luna: 'low' },
     maxIn: 2400,
     perPass: 30,
@@ -267,7 +267,7 @@ export const FEATURES = {
   'weather-ask': {
     app: 'weather',
     tap: true,
-    models: ['luna', 'haiku'],
+    models: ['luna', 'haiku', 'lite'],
     effort: { luna: 'low' },
     maxIn: 1700,
     perPass: 30,
@@ -303,7 +303,7 @@ export const FEATURES = {
   'money-month': {
     app: 'money',
     tap: true,
-    models: ['haiku', 'luna'],
+    models: ['haiku', 'luna', 'lite'],
     effort: { luna: 'low' },
     maxIn: 3200,
     perPass: 4,
@@ -334,7 +334,7 @@ export const FEATURES = {
   'words-check': {
     app: 'vocab',
     tap: true,
-    models: ['haiku', 'luna'],
+    models: ['haiku', 'luna', 'lite'],
     effort: { luna: 'low' },
     perPass: 80,
     perMinute: 20,
@@ -367,7 +367,7 @@ export const FEATURES = {
   'words-chat': {
     app: 'vocab',
     tap: true,
-    models: ['haiku', 'luna'],
+    models: ['haiku', 'luna', 'lite'],
     effort: { luna: 'low' },
     maxIn: 3000,
     perPass: 300,
@@ -412,7 +412,7 @@ export const FEATURES = {
   'words-photo': {
     app: 'vocab',
     tap: true,
-    models: ['flash', 'haiku'],
+    models: ['flash', 'haiku', 'luna'],
     effort: 'low',
     timeoutMs: 40_000,
     perPass: 20,
@@ -453,7 +453,7 @@ export const FEATURES = {
   'transit-say': {
     app: 'transit',
     tap: true,
-    models: ['luna', 'haiku'],
+    models: ['luna', 'haiku', 'lite'],
     effort: { luna: 'low' },
     maxIn: 2400,
     perPass: 40,
@@ -516,7 +516,7 @@ export const FEATURES = {
   'sports-ask': {
     app: 'match',
     tap: true,
-    models: ['haiku', 'luna'],
+    models: ['haiku', 'luna', 'lite'],
     effort: { luna: 'low' },
     maxIn: 7900,
     perPass: 40,
@@ -558,7 +558,7 @@ export const FEATURES = {
     app: 'stock',
     tap: true,
     shared: true,
-    models: ['haiku', 'luna'],
+    models: ['haiku', 'luna', 'lite'],
     maxIn: 6500,
     perPass: 40,
     perMinute: 8,
@@ -600,7 +600,7 @@ export const FEATURES = {
   'sec-lesson': {
     app: 'stock',
     tap: true,
-    models: ['haiku', 'luna'],
+    models: ['haiku', 'luna', 'lite'],
     maxIn: 3300,
     perPass: 30,
     perMinute: 6,
@@ -641,7 +641,7 @@ export const FEATURES = {
     tap: true,
     // (the same question over the same cards: one answer for every visitor, a week)
     shared: true,
-    models: ['haiku', 'luna'],
+    models: ['haiku', 'luna', 'lite'],
     effort: { luna: 'low' },
     perPass: 20,
     perMinute: 6,
@@ -692,7 +692,7 @@ export const FEATURES = {
   // each named in plain words with what it likely means; the owner reads it
   // in the admin panel. Haiku: writing from given facts.
   'rec-weekly': {
-    models: ['haiku', 'luna'],
+    models: ['haiku', 'luna', 'lite'],
     effort: { luna: 'low' },
     maxIn: 12000,
     parts: ({ groups, routes }) =>

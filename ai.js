@@ -30,7 +30,9 @@ import { buildKeyOk } from './law-hosts.js';
 // a model of the same class from another maker (Jay 11-10: "fallback better
 // be designed well"): Sonnet ↔ GPT's Sol (judgment), Haiku ↔ Luna (writing,
 // forms), Flash → Haiku (pictures: Claude reads them too). Never a lesser
-// class behind a better one.
+// class behind a better one. And the third maker last of all (Jay 11-17,
+// keeping all three: nothing dies when one balance hits zero): Flash-Lite
+// behind Haiku and Luna, Luna or Sol behind a picture, Flash behind Sol.
 export const MODELS = { sonnet: 'claude-sonnet-5-5', sol: 'gpt-6.1-sol', haiku: 'claude-haiku-5-5', luna: 'gpt-6-luna', flash: 'gemini-3.6-flash', lite: 'gemini-3.5-flash-lite' };
 // US$ per 1M tokens (11-10; Flash doubles 2027-01-01): what aiBill counts spend by.
 export const PRICES = {

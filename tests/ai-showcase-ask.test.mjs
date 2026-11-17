@@ -7,7 +7,7 @@ import { FEATURES } from '../ai-features.js';
 test('showcase-ask: the showcase’s own pass, the cards given only', () => {
   const f = FEATURES['showcase-ask'];
   assert.equal(f.app, 'showcase');
-  assert.deepEqual(f.models, ['haiku', 'luna']);
+  assert.deepEqual(f.models, ['haiku', 'luna', 'lite']);
   const i = f.input({ q: '怎麼做到不花錢', cards: [{ id: 'cheap', title: '不花錢', text: '免費額度內 10 萬次' }, { id: 'team', title: '怎麼做', text: 'Jay 決定' }], lang: 'zh' });
   assert.deepEqual(f.clean({ line: '都在免費額度內（10 萬次）。', ids: ['cheap', 'x'] }, i), { line: '都在免費額度內（10 萬次）。', points: [], ids: ['cheap'] });
   assert.deepEqual(f.clean({ line: '一個月 50 萬次。', ids: ['cheap'] }, i), { line: '', points: [], ids: ['cheap'] });

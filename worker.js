@@ -77,7 +77,7 @@ import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
 import { docStore, storeReady } from './doc-store.js';
 import { handleMoneyRead } from './money-read.js';
 import { logCall, callsSince, reliability, spendOf, lastFailed, providerCapped, providerToday } from './gemini-use.js';
-import { handleAi, handleAiBuild, aiTry } from './ai.js';
+import { handleAi, handleAiBuild, aiTry, MODELS } from './ai.js';
 import { storyTr, batchTr } from './builders/news-tr.js';
 import { handleTr } from './translate.js';
 import { r2Store } from './builders/store.js';
@@ -749,7 +749,25 @@ async function claudeAnswer(model, parts, schema, env, ctx, feature, { onText = 
 const FLASH_FIRST_MS = 12_000;
 const FLASH_SICK_MS = 10 * 60_000;
 const retryable = status => status >= 500 || status === 429;
-async function geminiAnswer(model, parts, schema, env, headers, ctx, feature, { timeoutMs = 0, liteMs = timeoutMs, thinking = null, onText = null } = {}) {
+// Gemini failing, at its day cap or out of credit (a prepaid balance at 0
+// answers 429): the same ask to Claude's Haiku, then GPT's Luna, which read
+// pictures and PDFs too (Jay 11-17, keeping all three makers: "nothing dies
+// when a balance hits zero"). `backups: []` where the caller has its own
+// next model (ai.js runFeature's chain).
+const GEMINI_BACKUPS = [MODELS.haiku, MODELS.luna];
+async function geminiAnswer(model, parts, schema, env, headers, ctx, feature, { backups = GEMINI_BACKUPS, onText = null, ...opts } = {}) {
+  const res = await geminiOnly(model, parts, schema, env, headers, ctx, feature, { ...opts, onText });
+  if (res.ok || !backups.length) return res;
+  const failed = { status: res.status, body: await res.text().catch(() => '') };
+  for (const m of backups) {
+    if (!(makerOf(m) === 'anthropic' ? env.ANTHROPIC_API_KEY : env.OPENAI_API_KEY) || (await lastFailed(env, m, FLASH_SICK_MS))) continue;
+    const r = await claudeAnswer(m, parts, schema, env, ctx, feature, { onText });
+    if (r.ok) return new Response(await r.text(), { status: 200, headers: { ...headers, 'Content-Type': 'application/json' } });
+    await r.body?.cancel().catch(() => {});
+  }
+  return new Response(failed.body, { status: failed.status, headers: { ...headers, 'Content-Type': 'application/json' } });
+}
+async function geminiOnly(model, parts, schema, env, headers, ctx, feature, { timeoutMs = 0, liteMs = timeoutMs, thinking = null, onText = null } = {}) {
   const lite = GEMINI_ALLOWED_MODELS[0];
   const once = m =>
     m === lite && !onText
@@ -1417,12 +1435,12 @@ async function route(request, env, ctx, headers, origin) {
   // thinking: the model's thinking level, 'low' unless said.)
   // (A Claude model asked for by name, /law-chat's answer: streamed through the relay, logged as
   // Gemini's calls are; thinking is then its effort, 'low' | 'medium' | 'high'.)
-  const lawGemini = feature => (parts, schema, model = GEMINI_ALLOWED_MODELS[0], { onText = null, thinking = null } = {}) => {
+  const lawGemini = (feature, { backups } = {}) => (parts, schema, model = GEMINI_ALLOWED_MODELS[0], { onText = null, thinking = null } = {}) => {
     if (makerOf(model)) return claudeAnswer(model, parts, schema, env, ctx, feature, { onText, effort: thinking });
     const m = GEMINI_ALLOWED_MODELS.includes(model) ? model : GEMINI_ALLOWED_MODELS[0];
     const level = ['minimal', 'low', 'medium'].includes(thinking) ? thinking : null;
-    // (Flash stuck or failing: Flash-Lite's answer instead, geminiAnswer.)
-    return geminiAnswer(m, parts, schema, env, headers, ctx, feature, { timeoutMs: 40_000, liteMs: 25_000, thinking: level, onText });
+    // (Flash stuck or failing: Flash-Lite's answer instead, then Haiku's, then Luna's: geminiAnswer.)
+    return geminiAnswer(m, parts, schema, env, headers, ctx, feature, { timeoutMs: 40_000, liteMs: 25_000, thinking: level, onText, backups });
   };
   if (path === '/law-ask' || path === '/law-chat') {
     const session = await sessionOf(request, env);
@@ -1478,7 +1496,7 @@ async function route(request, env, ctx, headers, origin) {
     try {
       feature = String((await request.clone().json())?.feature || '');
     } catch {}
-    return handleAiBuild(request, env, ctx, headers, { cap: FEATURES[feature]?.build ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai') });
+    return handleAiBuild(request, env, ctx, headers, { cap: FEATURES[feature]?.build ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai', { backups: [] }) });
   }
   if (path === '/ai') {
     let feature = '';
@@ -1489,7 +1507,7 @@ async function route(request, env, ctx, headers, origin) {
     const show = FEATURES[feature]?.app === 'showcase';
     const session = show ? await showcaseOf(request, env, { ip, origin }) : await sessionOf(request, env);
     const spend = show ? async () => (session ? true : 'level') : spendFor(session);
-    return handleAi(request, env, ctx, headers, session, { cap: FEATURES[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai'), spend });
+    return handleAi(request, env, ctx, headers, session, { cap: FEATURES[feature] ? await aiCap(env, ctx, feature) : 0, gemini: lawGemini(feature || 'ai', { backups: [] }), spend });
   }
   // Orbit Class's 學校公告摘要 (class-news.js): a school's list read by code, worded once an hour by the AI, kept in R2.
   // Orbit News in one language: a story's own headlines and summary in the reader's, as it's opened (builders/news-tr.js).

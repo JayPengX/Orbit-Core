@@ -329,15 +329,22 @@ test('nothing found is not covered, without the answer\'s call; a guard that emp
   assert.deepEqual([out.covered, out.answer, out.points, out.next.length], [false, '找到的法規沒有直接回答這個問題。', [], 1]);
 });
 
-test('Gemini or Orbit Law failing is a 502, nothing kept; no key a 503; the guard\'s pace 2 a 503; 10 a minute a Pass', async () => {
+test('Gemini failing: the plan from Haiku, then Luna (Jay 11-17); every maker or Orbit Law failing is a 502, nothing kept; no key a 503; the guard\'s pace 2 a 503; 10 a minute a Pass', async () => {
   const env = envOf();
   geminiStatus = 503;
   try {
-    const r = await chat({ ...Q, q: '押金失敗' }, { env });
+    const n = gemini.length;
+    assert.equal((await chat({ ...Q, q: '押金失敗' }, { env: envOf() })).status, 200);
+    assert.ok(gemini.slice(n).some(g => g.model === 'claude-haiku-5-5'));
+    claude = { status: 529, refuse: false };
+    for (const m of ['gpt-6-luna', 'gpt-6.1-sol']) MODEL_STATUS[m] = 503;
+    const r = await chat({ ...Q, q: '押金全失敗' }, { env });
     assert.equal(r.status, 502);
     assert.equal(env.RATE_LIMIT_KV.m.size, 0);
   } finally {
     geminiStatus = 200;
+    claude = { status: 200, refuse: false };
+    for (const m of ['gpt-6-luna', 'gpt-6.1-sol']) delete MODEL_STATUS[m];
   }
   textStatus = 500;
   try {
@@ -524,14 +531,14 @@ test('only the judgments and rules the answer cites come back; a judgment is rea
   assert.deepEqual(lookOf({ budgets: [], bills: [], news: [], facts: [] }, [], false), ['cases']);
 });
 
-test("no Gemini answers: Sonnet and Sol both failing is a 502, never Flash; the plan's Flash-Lite 503 asked once more", async () => {
+test("Sonnet and Sol both failing (out of credit): Gemini's Flash answers last (Jay 11-17, nothing dies when a balance hits zero); the plan's Flash-Lite 503 asked once more", async () => {
   MODEL_STATUS['gpt-6.1-sol'] = 503;
   claude = { status: 529, refuse: false };
   try {
     const n = gemini.length;
     const r = await chat({ ...Q, q: '押金退不回來' });
-    assert.equal(r.status, 502);
-    assert.deepEqual(gemini.slice(n).map(g => `${g.kind} ${g.model}`), ['plan gemini-3.5-flash-lite', 'answer claude-sonnet-5-5', 'answer gpt-6.1-sol']);
+    assert.equal(r.status, 200);
+    assert.deepEqual(gemini.slice(n).map(g => `${g.kind} ${g.model}`), ['plan gemini-3.5-flash-lite', 'answer claude-sonnet-5-5', 'answer gpt-6.1-sol', 'answer gemini-3.6-flash']);
   } finally {
     delete MODEL_STATUS['gpt-6.1-sol'];
     claude = { status: 200, refuse: false };

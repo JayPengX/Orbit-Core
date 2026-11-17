@@ -114,7 +114,7 @@ into absolutes; push back when a rule makes things worse.
 - 11-10 AI gets a small code-picked digest of what the page doesn't already show (insight, never a repeat of the card); prompts are crafted and tested (`/ops ai-try`); it asks back with tap pickers from the person's own lists where that helps; each call's cost shows in admin.
 - 11-11 An AI answer is never plain text: it is drawn (kit `aiAnswer`: rows with icons, logos, faces, bars), with a skeleton of its shape while it's made (`aiAnswerWait`). Names in its words are chips: a player with their face, a team with its logo (`.q-ai-ref`).
 - 11-11 Every smart feature, code-only ones too, carries the Orbit AI mark (kit `icons.ai`, `--q-ai`), never a sparkle.
-- 11-11 A fallback is the same class from another maker (Sonnet ↔ GPT Sol for judgement, Haiku ↔ Luna for writing, Flash only for pictures and the cheapest), each answer naming its model in admin. AI makers are Anthropic, OpenAI and Google only (never DeepSeek or Qwen).
+- 11-11 A fallback is the same class from another maker (Sonnet ↔ GPT Sol for judgement, Haiku ↔ Luna for writing, Flash only for pictures and the cheapest), each answer naming its model in admin. AI makers are Anthropic, OpenAI and Google only (never DeepSeek or Qwen). 11-17 (Jay keeps all three makers): every AI feature ends on the third maker, so one balance at zero or one maker down never stops it; that last answer may be a lesser class (Flash after Sonnet and Sol, Flash-Lite after Haiku and Luna), and an ask only Gemini made (a photo, a timetable, 問法律's plan) goes to Haiku, then Luna, when Gemini fails.
 
 ## 3. Design
 
