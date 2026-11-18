@@ -207,8 +207,9 @@ them on by hand in each repo's Actions tab.
   date; check it 12-02); 12-05 the Firebase key goes; 12-24 the 3-month US
   bill matures (Securities); 12-25 the 代表會 term ends (Law's 104 town
   sites move to the next term by themselves once each site lists a session
-  of it, `termsToTry`; Law's `scripts/town-roster.json` is still made by
-  hand after an election, for the recordings' names);
+  of it, `termsToTry`; once 中選會 has the results, an agent reruns Law's
+  `node scripts/town-roster.mjs` for the recordings' names: till then a new
+  term's recordings name only each site's own members, `rosterFor`);
   about 12 TWSE's 2027 calendar (compare with `kit/stock-holidays.mjs`'s
   derived one); 2027-01-01 Gemini Flash's price doubles (the bill counts it);
   spring 2027 the 117 學測 (Class's `DEFAULT_COUNTDOWN_EVENTS`); March 2027
