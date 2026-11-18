@@ -31,6 +31,11 @@ document.documentElement.classList.add('q-suite-host');
 // (The iPhone's safe area as it reports it, keys up or not: the home bar's 34 px.)
 const gcs = getComputedStyle;
 globalThis.getComputedStyle = (el, p) => (el?.style?.cssText?.includes('safe-area-inset-top') ? { paddingTop: '0px', paddingRight: '0px', paddingBottom: '34px', paddingLeft: '0px' } : gcs(el, p));
+// (Keys played by making the window shorter can leave it wider than tall (393 × 353), and Chromium calls
+// that a turn of the phone; an iPhone never does. Left in, the test passed or failed by how fast the machine
+// was: the turn's last look, 1.5 s on, counts only within 2.5 s of the page's start. Only a turn the test
+// plays itself (its own orientationchange) is one.)
+for (const [t, k] of [[globalThis, 'orientationchange'], [screen.orientation, 'change']]) t?.addEventListener?.(k, e => e.isTrusted && e.stopImmediatePropagation());
 const suite = await import('/kit/suite.mjs');
 suite.host(document.getElementById('frames'), { first: { app: 'money', url: '/money/' } });
 </script></body></html>`;
