@@ -33,7 +33,7 @@
 import { BRANDS, APP_ORDER, FAMILY, pathOf, homeOf, appIcon, familyMark } from './brand.mjs';
 import { DEV, cleanDev } from './brand.mjs';
 import { encodeSetup, startOf, newId, mineSaved, mergeMine, MINE_KEY, WHICH_KEY, appsOf, whichTag } from './orbit-mine.mjs';
-import { API, SITE as HOME, isApi } from './domain.mjs';
+import { API, SITE as HOME, isApi, onDomain } from './domain.mjs';
 import { passkeyHere, passkeyName, deviceName, makePasskey, usePasskey, forgetPasskey, cancelled } from './passkey.mjs';
 import { icons, tile, cell, pullToRefresh, setSheetDetent, toast, sheet, h as node } from './ui.mjs';
 import { scrollBusy } from './hold-place.mjs';
@@ -823,7 +823,13 @@ function patient(wait) {
 }
 // A proxy ask with this app's token: turned away for it (401: a token signed
 // before the proxy's secret changed, or run out), asked once more with a new one.
+// Signed out on the family's own pages, a data read is never sent: the proxy
+// can only refuse it, and each refusal is one of the day's 100,000 (Sports
+// behind the sign-in screen sent 30 to 50 at every opening, 2026-11-18). The
+// answer here is the proxy's own. (A local preview still asks: the dev door.)
+const REFUSED = '{"error":{"code":"ORBIT_PASS_REQUIRED","message":"Sign in with a Orbit Pass."}}';
 async function signedFetch(address, init) {
+  if (onDomain && address.startsWith(PROXY_URL) && !storedAccount()) return new Response(REFUSED, { status: 401, headers: { 'Content-Type': 'application/json' } });
   const withToken = t => fetch(`${address}${t ? `&qt=${encodeURIComponent(t)}` : ''}`, init);
   const res = await withToken(await dataToken(false, address.startsWith(PROXY_URL)));
   return res.status === 401 && dataSession ? withToken(await dataToken(true)) : res;
