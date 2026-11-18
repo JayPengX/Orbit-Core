@@ -3,6 +3,7 @@
 // changed, so a phone re-downloads only what a deploy changed; and the
 // built kit's files reach each other at the import map's addresses.
 import test from 'node:test';
+import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, readdir, cp } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
@@ -110,4 +111,33 @@ test("the built kit: minified, its files import each other through the map, ever
   const second = JSON.parse(await readFile(join(again, 'kit/version.json'), 'utf8'));
   assert.deepEqual(second.files, files);
   assert.equal(second.version, version, 'the same kit from another commit: the same version');
+});
+
+// Orbit's window (site/app/) loads the kit too, and was never readied as an app's page is: on a first visit it
+// asked for the kit at bare addresses, one import level at a time, and the app it then held asked for every
+// file again at its hash: 182 KB of a first opening's 457 KB of kit came down twice on slow 4G (2026-11-18).
+test("the family's own pages are built with the kit: its hashes baked into their loader, their kit modules preloaded", async () => {
+  const out = await mkdtemp(join(tmpdir(), 'kit-site-'));
+  await cp(new URL('../site/app', import.meta.url).pathname, join(out, 'app'), { recursive: true });
+  execFileSync(process.execPath, [new URL('../kit/stamp.mjs', import.meta.url).pathname, out, 'v1'], { stdio: 'ignore' });
+  const { version, files } = JSON.parse(await readFile(join(out, 'kit/version.json'), 'utf8'));
+  const page = await readFile(join(out, 'app/index.html'), 'utf8');
+  const baked = /\('\/Orbit-Core\/kit\/',(\{.*?\}),(\[[^\]]*\])\)<\/script>/.exec(page);
+  assert.ok(baked, 'the loader holds the kit and the page’s modules, not null, null');
+  assert.deepEqual(JSON.parse(baked[1]), { version, files }, 'this build’s own version and hashes');
+  const names = JSON.parse(baked[2]);
+  for (const name of names) assert.ok(files[name], `${name} is a served kit file`);
+  // Everything the window imports, and what those import: none found a level at a time.
+  for (const need of ['suite.mjs', 'brand.mjs', 'orbit-mine.mjs', 'domain.mjs', 'orbit.mjs', 'ui.mjs', 'vault.mjs', 'usage.mjs']) assert.ok(names.includes(need), need);
+  assert.equal(new Set(names).size, names.length);
+  // The loader as the page runs it: every module at its hash, listed after the import map and ahead of the style sheet.
+  const code = /<!-- kit:head -->\n<script>([\s\S]*?)<\/script>\n<!-- \/kit:head -->/.exec(page)[1];
+  let wrote = '';
+  const window = {};
+  vm.runInNewContext(code, { window, localStorage: { getItem: () => null }, document: { write: text => (wrote += text) }, JSON, encodeURIComponent });
+  const asked = [...wrote.matchAll(/<link rel="(modulepreload|preload" as="script)" href="([^"]+)">/g)].map(m => [m[1] === 'modulepreload', m[2]]);
+  assert.deepEqual(asked, names.map(name => [name.endsWith('.mjs'), `/Orbit-Core/kit/${name}?v=${files[name]}`]), 'modules as modules, boot.js as the script it is');
+  assert.ok(names.includes('boot.js'), 'every app’s first script too');
+  assert.ok(wrote.indexOf('importmap') < wrote.indexOf('modulepreload') && wrote.lastIndexOf('preload') < wrote.indexOf('rel="stylesheet"'), 'the map first, the style sheet last');
+  assert.equal(window.ORBIT_KIT.version, version);
 });

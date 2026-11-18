@@ -9,7 +9,7 @@
 import { cp, readdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { KIT_TOOLS } from './preload.mjs';
+import { KIT_TOOLS, kitGraph } from './preload.mjs';
 import { hashFiles } from './hash.mjs';
 
 const [out, version] = process.argv.slice(2);
@@ -35,3 +35,31 @@ const listed = Object.fromEntries([...hashes].sort());
 const kitVersion = `k${createHash('sha256').update(JSON.stringify(listed)).digest('hex').slice(0, 12)}`;
 await writeFile(join(dest, 'version.json'), JSON.stringify({ version: kitVersion, commit: version, files: listed }) + '\n');
 console.log('kit', kitVersion, `(${version})`, '->', dest, `(${hashes.size} files)`);
+
+// The family's own pages that load the kit (site/, copied into <out> before
+// this runs: Orbit's window, /app/), readied as an app's deploy readies its
+// page (stamp-app.mjs). Their loader ends `(…,null,null)`: the first becomes
+// the kit's version and hashes, so a first visit asks for each kit file at
+// the address the apps ask for it at; the second the kit modules the page
+// imports (in the order it comes to them), which the loader asks for with
+// the page (modulepreload). (Orbit's window asked for the kit
+// at bare addresses, one import level at a time, and the app it held then
+// downloaded all of it again: 182 KB of a first opening's 457 KB of kit,
+// 2026-11-18.)
+const BAKE = "('/Orbit-Core/kit/',null,null)";
+async function pages(dir, found = []) {
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) path === dest || (await pages(path, found));
+    else if (entry.name.endsWith('.html')) found.push(path);
+  }
+  return found;
+}
+for (const page of await pages(out)) {
+  const html = await readFile(page, 'utf8');
+  if (!html.includes(BAKE)) continue;
+  // (And boot.js, the first script of every app the window holds: there when the app's page asks.)
+  const names = [...(await kitGraph([page], src)).keys(), 'boot.js'].filter(name => listed[name]);
+  await writeFile(page, html.replace(BAKE, () => `('/Orbit-Core/kit/',${JSON.stringify({ version: kitVersion, files: listed })},${JSON.stringify(names)})`));
+  console.log('page', page, `(${names.length} kit modules)`);
+}

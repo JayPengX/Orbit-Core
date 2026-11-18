@@ -795,7 +795,9 @@ export function intoOrbit({ standalone = false, phone = false } = {}) {
 
 let started = false;
 export function start() {
-  if (started || typeof document === 'undefined') return;
+  // (Never Orbit's own window, whose address says the app it shows: host below. The kit coming in after
+  // the window had shown an app took the window for that app's page opened alone, and loaded it again.)
+  if (started || typeof document === 'undefined' || globalThis.ORBIT_HOST) return;
   app = appAt(location.pathname);
   if (!app) return;
   started = true;

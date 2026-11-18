@@ -5943,8 +5943,10 @@ export function balanceRows(root = document) {
   }
 }
 function watchNames() {
-  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || globalThis.__orbitFit) return;
-  globalThis.__orbitFit = true;
+  // (Its own mark: Orbit's window keeps its fit for the keys at __orbitFit (suite.mjs host), and with the
+  // window holding an app before this file is in, that was taken for this watch already started.)
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined' || globalThis.__orbitNames) return;
+  globalThis.__orbitNames = true;
   let frame = 0;
   const soon = () => (frame ||= requestAnimationFrame(() => ((frame = 0), fitNames(), balanceRows(), fullRows())));
   const start = () => {

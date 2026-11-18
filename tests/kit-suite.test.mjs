@@ -228,3 +228,22 @@ test('no separate apps: an app’s page opened on its own goes into Orbit at tha
   const orbit = readFileSync(new URL('../kit/orbit.mjs', import.meta.url), 'utf8');
   assert.ok(!/function orbitTip|function movedGate|suiteAsk/.test(orbit), 'the separate apps’ banner, signed-out screen and offer are gone');
 });
+
+// Orbit's window now takes in orbit.mjs after it has asked for its first app (2026-11-18), when its address
+// already says that app (/sports/). suite.mjs start, run as orbit.mjs comes in, took the window for the
+// app's own page opened alone: it sent the window into Orbit again (a second load of everything, seen in
+// the speed run: /app/ asked for twice in one opening), then would have drawn an app's switcher over it.
+test("Orbit's own window is never started as an app's page, whatever its address says", async () => {
+  const { pathOf } = await import('../kit/brand.mjs');
+  const was = { document: globalThis.document, location: globalThis.location, host: globalThis.ORBIT_HOST };
+  const did = [];
+  globalThis.document = { documentElement: { classList: { add: c => did.push(`class ${c}`) } }, body: null, addEventListener: () => {}, querySelector: () => null, getElementById: () => null };
+  globalThis.location = { pathname: pathOf('match'), search: '', hash: '', href: `https://orbit.test${pathOf('match')}`, origin: 'https://orbit.test', replace: to => did.push(`replace ${to}`), assign: to => did.push(`assign ${to}`) };
+  globalThis.ORBIT_HOST = { shown: () => 'match' };
+  try {
+    S.start();
+    assert.deepEqual(did, [], 'nothing marked, nowhere gone');
+  } finally {
+    for (const [k, v] of [['document', was.document], ['location', was.location], ['ORBIT_HOST', was.host]]) v === undefined ? delete globalThis[k] : (globalThis[k] = v);
+  }
+});

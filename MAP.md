@@ -1,8 +1,7 @@
 # Orbit: the family's map
 
-The architecture of the whole family: the system, the apps, the kit and its
-component patterns, the Workers and their routes, where data lives and how it
-syncs, the Pass, notices, the bill, deploying. Read the part your task touches
+The family's architecture: system, apps, kit, Workers' routes, data and sync,
+the Pass, notices, the bill, deploying. Read the part your task touches
 (the kit's §3 before writing UI; §4–§5 before a route or a read). An
 architecture change (a kit module or pattern, a route, a Worker, a binding, a
 table, an R2 prefix or KV family, a data or sync layer, a cron's work, a
@@ -46,7 +45,7 @@ orbit-site (site.js): the domain's hosts as custom domains
 | Orbit Law | `law` | `/law/` | Orbit-Law | `orbit-law` |
 | Orbit Securities | `stock` | `/securities/` | Orbit-Securities | `stock-study-accounts` |
 
-Order: `APP_ORDER`. Orbit-Showcase: Jay's homepage, `/showcase/`. This repo's site has the family page
+Order: `APP_ORDER`. Orbit-Showcase: Jay's homepage, `/showcase/`. This repo's site: the family page
 (`/`) and the admin page (`site/admin/`, at `/admin/` alone). A new app: a `slug` in
 `kit/brand.mjs` and a collection in `eco.js` `ECO_APPS`.
 
@@ -54,8 +53,7 @@ Order: `APP_ORDER`. Orbit-Showcase: Jay's homepage, `/showcase/`. This repo's si
 §11) with the kit's snippets (`kit/loader.html`: an import map for `#kit/…`,
 `orbit.css`, `boot.js`, the `#loading` cover); one entry module draws the tabs; `lib/` holds the logic
 (tested with `node --test`); views, cards and sheets draw it with the kit's
-builders; the app's own CSS is only for what is truly the app's (a pitch, a
-map, a chart); `sw.js` is the app's settings and then `kit/sw.js`. Its
+builders; the app's own CSS is only for what is truly the app's (§3.3); `sw.js` is the app's settings and then `kit/sw.js`. Its
 deploy workflow tests against main's kit, stamps every file with its hash
 (`scripts/stamp-version.mjs` → `kit/stamp-app.mjs`) and publishes with
 `Orbit-Core/deploy/cf-site.mjs`. `npm test`'s `pretest` links `.kit` to
@@ -65,14 +63,17 @@ deploy workflow tests against main's kit, stamps every file with its hash
 
 ### 3.1 How it's served
 
-Served from this repo's site, never copied. Each app's page carries
-`kit/loader.html`'s snippets; `kit/preload.mjs` lists the first screen's
-modules for modulepreload.
+Served from this repo's site, never copied; `kit/preload.mjs` lists the
+first screen's modules for modulepreload.
 
 - **Addresses by content.** The kit's deploy (`kit/stamp.mjs`) and every
   app's (`kit/stamp-app.mjs`) minify each file and address it by its hash
-  (`?v=<hash>`, `kit/hash.mjs`): a phone downloads only what a push changed;
-  `version.json` lists every hash (`orbit.kitFiles`).
+  (`?v=<hash>`, `kit/hash.mjs`): a phone downloads only what changed;
+  `version.json` lists every hash (`orbit.kitFiles`); `stamp.mjs` bakes them,
+  with preloads, into `site/app/`.
+- **Orbit's window** asks for the app's frame on `suite`, `brand`,
+  `orbit-mine` and `domain.mjs` alone; `orbit.mjs` and `ui.mjs` come behind
+  (`kit()`).
 - **Updates.** On a quick link `sw.js pageFirst` opens the server's page
   (the new version, started once); else boot.js reloads behind the cover.
   An open page swaps only after 5 minutes away (`AWAY_MS`).
@@ -84,18 +85,18 @@ modules for modulepreload.
 | --- | --- |
 | `orbit.mjs` | The core: the session, data reads and device storage (§5), the economy's tables, looks and milestones, notices, the frame (`tabBar`, `topActions`, `accountButton`, `ask`/`tell`), screens, fitting, live beats and break countdowns, recommendations (`rank`, `affinity`), the 除錯紀錄 (`rec`); on import: no pinch zoom, sheets over the keyboard (`watchKeyboard`, `landField`), presses only when pressed; `switchGlide` |
 | `orbit.css` | The design system: iOS 27's tokens (colour, type, space, radius, Liquid Glass, springs) and every `q-` component; the apps' accents (`tools/accent-css.mjs`); at its end Orbit's own look (`data-look="native"`, DESIGN §11) |
-| `ui.mjs` | The builders (§3.3) and their HTML-string twins (`…Html`) for apps that draw with template strings; loads `hold-place.mjs` |
+| `ui.mjs` | The builders (§3.3) and their HTML-string twins (`…Html`); loads `hold-place.mjs` |
 | `hold-place.mjs` | A redraw never moves page, sheet or panel; a tap holds the control under the finger; not a drawing (`loose`); a sized sheet keeps its height (`--q-sheet-floor`); `scrollBusy()` holds `everyDev` under a finger; `freshScreen()`: a new screen at the top; `letGo()`: a drag carries its grip away |
 | `steady-pics.mjs` | A picture drawn again is eager and decoded at once |
 | `usage.mjs` | Usage as counts, no id (`usageStep`), to `/usage`; Pass › 使用統計; `site/privacy/` |
 | `sources.mjs`, `source-watch.mjs` | Outside sources (`SOURCES`, `sourceOf`, `stateOf`: admin 外部來源); a phone's own outside reads, beaconed to `/sources` |
 | `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, first) |
-| `loader.html` | The snippets every app's page carries (`kit:head`, `kit:boot`) |
+| `loader.html` | The apps' snippets (`kit:head`, `kit:boot`) |
 | `brand.mjs` | Families, names, colours, marks, repos, slugs, `APP_ORDER`, `DEV` (speeds, §9) |
 | `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); each app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
 | `passkey.mjs`, `pass-mail.mjs` | Passkeys in the browser (`passkeyHere()`); the recovery email's screens |
 | `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); `TOPICS`; `sideOf`, `partiesIn`, `topicsOf`, `namesRe` |
-| `ai.mjs`, `family.mjs`, `today.mjs`, `act.mjs` | AI (mark `icons.ai`, `--q-ai`; `.q-ai-ref` a name chip): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer`, `aiAnswerWait` (answers drawn); the family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天; `act.mjs` `readAct`: a command said in an app's ask box (start a focus, add a countdown, follow a team) read by code, no AI call |
+| `ai.mjs`, `family.mjs`, `today.mjs`, `act.mjs` | AI (mark `icons.ai`, `--q-ai`; `.q-ai-ref` a name chip): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer`, `aiAnswerWait` (answers drawn); the family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天; `act.mjs` `readAct`: a command in an app's ask box (a focus, a countdown, a team to follow) read by code, no AI |
 | `testtools.mjs` | 測試工具, hidden until unlocked (seven taps on 除錯紀錄 in 4 s): a moved or fast clock, a place, a trip's fixes played back (`playTrip`), the network off/slow/failing (`boot.js`, `orbit.tester`), test notices (`pushTest`), each app's switches (`ORBIT_TEST_TOOLS`, `ORBIT_TEST?.flags?.x`), versions; a pill while anything is on |
 | `suite.mjs` | Orbit (`site/app/`; `inSuite()`): each app a frame of `host`, kept running (`toClose`), tabs, the ⌄ switcher; behaviour: `docs/ORBIT.md` |
 | `notice-kinds.mjs` | Notice kinds |
@@ -105,14 +106,14 @@ modules for modulepreload.
 | `share.mjs`, `qrcode.mjs` | The share sheet (`shareSheet`): the link and its QR code in the person's own style, saved as PNG or SVG; `qrcode.mjs`: qrcode-generator 2.0.4 (MIT), vendored |
 | `lang.mjs`, `format.mjs` | `lang`, `en`, `W(zh, en)`, `makeT`, `place()` (English place names); `money`, `price`, `pct`, `num`, `compact`, `DASH`, `twDay`/`twMonth` (Taiwan's), `localDay` (the phone's), `addDays`, `placeEn` (the Worker's too) |
 | `feedback.mjs` | Every app's picks, one engine: `shown`, `picked`, `passed`, `did` → weights per key (30-day half-life); `scorer`, `lifter`, `chance`, `whyOf` (常看), `hitRate`; on the Pass: `fb:<app>` |
-| `holidays.mjs`, `dayoff.mjs`, `rain-now.mjs` | Taiwan's days off (the years 人事行政總處 has published, then the holiday law's own rules on the lunar dates to 2036, so no yearly chore); typhoon days off (停班停課) by who decides them; `radar` as rain (`rainNow`) |
+| `holidays.mjs`, `dayoff.mjs`, `rain-now.mjs` | Taiwan's days off (人事行政總處's published years, then the holiday law's rules on the lunar dates to 2036); typhoon days off (停班停課) by who decides them; `radar` as rain (`rainNow`) |
 | `catalog.mjs`, `logos.mjs`, `names.mjs`, `photos.mjs`, `photo-urls.mjs` | Sports' leagues once; logos (ESPN, TheSportsDB, flags, F1, old names); teams in Chinese; studio headshots; photos' addresses alone |
 | `f1live.mjs`, `postseason.mjs`, `sports-espn.mjs`, `sports-broadcast.mjs`, `sports-highlights.mjs`, `sports-winprob.mjs` | F1's own timing read one way everywhere; MLB's postseason; ESPN's scoreboards as events (proxy and phone); where to watch in Taiwan (else `eltaGuess`, 預估); highlights; win probability |
 | `stock-account.mjs`, `stock-access.mjs`, `stock-credit.mjs`, `stock-markets.mjs`, `stock-quotes.mjs`, `stock-bonds.mjs`, `stock-savings.mjs`, `stock-ipo.mjs`, `stock-holidays.mjs`, `stock-hk-lots.mjs`, `stock-jp-lists.mjs`, `stock-codec.mjs` | Securities' ledger, broker rules, markets, prices, bonds, savings, IPOs, holidays, lot sizes, saved-copy codec; shared with the Worker |
 | `pay.mjs`, `gov.mjs` | The weekly pay and relief (rules only; the Worker alone writes them); what the government took and gave one account |
 | `flight.mjs`, `ebus.mjs`, `ebus-read.mjs` | A real plane in the air on a sphere (`/flight`, Class's 專注飛行); bus sites' ETAs, notices as TDX's (臺中, 桃園, 臺南: phones, then proxy; 高雄: phones) |
 | `domain.mjs`, `devconfig.mjs`, `mirror.mjs`, `data-pack.mjs`, `img/` | The family's domain (one place); `DEV` for the Workers; the nightly mirror's addresses; small data files in packs (`packReader`: the 20,000-file cap); the kit's pictures |
-| `sw.js`, `sw-images.js` | The one service worker every app imports (page and own pictures kept first, refreshed behind; `?v=` files from the cache, checked against their hash); other sites' pictures in one cache all apps share |
+| `sw.js`, `sw-images.js` | The one service worker every app imports (page and own pictures first, refreshed behind; `?v=` files from the cache, checked against their hash); other sites' pictures in one cache for all |
 | `apps.mjs`, `link.mjs`, `preload.mjs`, `stamp.mjs`, `stamp-app.mjs`, `hash.mjs`, `frame-guard.mjs`, `no-net.mjs` | Build tools, never served: the apps' snippets; `.kit` links; modulepreload; the content-hashed builds; `frameFaults` (only colours on the tab bar); tests offline |
 
 ### 3.3 Component patterns: what to use for what
@@ -282,6 +283,7 @@ A read (`kit proxyJson`) goes down these until one answers:
   fails; to paint at once, an app asks `peekJson(url)` (the last copy of
   any age) and draws the fresh one when it lands.
 - Reads within a few ms go to the proxy as one batch.
+- Signed out on the site, no read is sent: the phone answers 401.
 - A failed read is a failure, never "nothing there": the device's copy of
   any age answers, asked again soon; a failed batch item fails alone. So is
   an answer without the source's shape (`valid`), never saved over the good one.

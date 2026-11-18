@@ -108,6 +108,8 @@
     s.on = 1;
     s.t = s.t || Date.now();
     ls.setItem('orbit.suite.v1', JSON.stringify(s));
+    // (Said to the module below: this is Orbit's window, known before any of the kit is in.)
+    window.ORBIT_WINDOW = 1;
     // (Only a page of this site, kept by its path: any address was taken as it came, so a link could show
     // another site's page in Orbit's window under Orbit's address, or run a script as Orbit, 11-17.)
     var open = /[?&]open=([^&#]+)/.exec(location.search), to = open ? new URL(decodeURIComponent(open[1]), location.origin) : null;
@@ -115,8 +117,12 @@
   } catch (e) {}
 }();
 </script>
+<!-- (The kit's loader, as in every app (kit/loader.html), with this page's two own parts, both put in by the
+     build (kit/stamp.mjs; here null, null): the kit's version and hashes, and the kit modules the page
+     imports (and boot.js, the first script of every app it holds), asked for with the page, ahead of
+     the style sheet the scripts wait for.) -->
 <!-- kit:head -->
-<script>!function(b,d,v,h,n,m,f,i,u){try{v=localStorage.getItem('orbit.kit')||'';h=JSON.parse(localStorage.getItem('orbit.kitFiles')||'null')}catch(e){v=''}n=!!v;if(!n&&d){v=d.version;h=d}h=h&&h.version===v?h.files:null;u=function(x){var k=h&&h[x];return b+x+(k?'?v='+k:v?'?v='+encodeURIComponent(v):'')};m={'#kit/':b};f=['brand.mjs','format.mjs','hold-place.mjs','lang.mjs','orbit.mjs','suite.mjs','ui.mjs'];for(i=0;i<f.length;i++)m['#kit/'+f[i]]=u(f[i]);if(h)for(i in h)/\.mjs$/.test(i)&&(m['#kit/'+i]=u(i));window.ORBIT_KIT={base:b,version:v,noted:n,url:u};document.write('<script type="import'+'map">'+JSON.stringify({imports:m})+'<\/script><link rel="stylesheet" href="'+u('orbit.css')+'">')}('/Orbit-Core/kit/',null)</script>
+<script>!function(b,d,p,v,h,n,m,f,i,u){try{v=localStorage.getItem('orbit.kit')||'';h=JSON.parse(localStorage.getItem('orbit.kitFiles')||'null')}catch(e){v=''}n=!!v;if(!n&&d){v=d.version;h=d}h=h&&h.version===v?h.files:null;u=function(x){var k=h&&h[x];return b+x+(k?'?v='+k:v?'?v='+encodeURIComponent(v):'')};m={'#kit/':b};f=['brand.mjs','format.mjs','hold-place.mjs','lang.mjs','orbit.mjs','suite.mjs','ui.mjs'];for(i=0;i<f.length;i++)m['#kit/'+f[i]]=u(f[i]);if(h)for(i in h)/\.mjs$/.test(i)&&(m['#kit/'+i]=u(i));window.ORBIT_KIT={base:b,version:v,noted:n,url:u};for(f='',i=0;p&&i<p.length;i++)f+='<link rel="'+(/\.mjs$/.test(p[i])?'modulepreload':'preload" as="script')+'" href="'+u(p[i])+'">';document.write('<script type="import'+'map">'+JSON.stringify({imports:m})+'<\/script>'+f+'<link rel="stylesheet" href="'+u('orbit.css')+'">')}('/Orbit-Core/kit/',null,null)</script>
 <!-- /kit:head -->
 <style>
   .door { --q-accent: #4f46e5; box-sizing: border-box; max-width: 560px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 28px) 16px calc(env(safe-area-inset-bottom) + 32px); }
@@ -248,18 +254,40 @@
 <main class="door" id="door" hidden></main>
 <div class="q-suite-frames" id="frames"></div>
 <script type="module">
-  const [{ installGate, isPhoneOrTablet, isStandalone, detectLang, storedAccount, orbitSession, accountSheet, signInScreen }, ui, { APP_ORDER, BRANDS, appIcon, pathOf }, suite] = await Promise.all([import('#kit/orbit.mjs'), import('#kit/ui.mjs'), import('#kit/brand.mjs'), import('#kit/suite.mjs')]);
-  const brand = await import('#kit/brand.mjs');
+  // Orbit's window starts on the kit's small files that hold an app (suite.mjs, brand.mjs, orbit-mine.mjs).
+  // Signed in, with an app to go on with, that app is asked for at once; the rest of the kit (orbit.mjs and
+  // ui.mjs: the list of apps, the sign-in, the sheets) comes in behind it, or the moment one of them is
+  // wanted. (The window took in the whole kit before it asked for the app: the app's page was asked for
+  // 2.1 s into a first opening on slow 4G and 0.7 s into every later one, 2026-11-18.)
   // This Orbit (kit/orbit-mine.mjs): its name, look and apps. (An older kit without it: every app, as before.)
-  const mine = await import('#kit/orbit-mine.mjs').catch(() => null);
+  const [brand, suite, mine, onDomain] = await Promise.all([import('#kit/brand.mjs'), import('#kit/suite.mjs'), import('#kit/orbit-mine.mjs').catch(() => null), import('#kit/domain.mjs').then(m => m.onDomain, () => undefined)]);
+  const { APP_ORDER, BRANDS, appIcon, pathOf } = brand;
+  let installGate, isPhoneOrTablet, isStandalone, storedAccount, orbitSession, accountSheet, signInScreen, ui;
+  let lang = 'zh';
+  let en = false;
+  let kitIn = null;
+  // (A file that didn't come, the link gone for a moment: asked again by whatever wants it next.)
+  const kit = () =>
+    (kitIn ||= Promise.all([import('#kit/orbit.mjs'), import('#kit/ui.mjs')]).then(
+      ([o, u]) => {
+        ({ installGate, isPhoneOrTablet, isStandalone, storedAccount, orbitSession, accountSheet, signInScreen } = o);
+        lang = o.detectLang();
+        en = lang === 'en';
+        if (en) document.documentElement.lang = 'en';
+        ui = u;
+        // (The address may say the app in use from here on: addressOf below.)
+        setTimeout(() => ((addressed = true), wanted && addressOf(wanted[0])), 300);
+      },
+      error => {
+        kitIn = null;
+        throw error;
+      }
+    ));
   const tag = window.ORBIT_TAG || '';
   const setup = mine?.setupOf ? mine.setupOf(tag) : { name: 'Orbit', apps: [...APP_ORDER], look: 'space' };
   const myApps = () => (mine?.appsOf ? mine.appsOf(tag) : [...APP_ORDER]);
   const lookSrc = look => `data:image/svg+xml,${encodeURIComponent(brand.orbitIcon ? brand.orbitIcon(look) : brand.familyMark())}`;
   const myIcon = lookSrc(setup.look);
-  const lang = detectLang();
-  const en = lang === 'en';
-  if (en) document.documentElement.lang = 'en';
   const W = (zh, e) => (en ? e : zh);
   const door = document.getElementById('door');
   let held = null;
@@ -283,11 +311,20 @@
   // The list of apps, the one used last on top (over the apps held, on a return).
   const icon = id => Object.assign(document.createElement('img'), { className: 'door-icon', src: `data:image/svg+xml,${encodeURIComponent(appIcon(id, { crisp: true }))}`, alt: '' });
   // Signed in first (Jay 2026-11-13): Orbit is the Pass's, one sign-in for every app.
-  const signedIn = () => !storedAccount || !!storedAccount();
+  // (Before the kit is in: the device's own note of the account, read as orbit.mjs storedAccount reads it.)
+  const signedIn = () => {
+    if (ui) return !storedAccount || !!storedAccount();
+    try {
+      return /^[0-9a-f]{16}$/.test(localStorage.getItem('orbit.account') || '') && !!localStorage.getItem('orbit.refresh');
+    } catch {
+      return false;
+    }
+  };
   let session = null;
   // Signed out: the kit's one sign-in (Jay 11-14: the same in every app),
   // this Orbit's own mark and apps in its ring.
   function showSignIn(then) {
+    if (!ui) return void kit().then(() => showSignIn(then));
     session ||= orbitSession(suite.lastApp?.(suite.savedSuite()) || myApps()[0], { lang });
     let over = false;
     const go = () => {
@@ -334,6 +371,7 @@
   };
   const role = id => BRANDS[id].role?.[lang] || '';
   function showList() {
+    if (!ui) return void kit().then(showList);
     if (!signedIn()) return showSignIn(showList);
     const saved = suite.savedSuite();
     const now = Date.now();
@@ -380,9 +418,14 @@
   // stays, only its address changes. A reload there comes back into this
   // Orbit (kit suite.mjs start, orbit.addr; the home page forwards an
   // installed app's window here).
-  const onDomain = (await import('#kit/domain.mjs').catch(() => ({}))).onDomain;
+  // (Only once the rest of the kit is in, and a moment more: orbit.mjs reads the address as it starts (its
+  // update watch, suite.mjs start) and must find the window's own, never an app's: it took the window
+  // for that app's page opened alone, and sent it into Orbit again.)
+  let addressed = false;
+  let wanted = null;
   function addressOf(id) {
     if (!onDomain) return;
+    if (!addressed) return void (wanted = [id]);
     const to = id ? pathOf(id) : '/';
     try {
       sessionStorage.setItem('orbit.addr', to);
@@ -408,6 +451,7 @@
     return ui.evenGrid?.(grid, { min: 52, max: 5 }) || grid;
   }
   function editApps() {
+    if (!ui) return void kit().then(editApps);
     const chosen = new Set(myApps());
     const done = ui.h('button', { class: 'q-btn primary block', type: 'button', text: W('完成', 'Done') });
     const s = ui.sheet({ title: W('這個 Orbit 裡的 App', 'Apps in this Orbit'), cls: 'o-sheet', body: [ui.h('p', { class: 'o-note', text: W('名稱和圖示在加入主畫面時就定好了。只要一個 App 的 Orbit，在 Safari 另外加入一個。', 'The name and icon were set when it was added. For an Orbit of one app, add another one from Safari.') }), appTiles(chosen, null, 2)], foot: ui.h('div', { class: 'o-foot' }, [done]) });
@@ -505,7 +549,11 @@
     return panel;
   }
 
-  if (!window.ORBIT_FIRST && isPhoneOrTablet() && !isStandalone()) {
+  // (The head's script said this is Orbit's window, never a phone's browser to add it from: with someone
+  // signed in, none of the rest of the kit is waited for.)
+  const fast = window.ORBIT_WINDOW === 1 && signedIn();
+  if (!fast) await kit();
+  if (!fast && !window.ORBIT_FIRST && isPhoneOrTablet() && !isStandalone()) {
     // (Set up already: what was picked, and a way back to it.)
     const plain = !mine?.isPlain || mine.isPlain(setup);
     const picked = !plain ? `${setup.apps.length === APP_ORDER.length ? W('全部 App', 'Every app') : setup.apps.map(id => BRANDS[id].short).join('、')}` : '';
@@ -575,6 +623,9 @@
     };
     if (signedIn()) go();
     else showSignIn(go);
+    // The rest of the kit, behind the app just asked for (its page is a round trip away): the list of apps
+    // and the sheets are there at a tap.
+    kit().catch(() => {});
   }
 </script>
 </body>

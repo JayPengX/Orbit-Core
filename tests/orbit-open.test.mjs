@@ -70,3 +70,45 @@ test('Orbit’s window holds only this site’s own app pages (ownPage)', () => 
   assert.ok(hold.indexOf('to.origin !== location.origin') < hold.indexOf('location.assign('));
   assert.doesNotMatch(hold, /location\.assign\(first\.url\)/);
 });
+
+// Orbit's window took in the whole kit (orbit.mjs and ui.mjs, 97 KB on the wire and most of its script time)
+// before it asked for the app to show: the app's page was asked for 2.1 s into a first opening on slow 4G, and
+// 0.7 s into every later one (2026-11-18). It starts on the small files that hold an app; the rest comes behind.
+test("Orbit's window asks for the app before the rest of the kit: its first files are the small ones, and stay small", async () => {
+  const module = /<script type="module">([\s\S]*?)<\/script>/.exec(door)[1];
+  const first = /await Promise\.all\(\[([^\n]*)\]\)/.exec(module)[1];
+  const asked = [...first.matchAll(/import\('#kit\/([^']+)'\)/g)].map(m => m[1]).sort();
+  assert.deepEqual(asked, ['brand.mjs', 'domain.mjs', 'orbit-mine.mjs', 'suite.mjs'], 'what the window waits for first');
+  // orbit.mjs and ui.mjs: asked for in one place, after the app (or by whatever needs them).
+  for (const big of ['orbit.mjs', 'ui.mjs']) {
+    const at = [...module.matchAll(new RegExp(`import\\('#kit/${big.replace('.', '\\.')}'\\)`, 'g'))].map(m => m.index);
+    assert.equal(at.length, 1, big);
+    assert.ok(at[0] > module.indexOf('const kit = () =>') && at[0] < module.indexOf('const hold = '), `${big} is the rest of the kit`);
+  }
+  // (And none of the first files brings the big ones with it.)
+  const { kitGraph } = await import('../kit/preload.mjs');
+  const kitDir = new URL('../kit/', import.meta.url).pathname;
+  const reached = await kitGraph(asked.map(f => kitDir + f), kitDir);
+  for (const big of ['orbit.mjs', 'ui.mjs']) assert.ok(!reached.has(big), `${big} is imported by one of ${asked.join(', ')}`);
+  // The head says whose window this is before any of the kit is in: a phone's browser (the add page) never, Orbit's own always.
+  const head = [...door.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).find(c => c.includes('ORBIT_FIRST'));
+  const mark = (ua, standalone) => {
+    const store = () => ({ getItem: () => null, setItem: () => {}, removeItem: () => {} });
+    const window = {};
+    vm.runInNewContext(head, { window, location: { search: '', origin: 'https://orbit.jaypengx.com', pathname: '/app/' }, URL, sessionStorage: store(), localStorage: store(), navigator: { userAgent: ua, maxTouchPoints: 0, standalone }, matchMedia: () => ({ matches: false }), Date, JSON, decodeURIComponent });
+    return window.ORBIT_WINDOW === 1;
+  };
+  const iphone = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X)';
+  assert.equal(mark(iphone, false), false, 'a phone’s browser: the add page, decided by the kit');
+  assert.equal(mark(iphone, true), true, 'the installed Orbit');
+  assert.equal(mark('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', undefined), true, 'a computer');
+});
+
+// The window holds an app before orbit.mjs is in, and keeps its fit for the keys at __orbitFit (suite.mjs host).
+// orbit.mjs marked its own name-fitting watch as started under that same name: coming in second, it took the
+// watch for started and never ran it in the window (the list's and the sheets' long names never fitted).
+test("the kit coming in behind an app still starts its own watches: nothing of the host's is its mark", () => {
+  const orbit = readFileSync(new URL('../kit/orbit.mjs', import.meta.url), 'utf8');
+  assert.match(suite, /globalThis\.__orbitFit = fit;/, "the host's fit for the keys");
+  assert.doesNotMatch(orbit, /globalThis\.__orbitFit/, 'orbit.mjs marks its watches with names of its own');
+});
