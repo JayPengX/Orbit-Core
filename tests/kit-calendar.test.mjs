@@ -157,3 +157,20 @@ test("the exchange's typhoon closing is on Securities' list of days it's shut", 
   keepDayOff(TWSE, { '2026-10-29': { work: { off: true }, trade: { off: true } } });
   assert.deepEqual(upcomingHolidays('TW', '2026-10-28', 2), ['2026-10-29', '2026-12-25']);
 });
+
+// Law's agenda asked at every opening and waited for it: a Worker request and a round trip each time,
+// though the Worker itself reads the page only every 3 minutes (2026-11-18).
+test('a place’s typhoon days are asked for once in 3 minutes, however often an app asks; an old copy is asked again', async () => {
+  const { loadDayOff, keepDayOff } = await import('../kit/dayoff.mjs');
+  const place = { county: '花蓮縣', town: '花蓮市' };
+  const days = { '2026-10-23': { work: { off: true, from: null }, class: { off: true, from: null } } };
+  let asked = 0;
+  const fetchFn = async () => (asked++, new Response(JSON.stringify({ at: Date.now(), place, days })));
+  assert.deepEqual(await loadDayOff(place, fetchFn), days);
+  assert.deepEqual(await loadDayOff(place, fetchFn), days);
+  assert.deepEqual(await Promise.all([loadDayOff(place, fetchFn), loadDayOff(place, fetchFn)]), [days, days]);
+  assert.equal(asked, 1, 'the copy just read answers');
+  keepDayOff(place, days, Date.now() - 4 * 60_000);
+  await loadDayOff(place, fetchFn);
+  assert.equal(asked, 2, 'four minutes old: asked again');
+});

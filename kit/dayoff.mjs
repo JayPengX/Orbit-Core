@@ -14,7 +14,8 @@
 //   TWSE                          the exchange's place
 //   dayOffOn(date, place, need)   { zh, en, from } on that Taiwan day, else null
 //                                 (need: 'class' | 'work' | 'trade'; from: 'HH:MM' or null, the whole day)
-//   loadDayOff(place)             asks now (dayOffOn asks by itself when its copy is old)
+//   loadDayOff(place)             the place's days, asked now unless its copy is 3 minutes new
+//                                 (dayOffOn asks by itself when its copy is old)
 //   onDayOff(fn)                  fn() when a place's answer changes (redraw)
 //   setPlace(role, place) / placeOf(role)   a person's places (role: 'school' | 'work' | 'home'),
 //                                 { county, town } or { lat, lon }, shared by the apps
@@ -79,6 +80,10 @@ export function loadDayOff(place, fetchFn = globalThis.fetch) {
   const k = placeKey(place);
   if (!k || typeof fetchFn !== 'function') return Promise.resolve(null);
   if (asking.has(k)) return asking.get(k);
+  // (An answer of the last 3 minutes is the answer: the Worker reads the page no more often. Asked
+  // at every opening (Law's agenda), each one was a round trip waited for and a Worker request, 2026-11-18.)
+  const hit = cache.get(k);
+  if (hit && Date.now() - hit.at < FRESH_MS && Date.now() >= hit.at) return Promise.resolve(hit.days);
   const q = place.county ? `county=${encodeURIComponent(tai(place.county))}${place.town ? `&town=${encodeURIComponent(tai(place.town))}` : ''}` : `lat=${place.lat}&lon=${place.lon}`;
   const p = fetchFn(`${URL_}?${q}`, { signal: AbortSignal.timeout?.(8000) })
     .then(r => (r.ok ? r.json() : null))
