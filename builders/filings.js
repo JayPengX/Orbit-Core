@@ -87,11 +87,16 @@ export function filingOf(r) {
   return { code, id: `${code}-${at.slice(0, 19).replace(/\D/g, '')}`, at, title: title.slice(0, 160), rows: rowsOf(r['說明']) };
 }
 
-export async function runFilings({ store, now = Date.now(), get = u => fetch(u, { headers: { Accept: 'application/json' } }) }) {
+// A list not in by then is a failure (the run's note says which): TPEx's
+// gave the Worker no answer at all (189 of the week's runs to 2026-11-18),
+// and each of the 48 runs a day waited it out, ~55 s of the Runner's time
+// (Durable Objects are billed by the time they're awake) for nothing.
+export const LIST_MS = 15_000;
+export async function runFilings({ store, now = Date.now(), get = (u, init) => fetch(u, init), listMs = LIST_MS }) {
   const why = [];
   const lists = await Promise.all(
     [TWSE_FILINGS, TPEX_FILINGS].map((u, i) =>
-      get(u)
+      get(u, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(listMs) })
         .then(r => (r.ok ? r.json() : ((why[i] = `${r.status}`), null)))
         .catch(e => ((why[i] = String(e?.message || e).slice(0, 60)), null))
     )

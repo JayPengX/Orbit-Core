@@ -64,6 +64,26 @@ test('a new filing written into its bucket once; nothing new, nothing written', 
   assert.equal(puts, before);
 });
 
+// TPEx's list gave the Worker no answer for days (2026-11-18) and every run
+// waited it out: each list gets its time, then the run goes on without it.
+test("a list that never answers: given up at its time, the other list's filings kept", async () => {
+  const files = new Map();
+  const store = { json: async p => (files.has(p) ? structuredClone(files.get(p)) : null), put: async (p, d) => files.set(p, d) };
+  const get = (u, init) =>
+    /twse/.test(u)
+      ? Promise.resolve({ ok: true, json: async () => [twse] })
+      : new Promise((_, no) => {
+          // (Unless it's given up on, the list gives up only after 3 s.)
+          const hang = setTimeout(() => no(new Error('no answer')), 3000);
+          init?.signal?.addEventListener('abort', () => (clearTimeout(hang), no(init.signal.reason)));
+        });
+  const t = Date.now();
+  const r = await runFilings({ store, get, now: Date.parse('2026-11-11T00:00:00Z'), listMs: 50 });
+  assert.ok(Date.now() - t < 2000, `waited ${Date.now() - t} ms`);
+  assert.equal(r.fresh, 1);
+  assert.ok(files.get(bucketOf('5306')));
+});
+
 test("sec-filing: the line's figures the filing's (rounded, in 萬/億, dates without zeros), the rows picked by number", () => {
   assert.ok(filingNumbers('每股約配 0.99 元，3/18 除息', '0.9939939 116/03/18'));
   assert.ok(filingNumbers('營收 12.3 億元', '1,227,508 (仟元)'));
