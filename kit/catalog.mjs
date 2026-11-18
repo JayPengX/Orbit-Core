@@ -176,14 +176,19 @@ export function parseCpblSeries(wikitext, year, kind) {
   return out;
 }
 // Wikipedia's pages read apart from TheSportsDB's queue (its refusals hold
-// that a minute: the series went unread with it), each kept 10 minutes.
+// that a minute: the series went unread with it), each kept 10 minutes. A
+// read that failed is kept too, two minutes: let go at once, a page
+// Wikipedia refused (429) was asked again by every read of the month, four
+// refusals in ten seconds of one opening of Sports (2026-11-18).
+const WIKI_FAILED_MS = 2 * 60_000;
 const wikiCache = new Map();
 function wikiJson(url) {
   const hit = wikiCache.get(url);
-  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.p;
+  if (hit && Date.now() - hit.at < hit.ms) return hit.p;
   const p = fetch(url).then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))));
-  wikiCache.set(url, { at: Date.now(), p });
-  p.catch(() => wikiCache.delete(url));
+  const kept = { at: Date.now(), ms: 10 * 60_000, p };
+  wikiCache.set(url, kept);
+  p.catch(() => ((kept.at = Date.now()), (kept.ms = WIKI_FAILED_MS)));
   return p;
 }
 export async function withCpblSeries(games, ym, { fetchJson = wikiJson } = {}) {
