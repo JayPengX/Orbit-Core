@@ -55,7 +55,7 @@ import { handlePush, sendDue, movePushes, forgetPushes, keepDevices } from './pu
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
 import { radarCron } from './weather-radar.js';
-import { handleTransit, tally, warmBikes, mirrorMeter } from './transit.js';
+import { handleTransit, tally, warmBikes, mirrorMeter, MIRROR_EVERY } from './transit.js';
 import { readDev, capacityCron, CONFIG_COLLECTION, ADMIN_TOOLS } from './eco-admin.js';
 import { PASSKEY_COLLECTION } from './passkey.js';
 import { MAIL_COLLECTION, mailReady, mailPage } from './pass-mail.js';
@@ -2030,8 +2030,10 @@ async function cronTick(event, env, ctx, part) {
     if (!pace && min === 10) run('weather-skill', () => weatherCron(env));
     if (!storeReady(env)) return;
     // The month's counts (Google's calls, TDX's points: transit.js), added in
-    // D1, copied to KV for every isolate's reads.
-    run('meter', () => mirrorMeter(env, tick.getTime()), r => (r.seeded ? r : null));
+    // D1, copied to KV for every isolate's reads, each MIRROR_EVERY (the copy
+    // was written no oftener; read every 2 minutes it was 866,000 of D1's
+    // 1.1 million rows read a day, 2026-11-18).
+    if (min % (MIRROR_EVERY / 60_000) === 4) run('meter', () => mirrorMeter(env, tick.getTime()), r => (r.seeded ? r : null));
     // The Pass's store kept safe each night, 04:30 Taiwan: old versions
     // thinned (doc-store.js), then the whole store copied to R2 (store-backup.js).
     if (min === 30 && tick.getUTCHours() === 20) run('store-backup', async () => ({ pruned: await DOCS.prune(env), sources: await pruneSources(env, tick.getTime()).catch(e => ({ failed: String(e?.message || e).slice(0, 80) })), usage: await pruneUsage(env, tick.getTime()).catch(e => ({ failed: String(e?.message || e).slice(0, 80) })), bugs: await pruneReports(env, tick.getTime()).catch(e => ({ failed: String(e?.message || e).slice(0, 80) })), ...(await backupStore(env, DOCS, tick.getTime())) }));

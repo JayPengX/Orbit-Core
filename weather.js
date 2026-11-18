@@ -62,6 +62,12 @@ const TAIPEI = { lat: 25.034, lon: 121.565 };
 export const MIN = 60_000;
 export const HOUR = 60 * MIN;
 export const FRESH_MS = 15 * MIN;
+// Our own tools (the dev door: previews, screenshots, the checks) take a
+// cell's copy up to an hour old as it is, as Transit's take TDX's
+// (DEV_OLDEST): on 2026-11-17 nine of ten /weather asks were theirs, the
+// same few places again every few minutes, and 65% of Google's month (its
+// cap, GOOGLE_MONTH_CALLS) was gone by the 17th: a refresh is up to 12 calls.
+export const DEV_FRESH_MS = HOUR;
 export const STALE_MS = 3 * HOUR;
 export const KEEP_MS = 6 * HOUR;
 // Farther than this from every CWA station / MOENV site (abroad): Google only.
@@ -1932,7 +1938,7 @@ export async function handleWeather(request, env, headers, path, { session = nul
     let rest = null;
     // (The next hour's rain from CWA's radar, weather-radar.js: read for each answer, never kept with the cell.)
     const radar = radarAt(env, lat, lon).catch(() => null);
-    const first = { ...(await withDayOff(env, await cellForecast(env, ctx, lat, lon, { fetchFn, follow: q.get('lines') ? job => (rest = job) : null }), { lat, lon }, fetchFn, ctx)), ...where, radar: await radar };
+    const first = { ...(await withDayOff(env, await cellForecast(env, ctx, lat, lon, { fetchFn, freshMs: session.dev ? DEV_FRESH_MS : FRESH_MS, follow: q.get('lines') ? job => (rest = job) : null }), { lat, lon }, fetchFn, ctx)), ...where, radar: await radar };
     if (!rest) return send(first);
     // (Gzipped, each line flushed: http.js lineAnswer. Sent whole, the two lines were 156 KB.)
     const lines = lineAnswer(request, headers);

@@ -310,6 +310,33 @@ test('/weather: a Orbit Pass session, a place or where the IP says', async () =>
   assert.equal(vpn.place.town, '信義區');
 });
 
+// Our own tools' previews (the dev door) took nine of ten /weather asks on
+// 2026-11-17, the same places again and again: Google's month went to them.
+test("/weather from our own tools (the dev door): a cell's copy up to an hour old answers as it is; a person's is refreshed past 15 minutes", async () => {
+  const e = { ...env, RATE_LIMIT_KV: memKv() };
+  const waits = [];
+  const ctx = { waitUntil: p => waits.push(p) };
+  const log = [];
+  const get = session => handleWeather(new Request('https://w.example/weather?lat=25.034&lon=121.565'), e, {}, '/weather', { fetchFn: upstream(log), cf: undefined, session, ctx });
+  assert.equal((await get({ s: 'x' })).status, 200);
+  await Promise.all(waits.splice(0));
+  const google = () => log.splice(0).filter(u => /^\/v1\//.test(u)).length;
+  google();
+  const was = Date.now;
+  const at = was() + 40 * 60_000;
+  Date.now = () => at;
+  try {
+    assert.equal((await get({ s: 'dev', dev: true })).status, 200);
+    await Promise.all(waits.splice(0));
+    assert.equal(google(), 0, "the tools' ask: the copy as it is");
+    assert.equal((await get({ s: 'x' })).status, 200);
+    await Promise.all(waits.splice(0));
+    assert.ok(google() > 0, "a person's: Google asked again");
+  } finally {
+    Date.now = was;
+  }
+});
+
 test('/weather?lines=1: the quick answer, then the whole one on the same request; a whole cell, one line', async () => {
   const e = { ...env, RATE_LIMIT_KV: memKv() };
   const waits = [];

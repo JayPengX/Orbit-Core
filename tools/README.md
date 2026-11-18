@@ -67,8 +67,10 @@ dev door, and on 2026-11-06 our tools made six of every seven TDX calls. So
 the proxy answers the dev door with any copy of TDX's up to 10 minutes old
 (a bus time 10 minutes old: say so if a shot shows one), never keeps YouBike
 warm for it, and past half a point a Taiwan day (`transit.js DEV_TDX_DAY`)
-gives it copies only (`DEV_TDX_CAP` where there's none). `npm test` reaches
-nothing off the machine (`kit/no-net.mjs`).
+gives it copies only (`DEV_TDX_CAP` where there's none). Google's Weather
+month too: the dev door gets a place's forecast up to an hour old as it is
+(`weather.js DEV_FRESH_MS`; on 2026-11-17 nine of ten /weather asks were
+ours). `npm test` reaches nothing off the machine (`kit/no-net.mjs`).
 
 ## `node tools/family-check.mjs [app…] [--langs zh,en] [--screens 390,ipad,laptop] [--themes light,dark] [--engines chromium,webkit] [--read]`: does it work
 

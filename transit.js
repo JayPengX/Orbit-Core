@@ -98,7 +98,7 @@ export const billingMonth = (now = Date.now()) => new Date(now - 8 * HOUR).toISO
 // isolates writing at once kept one's (TDX's own page said 41 points for the
 // month's first five days, the meter 17).
 // Reads stay on KV's copy (transit:use:<month>, read at most once a minute),
-// written from D1 by the cron each 2 minutes (mirrorMeter: one writer), with
+// written from D1 by the cron each 10 minutes (mirrorMeter: one writer), with
 // what D1 answered this isolate's own adds on top. With no D1 (the tests, the
 // preview) KV's copy is the meter, written as before.
 
@@ -355,7 +355,7 @@ export async function flushUse(env, now = Date.now()) {
   meter.stored = fresh;
   meter.readAt = now;
 }
-// The cron's, each 2 minutes: KV's copy of the month (and of the month just
+// The cron's, each MIRROR_EVERY: KV's copy of the month (and of the month just
 // ended, its last adds, for its first two hours) written from D1. A month
 // first seen here gets KV's counts from before D1 kept them added in, once
 // (`_seeded`, in the same transaction as the adds).
