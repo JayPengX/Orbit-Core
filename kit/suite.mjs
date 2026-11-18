@@ -1216,14 +1216,24 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
       return null;
     }
   };
-  let full = 0, fullW = 0, widthAt = 0, was = '', backs = 0, after = 0, field = null;
+  // (settled: each width's height as it was when the phone was turned from it; owed: a turn made while typing,
+  // measured once the field is let go. See turned.)
+  let full = 0, fullW = 0, widthAt = 0, was = '', backs = 0, after = 0, field = null, owed = false;
+  const settled = {};
   const fit = () => {
     if (!vv) return;
     const w = globalThis.innerWidth;
-    if (w !== fullW) ((fullW = w), (full = 0), (widthAt = Date.now()));
+    if (w !== fullW) {
+      if (full && Date.now() - widthAt > 2500) settled[fullW] = full;
+      ((fullW = w), (full = 0), (widthAt = Date.now()));
+    }
     // (A phone's or tablet's keys only: a computer's window is its frames' size, resized or not.)
     const touch = Boolean(globalThis.matchMedia?.('(pointer: coarse)').matches);
     const el = touch ? frameField() : null;
+    if (owed && !el) {
+      owed = false;
+      setTimeout(() => (frameField() || ((full = 0), (was = '')), fit()), 1500);
+    }
     full = Math.max(full, Math.round(globalThis.innerHeight), el ? 0 : Math.round(vv.height));
     const kb = Boolean(el) && full - vv.height > 80;
     if (!kb || el !== field) backs = 0;
@@ -1261,9 +1271,21 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
     // an iPhone hides the status bar; turning back, it gives the whole screen's height (852) for a moment before
     // the bar takes its room (793), and that moment's height, kept as the most seen, left the frame 59 px taller
     // than the window. Measured afresh once the turn is over, it's the window's own. (Only a real turn, its
-    // width changed just now: the keys going, the window short a moment longer, is never one.)
+    // width changed just now: the keys going, the window short a moment longer, is never one.) Turned while
+    // typing, a window shrunk to the room above the keys is no measure of the screen: the height this width
+    // had before the turn is taken back, or, never this wide before, the window is measured once the field is
+    // let go (11-18, the iOS 27 Simulator: turned with 問我的帳's field still taken, the turn's 874 stayed and
+    // the app sat 62 pt below the screen's foot, its tab bar out of reach).
     const turned = () => {
-      for (const ms of [300, 800, 1500]) setTimeout(() => (frameField() || Date.now() - widthAt > 2500 || ((full = 0), (was = '')), fit()), ms);
+      for (const ms of [300, 800, 1500])
+        setTimeout(() => {
+          if (Date.now() - widthAt <= 2500) {
+            if (!frameField() || globalThis.innerHeight - vv.height > 80) ((full = 0), (was = ''));
+            else if (settled[fullW]) ((full = settled[fullW]), (was = ''));
+            else owed = true;
+          }
+          fit();
+        }, ms);
     };
     globalThis.screen?.orientation?.addEventListener?.('change', turned);
     globalThis.addEventListener('orientationchange', turned);

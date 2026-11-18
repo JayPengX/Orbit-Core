@@ -159,6 +159,36 @@ test("typing in Orbit on an iPhone: the field 12 px off the keys whatever their 
       assert.ok(r.first >= r.grabber + 6, `a short phone: the first line ${Math.round(r.first - r.grabber)} px under the grabber, not under it`);
       await ctx.close();
     }
+    // Turned on its side and back with the field still taken (11-18, the iOS 27
+    // Simulator): the turn's whole-screen moment (852) is never kept as the
+    // app's height (it sat 62 pt below the screen's foot, its tab bar gone).
+    {
+      const ctx = await browser.newContext({ viewport: { width: W, height: H }, hasTouch: true, isMobile: true });
+      await ctx.route(/^https?:\/\/(?!localhost)/, r => r.abort());
+      const page = await ctx.newPage();
+      await page.goto(`http://localhost:${server.address().port}/app/`);
+      await page.waitForFunction(() => document.querySelector('.q-suite-frame')?.contentWindow?.ready);
+      const app = page.frames().find(f => f.url().endsWith('/money/'));
+      const size = (width, height) => page.setViewportSize({ width, height });
+      const turn = async (width, height) => (await size(width, height), await page.evaluate(() => dispatchEvent(new Event('orientationchange'))));
+      const frame = () => page.evaluate(() => (r => [Math.round(r.top), Math.round(r.bottom)])(document.querySelector('.q-suite-frame').getBoundingClientRect()));
+      await app.evaluate(() => globalThis.ask());
+      await wait(2600);
+      await size(W, H - K);
+      await wait(300);
+      await turn(H, W - 210);
+      await wait(1800);
+      await turn(W, 852);
+      await wait(100);
+      await size(W, H - K);
+      await wait(1800);
+      assert.deepEqual(await frame(), [0, H], 'turned back while typing: the app as tall as the screen, not the turn’s moment');
+      await app.evaluate(() => document.activeElement.blur());
+      await size(W, H);
+      await wait(1800);
+      assert.deepEqual(await frame(), [0, H], 'turned back while typing, the field let go: the app as tall as the screen');
+      await ctx.close();
+    }
   } finally {
     await browser.close();
     server.close();
