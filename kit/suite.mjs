@@ -901,23 +901,37 @@ function insetsNow() {
   p.remove();
   return ins;
 }
+// Each style sheet is read once: its rules that name the safe area are
+// remembered, and only those are written again, when the insets change (the
+// phone turned). Asked every 50 ms while an app loads, every rule of every
+// sheet was read again and each of those written again, the same: about
+// 100 ms of a slow phone's opening and a restyle each time (2026-11-18).
+// (A sheet that grew, an app's rule added by script, is read again.)
 const told = new WeakMap();
-function tellInsets(doc, ins) {
-  const walk = rules => {
-    for (const r of rules || []) {
-      if (r.style) {
-        const was = told.get(r) ?? r.style.cssText;
-        if (was.includes('safe-area-inset')) {
-          told.set(r, was);
-          r.style.cssText = withInsets(was, ins);
-        }
-      }
-      if (r.cssRules) walk(r.cssRules);
-    }
-  };
+const sheetsRead = new WeakMap();
+export function tellInsets(doc, ins) {
+  const key = `${ins.top}|${ins.right}|${ins.bottom}|${ins.left}`;
   for (const sheet of doc?.styleSheets || []) {
     try {
-      walk(sheet.cssRules);
+      const rules = sheet.cssRules;
+      let s = sheetsRead.get(sheet);
+      if (!s || s.n !== rules.length) {
+        s = { n: rules.length, named: [], key: '' };
+        const walk = list => {
+          for (const r of list || []) {
+            if (r.style) {
+              const was = told.get(r) ?? r.style.cssText;
+              if (was.includes('safe-area-inset')) (told.set(r, was), s.named.push(r));
+            }
+            if (r.cssRules) walk(r.cssRules);
+          }
+        };
+        walk(rules);
+        sheetsRead.set(sheet, s);
+      }
+      if (s.key === key) continue;
+      s.key = key;
+      for (const r of s.named) r.style.cssText = withInsets(told.get(r), ins);
     } catch {}
   }
 }

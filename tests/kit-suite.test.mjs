@@ -176,6 +176,37 @@ test("an app held in Orbit's window gets the phone's safe area written in (a fra
   assert.equal(withInsets('padding: 0', ins), 'padding: 0');
 });
 
+// Asked every 50 ms while an app loads (suite.mjs host: before its load, as its first screen paints), every
+// rule of every sheet was read again and each rule naming the safe area written again with the same value:
+// about 100 ms of a slow phone's opening, and a restyle of the app each time (2026-11-18).
+test("an app's style sheets are read once for the safe area; told again, nothing is read or written until the phone turns", async () => {
+  const { tellInsets } = await import('../kit/suite.mjs');
+  let reads = 0;
+  let writes = 0;
+  const rule = text => ({ style: { get cssText() { return reads++, text; }, set cssText(v) { writes++; text = v; } }, text: () => text });
+  const plain = [rule('color: red;'), rule('margin: 0;')];
+  const bar = rule('padding-bottom: env(safe-area-inset-bottom);');
+  const head = rule('top: env(safe-area-inset-top, 0px);');
+  const sheet = { cssRules: [plain[0], bar, { cssRules: [plain[1], head] }] };
+  const doc = { styleSheets: [sheet, { get cssRules() { throw new Error('another site’s sheet'); } }] };
+  const up = { top: 59, right: 0, bottom: 34, left: 0 };
+  tellInsets(doc, up);
+  assert.deepEqual([bar.text(), head.text(), plain[0].text()], ['padding-bottom: var(--q-inset-bottom, 34px);', 'top: 59px;', 'color: red;']);
+  assert.deepEqual([reads, writes], [4, 2], 'each rule read once, the two that name the safe area written');
+  for (let i = 0; i < 20; i++) tellInsets(doc, { ...up });
+  assert.deepEqual([reads, writes], [4, 2], 'told the same again: nothing read, nothing written');
+  // The phone on its side: the same two rules, from their own text.
+  tellInsets(doc, { top: 0, right: 47, bottom: 21, left: 47 });
+  assert.deepEqual([bar.text(), head.text()], ['padding-bottom: var(--q-inset-bottom, 21px);', 'top: 0px;']);
+  assert.deepEqual([reads, writes], [4, 4]);
+  // A rule the app adds later is found, and the ones written before keep their own text.
+  const late = rule('left: env(safe-area-inset-left);');
+  sheet.cssRules.push(late);
+  tellInsets(doc, { top: 0, right: 47, bottom: 21, left: 47 });
+  assert.equal(late.text(), 'left: 47px;');
+  assert.equal(bar.text(), 'padding-bottom: var(--q-inset-bottom, 21px);');
+});
+
 test("the 進行中 tab asks its app, once, for what's under way in full", async () => {
   const store = new Map();
   globalThis.sessionStorage = { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
