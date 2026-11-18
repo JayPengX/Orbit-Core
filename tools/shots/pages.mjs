@@ -18,6 +18,9 @@ const lift = (scope, n = 0, by = 70) => `js:(()=>{const g=[...document.querySele
 // A finger swiped across `sel` by `dx` px (touch events, as a phone sends them): a day on in a day swipe.
 const swipe = (sel, dx) => `js:(async()=>{const n=document.querySelector('${sel}');const r=n.getBoundingClientRect();const x=r.x+r.width/2,y=r.y+Math.min(r.height/2,60);const t=X=>new Touch({identifier:1,target:n,clientX:X,clientY:y});const ev=(k,X)=>n.dispatchEvent(new TouchEvent(k,{bubbles:true,cancelable:true,touches:k==='touchend'?[]:[t(X)],changedTouches:[t(X)]}));ev('touchstart',x);for(let i=1;i<=8;i++){await new Promise(r=>setTimeout(r,16));ev('touchmove',x+(${dx})*i/8)}ev('touchend',x+(${dx}))})()`;
 
+// The same, held mid-way and never let go: what moves under the finger and what stays put.
+const drag = (sel, dx) => `js:(async()=>{const n=document.querySelector('${sel}');const r=n.getBoundingClientRect();const x=r.x+r.width/2,y=r.y+Math.min(r.height/2,60);const t=X=>new Touch({identifier:1,target:n,clientX:X,clientY:y});const ev=(k,X)=>n.dispatchEvent(new TouchEvent(k,{bubbles:true,cancelable:true,touches:[t(X)],changedTouches:[t(X)]}));ev('touchstart',x);for(let i=1;i<=8;i++){await new Promise(r=>setTimeout(r,16));ev('touchmove',x+(${dx})*i/8)}})()`;
+
 // The same, a finger on whatever is at the screen's foot (the page's empty space under a short day).
 const swipeAt = dx => `js:(async()=>{const x=innerWidth*0.6,y=innerHeight-30;const n=document.elementFromPoint(x,y);window.__swipeAt=n&&(n.id||n.className||n.tagName);const t=X=>new Touch({identifier:1,target:n,clientX:X,clientY:y});const ev=(k,X)=>n.dispatchEvent(new TouchEvent(k,{bubbles:true,cancelable:true,touches:k==='touchend'?[]:[t(X)],changedTouches:[t(X)]}));ev('touchstart',x);for(let i=1;i<=8;i++){await new Promise(r=>setTimeout(r,16));ev('touchmove',x+(${dx})*i/8)}ev('touchend',x+(${dx}))})()`;
 
@@ -65,6 +68,8 @@ export const PAGES = {
     'f1-season': { args: click('#tab-matches', '[data-league=f1]', wait(4000)) },
     // 轉播's 愛爾達節目表 (full height whatever the day), then swiped a finger left across it: the next day.
     guide: { args: click('#tab-live', wait(6000), "js:document.querySelector('.guide-link .q-ritem').click()", wait(2500)) },
+    // 愛爾達節目表 swiped on the empty space at the sheet's foot (Jay 2026-11-18).
+    'guide-swipe-empty': { args: click('#tab-live', wait(6000), "js:document.querySelector('.guide-link .q-ritem').click()", wait(2500), swipeAt(-160), wait(1200)) },
     'guide-swipe': { args: click('#tab-live', wait(6000), "js:document.querySelector('.guide-link .q-ritem').click()", wait(2500), swipe('dialog.q-sheet[open] .tv-guide', -160), wait(1200)) },
     // 轉播 scrolled to 我的比賽 (their own games by day: no row lit grey, Jay 2026-11-05; with --account fan).
     'tv-mine': { args: click('#tab-live', wait(8000), "js:document.querySelector('.mine-list')?.scrollIntoView({block:'start'})", wait(1500)) },
@@ -321,6 +326,9 @@ export const PAGES = {
     key: { args: click("js:window.openTransferSheet('key')", wait(1200)) },
     photo: { args: click("js:window.openTransferSheet('photo')", wait(1200)) },
     swap: { hash: 'week', args: click('.cx-way.is-swap', wait(1200)) },
+    // 課表 swiped to the other week; 今天 held mid-swipe (the card stays put, the day slides). With --account week.
+    'week-swipe': { hash: 'week', args: click(wait(1500), swipe('#cx-grid', -160), wait(1200)) },
+    'today-drag': { args: click(wait(2000), drag('#cx-list-sec', -200), wait(300)) },
     flight: { hash: 'tools', args: click('.cx-fly-card', wait(2500)) },
     sim: { args: click('js:window.openTestPanel()', wait(1200)) },
     // 待辦 and 學校公告 on 今天; a to-do's sheet; 工具's 學習: 學校公告, its school picker.
@@ -463,6 +471,8 @@ export const PAGES = {
     list: { args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(3000)) },
     stock: { args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(2500), "js:[...document.querySelectorAll('[data-action=open][data-symbol=\"2330.TW\"]')].find(e => e.offsetParent).click()", wait(3000), '[data-action=chart-style][data-v=candle]', '[data-action=range][data-range="6mo"]', wait(4000)) },
     ticket: { args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(2500), "js:[...document.querySelectorAll('[data-action=open][data-symbol=\"2330.TW\"]')].find(e => e.offsetParent).click()", wait(3000), '[data-action=trade][data-side=buy]', wait(1500)) },
+    // The ticket with 融資 picked (an account without a credit account: the way to open one).
+    'ticket-credit': { args: click('#tab-markets', '[data-action=product][data-id=tw]', wait(2500), "js:[...document.querySelectorAll('[data-action=open][data-symbol=\"2330.TW\"]')].find(e => e.offsetParent).click()", wait(3000), '[data-action=trade][data-side=buy]', wait(1500), '[data-action=credit][data-credit="1"]', wait(800)) },
     // 持股's 更多 card (組成, 配息, 定期定額, 提醒, 掛單中 with its count), scrolled into view;
     // --account orders has one open order (a BTC sell at 200,000, placed in the preview).
     more: { args: click('#tab-portfolio', wait(2500), "js:document.querySelector('.pf-more')?.scrollIntoView({ block: 'center' })", wait(1200)) },
