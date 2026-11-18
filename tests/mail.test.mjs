@@ -2,7 +2,7 @@
 // plan/settle: never spam, never miss) and the looks (site/admin/mail-look.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { plan, settle, groupsAt, DAY_MAX, modelIssues } from '../mail-alerts.js';
+import { plan, settle, groupsAt, DAY_MAX, modelIssues, tdxIssue } from '../mail-alerts.js';
 import { addressesOf, isAddress, sendMail } from '../mail.js';
 import { mailRender, alertMail, blocksOf, MAIL_LOOKS } from '../site/admin/mail-look.mjs';
 
@@ -179,4 +179,21 @@ test('alerts: a model failing every call today is told (the next maker answers m
   assert.deepEqual(modelIssues(calls).map(i => [i.id, i.tone, i.mail]), [['ai-model:claude-haiku-5-5', 'warn', true]]);
   assert.match(modelIssues(calls)[0].title, /^Claude /);
   assert.deepEqual(modelIssues(null), []);
+});
+
+// From 2026-12-01 TDX's free tier is 3 points a month, and the guard spends it to 95% by design: a mail
+// every month near its end would be noise Jay can do nothing about (2026-11-18, "alerts only for what truly needs me").
+test("TDX's month near its points: mailed on 銅級; on the free tier amber only, never mailed", () => {
+  const nov = Date.parse('2026-11-25T04:00:00Z');
+  const dec = Date.parse('2026-12-25T04:00:00Z');
+  // 銅級: 170 of 200 points (advanced calls: 200 a point).
+  const paid = tdxIssue({ 'tdx:a:2026-11-20': 170 * 200 }, nov);
+  assert.equal(paid.length, 1);
+  assert.equal(paid[0].mail, true);
+  // Free tier: 2.9 of 3 points.
+  const free = tdxIssue({ 'tdx:a:2026-12-20': 2.9 * 200 }, dec);
+  assert.equal(free.length, 1);
+  assert.equal(free[0].tone, 'warn');
+  assert.ok(!free[0].mail);
+  assert.deepEqual(tdxIssue({ 'tdx:a:2026-12-20': 100 }, dec), []);
 });

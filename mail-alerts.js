@@ -125,11 +125,19 @@ async function mid(env, deps, now) {
     }
   }
   out.push(...modelIssues(calls));
-  if (tdx) {
-    const share = tdxPoints(tdx, now).month / tdxPlan(now).month;
-    if (share >= 0.8) out.push({ id: 'tdx', tone: share >= 0.95 ? 'bad' : 'warn', mail: true, title: `TDX 這個月的點數用了 ${pct(share)}`, detail: '用完之後公車與鐵路的即時資料會停到下個月。', go: 'usage' });
-  }
+  out.push(...tdxIssue(tdx, now));
   return out;
+}
+// TDX's month (transit.js tdxPlan). On 銅級 a month near its 200 points is news, mailed. On the free tier
+// (from 2026-12-01: 3 points) the guard spends the month to 95% by design, keeping answers longer as it
+// goes (tdxGuard), so most months come near it: shown amber, never mailed (nothing for Jay to do but pay).
+export function tdxIssue(tdx, now = Date.now()) {
+  if (!tdx) return [];
+  const plan = tdxPlan(now);
+  const share = tdxPoints(tdx, now).month / plan.month;
+  if (share < 0.8) return [];
+  if (!plan.paid) return [{ id: 'tdx', tone: 'warn', title: `TDX 免費的 3 點這個月用了 ${pct(share)}`, detail: '用到 95% 之後，公車與鐵路的即時資料只用存著的，到下個月 1 號。', go: 'usage' }];
+  return [{ id: 'tdx', tone: share >= 0.95 ? 'bad' : 'warn', mail: true, title: `TDX 這個月的點數用了 ${pct(share)}`, detail: '用完之後公車與鐵路的即時資料會停到下個月。', go: 'usage' }];
 }
 async function slow(env, deps, now) {
   // (GitHub's token failing or ending soon: github-keep.js.)

@@ -24,6 +24,7 @@ import { paceOf } from './pace.js';
 import { notifyNow } from './push.js';
 import { ECO_APPS } from './eco.js';
 import { SITE } from './kit/domain.mjs';
+import { GH_KEEP } from './github-keep.js';
 
 export const TOLD_KEY = 'guard:told';
 export const OPS_DOC = ['orbit-config', 'ops'];
@@ -188,6 +189,8 @@ export async function systemReport(env, deps) {
   const kv = env.RATE_LIMIT_KV;
   const g = kv ? JSON.parse((await kv.get(GUARD_STATE).catch(() => null)) || 'null') : null;
   const told = kv || env.DATA ? await keptRead(env, TOLD_KEY) : null;
+  // (GH_ACTIONS_TOKEN's end, as GitHub said it last: github-keep.js; the free plans' watch prints it.)
+  const gh = await keptRead(env, GH_KEEP).catch(() => null);
   const [pace, rows, store, data, account] = await Promise.all([
     paceOf(env),
     beats(env).catch(e => ({ error: String(e?.message || e) })),
@@ -205,6 +208,7 @@ export async function systemReport(env, deps) {
     beats: rows,
     store,
     data,
+    github: gh ? { tokenEnds: gh.tokenEnds ?? null, at: gh.at ?? null, bad: gh.bad?.status ?? null } : null,
     secrets: Object.fromEntries(SECRETS.map(k => [k, !!env[k]])),
     bindings: Object.fromEntries(BINDINGS.map(k => [k, !!env[k]]))
   };

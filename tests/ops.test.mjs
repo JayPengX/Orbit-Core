@@ -1,6 +1,8 @@
 // The proxy watching itself (ops.js): heartbeats, the bill's alerts, the report.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { keptPut } from '../kept-store.js';
+import { GH_KEEP } from '../github-keep.js';
 import { beat, beats, news, billNotice, tellOwner, systemReport, dataFolders, TOLD_KEY, OPS_DOC } from '../ops.js';
 import { fakeD1 } from './fake-d1.mjs';
 import { memoryBucket } from './fixtures/bucket.mjs';
@@ -81,4 +83,9 @@ test('the report: secrets and bindings set or not (never a value), R2 by folder,
   assert.ok(!JSON.stringify(r).includes('secret-value'));
   assert.deepEqual(r.store, { 'eco-wallets': 1 });
   assert.equal(r.pace.pace, 0);
+  // GitHub's token's end, as github-keep.js kept it (the free plans' watch prints it, for the dates Jay checks in on).
+  assert.equal(r.github, null);
+  await keptPut(env, GH_KEEP, { at: 4, tokenEnds: Date.parse('2027-03-01T12:00:00Z') }, 3600);
+  const r2 = await systemReport(env, { now: () => 5, fsGet: async () => ({ exists: false }), count: async () => ({}) });
+  assert.deepEqual(r2.github, { tokenEnds: Date.parse('2027-03-01T12:00:00Z'), at: 4, bad: null });
 });

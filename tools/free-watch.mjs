@@ -100,6 +100,9 @@ async function beats() {
   const failing = (r.body.beats || []).filter(b => !b.ok && (b.fails || 0) >= 3);
   for (const b of failing) bad(`cron ${b.job}: failed ${b.fails} times in a row; last good ${b.okAt ? new Date(b.okAt).toISOString() : 'never'}: ${String(b.note || '').slice(0, 200)}`);
   notes.push(`cron jobs: ${(r.body.beats || []).length} watched, ${failing.length} failing`);
+  // (GitHub's token for the schedules, github-keep.js: Jay is mailed 21 days before it ends.)
+  const gh = r.body.github;
+  notes.push(`GH_ACTIONS_TOKEN: ${!gh ? 'not seen yet' : gh.bad ? `refused (${gh.bad})` : gh.tokenEnds ? `ends ${new Date(gh.tokenEnds).toISOString().slice(0, 10)}` : 'no end date'}`);
 }
 
 // The AI makers' money (Jay pays for these, 11-14): each balance typed less
