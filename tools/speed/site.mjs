@@ -73,11 +73,13 @@ export async function buildSide({ name, ref = 'work', refs = {}, apps, dir: fina
   const at = repo => refs[repo] || ref;
   const made = { name, dir, apps: {}, kit: null };
   // The kit: its source (for each app's modulepreload list) and its built copy.
-  made.kitSha = take('Orbit-Core', at('Orbit-Core'), ['kit', 'http.js'], join(dir, 'Orbit-Core'));
+  made.kitSha = take('Orbit-Core', at('Orbit-Core'), ['kit', 'http.js', 'site'], join(dir, 'Orbit-Core'));
   // How this side's proxy sends an answer a line at a time (http.js lineAnswer: gzipped, each line
   // flushed, from 2026-11-05; before that as it was): the recorded lines are sent as it would.
   made.gzipLines = existsSync(join(dir, 'Orbit-Core/http.js')) ? (await import(pathToFileURL(join(dir, 'Orbit-Core/http.js')).href + `?${name}`)).gzipLines || null : null;
   if (next) appendFileSync(join(dir, 'Orbit-Core/kit/orbit.mjs'), NEXT);
+  // (The family's own pages built with it, as pages.yml does: site/ copied in, then the kit stamped over it.)
+  if (existsSync(join(dir, 'Orbit-Core/site'))) cpSync(join(dir, 'Orbit-Core/site'), join(dir, 'kit-out'), { recursive: true });
   sh(process.execPath, [join(dir, 'Orbit-Core/kit/stamp.mjs'), join(dir, 'kit-out'), `speed-${name}`]);
   const kitVersion = JSON.parse(readFileSync(join(dir, 'kit-out/kit/version.json'), 'utf8'));
   made.kit = { version: kitVersion.version, files: kitVersion.files };
@@ -321,6 +323,13 @@ export function siteHandler({ rec }) {
         const file = join(side.dir, 'kit-out/kit', path.slice('/Orbit-Core/kit/'.length));
         if (existsSync(file) && statSync(file).isFile()) return asset(readFileSync(file), TYPES[extname(file)] || 'application/octet-stream', req);
         return json(404, { error: 'no kit file' });
+      }
+      // Orbit-Core's own site (deploy/cf-site.mjs): Orbit's window at /app/, the family's page, the root's icons.
+      const own = path === '/' ? 'index.html' : /^\/(app|privacy|terms)(\/|$)/.test(path) ? path.slice(1) : path.startsWith('/Orbit-Core/') ? path.slice('/Orbit-Core/'.length) : path === '/favicon.ico' ? 'favicon.ico' : /^\/apple-touch-icon/.test(path) ? 'icons/apple-touch-icon.png' : null;
+      if (own != null) {
+        let file = join(side.dir, 'kit-out', own);
+        if (existsSync(file) && statSync(file).isDirectory()) file = join(file, 'index.html');
+        if (existsSync(file)) return asset(readFileSync(file), TYPES[extname(file)] || 'application/octet-stream', req);
       }
       const m = /^\/([^/]+)(\/.*)?$/.exec(path);
       const key = m && Object.keys(APPS).find(k => APPS[k].slug === m[1]);

@@ -7,9 +7,23 @@
 // tree), the same recorded world for both (tools/speed/site.mjs), on a
 // 3G-like link by default (tools/speed/net.mjs: 400 kbps, 400 ms).
 //
-//   node tools/speed.mjs <app…|all> [--before main] [--after work] [--net 3g|4g|wifi]
+//   node tools/speed.mjs <app…|all> [--before main] [--after work] [--net 3g|slow4g|4g|wifi]
 //        [--cpu 4] [--steps open,idle,tabs,scroll,away,reopen,update,relaunch] [--idle 30] [--out dir] [--only before|after]
 //        [--warm] [--at <ISO time>] [--refresh-after <regex>] [--verbose]
+//        [--screen phone|ipad|desktop] [--orbit] [--trace open,reopen]
+//
+// --trace <steps>: where the phone's own time went in those steps (the main
+// thread's work by kind and by file: scripts compiled and run, styles, layout,
+// paint), printed and kept beside the results as <app>-<side>-<step>.trace.json.
+//
+// --orbit: as a person gets it, not as our tools do. A phone and an iPad open
+// Orbit's own window from the home screen (/app/, kit suite.mjs) and the app
+// in its frame: `open` is Orbit opened straight onto the app with nothing on
+// the device (a one-app Orbit, a notice, a link), `home` Orbit's list of apps
+// (`rehome`: again, 15 minutes after it was closed), `reopen` the app again 15
+// minutes later, from what the phone kept.
+// A computer opens the app's own address in a tab. Without it the app runs
+// alone, as `navigator.webdriver` sees it (the kit's tools' way).
 //
 // Needs the app repos beside this one (as tools/test-apps.mjs), Chromium
 // (Playwright's), openssl, and port 443 free (it serves every host there:
@@ -38,15 +52,27 @@ const opt = (name, def) => {
   return i >= 0 ? argv[i + 1] : def;
 };
 const flags = new Set(argv.filter(a => a.startsWith('--')).map(a => a.slice(2)));
-const valued = new Set(['before', 'after', 'net', 'cpu', 'steps', 'idle', 'out', 'only', 'runs', 'record', 'at', 'refresh-after']);
+const valued = new Set(['before', 'after', 'net', 'cpu', 'steps', 'idle', 'out', 'only', 'runs', 'record', 'at', 'refresh-after', 'screen', 'trace']);
 const named = argv.filter((a, i) => !a.startsWith('--') && !(i > 0 && argv[i - 1].startsWith('--') && valued.has(argv[i - 1].slice(2))));
 const apps = named.includes('all') || !named.length ? Object.keys(APPS) : named;
 for (const a of apps) if (!APPS[a]) throw new Error(`no app ${a}: ${Object.keys(APPS).join(' ')}`);
 const net = opt('net', '3g');
 const profile = PROFILES[net];
 if (!profile) throw new Error(`--net ${net}: ${Object.keys(PROFILES).join('|')}`);
-const cpu = Number(opt('cpu', 4));
-const steps = opt('steps', 'open,idle,tabs,scroll,away,reopen').split(',');
+// The device: a phone (an iPhone's page), an iPad on its side, a computer with a mouse (tools/preview.mjs's).
+const SCREENS = {
+  phone: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', cpu: 4 },
+  ipad: { viewport: { width: 1180, height: 820 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15', touches: 5, cpu: 2 },
+  desktop: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, isMobile: false, hasTouch: false, userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36', cpu: 1 }
+};
+const screenName = opt('screen', 'phone');
+const screen = SCREENS[screenName];
+if (!screen) throw new Error(`--screen ${screenName}: ${Object.keys(SCREENS).join('|')}`);
+const orbit = flags.has('orbit');
+// (Orbit's own window holds the app on a phone and an iPad; a computer's tab is the app's own page.)
+const framed = orbit && screenName !== 'desktop';
+const cpu = Number(opt('cpu', screen.cpu));
+const steps = opt('steps', orbit ? 'open,reopen' : 'open,idle,tabs,scroll,away,reopen').split(',');
 const idleS = Number(opt('idle', 30));
 const out = resolve(opt('out', join(tmpdir(), 'orbit-speed', new Date().toISOString().slice(0, 16).replace(/[-:T]/g, ''))));
 const work = join(tmpdir(), 'orbit-speed-build');
@@ -90,7 +116,6 @@ const afterRec = recAfter && { get: (m, u, b, f) => (refreshAfter.test(u) ? recA
 const { server, close } = await startServer({ devices, handle: siteHandler({ rec }) });
 const { spki } = tls();
 let ipN = 20 + (process.pid % 200);
-const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/proxy/i.test(k)));
 const pageScript = readFileSync(new URL('./speed/page.js', import.meta.url), 'utf8');
 
@@ -111,13 +136,14 @@ async function device(app, side, prof = profile) {
   // `later`: ms the page's clock is ahead (opening the app again a while after).
   const launch = async (later = 0) => {
     const ctx = await chromium.launchPersistentContext(dir, {
-      args: [`--host-resolver-rules=MAP * ${ip}, EXCLUDE localhost`, `--ignore-certificate-errors-spki-list=${spki}`, '--no-proxy-server', '--disable-features=PrivacySandboxSettings4'],
+      // (--orbit: a person's browser, navigator.webdriver false, so the kit takes the page into Orbit as it does for them.)
+      args: [`--host-resolver-rules=MAP * ${ip}, EXCLUDE localhost`, `--ignore-certificate-errors-spki-list=${spki}`, '--no-proxy-server', '--disable-features=PrivacySandboxSettings4', ...(orbit ? ['--disable-blink-features=AutomationControlled'] : [])],
       env: cleanEnv,
-      viewport: { width: 390, height: 844 },
-      deviceScaleFactor: 3,
-      isMobile: true,
-      hasTouch: true,
-      userAgent: IPHONE,
+      viewport: screen.viewport,
+      deviceScaleFactor: screen.deviceScaleFactor,
+      isMobile: screen.isMobile,
+      hasTouch: screen.hasTouch,
+      userAgent: screen.userAgent,
       locale: 'zh-TW',
       timezoneId: 'Asia/Taipei',
       serviceWorkers: 'allow',
@@ -140,8 +166,9 @@ async function device(app, side, prof = profile) {
       globalThis.Date = D;
     }, clockShift + later);
     // Opened from the home screen, signed in (as tools/preview.mjs).
-    await ctx.addInitScript(refresh => {
-      Object.defineProperty(Navigator.prototype, 'standalone', { get: () => true });
+    await ctx.addInitScript(([refresh, home, touches]) => {
+      if (home) Object.defineProperty(Navigator.prototype, 'standalone', { get: () => true });
+      if (touches) Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => touches });
       try {
         if (!localStorage.getItem('orbit.refresh')) {
           localStorage.setItem('orbit.refresh', refresh);
@@ -149,28 +176,93 @@ async function device(app, side, prof = profile) {
           localStorage.setItem('orbit.lang', 'zh');
         }
       } catch {}
-    }, REFRESH);
+    }, [REFRESH, screenName !== 'desktop', screen.touches || 0]);
     return ctx;
   };
   return { dev, ctx: await launch(), launch };
 }
 
 const M = list => Object.fromEntries(list.metrics.map(m => [m.name, m.value]));
+// ---- --trace: the main thread's work in a step ----
+const traced = new Set((opt('trace') || '').split(',').filter(Boolean));
+async function traceStart(cdp) {
+  await cdp.send('Tracing.start', { transferMode: 'ReturnAsStream', traceConfig: { includedCategories: ['devtools.timeline', 'v8.execute', 'disabled-by-default-v8.compile', 'blink.user_timing', 'loading'], excludedCategories: ['*'] } });
+  // (The scripts' own time by function: V8's sampler, every 0.2 ms.)
+  await cdp.send('Profiler.enable');
+  await cdp.send('Profiler.setSamplingInterval', { interval: 200 });
+  await cdp.send('Profiler.start');
+}
+const WORK = /^(FunctionCall|EvaluateScript|v8\.|V8\.|UpdateLayoutTree|Layout|Paint|PrePaint|ParseHTML|RunMicrotasks|TimerFire|EventDispatch|FireAnimationFrame|Layerize|Commit|HitTest|ParseAuthorStyleSheet|MinorGC|MajorGC|XHR)/;
+async function traceEnd(cdp, file) {
+  const { profile } = await cdp.send('Profiler.stop');
+  await cdp.send('Profiler.disable').catch(() => {});
+  const done = new Promise(ok => cdp.once('Tracing.tracingComplete', ok));
+  await cdp.send('Tracing.end');
+  const { stream } = await done;
+  let text = '';
+  for (;;) {
+    const part = await cdp.send('IO.read', { handle: stream });
+    text += part.base64Encoded ? Buffer.from(part.data, 'base64').toString() : part.data;
+    if (part.eof) break;
+  }
+  await cdp.send('IO.close', { handle: stream }).catch(() => {});
+  writeFileSync(file, text);
+  writeFileSync(file.replace(/\.trace\.json$/, '.cpuprofile'), JSON.stringify(profile));
+  const parsed = JSON.parse(text);
+  const events = (parsed.traceEvents || parsed).filter(e => e.ph === 'X' && e.dur && WORK.test(e.name));
+  // The page's main thread: the one with the most of this work. Each event's own time: its length less its children's.
+  const byThread = new Map();
+  for (const e of events) byThread.set(`${e.pid}:${e.tid}`, (byThread.get(`${e.pid}:${e.tid}`) || 0) + 1);
+  const main = [...byThread].sort((a, b) => b[1] - a[1])[0]?.[0];
+  const mine = events.filter(e => `${e.pid}:${e.tid}` === main).sort((a, b) => a.ts - b.ts || b.dur - a.dur);
+  const kinds = {};
+  const stack = [];
+  const nodes = [];
+  let busy = 0;
+  for (const e of mine) {
+    while (stack.length && stack.at(-1).end <= e.ts) stack.pop();
+    const node = { end: e.ts + e.dur, name: e.name, self: e.dur };
+    if (stack.length) stack.at(-1).self -= e.dur;
+    else busy += e.dur;
+    stack.push(node);
+    nodes.push(node);
+  }
+  for (const n of nodes) kinds[n.name] = (kinds[n.name] || 0) + n.self;
+  // The scripts' own time: by file, and the functions that took the most.
+  const self = new Map();
+  const byId = new Map(profile.nodes.map(n => [n.id, n]));
+  for (const [i, id] of profile.samples.entries()) self.set(id, (self.get(id) || 0) + (profile.timeDeltas[i] || 0));
+  const files = {};
+  const fns = {};
+  for (const [id, us] of self) {
+    const f = byId.get(id).callFrame;
+    if (!f.url && /^\((idle|program|root)\)$/.test(f.functionName)) continue;
+    const file = f.url ? f.url.replace(/^https:\/\/[^/]+/, '').replace(/\?.*$/, '') : f.functionName;
+    files[file] = (files[file] || 0) + us;
+    const fn = `${f.functionName || '(anonymous)'} ${file}${f.url ? `:${f.lineNumber + 1}` : ''}`;
+    fns[fn] = (fns[fn] || 0) + us;
+  }
+  const top = (o, n) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => `${k} ${Math.round(v / 1000)}`).join(', ');
+  return { kinds: top(kinds, 14), files: top(files, 16), functions: top(fns, 24), busyMs: Math.round(busy / 1000) };
+}
+// Where the app runs: Orbit's frame of it (--orbit on a phone or an iPad), else the page itself.
+const appFrame = (page, app) => page.frames().find(f => f !== page.mainFrame() && new RegExp(`^https://[^/]+/${APPS[app].slug}/`).test(f.url())) || null;
+const probe = (page, dev) => (framed && appFrame(page, dev.app)) || page.mainFrame();
 async function quietFor(page, dev, { quiet = 1500, max = 60_000, since = now() } = {}) {
   // Until nothing is asked for `quiet` ms and the page hasn't changed for 600 ms (or `max`).
   let lastBusy = now();
   const end = since + max;
   while (now() < end) {
     if (dev.inflight > 0) lastBusy = now();
-    const idleFor = await page.evaluate(() => performance.now() - (window.__speed?.lastMut || 0)).catch(() => 0);
+    const idleFor = await probe(page, dev).evaluate(() => performance.now() - (window.__speed?.lastMut || 0)).catch(() => 0);
     if (now() - lastBusy >= quiet && idleFor >= 600) return { timedOut: false };
     await new Promise(r => setTimeout(r, 100));
   }
   return { timedOut: true };
 }
-async function readings(page, cdp) {
+async function readings(page, cdp, dev) {
   const m = M(await cdp.send('Performance.getMetrics'));
-  const s = await page.evaluate(() => ({ mut: __speed.mut, long: __speed.long.slice(), lastMut: __speed.lastMut, ready: __speed.ready, lcp: __speed.lcp, cls: __speed.cls, events: __speed.events.slice() })).catch(() => ({ mut: 0, long: [], events: [] }));
+  const s = await probe(page, dev).evaluate(() => ({ mut: __speed.mut, long: __speed.long.slice(), lastMut: __speed.lastMut, ready: __speed.ready, lcp: __speed.lcp, cls: __speed.cls, events: __speed.events.slice() })).catch(() => ({ mut: 0, long: [], events: [] }));
   return { m, s, t: now() };
 }
 async function heapMB(cdp) {
@@ -181,11 +273,18 @@ async function heapMB(cdp) {
 // One step: what it asked over the link, and what the phone did.
 async function step(name, page, cdp, dev, fn, { settle = true, max = 60_000 } = {}) {
   dev.step = { name, log: [], handshakes: 0, zero: now() - dev.zero };
-  const r0 = await readings(page, cdp);
-  const pageT0 = await page.evaluate(() => performance.now()).catch(() => 0);
+  const r0 = await readings(page, cdp, dev);
+  const pageT0 = await probe(page, dev).evaluate(() => performance.now()).catch(() => 0);
+  const tracing = traced.has(name.split(' ')[0]);
+  if (tracing) await traceStart(cdp);
   const extra = (await fn()) || {};
+  if (tracing) {
+    const t = await traceEnd(cdp, join(out, `${dev.app}-${dev.sideName}-${name.replace(/\W+/g, '-')}.trace.json`)).catch(e => ({ kinds: String(e.message || e), files: '', functions: '', busyMs: 0 }));
+    console.log(`  ${dev.app} ${dev.sideName} ${name}: main thread busy ${t.busyMs} ms (as slowed)\n    by kind (ms): ${t.kinds}\n    scripts by file (ms): ${t.files}\n    functions (ms): ${t.functions || ''}`);
+    extra.more = { ...extra.more, trace: t };
+  }
   const q = settle ? await quietFor(page, dev, { max }) : { timedOut: false };
-  const r1 = await readings(page, cdp);
+  const r1 = await readings(page, cdp, dev);
   const log = dev.step.log;
   const kb = log.reduce((s, e) => s + e.bytes, 0) + dev.step.handshakes * HANDSHAKE;
   const routes = {};
@@ -246,23 +345,66 @@ async function waitReady(page, max = 90_000) {
   }
   return null;
 }
+// In Orbit's window: the app's first screen in its frame, timed from the
+// moment Orbit's own page was asked for (what the person waits, icon to
+// screen), and its two parts: `shellMs` until Orbit asked for the app's page,
+// `frameMs` the app's own time from there.
+async function waitFramed(page, app, max = 90_000) {
+  const t = Date.now();
+  while (Date.now() - t < max) {
+    const f = appFrame(page, app);
+    const r = f ? await f.evaluate(() => (window.__speed?.ready == null ? null : [performance.timeOrigin, window.__speed.ready, window.__speed.lcp || 0])).catch(() => null) : null;
+    if (r) {
+      const zero = await page.evaluate(() => performance.timeOrigin).catch(() => r[0]);
+      return { readyMs: Math.round(r[0] + r[1] - zero), shellMs: Math.round(r[0] - zero), frameMs: r[1], lcpMs: Math.round(r[0] + r[2] - zero) };
+    }
+    await new Promise(res => setTimeout(res, 100));
+  }
+  return { readyMs: null, shellMs: null, frameMs: null, lcpMs: 0 };
+}
+// Orbit's home: its list of apps drawn.
+async function waitHome(page, max = 90_000) {
+  const t = Date.now();
+  while (Date.now() - t < max) {
+    const r = await page.evaluate(() => (document.querySelector('#door:not([hidden]) .door-tile') ? Math.round(performance.now()) : null)).catch(() => null);
+    if (r != null) return r;
+    await new Promise(res => setTimeout(res, 100));
+  }
+  return null;
+}
 
 async function runApp(app, side, { prof = profile, rate = cpu, idle = idleS } = {}) {
   let { dev, ctx, launch } = await device(app, side, prof);
-  const url = `https://${HOST}/${APPS[app].slug}/`;
+  // (Orbit opened straight onto the app, as a one-app Orbit, a notice or a link does.)
+  const url = framed ? `https://${HOST}/app/?open=${encodeURIComponent(`/${APPS[app].slug}/`)}` : `https://${HOST}/${APPS[app].slug}/`;
+  const opened = async () => {
+    if (framed) {
+      const r = await waitFramed(page, app);
+      return { readyMs: r.readyMs, resetMut: true, pageT0: 0, more: { lcpMs: r.lcpMs, shellMs: r.shellMs, frameMs: r.frameMs } };
+    }
+    const ready = await waitReady(page);
+    const lcp = await page.evaluate(() => __speed.lcp).catch(() => 0);
+    return { readyMs: ready, resetMut: true, pageT0: 0, more: { lcpMs: lcp } };
+  };
   const results = [];
   let { page, cdp } = await openPage(ctx, rate);
   const errors = [];
   let tabs = [];
   page.on('pageerror', e => errors.push(String(e.message || e).slice(0, 160)));
   try {
+    // Orbit's own home, nothing on the device: its list of apps (then the same device goes on to the app).
+    if (framed && steps.includes('home'))
+      results.push(
+        await step('home', page, cdp, dev, async () => {
+          await page.goto(`https://${HOST}/app/`, { waitUntil: 'commit', timeout: 120_000 });
+          return { readyMs: await waitHome(page), resetMut: true, pageT0: 0 };
+        }, { max: 90_000 })
+      );
     if (steps.includes('open'))
       results.push(
         await step('open', page, cdp, dev, async () => {
           await page.goto(url, { waitUntil: 'commit', timeout: 120_000 });
-          const ready = await waitReady(page);
-          const lcp = await page.evaluate(() => __speed.lcp).catch(() => 0);
-          return { readyMs: ready, resetMut: true, pageT0: 0, more: { lcpMs: lcp } };
+          return opened();
         }, { max: 90_000 })
       );
     if (steps.includes('idle'))
@@ -272,12 +414,12 @@ async function runApp(app, side, { prof = profile, rate = cpu, idle = idleS } = 
           return { readyMs: 0 };
         }, { settle: false })
       );
-    tabs = await page.evaluate(() => [...document.querySelectorAll('.q-tab[data-tab]')].map(b => b.dataset.tab)).catch(() => []);
+    tabs = await probe(page, dev).evaluate(() => [...document.querySelectorAll('.q-tab[data-tab]')].map(b => b.dataset.tab)).catch(() => []);
     if (steps.includes('tabs'))
       for (const tab of tabs.slice(1).concat(tabs.slice(0, 1))) {
         results.push(
           await step(`tab ${tab}`, page, cdp, dev, async () => {
-            await page.click(`.q-tab[data-tab="${tab}"]`, { timeout: 10_000 }).catch(() => {});
+            await probe(page, dev).click(`.q-tab[data-tab="${tab}"]`, { timeout: 10_000 }).catch(() => {});
           })
         );
       }
@@ -363,6 +505,19 @@ async function runApp(app, side, { prof = profile, rate = cpu, idle = idleS } = 
         }, { max: 120_000 })
       );
     }
+    // Orbit's home again, the icon tapped 15 minutes after it was closed: its list from what the phone kept.
+    if (framed && steps.includes('rehome')) {
+      await ctx.close();
+      for (let t = Date.now(); dev.inflight > 0 && Date.now() - t < 30_000; ) await new Promise(r => setTimeout(r, 100));
+      ctx = await launch(REOPEN_AFTER);
+      ({ page, cdp } = await openPage(ctx, rate));
+      results.push(
+        await step('rehome', page, cdp, dev, async () => {
+          await page.goto(`https://${HOST}/app/`, { waitUntil: 'commit', timeout: 120_000 });
+          return { readyMs: await waitHome(page), resetMut: true, pageT0: 0 };
+        }, { max: 90_000 })
+      );
+    }
     if (steps.includes('reopen')) {
       // The app closed (the browser gone, its service worker too) and opened
       // again 15 minutes later: what was kept on the phone, and what's asked again.
@@ -374,9 +529,9 @@ async function runApp(app, side, { prof = profile, rate = cpu, idle = idleS } = 
       results.push(
         await step('reopen', page, cdp, dev, async () => {
           await page.goto(url, { waitUntil: 'commit', timeout: 120_000 });
-          const ready = await waitReady(page);
-          const version = await page.evaluate(() => document.querySelector('meta[name="build-version"]')?.content || '').catch(() => '');
-          return { readyMs: ready, resetMut: true, pageT0: 0, more: { version } };
+          const r = await opened();
+          const version = await probe(page, dev).evaluate(() => document.querySelector('meta[name="build-version"]')?.content || '').catch(() => '');
+          return { ...r, more: { ...r.more, version } };
         }, { max: 90_000 })
       );
     }
@@ -399,7 +554,7 @@ for (const app of apps)
     const t = Date.now();
     const r = await runApp(app, side);
     all.push(r);
-    writeFileSync(join(out, 'results.json'), JSON.stringify({ net: profile.name, cpu, at: new Date().toISOString(), sides: Object.fromEntries(sides), record: rec.stats, runs: all }, null, 1));
+    writeFileSync(join(out, 'results.json'), JSON.stringify({ net: profile.name, cpu, screen: screenName, orbit, at: new Date().toISOString(), sides: Object.fromEntries(sides), record: rec.stats, runs: all }, null, 1));
     const open = r.results.find(x => x.name === 'open');
     console.log(`${app} ${side}: open ${open ? `${(open.readyMs / 1000).toFixed(1)} s, ${open.kb} KB, ${open.requests} req` : '-'} (${Math.round((Date.now() - t) / 1000)} s)${r.errors.length ? ` errors: ${r.errors.join(' | ')}` : ''}`);
   }
@@ -407,7 +562,7 @@ await close();
 
 // ---- The table ----
 const fmtS = ms => (ms == null ? '—' : `${(ms / 1000).toFixed(1)} s`);
-const lines = [`# Speed: ${profile.name}, CPU ×${cpu}`, '', `${new Date().toISOString()} · before ${sides.find(s => s[0] === 'before')?.[1] || '—'} · after ${sides.find(s => s[0] === 'after')?.[1] || '—'} · replayed ${rec.stats.replayed}, recorded ${rec.stats.recorded}`, ''];
+const lines = [`# Speed: ${screenName}${orbit ? (framed ? ' in Orbit' : ' as a person') : ''}, ${profile.name}, CPU ×${cpu}`, '', `${new Date().toISOString()} · before ${sides.find(s => s[0] === 'before')?.[1] || '—'} · after ${sides.find(s => s[0] === 'after')?.[1] || '—'} · replayed ${rec.stats.replayed}, recorded ${rec.stats.recorded}`, ''];
 for (const app of apps) {
   lines.push(`## ${app}`, '', '| step | side | ready | settled | KB | req | CPU ms | blocking ms | layouts | redraw nodes | heap MB | proxy req | proxy CPU ms |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|');
   const runs = all.filter(r => r.app === app);

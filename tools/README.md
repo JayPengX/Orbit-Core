@@ -187,10 +187,25 @@ beside the results), then replayed to both sides, at one fixed moment
 side (a change on the server: a slimmer pack). `--warm` records each app
 once first, so no live read is timed.
 
+`--orbit`: the app as a person opens it since 11-15, inside Orbit's window
+(`/app/?open=/<slug>/`: the window, then the app in its frame); its steps
+are `open` and `reopen` unless `--steps` says, the time is to the app's
+first screen from the tap, and the row also says when Orbit asked for the
+app's page (`shellMs`). Without it an app is measured alone, as a tool's
+browser sees it. With it, `--steps home,rehome` times Orbit's own list of
+apps, first and again. `--screen phone|ipad|desktop` (390×844 CPU ×4,
+1180×820 ×2, 1440×900 ×1; `--cpu` overrides), `--net slow4g` (1.6 Mbps,
+150 ms: Chrome's Slow 4G). `--trace <steps>` records those steps' main
+thread and says where its time went (by kind of work, by file, by
+function; `<app>-<side>-<step>.trace.json` and `.cpuprofile` beside the
+results); a traced step runs slower, so never compare its time.
+
 ```bash
 git -C ../Orbit-Weather tag speed-before   # (each repo, as long work begins)
 node tools/speed.mjs weather --before speed-before --warm --verbose
 node tools/speed.mjs all --only before --out /tmp/base   # today's numbers alone
+node tools/speed.mjs all --orbit --net slow4g --before speed-before   # as people open them
+node tools/speed.mjs sports --orbit --net slow4g --only after --trace reopen
 ```
 
 It writes `results.md` (a table a step a row) and `results.json` (every

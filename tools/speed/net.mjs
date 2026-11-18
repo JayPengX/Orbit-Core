@@ -20,6 +20,8 @@ import { performance } from 'node:perf_hooks';
 export const PROFILES = {
   // WebPageTest's "3G (slow)": 400 kbps both ways, 400 ms round trips (Jay 2026-11-05: "close to 3G").
   '3g': { name: '3G (400 kbps, 400 ms)', rtt: 400, down: 400_000 / 8 / 1000, up: 400_000 / 8 / 1000, setup: 2 },
+  // A weak 4G signal (Chrome's and Lighthouse's "Slow 4G": 1.6 Mbps down, 750 kbps up, 150 ms).
+  slow4g: { name: 'slow 4G (1.6 Mbps, 150 ms)', rtt: 150, down: 1_600_000 / 8 / 1000, up: 750_000 / 8 / 1000, setup: 2 },
   // A phone's 4G in Taiwan (WebPageTest's 4G: 9 Mbps, 170 ms).
   '4g': { name: '4G (9 Mbps, 170 ms)', rtt: 170, down: 9_000_000 / 8 / 1000, up: 3_000_000 / 8 / 1000, setup: 2 },
   wifi: { name: 'Wi-Fi (50 Mbps, 20 ms)', rtt: 20, down: 50_000_000 / 8 / 1000, up: 20_000_000 / 8 / 1000, setup: 2 }
