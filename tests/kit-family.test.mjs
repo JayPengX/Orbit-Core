@@ -13,8 +13,8 @@ test('a fact told is heard, old ones when allowed', () => {
   assert.equal(F.heard('sports', 'follows', { now })[0].name, '洋基');
   assert.equal(F.heard('sports', 'follows', { maxAge: 1000, now: now + 5000 }), null);
   assert.equal(F.heard('stock', 'holds'), null);
-  F.setPlace('school', { lat: 24.81, lon: 121.0, name: '竹北高中' }, 'weather');
-  assert.equal(F.placeFor('school').name, '竹北高中');
+  F.setPlace('school', { lat: 25.04, lon: 121.5, name: '測試高中' }, 'weather');
+  assert.equal(F.placeFor('school').name, '測試高中');
   F.setPlace('moon', { lat: 1, lon: 1 });
   assert.equal(F.placeFor('moon'), null);
 });

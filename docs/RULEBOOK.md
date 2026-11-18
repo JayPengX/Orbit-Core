@@ -11,7 +11,7 @@ clearly makes a result worse, say so in a line rather than follow it blindly.
 
 **The owner.** Jay owns the family and decides what the products are. He judges the apps on his
 iPhone and iPad (home-screen apps, Safari's engine), sends lists, screenshots and 除錯紀錄 from
-the Pass sheet, lives in 新竹 (every app works for all of Taiwan), and doesn't read code: talk in
+the Pass sheet (every app works for all of Taiwan, not only where he is), and doesn't read code: talk in
 plain words and screenshots, and when a change touches structure say what moved and why in a
 sentence. He values, in order: speed of delivery, clean code, efficiency, low cost, reuse. Other
 people use the apps too, so polish matters for strangers. His complaints are a customer's

@@ -67,11 +67,11 @@ test('what the app is in the middle of goes up from the live place, coalesced; a
 
 test("the family's notebook: a fact told goes up; the Pass's newer facts come in, older ones never over newer", async () => {
   signedIn();
-  const sent = worker(body => (body.op === 'refresh' ? { token: 'tok', active: true, wallet: { entries: [] }, family: { 'class.school': { v: { name: '竹東高中' }, at: 50 }, 'vocab.due': { v: { n: 1 }, at: 1 } }, familyTime: 'f2' } : body.op === 'now' ? { familyTime: 'f3' } : {}));
+  const sent = worker(body => (body.op === 'refresh' ? { token: 'tok', active: true, wallet: { entries: [] }, family: { 'class.school': { v: { name: '測試高中' }, at: 50 }, 'vocab.due': { v: { n: 1 }, at: 1 } }, familyTime: 'f2' } : body.op === 'now' ? { familyTime: 'f3' } : {}));
   F.tell('vocab', 'due', { n: 9 }, 40);
   const s = kit.orbitSession('money', { heartbeat: 1e9 });
   await s.claim();
-  assert.equal(F.heard('class', 'school').name, '竹東高中', "another app's fact, heard here");
+  assert.equal(F.heard('class', 'school').name, '測試高中', "another app's fact, heard here");
   assert.equal(F.heard('vocab', 'due').n, 9, 'the newer one here stays');
   F.tell('transit', 'ride', { id: 'r1', fare: 30 }, Date.now());
   await wait(4300);

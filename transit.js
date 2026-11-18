@@ -792,7 +792,7 @@ async function etaAsked(env, city, stops, routes, deps) {
 // 公路客運 (InterCity: all Taiwan, 60,000 estimates, 24 MB; 1,848 buses) is
 // never read whole, so each stop card was its own read of its stops' times
 // (each 30 s) and its lagging routes' places (each 20 s): a crowd at its own
-// stops as many reads (竹東's: 13 of the 17 buses within 4 km were
+// stops as many reads (one town's: 13 of the 17 buses within 4 km were
 // 公路客運's, 2026-11-06). The stops (routes) this colo was asked within
 // SPREAD_MS are kept at the edge, one small list each (`kind`), split into
 // groups by a hash of each id (2, 4, 8… as the list grows, about `per`
@@ -1354,7 +1354,7 @@ export function nameMatch(name, text) {
   return 0.4 * ((c + b) / 2);
 }
 // The places found, best first (Jay 2026-11-14: 立法院 listed four
-// legislators' offices near 竹北 before the Legislative Yuan; "sorting by
+// legislators' offices nearby before the Legislative Yuan; "sorting by
 // distance alone is not the best approach"): each scored by how well its
 // name answers the words (`nameMatch`), Google's own order (its sense of
 // what's known: Autocomplete's five, Text Search's twenty), less the
@@ -1822,7 +1822,7 @@ async function routes(env, q, { fetchFn, ctx, now, cache, by: who }) {
   } else if (env.TDX_CLIENT_ID) {
     // Twice: walking to and from the stops, and by 共享單車 (YouBike) for the
     // first and last mile (TDX's mode 3), which reaches the express buses and
-    // stations a walk doesn't (the owner: bike to 快捷8號, bike from 竹東).
+    // stations a walk doesn't (a bike to an express bus, a bike from a station).
     const ask = (key, mile, minutes) => {
       const params = new URLSearchParams({ origin: `${from.lat},${from.lon}`, destination: `${to.lat},${to.lon}`, gc: '1.0', top: '5', transit: tdxTransit(modes), transfer_time: '0,60', first_mile_mode: mile, first_mile_time: minutes, last_mile_mode: mile, last_mile_time: minutes });
       params.set(by === 'arrive' ? 'arrival' : 'depart', twIso(at + (by === 'arrive' ? 0 : MIN)));
@@ -2007,7 +2007,7 @@ async function book(env, q, { fetchFn, now }) {
 // ---- Walks ----------------------------------------------------------------------------
 //
 // Walking from a spot to up to five others, by Google (it knows the lanes
-// and short cuts OpenStreetMap's router doesn't: 210 m from 綠41公園 to 成功國中's
+// and short cuts OpenStreetMap's router doesn't: 210 m from a side street to a school's
 // YouBike, not 485 round the block): its route matrix, an element each, or
 // with `line=1` one walk with its line (Compute Routes). Each walk kept a
 // month (streets don't move), so a walk asked once is never paid for again.
@@ -2060,9 +2060,9 @@ async function walks(env, q, { fetchFn, ctx, now, cache, by }) {
           src = r.ok ? 'google' : `http ${r.status}`;
           // The matrix refused (403 since 2026-11-07 while Compute Routes still
           // answered): each walk by Compute Routes, from that share, never
-          // OpenStreetMap's round the block (成功國中 → 綠41公園: Google's 267 m by
+          // OpenStreetMap's round the block (a school's dock → a side street: Google's 267 m by
           // the lane, OpenStreetMap's 460 round the school; the phone left the
-          // YouBike at 新竹縣體育場 for it, Jay 2026-11-07).
+          // YouBike at a farther dock for it, Jay 2026-11-07).
           // (Not once Google's day is used up: Compute Routes is the trips' too.)
           if (!r.ok && (r.status === 403 || r.status === 401) && !googleOut(now) && (await spend(env, 'routes', todo.length, now, ctx, { by }))) {
             const got = await Promise.all(

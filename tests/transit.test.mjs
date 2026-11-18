@@ -584,7 +584,7 @@ test('place search: the near branches of a chain first, nearest first; the same 
   assert.deepEqual(nearFirst([], [{ id: 'k', name: '新竹高中214班', dist: 1390 }, { id: 's', name: '新竹高中', dist: 1430 }, { id: 'g', name: '新竹高中劍道館', dist: 1500 }], '新竹高中').map(i => i.id), ['s', 'k', 'g']);
 });
 
-test('place search, 立法院 from 竹北 (Jay 2026-11-14): the Legislative Yuan, 56 km off, before the legislators\' offices and the council next door', () => {
+test('place search, 立法院 from another county (Jay 2026-11-14): the Legislative Yuan, 56 km off, before the legislators\' offices and the council next door', () => {
   const gov = ['government_office', 'point_of_interest'];
   const office = ['association_or_organization', 'point_of_interest'];
   // Autocomplete: the 立法院's buildings, by Google's sense of what's known.
@@ -641,7 +641,7 @@ test('place search: LaLaport is LaLaport, not its cinema, its car parks or a sho
   assert.deepEqual(nearFirst([list[6], list[5]], list.slice(0, 5), 'LaLaport').map(i => i.id), ['m']);
 });
 
-test("place search, a chain typed with a typo from 綠41公園 (八分雲集): every 八方雲集 near you, nearest first, none from another city while one's near; an address still there", async () => {
+test("place search, a chain typed with a typo (八分雲集): every 八方雲集 near you, nearest first, none from another city while one's near; an address still there", async () => {
   fresh();
   const env = { GOOGLE_MAPS_KEY: 'k', RATE_LIMIT_KV: memKv() };
   const cache = memCache();
@@ -689,7 +689,7 @@ test("walks by Google's streets: five in one matrix call, each kept a month; wit
     if (String(url).includes('computeRouteMatrix')) {
       matrix++;
       assert.match(opts.headers['X-Goog-FieldMask'], /distanceMeters/);
-      // (綠41公園 to 成功國中's station by its lane, 210 m; one with no way on foot.)
+      // (a side street to a school's dock by its lane, 210 m; one with no way on foot.)
       return json(body.destinations.map((d, i) => (d.waypoint.location.latLng.latitude === 24.9 ? { originIndex: 0, destinationIndex: i, condition: 'ROUTE_NOT_FOUND' } : { originIndex: 0, destinationIndex: i, condition: 'ROUTE_EXISTS', distanceMeters: 210 + i, duration: `${150 + i}s` })));
     }
     if (String(url).includes('computeRoutes')) {
@@ -727,7 +727,7 @@ test("walks by Google's streets: five in one matrix call, each kept a month; wit
 });
 
 // Jay 2026-11-07: Google's matrix answered 403 while Compute Routes answered;
-// every station's walk fell to OpenStreetMap's (成功國中 → 綠41公園 460 m round
+// every station's walk fell to OpenStreetMap's (a school's dock → a side street, 460 m round
 // the school, Google's 267 by the lane) and the bike went back at the wrong station.
 test("the matrix refused: each walk by Compute Routes instead, counted on its share, never left to the app's router", async () => {
   fresh();

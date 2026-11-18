@@ -307,12 +307,12 @@ test('the wallet’s own parts locked too: every setting’s value and an app’
   const now = PARTS_FROM + 60_000;
   t.deps.now = () => now;
   const a = await newPass(t, 'orbit');
-  const places = { places: [[24.8177, 121.0159, 'home']] };
+  const places = { places: [[25.0478, 121.517, 'home']] };
   assert.equal((await t.call('PATCH', `${t.qt(a.token)}&app=orbit`, { payload: '{"days":[1]}', wallet: { settings: { 'fb:transit': { value: places, t: now - 5 } }, snap: { orbit: { lessons: 12, t: now - 5 } } } })).status, 200);
   assert.deepEqual(wallet(t).settings['fb:transit'].value, places, 'sent open by an older kit');
   await sealSweep(t.env, t.deps);
   const w = wallet(t);
-  assert.ok(!JSON.stringify(w.settings).includes('24.8177'), 'no place left open');
+  assert.ok(!JSON.stringify(w.settings).includes('25.0478'), 'no place left open');
   assert.match(w.settings['fb:transit'].e, /^e1:/);
   assert.equal(w.settings['fb:transit'].t, now - 5, 'its time kept, for merging');
   assert.equal(w.snap.orbit.lessons, undefined);

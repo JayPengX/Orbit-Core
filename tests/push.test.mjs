@@ -150,7 +150,7 @@ test('Orbit Transit’s bus alert: checked each run until the bus is that close,
   const post = (p, body) => handlePush(new Request(`https://w/${p}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, session, p);
   const subKeys = { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
   assert.equal((await post('/push/subscribe', { sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/t', keys: subKeys } })).status, 200, 'Transit may push');
-  await post('/push/schedule', { items: [{ at: now, until: now + 7_200_000, title: '5608 快到了', body: '{result}（竹東高中）', check: { bus } }] });
+  await post('/push/schedule', { items: [{ at: now, until: now + 7_200_000, title: '5608 快到了', body: '{result}（台北車站）', check: { bus } }] });
 
   let sec = 600;
   const sent = [];
