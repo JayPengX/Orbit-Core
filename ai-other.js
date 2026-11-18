@@ -7,6 +7,7 @@
 // through the Taiwan relay (gemini-relay.js) when bound.
 
 import { providerCapped } from './gemini-use.js';
+import { liveModel } from './ai-models.js';
 
 export const ANTHROPIC = 'https://api.anthropic.com/v1/messages';
 export const OPENAI = 'https://api.openai.com/v1/chat/completions';
@@ -93,6 +94,8 @@ const viaRelay = (env, url, init) => (env.GEMINI_RELAY ? env.GEMINI_RELAY.fetch(
 
 // One call: a Response of Gemini's shape (or the maker's own error, its status kept).
 export async function otherAnswer(model, parts, schema, env, { timeoutMs = 60_000, effort = null } = {}) {
+  // (A model its maker has retired: the successor the cron found, ai-models.js.)
+  model = await liveModel(env, model);
   const req = requestOf(model, parts, schema, env, effort);
   if (!req) return new Response(JSON.stringify({ error: { message: 'unknown model' } }), { status: 400 });
   const key = makerOf(model) === 'anthropic' ? env.ANTHROPIC_API_KEY : env.OPENAI_API_KEY;
@@ -111,6 +114,7 @@ export async function otherAnswer(model, parts, schema, env, { timeoutMs = 60_00
 export async function streamOther(model, parts, schema, env, { onText = null, timeoutMs = 60_000, firstMs = 0, effort = null } = {}) {
   if (await providerCapped(env, makerOf(model))) return new Response(JSON.stringify({ error: { message: 'day cap' } }), { status: 429 });
   if (makerOf(model) !== 'anthropic') return otherAnswer(model, parts, schema, env, { timeoutMs, effort });
+  model = await liveModel(env, model);
   const req = requestOf(model, parts, schema, env, effort);
   if (!env.ANTHROPIC_API_KEY) return new Response(JSON.stringify({ error: { message: 'no key' } }), { status: 503 });
   const stop = new AbortController();

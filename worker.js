@@ -63,6 +63,7 @@ import { backupStore } from './store-backup.js';
 import { paceOf } from './pace.js';
 import { beat, tellOwner, systemReport, countFolders, FOLDERS_KEY, startFreeWatch, moveAlertAccount } from './ops.js';
 import { keepWorkflows } from './github-keep.js';
+import { liveGeminiUrl, checkModels } from './ai-models.js';
 import { mailAlerts, gather as alertsNow } from './mail-alerts.js';
 import { mailSettings, sendMail } from './mail.js';
 import { sweepKept, keptText } from './kept-store.js';
@@ -77,7 +78,7 @@ import { runBuilders, SLOTS as BUILD_SLOTS } from './builders/run.js';
 import { docStore, storeReady } from './doc-store.js';
 import { handleMoneyRead } from './money-read.js';
 import { logCall, callsSince, reliability, spendOf, lastFailed, providerCapped, providerToday } from './gemini-use.js';
-import { handleAi, handleAiBuild, aiTry, MODELS } from './ai.js';
+import { handleAi, handleAiBuild, aiTry, MODELS, PRICES } from './ai.js';
 import { storyTr, batchTr } from './builders/news-tr.js';
 import { handleTr } from './translate.js';
 import { r2Store } from './builders/store.js';
@@ -420,8 +421,12 @@ const GEMINI_ALLOWED_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.7-flash', 'gem
 // Gemini from Taiwan: through the relay (gemini-relay.js, pinned there) when
 // bound; this Worker runs near each caller, which Gemini may refuse (Hong Kong).
 // (Past Google's day cap, gemini-use.js providerCapped: refused here, a 429 like Google's own.)
-const geminiFetch = async (env, url, init) =>
-  (await providerCapped(env, 'google')) ? new Response(JSON.stringify({ error: { message: 'day cap' } }), { status: 429, headers: { 'Content-Type': 'application/json' } }) : env.GEMINI_RELAY ? env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(url)}`, init) : fetch(url, init);
+// (A model Google has retired: the successor the cron found, ai-models.js.)
+const geminiFetch = async (env, url, init) => {
+  if (await providerCapped(env, 'google')) return new Response(JSON.stringify({ error: { message: 'day cap' } }), { status: 429, headers: { 'Content-Type': 'application/json' } });
+  url = await liveGeminiUrl(env, url);
+  return env.GEMINI_RELAY ? env.GEMINI_RELAY.fetch(`https://gemini-relay/?to=${encodeURIComponent(url)}`, init) : fetch(url, init);
+};
 function geminiUrl(model, env) {
   return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${env.GEMINI_API_KEY}`;
 }
@@ -2047,6 +2052,8 @@ async function cronTick(event, env, ctx, part) {
     if (min === 18 && tick.getUTCHours() % 3 === 0) run('free-watch', () => startFreeWatch(env));
     // The family's GitHub schedules kept on with nobody committing (github-keep.js): one repo an hour, in turn.
     if (min === 12) run('github-keep', () => keepWorkflows(env, tick.getTime()), r => (r.revived || r.failed ? r : null));
+    // Each maker's models, once a day (03:36 Taiwan): one of ours retired is answered by its own line's newest (ai-models.js).
+    if (min === 36 && tick.getUTCHours() === 19) run('ai-models', () => checkModels(env, [...Object.values(MODELS), ...Object.keys(PRICES)]), r => (r.changed || r.gone.length ? r : null));
     // Class's 專注飛行: flight.yml started when R2's pool is 10 minutes old (flight.js keepPool; GitHub's own timer ran every 4–9 hours).
     if (min % 10 === 6) run('flight-keep', () => keepPool(env, tick.getTime()), r => (r.failed ? r : null));
     // Every account's app data sealed (eco.js sealSweep), a few accounts a run, till none is left open.

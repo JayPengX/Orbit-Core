@@ -182,7 +182,7 @@ w;dur=`, noted by the 除錯紀錄 when slow, and `LOCKED` (never runs as a page
 | `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `f1-people.js`, `fund-nav.js`, `taifex.js` | The data proxy (§4.1): sports, quotes, F1, Asian baseball, SITCA's fund NAVs, TAIFEX |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
-| `/ai` | `ai.js`, `ai-features.js`, `law-ai.js`, `ai-util.js`, `ai-fixtures.js` | Every app's AI by name: fixed prompt, models in turn, lean input (`maxIn`), caps, asks back (`clarify`, `pick`); builders' `aiOnce`; ops `ai-try` (`site/ai-try/`) |
+| `/ai` | `ai.js`, `ai-features.js`, `law-ai.js`, `ai-util.js`, `ai-fixtures.js` | Every app's AI by name: fixed prompt, models in turn, lean input (`maxIn`), caps, asks back (`clarify`, `pick`); builders' `aiOnce`; ops `ai-try` (`site/ai-try/`). A retired model: its line's newest that answers (`ai-models.js`, daily) |
 | `/ai/build` | `ai.js` | A build's `build:` features (Law's key: 法案週報) |
 | `/law-ask` | `law.js`, `law-ruling.js`, `law-town.js`, `law-ground.js` | Law's questions on 1–8 articles, each point cited, checked, kept in KV (or Law's `data/ai/`); modes `bill`, `diff`, `ruling`, `town`, `paper`; 40 Gemini calls a day a Pass, 300 in all with `/law-chat`'s (D1 `law_day`) |
 | `/law-chat` | `law-chat.js`, `ai-other.js` | 問法律: a plan (Flash-Lite), up to 14 articles (and delegated ones) from Law's index, answered from those by Sonnet (failing: Sol), cites checked; grounded by `law-ground.js`, `law-more.js`, `law-local.js` (councils); 16 turns back; 30 a day a Pass |
@@ -429,9 +429,8 @@ Web Push, some checked first (`runCheck`). Each device once (its Orbit, else the
   - every app repo's deploy workflow: its site, to Cloudflare.
 - Every 3 hours: `free-watch.yml` (`tools/free-watch.mjs`, started by the cron's `startFreeWatch`): pages, routes, crons, free amounts; a failure mails Jay.
 - GitHub turns a public repo's scheduled workflows off after 60 days with no
-  commit: `github-keep.js` (the cron, :12 each hour, one repo in turn) turns
-  them on again and refreshes them weekly with `GH_ACTIONS_TOKEN`, keeps the
-  token's end date, and `mail-alerts.js` mails Jay 21 days before it ends.
+  commit: `github-keep.js` (hourly, a repo in turn) turns them on again
+  with `GH_ACTIONS_TOKEN`; Jay is mailed 21 days before it ends.
 - By hand: `build.yml` (a builder, a check), `tail.yml` (logs),
   `audit.yml` (secrets, store counts), `zone-speed.yml` (speed), `credit.yml` (`tools/credit/`), `agent.yml` (a task).
 - Never a cancelling `concurrency:` (a cancel mails Jay): copy the `queue`
