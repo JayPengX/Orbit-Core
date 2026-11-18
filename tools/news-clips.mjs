@@ -15,6 +15,7 @@
 //
 //   node tools/news-clips.mjs [--dry]   (--dry: read and counted, nothing written)
 import { clipsToRead, readPage, shortOf, NEWS_CLIPS, KEEP_MS } from '../builders/news.js';
+import { TPEX_FILINGS, TPEX_COPY } from '../builders/filings.js';
 
 const API = (process.env.ORBIT_API || 'https://orbit-workers-proxy.pengzjay.workers.dev').replace(/\/$/, '');
 const SECRET = process.env.DATA_PUSH_SECRET || '';
@@ -82,7 +83,13 @@ function frame(path, text) {
   head.writeUInt32BE(b.length, 4 + p.length);
   return Buffer.concat([head, b]);
 }
-const body = frame(NEWS_CLIPS, JSON.stringify({ at: now, pages, shorts }));
+// (And Orbit Securities' 重大訊息 from TPEx, which answers GitHub but not Cloudflare since about
+// 2026-11-14: its list pushed as it is, builders/filings.js TPEX_COPY. Not read: left out, the run goes on.)
+const tpex = await fetch(TPEX_FILINGS, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(20_000) })
+  .then(r => (r.ok ? r.json() : null))
+  .catch(() => null);
+console.log(`tpex filings: ${Array.isArray(tpex) ? `${tpex.length} rows` : 'not read'}`);
+const body = Buffer.concat([frame(NEWS_CLIPS, JSON.stringify({ at: now, pages, shorts })), ...(Array.isArray(tpex) && tpex.length ? [frame(TPEX_COPY, JSON.stringify({ at: Date.now(), rows: tpex }))] : [])]);
 for (let tries = 0; ; tries++) {
   const r = await fetch(`${API}/data/push`, { method: 'POST', headers: { Authorization: `Bearer ${SECRET}`, 'Content-Type': 'application/octet-stream' }, body }).catch(e => ({ ok: false, status: String(e) }));
   if (r.ok) {

@@ -1,6 +1,8 @@
 # Orbit News: the videos in Taiwan's articles, read here (most of Taiwan's
 # outlets refuse Cloudflare's reads of an article) and written to R2
-# news/clips.json (tools/news-clips.mjs). Started by the news build
+# news/clips.json (tools/news-clips.mjs); and Orbit Securities' TPEx 重大訊息
+# list, which TPEx sends GitHub but not Cloudflare (builders/filings.js
+# TPEX_COPY). Started by the news build
 # (builders/news.js newsClips) when the last finds are 15 minutes old;
 # GitHub's own timer is a backup only (it runs late or not at all). Runs
 # may overlap: each writes a whole file, so no concurrency group (a cancel

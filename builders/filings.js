@@ -92,13 +92,23 @@ export function filingOf(r) {
 // and each of the 48 runs a day waited it out, ~55 s of the Runner's time
 // (Durable Objects are billed by the time they're awake) for nothing.
 export const LIST_MS = 15_000;
+// TPEx's list as GitHub read it (tools/news-clips.mjs, run every half hour or
+// so): TPEx answers GitHub's machines, not Cloudflare's, so from about
+// 2026-11-14 上櫃 companies' filings were missing. Taken while under 2 hours
+// old; TPEx itself is asked only when there's none that new.
+export const TPEX_COPY = 'stock/filings/tpex-list.json';
+export const TPEX_COPY_MS = 2 * 3_600_000;
 export async function runFilings({ store, now = Date.now(), get = (u, init) => fetch(u, init), listMs = LIST_MS }) {
   const why = [];
+  const copy = await store.json(TPEX_COPY).catch(() => null);
+  const copied = copy && now - copy.at < TPEX_COPY_MS && Array.isArray(copy.rows) ? copy.rows : null;
   const lists = await Promise.all(
     [TWSE_FILINGS, TPEX_FILINGS].map((u, i) =>
-      get(u, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(listMs) })
-        .then(r => (r.ok ? r.json() : ((why[i] = `${r.status}`), null)))
-        .catch(e => ((why[i] = String(e?.message || e).slice(0, 60)), null))
+      i === 1 && copied
+        ? copied
+        : get(u, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(listMs) })
+            .then(r => (r.ok ? r.json() : ((why[i] = `${r.status}`), null)))
+            .catch(e => ((why[i] = String(e?.message || e).slice(0, 60)), null))
     )
   );
   // (Why each list wasn't read, in the run's note: the admin panel's 系統, free-watch.)
@@ -124,5 +134,5 @@ export async function runFilings({ store, now = Date.now(), get = (u, init) => f
   const cut = new Date(now - WEEK - 86_400_000).toISOString().slice(0, 10);
   for (const [id, day] of Object.entries(seen.ids)) if (day < cut) delete seen.ids[id];
   if (fresh.length) await store.put(SEEN, { ids: seen.ids });
-  return { listed: all.length, fresh: fresh.length, buckets: by.size };
+  return { listed: all.length, fresh: fresh.length, buckets: by.size, ...(copied ? { tpex: 'copy' } : {}), ...(why[1] ? { tpexFailed: why[1] } : {}) };
 }

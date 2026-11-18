@@ -361,7 +361,7 @@ writing a file only when it changed (`builders/store.js`):
 | `kept.js` | wipes kept copies (`mirror/`) before a league's first askable day | daily 17:00 |
 | `news.js`, `news-words.js`, `news-laws.js` | `news/index.json` (3 days), `past.json` (weeks): stories by weight, topic, side, 快訊 (`live`: many outlets in 2 h, ranked up); `laws.json`: laws named | every 10 min |
 | `tools/flight-pool.mjs` (`flight.yml`, started by the cron: `flight.js keepPool`) | `flight/` | 10 min |
-| `tools/news-clips.mjs` (`news-clips.yml`) | `news/clips.json`: the clips in Taiwan's articles (those outlets refuse Cloudflare), taken into the stories by `news.js` | started by `newsClips` (15 min) |
+| `tools/news-clips.mjs` (`news-clips.yml`) | `news/clips.json`: the clips in Taiwan's articles (those outlets refuse Cloudflare) for `news.js`; TPEx's 重大訊息 list too (`TPEX_COPY`) | started by `newsClips` (15 min) |
 | `filings.js`; `ai.js` | 重大訊息 as rows: `stock/filings/`; Mondays the admin's 除錯紀錄週報 (`rec-weekly`, the only AI made ahead). Words' cards (`words/cards/`) were made once and are kept as they are | :04 :34 |
 
 A season is kept until the next one's first game.

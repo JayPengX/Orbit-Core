@@ -2,7 +2,7 @@
 // rows by code, and a bucket written only when a new one lands in it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rocAt, rowsOf, filingOf, runFilings, bucketOf } from '../builders/filings.js';
+import { rocAt, rowsOf, filingOf, runFilings, bucketOf, TPEX_COPY } from '../builders/filings.js';
 import { FEATURES, filingNumbers } from '../ai-features.js';
 
 const twse = {
@@ -82,6 +82,28 @@ test("a list that never answers: given up at its time, the other list's filings 
   assert.ok(Date.now() - t < 2000, `waited ${Date.now() - t} ms`);
   assert.equal(r.fresh, 1);
   assert.ok(files.get(bucketOf('5306')));
+});
+
+// TPEx answers GitHub's machines but not Cloudflare's (from about 2026-11-14 上櫃 filings were missing):
+// GitHub's copy of its list (tools/news-clips.mjs) is read while under 2 hours old, TPEx itself never asked then.
+test("TPEx's list from GitHub's copy while it's new; past 2 hours TPEx is asked itself", async () => {
+  const now = Date.parse('2026-11-11T00:00:00Z');
+  const files = new Map([[TPEX_COPY, { at: now - 30 * 60_000, rows: [tpex] }]]);
+  const store = { json: async p => (files.has(p) ? structuredClone(files.get(p)) : null), put: async (p, d) => files.set(p, d) };
+  const asked = [];
+  const get = async u => (asked.push(/twse/.test(u) ? 'twse' : 'tpex'), /twse/.test(u) ? { ok: true, json: async () => [twse] } : { ok: false, status: 522 });
+  const r = await runFilings({ store, get, now });
+  assert.deepEqual(asked, ['twse']);
+  assert.equal(r.fresh, 2);
+  assert.equal(r.tpex, 'copy');
+  assert.ok(files.get(bucketOf('6790')).codes['6790']);
+  // An old copy: TPEx asked (and its failure said).
+  files.clear();
+  files.set(TPEX_COPY, { at: now - 3 * 3_600_000, rows: [tpex] });
+  asked.length = 0;
+  const r2 = await runFilings({ store, get, now });
+  assert.deepEqual(asked.sort(), ['tpex', 'twse']);
+  assert.equal(r2.tpexFailed, '522');
 });
 
 test("sec-filing: the line's figures the filing's (rounded, in 萬/億, dates without zeros), the rows picked by number", () => {
