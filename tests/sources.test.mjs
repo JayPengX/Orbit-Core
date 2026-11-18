@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { fakeD1 } from './fake-d1.mjs';
-import { noteSource, flushSources, readSources, pruneSources, takeBeacon, asSourceCall, _pending, _reset } from '../sources.js';
+import { noteSource, flushSources, readSources, pruneSources, takeBeacon, asSourceCall, _pending, _reset, READ } from '../sources.js';
 import { sourceOf, stateOf, lateOf, SOURCES, GROUPS } from '../kit/sources.mjs';
 
 const HOUR = 3_600_000;
@@ -33,6 +33,17 @@ test('every source: a unique id, a known group, somewhere it is read', () => {
     assert.ok(s.where.length, s.id);
     assert.ok(s.hosts.length || s.match || s.fresh, `${s.id}: counted or aged somehow`);
   }
+});
+
+// D1 bills the rows a query looks at: the alert mails' check every 30 minutes
+// asks the last day, and scanned all 8 days' rows (172,579 rows read on 2026-11-17).
+test('reading the last day looks only at its hours (by an index), not the whole table', async () => {
+  _reset();
+  const env = { STORE: fakeD1() };
+  await readSources(env, 1_800_000_000_000, 1);
+  const plan = (await env.STORE.prepare(`EXPLAIN QUERY PLAN ${READ}`).bind(0).all()).results.map(r => r.detail).join(' | ');
+  assert.match(plan, /USING (COVERING )?INDEX sources_hour/, plan);
+  assert.doesNotMatch(plan, /^SCAN sources$/, plan);
 });
 
 test('counted, kept in D1 once due (sooner while failing), read back by source', async () => {

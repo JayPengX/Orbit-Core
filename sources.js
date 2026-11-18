@@ -127,10 +127,15 @@ const TABLE = 'CREATE TABLE IF NOT EXISTS sources (src TEXT NOT NULL, hour INTEG
 const ADD = `INSERT INTO sources (src, hour, side, ok, fail, ms, last_ok, last_fail, err)
   SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]'), json_extract(value, '$[2]'), json_extract(value, '$[3]'), json_extract(value, '$[4]'), json_extract(value, '$[5]'), json_extract(value, '$[6]'), json_extract(value, '$[7]'), json_extract(value, '$[8]') FROM json_each(?1) WHERE true
   ON CONFLICT (src, hour, side) DO UPDATE SET ok = ok + excluded.ok, fail = fail + excluded.fail, ms = ms + excluded.ms, last_ok = MAX(last_ok, excluded.last_ok), last_fail = MAX(last_fail, excluded.last_fail), err = CASE WHEN excluded.last_fail > last_fail THEN excluded.err ELSE err END`;
+// Read by the hour: the alert mails' check (every 30 minutes, the last day)
+// scanned the whole table without it (its key starts with the source), 8 days
+// of rows each time: 172,579 of D1's 1.1 million rows read on 2026-11-17.
+const BY_HOUR = 'CREATE INDEX IF NOT EXISTS sources_hour ON sources (hour)';
 const ready = new WeakSet();
 async function table(db) {
   if (ready.has(db)) return;
   await db.prepare(TABLE).run();
+  await db.prepare(BY_HOUR).run();
   ready.add(db);
 }
 
@@ -172,12 +177,13 @@ export async function pruneSources(env, now = Date.now()) {
 // hours: [[hour, ok, fail]] (the last 24 h), week: { ok, fail }, sides: { side: { ok, fail, lastOk, lastFail } } } }):
 // ok/fail/ms are the last 24 hours'; lastOk/lastFail/err the week's.
 // (`days`: how far back; the alert mails read one day, mail-alerts.js.)
+export const READ = 'SELECT src, hour, side, ok, fail, ms, last_ok, last_fail, err FROM sources WHERE hour >= ?1';
 export async function readSources(env, now = Date.now(), days = 7) {
   if (!env?.STORE) return {};
   await table(env.STORE);
   const since = Math.floor((now - days * DAY) / HOUR);
   const dayAgo = Math.floor((now - DAY) / HOUR);
-  const { results } = await env.STORE.prepare('SELECT src, hour, side, ok, fail, ms, last_ok, last_fail, err FROM sources WHERE hour >= ?1').bind(since).all();
+  const { results } = await env.STORE.prepare(READ).bind(since).all();
   const out = {};
   for (const r of results || []) {
     const s = (out[r.src] ||= { ok: 0, fail: 0, ms: 0, lastOk: 0, lastFail: 0, err: '', hours: {}, week: { ok: 0, fail: 0 }, sides: {} });
