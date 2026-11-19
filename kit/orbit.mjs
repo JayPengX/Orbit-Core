@@ -2692,7 +2692,7 @@ function makeSession(app, { lang, heartbeat }) {
     // show, the recovery email's).
     setTimeout(() => usageNotice(s), 4_000);
     // The first open of an app with a guide on this account: the one quiet offer (coach.mjs).
-    if (!first?.offline) setTimeout(() => import('./coach.mjs').then(m => m.guideOffer(s, quietTip)).catch(() => {}), 8_000);
+    if (!first?.offline) setTimeout(() => import('./coach.mjs').then(m => m.guideOffer(s, quietTip)).catch(() => {}), 9_500);
     if (!first?.offline) setTimeout(() => passkeyOffer(s).then(shown => shown || mailOffer(s)).catch(() => {}), 12_000);
     // (The data locked and this device without its key yet: taken quietly, nothing asked.)
     s.on?.('locked', () => keyWait(s));
@@ -4291,7 +4291,8 @@ export const TIP_FOR = 5_000;
 export const QUIET_TIP_FOR = TIP_FOR;
 export function quietTip({ accent = '', mark = null, label = '', title, line, go, never = '', onGo = () => {}, onNever = () => {}, cls = '' }) {
   // (Never in a showcase demo, window.__DEMO: nobody's account is there to ask.)
-  if (typeof document === 'undefined' || !document.body || bannerEl?.isConnected || globalThis.__DEMO) return null;
+  // (Nor over a guide that's running, coach.mjs: it holds the screen till it ends.)
+  if (typeof document === 'undefined' || !document.body || bannerEl?.isConnected || globalThis.__DEMO || document.querySelector('.q-coach')) return null;
   const acts = [node('button', { class: 'q-banner-go', type: 'button', text: go }), never ? node('button', { class: 'q-orbit-tip-never', type: 'button', text: never }) : null];
   const el = node('div', { class: `q-banner q-banner-ask q-orbit-tip ${cls}`.trim(), role: 'dialog', 'aria-label': label || title, style: accent ? `--q-accent:${accent}` : '' }, [
     mark,

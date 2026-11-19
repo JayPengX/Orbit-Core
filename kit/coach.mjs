@@ -212,22 +212,25 @@ const keep = (s, app, value) => s?.write?.({ wallet: { settings: { [GUIDE_KEY(ap
 
 // The one offer, the first time an account opens an app that has a guide: a
 // quiet banner (orbit.mjs quietTip), never a dialog, never started by itself.
-// 不用了 or the guide itself keeps the answer on the account.
-export function guideOffer(s, quietTip) {
+// 不用了 or the guide itself keeps the answer on the account. Another banner
+// or a sheet up (a new account's first open has the usage note): it waits its
+// turn, a few times, never over it.
+export function guideOffer(s, quietTip, tries = 5) {
   const app = s?.app;
   if (!GUIDES[app] || typeof document === 'undefined' || globalThis.navigator?.webdriver || globalThis.__DEMO) return false;
   if (!s.wallet || s.wallet.settings?.[GUIDE_KEY(app)]?.value != null) return false;
-  if (document.querySelector('dialog[open]') || document.visibilityState === 'hidden') return false;
+  const later = () => (tries > 1 && setTimeout(() => guideOffer(s, quietTip, tries - 1), 6_000), false);
+  if (document.querySelector('dialog[open], .q-banner') || document.visibilityState === 'hidden' || running) return later();
   const en = s.lang === 'en';
   const shown = quietTip({
     mark: h('span', { class: 'q-tip-mark', 'aria-hidden': 'true', html: icons.compass || '' }),
     label: en ? 'Guide' : '導覽',
     title: en ? 'New here? Let me show you around' : '第一次用？帶你走一遍',
-    line: en ? 'Thirty seconds, on your own screen. Nothing is changed.' : '30 秒，就在你的畫面上走，不會改到任何東西。',
+    line: en ? 'Thirty seconds on your own screen; nothing changes.' : '30 秒，不會改到任何東西。',
     go: en ? 'Show me' : '好',
     never: en ? 'No thanks' : '不用了',
     onGo: () => startGuide(s, app),
     onNever: () => keep(s, app, 'no')
   });
-  return Boolean(shown);
+  return shown ? true : later();
 }
