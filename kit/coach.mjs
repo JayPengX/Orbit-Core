@@ -1,10 +1,13 @@
 // The guide: the showcase's coach mark on the real app (Jay 2026-11-19,
 // "introduce this"). A ring round the next thing to tap and one short line;
-// the tap itself moves it on. While it runs only that target answers a tap
-// (scrolling stays free); 略過 ends it. It never saves, buys or deletes
+// the tap itself moves it on. While it runs only that target answers a tap,
+// a press or a swipe, and nothing does on a line or a `show` (Jay 11-19: none
+// stuck, none twice, no way out by mistake); scrolling stays free; 略過 or
+// Escape ends it. It never saves, buys or deletes
 // anything: a step that would is a `show` (the ring and 下一步, no tap).
-// A step whose target isn't on screen within a few seconds is skipped, never
-// stuck. Started from the Pass sheet's 說明 (帶我走一遍), or once from a quiet
+// A step whose target isn't on screen within a few seconds is skipped; one
+// whose target goes away (redrawn: found again; its sheet closed: moved on;
+// else 下一步 shows) is never stuck. Started from the Pass sheet's 說明 (帶我走一遍), or once from a quiet
 // offer the first time an account opens the app (guideOffer, orbit.mjs boot);
 // 'done' or 'no' is kept on the account (settings guide_<app>), so a new phone
 // doesn't offer it again.
@@ -16,7 +19,7 @@ import { h, toast, icons } from './ui.mjs';
 
 export const GUIDES = {
   match: [
-    { say: ['今天在台灣看得到的比賽，放在一起；每一種中斷都有倒數。', 'Today’s games you can watch in Taiwan, together; a countdown for every break.'] },
+    { say: ['今天在台灣看得到的比賽，放在一起；中場、暫停也有倒數。', 'Today’s games you can watch in Taiwan, together, with a countdown through every break.'] },
     { tap: '.sport-grid > :nth-child(1)', optional: true, say: ['先選你最常看的運動', 'First the sport you watch most'] },
     { tap: '.sp-done', optional: true, wait: 4000, say: ['選好了，看今天的比賽', 'Done: today’s games'] },
     { tap: 'button.event-row:not(.wide)', wait: 2000, say: ['點一場比賽', 'Tap a game'] },
@@ -31,7 +34,7 @@ export const GUIDES = {
     { tap: '#tab-times', wait: 1500, say: ['查時刻', 'Timetables'] },
     { tap: '[data-view="bus"]', wait: 3000, say: ['附近每一站的公車', 'Buses at every stop nearby'] },
     { tap: '.ot-bus-no', wait: 3000, say: ['點一路公車', 'Tap a bus'] },
-    { tap: 'dialog[open] .q-close', say: ['每站幾分鐘到，都在這裡', 'Minutes to every stop, right here'] }
+    { tap: 'dialog[open] .q-close', say: ['每站還要幾分鐘到，都在這裡；看完關掉', 'Minutes to every stop, right here; close it when done'] }
   ],
   weather: [
     { say: ['一個預報，合併氣象署、Google 和環境部的資料，準到你的鄉鎮。', 'One forecast, blended from the weather bureau’s, Google’s and the environment ministry’s data, down to your township.'] },
@@ -43,7 +46,7 @@ export const GUIDES = {
     { tap: '#tab-places', say: ['存好家和學校，預報跟著你一天走', 'Save home and school; the forecast follows your day'] }
   ],
   orbit: [
-    { say: ['最上面是現在這節課，倒數到下課。', 'The class on now, counting down to the bell.'] },
+    { say: ['課表、待辦和考試倒數放在一起；上課時，最上面倒數到下課。', 'Your timetable, to-dos and exam countdowns together; in class, the top counts down to the bell.'] },
     { tap: '.q-tab[data-tab="week"]', wait: 1200, say: ['整週課表', 'The whole week'] },
     { tap: '.q-tab[data-tab="tools"]', wait: 1200, say: ['改課表、考試倒數', 'Edit it, count down to exams'] },
     { show: '.cx-fly-card', say: ['專注讀書：跟著天上一架真的飛機，降落就是時間到', 'Study along with a real plane in the sky; it lands when time’s up'] }
@@ -101,6 +104,12 @@ export const GUIDE_KEY = app => `guide_${app}`;
 
 const FIND_MS = 4000; // how long a step's target may take to appear
 const STEP_MS = 700; // after a tap, the app's own answer first
+const QUIET_MS = 1500; // the person's hands this long still: a target scrolled away is brought back
+const LOST_MS = 1500; // a step's target gone this long: its sheet closed (moved on) or 下一步 shown
+// What a tap, a press or a swipe is made of: all held back off the step's target. (The moves
+// too: an app's drag code that heard them without their start could take the next real tap
+// for a drag's end and drop its click.)
+const HANDS = ['pointerdown', 'pointermove', 'pointerup', 'mousedown', 'mousemove', 'mouseup', 'touchstart', 'touchmove', 'touchend', 'click', 'dblclick', 'contextmenu'];
 const T = (lang, [zh, en]) => (lang === 'en' ? en : zh);
 
 let running = null;
@@ -110,6 +119,12 @@ const visible = el => {
   if (!el?.isConnected) return false;
   const r = el.getBoundingClientRect();
   return r.width > 0 && r.height > 0 && !el.closest('[hidden], [inert]');
+};
+// Something of the app's own over the target's middle (its floating tab bar): a tap there misses it.
+const covered = (el, r) => {
+  const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  // (nothing there: its middle is just past the screen's edge, half of it showing)
+  return !top || (!top.closest('.q-coach, .q-coach-ring') && top !== el && !el.contains(top) && !top.contains(el));
 };
 const find = sel => [...document.querySelectorAll(sel)].find(visible) || null;
 const waitFor = (sel, ms = FIND_MS) =>
@@ -155,8 +170,12 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
   let raf = 0;
   let turn = 0;
   let moving = false;
-  let scrolled = false;
-  let touched = 0;
+  let brought = 0; // (when the guide last brought the target into view)
+  let touched = 0; // (the person's hands last: a touch, or a scroll still moving from one)
+  let hand = 0; // (their finger or wheel last)
+  let lost = 0; // (when the step's target went away)
+  let waiting = false; // (looking for the step's target)
+  let skipped = 0; // (steps not on screen: left out of the count, so it never jumps)
 
   const place = () => {
     raf = requestAnimationFrame(place);
@@ -167,6 +186,20 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
     const vw = innerWidth;
     const vh = innerHeight;
     const b = bubble.getBoundingClientRect();
+    const s = steps[at];
+    const sel = s?.tap || s?.show;
+    // (Redrawn since, a live score's row: the new one. Gone: its sheet closed some other way moves
+    // the guide on; anything else shows 下一步, so it's never stuck.)
+    if (sel && !waiting && (!target || !visible(target))) {
+      target = find(sel);
+      if (target) lost = 0;
+      else if (!lost) lost = Date.now();
+      else if (Date.now() - lost > LOST_MS && !moving) {
+        lost = Date.now();
+        if (/^dialog\[open\]/.test(sel) && !document.querySelector('dialog[open]:not(.q-leaving)')) go(at + 1);
+        else next.hidden = false;
+      }
+    }
     if (!target || !visible(target)) {
       ring.hidden = true;
       bubble.classList.remove('up', 'down');
@@ -174,9 +207,11 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
       return;
     }
     const r = target.getBoundingClientRect();
-    // Off screen and not being scrolled by the person: brought to the middle once.
-    if (!scrolled && Date.now() - touched > 1500 && (r.bottom < 0 || r.top > vh || r.bottom > vh - 90)) {
-      scrolled = true;
+    // Off screen, or under the app's own bar, and the person's hands still a moment: brought to the
+    // middle (again, if they scroll it away: 11-19, a ring left on a row under the tab bar).
+    const now = Date.now();
+    if (!moving && now - touched > QUIET_MS && now - brought > 700 && (r.bottom < 0 || r.top > vh || covered(target, r))) {
+      brought = now;
       target.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
     ring.hidden = false;
@@ -193,13 +228,18 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
     bubble.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
   };
 
-  // While a step waits for its tap, a tap anywhere else is held back (the app never hears it).
+  // While the guide runs, a tap, a press or a swipe anywhere but the step's
+  // target (and the bubble) is held back: the app never hears it. On a line
+  // or a `show` step nothing in the app answers, nor between a tap and the
+  // next step; scrolling is the browser's own, so it stays free.
   const shield = e => {
+    if (bubble.contains(e.target)) return;
     const s = steps[at];
-    if (!s?.tap || moving || bubble.contains(e.target)) return;
+    // (The close: a tap anywhere is the person going on by themselves.)
+    if (at >= steps.length) return void (e.type === 'click' && end(true));
     // (Any element the step points at: a screen drawn again since the step began has a new one, Sports' picker.)
-    const hit = e.target.closest?.(s.tap);
-    if (hit || (target && (target === e.target || target.contains(e.target)))) {
+    const hit = s?.tap && !moving && !waiting ? e.target.closest?.(s.tap) : null;
+    if (hit || (s?.tap && !moving && !waiting && target && (target === e.target || target.contains(e.target)))) {
       if (hit) target = hit;
       if (e.type === 'click') {
         moving = true;
@@ -208,27 +248,30 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
       }
       return;
     }
-    if (e.type === 'pointerdown' || e.type === 'touchstart') return void (touched = Date.now());
-    e.preventDefault();
+    if (e.type === 'pointerdown' || e.type === 'touchstart') hand = touched = Date.now();
     e.stopPropagation();
-    ring.animate?.([{ opacity: 1 }, { opacity: 0.35 }, { opacity: 1 }], { duration: 360 });
+    if (e.type === 'click' || e.type === 'mousedown' || e.type === 'contextmenu' || e.type === 'dblclick') e.preventDefault();
+    if (e.type === 'click') ring.animate?.([{ opacity: 1 }, { opacity: 0.35 }, { opacity: 1 }], { duration: 360 });
   };
   const keys = e => e.key === 'Escape' && end(false);
-  const scrolls = () => (touched = Date.now());
-  document.addEventListener('click', shield, true);
-  document.addEventListener('pointerdown', shield, true);
+  // (A scroll still moving after the finger is gone counts as theirs: not one the guide began, nor
+  // one the app makes by itself, only from a finger in the last 3 s.)
+  const scrolls = () => Date.now() - hand < 3000 && Date.now() - brought > 1000 && (touched = Date.now());
+  const wheel = () => (hand = touched = Date.now());
+  for (const ev of HANDS) addEventListener(ev, shield, true);
   document.addEventListener('keydown', keys, true);
   addEventListener('scroll', scrolls, { capture: true, passive: true });
+  addEventListener('wheel', wheel, { capture: true, passive: true });
 
   function end(finished) {
     if (!running || running.end !== end) return;
     running = null;
     turn++;
     cancelAnimationFrame(raf);
-    document.removeEventListener('click', shield, true);
-    document.removeEventListener('pointerdown', shield, true);
+    for (const ev of HANDS) removeEventListener(ev, shield, true);
     document.removeEventListener('keydown', keys, true);
     removeEventListener('scroll', scrolls, true);
+    removeEventListener('wheel', wheel, true);
     bubble.classList.add('out');
     ring.remove();
     setTimeout(() => bubble.remove(), 200);
@@ -238,14 +281,17 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
   async function go(i) {
     const mine = ++turn;
     moving = false;
-    scrolled = false;
+    brought = 0;
+    lost = 0;
+    waiting = false;
+    bubble.classList.remove('wait');
     at = i;
     target = null;
     if (i >= steps.length) {
       // The close: where to find it again.
       lift();
       bubble.classList.add('done');
-      say.textContent = T(lang, ['好了！之後在 Orbit Pass 的「說明」裡，隨時可以再走一遍。', 'That’s it. Show me around is in the Orbit Pass’s Help any time.']);
+      say.textContent = T(lang, ['好了！之後在 Orbit Pass 的「說明」裡，隨時可以再走一遍。', 'That’s it. To see this again: Orbit Pass › Help › Show me around.']);
       n.textContent = '';
       skip.hidden = true;
       next.hidden = false;
@@ -257,14 +303,19 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
     const sel = s.tap || s.show;
     if (sel) {
       // (A step only some see, `optional`: Sports' picker on a first open, looked for a moment only.)
+      // (the last step's words are hidden meanwhile: never shown over the wrong screen)
+      waiting = true;
+      bubble.classList.add('wait');
       target = await waitFor(sel, s.optional ? 500 : FIND_MS);
       if (mine !== turn) return;
+      waiting = false;
+      bubble.classList.remove('wait');
       // (not on screen today: skipped, never stuck)
-      if (!target) return go(i + 1);
+      if (!target) return (skipped++, go(i + 1));
     }
     lift();
     say.textContent = T(lang, s.say);
-    n.textContent = `${i + 1}/${steps.length}`;
+    n.textContent = `${i + 1 - skipped}/${steps.length - skipped}`;
     skip.hidden = false;
     next.hidden = Boolean(s.tap);
     next.textContent = T(lang, ['下一步', 'Next']);

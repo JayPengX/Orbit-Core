@@ -8259,6 +8259,7 @@ html:not(.q-desk) .q-suite-desk {
   transition: transform 0.25s ease, opacity 0.2s;
 }
 .q-coach.out { opacity: 0; }
+.q-coach.wait { visibility: hidden; }
 .q-coach-say { margin: 0; font: 500 15px/1.4 var(--q-font); text-wrap: pretty; }
 .q-coach-foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 4px; }
 .q-coach-n { color: var(--q-label-2); font: 400 12px/1 var(--q-font); font-variant-numeric: tabular-nums; }
