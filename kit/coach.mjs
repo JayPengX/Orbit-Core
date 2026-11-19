@@ -23,6 +23,16 @@ export const GUIDES = {
     { tap: '[data-range="rain:10d"]', say: ['十天內哪天會下雨', 'Which of the next ten days it rains'] },
     { tap: 'dialog[open] .q-close', say: ['關掉', 'Close it'] },
     { tap: '#tab-places', say: ['存好家和學校，預報跟著你一天走', 'Save home and school; the forecast follows your day'] }
+  ],
+  law: [
+    { say: ['法律、判決、立法院和地方議會，全部互相連結，用白話看懂。', 'Laws, rulings, the legislature and local councils, all linked, in plain words.'] },
+    { tap: '.nv-topic', wait: 1500, say: ['依生活的事找法規，例如「勞動」', 'Find laws by what they’re about: work, say'] },
+    { tap: '.lw-quick-q', wait: 2500, say: ['問一個常見問題', 'A common question'] },
+    { tap: '.lw-find-card', wait: 2500, say: ['直接找到答案在哪一條', 'Straight to the article that answers it'] },
+    { tap: '.lw-rul', wait: 2500, say: ['這一條，法院怎麼判', 'How courts have ruled on it'] },
+    { tap: 'dialog[open] .q-close', say: ['看完關掉', 'Close it'] },
+    { tap: '#tab-bills', wait: 2500, say: ['立法院的每個法案，走到哪一步', 'Every bill in the legislature, and how far it’s got'] },
+    { tap: '.lw-scope [data-id="local"]', wait: 2500, say: ['地方：縣市議會和鄉鎮代表會', 'Local: county and township councils'] }
   ]
 };
 
