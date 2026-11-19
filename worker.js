@@ -1776,6 +1776,8 @@ async function route(request, env, ctx, headers, origin) {
     // The admin panel's 容量 (capacity.js): people (counts only), every quota
     // and how many people it holds.
     if (check === 'capacity') return json(await ADMIN_TOOLS.capacity({ env, deps: ECO_DEPS }), 200, headers);
+    // R2's folders counted now, as the 6-hourly job does (build.yml `folders`): its heartbeat kept too.
+    if (check === 'folders') return json(await beat(env, 'data-folders', () => countFolders(env)), 200, headers);
     // Each outside source's last 7 days as the proxy and the phones counted
     // them (sources.js, the panel's 外部來源): ?src=a,b only those.
     // The panel's own verdict on every source (kit/sources.mjs sourceState,
@@ -2046,7 +2048,8 @@ async function cronTick(event, env, ctx, part) {
     // The live refreshes by how many people there are (capacity.js), every 6 hours.
     if (min === 20 && tick.getUTCHours() % 6 === 0) run('capacity', () => capacityCron(env, ECO_DEPS));
     // R2's folders for the panel's 健康 (ops.js countFolders), every 6 hours (and on the first run after a deploy).
-    if (env.DATA && min === 40 && (tick.getUTCHours() % 6 === 0 || !(await keptText(env, FOLDERS_KEY)))) run('data-folders', () => countFolders(env));
+    // (At :44, a minute no builder has: at :40 it shared the news build's tick and was cut off with it, 11-18.)
+    if (env.DATA && min === 44 && (tick.getUTCHours() % 6 === 0 || !(await keptText(env, FOLDERS_KEY)))) run('data-folders', () => countFolders(env));
     // What the Worker kept for itself (kept-store.js, D1) and has ended, deleted: every 6 hours.
     if (min === 42 && tick.getUTCHours() % 6 === 0) run('kept-sweep', async () => ({ kept: await sweepKept(env), files: await sweepDataFiles(env) }));
     // The free plans' watch (free-watch.yml) started every 3 hours, on an even minute (the odd ones run F1 only): GitHub's own timer ran it none of the first 6 (2026-11-13).
