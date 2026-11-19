@@ -3,7 +3,7 @@
 // outlets' places (kit/news-outlets.mjs), kept across builds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { piecesOf, teamsOf, otherGame, placesOf, placeHints, marksAll, gameOf, unboiled, ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, TOPIC_MIN_OF, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, NEWS_PATH, NEWS_PAST, NEWS_STATE, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN, blindOf, oneSidedOf, coreKeep, twoWords, weigh } from '../builders/news.js';
+import { piecesOf, teamsOf, otherGame, placesOf, placeHints, marksAll, gameOf, unboiled, ALTS, CLIPS_SHOWN, CLIP_LOOSE, CLIP_NEAR, bing, laOffset, frontOf, TOPIC_MIN, TOPIC_MIN_OF, parseFeed, feedsDue, FEEDS, cleanTitle, newsUrl, cleanUrl, groupStories, storyOf, storiesOf, deskOf, runNews, runDesk, NEWS_PATH, NEWS_PAST, NEWS_STATE, NEWS_RECS, idOf, undated, fillerOf, softOf, pageOf, sameOf, bigPicture, isVideo, pagesToRead, CLIPS_AT, CLIPS_HERE, CLIP_READS, PAGE_READS, clipsToRead, withClips, newsClips, NEWS_CLIPS, newsSite, NEWS_SITE, CHANNELS, parseChannel, clipTitle, ytFeed, reportOf, reportsOwner, otherReport, BURST, LIVE_NEW, LIVE_TURN, blindOf, oneSidedOf, coreKeep, twoWords, weigh } from '../builders/news.js';
 import { OUTLETS, sideOf, partiesIn, topicsOf, TOPICS, SPORTS_OUTLETS } from '../kit/news-outlets.mjs';
 
 const H = 3_600_000;
@@ -225,6 +225,7 @@ test('a build reads every feed, keeps what it read, never writes an empty page o
   assert.equal(files.get(NEWS_PATH).tw.length, 1);
   // Every feed failing, nothing kept: the page stays as it was.
   files.set(NEWS_STATE, { items: [], etag: {} });
+  files.delete(NEWS_RECS);
   const before = files.get(NEWS_PATH);
   const r3 = await runNews({ store, now: NOW + 1_200_000, fetchImpl: async () => new Response('', { status: 500 }), feeds, channels: {} });
   assert.equal(r3.failed.length, 3);
@@ -1037,4 +1038,35 @@ test('a story’s days over New Year in the order they came', () => {
     mk('tvbs', '立法院臨時會審預算 行政院回應', '2027-01-02T09:00:00+08:00')
   ], 'tw', at('2027-01-02T12:00:00+08:00'));
   assert.deepEqual(s.days.map(d => d[0]), ['12-30', '12-31', '01-01', '01-02']);
+});
+
+// 11-19: the desk passed the Worker's 30 s of CPU every run, so the build is
+// two halves: the proxy reads and keeps (desk: false), GitHub Actions lays the
+// desk (runDesk). The two halves write the same page as one build did.
+test('a read then the desk write what one build does; the read alone writes no page', async () => {
+  const rss = list => `<rss><channel>${list.map(([t, h]) => `<item><title>${t}</title><link>https://x.example/${encodeURIComponent(t)}</link><pubDate>${new Date(NOW - h * H).toUTCString()}</pubDate></item>`).join('')}</channel></rss>`;
+  const feeds = { cna: [['https://cna/1', 'rss']], ctinews: [['https://cti/1', 'rss']], setn: [['https://setn/1', 'rss']] };
+  const bodies = {
+    'https://cna/1': rss([['川普：黃仁勳不知婚外情對象涉共諜 FBI查明中', 3]]),
+    'https://cti/1': rss([['黃仁勳婚外情對象涉共諜？川普稱「他不知情」 FBI調查中', 2]]),
+    'https://setn/1': rss([['黃仁勳外遇後首交談！川普曝他「不知黃樂涉共諜」：FBI查明中', 1]])
+  };
+  const fetchImpl = async url => new Response(bodies[url], { status: 200 });
+  const mk = () => {
+    const files = new Map();
+    return { files, store: { json: async p => files.get(p) ?? null, put: async (p, d) => (files.set(p, JSON.parse(JSON.stringify(d))), true) } };
+  };
+  const one = mk();
+  await runNews({ store: one.store, now: NOW, fetchImpl, feeds, channels: {} });
+  const two = mk();
+  const read = await runNews({ store: two.store, now: NOW, fetchImpl, feeds, channels: {}, desk: false });
+  assert.equal(read.items, 3);
+  assert.equal(two.files.get(NEWS_PATH), undefined, 'the read lays no desk');
+  const desk = await runDesk({ store: two.store, now: NOW });
+  assert.equal(desk.tw, 1);
+  assert.deepEqual(two.files.get(NEWS_PATH), one.files.get(NEWS_PATH));
+  assert.deepEqual(two.files.get(NEWS_RECS).recs, one.files.get(NEWS_RECS).recs);
+  // The next read keeps the desk's stories beside what it read.
+  await runNews({ store: two.store, now: NOW + 600_000, fetchImpl, feeds, channels: {}, desk: false });
+  assert.deepEqual(two.files.get(NEWS_STATE).recs, one.files.get(NEWS_RECS).recs);
 });

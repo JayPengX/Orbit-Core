@@ -55,6 +55,8 @@ import { enOf, NAMES } from './news-words.js';
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
 export const NEWS_PATH = 'news/index.json';
 export const NEWS_STATE = 'private/news/items.json.gz';
+// The stories kept, as the desk last laid them (runDesk, in GitHub Actions: tools/news-desk.mjs).
+export const NEWS_RECS = 'private/news/recs.json.gz';
 const HOUR = 3_600_000;
 export const KEEP_MS = 48 * HOUR;
 const WINDOW = { tw: 36 * HOUR, intl: 48 * HOUR };
@@ -1724,7 +1726,12 @@ async function readFeed(url, kind, tag, { fetchImpl = fetch } = {}) {
   return { items: parseFeed(await res.text(), kind), etag: res.headers.get('ETag') || '' };
 }
 
-export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feeds = FEEDS, channels = CHANNELS, channelEvery = CHANNEL_EVERY } = {}) {
+// The build in two halves (11-19: laid in the Worker, the desk passed its
+// 30 s of CPU on every run once ~22,000 headlines and ~5,000 stories were kept):
+// `desk: false` (the proxy's cron) reads the feeds, channels and pages and
+// keeps them (NEWS_STATE); runDesk, in GitHub Actions, lays the desk from them.
+// `desk: true` does both in one (tests, a build by hand).
+export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feeds = FEEDS, channels = CHANNELS, channelEvery = CHANNEL_EVERY, desk = true } = {}) {
   const kept = (await store.json(NEWS_STATE).catch(() => null)) || { items: [], etag: {} };
   const byUrl = new Map(kept.items.filter(it => now - it.at <= KEEP_MS && OUTLETS[it.o]).map(it => [it.u, it]));
   // (A feed not due this build keeps its ETag.)
@@ -1782,7 +1789,7 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
     return !seen.has(k) && seen.add(k);
   });
   // The pages read before (still kept), then a few more for the top stories.
-  const recs = kept.recs || [];
+  const recs = (await store.json(NEWS_RECS).catch(() => null))?.recs || kept.recs || [];
   const pages = {};
   for (const it of [...items, ...recs.flatMap(r => r.items)]) if (kept.pages?.[it.u]) pages[it.u] = kept.pages[it.u];
   // (And the clips GitHub found in the pages that refuse us.)
@@ -1806,10 +1813,21 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
     if (!p) (unread[o] ||= []).push(whyNot[u] || '?');
     pages[u] = p ? { ...p, y: p.y.filter(id => !(shorts[id] < 0)) } : { i: '', y: [] };
   });
+  const storyFails = failed.filter(f => !/ clips: /.test(f)).length;
+  const missed = failed.length && storyFails * 2 < feedsNow.length ? failed.slice(0, 12) : null;
+  const read_ = { items: items.length, fresh, clips: clips.length, pages: want.length, ...(Object.keys(unread).length ? { unread } : {}), ...(ask.length ? { asked: ask.length, shorts: isShort.filter(Boolean).length } : {}) };
+  if (!desk) {
+    // (What's read kept, the stories as the desk last left them beside it: the desk lays them next.)
+    const keep = new Set([...items, ...recs.flatMap(r => r.items)].map(it => it.u));
+    for (const u of Object.keys(pages)) if (!keep.has(u)) delete pages[u];
+    await store.put(NEWS_STATE, { items, etag, pages, recs, vids: clips, shorts });
+    return { ...read_, ...(missed ? { missed } : { failed }) };
+  }
   const out = deskOf(items, recs, now, { pages, vids: clips });
   const keep = new Set([...items, ...out.recs.flatMap(r => r.items)].map(it => it.u));
   for (const u of Object.keys(pages)) if (!keep.has(u)) delete pages[u];
   await store.put(NEWS_STATE, { items, etag, pages, recs: out.recs, vids: clips, shorts });
+  await store.put(NEWS_RECS, { at: now, recs: out.recs });
   // (Never an empty page over a good one: a build that read nothing keeps the last.)
   if (out.tw.length || out.intl.length) {
     await store.put(NEWS_PATH, { built: now, tw: out.tw, intl: out.intl });
@@ -1819,9 +1837,24 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
   // failing is the build's failure, what the beat and the panel's 外部來源 call broken.)
   // (Channels' clips apart: YouTube's feeds can all 404 for a day (11-11, every channel from
   // everywhere) while the stories build fine; the clips kept 48 hours carry them.)
-  const storyFails = failed.filter(f => !/ clips: /.test(f)).length;
-  const missed = failed.length && storyFails * 2 < feedsNow.length ? failed.slice(0, 12) : null;
-  return { items: items.length, fresh, clips: clips.length, pages: want.length, ...(Object.keys(unread).length ? { unread } : {}), ...(ask.length ? { asked: ask.length, shorts: isShort.filter(Boolean).length } : {}), kept: out.recs.length, tw: out.tw.length, intl: out.intl.length, past: out.past.tw.length + out.past.intl.length, ...(missed ? { missed } : { failed }) };
+  return { ...read_, kept: out.recs.length, tw: out.tw.length, intl: out.intl.length, past: out.past.tw.length + out.past.intl.length, ...(missed ? { missed } : { failed }) };
+}
+
+// The desk, from what the last read kept (NEWS_STATE) and the stories it
+// laid before (NEWS_RECS): the front and the past written, the stories kept.
+// Run in GitHub Actions (tools/news-desk.mjs), where it has the CPU it needs.
+export async function runDesk({ store, now = Date.now() } = {}) {
+  const state = await store.json(NEWS_STATE).catch(() => null);
+  if (!state?.items) return { off: 'nothing read yet' };
+  const recs = (await store.json(NEWS_RECS).catch(() => null))?.recs || state.recs || [];
+  const out = deskOf(state.items, recs, now, { pages: state.pages || {}, vids: state.vids || [] });
+  await store.put(NEWS_RECS, { at: now, recs: out.recs });
+  // (Never an empty page over a good one.)
+  if (out.tw.length || out.intl.length) {
+    await store.put(NEWS_PATH, { built: now, tw: out.tw, intl: out.intl });
+    await store.put(NEWS_PAST, { built: now, ...out.past });
+  }
+  return { items: state.items.length, kept: out.recs.length, tw: out.tw.length, intl: out.intl.length, past: out.past.tw.length + out.past.intl.length };
 }
 
 // Outlets whose article pages carry the story's own clip, most often first
@@ -1992,4 +2025,18 @@ export async function newsSite({ store, env, now = Date.now(), fetchImpl = fetch
   if (!go.ok) return { failed: `start: HTTP ${go.status}` };
   await store.put(NEWS_SITE, { sha, at: now });
   return { sha: sha.slice(0, 7), started: true };
+}
+
+// The desk started in GitHub Actions (news-desk.yml) once a read is kept: the
+// proxy's cron is its clock, as for the flight pool (GitHub's own timer ran
+// hours late). A start refused says so in the build's note.
+export async function startNewsDesk(env, fetchImpl = fetch) {
+  if (!env?.GH_ACTIONS_TOKEN) return { off: 'no token' };
+  const go = await fetchImpl('https://api.github.com/repos/JayPengX/Orbit-Core/actions/workflows/news-desk.yml/dispatches', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.GH_ACTIONS_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'orbit-news', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ref: 'main' }),
+    signal: AbortSignal.timeout(10_000)
+  });
+  return go.ok ? { started: true } : { failed: `start: HTTP ${go.status}` };
 }

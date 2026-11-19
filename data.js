@@ -13,6 +13,8 @@
 //   GET  /data/_list         what R2 holds ({ files: [[path, md5, size]],
 //                            cursor }), the same secret: a builder sends only
 //                            what changed
+//   GET  /data/_get?p=<path> a file as kept, `private/` too, the same secret
+//                            (the news desk in GitHub Actions reads its state)
 //
 // `private/` (the store's backups) is never served: only a builder's
 // _list sees it.
@@ -159,11 +161,17 @@ async function list(request, env, headers) {
 
 export async function handleData(request, env, ctx, headers, ip, path) {
   const rest = path.slice('/data/'.length);
-  if (rest === 'push' || rest === '_list') {
+  if (rest === 'push' || rest === '_list' || rest === '_get') {
     if (!authorized(request, env)) return json({ error: { message: 'Not allowed' } }, 401, headers);
     if (!env.DATA) return json({ error: { message: 'No data bucket yet' } }, 503, headers);
     if (rest === 'push' && request.method === 'POST') return push(request, env, ctx, headers);
     if (rest === '_list' && request.method === 'GET') return list(request, env, headers);
+    if (rest === '_get' && request.method === 'GET') {
+      const p = new URL(request.url).searchParams.get('p') || '';
+      if (!validPath(p)) return json({ error: { message: 'Bad path' } }, 400, headers);
+      const obj = await env.DATA.get(p);
+      return obj ? new Response(obj.body, { headers: { ...headers, 'Content-Type': typeOf(p), 'Cache-Control': 'no-store' } }) : json({ error: { message: 'Not found' } }, 404, headers);
+    }
     return json({ error: { message: 'Method not allowed' } }, 405, headers);
   }
   if (request.method !== 'GET' && request.method !== 'HEAD') return json({ error: { message: 'GET only' } }, 405, headers);

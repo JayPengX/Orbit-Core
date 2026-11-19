@@ -1,0 +1,26 @@
+# Orbit News's desk: the stories laid from what the proxy's cron last read
+# (tools/news-desk.mjs, builders/news.js runDesk). In the proxy it passed the
+# Runner's 30 s of CPU on every build (11-19). Started by the proxy's cron
+# after each read (news.js startNewsDesk); GitHub's own timer is a spare only.
+# Runs may overlap: each lays the whole desk from the latest read.
+name: News desk
+on:
+  schedule:
+    - cron: '25,55 * * * *'
+  workflow_dispatch:
+jobs:
+  desk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      # main's tip, never the commit that started the run.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Lay the desk and push it
+        run: node tools/news-desk.mjs
+        env:
+          DATA_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET }}

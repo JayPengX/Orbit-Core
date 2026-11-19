@@ -33,7 +33,7 @@ import { runPhotos, runCutouts, PHOTOS_HOUR } from './photos.js';
 import { runBuses, kickBuses, BUSES_HOUR } from './buses.js';
 import { runKept, KEPT_HOUR } from './kept.js';
 import { runF1Kept } from './f1kept.js';
-import { runNews, newsSite, newsClips } from './news.js';
+import { runNews, newsSite, newsClips, startNewsDesk } from './news.js';
 import { runFilings } from './filings.js';
 import { runNewsLaws } from './news-laws.js';
 import { runAi } from './ai.js';
@@ -71,7 +71,9 @@ export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[ne
   if (job === 'ai' || only === 'ai' || only?.startsWith?.('ai-')) await step('ai', () => runAi({ store, env, proxy, now, cap: aiCap, only: only?.startsWith?.('ai-') ? only.slice(3) : null }));
   if (job === 'ai' || only === 'filings') await step('filings', () => runFilings({ store, now }));
   if (job === 'news' || only === 'news') {
-    await step('news', () => runNews({ store, now }));
+    // (The read here, the desk in GitHub Actions: tools/news-desk.mjs, 11-19.)
+    await step('news', () => runNews({ store, now, desk: false }));
+    await step('newsDesk', () => startNewsDesk(env));
     await step('newsSite', () => newsSite({ store, env, now }));
     await step('newsClips', () => newsClips({ store, env, now }));
     await step('newsLaws', () => runNewsLaws({ store, now }));
