@@ -354,6 +354,8 @@ export const PAGES = {
     'entry-digital': { args: click('[aria-label="記一筆"],[aria-label="Add an entry"]', wait(1500), tap('數位|Digital'), wait(800)) },
     // 記一筆 on 轉帳: from, to, the amount, a fee, the day, a note.
     'entry-move': { args: click('[aria-label="記一筆"],[aria-label="Add an entry"]', wait(1500), tap('轉帳|Transfer'), wait(800)) },
+    // 記一筆 on 交通: TPASS, 搭車, YouBike, 長途, 汽機車.
+    'entry-transport': { args: click('[aria-label="記一筆"],[aria-label="Add an entry"]', wait(1500), tap('交通|Transport'), wait(800)) },
     // 記一筆 on 餐飲: 早餐, 午餐, 晚餐, 飲料點心.
     'entry-food': { args: click('[aria-label="記一筆"],[aria-label="Add an entry"]', wait(1500), tap('餐飲|Food'), wait(800)) },
     // 記一筆 as it opens (its guess), then NT$25 typed: guessed again with the amount.
