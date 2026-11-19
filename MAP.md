@@ -93,7 +93,7 @@ first screen's modules for modulepreload.
 | `boot.js` | The loading screen (`#loading`) and the first update check (a classic script, first) |
 | `loader.html` | The apps' snippets (`kit:head`, `kit:boot`) |
 | `brand.mjs` | Families, names, colours, marks, repos, slugs, `APP_ORDER`, `DEV` (speeds, §9) |
-| `pass.mjs`, `help.mjs` | The Pass sheet (account, looks, apps, guides: no money); each app's guide (`#help=<app>[:topic]`; `tools/help-shots.mjs`) |
+| `pass.mjs`, `help.mjs`, `coach.mjs` | The Pass sheet (account, looks, apps, help; no money); each app's help (`#help=<app>[:topic]`), 帶我走一遍 (`GUIDES`) |
 | `passkey.mjs`, `pass-mail.mjs` | Passkeys in the browser (`passkeyHere()`); the recovery email's screens |
 | `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); `TOPICS`; `sideOf`, `partiesIn`, `topicsOf`, `namesRe` |
 | `ai.mjs`, `family.mjs`, `today.mjs`, `act.mjs` | AI (mark `icons.ai`, `--q-ai`; `.q-ai-ref` a name chip): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer`, `aiAnswerWait` (answers drawn); the family notebook (`tell`/`heard`, places, Class's periods, `planHash`); Pass's 今天; `act.mjs` `readAct`: a command in an app's ask box (a focus, a countdown, a team to follow) read by code, no AI |

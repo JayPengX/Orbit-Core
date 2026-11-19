@@ -14,6 +14,7 @@ export const loadHelp = () => (helpLoad ||= import('./help.mjs').then(m => (help
 import { sheet, section, list, cell, toast, icons } from './ui.mjs';
 import { todayRows } from './today.mjs';
 import { homeOf } from './brand.mjs';
+import { hasGuide, startGuide } from './coach.mjs';
 
 export const STRINGS = {
   zh: {
@@ -296,6 +297,19 @@ function renderHelp(box, { q, t, locale }, { app, topic }) {
     el('div', { class: 'hp-head-text' }, [el('h3', { text: full(at) }), el('small', { text: (ROLE?.[at] || APPS[at]?.role)?.[en ? 'en' : 'zh'] || '' })]),
     go
   ]);
+  // 帶我走一遍: the guide on this app's own screen (coach.mjs), the sheet closed first.
+  const guide =
+    at === q.app && hasGuide(at)
+      ? el('button', {
+          class: 'q-btn hp-guide',
+          type: 'button',
+          html: `${icons.compass || ''}<span>${en ? 'Show me around' : '帶我走一遍'}</span>`,
+          onclick: () => {
+            closeSheet(box.closest('dialog'));
+            setTimeout(() => startGuide(q, at, locale), 320);
+          }
+        })
+      : null;
   const intro = what ? el('div', { class: 'hp-what' }, what[2].map(p => el('p', { text: p }))) : null;
   // The tour: each tab (and the screens worth knowing), its real screenshot and what it's for.
   const shot = (stop, label) => {
@@ -328,7 +342,7 @@ function renderHelp(box, { q, t, locale }, { app, topic }) {
         )
       ])
     : null;
-  put(box, el('div', { class: 'hp' }, [picker, head, intro, tour, folds]));
+  put(box, el('div', { class: 'hp' }, [picker, head, guide, intro, tour, folds]));
   // The app's own mark in view (Transit's is far along the row at 320 px).
   setTimeout(() => {
     const on = picker.querySelector('[aria-selected="true"]');

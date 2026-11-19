@@ -8223,3 +8223,53 @@ html:not(.q-desk) .q-suite-desk {
   display: none;
 }
 
+
+/* ---- The guide (coach.mjs): a ring round the next thing to tap, one short line ----
+   The showcase's coach mark, on the real app; 帶我走一遍 in the Pass sheet's 說明. */
+.q-pass .hp-guide { justify-self: stretch; gap: 8px; min-height: 44px; }
+.q-pass .hp-guide svg { width: 18px; height: 18px; }
+.q-coach-ring {
+  position: fixed;
+  z-index: 2147483646;
+  top: 0;
+  left: 0;
+  border-radius: 14px;
+  box-shadow: 0 0 0 2.5px var(--q-accent), 0 0 0 8px color-mix(in srgb, var(--q-accent) 22%, transparent);
+  pointer-events: none;
+  transition: width 0.25s ease, height 0.25s ease, transform 0.25s ease;
+}
+.q-coach-ring[hidden] { display: none; }
+/* (both are popovers, in the top layer: none of a popover's own box) */
+.q-coach-ring:popover-open, .q-coach:popover-open { inset: 0 auto auto 0; margin: 0; border: 0; overflow: visible; }
+.q-coach-ring:popover-open { padding: 0; background: none; }
+.q-coach {
+  position: fixed;
+  z-index: 2147483647;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 190px;
+  max-width: min(300px, calc(100vw - 24px));
+  padding: 10px 12px 8px 14px;
+  border-radius: 14px;
+  background: var(--q-elevated);
+  color: var(--q-label);
+  box-shadow: 0 0 0 0.5px var(--q-sep), 0 8px 28px rgba(0, 0, 0, 0.24);
+  transition: transform 0.25s ease, opacity 0.2s;
+}
+.q-coach.out { opacity: 0; }
+.q-coach-say { margin: 0; font: 500 15px/1.4 var(--q-font); text-wrap: pretty; }
+.q-coach-foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 4px; }
+.q-coach-n { color: var(--q-label-2); font: 400 12px/1 var(--q-font); font-variant-numeric: tabular-nums; }
+.q-coach-acts { display: flex; gap: 4px; }
+.q-coach-skip, .q-coach-next { min-height: 32px; padding: 0 8px; border: 0; background: none; font: 400 15px/1 var(--q-font); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.q-coach-skip { color: var(--q-label-2); }
+.q-coach-next { color: var(--q-accent); font-weight: 600; }
+.q-coach-skip[hidden], .q-coach-next[hidden] { display: none; }
+.q-coach.done { padding: 10px 14px; }
+.q-coach.done .q-coach-foot { justify-content: flex-end; }
+.q-coach-tip { position: absolute; left: calc(var(--tip, 50%) - 7px); display: none; width: 14px; height: 14px; z-index: -1; background: inherit; transform: rotate(45deg); }
+.q-coach.down .q-coach-tip { top: -6px; display: block; box-shadow: -0.5px -0.5px 0 0 var(--q-sep); }
+.q-coach.up .q-coach-tip { bottom: -6px; display: block; box-shadow: 0.5px 0.5px 0 0 var(--q-sep); }
+@media (prefers-reduced-motion: reduce) { .q-coach, .q-coach-ring { transition: none; } }
