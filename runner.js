@@ -77,7 +77,8 @@ function patchFetch() {
 // Worker too: Yahoo turned most reads from Taiwan's side away, 2026-10-14.
 // Bus times and Law's pages moved in, 2026-11-10: one in eight bus times
 // (the cities' own feeds read and matched) and one in twenty pages passed 10 ms.)
-const STAY = /^\/(?:data\/(?!build$)|config$|sources$|guard$|transit\/tdx$|transit\/config$|transit\/status$|transit\/gtfs$|push\/|law-live$|showcase\/|store\/check$|$)/;
+// (A push runs here: unpacking and summing a builder's file, the news desk's stories a few MB, passed a Worker's 2 s of CPU, 11-19.)
+const STAY = /^\/(?:data\/(?!build$|push$)|config$|sources$|guard$|transit\/tdx$|transit\/config$|transit\/status$|transit\/gtfs$|push\/|law-live$|showcase\/|store\/check$|$)/;
 export function runsInRunner(request, path) {
   if (request.headers.has(RUNNER_MARK) || request.method === 'OPTIONS') return false;
   const p = path.replace(/^\/api(?=\/)/, '');

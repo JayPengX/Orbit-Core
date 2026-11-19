@@ -43,3 +43,12 @@ test('one tick an alarm, the next alarm set before it runs; a tick that throws l
   assert.deepEqual(ran, [1, 2, 3]);
   assert.equal(await storage.getAlarm(), null, 'nothing left: no alarm');
 });
+
+// A builder's push runs in the Runner (30 s of CPU): in the Worker, the news
+// desk's stories, a few MB unpacked and summed, passed its 2 s (11-19). Reads stay.
+test('/data/push runs in the Runner; a /data read stays in the Worker', async () => {
+  const { runsInRunner } = await import('../runner.js');
+  assert.equal(runsInRunner(new Request('https://p/data/push', { method: 'POST' }), '/data/push'), true);
+  assert.equal(runsInRunner(new Request('https://p/data/news/index.json'), '/data/news/index.json'), false);
+  assert.equal(runsInRunner(new Request('https://p/data/_get?p=x'), '/data/_get'), false);
+});
