@@ -2031,8 +2031,9 @@ async function cronTick(event, env, ctx, part) {
     // Orbit Weather's next two hours of rain: CWA's radar echoes and how they move, packed for R2 every
     // 10 minutes (weather-radar.js); at :x8, a minute after CWA posts each frame (~7 minutes past its time).
     if (pace < 2 && min % 10 === 8) run('radar', () => radarCron(env), r => (r.failed ? r : null));
-    // Orbit Weather's scoring, once an hour (weather-skill.js).
-    if (!pace && min === 10) run('weather-skill', () => weatherCron(env));
+    // Orbit Weather's scoring, once an hour (weather-skill.js): at :14, a minute no builder has
+    // (at :10 it shared the news build's tick, and the two passed the tick's 30 s of CPU, 11-18).
+    if (!pace && min === 14) run('weather-skill', () => weatherCron(env));
     if (!storeReady(env)) return;
     // The month's counts (Google's calls, TDX's points: transit.js), added in
     // D1, copied to KV for every isolate's reads, each MIRROR_EVERY (the copy

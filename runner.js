@@ -202,22 +202,27 @@ export function makeRunner(handle, cronTick) {
       out.headers.set('x-orbit-ran', 'runner');
       return out;
     }
+    // One tick an alarm, the next one's alarm set first: each tick has its own
+    // 30 s of CPU, and one cut off for its CPU (the news build late in a busy
+    // day) never takes the ticks queued behind it along (2026-11-18: three in
+    // one alarm were cut off 188 times, and Weather's scoring and the news
+    // build stopped for hours).
     async alarm() {
-      const ticks = (await this.state.storage.get('ticks')) || [];
-      await this.state.storage.put('ticks', []);
+      const [t, ...rest] = (await this.state.storage.get('ticks')) || [];
+      await this.state.storage.put('ticks', rest);
+      if (rest.length) await this.state.storage.setAlarm(Date.now());
+      if (!t) return;
       const b = { n: 0, relayed: 0, ns: this.env.RUNNER };
-      for (const t of ticks) {
-        const ctx = shimCtx();
-        try {
-          await budget.run(b, async () => {
-            await cronTick({ cron: t.cron, scheduledTime: t.at }, this.env, ctx, t.part || null);
-            await ctx.settle();
-          });
-        } catch (e) {
-          console.log('cron failed', t.part, String(e?.message || e).slice(0, 200));
-        }
+      const ctx = shimCtx();
+      try {
+        await budget.run(b, async () => {
+          await cronTick({ cron: t.cron, scheduledTime: t.at }, this.env, ctx, t.part || null);
+          await ctx.settle();
+        });
+      } catch (e) {
+        console.log('cron failed', t.part, String(e?.message || e).slice(0, 200));
       }
-      if (b.relayed) console.log('runner relayed', ticks.map(t => t.part).join(), b.n, b.relayed);
+      if (b.relayed) console.log('runner relayed', t.part, b.n, b.relayed);
       // (Ticks that came while this ran: their turn now.)
       if (((await this.state.storage.get('ticks')) || []).length && !(await this.state.storage.getAlarm())) await this.state.storage.setAlarm(Date.now());
     }
