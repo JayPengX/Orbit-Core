@@ -30,8 +30,19 @@ if [ "$name" = Orbit-Class ]; then npm run build >"$log" 2>&1 || no "the build f
 
 # (Another push may land meanwhile: then the tree is rebased onto it and
 # its tests run again.)
+# Pushed: the checkout left on main, at what was pushed, tracking origin/main.
+# A cloud session starts on a branch of its own (claude/…) that nothing ever
+# pushes to (main only), and its stop hook counted every shipped commit as
+# "unpushed" against that branch's copy on GitHub (Jay 2026-11-20: "how could
+# we ever remove those hooks"). On main it compares with origin/main: equal.
+# The same commit, so the files and anything not yet committed stay as they are.
+onmain() {
+  [ "$(git -C "$repo" branch --show-current)" = main ] && return
+  git -C "$repo" checkout -q -B main HEAD && git -C "$repo" branch -q --set-upstream-to=origin/main main 2>/dev/null
+  echo "push: now on main (it was $(git -C "$repo" rev-parse --abbrev-ref '@{-1}' 2>/dev/null))." >&2
+}
 for try in 1 2 3; do
-  git push -q origin HEAD:main 2>"$log" && { rm -f "$log"; echo "push: pushed." >&2; exit 0; }
+  git push -q origin HEAD:main 2>"$log" && { rm -f "$log"; onmain; echo "push: pushed." >&2; exit 0; }
   grep -qE 'rejected|fetch first|non-fast-forward' "$log" || { cat "$log" >&2; no "the push failed"; }
   echo "push: main moved meanwhile; rebasing and testing again…" >&2
   git -C "$repo" fetch -q origin main || no "fetch failed"

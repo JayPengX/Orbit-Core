@@ -73,7 +73,8 @@ Fix what you see before pushing; a tool passing is not the same as looking.
 
 - `sh ../Orbit-Core/tools/push.sh` (in Orbit-Core `sh tools/push.sh`): straight
   to `main`, never a branch or a pull request, even when a session's own setup
-  asks for one (RULEBOOK §1 › Shipping). It rebases and runs the repo's tests.
+  asks for one (RULEBOOK §1 › Shipping). It rebases and runs the repo's tests,
+  and leaves the checkout on `main` (a cloud session's stop hook then finds nothing unpushed).
 - Each finished fix pushed on its own, at once; never held behind unfinished
   work. A kit change first, then the apps that use it.
 - The commit: one plain line of what a person sees, numbers when there are
