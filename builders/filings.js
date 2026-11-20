@@ -9,12 +9,13 @@
 // → stock/filings/<last two digits of the code>.json:
 //   { built, codes: { '<code>': [{ id, at, title, rows: [[label, value]] }] } }
 //   newest first, a week's, at most 8 a code. A bucket is read and written
-//   only when a new filing lands in it (stock/filings/seen.json: the ids of
+//   only when a new filing lands in it (stock/filings/seen-v2.json: the ids of
 //   the past week, by day).
 export const TWSE_FILINGS = 'https://openapi.twse.com.tw/v1/opendata/t187ap04_L';
 export const TPEX_FILINGS = 'https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap04_O';
 export const bucketOf = code => `stock/filings/${String(code).slice(-2).padStart(2, '0')}.json`;
-const SEEN = 'stock/filings/seen.json';
+// (v2, 11-20: rows parsed again once, a value's "0.91%" line no longer row 0.)
+const SEEN = 'stock/filings/seen-v2.json';
 const WEEK = 7 * 86_400_000;
 
 // 1151110 + 65705 → 2026-11-10T06:57:05+08:00 (the ROC year).
@@ -36,23 +37,31 @@ const DULL = /^(事實發生日|與公司關係|相互持股比例|因應措施|
 const EMPTY = /^(不適用|無|NA|N\/A|none|－|-|—|無。|不適用。)$/i;
 
 // A label without the form's own hints; a value's (1,234) as −1,234.
+// (A hint is any bracket of 5 or more characters: （含付款期間及金額）, while
+// （息） and (仟元) stay; a label too long still is cut with an ellipsis.)
 const label = k =>
   k
     .replace(/\s+/g, '')
     .replace(/[（(][請如][^）)]*[）)]/g, '')
+    .replace(/[（(][^（()）]{5,}[）)]/g, '')
     .replace(/\(X{2,}.*$/, '')
     .replace(/^1月1日累計至本期止/, '今年累計')
     .replace(/[:：]$/, '');
 const value = v => v.replace(/\s+/g, ' ').replace(/^\(([\d,.]+)\)$/, '−$1').replace(/。$/, '');
 // The 說明 as rows: "1.label:value" each, a line without a number joined to the one before.
+// After the first, a number starts a row only as the next one (one skipped allowed), never
+// a decimal: a value's own line "0.91%；0.94%" or "0.01元" isn't row 0 (2330, 11-20).
 export function rowsOf(text) {
   const rows = [];
+  let n = 0;
   for (const raw of clean(text).split('\n')) {
     const line = raw.trim();
     if (!line) continue;
-    const m = /^(\d{1,2})\s*[.、．]\s*(.*)$/.exec(line);
-    if (m) rows.push(m[2]);
-    else if (rows.length) rows[rows.length - 1] += line;
+    const m = /^(\d{1,2})\s*[.、．](?!\d)\s*(.*)$/.exec(line);
+    if (m && (!n || (+m[1] > n && +m[1] <= n + 2))) {
+      n = +m[1];
+      rows.push(m[2]);
+    } else if (rows.length) rows[rows.length - 1] += line;
     else rows.push(line);
   }
   const pair = r => {
@@ -73,7 +82,7 @@ export function rowsOf(text) {
       )
       .map(([k, v]) => [label(k), value(v)])
       .filter(([k, v]) => v && !EMPTY.test(v) && !DULL.test(k) && (k || v.length >= 6))
-      .map(([k, v]) => [k.slice(0, 30), v.slice(0, 160)])
+      .map(([k, v]) => [k.length > 40 ? `${k.slice(0, 39)}…` : k, v.slice(0, 160)])
       .slice(0, 12)
   );
 }

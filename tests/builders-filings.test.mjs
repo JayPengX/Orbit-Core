@@ -42,6 +42,18 @@ test("the 說明 as rows: a line joined to its number, (1)(2) split, the form's 
   assert.deepEqual(rows[2], ['今年累計x', '−48,339']);
 });
 
+test('a value line starting "0.91%" or "0.01元" stays its row\'s value, and a long label keeps its words (2330, 11-20)', () => {
+  const rows = rowsOf(
+    '6.交易相對人及其與公司之關係（交易相對人如屬自然人，且非公司之\r\n關係人者，得免揭露其姓名）:\r\nAnthropic；與公司之關係：無。\r\n7.取得或處分有價證券標的公司每股淨值:\r\n0.01元\r\n8.迄目前為止，累積持有本交易證券（含本次交易）之數量、金額、持股\r\n比例及權利受限情形（如質押情形）:\r\n6,024,096股；0.03%；無。\r\n9.占總資產之比例:\r\n0.91%；0.94%；NT$325,002佰萬元。'
+  );
+  assert.deepEqual(rows, [
+    ['交易相對人及其與公司之關係', 'Anthropic；與公司之關係：無'],
+    ['取得或處分有價證券標的公司每股淨值', '0.01元'],
+    ['迄目前為止，累積持有本交易證券之數量、金額、持股比例及權利受限情形', '6,024,096股；0.03%；無'],
+    ['占總資產之比例', '0.91%；0.94%；NT$325,002佰萬元']
+  ]);
+});
+
 test("either list's row read as one filing, by code", () => {
   assert.deepEqual(filingOf(twse).id, '5306-20261110170422');
   assert.equal(filingOf(tpex).code, '6790');
