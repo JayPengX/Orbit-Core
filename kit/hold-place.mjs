@@ -318,6 +318,14 @@ function keepTap(t) {
     tap = null;
     return anchor(s);
   }
+  // A finger down and the scroller moved since: the finger is scrolling, not
+  // tapping (a swipe that starts on 勝率走勢: a touch on the chart first,
+  // the page's pan a moment later). Held where it was touched, the page
+  // snapped back under the swipe, or went to the top (Jay 2026-11-20, iPhone).
+  if (fingers() > 0 && Math.abs(s.scrollTop - t.top) > 1) {
+    tap = null;
+    return;
+  }
   const n = t.node.isConnected && shown(t.node) ? t.node : standIn(s, { node: t.node, sig: t.sig, y: t.y, top: t.top }, true);
   // Gone (a part with no such control), or grown above it (a list opened over its 再看): the view's place.
   const off = n ? atView(s, n) + s.scrollTop : 0;
@@ -397,6 +405,8 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
   addEventListener('pointerdown', ev => ((lastGesture = Date.now()), noteTap(ev.target)), true);
   // (The window counts from the finger lifting: a slow swipe's day lands after it.)
   addEventListener('pointerup', () => ((lastGesture = Date.now()), tap && (tap.at = Date.now())), true);
+  // (The browser took the touch for a scroll: no tap to hold, before what the page draws as it lets go.)
+  addEventListener('pointercancel', ev => ev.pointerType === 'touch' && (tap = null), true);
   // Typing: the field stays where it is while what it finds changes under it.
   addEventListener('keydown', ev => ((lastGesture = inputAt = Date.now()), noteTap(ev.target)), true);
   addEventListener('wheel', () => ((lastGesture = inputAt = Date.now()), (tap = null)), { capture: true, passive: true });

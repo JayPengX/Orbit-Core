@@ -297,3 +297,82 @@ test('in a browser: a hover redrawing a chart holds no scroll back; Safari\'s th
     server.close();
   }
 });
+
+// Jay 2026-11-20 (iPhone, an MLS game over): a swipe that starts on
+// 勝率走勢 is a touch on the chart first (it shows the point under the
+// finger) and the page's pan a moment later, when Safari cancels the touch
+// and the chart lets go. The chart was held under the finger like a tapped
+// button, and Safari's page had already begun to move: it snapped back, or
+// to the top.
+test('in a browser: a swipe that starts on a chart scrolls; the chart is never held under the finger', async t => {
+  let chromium;
+  try {
+    ({ chromium } = (await import('node:module')).createRequire(import.meta.url)('playwright'));
+  } catch {
+    return t.skip('no Playwright here');
+  }
+  const { createServer } = await import('node:http');
+  const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width"><style>
+    body { margin: 0; height: 100vh; }
+    dialog { width: 390px; height: 800px; max-height: none; margin: auto; padding: 0 16px; overflow-y: auto; border: 0; box-sizing: border-box; }
+    .row { height: 80px; }
+    #chart { height: 90px; touch-action: pan-y; }
+  </style></head><body>
+  <dialog id="d"></dialog>
+  <script type="module">
+    const raw = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
+    globalThis.rawTop = (s, v) => raw.set.call(s, v);
+    await import('/hold-place.mjs');
+    const d = document.getElementById('d');
+    const rows = n => Array.from({ length: n }, (_, k) => Object.assign(document.createElement('div'), { className: 'row', textContent: 'Row ' + k }));
+    const at = Object.assign(document.createElement('small'), { textContent: '目前' });
+    const chart = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    chart.id = 'chart';
+    const say = w => at.replaceChildren(document.createTextNode(w));
+    chart.addEventListener('pointerdown', () => say('第 3 節'));
+    chart.addEventListener('pointercancel', () => say('目前'));
+    d.append(...rows(10), at, chart, ...rows(30));
+    d.show();
+    globalThis.ready = true;
+  </script></body></html>`;
+  const server = createServer((req, res) => {
+    if (req.url === '/hold-place.mjs') return res.writeHead(200, { 'content-type': 'text/javascript' }).end(kit('hold-place.mjs'));
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(page);
+  });
+  await new Promise(r => server.listen(0, r));
+  let browser;
+  try {
+    browser = await chromium.launch();
+    const p = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await p.goto(`http://localhost:${server.address().port}/`);
+    await p.waitForFunction(() => globalThis.ready);
+    // Safari's order: the touch on the chart, the page already moving when the touch is cancelled.
+    const r = await p.evaluate(async () => {
+      const d = document.getElementById('d');
+      const chart = document.getElementById('chart');
+      rawTop(d, 500);
+      await new Promise(r => setTimeout(r, 400));
+      const fire = (type, Kind = Event, o = {}) => chart.dispatchEvent(new Kind(type, { bubbles: true, ...o }));
+      fire('touchstart');
+      fire('pointerdown', PointerEvent, { pointerType: 'touch', pointerId: 1 });
+      await new Promise(r => requestAnimationFrame(r));
+      rawTop(d, 512);
+      fire('pointercancel', PointerEvent, { pointerType: 'touch', pointerId: 1 });
+      await new Promise(r => requestAnimationFrame(r));
+      const atCancel = d.scrollTop;
+      rawTop(d, 530);
+      await new Promise(r => requestAnimationFrame(r));
+      fire('touchmove');
+      document.querySelector('small').textContent = '目前 ';
+      await new Promise(r => requestAnimationFrame(r));
+      const after = d.scrollTop;
+      fire('touchend');
+      return { atCancel, after };
+    });
+    assert.equal(r.atCancel, 512, 'the page goes on where the swipe had it as the touch is cancelled');
+    assert.equal(r.after, 530, 'and while the finger scrolls on');
+  } finally {
+    await browser?.close();
+    server.close();
+  }
+});
