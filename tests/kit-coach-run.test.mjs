@@ -195,3 +195,45 @@ test('the guide: a target scrolled under a floating bar is brought back once the
     await browser.close();
   }
 });
+
+// Jay 11-20: a guide started away from the app's home (another tab) found none of its steps,
+// looked for each one with its bubble hidden and every tap held back, and the app seemed frozen.
+// Now it starts from home (goHome: the first tab, tapped again if need be), nothing is held back
+// while it looks, and two steps in a row not there stop it, said.
+test('the guide: started away from home it goes home first; looking never freezes the app; lost, it stops', async t => {
+  if (!chromium || !existsSync(chromium.executablePath())) return t.skip('no Chromium here');
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    const tabs = PAGE.replace('<script type="module">', `<nav class="q-tabbar"><button class="q-tab" id="tab-home" aria-selected="false">home</button><button class="q-tab" id="tab-two" aria-selected="true">two</button></nav>
+<script>
+  document.getElementById('t1').hidden = true;
+  document.getElementById('tab-home').onclick = () => { document.getElementById('t1').hidden = false; document.getElementById('tab-home').setAttribute('aria-selected', 'true'); document.getElementById('tab-two').setAttribute('aria-selected', 'false'); };
+</script><script type="module">
+  window.coach = await import('/kit/coach.mjs');`);
+    await page.route('http://app.test/**', route => {
+      const path = new URL(route.request().url()).pathname;
+      if (path.startsWith('/kit/')) return route.fulfill({ contentType: 'text/javascript', body: readFileSync(new URL(path.slice(5), kit)) });
+      return route.fulfill({ contentType: 'text/html', body: tabs });
+    });
+    await page.goto('http://app.test/');
+    await page.waitForFunction(() => window.ready && window.coach);
+    // Home first: the first tab opened, so the first step's target is there.
+    assert.equal(await page.locator('#t1').isVisible(), false, 'set up: away from home');
+    await page.evaluate(() => window.coach.goHome([{ say: ['開場', 'Open'] }, { tap: '#t1', say: ['一', 'One'] }]));
+    assert.equal(await page.locator('#t1').isVisible(), true, 'home: the first step is on screen');
+
+    // Lost: two steps in a row not there. While it looks, a tap reaches the app; then it stops.
+    await page.evaluate(() => window.heard.splice(0));
+    await page.evaluate(() => window.tour([{ say: ['開場', 'Open'] }, { tap: '#nope1', say: ['甲', 'A'] }, { tap: '#nope2', say: ['乙', 'B'] }, { tap: '#t1', say: ['一', 'One'] }]));
+    await page.waitForSelector('.q-coach-next:not([hidden])');
+    await page.click('.q-coach-next');
+    await page.waitForSelector('.q-coach.wait', { state: 'attached' });
+    await page.mouse.click(60, 520);
+    assert.ok((await page.evaluate(() => window.heard.splice(0))).includes('click:other'), 'looking, the app still answers');
+    await page.waitForFunction(() => window.ended === false, null, { timeout: 12000 });
+    await page.waitForFunction(() => /導覽先停在這裡/.test(document.querySelector('.q-toast')?.textContent || ''), null, { timeout: 2000 });
+  } finally {
+    await browser.close();
+  }
+});

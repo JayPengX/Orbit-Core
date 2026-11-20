@@ -176,6 +176,7 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
   let lost = 0; // (when the step's target went away)
   let waiting = false; // (looking for the step's target)
   let skipped = 0; // (steps not on screen: left out of the count, so it never jumps)
+  let missed = 0; // (steps not found in a row)
 
   const place = () => {
     raf = requestAnimationFrame(place);
@@ -234,6 +235,9 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
   // next step; scrolling is the browser's own, so it stays free.
   const shield = e => {
     if (bubble.contains(e.target)) return;
+    // (Looking for the next step's target, its bubble hidden: nothing held back, so the app never
+    // seems frozen. Jay 11-20, a guide started away from the home page: nothing answered for 20 s.)
+    if (waiting) return;
     const s = steps[at];
     // (The close: a tap anywhere is the person going on by themselves.)
     if (at >= steps.length) return void (e.type === 'click' && end(true));
@@ -311,7 +315,17 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
       waiting = false;
       bubble.classList.remove('wait');
       // (not on screen today: skipped, never stuck)
-      if (!target) return (skipped++, go(i + 1));
+      if (!target) {
+        // (Two steps in a row not on screen: this isn't the screen the guide knows; it stops, said,
+        // rather than skip on unseen.)
+        // (A sheet's ✕ isn't a miss of its own: the step before it opened that sheet, or didn't.)
+        if (!s.optional && !/^dialog\[open\]/.test(sel) && ++missed >= 2) {
+          toast(T(lang, ['導覽先停在這裡', 'The guide stopped here']));
+          return end(false);
+        }
+        return (skipped++, go(i + 1));
+      }
+      if (!s.optional) missed = 0;
     }
     lift();
     say.textContent = T(lang, s.say);
@@ -328,10 +342,29 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
   return { end };
 }
 
-// 帶我走一遍: the app's own guide, from the Pass sheet's 說明 (pass.mjs) or the offer.
-export function startGuide(s, app = s?.app, lang = s?.lang || 'zh') {
+// The app's home, where every guide starts (Jay 11-20: started from another tab, none of its
+// steps were there): any sheet closed, the first tab opened, and tapped again if its first step's
+// target still isn't there (a tab tapped at its top resets itself, kit tabBar).
+const pause = ms => new Promise(r => setTimeout(r, ms));
+export async function goHome(steps) {
+  const first = steps.find(x => (x.tap || x.show) && !x.optional);
+  const there = () => !first || Boolean(find(first.tap || first.show));
+  const shut = globalThis.orbitCloseSheet || (d => d.close());
+  const open = [...document.querySelectorAll('dialog[open]:not(.q-leaving)')];
+  for (const d of open) shut(d);
+  if (open.length) await pause(350);
+  const tab = document.querySelector('.q-tabbar .q-tab');
+  for (let k = 0; k < 2 && tab && !there(); k++) {
+    tab.click();
+    await pause(500);
+  }
+}
+
+// 帶我走一遍: the app's own guide, from the Pass sheet's 說明 (pass.mjs) or the offer, from its home.
+export async function startGuide(s, app = s?.app, lang = s?.lang || 'zh') {
   const steps = GUIDES[app];
   if (!steps) return null;
+  await goHome(steps);
   return coachTour(steps, {
     lang,
     onEnd: done => {
