@@ -9,6 +9,16 @@
 // peak, until, bars } (raining now, or from `from`; `to` null: still raining
 // at `until`; `bars`: the rate every step from now, for a strip).
 
+// CWA's echo grid (O-A0059-001; weather-radar.js reads it): a point every
+// 0.0125° (~1.25 km east–west, ~1.4 km north–south) from 18°N 115°E, on
+// Taiwan's old datum (TWD67: a WGS84 point sits ~250 m north and ~800 m
+// west on it). `radarSquare`: the grid point a place is read nearest, one
+// key a square: two places in one square have the same radar (Weather's
+// 我的行程 asks whether you're in the square of where it has you, Jay 2026-11-20).
+export const RADAR_GRID = { lat0: 18, lon0: 115, step: 0.0125, dLat: 0.00225, dLon: -0.008 };
+export const radarSquare = (lat, lon) =>
+  `${Math.round((lat + RADAR_GRID.dLat - RADAR_GRID.lat0) / RADAR_GRID.step)},${Math.round((lon + RADAR_GRID.dLon - RADAR_GRID.lon0) / RADAR_GRID.step)}`;
+
 // A frame this old (its data time) is no longer read (weather-radar.js RADAR_OLD_MS).
 export const RADAR_FRESH_MS = 40 * 60_000;
 // Rain worth saying: mm an hour (weather-radar.js: under ~0.5 an echo is dry).

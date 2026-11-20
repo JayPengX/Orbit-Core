@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { packEcho, radarCron, radarAt, cellAt, encodeDbz, decodeDbz, rateOf, motionOf, NX, NY, RADAR_KEY, STEPS } from '../weather-radar.js';
-import { rainNow, rainWord, RAIN_WORDS } from '../kit/rain-now.mjs';
+import { rainNow, rainWord, RAIN_WORDS, radarSquare } from '../kit/rain-now.mjs';
 import { radarNotice } from '../weather.js';
 
 const MIN = 60_000;
@@ -136,4 +136,15 @@ test('the notice: when, how hard and until when, in words; drizzle or more than 
   assert.equal(en.body, 'Light rain from 20:30 to about 21:00; take an umbrella');
   for (const n of [say(now + 15 * MIN, now + 45 * MIN, 2.5), say(now + 15 * MIN, null, 40)]) assert.ok(n.body.length <= 26, `a lock screen reads it at a glance: ${n.body}`);
   assert.equal(radarNotice({ kind: 'now', from: now, to: null, peak: 5, until: now }, now), null, 'already raining: no 快下雨了');
+});
+
+test('a place\'s radar square: the grid point it\'s read nearest, the same the radar reads (Jay 11-20)', () => {
+  // Taipei 101 and a step beside it: one square; 1.3 km north: the next.
+  assert.equal(radarSquare(25.0336, 121.5646), radarSquare(25.0336 + 0.004, 121.5646 + 0.004));
+  assert.notEqual(radarSquare(25.0336, 121.5646), radarSquare(25.0336 + 0.0125, 121.5646));
+  // The same grid as the radar's slice (weather-radar.js cellAt), 160 rows and 240 columns in.
+  const [r, c] = radarSquare(25.0336, 121.5646).split(',').map(Number);
+  const cell = cellAt(25.0336, 121.5646);
+  assert.equal(r - 160, Math.round(cell.row));
+  assert.equal(c - 240, Math.round(cell.col));
 });

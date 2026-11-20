@@ -18,6 +18,8 @@
 // walks back along the motion from the place: what is upwind now is what
 // arrives (`radarAt`: `{ at, step, rate, mm, near }`, the rain rate at the
 // place every 5 minutes for two hours from the frame's time, mm an hour).
+import { RADAR_GRID } from './kit/rain-now.mjs';
+
 export const ECHO_URL = 'https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0059-001.json';
 export const RADAR_KEY = 'weather/radar-echo.bin';
 // Taiwan's part (the grid CWA's rain products use): 118–123.5°E, 20–27°N.
@@ -57,8 +59,8 @@ const zOf = b => (b === 0 || b === 255 ? 0 : Math.pow(10, b / 20));
 
 // WGS84 to the grid's TWD67 (about 800 m east, 250 m north apart in Taiwan), fractional.
 export function cellAt(lat, lon) {
-  const row = (lat + 0.00225 - Y0) / STEP;
-  const col = (lon - 0.008 - X0) / STEP;
+  const row = (lat + RADAR_GRID.dLat - Y0) / STEP;
+  const col = (lon + RADAR_GRID.dLon - X0) / STEP;
   return row >= 1 && row < NY - 1 && col >= 1 && col < NX - 1 ? { row, col } : null;
 }
 
