@@ -39,11 +39,18 @@ export function f1ToKeep(events, now = Date.now()) {
 // until `until` (a run's 12 minutes) or `per` sessions; one turned away
 // tried again 20 seconds on, then the next session (three in a row: the
 // next run). `per` 0: only counted.
-// → { sessions, kept, read, stopped? }.
+// → { sessions, kept, read, stopped?, waiting? (OpenF1 shut: not a failure) }.
 export const F1KEPT_MS = 12 * 60_000;
 export const KEPT_LIST = 'private/f1/kept-sessions.json';
 const SESSION_MS = 30_000;
-export async function runF1Kept({ store, proxy, now = Date.now(), per = Infinity, until = now + F1KEPT_MS, sleep = ms => new Promise(r => setTimeout(r, ms)), clock = Date.now }) {
+// Whether OpenF1 is shut to us now: through a race weekend it turns every free
+// asker away, past sessions too ("Live F1 session in progress", 401; Las Vegas
+// 2026-11-20: three runs turned away mailed Jay a failure). Asked only once a read fails.
+export const openF1Shut = () =>
+  fetch('https://api.openf1.org/v1/sessions?session_key=latest')
+    .then(r => r.status === 401 || r.status === 403)
+    .catch(() => false);
+export async function runF1Kept({ store, proxy, now = Date.now(), per = Infinity, until = now + F1KEPT_MS, sleep = ms => new Promise(r => setTimeout(r, ms)), clock = Date.now, shut = openF1Shut }) {
   const year = new Date(now).getUTCFullYear();
   const events = (await store.json(`sports/f1/${year}.json`))?.events || [];
   const missing = [];
@@ -76,6 +83,8 @@ export async function runF1Kept({ store, proxy, now = Date.now(), per = Infinity
       again++;
       await sleep(20_000);
       if (await proxy(url).catch(() => null)) continue;
+      // (OpenF1 shut for a weekend: nothing wrong, the session waits for a run after it.)
+      if (await shut()) return out({ waiting: url });
       ok = false;
       failed.push(url);
       break;

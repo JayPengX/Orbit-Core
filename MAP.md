@@ -359,7 +359,7 @@ writing a file only when it changed (`builders/store.js`):
 | `photos.js`, `official-photos.js` | photo lists, cutouts, official headshots | hourly / daily 18:00 |
 | `gtfs.js`, `buses.js`, `ntpc.js` (GitHub `buses.yml`, `tools/gtfs-buses.mjs`) | `bus/…`, `shape/…`, `station/…`, `where.json`, `rail/…`, `tdx/…` | weekly (`kickBuses`) |
 | `asia.js`, `cpbl.js` | CPBL's month and standings | daily 15:00 |
-| `f1kept.js` | each finished F1 session's 數據 and laps, kept early (via the proxy) | :06, :26, :46 |
+| `f1kept.js` | each finished F1 session's 數據 and laps, kept early (via the proxy); OpenF1 shut (a race weekend): waiting | :06, :26, :46 |
 | `kept.js` | wipes kept copies (`mirror/`) before a league's first askable day | daily 17:00 |
 | `news.js`, `news-words.js`, `news-laws.js` | `news/index.json` (3 days), `past.json`: stories by weight, topic, side, 快訊 (`live`: many outlets in 2 h); `laws.json`; read here, the desk laid by `news-desk.yml` | every 10 min |
 | `tools/flight-pool.mjs` (`flight.yml`, started by the cron: `flight.js keepPool`) | `flight/` | 10 min |
