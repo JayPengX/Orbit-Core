@@ -310,6 +310,8 @@ export function withLive(q, row, now = Date.now()) {
     volume,
     marketTime: at,
     line: [...(q.line || []).filter(p => p[0] < at), [at, last]],
+    // (A future's 價差 is now the trade's over what it's on: its estimate was that plus the old basis.)
+    ...(Number.isFinite(q.basis) ? { basis: last - (q.price - q.basis) } : {}),
     live: 'TAIFEX'
   };
 }

@@ -73,6 +73,8 @@ test("a live trade today moves the quote to it; yesterday's or none leaves it", 
   const live = withLive(q, today, NOW);
   assert.deepEqual([live.price, live.prev, live.change, live.bid, live.ask, live.live], [35875, 38607, -2732, 35870, 35880, 'TAIFEX']);
   assert.deepEqual(live.line.at(-1), [NOW - 1000, 35875]);
+  // (Estimated at the index 36,000 plus 100: the trade is 125 under the index.)
+  assert.equal(withLive({ ...q, basis: 100 }, today, NOW).basis, -125);
   assert.equal(withLive(q, [...today.slice(0, 7), NOW - 86_400_000], NOW), q);
   assert.equal(withLive(q, [null, 38607, null, null, null, null, 0, NOW], NOW), q);
   assert.equal(withLive(q, undefined, NOW), q);
