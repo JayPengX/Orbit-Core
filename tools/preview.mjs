@@ -8,7 +8,7 @@
 //                          [--settle]  (--wait and each click's wait end early once the page has stopped changing)
 //                          [--type 'selector=text']  (fills a field after the clicks)
 //                          [--store 'key=value']  (a localStorage entry to start with; a reload keeps the page's own)
-//                          [--geo lat,lon]  (where the phone is; Transit's default 新竹車站)
+//                          [--geo lat,lon]  (where the phone is; Transit's default 新竹車站, Weather's Taipei 101)
 //                          [--geo-path 'lat,lon;…' --geo-every ms]  (the phone moving, during --wait)
 //                          [--safari]  (opened in Safari, not from the home screen: the install screen)
 //                          [--signed-out]  (the sign-in screen, as a new device sees it)
@@ -676,7 +676,7 @@ const context = serve ? stub : persistent ? await playwright[engine].launchPersi
 if (clock && !serve) await context.clock.install({ time: clockTime(clock) }).then(() => context.clock.resume());
 if (appId === 'weather' && !noGeo) {
   await context.grantPermissions(['geolocation']);
-  await context.setGeolocation({ latitude: 25.034, longitude: 121.565 });
+  await context.setGeolocation(geoAt?.length === 2 ? { latitude: geoAt[0], longitude: geoAt[1], accuracy: 20 } : { latitude: 25.034, longitude: 121.565 });
 }
 if (appId === 'transit' && !noGeo) {
   await context.grantPermissions(['geolocation']);
