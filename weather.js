@@ -48,6 +48,7 @@
 import { keptRead, keptPut } from './kept-store.js';
 import { radarAt } from './weather-radar.js';
 import { STATIONS } from './weather-stations.js';
+import { TOWNS } from './weather-towns.js';
 import { twDay, placeEn } from './kit/format.mjs';
 import { rainNow, rainWord } from './kit/rain-now.mjs';
 import { COUNTIES, readTyphoon, readDgpa, readSeatRain, dayOffFor, closuresFor, tradeClosed, stampSeen } from './typhoon.js';
@@ -765,39 +766,11 @@ export async function googleAllowed(env, now, calls = 4, defer = null, spare = f
   return true;
 }
 
-// Each township's middle (its stations' mean), for the place picker.
-let townsCache = null;
-// The townships no CWA station stands in: each at its district office
-// (checked against NLSC's /weather/where, 2026-11-12). Without them 搜尋地點
-// couldn't find 臺中市西區 or 臺南市東區.
-const NO_STATION = [
-  ['臺中市', '中區', 24.1435, 120.6795],
-  ['臺中市', '東區', 24.1366, 120.6985],
-  ['臺中市', '南區', 24.1206, 120.664],
-  ['臺中市', '西區', 24.1414, 120.6714],
-  ['臺南市', '東區', 22.9805, 120.2248],
-  ['高雄市', '鹽埕區', 22.6248, 120.2853],
-  ['高雄市', '前金區', 22.6276, 120.2943],
-  ['高雄市', '鳥松區', 22.6594, 120.364],
-  ['基隆市', '信義區', 25.1294, 121.7517]
-];
-export function townships() {
-  if (townsCache) return townsCache;
-  const by = new Map();
-  for (const [, , lat, lon, county, town] of [...STATIONS, ...NO_STATION.map(([county, town, lat, lon]) => ['', '', lat, lon, county, town])]) {
-    const k = `${county}|${town}`;
-    const t = by.get(k) || { county, town, lat: 0, lon: 0, n: 0 };
-    t.lat += lat;
-    t.lon += lon;
-    t.n++;
-    by.set(k, t);
-  }
-  const order = Object.keys(COUNTY_IDS);
-  townsCache = [...by.values()]
-    .sort((a, b) => order.indexOf(a.county) - order.indexOf(b.county) || a.town.localeCompare(b.town, 'zh-Hant'))
-    .map(t => [t.county, t.town, Math.round((t.lat / t.n) * 1e4) / 1e4, Math.round((t.lon / t.n) * 1e4) / 1e4]);
-  return townsCache;
-}
+// Every township at CWA's own point for it (its 公所, where its township
+// forecast is for: weather-towns.js), for the place picker. (Not the mean of
+// its stations, as until 2026-11-20: 19 of 368 fell outside their township,
+// 旗津區 in the South China Sea with 東沙島 and 南沙島's.)
+export const townships = () => TOWNS;
 
 // MOENV's AQI sites, kept whole in KV 20 minutes (the cell build and the
 // cron's history share them).

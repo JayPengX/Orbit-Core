@@ -9,7 +9,7 @@ import {
   airForecast, parseGoogleAir, googleAirBody,
   weatherStatus, handleWeather, scrub, cellOf, nearestStation, townIds, airArea, parseCwaTown, cwaAt, parseGoogleDay, parseGoogleHour,
   blend, buildCell, GOOGLE_DAILY_CALLS, parseVillage, whereIs, addAirReading, briefText, rainPhrase, weatherCheck, noteRecent, cellForecast, FRESH_WAIT_MS, advise, adviceWindow, parseCwaWarnings, aqiLevel, uvLevel, num, DEFAULT_WEIGHTS
-, popStep, keepJson, keptJson, KV_EVERY_MS, googleAllowed, googlePace, gridOf, keepPast, googleDayCap, googleToday, GOOGLE_MONTH_CALLS, aqfDays, parseAir } from '../weather.js';
+, popStep, keepJson, keptJson, KV_EVERY_MS, googleAllowed, googlePace, gridOf, keepPast, googleDayCap, googleToday, GOOGLE_MONTH_CALLS, aqfDays, parseAir, km } from '../weather.js';
 import { STATIONS } from '../weather-stations.js';
 import { twDay } from '../kit/format.mjs';
 import { upstream as fixtureUpstream } from './fixtures/weather/upstream.mjs';
@@ -453,6 +453,16 @@ test('the township list for the picker', async () => {
   const xinyi = list.find(([c, t]) => c === '臺北市' && t === '信義區');
   assert.ok(xinyi && Math.abs(xinyi[2] - 25.03) < 0.05);
   assert.equal(list[0][0], '宜蘭縣');
+  // Each where its people are, not the middle of its stations (2026-11-20: 旗津區
+  // sat in the South China Sea with 東沙島 and 南沙島's, 加入 refused it; 基隆市中正區
+  // 22 km out with 彭佳嶼's): within 12 km of a station of its own, in Taiwan's box.
+  for (const [c, t, la, lo] of list) {
+    assert.ok(la > 21.8 && la < 26.5 && lo > 118 && lo < 122.1, `${c}${t} at ${la},${lo}`);
+    const own = STATIONS.filter(s => s[4] === c && s[5] === t);
+    if (own.length) assert.ok(Math.min(...own.map(s => km(la, lo, s[2], s[3]))) < 12, `${c}${t} is far from its own stations`);
+  }
+  const qijin = list.find(([c, t]) => c === '高雄市' && t === '旗津區');
+  assert.ok(km(qijin[2], qijin[3], 22.6146, 120.2647) < 3, '旗津區 is at 旗津');
 });
 
 test('Google is asked at most GOOGLE_DAILY_CALLS times a day; far hours every 6 hours; then CWA alone', async () => {
