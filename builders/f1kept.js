@@ -39,18 +39,19 @@ export function f1ToKeep(events, now = Date.now()) {
 // until `until` (a run's 12 minutes) or `per` sessions; one turned away
 // tried again 20 seconds on, then the next session (three in a row: the
 // next run). `per` 0: only counted.
-// → { sessions, kept, read, stopped?, waiting? (OpenF1 shut: not a failure) }.
+// → { sessions, kept, read, stopped?, waiting? (OpenF1 refusing: not a failure) }.
 export const F1KEPT_MS = 12 * 60_000;
 export const KEPT_LIST = 'private/f1/kept-sessions.json';
 const SESSION_MS = 30_000;
-// Whether OpenF1 is shut to us now: through a race weekend it turns every free
-// asker away, past sessions too ("Live F1 session in progress", 401; Las Vegas
-// 2026-11-20: three runs turned away mailed Jay a failure). Asked only once a read fails.
-export const openF1Shut = () =>
-  fetch('https://api.openf1.org/v1/sessions?session_key=latest')
-    .then(r => r.status === 401 || r.status === 403)
-    .catch(() => false);
-export async function runF1Kept({ store, proxy, now = Date.now(), per = Infinity, until = now + F1KEPT_MS, sleep = ms => new Promise(r => setTimeout(r, ms)), clock = Date.now, shut = openF1Shut }) {
+// OpenF1 turning us away (not our failure): through a race weekend it shuts to
+// every free asker, past sessions too (401, "Live F1 session in progress"), and
+// its limit on Cloudflare's shared addresses answers 429 for hours (Las Vegas
+// 2026-11-20: runs turned away mailed Jay a failure, twice). Such a session
+// waits for a later run; one still turned away 4 days after it ended is a failure.
+const REFUSED = /openf1 (401|403|429)/;
+const WAIT_MS = 4 * 86_400_000;
+const startOf = url => Date.parse(new URL(url).searchParams.get('start'));
+export async function runF1Kept({ store, proxy, now = Date.now(), per = Infinity, until = now + F1KEPT_MS, sleep = ms => new Promise(r => setTimeout(r, ms)), clock = Date.now }) {
   const year = new Date(now).getUTCFullYear();
   const events = (await store.json(`sports/f1/${year}.json`))?.events || [];
   const missing = [];
@@ -77,14 +78,17 @@ export async function runF1Kept({ store, proxy, now = Date.now(), per = Infinity
     const began = clock();
     let ok = true;
     for (const url of todo) {
-      if (await proxy(url).catch(() => null)) continue;
+      const read = () => proxy(url, '', { why: true }).catch(e => ({ error: String(e?.message || e) }));
+      let got = await read();
+      if (got && !got.error) continue;
       // (Turned away: once more 20 seconds on; still not, the next session:
       // one OpenF1 can't give (a session called off) never holds up the rest.)
       again++;
       await sleep(20_000);
-      if (await proxy(url).catch(() => null)) continue;
-      // (OpenF1 shut for a weekend: nothing wrong, the session waits for a run after it.)
-      if (await shut()) return out({ waiting: url });
+      got = await read();
+      if (got && !got.error) continue;
+      // (OpenF1 refusing, not 4 days on: nothing wrong, the session waits for a later run.)
+      if (REFUSED.test(got?.error || '') && now - startOf(url) < WAIT_MS) return out({ waiting: url, why: got.error });
       ok = false;
       failed.push(url);
       break;

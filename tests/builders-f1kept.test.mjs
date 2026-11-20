@@ -35,7 +35,7 @@ test('a run reads the sessions not kept, skips what’s kept, until its time is 
   assert.deepEqual(r, { sessions: 4, kept: 3, read: 2, again: 0 });
   assert.deepEqual(asked, [f1SessionUrl('2026-10-11T12:00Z'), f1LapsUrl('2026-10-11T12:00Z'), f1SessionUrl('2026-10-10T09:00Z'), f1LapsUrl('2026-10-10T09:00Z')]);
   let waited = 0;
-  const shut = await runF1Kept({ store: r2Store(bucket), proxy: async () => null, now, clock: () => now, sleep: async ms => (waited += ms), shut: async () => false });
+  const shut = await runF1Kept({ store: r2Store(bucket), proxy: async () => null, now, clock: () => now, sleep: async ms => (waited += ms) });
   // Each tried once more 20 seconds on, the three left each failing: stopped at the third.
   assert.ok(waited >= 3 * 20_000);
   assert.equal(shut.read, 0);
@@ -52,10 +52,19 @@ test('a run reads the sessions not kept, skips what’s kept, until its time is 
   listed.has = async p => (heads.push(p), has(p));
   await runF1Kept({ store: listed, proxy: async () => assert.fail(), now, per: 0 });
   assert.equal(heads.length, 6, 'only the three not kept looked for');
-  // OpenF1 shut for a race weekend (Las Vegas, 11-20): waiting, never a failure (no alert mailed).
-  const locked = await runF1Kept({ store: r2Store(bucket), proxy: async () => null, now, clock: () => now, sleep: async () => {}, shut: async () => true });
+  // OpenF1 refusing (a race weekend's 401, its 429 on Cloudflare's addresses; Las Vegas, 11-20):
+  // waiting, never a failure (no alert mailed)...
+  const refused = async () => ({ error: 'archive 401; openf1 429' });
+  const soon = Date.parse('2026-10-12T04:00Z');
+  const locked = await runF1Kept({ store: r2Store(bucket), proxy: refused, now: soon, clock: () => soon, sleep: async () => {} });
   assert.equal(locked.failed, undefined);
   assert.equal(locked.waiting, f1SessionUrl('2026-10-11T12:00Z'));
+  // ...until 4 days after: then a failure, so a block that never lifts is told.
+  const stale = await runF1Kept({ store: r2Store(bucket), proxy: refused, now, clock: () => now, sleep: async () => {} });
+  assert.ok(stale.failed?.length);
+  // Any other refusal (the proxy's own error) a failure at once.
+  const broken = await runF1Kept({ store: r2Store(bucket), proxy: async () => ({ error: 'archive 500' }), now, clock: () => now, sleep: async () => {} });
+  assert.ok(broken.failed?.length);
   // Its time up: none read.
   assert.equal((await runF1Kept({ store: r2Store(bucket), proxy: async () => ({}), now, until: now, clock: () => now, sleep: async () => {} })).read, 0);
 });

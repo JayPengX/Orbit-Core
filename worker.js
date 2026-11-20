@@ -1333,10 +1333,12 @@ const stockReads = env => async url => {
   return res.json();
 };
 // The builders' reads through the data proxy's route, as Orbit Sports' (its trims, its cache).
-const builderProxy = env => async (url, trim = '') => {
+// (`why`: a refused read answered { error } with the proxy's reason, not null: builders/f1kept.js.)
+const builderProxy = env => async (url, trim = '', { why = false } = {}) => {
   const ask = `https://orbit-workers-proxy.orbit/sports-proxy?url=${encodeURIComponent(url)}&app=match${trim ? `&trim=${encodeURIComponent(trim)}` : ''}&qt=${encodeURIComponent(await sportsToken(env, 'match'))}`;
   const res = await handleSports(new Request(ask), env, inPlace, {}, 'worker');
-  return res.ok ? res.json() : null;
+  if (res.ok) return res.json();
+  return why ? { error: String((await res.json().catch(() => null))?.error || `HTTP ${res.status}`).slice(0, 120) } : null;
 };
 // A builder's AI cap for a feature (the admin panel's DEV ai*), as a route's is.
 const builderCap = env => feature => aiCap(env, { waitUntil() {} }, feature);
