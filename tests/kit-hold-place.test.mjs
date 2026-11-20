@@ -208,3 +208,92 @@ test('fingers are counted from each touch event, never summed; one unheard of fo
   assert.match(orbit, /BEAT_WAIT_MAX_MS/);
   assert.match(orbit.slice(orbit.indexOf('export function everyDev')), /Date\.now\(\) - heldSince < BEAT_WAIT_MAX_MS/);
 });
+
+// Jay 2026-11-20: hovering 勝率走勢 on a live game's page often threw him
+// back up. Each hover's redraw (the chart read under the pointer) was taken
+// for a redraw the page moved after: a scroll the page doesn't hear start
+// (an iPad's trackpad, the scroll bar) was put back, and Safari's own throw
+// to the top after a live redraw, inside that scroll, kept.
+test('in a browser: a hover redrawing a chart holds no scroll back; Safari\'s throw to the top inside one is put back', async t => {
+  let chromium;
+  try {
+    ({ chromium } = (await import('node:module')).createRequire(import.meta.url)('playwright'));
+  } catch {
+    return t.skip('no Playwright here');
+  }
+  const { createServer } = await import('node:http');
+  const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width"><style>
+    body { margin: 0; height: 100vh; }
+    dialog { width: 600px; height: 700px; max-height: none; margin: auto; padding: 0 16px; overflow-y: auto; border: 0; box-sizing: border-box; }
+    .row { height: 80px; border-bottom: 1px solid #ddd; }
+    #chart { height: 90px; background: #eef; }
+  </style></head><body>
+  <dialog id="d"></dialog>
+  <script type="module">
+    const raw = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
+    globalThis.rawTop = (s, v) => raw.set.call(s, v);
+    await import('/hold-place.mjs');
+    const d = document.getElementById('d');
+    const rows = n => Array.from({ length: n }, (_, k) => Object.assign(document.createElement('div'), { className: 'row', textContent: 'Row ' + k }));
+    const at = Object.assign(document.createElement('small'), { textContent: '目前' });
+    const chart = Object.assign(document.createElement('div'), { id: 'chart' });
+    chart.addEventListener('pointermove', ev => at.replaceChildren(document.createTextNode('第' + Math.round(ev.offsetX) + '點'), Object.assign(document.createElement('span'), { textContent: '2–1' })));
+    d.append(...rows(10), at, chart, ...rows(30));
+    d.show();
+    globalThis.ready = true;
+  </script></body></html>`;
+  const server = createServer((req, res) => {
+    if (req.url === '/hold-place.mjs') return res.writeHead(200, { 'content-type': 'text/javascript' }).end(kit('hold-place.mjs'));
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(page);
+  });
+  await new Promise(r => server.listen(0, r));
+  let browser;
+  try {
+    browser = await chromium.launch();
+    const p = await browser.newPage({ viewport: { width: 1180, height: 820 } });
+    await p.goto(`http://localhost:${server.address().port}/`);
+    await p.waitForFunction(() => globalThis.ready);
+    // (Scrolled by the wheel, the chart in the middle of the view, settled.)
+    await p.mouse.move(590, 400);
+    const chart = await p.evaluate(() => {
+      const d = document.getElementById('d');
+      return document.getElementById('chart').getBoundingClientRect().top - d.getBoundingClientRect().top - 300;
+    });
+    await p.mouse.wheel(0, chart);
+    await p.waitForTimeout(1200);
+    const box = await p.evaluate(() => {
+      const r = document.getElementById('chart').getBoundingClientRect();
+      return { x: r.left, y: r.top + 45, w: r.width };
+    });
+    // (The wheel's scroll long over, then the pointer along the chart.)
+    await p.waitForTimeout(1500);
+    for (let i = 0; i < 20; i++) await p.mouse.move(box.x + (box.w * i) / 20, box.y);
+    // A scroll the page doesn't hear start (no finger, no wheel), a frame at a time, right after.
+    const after = await p.evaluate(async () => {
+      const d = document.getElementById('d');
+      const a = d.scrollTop;
+      const seen = [];
+      for (let k = 1; k <= 8; k++) {
+        rawTop(d, a + k * 15);
+        await new Promise(r => requestAnimationFrame(r));
+        seen.push(d.scrollTop - a);
+      }
+      return seen;
+    });
+    assert.deepEqual(after, after.map((_, k) => (k + 1) * 15), 'the scroll after a hover goes where it was taken, never put back');
+    // Inside that scroll, a live redraw and Safari's throw to the top in the same moment: put back.
+    const thrown = await p.evaluate(async () => {
+      const d = document.getElementById('d');
+      const a = d.scrollTop;
+      d.querySelector('.row').textContent = 'Row 0 again';
+      rawTop(d, 0);
+      await new Promise(r => setTimeout(r, 50));
+      return { was: a, now: d.scrollTop };
+    });
+    assert.ok(thrown.was > 300, 'scrolled down first');
+    assert.equal(thrown.now, thrown.was, 'Safari\'s throw to the top is put back');
+  } finally {
+    await browser?.close();
+    server.close();
+  }
+});

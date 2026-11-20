@@ -62,6 +62,15 @@ export const countFingers = (left, now = Date.now()) => ((touching = Math.max(0,
 // it taken for the bar's and kept).
 const BAR_HOLD_MS = 2_500;
 let barLast = 0;
+// A pointer hovering (a mouse, an iPad's trackpad or Pencil, no button
+// down) as its move is handled: what that move draws is the person's own (a
+// chart read under the pointer), never a redraw the page "moved" after. Taken
+// for one, every hover over 勝率走勢 put the place back and stamped the page
+// just drawn, so a trackpad's scroll (no finger, no wheel the page hears) was
+// held still or put back, and Safari's throw to the top kept (Jay 2026-11-20).
+let hovering = false;
+// The last wheel or key: a scroll from them is the person's, even a jump to the top.
+let inputAt = 0;
 // A scroll still running, a finger on the screen, or the scroll bar in hand: a live redraw waits.
 export const scrollBusy = () => fingers() > 0 || Date.now() - lastScroll < SCROLL_IDLE_MS || Date.now() - barLast < BAR_HOLD_MS;
 // The person did something just now: a change after it is theirs (a tab, a chip, a row opened).
@@ -234,6 +243,9 @@ const AGAIN_MS = 400;
 const BAR_MS = 2000;
 const SAFARI_MS = 150;
 const drawnAt = new WeakMap();
+// Where each scroller's last scroll had it, and how far a single move to the top must come from to be Safari's throw, not a scroll reaching it.
+const lastTopAt = new WeakMap();
+const THROWN_PX = 300;
 const putBackAt = new WeakMap();
 const barAt = new WeakMap();
 let anyAt = 0;
@@ -386,8 +398,11 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
   // (The window counts from the finger lifting: a slow swipe's day lands after it.)
   addEventListener('pointerup', () => ((lastGesture = Date.now()), tap && (tap.at = Date.now())), true);
   // Typing: the field stays where it is while what it finds changes under it.
-  addEventListener('keydown', ev => ((lastGesture = Date.now()), noteTap(ev.target)), true);
-  addEventListener('wheel', () => ((lastGesture = Date.now()), (tap = null)), { capture: true, passive: true });
+  addEventListener('keydown', ev => ((lastGesture = inputAt = Date.now()), noteTap(ev.target)), true);
+  addEventListener('wheel', () => ((lastGesture = inputAt = Date.now()), (tap = null)), { capture: true, passive: true });
+  // (Set as a hover's move starts, cleared once it's handled: the observer hears its changes in between.)
+  addEventListener('pointermove', ev => void ((hovering = ev.pointerType !== 'touch' && !ev.buttons), hovering && setTimeout(() => (hovering = false))), { capture: true, passive: true });
+  addEventListener('pointermove', () => void (hovering = false), { passive: true });
   addEventListener('touchstart', ev => (countFingers(ev.touches?.length ?? 1), (lastGesture = Date.now())), { capture: true, passive: true });
   // (A finger held still sends nothing: a move says it's still there.)
   addEventListener('touchmove', ev => countFingers(ev.touches?.length ?? touching), { capture: true, passive: true });
@@ -413,6 +428,9 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
     ev => {
       const s = rootOf(ev.target === document ? document.scrollingElement : ev.target);
       if (!s || s.nodeType !== 1) return;
+      // (Where the scroll before this one had it.)
+      const was = lastTopAt.get(s) ?? 0;
+      lastTopAt.set(s, s.scrollTop);
       const st = held.get(s);
       if (st && st.top === s.scrollTop) return;
       if (!st && !s.scrollTop) return;
@@ -440,6 +458,17 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
           return restore(s);
         }
         chains.set(s, 'bar');
+      }
+      // Safari's throw to the top, straight after a redraw, in a scroll no
+      // finger, wheel, key or code is making (the scroll bar's, a trackpad's):
+      // the bar's chain took it for its own and the page stayed at the top
+      // (Jay 2026-11-20, a live game's page, hovering its chart). Put back
+      // where that scroll had it.
+      if (st && safari && s.scrollTop < 1 && was >= THROWN_PX && !fingers() && now - inputAt > GESTURE_MS && !codeScrolled(s)) {
+        putBackAt.set(s, now);
+        place(s, was);
+        lastTopAt.set(s, s.scrollTop);
+        return;
       }
       if (chains.get(s) === 'bar') barAt.set(s, (barLast = now));
       // (The code's own jump, no finger: held from where it landed at once,
@@ -470,9 +499,9 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
     const t = tapLive() ? tap : null;
     if (t && !settle.has(t.s) && touched(t.s, list)) keepTap(t);
     if (!held.size) return;
-    // (When each held scroller was last drawn in: Safari's own move follows that.)
-    for (const s of held.keys()) touched(s, list) && drawnAt.set(s, Date.now());
-    if (theirs() || fingers()) {
+    // (When each held scroller was last drawn in: Safari's own move follows that. Not a hover's: the person's own.)
+    if (!hovering) for (const s of held.keys()) touched(s, list) && drawnAt.set(s, Date.now());
+    if (theirs() || fingers() || hovering) {
       for (const s of held.keys()) (t && s === t.s) || settle.has(s) || (s.isConnected ? anchor(s) : held.delete(s));
       return;
     }

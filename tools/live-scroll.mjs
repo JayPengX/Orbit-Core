@@ -109,7 +109,8 @@ const LIVE = {
   document.querySelector('#tab-matches')?.click();
   await wait(2500);
   const leagues = [...document.querySelectorAll('[data-league]')].filter(e => e.offsetParent).map(e => e.dataset.league);
-  for (const lg of [...new Set(leagues)]) {
+  // (A team game's: not 全部's mix, nor a race weekend's session, which has no tabs to scroll.)
+  for (const lg of [...new Set(leagues)].filter(l => !/^(all|f1)$/.test(l))) {
     [...document.querySelectorAll('[data-league=' + lg + ']')].find(e => e.offsetParent)?.click();
     await wait(3000);
     const row = [...document.querySelectorAll('.event-row.live')].find(e => e.offsetParent && !e.disabled);
