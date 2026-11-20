@@ -66,3 +66,43 @@ test('turned on its side and back upright: Orbit’s frame is the window’s hei
     server.close();
   }
 });
+
+test('opened (from a notification, the home screen) with the whole screen’s height for a moment: the frame settles on the window’s, never stays 59 px too tall', async t => {
+  if (!chromium || !existsSync(chromium.executablePath())) return t.skip('no Chromium here');
+  const server = createServer((req, res) => {
+    const path = decodeURIComponent(req.url.split('?')[0]);
+    if (path === '/app/') return res.writeHead(200, { 'content-type': 'text/html' }).end(HOST);
+    if (path === '/money/') return res.writeHead(200, { 'content-type': 'text/html' }).end(APP);
+    const file = join(ROOT, 'kit', path.replace(/^\/kit\//, ''));
+    if (!path.startsWith('/kit/') || !existsSync(file)) return res.writeHead(404).end();
+    res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' }).end(readFileSync(file));
+  });
+  await new Promise(ok => server.listen(0, ok));
+  const browser = await chromium.launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 393, height: 793 }, hasTouch: true, isMobile: true });
+    await ctx.route(/^https?:\/\/(?!localhost)/, r => r.abort());
+    const page = await ctx.newPage();
+    await page.goto(`http://localhost:${server.address().port}/app/`);
+    await page.waitForSelector('.q-suite-frame');
+    const frameH = () => page.evaluate(() => Math.round(document.querySelector('.q-suite-frames').getBoundingClientRect().height));
+    await page.waitForTimeout(300);
+    assert.equal(await frameH(), 793, 'upright');
+    // iOS gives the whole screen (852) for a moment, then the status bar takes its room (793): no turn.
+    await page.setViewportSize({ width: 393, height: 852 });
+    await page.waitForTimeout(100);
+    await page.setViewportSize({ width: 393, height: 793 });
+    await page.waitForTimeout(1500);
+    assert.equal(await frameH(), 793, 'the window’s height, not the moment’s 852');
+    // And back from another app the same.
+    await page.setViewportSize({ width: 393, height: 852 });
+    await page.waitForTimeout(50);
+    await page.setViewportSize({ width: 393, height: 793 });
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.waitForTimeout(1500);
+    assert.equal(await frameH(), 793, 'back on the screen');
+  } finally {
+    await browser.close();
+    server.close();
+  }
+});

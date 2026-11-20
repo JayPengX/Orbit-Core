@@ -1234,7 +1234,8 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
   };
   // (settled: each width's height as it was when the phone was turned from it; owed: a turn made while typing,
   // measured once the field is let go. See turned.)
-  let full = 0, fullW = 0, widthAt = 0, was = '', backs = 0, after = 0, field = null, owed = false;
+  // (fieldAt: when a field in the app was last seen taken; anew, below, never forgets the most seen while the keys are near.)
+  let full = 0, fullW = 0, widthAt = 0, was = '', backs = 0, after = 0, field = null, owed = false, fieldAt = 0;
   const settled = {};
   const fit = () => {
     if (!vv) return;
@@ -1253,7 +1254,7 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
     full = Math.max(full, Math.round(globalThis.innerHeight), el ? 0 : Math.round(vv.height));
     const kb = Boolean(el) && full - vv.height > 80;
     if (!kb || el !== field) backs = 0;
-    if (el) after = 0;
+    if (el) ((after = 0), (fieldAt = Date.now()));
     field = kb ? el : null;
     const slid = vv.offsetTop > 1 || globalThis.scrollY > 1;
     if (kb && slid && backs < 3) {
@@ -1305,9 +1306,30 @@ export function host(box, { first = null, list = null, onShow = null, mine = nul
     };
     globalThis.screen?.orientation?.addEventListener?.('change', turned);
     globalThis.addEventListener('orientationchange', turned);
+    // Any other moment iOS gives the whole screen's height, the status bar's room included (852 for 793): Orbit
+    // opened from a notification or the home screen, back from another app, the window resized by itself. Kept
+    // as the most seen, the frame stayed 59 px taller than the window until the phone was turned, the app's tab
+    // bar half under the screen's foot (Jay 11-20, Sports in Orbit). So the window is measured afresh as it
+    // settles, whenever no field has been taken for 3 s: the keys' late or short window (11-17) is still never
+    // taken for the screen.
+    let anewAt = [];
+    const anew = () => {
+      anewAt.forEach(clearTimeout);
+      anewAt = [300, 1000, 2000, 3500].map(ms =>
+        setTimeout(() => {
+          if (frameField() || Date.now() - fieldAt < 3000 || owed) return;
+          if (full && full !== Math.max(Math.round(globalThis.innerHeight), Math.round(vv.height))) ((full = 0), (was = ''));
+          fit();
+        }, ms)
+      );
+    };
+    globalThis.addEventListener('resize', anew, { passive: true });
+    globalThis.addEventListener('pageshow', anew);
+    top.addEventListener('visibilitychange', () => top.visibilityState === 'visible' && anew());
     // (A field taken or left in the app: its frame tells, focus never reaching this window.)
     globalThis.__orbitFit = fit;
     fit();
+    anew();
   }
   // Off the phone's screen: which app, and when (where Orbit opens next). Back
   // on it: the rules of launchTarget again, with a playing app live too.
