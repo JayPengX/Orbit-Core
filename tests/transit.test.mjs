@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   tdxRequest, tdxGet, warmBikes, SLOW_MS, tdxAccess, resetTdxToken, resetPace, resetTurns, resetMeter, spend, usage, flushUse, billingMonth, CAPS,
-  parseGoogleRoutes, parseAutocomplete, nearFirst, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta, tdxTrim, tdxUse, DEV_SHARE, ETA_ROWS, wholeAt, together, devTdxDay, DEV_OLDEST, tdxFamily, tdxPlan, TDX_PAID_UNTIL, buildTdxMonth, buildTdxRoom
+  parseGoogleRoutes, parseAutocomplete, nearFirst, aliasOf, parseNominatim, parsePlace, parseTdxRoutes, planSig, googleRouteBody, handleTransit, GOOGLE_ROUTE_FIELDS, tdxPoints, tdxGuard, onceName, resetEta, tdxTrim, tdxUse, DEV_SHARE, ETA_ROWS, wholeAt, together, devTdxDay, DEV_OLDEST, tdxFamily, tdxPlan, TDX_PAID_UNTIL, buildTdxMonth, buildTdxRoom
 } from '../transit.js';
 
 const NOW = Date.parse('2026-10-03T01:00:00Z');
@@ -1407,4 +1407,24 @@ test("the weekly build reads TDX's own lists, never the copies it wrote (a perso
   const build = await ask({ s: 'build', build: true });
   assert.equal((await build.json())[0].from, 'tdx');
   assert.equal(calls, 1);
+});
+
+test('place search, 竹北高中 (Jay 2026-11-20): the school by its new name (國立陽明交大附中 since 2023) before the shops named for being across from it', () => {
+  const food = ['restaurant', 'food', 'point_of_interest'];
+  // Autocomplete, as Google gave it (no position), and Text Search's school.
+  const found = d => [
+    { id: 'chicken', name: '胖老爹美式炸雞- 竹北博愛店（移至竹北高中斜對面）', sub: '新竹縣竹北市竹義里中華路', dist: d && 636, types: ['meal_takeaway', ...food] },
+    { id: 'deli', name: '幽靈馬車 竹北高中分店', sub: '新竹縣竹北市福德里中華路竹北高中斜對面', dist: d && 647, types: ['deli', 'food', 'establishment'] },
+    { id: 'school', name: '國立陽明交大附中', sub: '新竹縣竹北市竹義里中央路3號', dist: d && 677, types: ['school', 'educational_institution', 'point_of_interest'] },
+    { id: 'cram', name: '聯合補習班高中部', sub: '新竹縣竹北鹿場里自強三路', dist: d && 2541, types: ['establishment', 'school', 'educational_institution'] },
+    { id: 'swim', name: '鷹萬游泳學校', sub: '新竹縣竹北市竹義里中央路', dist: d && 975, types: ['sports_school', 'sports_activity_location', 'point_of_interest'] }
+  ];
+  const near = d => [{ id: 'school', name: '國立陽明交大附中', lat: 24.8335, lon: 121.0119, dist: d && 677, types: ['school', 'secondary_school'] }];
+  for (const d of [true, null]) {
+    const ids = nearFirst(found(d), near(d), '竹北高中').map(i => i.id);
+    assert.equal(ids[0], 'school', `with${d ? '' : 'out'} your position: ${ids}`);
+    assert.ok(ids.indexOf('chicken') < ids.indexOf('cram'));
+  }
+  // No place points at the words: nothing renamed (新竹高中 stays the 新竹高中 named so).
+  assert.equal(aliasOf([{ id: 's', name: '新竹高中', types: ['school'] }, { id: 'k', name: '補習班', types: ['school'] }], '新竹高中'), null);
 });

@@ -1367,8 +1367,32 @@ export const MATCH_KM = 0.3;
 // office, a park…) a little over what's in or by it: 巨城's mall before its
 // sogo's VIP room; a bus stop or a shop never.
 const LANDMARK = new Set([...WHOLE, 'government_office', 'city_hall', 'local_government_office', 'courthouse', 'school', 'secondary_school', 'primary_school', 'tourist_attraction', 'park', 'library']);
+// A name that points at the words rather than being them: 幽靈馬車 竹北高中分店,
+// 胖老爹（移至竹北高中斜對面）, 近新竹高中.
+export const pointsAt = (name, text) => {
+  const n = plain(name);
+  const t = plain(text);
+  const i = t.length >= 2 ? n.indexOf(t) : -1;
+  return i >= 0 && (/^(斜?對面|旁邊?|附近|前面?|後面?|分店|分校|門口|側門?)/.test(n.slice(i + t.length)) || /(近|鄰近|靠近|往)$/.test(n.slice(0, i)));
+};
+// The place the words name by another name (Jay 2026-11-20: 竹北高中, 國立陽明交大附中
+// since 2023, came third after two shops named for being across from it): when
+// places found point at the words (`pointsAt`), a landmark Google found for them
+// though its name lacks them, within 1.5 km of one of those places (by position,
+// or by distance from you when one has none); with no distances, Google's first.
+export function aliasOf(list, text) {
+  const t = plain(text);
+  const refs = list.filter(i => pointsAt(i.name, t));
+  if (!refs.length) return null;
+  const cands = list.filter(i => !plain(i.name).includes(t) && (i.types || []).some(x => LANDMARK.has(x)) && !isPart(i.types));
+  const close = (a, b) => (a.lat != null && b.lat != null ? distM(a.lat, a.lon, b.lat, b.lon) <= 1500 : a.dist != null && b.dist != null ? Math.abs(a.dist - b.dist) <= 1500 : null);
+  const near = cands.find(c => refs.some(r => close(c, r)));
+  if (near) return near.id;
+  return cands.length && cands.every(c => refs.every(r => close(c, r) === null)) ? cands[0].id : null;
+}
 export function nearFirst(found, near, text) {
   const all = folded([...near, ...found], text);
+  const alias = aliasOf(all, text);
   const close = all.filter(i => i.dist != null && i.dist <= NEAR_M);
   const chains = new Set(close.map(i => stem(i.name)).filter(Boolean));
   const keep = all.filter(i => !(i.dist != null && i.dist > NEAR_M && chains.has(stem(i.name))));
@@ -1379,7 +1403,7 @@ export function nearFirst(found, near, text) {
   // (Found by both of Google's searches: a little surer.)
   const both = new Set(found.filter(i => near.some(j => j.id === i.id)).map(i => i.id));
   const far = i => MATCH_KM * Math.log10(1 + (i.dist ?? NEAR_M) / 1000);
-  const score = i => nameMatch(i.name, text) + (known.get(i.id) || 0) + (both.has(i.id) ? 0.05 : 0) + ((i.types || []).some(x => LANDMARK.has(x)) ? 0.15 : 0) - far(i);
+  const score = i => (i.id === alias ? 0.9 : nameMatch(i.name, text)) + (known.get(i.id) || 0) + (both.has(i.id) ? 0.05 : 0) + ((i.types || []).some(x => LANDMARK.has(x)) ? 0.15 : 0) - far(i);
   // (Each place once: the copy with its position, Text Search's, kept.)
   const once = new Map();
   for (const i of keep) if (!once.has(i.id) || (once.get(i.id).lat == null && i.lat != null)) once.set(i.id, i);
