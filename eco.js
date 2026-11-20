@@ -81,7 +81,7 @@ const CODE8 = /^[2-9A-HJ-NP-Z]{8}$/;
 
 // Each app's data collection.
 //   stock  Orbit Securities
-//   match  Orbit Sports, a related add-on: follows and services
+//   match  Orbit Sports, a related add-on: follows and services, and every league's 推薦 of each day (a season's: up to ~400 KB locked)
 //   vocab  Orbit Words, a related add-on: word progress
 //   orbit  Orbit Class, a related add-on: its class schedule
 //   weather  Orbit Weather, a related add-on: its pinned places and settings
@@ -93,7 +93,7 @@ const CODE8 = /^[2-9A-HJ-NP-Z]{8}$/;
 export const ECO_APPS = {
   stock: { collection: 'stock-study-accounts', maxPayload: 1_000_000 },
   vocab: { collection: 'vocab-progress-sync', maxPayload: 600_000 },
-  match: { collection: 'match-find-settings', maxPayload: 100_000 },
+  match: { collection: 'match-find-settings', maxPayload: 600_000 },
   orbit: { collection: 'orbit-class', maxPayload: 200_000 },
   weather: { collection: 'orbit-weather', maxPayload: 50_000 },
   transit: { collection: 'orbit-transit', maxPayload: 200_000 },
