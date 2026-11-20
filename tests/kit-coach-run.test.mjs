@@ -105,10 +105,13 @@ test('the guide: one tap on the ring, nothing else reaches the app, never stuck'
     await at('看');
     assert.equal(await count(), '3/7');
 
-    // A show step: its target, too, answers nothing.
+    // A show step: a tap elsewhere is held back; a tap on its ringed target goes on, as 下一步,
+    // and the app never hears it (Jay 11-20, Securities' 買進: "this step doesn't work").
+    await page.mouse.click(60, 120);
+    assert.deepEqual(await heard(), [], 'a show step: elsewhere held back');
+    assert.equal(await say(), '看');
     await page.mouse.click(60, 520);
-    assert.deepEqual(await heard(), [], 'a show step taps nothing');
-    await page.click('.q-coach-next');
+    assert.deepEqual(await heard(), [], 'a show step never taps its target in the app');
 
     // A sheet opened by the step, then closed some other way (a swipe, its dimmed page): moved on.
     await at('開');

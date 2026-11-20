@@ -120,6 +120,27 @@ const visible = el => {
   const r = el.getBoundingClientRect();
   return r.width > 0 && r.height > 0 && !el.closest('[hidden], [inert]');
 };
+const pause = ms => new Promise(r => setTimeout(r, ms));
+// After a step's tap: on as soon as the app's answer has drawn (the page still for a moment), the
+// step's own wait at most (Jay 11-20: "the next step take seconds to show": a fixed 1.7 s after a
+// quick K 線 switch, up to 3 s after a tab).
+const SETTLE_MS = 250;
+const settled = max =>
+  new Promise(done => {
+    const t0 = Date.now();
+    let last = t0;
+    // (the guide's own ring and bubble, moved every frame, aren't the app drawing)
+    const ours = n => (n.nodeType === 1 ? n : n.parentElement)?.closest?.('.q-coach, .q-coach-ring');
+    const seen = new MutationObserver(list => list.some(m => !ours(m.target)) && (last = Date.now()));
+    seen.observe(document.body, { childList: true, subtree: true, attributes: true, characterData: true });
+    const look = () => {
+      const now = Date.now();
+      if (now - t0 >= max || (now - t0 >= 350 && now - last >= SETTLE_MS)) return seen.disconnect(), done();
+      setTimeout(look, 50);
+    };
+    look();
+  });
+
 // Something of the app's own over the target's middle (its floating tab bar): a tap there misses it.
 const covered = (el, r) => {
   const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
@@ -248,8 +269,16 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
       if (e.type === 'click') {
         moving = true;
         const mine = ++turn;
-        setTimeout(() => mine === turn && go(at + 1), (s.wait || 0) + STEP_MS);
+        settled((s.wait || 0) + STEP_MS).then(() => mine === turn && go(at + 1));
       }
+      return;
+    }
+    // A shown step's own thing tapped (its ring asks for it; Jay 11-20, Securities' 買進: "this
+    // step doesn't work"): the guide goes on, as 下一步; the app still never hears it.
+    if (s?.show && !moving && e.target.closest?.(s.show)) {
+      e.stopPropagation();
+      if (e.type === 'click' || e.type === 'mousedown' || e.type === 'contextmenu' || e.type === 'dblclick') e.preventDefault();
+      if (e.type === 'click') go(at + 1);
       return;
     }
     if (e.type === 'pointerdown' || e.type === 'touchstart') hand = touched = Date.now();
@@ -345,7 +374,6 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
 // The app's home, where every guide starts (Jay 11-20: started from another tab, none of its
 // steps were there): any sheet closed, the first tab opened, and tapped again if its first step's
 // target still isn't there (a tab tapped at its top resets itself, kit tabBar).
-const pause = ms => new Promise(r => setTimeout(r, ms));
 export async function goHome(steps) {
   const first = steps.find(x => (x.tap || x.show) && !x.optional);
   const there = () => !first || Boolean(find(first.tap || first.show));
