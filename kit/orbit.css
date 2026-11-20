@@ -3440,7 +3440,9 @@ dialog.q-moved::backdrop {
   padding: 0 16px;
   border: 1px solid var(--q-border);
   border-radius: 14px;
-  background: var(--q-surface-2);
+  /* The card's fill: the screen behind is --q-page, which is --q-surface-2
+     in light (the box was there but unseen, its border transparent). */
+  background: var(--q-surface);
   color: var(--q-text);
   font: 700 22px/1 ui-monospace, 'SF Mono', Menlo, monospace;
   letter-spacing: 0.12em;
