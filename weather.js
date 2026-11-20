@@ -1197,7 +1197,10 @@ export function briefText(resp, now, lang = 'zh') {
 // null: push.js asks again in 15 minutes, until `until`): first the radar's
 // tracked showers (weather-radar.js, read by the kit's rain-now.mjs as the
 // app reads them: when, how hard in plain words, until when; 小雨 or more,
-// starting within the hour), then an hour of the next 2 at RAIN_ALERT. A wet
+// starting within the hour), then an hour of the next 2 at RAIN_ALERT. Short
+// enough for a lock screen (Jay 2026-11-20: "too long and hard to read"): the
+// title is the app's (學校 快下雨了), the line under it when, how hard, until
+// when and what to do; the radar's reach stays on the sky card. A wet
 // hour the fresh radar sees nothing of within the hour waits (Jay
 // 2026-11-10: an alert said rain while the page said 晴).
 export const RAIN_ALERT = 60;
@@ -1205,13 +1208,9 @@ export const RADAR_ALERT_MMH = 1;
 export function radarNotice(rain, now, tz, lang = 'zh') {
   if (!rain || rain.kind !== 'start' || rain.peak < RADAR_ALERT_MMH || rain.from - now > HOUR) return null;
   const word = rainWord(rain.peak);
-  const mins = Math.max(5, Math.round((rain.from - now) / (5 * MIN)) * 5);
-  const lasts = rain.to ? `約 ${clockIn(rain.to, tz)} 停（下 ${Math.max(5, Math.round((rain.to - rain.from) / (5 * MIN)) * 5)} 分鐘左右）` : `至少下到 ${clockIn(rain.until, tz)}`;
-  if (lang === 'en') {
-    const lastsEn = rain.to ? `stopping about ${clockIn(rain.to, tz)} (about ${Math.max(5, Math.round((rain.to - rain.from) / (5 * MIN)) * 5)} min)` : `until at least ${clockIn(rain.until, tz)}`;
-    return { title: `{title} · ${word.en} from ${clockIn(rain.from, tz)}`, body: `Starts in about ${mins} min, ${lastsEn}; ${word.tipEn}. Rain clouds tracked by radar, within about 1.5 km` };
-  }
-  return { title: `{title} · ${clockIn(rain.from, tz)} 起${word.zh}`, body: `約 ${mins} 分鐘後開始，${lasts}，${word.tipZh}。雷達追蹤雨雲，約 1.5 公里內` };
+  const from = clockIn(rain.from, tz);
+  if (lang === 'en') return { title: '{title}', body: `${word.en} from ${from}${rain.to ? ` to about ${clockIn(rain.to, tz)}` : `, until at least ${clockIn(rain.until, tz)}`}; ${word.tipEn}` };
+  return { title: '{title}', body: `${from} 起${word.zh}，${rain.to ? `約 ${clockIn(rain.to, tz)} 停` : `至少下到 ${clockIn(rain.until, tz)}`}，${word.tipZh}` };
 }
 export async function weatherCheck(env, w, { fetchFn = fetch, now = Date.now(), lang = 'zh' } = {}) {
   const jobs = [];
@@ -1228,7 +1227,8 @@ export async function weatherCheck(env, w, { fetchFn = fetch, now = Date.now(), 
   const seen = rain?.kind === 'dry' ? Math.min(rain.until, now + HOUR) : rain ? Infinity : now;
   const wet = (resp.hours || []).find(h => h.t + HOUR > now && h.t < now + 2 * HOUR && h.pop >= RAIN_ALERT && h.t >= seen);
   if (!wet) return null;
-  return { title: `{title} · ${clockIn(Math.max(wet.t, now), resp.tz)}`, body: lang === 'en' ? `${wet.pop}% chance of rain, take an umbrella` : `降雨機率 ${wet.pop}%，出門記得帶傘`, place };
+  const at = clockIn(Math.max(wet.t, now), resp.tz);
+  return { title: '{title}', body: lang === 'en' ? `${wet.pop}% chance of rain at ${at}; take an umbrella` : `${at} 降雨機率 ${wet.pop}%，記得帶傘`, place };
 }
 
 // ---- Advice (plan section D; thresholds in one table) ---------------------------

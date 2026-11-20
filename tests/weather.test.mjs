@@ -572,15 +572,15 @@ test('the rain alert answers only when the next 2 hours turn wet', async () => {
   entry.resp.hours.find(h => h.t === Date.parse('2026-10-03T13:00:00+08:00')).pop = 75;
   kv.store.set('weather:cell:25.03,121.57', JSON.stringify(entry));
   const alert = await weatherCheck(e, { lat: 25.034, lon: 121.565, kind: 'rain' }, { fetchFn: upstream(), now: at });
-  assert.equal(alert.title, '{title} · 13:00');
-  assert.match(alert.body, /^降雨機率 75%/);
+  assert.equal(alert.title, '{title}');
+  assert.equal(alert.body, '13:00 降雨機率 75%，記得帶傘');
   assert.equal(alert.place, '信義區');
   const alertEn = await weatherCheck(e, { lat: 25.034, lon: 121.565, kind: 'rain' }, { fetchFn: upstream(), now: at, lang: 'en' });
-  assert.match(alertEn.body, /^75% chance of rain/);
+  assert.equal(alertEn.body, '75% chance of rain at 13:00; take an umbrella');
   // The notice as the phone shows it (push.js fills the app's own title, Weather's pins.mjs): no Chinese, one space.
   assert.equal(alertEn.place, 'Xinyi');
-  assert.equal(alertEn.title.replace('{title}', placedTitle('Rain soon in {place}', alertEn.place)), 'Rain soon in Xinyi · 13:00');
-  assert.equal(alert.title.replace('{title}', placedTitle('{place}快下雨了', alert.place)), '信義區 快下雨了 · 13:00');
+  assert.equal(alertEn.title.replace('{title}', placedTitle('Rain soon in {place}', alertEn.place)), 'Rain soon in Xinyi');
+  assert.equal(alert.title.replace('{title}', placedTitle('{place}快下雨了', alert.place)), '信義區 快下雨了');
   // A fresh radar frame with nothing coming for two hours: the wet hour within the hour waits (Jay 2026-11-10).
   const still = btoa(String.fromCharCode(...new Uint8Array(2 * 14 * 18)));
   const DATA = { get: async (k, o) => ({ customMetadata: { at: String(at - 10 * 60_000), motion: still }, arrayBuffer: async () => new ArrayBuffer(o.range.length) }) };

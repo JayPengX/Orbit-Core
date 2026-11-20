@@ -117,11 +117,13 @@ test('rain now: when it starts and stops, how hard in words', () => {
 test('the notice: when, how hard and until when, in words; drizzle or more than an hour away is not sent', () => {
   const now = Date.parse(AT);
   const say = (from, to, peak, until = now + 110 * MIN) => radarNotice({ kind: 'start', from, to, peak, until }, now, 'Asia/Taipei');
-  assert.deepEqual(say(now + 15 * MIN, now + 45 * MIN, 2.5), { title: '{title} · 20:25 起小雨', body: '約 15 分鐘後開始，約 20:55 停（下 30 分鐘左右），記得帶傘。雷達追蹤雨雲，約 1.5 公里內' });
-  assert.match(say(now + 15 * MIN, null, 12).body, /至少下到 22:00，晚點再出門/);
+  assert.deepEqual(say(now + 15 * MIN, now + 45 * MIN, 2.5), { title: '{title}', body: '20:25 起小雨，約 20:55 停，記得帶傘' });
+  assert.match(say(now + 15 * MIN, null, 12).body, /起大雨，至少下到 22:00，晚點再出門$/);
   assert.equal(say(now + 15 * MIN, now + 45 * MIN, 0.8), null, 'a drizzle');
   assert.equal(say(now + 70 * MIN, null, 5), null, 'past the hour: asked again later');
   const en = radarNotice({ kind: 'start', from: now + 20 * MIN, to: now + 50 * MIN, peak: 2, until: now + 110 * MIN }, now, 'Asia/Taipei', 'en');
   assert.ok(!/[\u4e00-\u9fff]/.test(en.title + en.body), en.title + en.body);
+  assert.equal(en.body, 'Light rain from 20:30 to about 21:00; take an umbrella');
+  for (const n of [say(now + 15 * MIN, now + 45 * MIN, 2.5), say(now + 15 * MIN, null, 40)]) assert.ok(n.body.length <= 26, `a lock screen reads it at a glance: ${n.body}`);
   assert.equal(radarNotice({ kind: 'now', from: now, to: null, peak: 5, until: now }, now), null, 'already raining: no 快下雨了');
 });
