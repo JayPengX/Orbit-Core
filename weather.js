@@ -1759,6 +1759,8 @@ const SAMPLES = {
 for (const county of Object.keys(COUNTY_IDS)) {
   const [d3, w1] = townIds(county);
   for (const id of [d3, w1]) SAMPLES[`cwa-${id}`] = env => cwaUrl(env, id, `&ElementName=${encodeURIComponent('天氣現象')}&limit=1`);
+  // Every township of the county with CWA's own point for it (its 公所): tools/weather-towns.mjs.
+  SAMPLES[`cwa-towns-${d3}`] = env => cwaUrl(env, d3, `&ElementName=${encodeURIComponent('溫度')}`);
 }
 
 async function probe(env, source, fetchFn) {
