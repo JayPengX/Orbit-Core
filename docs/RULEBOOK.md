@@ -70,6 +70,7 @@ into absolutes; push back when a rule makes things worse.
 - 11-12 Orbit (`/app/`, kit `suite.mjs`): every app in one home-screen app, to become the main way to use Orbit. Never called a "portal" on screen. It feels like the separate apps (no grid of tiles): tabs across apps with an animated switch, never a white flash (11-14, every case in `docs/ORBIT.md`), every cross-app feature opening in place. A separate app may suggest Orbit at a hop to another app, always declinable, never nagging (`suiteAsk`).
 - 11-15 No separate apps (Jay: "the link … of individual app should still open that app in orbit, not the standalone app, make standalone app no more"): every app's address (orbit.jaypengx.com/sports/, a notice, an old home-screen icon) opens in Orbit at that app (kit `suite.mjs` `alone`); on a phone's browser that is Orbit's add page. Only our tools (`navigator.webdriver`), another page's frame (the Showcase's demos) or `?solo` see an app alone. The website, Showcase and every README point to Orbit.
 - 11-14 Many Orbits: before Add to Home Screen, an optional setup picks which apps and which icon (many to choose from); a person may add several Orbits for different purposes, single-app ones too. Setup is never required. For new people a single-app Orbit replaces the separate apps; separate apps already on a home screen keep working. Orbit's address shows the app on screen (`/sports/`, `/transit/`), never the setup; how each case behaves: `docs/ORBIT.md` 18–23.
+- 11-20 Notices come on time, never held for a class (Jay, after an MLS start never came during one: "remove that"): no app waits for Orbit Class's break.
 - 11-14 Every notice banner is one kind (kit `noticeLife`): the same 5 s on screen (a touch gives it 5 s more), swiped up to take it away (11-14: up only, never dragged about), gone on a scroll or a tap elsewhere. Jay: "unify … all can be swiped off, all stay the same amount of time".
 - 11-13 Orbit keeps every app opened running: switching back never loads it again, and an app playing sound (Beats) is never closed however many apps are opened after it.
 - 11-13 Where Orbit opens: an app with something live (a trip, a rental, a bus alert, 專注飛行, Beats playing) on that screen; else, back to an Orbit the phone kept, the last app if left under an hour ago; else (and always after Orbit was closed) the app list, last app on top, every app at its start. Orbit Pass sign-in comes first.
@@ -193,6 +194,7 @@ Gone for good, never revived: Longshot (shut down 10-31: Worker, data and secret
 | Old rule | Replaced by | When |
 |---|---|---|
 | Keep the US$5 Workers Paid plan | Only the domain is paid (Workers Free, Runner DO) | 11-06 |
+| 上課勿擾: a notice due in class waits for the break (11-10) | Every notice on time | 11-20 |
 | Gemini on its free tier like everything else | AI may be paid, a blind test picks | 11-10 |
 | AI made ahead for everyone (titles, sides, briefs, recaps, cards, minutes) | Made when someone opens it, or by code | 11-14 |
 | Gemini/AI answers as text; team chips without logos | Drawn answers; a team chip with its logo | 11-11 |

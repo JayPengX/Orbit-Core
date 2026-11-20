@@ -15,7 +15,7 @@
 //   setPlace(role, place, app)       home / school / work: { lat, lon, name } (Weather's pins, Transit's places)
 //   placeFor(role)                   that place, or null
 //   classesOn(day)                   Class's periods that day [{ n, name, from, to, out }] (out: outdoors, 體育)
-//   classAt(t), breakAfter(t)        the period on now, when the next break begins
+//   classAt(t)                       the period on now
 //   schoolHours(day)                 { from, to } of the first and last period, or null (no school)
 //   planHash(place, at)              Orbit Transit's trip to a place (#plan…), there by `at` when given
 //
@@ -124,11 +124,4 @@ export function schoolHours(day) {
 export function classAt(t = Date.now()) {
   const { day, min } = twParts(t);
   return classesOn(day).find(p => mins(p.from) <= min && min < mins(p.to)) || null;
-}
-// When the period on at `t` ends (the break begins), as a moment; null when none is on.
-export function breakAfter(t = Date.now()) {
-  const p = classAt(t);
-  if (!p) return null;
-  const { day } = twParts(t);
-  return Date.parse(`${day}T${p.to.padStart(5, '0')}:00+08:00`);
 }
