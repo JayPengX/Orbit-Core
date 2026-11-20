@@ -112,6 +112,16 @@ test('rain now: when it starts and stops, how hard in words', () => {
   assert.equal(rainNow(radar(unknown), at).to, null, 'still raining where the radars stop saying');
   assert.equal(rainNow(radar(unknown), at).until, at + 50 * MIN);
   assert.deepEqual(RAIN_WORDS.map(w => rainWord(w.upTo - 0.1).zh), ['毛毛雨', '小雨', '中雨', '大雨', '豪大雨']);
+  // Jay's 11-20 evening: drizzle from 19:10, a 10-minute lull, then on and off to the strip's end: one shower, not 「19:10–19:15」.
+  const onOff = dry.slice();
+  for (const i of [11, 14, 16, 18, 19, 20, 21, 22, 23, 24]) onOff[i] = 0.8;
+  const j = rainNow(radar(onOff), at);
+  assert.equal(j.from, at + 55 * MIN);
+  assert.equal(j.to, null, 'still raining at the strip’s end');
+  // A 15-minute gap ends it: the shower stops at its last wet step's end.
+  const gap = dry.slice();
+  for (const i of [11, 15]) gap[i] = 0.8;
+  assert.equal(rainNow(radar(gap), at).to, at + 60 * MIN);
 });
 
 test('the notice: when, how hard and until when, in words; drizzle or more than an hour away is not sent', () => {

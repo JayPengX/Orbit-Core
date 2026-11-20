@@ -13,6 +13,8 @@
 export const RADAR_FRESH_MS = 40 * 60_000;
 // Rain worth saying: mm an hour (weather-radar.js: under ~0.5 an echo is dry).
 export const WET_RATE = 0.5;
+// Dry steps (5 minutes each) a shower may pause for and still be one shower.
+export const LULL_STEPS = 2;
 
 // How hard it rains, in everyday words, with what it means for going out
 // (Jay 2026-11-10: "3 毫米" told him nothing). By mm an hour: under 1 a
@@ -43,9 +45,13 @@ export function rainNow(radar, now = Date.now()) {
   if (!bars.length) return null;
   const first = bars.findIndex(b => b.v >= WET_RATE);
   if (first < 0) return { kind: 'dry', until, bars };
-  // The shower: from its first wet step on, a single dry step inside it kept.
+  // The shower: from its first wet step on, a lull of up to LULL_STEPS inside
+  // it kept (Jay 2026-11-20: drizzle on and off to the strip's end read
+  // 「19:10–19:15」, a 10-minute lull taken for the end).
   let last = first;
-  while (last + 1 < bars.length && (bars[last + 1].v >= WET_RATE || (last + 2 < bars.length && bars[last + 2].v >= WET_RATE))) last++;
+  const wetWithin = i => bars.slice(i + 1, i + 2 + LULL_STEPS).some(b => b.v >= WET_RATE);
+  while (last + 1 < bars.length && wetWithin(last)) last++;
+  while (bars[last].v < WET_RATE) last--;
   const peak = Math.max(...bars.slice(first, last + 1).map(b => b.v));
   const to = last === bars.length - 1 ? null : bars[last + 1].t;
   return { kind: first === 0 ? 'now' : 'start', from: bars[first].t, to, peak, until, bars };
