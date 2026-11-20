@@ -39,3 +39,49 @@ test('TAIFEX: TXO day-session settlements near the money, monthly and weekly, 50
   assert.deepEqual(parseOptions(json, { TX202611: 46510 }), { 202611: { C: { 46500: 412 }, P: { 46500: 398 } }, '202610W4': { C: { 46500: 90 }, P: {} } });
   assert.deepEqual(parseMargins([{ Contract: '臺指選擇權風險保證金(A)值', InitialMargin: '187000', MaintenanceMargin: '143000' }], { '臺指選擇權風險保證金(A)值': 'A' }), { A: [187000, 143000] });
 });
+
+// (11-20) TAIFEX's own live quotes: futures and options at their last trade in the day session.
+import { parseLive, taifexResponse as liveResponse } from '../taifex.js';
+import { withLive, taifexOpen, liveCid } from '../kit/stock-quotes.mjs';
+
+const NOW = Date.parse('2026-11-20T11:00:00+08:00');
+const row = (SymbolID, last, ref, time = '105959') => ({ SymbolID, CLastPrice: String(last), CRefPrice: String(ref), CBestBidPrice: '', CBestAskPrice: '0.000', CHighPrice: String(last), CLowPrice: String(last), CTotalVolume: '12', CDate: '20261120', CTime: time });
+
+test("TAIFEX's live list: a contract's months (not the spot, not a weekly), an option series by right and strike", () => {
+  const fut = parseLive([row('TXF-S', 36033.29, 38426.89), row('TXFL6-F', 35875, 38607), row('TXFA7-F', 35997, 38766), row('MX4K6-F', 1, 1)], 'TXF', NOW);
+  assert.deepEqual(Object.keys(fut), ['202612', '202701']);
+  assert.deepEqual(fut['202612'], [35875, 38607, null, null, 35875, 35875, 12, Date.parse('2026-11-20T10:59:59+08:00')]);
+  const opt = parseLive([row('TXO-Q', 1, 1), row('TXO25200L6-O', 10700, 13000), row('TXO25200X6-O', 0.1, 0.2), row('TX434500K6-O', 1720, 4080)], 'TXO', NOW);
+  assert.deepEqual(Object.keys(opt).sort(), ['C25200', 'C34500', 'P25200']);
+  assert.equal(liveCid('MTX'), 'MXF');
+  assert.equal(liveCid('CDF'), 'CDF');
+});
+
+test('only a named contract or a series is asked of TAIFEX', async () => {
+  const asked = [];
+  const fetchFn = async (u, init) => (asked.push(JSON.parse(init.body)), { ok: true, json: async () => ({ RtData: { QuoteList: [row('TXFL6-F', 35875, 38607)] } }) });
+  assert.equal((await liveResponse(new URL('https://taifex.orbit/live.json?cid=TXO'), fetchFn)).status, 404);
+  assert.equal((await liveResponse(new URL('https://taifex.orbit/live.json?cid=tx;1'), fetchFn)).status, 404);
+  const ok = await liveResponse(new URL('https://taifex.orbit/live.json?cid=TXO&series=202611W4'), fetchFn);
+  assert.equal(ok.status, 200);
+  assert.deepEqual([asked.length, asked[0].CID, asked[0].SymbolType, asked[0].ExpireMonth], [1, 'TXO', 'O', '202611W4']);
+});
+
+test("a live trade today moves the quote to it; yesterday's or none leaves it", () => {
+  const q = { symbol: 'TX202612.TF', price: 36100, prev: 38500, line: [[NOW - 60_000, 36100]] };
+  const today = [35875, 38607, 35870, 35880, 37673, 35563, 183564, NOW - 1000];
+  const live = withLive(q, today, NOW);
+  assert.deepEqual([live.price, live.prev, live.change, live.bid, live.ask, live.live], [35875, 38607, -2732, 35870, 35880, 'TAIFEX']);
+  assert.deepEqual(live.line.at(-1), [NOW - 1000, 35875]);
+  assert.equal(withLive(q, [...today.slice(0, 7), NOW - 86_400_000], NOW), q);
+  assert.equal(withLive(q, [null, 38607, null, null, null, null, 0, NOW], NOW), q);
+  assert.equal(withLive(q, undefined, NOW), q);
+});
+
+test("TAIFEX's day session: 08:45 to 13:45 on a trading day", () => {
+  assert.equal(taifexOpen(Date.parse('2026-11-20T08:44:00+08:00')), false);
+  assert.equal(taifexOpen(Date.parse('2026-11-20T08:45:00+08:00')), true);
+  assert.equal(taifexOpen(Date.parse('2026-11-20T13:45:00+08:00')), true);
+  assert.equal(taifexOpen(Date.parse('2026-11-20T15:00:00+08:00')), false);
+  assert.equal(taifexOpen(Date.parse('2026-11-21T10:00:00+08:00')), false);
+});

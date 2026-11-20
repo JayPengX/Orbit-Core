@@ -346,9 +346,9 @@ function cachePolicyFor(url) {
       return asiaPolicy(url);
     // A fund's NAV comes out once a day, in the evening.
     case FUND_HOST:
-    // (TAIFEX's settlement prices too: once a day, after the close.)
+    // (TAIFEX's settlement prices too: once a day, after the close; its live quotes as TWSE's.)
     case TAIFEX_HOST:
-      return CACHE_SCHEDULE;
+      return url.pathname === '/live.json' ? CACHE_QUOTES : CACHE_SCHEDULE;
     case F1_LIVE_HOST:
       // A finished session from F1's archive (f1-live.js /session.json): it doesn't change.
       // (A driver's background and where his head is in his picture: they don't change in a week.)

@@ -177,8 +177,63 @@ async function optionsReport(fetchFn) {
   return '';
 }
 
+// TAIFEX's own live quotes (行情資訊, mis.taifex.com.tw: what its site shows, the
+// last trade a few seconds old), the day session's: /live.json?cid=TXF (a
+// futures contract's months) or ?cid=TXO&series=202612 (an options series,
+// as Securities names it: 202611W4, 202611F4 too). → { at, rows }: a future's
+// by month (yyyymm), an option's by right and strike (C36000), each
+// [last, reference (the last settlement), bid, ask, high, low, volume, time];
+// a figure TAIFEX leaves empty or 0 is null. Kept 30 s at the edge for everyone.
+export const MIS_TAIFEX = 'https://mis.taifex.com.tw/futures/api/getQuoteList';
+const LIVE_CID = /^([A-Z]{3}|TXO)$/;
+const MONTHS = 'ABCDEFGHIJKL';
+const PUT_MONTHS = 'MNOPQRSTUVWX';
+// A contract's year from its one digit: the one from last year on.
+const yearOf = (digit, now) => {
+  const y = new Date(now + 8 * 3_600_000).getUTCFullYear() - 1;
+  return y + ((Number(digit) - (y % 10) + 10) % 10);
+};
+export function parseLive(list, cid, now = Date.now()) {
+  const rows = {};
+  const n = x => (Number(x) > 0 ? Number(x) : null);
+  for (const r of Array.isArray(list) ? list : []) {
+    const id = String(r?.SymbolID || '');
+    const d = String(r.CDate || '');
+    const t = String(r.CTime || '').padStart(6, '0');
+    const at = /^\d{8}$/.test(d) && /^\d{6}$/.test(t) ? Date.parse(`${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}T${t.slice(0, 2)}:${t.slice(2, 4)}:${t.slice(4)}+08:00`) : null;
+    const row = [n(r.CLastPrice), n(r.CRefPrice), n(r.CBestBidPrice), n(r.CBestAskPrice), n(r.CHighPrice), n(r.CLowPrice), Number(r.CTotalVolume) || 0, at];
+    let m;
+    if (cid !== 'TXO' && (m = new RegExp(`^${cid}([A-L])(\\d)-F$`).exec(id))) rows[`${yearOf(m[2], now)}${String(MONTHS.indexOf(m[1]) + 1).padStart(2, '0')}`] = row;
+    else if (cid === 'TXO' && (m = /^[A-Z0-9]{3}(\d{3,6})([A-X])\d-O$/.exec(id))) rows[`${PUT_MONTHS.includes(m[2]) ? 'P' : 'C'}${Number(m[1])}`] = row;
+  }
+  return rows;
+}
+async function live(url, fetchFn) {
+  const cid = url.searchParams.get('cid') || '';
+  const series = url.searchParams.get('series') || '';
+  if (!LIVE_CID.test(cid) || (cid === 'TXO') !== SERIES.test(series)) return null;
+  const r = await fetchFn(MIS_TAIFEX, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ MarketType: '0', SymbolType: cid === 'TXO' ? 'O' : 'F', KindID: '', CID: cid, ExpireMonth: cid === 'TXO' ? series : '', RowSize: '全部', PageNo: '', SortColumn: '', AscDesc: 'A' }),
+    signal: AbortSignal.timeout(8_000)
+  });
+  if (!r.ok) throw new Error(`TAIFEX ${r.status}`);
+  const list = (await r.json())?.RtData?.QuoteList;
+  if (!Array.isArray(list)) throw new Error('TAIFEX: no list');
+  return { at: Date.now(), rows: parseLive(list, cid) };
+}
+
 export async function taifexResponse(url, fetchFn = fetch) {
   const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  if (url.pathname === '/live.json') {
+    try {
+      const out = await live(url, fetchFn);
+      return out ? json(out) : json({ error: 'not found' }, 404);
+    } catch (error) {
+      return json({ error: String(error.message || error) }, 502);
+    }
+  }
   if (url.pathname !== '/fut.json') return json({ error: 'not found' }, 404);
   try {
     return json(await table(fetchFn));

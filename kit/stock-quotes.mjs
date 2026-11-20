@@ -23,7 +23,7 @@ const SPARK_BATCH = 20;
 export function ttlFor(url) {
   if (url.startsWith(FUND_NAV) || url === TAIFEX_URL) return 10 * 60_000;
   if (url.startsWith(FUND_HIST)) return 3 * 3_600_000;
-  if (url.startsWith(MIS_URL)) return 25_000;
+  if (url.startsWith(MIS_URL) || url.startsWith(TAIFEX_LIVE)) return 25_000;
   if (url.includes('/v1/finance/search')) return 24 * 3_600_000;
   if (url.includes('/v10/finance/quoteSummary')) return 3_600_000;
   const range = /[?&]range=([^&]+)/.exec(url)?.[1] || '1d';
@@ -106,7 +106,8 @@ export function misQuote(symbol, m, now = Date.now()) {
     tz: 'Asia/Taipei',
     marketTime,
     session: { start: at('09:00:00'), end: at('13:30:00') },
-    line: [[at('09:00:00'), base], [marketTime, price]]
+    line: [[at('09:00:00'), base], [marketTime, price]],
+    live: 'TWSE'
   };
 }
 // (TWSE turns some callers away for a while: then none asked for MIS_REST,
@@ -277,6 +278,42 @@ export function futQuote(symbol, under, table) {
   };
 }
 const readTaifex = () => getJson(TAIFEX_URL);
+// TAIFEX's live quotes in the day session (taifex.js /live.json: the proxy's
+// read of TAIFEX's own quote site, 30 s at the edge): a contract that has
+// traded today is at its last trade, its move from TAIFEX's reference price
+// (the last settlement), `live: 'TAIFEX'`; one that hasn't, or the session
+// shut, stays priced as above. TAIFEX's names for Securities' index futures.
+const TAIFEX_LIVE = 'https://taifex.orbit/live.json?cid=';
+const LIVE_CIDS = { TX: 'TXF', MTX: 'MXF', TMF: 'TMF' };
+export const liveCid = code => LIVE_CIDS[code] || code;
+// 08:45 to 13:45, Monday to Friday, by Taipei's clock (the day session; a holiday asks for nothing new).
+export function taifexOpen(now = Date.now()) {
+  const t = new Date(now + 8 * 3_600_000);
+  const min = t.getUTCHours() * 60 + t.getUTCMinutes();
+  return t.getUTCDay() >= 1 && t.getUTCDay() <= 5 && min >= 8 * 60 + 45 && min <= 13 * 60 + 50 && isTradingDay('TW', t.toISOString().slice(0, 10));
+}
+// A future's or option's quote moved on to TAIFEX's last trade today, or as it was.
+export function withLive(q, row, now = Date.now()) {
+  const [last, ref, bid, ask, hi, lo, volume, at] = Array.isArray(row) ? row : [];
+  if (!q || !(last > 0) || !(at > 0) || taipeiDate(at) !== taipeiDate(now)) return q;
+  const prev = ref > 0 ? ref : q.prev;
+  return {
+    ...q,
+    price: last,
+    prev,
+    change: Math.round((last - prev) * 100) / 100,
+    pct: prev ? last / prev - 1 : 0,
+    bid,
+    ask,
+    dayHigh: hi,
+    dayLow: lo,
+    volume,
+    marketTime: at,
+    line: [...(q.line || []).filter(p => p[0] < at), [at, last]],
+    live: 'TAIFEX'
+  };
+}
+const readLive = (cid, series = '') => getJson(`${TAIFEX_LIVE}${cid}${series ? `&series=${series}` : ''}`).catch(() => null);
 // TAIFEX's options (臺指選擇權): no live prices either. Each is priced by
 // Black-76 on its month's futures price (the live index plus that month's
 // basis), at the volatility its last settlement price implies (that day's
@@ -525,11 +562,14 @@ export async function fetchQuotes(symbols, { range = '1d', interval = '5m' } = {
   const futs = symbols.filter(isFuture);
   const opts = symbols.filter(isOption);
   const futRead = futs.length || opts.length ? readTaifex().catch(() => null) : null;
+  // (Today's, while TAIFEX trades: one read a contract, one an options series.)
+  const liveKeys = range === '1d' && taifexOpen() ? [...new Set([...futs.map(s => liveCid(futureOf(s).code)), ...opts.map(s => `TXO&${optionOf(s).series}`)])] : [];
+  const liveRead = Promise.all(liveKeys.map(k => (k.startsWith('TXO&') ? readLive('TXO', k.slice(4)) : readLive(k)).then(j => [k, j?.rows || null])));
   const batches = [];
   for (let i = 0; i < wanted.length; i += SPARK_BATCH) batches.push(wanted.slice(i, i + SPARK_BATCH));
   // (Today's quotes while Taiwan's market is open: TWSE's live beside Yahoo's late ones;
   // the two indexes the rest of a weekday too, for TWSE's own reference price.)
-  const listed = range === '1d' ? wanted.filter(x => (twOpen() && (isTwListed(x) || isWarrant(x))) || (MIS_INDEX[x] && twWeekday())) : [];
+  const listed = range === '1d' ? wanted.filter(x => (twOpen() && (isTwListed(x) || isWarrant(x) || isCb(x))) || (MIS_INDEX[x] && twWeekday())) : [];
   const misRead = listed.length ? fetchMisQuotes(listed).catch(() => new Map()) : null;
   const results = await Promise.allSettled(
     batches.map(batch =>
@@ -547,7 +587,7 @@ export async function fetchQuotes(symbols, { range = '1d', interval = '5m' } = {
     let got = 0;
     for (const [k, m] of await misRead) {
       // (A warrant Yahoo has no price for: TWSE's as it is, a bid if nothing traded.)
-      const q = isWarrant(k) && !out.has(k) ? m : liveTw(out.get(k), m);
+      const q = (isWarrant(k) || isCb(k)) && !out.has(k) ? m : liveTw(out.get(k), m);
       if (q) out.set(k, q), got++;
     }
     // (Yahoo down: TWSE's answered for these.)
@@ -563,20 +603,23 @@ export async function fetchQuotes(symbols, { range = '1d', interval = '5m' } = {
   }
   if (futRead) {
     const table = await futRead;
+    const lives = new Map(await liveRead);
     const taiex = out.get(TAIEX);
     for (const s of futs) {
-      const under = out.get(futureOf(s).underlying);
+      const f = futureOf(s);
+      const under = out.get(f.underlying);
       const q = table && under && futQuote(s, under, table);
-      if (q) out.set(s, q);
+      if (q) out.set(s, withLive(q, lives.get(liveCid(f.code))?.[`${f.year}${String(f.month).padStart(2, '0')}`]));
     }
     for (const s of opts) {
+      const o = optionOf(s);
       const q = table && taiex && optQuote(s, taiex, table);
-      if (q) out.set(s, q);
+      if (q) out.set(s, withLive(q, lives.get(`TXO&${o.series}`)?.[`${o.right}${o.strike}`]));
     }
     for (const u of new Set([TAIEX, ...futs.map(s => futureOf(s).underlying)])) if (!symbols.includes(u)) out.delete(u);
   }
-  // Warrants Yahoo has no price for: TWSE's own.
-  const noPrice = symbols.filter(s => isWarrant(s) && !out.has(s) && !listed.includes(s));
+  // Warrants and 可轉債 Yahoo has no price for: TWSE's own.
+  const noPrice = symbols.filter(s => (isWarrant(s) || isCb(s)) && !out.has(s) && !listed.includes(s));
   if (noPrice.length) for (const [k, v] of await fetchMisQuotes(noPrice).catch(() => new Map())) out.set(k, v);
   if (fundRead) {
     const f = await fundRead;
