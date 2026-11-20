@@ -1335,7 +1335,9 @@ export function folded(list, text) {
 // 八方雲集竹北店), the words somewhere in it, else the
 // share of their characters and pairs of characters it holds (Google's
 // spelling of a typo: 八分雲集 → 八方雲集; but 立法委員 … 服務處 only half 立法院).
-const plain = s => squash(s).replace(/[()（）\-－·・,，、.]/g, '');
+// (A school by the name people say: 國立新竹高級中學 is 新竹高中, 新竹市立光華國民中學 光華國中; Jay 2026-11-20.)
+const SAID = [[/高級中等學校|高級中學/g, '高中'], [/國民中學/g, '國中'], [/國民小學/g, '國小'], [/^(國立|私立|市立|縣立|(?:[\u4e00-\u9fff]{2}[市縣])立)/, '']];
+const plain = s => SAID.reduce((x, [re, to]) => x.replace(re, to), squash(s).replace(/[()（）\-－·・,，、.]/g, ''));
 const pairs = s => Array.from({ length: Math.max(0, s.length - 1) }, (_, i) => s.slice(i, i + 2));
 export function nameMatch(name, text) {
   const n = plain(name);

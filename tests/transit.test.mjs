@@ -1425,6 +1425,16 @@ test('place search, 竹北高中 (Jay 2026-11-20): the school by its new name (�
     assert.equal(ids[0], 'school', `with${d ? '' : 'out'} your position: ${ids}`);
     assert.ok(ids.indexOf('chicken') < ids.indexOf('cram'));
   }
+  // 新竹高中 is 國立新竹高級中學: the school before its pool, its tennis courts and its clubs.
+  const hsnu = ['secondary_school', 'school', 'educational_institution'];
+  const parts = [
+    { id: 'base', name: '新竹高中陸軍基地（竹中武擊社實戰訓練場）', dist: 578, types: ['establishment', 'point_of_interest', 'service'] },
+    { id: 'tennis', name: '新竹高中網球場', dist: 769, types: ['point_of_interest', 'event_venue'] },
+    { id: 'pool', name: '新竹高中游泳池', dist: 560, types: ['sports_activity_location', 'swimming_pool'] },
+    { id: 'hs', name: '國立新竹高級中學', dist: 647, types: hsnu }
+  ];
+  assert.equal(nearFirst(parts, [], '新竹高中')[0].id, 'hs');
+  assert.equal(nearFirst([{ id: 'j', name: '新竹市立光華國民中學', dist: 900, types: hsnu }, { id: 'x', name: '光華國中前公車站', dist: 800, types: ['bus_stop'] }], [], '光華國中')[0].id, 'j');
   // No place points at the words: nothing renamed (新竹高中 stays the 新竹高中 named so).
   assert.equal(aliasOf([{ id: 's', name: '新竹高中', types: ['school'] }, { id: 'k', name: '補習班', types: ['school'] }], '新竹高中'), null);
 });
