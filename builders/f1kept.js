@@ -12,8 +12,8 @@ import { mirrorPath } from '../kit/mirror.mjs';
 
 const at = start => encodeURIComponent(new Date(start).toISOString());
 // The app's addresses: a session's 數據 (v=2, see lib/f1.mjs ARCHIVE), a race's every lap.
-// (v=4, as Orbit-Sports lib/f1.mjs ARCHIVE: a practice's classified best, the laps deleted.)
-export const f1SessionUrl = start => `https://f1-live.orbit/session.json?start=${at(start)}&v=4`;
+// (v=5, as Orbit-Sports lib/f1.mjs ARCHIVE: a practice's classified best, the laps deleted, the grid drops said.)
+export const f1SessionUrl = start => `https://f1-live.orbit/session.json?start=${at(start)}&v=5`;
 export const f1LapsUrl = start => `https://f1-live.orbit/laps.json?start=${at(start)}&final=1&v=2`;
 // A session counted over two hours after its start (an hour's practice or
 // qualifying, a red flag's wait in); a race (and a sprint) three (a

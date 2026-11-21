@@ -65,6 +65,25 @@ export function deletedOf(msgs) {
   return out;
 }
 
+// The grid drops race control said in a session (Orbit Sports' projected
+// grid, Jay 2026-11-21: "a lot of grid penalty is known well before the race
+// start"): each car's places back, a start from the back of the grid or the
+// pit lane, in the order said; one revoked or withdrawn left out.
+// [{ no, kind: 'places'|'back'|'pitlane', n, at }]
+export function gridDropsOf(msgs) {
+  const out = [];
+  for (const m of list(msgs)) {
+    const t = String(m?.Message || '').toUpperCase();
+    if (!/GRID|PIT ?LANE START|FROM THE PIT ?LANE/.test(t) || /REVOKED|CANCELLED|WITHDRAWN|ORIGINAL GRID/.test(t)) continue;
+    const cars = [...t.matchAll(/\bCARS? (\d+)(?: \(\w+\))?/g)].map(x => x[1]);
+    const places = /(\d+)[ -]PLACE GRID PENALTY/.exec(t);
+    const kind = places ? 'places' : /BACK OF THE GRID/.test(t) ? 'back' : /PIT ?LANE START|FROM THE PIT ?LANE/.test(t) ? 'pitlane' : '';
+    if (!kind) continue;
+    for (const no of cars) out.push({ no, kind, n: places ? Number(places[1]) : 0, at: m?.Utc || '' });
+  }
+  return out;
+}
+
 export function stewardsOf(msgs) {
   const out = {};
   const of = no => (out[no] ||= { pen: [], probe: false });
@@ -216,6 +235,7 @@ export function trimF1Live(r, now = Date.now()) {
     yellow: yellowSectors(rcAll),
     // Who's under investigation or has a penalty to serve (Orbit Sports' 成績).
     stewards: stewardsOf(r?.RaceControlMessages?.Messages),
+    drops: gridDropsOf(r?.RaceControlMessages?.Messages),
     deleted: deletedOf(r?.RaceControlMessages?.Messages),
     cars
   };

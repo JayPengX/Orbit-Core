@@ -303,3 +303,22 @@ test('a circuit MultiViewer has not drawn (Madring, Sepang in 2026) is an outlin
     globalThis.fetch = was;
   }
 });
+
+// Jay 2026-11-21: grid drops known before the race (and before qualifying),
+// shown live on the board and in the grid to come.
+test("the grid drops race control said: places back, the back of the grid, the pit lane; one revoked left out", async () => {
+  const { gridDropsOf } = await import('../f1-live.js');
+  const msgs = [
+    { Utc: '2026-11-20T04:10:00', Message: 'FIA STEWARDS: 5 PLACE GRID PENALTY FOR CAR 12 (ANT) - CAUSING A COLLISION' },
+    { Utc: '2026-11-20T05:00:00', Message: 'CAR 63 (RUS) WILL START FROM THE BACK OF THE GRID' },
+    { Utc: '2026-11-20T05:01:00', Message: 'PIT LANE START FOR CAR 18 (STR)' },
+    { Utc: '2026-11-20T05:02:00', Message: 'FIA STEWARDS: 3 PLACE GRID PENALTY FOR CAR 44 (HAM) REVOKED' },
+    { Utc: '2026-11-20T05:03:00', Message: 'START ORDER: ORIGINAL GRID' },
+    { Utc: '2026-11-20T05:04:00', Message: 'CAR 1 (VER) TIME 1:35.123 DELETED - TRACK LIMITS' }
+  ];
+  assert.deepEqual(gridDropsOf(msgs), [
+    { no: '12', kind: 'places', n: 5, at: '2026-11-20T04:10:00' },
+    { no: '63', kind: 'back', n: 0, at: '2026-11-20T05:00:00' },
+    { no: '18', kind: 'pitlane', n: 0, at: '2026-11-20T05:01:00' }
+  ]);
+});
