@@ -376,3 +376,62 @@ test('in a browser: a swipe that starts on a chart scrolls; the chart is never h
     server.close();
   }
 });
+
+// Jay 2026-11-21, iPhone: a sheet opened from far down 賽事 and closed again,
+// and the page was its last card at the top and a screen of nothing under it.
+// The page behind the sheet got shorter while it was open, and the room held
+// at its end (kept so a redraw can't pull the reader up) outlived the sheet.
+// Shut, nothing is under a finger on the page: the room it doesn't need goes.
+test('in a browser: a page made shorter behind a sheet shows no empty room once the sheet shuts', async t => {
+  let chromium;
+  try {
+    ({ chromium } = (await import('node:module')).createRequire(import.meta.url)('playwright'));
+  } catch {
+    return t.skip('no Playwright here');
+  }
+  const { createServer } = await import('node:http');
+  const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width"><style>
+    body { margin: 0; }
+    .q-hold-room::after { content: ''; display: block; height: var(--q-hold-room, 0); }
+    .row { height: 80px; border-bottom: 1px solid #ccc; }
+    html:has(dialog[open]:modal), html:has(dialog[open]:modal) body { overflow: hidden; }
+  </style></head><body><div id="list"></div>
+  <script type="module">
+    import '/hold-place.mjs';
+    const list = document.getElementById('list');
+    window.rows = (n, tag) => list.replaceChildren(...Array.from({ length: n }, (_, k) => Object.assign(document.createElement('div'), { className: 'row', textContent: tag + ' ' + k })));
+    rows(40, 'Game');
+    window.openSheet = () => { const d = document.createElement('dialog'); d.className = 'q-sheet'; d.textContent = 'sheet'; document.body.append(d); d.showModal(); return d; };
+  </script></body></html>`;
+  const server = createServer((req, res) => {
+    if (req.url === '/hold-place.mjs') return res.writeHead(200, { 'content-type': 'text/javascript' }).end(kit('hold-place.mjs'));
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(page);
+  });
+  await new Promise(r => server.listen(0, r));
+  let browser;
+  try {
+    browser = await chromium.launch();
+    const p = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await p.goto(`http://localhost:${server.address().port}/`);
+    await p.waitForTimeout(200);
+    await p.mouse.move(195, 400);
+    await p.mouse.wheel(0, 2400);
+    // (Well after the wheel: a redraw now is no one's.)
+    await p.waitForTimeout(1500);
+    await p.evaluate(() => (window.d = openSheet()));
+    await p.waitForTimeout(100);
+    // (Behind the sheet: the day drawn anew, fourteen games where forty were.)
+    await p.evaluate(() => rows(14, 'Other'));
+    await p.waitForTimeout(300);
+    await p.evaluate(() => { d.addEventListener('close', () => d.remove()); d.close(); });
+    await p.waitForTimeout(300);
+    const blank = await p.evaluate(() => {
+      const last = document.querySelector('#list > .row:last-child').getBoundingClientRect().bottom;
+      return Math.round(innerHeight - Math.max(0, last));
+    });
+    assert.ok(blank < 2, `the screen under the page's last row is empty for ${blank}px`);
+  } finally {
+    await browser?.close();
+    server.close();
+  }
+});

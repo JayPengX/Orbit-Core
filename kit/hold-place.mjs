@@ -25,7 +25,8 @@
 //     is taken as it is;
 //   - a page that got shorter than where the person was gets the room back
 //     at its end, given back only as they scroll up (never at a touch: that
-//     pulled the page up under the finger);
+//     pulled the page up under the finger), or once a sheet over it shuts
+//     (no screen of nothing under its last card);
 //   - a sheet sized to its content never shrinks while it's open (a day
 //     with fewer rows, a part with less in it): it keeps the tallest it has
 //     been, as iOS's sheets keep their height;
@@ -427,6 +428,27 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
   const away = () => document.visibilityState === 'hidden' && countFingers(0);
   document.addEventListener('visibilitychange', away);
   addEventListener('pagehide', () => countFingers(0));
+  // A sheet shut: the page shows no room it held at its end. Made shorter
+  // behind the sheet (its day drawn anew), it kept the room so no redraw
+  // could pull the reader up; with the sheet gone no finger is on the page
+  // and nothing is being read there, so an empty screen under its last card
+  // is all that room would show (Jay 2026-11-21, iPhone, 賽事). Given back:
+  // the page ends at the screen's foot.
+  document.addEventListener(
+    'close',
+    ev => {
+      if (!ev.target.classList?.contains('q-sheet')) return;
+      requestAnimationFrame(() => {
+        if (document.querySelector('dialog[open]:modal')) return;
+        const s = document.scrollingElement;
+        const room = roomOf(s);
+        if (!room || s.scrollTop + s.clientHeight <= s.scrollHeight - room + 1) return;
+        holdRoom(s, 0);
+        held.has(s) && (s.scrollTop > 0 ? anchor(s) : held.delete(s));
+      });
+    },
+    true
+  );
   addEventListener('resize', unfloor);
   globalThis.visualViewport?.addEventListener('resize', unfloor);
   // Any scroller the person moves is held from then on; its anchor read once the scroll settles.
