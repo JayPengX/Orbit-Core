@@ -87,6 +87,7 @@ export const SOURCES = [
   { id: 'mlb', zh: 'MLB', group: 'sports', apps: ['match'], feeds: '美國職棒、季後賽', hosts: ['statsapi.mlb.com'], where: ['phone', 'worker'] },
   { id: 'jolpica', zh: 'Jolpica（F1 成績）', group: 'sports', apps: ['match'], feeds: 'F1 成績與積分', hosts: ['api.jolpi.ca'], where: ['worker', 'phone'] },
   { id: 'f1-timing', zh: 'F1 即時計時', group: 'sports', apps: ['match'], feeds: 'F1 即時與賽道圖', hosts: ['livetiming.formula1.com', 'api.multiviewer.app', 'www.formula1.com'], where: ['worker', 'cron'] },
+  { id: 'fia', zh: 'FIA 賽會文件', group: 'sports', apps: ['match'], feeds: 'F1 發車罰退', hosts: ['www.fia.com'], where: ['worker'] },
   { id: 'openf1', zh: 'OpenF1', group: 'sports', apps: ['match'], feeds: 'F1 賽段、數據、勝率', hosts: ['api.openf1.org'], where: ['phone', 'worker', 'cron'] },
   { id: 'polymarket', zh: 'Polymarket', group: 'sports', apps: ['match'], feeds: '預測市場機率（比賽）', hosts: ['gamma-api.polymarket.com', 'clob.polymarket.com'], where: ['phone', 'worker', 'cron'] },
   { id: 'kambi', zh: 'Kambi', group: 'sports', apps: ['match'], feeds: '場中比分', hosts: ['eu-offering-api.kambicdn.com'], where: ['worker'] },
