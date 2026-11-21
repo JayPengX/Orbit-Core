@@ -210,6 +210,8 @@ export const PAGES = {
     // restart's countdown, race control, the tower), and each 數據 tab and
     // card. With no session on, a real one replayed at a moment
     // (tools/f1-replay.mjs, its args.txt after --): a red flag, a safety car.
+    // A practice on now (or just over) with its laps: 各配方最快圈, each car's best lap on each tyre (Jay 2026-11-21: "a bit messy").
+    'f1-pace': { args: click('#tab-matches', '[data-league=f1]', '.wk-card.live', wait(9000), "js:[...document.querySelectorAll('dialog.q-sheet[open] button')].filter(b=>/^(圈速|Laps)$/.test(b.textContent.trim())).pop()?.click()", wait(5000), "js:(e=>{e?.scrollIntoView({block:'start'});let p=e?.parentElement;while(p&&!(p.scrollHeight>p.clientHeight+1&&/(auto|scroll)/.test(getComputedStyle(p).overflowY)))p=p.parentElement;if(p)p.scrollTop-=90})(document.querySelector('dialog.q-sheet[open] .pp-best')?.closest('.q-card'))", wait(1200)) },
     'f1-live': { args: click('#tab-matches', '[data-league=f1]', '.wk-card.live', wait(9000)) },
     // (Each view by its name: a race has 過程 second, a qualifying none.)
     ...Object.fromEntries([['story', '過程|Story'], ['track', '賽道|Track'], ['tyres', '輪胎|Tyres'], ['laps', '圈速|Laps'], ['points', '積分|Points']].map(([k, t]) => [`f1-live-${k}`, { args: click('#tab-matches', '[data-league=f1]', '.wk-card.live', wait(9000), `js:[...document.querySelectorAll('dialog.q-sheet[open] .lb-views button')].find(b=>/^(${t})$/.test(b.textContent.trim()))?.click()`, wait(3000), "js:document.querySelector('dialog.q-sheet[open] .f1-views')?.scrollIntoView({block:'start'})", wait(1000)) }])),
