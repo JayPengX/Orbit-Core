@@ -44,6 +44,8 @@ export const PAGES = {
     'epl-table': { args: click('#tab-matches', '[data-league=epl]', wait(2500), tap('排名|Table'), wait(4000)) },
     // NBA 排名: the two conferences' tables (a pinned rank and name column, the stats beside it).
     'nba-table': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('排名|Table|Standings'), wait(5000)) },
+    // NBA 排名's NBA 盃 groups: a game on now its score in the red pill beside each side, as the league table (Jay 11-21).
+    'nba-cup': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('排名|Table|Standings'), wait(5000), tap('NBA 盃|NBA Cup'), wait(5000)) },
     // NBA 排名's race card (第一最快 1/28 才會確定), once read, and just after the tap (its day still being read: drawn waiting, never 第 N 場 first).
     'nba-race': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('排名|Table|Standings'), wait(8000), "js:document.querySelector('.title-race')?.scrollIntoView({block:'center'})", wait(1200)) },
     'nba-race-early': { args: click('#tab-matches', '[data-league=nba]', wait(2500), tap('排名|Table|Standings'), "js:new Promise(ok=>{const go=()=>{const r=document.querySelector('.title-race');if(r){r.scrollIntoView({block:'center'});setTimeout(ok,60)}else setTimeout(go,20)};go()})") },
