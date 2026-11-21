@@ -357,6 +357,8 @@ function cachePolicyFor(url) {
       // until every lap is in (then kept for good: settled; the live log
       // standing in for OpenF1, shut or busy, was kept half an hour).
       if (url.pathname === '/laps.json') return CACHE_F1_LAPS;
+      // The stewards' grid drops (f1-fia.js): a new document now and then, read again each 10 minutes.
+      if (url.pathname === '/drops.json') return CACHE_SCHEDULE;
       return CACHE_F1_LIVE;
     default:
       return CACHE_LIVE;

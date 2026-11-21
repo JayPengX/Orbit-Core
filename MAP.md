@@ -180,7 +180,7 @@ w;dur=`, noted by the 除錯紀錄 when slow, and `LOCKED` (never runs as a page
 | `/push/…` | `push.js` | Subscriptions, scheduled notices, checks (an ESPN final, a Yahoo price, weather, a bus) |
 | `/weather…` | `weather.js`, `weather-skill.js`, `weather-stations.js`, `weather-towns.js`, `weather-radar.js`, `typhoon.js` | A ~1 km cell's blend (Google, CWA, MOENV, stations), bias-corrected, scored (`/weather/skill`); `radar`: 2 hours' rain; in a typhoon, `dayOff`: each county's 停班停課 or a fitted chance |
 | `/transit/…` | `transit.js`, `transit-free.js` | TDX (allowlist `TDX_RULES`; `tdxTrim`; YouBike, buses (but 金門, 馬祖; 高雄's: phones), 台鐵's day, fares, notices, boards, metros live: own sites; 高鐵's day, metros: `rail/`; slow lists: `tdx/`; `tdxf:*`), bus places (`gps`), map config, search, place, route (TDX's if `TDX_MAAS`), walk, book (高鐵), `gtfs` (bus build), `status` |
-| `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `f1-people.js`, `fund-nav.js`, `taifex.js` | The data proxy (§4.1): sports, quotes, F1, Asian baseball, SITCA's fund NAVs, TAIFEX |
+| `/sports-proxy` | `sports.js`, `asia-baseball.js`, `f1-live.js`, `f1-people.js`, `f1-fia.js`, `fund-nav.js`, `taifex.js` | The data proxy (§4.1): sports, quotes, F1, Asian baseball, SITCA's fund NAVs, TAIFEX |
 | `/sports-today` | `sports-today.js`, `kit/sports-espn.mjs` | Orbit Sports' day of scoreboards in one answer, built on demand (§4.1) |
 | `/gemini`, `/nl-edit` | `worker.js` | Orbit Class's photo import and plain-language edits (fixed prompts) |
 | `/ai` | `ai.js`, `ai-features.js`, `law-ai.js`, `ai-util.js`, `ai-fixtures.js` | Every app's AI by name: fixed prompt, models in turn, lean input (`maxIn`), caps, asks back (`clarify`, `pick`); builders' `aiOnce`; ops `ai-try` (`site/ai-try/`). A retired model: its line's newest that answers (`ai-models.js`, daily) |
@@ -233,7 +233,8 @@ w;dur=`, noted by the 除錯紀錄 when slow, and `LOCKED` (never runs as a page
 on `SPORTS_PROXY_ALLOWED_HOSTS`. Two hosts are not real: `asia-baseball.orbit`
 (the CPBL's months, from TheSportsDB) and `f1-live.orbit` (F1's live timing:
 `now.json`, `session.json`, `laps.json`, `circuit.json`; `/about.json` and
-`/face.json` for drivers the F1 sites don't know, `f1-people.js`; the DO
+`/face.json` for drivers the F1 sites don't know, `f1-people.js`; `/drops.json`
+a race's grid drops from the FIA's decision documents, `f1-fia.js`; the DO
 `F1Log` logs laps). A finished session is F1's archive's, else rebuilt from
 OpenF1's tables (`openF1Raw`), kept in R2.
 
@@ -466,7 +467,7 @@ Every tool: `tools/README.md`; everyday commands: `CLAUDE.md`.
 | `proxyJson`, `packJson` | Every app's first paint; `sports.js`, `data.js` |
 | A trim | Every parser that reads it, and the builders |
 | A Cloudflare product or cron | `guard.js` `PLAN` |
-| `f1-live.js`, `f1-people.js` | Sports' F1 board; drivers the F1 sites don't know |
+| `f1-live.js`, `f1-people.js`, `f1-fia.js` | Sports' F1 board; drivers the F1 sites don't know; the stewards' grid drops (the FIA's PDFs) |
 | `fund-nav.js`, `taifex.js` | Securities' 境內基金 NAVs; 期貨 and 選擇權 |
 | `money-read.js` | Orbit Money's 拍照記帳 (`views/photo.mjs`) |
 | `eco.js` money rules | The kit's tables, Securities' `lib/truth.mjs` and 資金 tab, `help.mjs` |

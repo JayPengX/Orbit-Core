@@ -11,6 +11,9 @@
 //
 // Served by the sports proxy as if from `https://f1-live.orbit/now.json`.
 import { driverAbout, face } from './f1-people.js';
+import { raceDrops } from './f1-fia.js';
+// Each race's drops as last read (/drops.json).
+const dropsKept = new Map();
 
 export const F1_LIVE_HOST = 'f1-live.orbit';
 const BASE = 'https://livetiming.formula1.com/signalrcore';
@@ -823,6 +826,20 @@ async function circuit(key, year) {
 
 export async function f1LiveResponse(url, { log = null } = {}) {
   const json = (body, status) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  // The stewards' grid drops for the race starting at `start` (f1-fia.js),
+  // from the FIA's decision documents: kept ten minutes in this isolate.
+  if (url.pathname === '/drops.json') {
+    try {
+      const start = url.searchParams.get('start') || '';
+      const kept = dropsKept.get(start);
+      if (kept && Date.now() - kept.at < 10 * 60_000) return json({ drops: kept.drops }, 200);
+      const drops = await raceDrops(start, { archive: archiveJson });
+      dropsKept.set(start, { at: Date.now(), drops });
+      return json({ drops }, 200);
+    } catch (error) {
+      return json({ error: String(error.message || error) }, 502);
+    }
+  }
   if (url.pathname === '/session.json') {
     try {
       return json(await archived(url.searchParams.get('start') || ''), 200);
