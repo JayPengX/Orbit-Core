@@ -142,7 +142,7 @@ test('the guide: one tap on the ring, nothing else reaches the app, never stuck'
   }
 });
 
-test('the guide: Escape or 略過 ends it, and the app answers taps again', async t => {
+test('the guide: Escape or 結束 ends it, and the app answers taps again', async t => {
   if (!chromium || !existsSync(chromium.executablePath())) return t.skip('no Chromium here');
   const browser = await chromium.launch();
   try {
@@ -236,6 +236,58 @@ test('the guide: started away from home it goes home first; looking never freeze
     assert.ok((await page.evaluate(() => window.heard.splice(0))).includes('click:other'), 'looking, the app still answers');
     await page.waitForFunction(() => window.ended === false, null, { timeout: 12000 });
     await page.waitForFunction(() => /導覽先停在這裡/.test(document.querySelector('.q-toast')?.textContent || ''), null, { timeout: 2000 });
+  } finally {
+    await browser.close();
+  }
+});
+
+// Jay 11-20: "you want me to click 台股 but it's already there"; 略過 read as "skip this one"
+// ended the guide; and a tap sometimes needed two (a ring and bubble written every frame read as
+// a hover by an iPhone; a target drawn again under the finger made no click at all).
+test('the guide: a step already done is passed over; 結束 ends it; the page left alone; a lost tap made again', async t => {
+  if (!chromium || !existsSync(chromium.executablePath())) return t.skip('no Chromium here');
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    const more = PAGE.replace('<script type="module">', `<button id="chosen" aria-pressed="true" style="position:absolute;left:150px;top:300px;width:100px;height:40px">台股</button>
+<script>
+  // a live redraw under the finger: the target replaced as it's pressed (no click comes)
+  window.redraw = false;
+  document.addEventListener('pointerdown', e => { if (window.redraw && e.target.id === 't1') e.target.replaceWith(e.target.cloneNode(true)); }, true);
+</script><script type="module">`);
+    await page.route('http://app.test/**', route => {
+      const path = new URL(route.request().url()).pathname;
+      if (path.startsWith('/kit/')) return route.fulfill({ contentType: 'text/javascript', body: readFileSync(new URL(path.slice(5), kit)) });
+      return route.fulfill({ contentType: 'text/html', body: more });
+    });
+    await page.goto('http://app.test/');
+    await page.waitForFunction(() => window.ready);
+    await page.evaluate(() => window.tour([{ say: ['開場', 'Open'] }, { tap: '#chosen', say: ['選台股', 'Pick'] }, { tap: '#t1', say: ['一', 'One'] }]));
+    await page.waitForSelector('.q-coach-next:not([hidden])');
+    assert.equal(await page.locator('.q-coach-skip').textContent(), '結束');
+    const seen = [];
+    await page.exposeFunction('saw', x => seen.push(x));
+    await page.evaluate(() => new MutationObserver(() => window.saw(document.querySelector('.q-coach-say')?.textContent)).observe(document.querySelector('.q-coach-say'), { childList: true, characterData: true, subtree: true }));
+    await page.click('.q-coach-next');
+    await page.waitForFunction(() => document.querySelector('.q-coach:not(.wait) .q-coach-say')?.textContent === '一');
+    assert.ok(!seen.includes('選台股'), 'the step already done is never shown');
+    assert.equal(await page.locator('.q-coach-n').textContent(), '2/2', 'and the count closes up');
+
+    // Nothing moving: the guide writes nothing to the page, frame after frame.
+    await page.waitForTimeout(600);
+    const writes = await page.evaluate(() => new Promise(done => {
+      let n = 0;
+      const o = new MutationObserver(list => (n += list.length));
+      o.observe(document.body, { attributes: true, childList: true, subtree: true });
+      setTimeout(() => (o.disconnect(), done(n)), 1000);
+    }));
+    assert.equal(writes, 0, `the page untouched while nothing moves (${writes} writes in 1 s)`);
+
+    // The target drawn again under the finger: no click comes, the tap is made again, once.
+    await page.evaluate(() => ((window.redraw = true), window.heard.splice(0)));
+    await page.mouse.click(60, 120);
+    await page.waitForFunction(() => window.ended !== null || document.querySelector('.q-coach.done'), null, { timeout: 4000 });
+    assert.equal((await page.evaluate(() => window.heard.splice(0))).filter(e => e === 'click:t1').length, 1, 'the app hears the tap once');
   } finally {
     await browser.close();
   }

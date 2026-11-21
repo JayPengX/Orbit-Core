@@ -2,7 +2,7 @@
 // "introduce this"). A ring round the next thing to tap and one short line;
 // the tap itself moves it on. While it runs only that target answers a tap,
 // a press or a swipe, and nothing does on a line or a `show` (Jay 11-19: none
-// stuck, none twice, no way out by mistake); scrolling stays free; 略過 or
+// stuck, none twice, no way out by mistake); scrolling stays free; 結束 or
 // Escape ends it. It never saves, buys or deletes
 // anything: a step that would is a `show` (the ring and 下一步, no tap).
 // A step whose target isn't on screen within a few seconds is skipped; one
@@ -165,7 +165,8 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
   const ring = h('div', { class: 'q-coach-ring', 'aria-hidden': 'true', hidden: true });
   const say = h('p', { class: 'q-coach-say', 'aria-live': 'polite' });
   const n = h('span', { class: 'q-coach-n' });
-  const skip = h('button', { class: 'q-coach-skip', type: 'button', text: T(lang, ['略過', 'Skip']) });
+  // (結束, not 略過: it ends the guide, not the step; read as "skip this one" it ended it all, Jay 11-20)
+  const skip = h('button', { class: 'q-coach-skip', type: 'button', text: T(lang, ['結束', 'End']) });
   const next = h('button', { class: 'q-coach-next', type: 'button' });
   const tip = h('span', { class: 'q-coach-tip', 'aria-hidden': 'true' });
   const bubble = h('div', { class: 'q-coach', role: 'dialog', 'aria-label': T(lang, ['導覽', 'Guide']) }, [say, h('div', { class: 'q-coach-foot' }, [n, h('span', { class: 'q-coach-acts' }, [skip, next])]), tip]);
@@ -175,7 +176,7 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
   if (layer) (ring.popover = 'manual'), (bubble.popover = 'manual');
   document.body.append(ring, bubble);
   // Inside the sheet that's open, if one is (a modal sheet makes all outside it untappable,
-  // the bubble's 下一步 and 略過 too: 11-19, Securities' stock sheet), else on the page.
+  // the bubble's 下一步 and 結束 too: 11-19, Securities' stock sheet), else on the page.
   const lift = () => {
     const host = [...document.querySelectorAll('dialog[open]:not(.q-leaving)')].pop() || document.body;
     if (bubble.parentNode !== host) host.append(ring, bubble);
@@ -198,7 +199,20 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
   let waiting = false; // (looking for the step's target)
   let skipped = 0; // (steps not on screen: left out of the count, so it never jumps)
   let missed = 0; // (steps not found in a row)
+  let pressed = null; // (where a finger went down on the step's target, and whether its click came)
 
+  // Written only when it changes: the page left untouched frame to frame. (Safari on an iPhone
+  // takes a page changing as a finger lands for a hover and drops the tap's click: a ring and a
+  // bubble written every frame made a tap need two, Jay 11-20.)
+  const wrote = new Map();
+  const put = (el, prop, v) => {
+    const k = (el === ring ? 'r' : 'b') + prop;
+    if (wrote.get(k) === v) return;
+    wrote.set(k, v);
+    el.style.setProperty(prop, v);
+  };
+  const shown = (el, on) => el.hidden === on && (el.hidden = !on);
+  const flag = (el, c, on) => el.classList.contains(c) !== on && el.classList.toggle(c, on);
   const place = () => {
     raf = requestAnimationFrame(place);
     // (Its sheet closed or closing under it, or another sheet opened over it: moved to where it's seen.)
@@ -223,9 +237,10 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
       }
     }
     if (!target || !visible(target)) {
-      ring.hidden = true;
-      bubble.classList.remove('up', 'down');
-      bubble.style.transform = `translate(${Math.round((vw - b.width) / 2)}px, ${Math.round(vh - b.height - 120)}px)`;
+      shown(ring, false);
+      flag(bubble, 'up', false);
+      flag(bubble, 'down', false);
+      put(bubble, 'transform', `translate(${Math.round((vw - b.width) / 2)}px, ${Math.round(vh - b.height - 120)}px)`);
       return;
     }
     const r = target.getBoundingClientRect();
@@ -236,18 +251,18 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
       brought = now;
       target.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
-    ring.hidden = false;
-    ring.style.transform = `translate(${Math.round(r.left - 5)}px, ${Math.round(r.top - 5)}px)`;
-    ring.style.width = `${Math.round(r.width + 10)}px`;
-    ring.style.height = `${Math.round(r.height + 10)}px`;
+    shown(ring, true);
+    put(ring, 'transform', `translate(${Math.round(r.left - 5)}px, ${Math.round(r.top - 5)}px)`);
+    put(ring, 'width', `${Math.round(r.width + 10)}px`);
+    put(ring, 'height', `${Math.round(r.height + 10)}px`);
     // Below the target when it fits, else above it.
     const below = r.bottom + 14 + b.height < vh - 80 || r.top - 14 - b.height < 60;
     const y = below ? r.bottom + 14 : r.top - 14 - b.height;
     const x = Math.min(Math.max(12, r.left + r.width / 2 - b.width / 2), vw - b.width - 12);
-    bubble.classList.toggle('down', below);
-    bubble.classList.toggle('up', !below);
-    bubble.style.setProperty('--tip', `${Math.round(Math.min(Math.max(16, r.left + r.width / 2 - x), b.width - 16))}px`);
-    bubble.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+    flag(bubble, 'down', below);
+    flag(bubble, 'up', !below);
+    put(bubble, '--tip', `${Math.round(Math.min(Math.max(16, r.left + r.width / 2 - x), b.width - 16))}px`);
+    put(bubble, 'transform', `translate(${Math.round(x)}px, ${Math.round(y)}px)`);
   };
 
   // While the guide runs, a tap, a press or a swipe anywhere but the step's
@@ -266,6 +281,20 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
     const hit = s?.tap && !moving && !waiting ? e.target.closest?.(s.tap) : null;
     if (hit || (s?.tap && !moving && !waiting && target && (target === e.target || target.contains(e.target)))) {
       if (hit) target = hit;
+      // (A finger lifted on the target with no click after it, the target drawn again under the
+      // finger by a live price, or Safari's hover rule: the tap is made again, once, so a tap never
+      // needs two, Jay 11-20.)
+      if (e.type === 'pointerdown') pressed = { x: e.clientX, y: e.clientY, clicked: false };
+      if (e.type === 'pointerup' && pressed && Math.hypot(e.clientX - pressed.x, e.clientY - pressed.y) < 12) {
+        const p = pressed;
+        const step = at;
+        setTimeout(() => {
+          if (p.clicked || at !== step || moving || !running) return;
+          const el = document.elementFromPoint(p.x, p.y)?.closest?.(s.tap);
+          if (el) el.click();
+        }, 450);
+      }
+      if (e.type === 'click' && pressed) pressed.clicked = true;
       if (e.type === 'click') {
         moving = true;
         const mine = ++turn;
@@ -355,6 +384,9 @@ export function coachTour(steps, { lang = 'zh', onEnd = () => {} } = {}) {
         return (skipped++, go(i + 1));
       }
       if (!s.optional) missed = 0;
+      // (Already as the step asks, 台股 already chosen: never asked for again, Jay 11-20: "you want
+      // me to click 台股 but it's already there"; skipped, out of the count.)
+      if (s.tap && target.closest('[aria-selected="true"], [aria-pressed="true"], [aria-current]:not([aria-current="false"])')) return (skipped++, go(i + 1));
     }
     lift();
     say.textContent = T(lang, s.say);
