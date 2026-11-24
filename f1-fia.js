@@ -8,6 +8,7 @@
 // start"). Orbit Sports' projected grid.
 //
 // Served by the sports proxy as if from `https://f1-live.orbit/drops.json?start=<the race's start>`.
+// The races in order from Jolpica's schedule (F1's archive index refuses the Workers).
 
 const FIA = 'https://www.fia.com';
 const F1_DOCS = `${FIA}/documents/championships/fia-formula-one-world-championship-14`;
@@ -140,7 +141,12 @@ export function dropOf(text) {
 const page = (url, f) => f(url, { signal: AbortSignal.timeout(TIMEOUT) }).then(r => (r.ok ? r.text() : Promise.reject(new Error(`fia ${r.status}`))));
 // A stewards' document that can decide a drop, by its file's name (never a
 // classification, a lap deleted, the notes, a procedure).
-export const mayDrop = href => /(infringement|decision|offence)/i.test(href) && !/deleted_lap|classification|summons|notes|procedure|entry_list|scrutineering/i.test(href);
+// (By the file's name alone: every link's folder is decision-document/, and
+// every document was read for it, the event's points and timetable too.)
+export const mayDrop = href => {
+  const name = String(href || '').split('/').pop();
+  return /(infringement|decision|offence)/i.test(name) && !/deleted_lap|classification|summons|notes|procedure|entry_list|scrutineering|starting_grid|points/i.test(name);
+};
 export function docLinks(html, slug = '') {
   const links = [...String(html || '').matchAll(/href="(\/system\/files\/decision-document\/[^"]+\.pdf)"/g)].map(x => x[1]);
   return [...new Set(links)].filter(h => mayDrop(h) && (!slug || h.includes(slug)));
@@ -154,21 +160,22 @@ export const slugOf = name =>
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_|_$/g, '');
 
-// A year's meetings in order, from F1's archive index: [{ name, first }], first the first session's start (ms).
-export function meetingsOf(index) {
-  return (index?.Meetings || [])
-    .map(m => ({
-      name: m.Name || '',
-      first: Math.min(
-        ...(m.Sessions || []).map(s => {
-          const [h, mm] = String(s.GmtOffset || '0:0').split(':').map(Number);
-          return Date.parse(`${s.StartDate}Z`) - ((h || 0) * 60 + (Math.sign(h) || 1) * (mm || 0)) * 60_000;
-        }).filter(Number.isFinite)
-      )
-    }))
-    .filter(m => m.name && Number.isFinite(m.first) && !/test/i.test(m.name))
-    .sort((a, b) => a.first - b.first);
+// A year's races in order, from Jolpica's schedule (F1's archive index
+// turned the Workers away, 401): [{ name, at }], at the race's start (ms).
+// Its names are the FIA's ("São Paulo Grand Prix", "Las Vegas Grand Prix").
+export function racesOf(schedule) {
+  return (schedule?.MRData?.RaceTable?.Races || [])
+    .map(r => ({ name: r.raceName || '', at: Date.parse(`${r.date}T${r.time || '12:00:00Z'}`) }))
+    .filter(r => r.name && Number.isFinite(r.at))
+    .sort((a, b) => a.at - b.at);
 }
+// The FIA's page's own current event (its open one), when the schedule can't be read.
+export const activeEvent = html => /event-title active">([^<]+)</.exec(String(html || ''))?.[1]?.trim() || '';
+
+// Whether a drop is served at this race: the last meeting's only if its
+// race decided it (for the next one); this one's never if its race did
+// (that's the next one's), but a pit-lane start, decided for this race, is.
+export const servedAt = (d, last) => (last ? d.session === 'Race' : d.session !== 'Race' || d.kind === 'pitlane');
 
 // Each of `list` through `fn`, four at a time (the FIA's site slowed to a
 // stop asked for twenty PDFs at once).
@@ -187,16 +194,22 @@ async function inTurn(list, fn, n = 4) {
 // The race starting at `start`: its meeting's drops (all of them) and the
 // last meeting's from its race (served at the next one), each car's once.
 // [{ no, name, kind, n, session, doc }]
-export async function raceDrops(start, { f = fetch, archive } = {}) {
+export async function raceDrops(start, { f = fetch } = {}) {
   const at = Date.parse(start);
   if (!Number.isFinite(at)) throw new Error('start');
   const year = new Date(at).getUTCFullYear();
-  const meetings = meetingsOf(await archive(`${year}/Index.json`));
-  const i = meetings.findLastIndex(m => m.first <= at && m.first > at - 6 * 86_400_000);
-  if (i < 0) return [];
+  const schedule = await f(`https://api.jolpi.ca/ergast/f1/${year}.json?limit=100`, { signal: AbortSignal.timeout(TIMEOUT), cf: { cacheTtl: 6 * 3_600, cacheEverything: true } })
+    .then(r => (r.ok ? r.json() : null))
+    .catch(() => null);
+  const races = racesOf(schedule);
   const root = await page(`${F1_DOCS}`, f).catch(() => '');
   const season = new RegExp(`season-${year}-(\\d+)`).exec(root)?.[1];
   if (!season) return [];
+  // (No schedule: the FIA's open event, this one's documents alone.)
+  let i = races.findIndex(r => Math.abs(r.at - at) < 86_400_000);
+  const meetings = i >= 0 ? races : [{ name: activeEvent(root) }];
+  if (i < 0) i = meetings[0].name ? 0 : -1;
+  if (i < 0) return [];
   const event = async (m, last) => {
     const html = await page(`${F1_DOCS}/season/season-${year}-${season}/event/${encodeURIComponent(m.name)}`, f).catch(() => '');
     const docs = docLinks(html, `${year}_${slugOf(m.name)}`);
@@ -206,8 +219,7 @@ export async function raceDrops(start, { f = fetch, archive } = {}) {
         const res = await f(`${FIA}${href}`, { signal: AbortSignal.timeout(TIMEOUT), cf: { cacheTtl: 7 * 86_400, cacheEverything: true } }).catch(() => null);
         if (!res?.ok) return null;
         const d = dropOf(await pdfText(new Uint8Array(await res.arrayBuffer())).catch(() => ''));
-        // (The last meeting's: only what its race decided, for the next one.)
-        return d && (!last || d.session === 'Race') ? { ...d, doc: `${FIA}${href}` } : null;
+        return d && servedAt(d, last) ? { ...d, doc: `${FIA}${href}` } : null;
       }
     );
     return read.filter(Boolean);

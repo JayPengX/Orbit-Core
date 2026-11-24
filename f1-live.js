@@ -833,7 +833,7 @@ export async function f1LiveResponse(url, { log = null } = {}) {
       const start = url.searchParams.get('start') || '';
       const kept = dropsKept.get(start);
       if (kept && Date.now() - kept.at < 10 * 60_000) return json({ drops: kept.drops }, 200);
-      const drops = await raceDrops(start, { archive: archiveJson });
+      const drops = await raceDrops(start);
       dropsKept.set(start, { at: Date.now(), drops });
       return json({ drops }, 200);
     } catch (error) {
