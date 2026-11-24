@@ -50,6 +50,11 @@ const SESSION_MS = 30_000;
 // waits for a later run; one still turned away 4 days after it ended is a failure.
 const REFUSED = /openf1 (401|403|429)/;
 const WAIT_MS = 4 * 86_400_000;
+// OpenF1 open but with nothing for the session (Las Vegas's FP1, 2026-11-20: no
+// results, 20 laps in all): waited for as a refusal is, then set aside for good
+// (KEPT_LIST `none`), never asked again. It was asked three times an hour for
+// days, each a failure, and mailed Jay "一直失敗" again and again.
+const EMPTY = /openf1 no \w+/;
 const startOf = url => Date.parse(new URL(url).searchParams.get('start'));
 export async function runF1Kept({ store, proxy, now = Date.now(), per = Infinity, until = now + F1KEPT_MS, sleep = ms => new Promise(r => setTimeout(r, ms)), clock = Date.now }) {
   const year = new Date(now).getUTCFullYear();
@@ -58,21 +63,26 @@ export async function runF1Kept({ store, proxy, now = Date.now(), per = Infinity
   const all = f1ToKeep(events, now);
   // (Sessions found kept, listed once (KEPT_LIST): not looked for again. Each run looked for
   // all 200 files of the season's 100 sessions, 55 s of the Runner's time three times an hour.)
-  const done = new Set((await store.json(KEPT_LIST).catch(() => null))?.done || []);
+  const list = (await store.json(KEPT_LIST).catch(() => null)) || {};
+  const done = new Set(list.done || []);
+  const none = new Set(list.none || []);
   const found = [];
   for (const urls of all) {
-    if (done.has(urls[0])) continue;
+    if (done.has(urls[0]) || none.has(urls[0])) continue;
     const todo = [];
     for (const url of urls) if (!(await store.has(`${mirrorPath(url, '')}.gz`))) todo.push(url);
     if (todo.length) missing.push(todo);
     else found.push(urls[0]);
   }
-  if (found.length) await store.put(KEPT_LIST, { done: [...done, ...found] });
+  const keepList = () => store.put(KEPT_LIST, { done: [...done], none: [...none] });
+  for (const u of found) done.add(u);
+  if (found.length) await keepList();
   let read = 0;
   const failed = [];
   let inRow = 0;
   let again = 0;
-  const out = extra => ({ sessions: all.length, kept: all.length - missing.length + read, read, again, ...(failed.length ? { failed } : {}), ...extra });
+  const empty = [];
+  const out = extra => ({ sessions: all.length, kept: all.length - missing.length + read, read, again, ...(empty.length ? { none: empty } : {}), ...(failed.length ? { failed } : {}), ...extra });
   for (const todo of missing) {
     if (read >= per || clock() + SESSION_MS > until) break;
     const began = clock();
@@ -89,11 +99,18 @@ export async function runF1Kept({ store, proxy, now = Date.now(), per = Infinity
       if (got && !got.error) continue;
       // (OpenF1 refusing, not 4 days on: nothing wrong, the session waits for a later run.)
       if (REFUSED.test(got?.error || '') && now - startOf(url) < WAIT_MS) return out({ waiting: url, why: got.error });
+      // (Nothing in OpenF1 for it: waited for, then set aside.)
+      if (EMPTY.test(got?.error || '')) {
+        if (now - startOf(url) >= WAIT_MS) (none.add(f1SessionUrl(new Date(startOf(url)).toISOString())), empty.push(url), await keepList());
+        ok = null;
+        break;
+      }
       ok = false;
       failed.push(url);
       break;
     }
     if (ok) (read++, (inRow = 0));
+    else if (ok === null) inRow = 0;
     // Three in a row: OpenF1 shut or turning this Worker away, the next run.
     else if (++inRow >= 3) return out({ stopped: failed.at(-1) });
     await sleep(Math.max(0, SESSION_MS - (clock() - began)));

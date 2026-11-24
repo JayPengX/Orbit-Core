@@ -1627,8 +1627,9 @@ async function route(request, env, ctx, headers, origin) {
     // What the alert mails would say now, and whether an address is set (never the address): mail-alerts.js.
     if (check === 'mail-check') {
       const set = await mailSettings(env, ECO_DEPS);
-      // (The mails sent, newest first: when, what kind and the subject, never the address: the run's log is public.)
-      const sent = (await mailLog(env)).map(({ at, kind, via, subject }) => ({ at: new Date(at).toISOString(), kind, via, subject }));
+      // (The alert mails sent, newest first: when and the subject, never the address nor
+      // another kind (a Pass's code is in its subject): the run's log is public.)
+      const sent = (await mailLog(env)).filter(m => m.kind === 'alert').map(({ at, subject }) => ({ at: new Date(at).toISOString(), subject }));
       return json({ address: !!set.to, on: set.on, quiet: set.quiet, mail: !!env.MAIL, resend: !!env.RESEND_API_KEY, issues: await alertsNow(env, ECO_DEPS, ['fast', 'mid', 'slow']), open: await alertState(env), sent }, 200, headers);
     }
     // The paid makers' keys and their models' names (ai-other.js).

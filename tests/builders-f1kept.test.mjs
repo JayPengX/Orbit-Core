@@ -68,3 +68,22 @@ test('a run reads the sessions not kept, skips what’s kept, until its time is 
   // Its time up: none read.
   assert.equal((await runF1Kept({ store: r2Store(bucket), proxy: async () => ({}), now, until: now, clock: () => now, sleep: async () => {} })).read, 0);
 });
+
+// Jay 11-25, the alert mails: Las Vegas's FP1 (11-20) has nothing in OpenF1 (no results), and
+// every run three times an hour failed on it, mailing "F1 過去的賽段 一直失敗" for days.
+test('a session OpenF1 has nothing for is waited for, then set aside for good, never a failure', async () => {
+  const bucket = memoryBucket({ 'sports/f1/2026.json': { events: [ev(['2026-10-25T20:00Z', 'FP1'])] } });
+  const asked = [];
+  const empty = async url => (asked.push(url), { error: 'archive 401; openf1 no session_result' });
+  const run = at => runF1Kept({ store: r2Store(bucket), proxy: empty, now: at, clock: () => at, sleep: async () => {} });
+  const soon = await run(Date.parse('2026-10-26T04:00Z'));
+  assert.equal(soon.failed, undefined);
+  assert.equal(soon.none, undefined, 'not set aside yet: OpenF1 may still fill it');
+  const late = await run(Date.parse('2026-10-30T04:00Z'));
+  assert.equal(late.failed, undefined);
+  assert.deepEqual(late.none, [f1SessionUrl('2026-10-25T20:00Z')]);
+  asked.length = 0;
+  const after = await run(Date.parse('2026-10-30T05:00Z'));
+  assert.deepEqual(asked, [], 'never asked again');
+  assert.equal(after.failed, undefined);
+});
