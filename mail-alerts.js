@@ -126,7 +126,30 @@ async function mid(env, deps, now) {
   }
   out.push(...modelIssues(calls));
   out.push(...tdxIssue(tdx, now));
+  out.push(...watchIssues(await keptRead(env, WATCH).catch(() => null), now));
   return out;
+}
+// The free plans' watch (tools/free-watch.mjs, every 3 hours on GitHub) never
+// fails its run (GitHub mailed each one: Jay 11-24, "never do that again"); it
+// hands what only it sees (a page or route not answering, a Cloudflare token
+// ending, an account left plain) to /ops?check=watch-report, and this mail says
+// it: once seen in two runs in a row (a blip isn't mailed), gone once a run
+// doesn't see it, a report older than 7 hours ignored.
+export const WATCH = 'mail:watch';
+const watchKey = p => String(p).split(':')[0].trim().slice(0, 60);
+export function watchMerge(prev, problems, now) {
+  const before = Object.fromEntries((prev?.problems || []).map(p => [p.key, p.runs]));
+  const list = (Array.isArray(problems) ? problems : []).slice(0, 40).map(p => String(p).slice(0, 300));
+  return { at: now, problems: list.map(text => ({ key: watchKey(text), text, runs: (before[watchKey(text)] || 0) + 1 })) };
+}
+export async function keepWatchReport(env, body, now = Date.now()) {
+  const next = watchMerge(await keptRead(env, WATCH).catch(() => null), body?.problems, now);
+  await keptPut(env, WATCH, next, 2 * 86_400);
+  return { kept: next.problems.length };
+}
+export function watchIssues(report, now = Date.now()) {
+  if (!report?.at || now - report.at > 7 * HOUR) return [];
+  return report.problems.filter(p => p.runs >= 2).map(p => ({ id: `watch:${p.key}`, tone: 'bad', title: `巡檢：${p.key}`, detail: p.text, go: 'health' }));
 }
 // TDX's month (transit.js tdxPlan). On 銅級 a month near its 200 points is news, mailed. On the free tier
 // (from 2026-12-01: 3 points) the guard spends the month to 95% by design, keeping answers longer as it

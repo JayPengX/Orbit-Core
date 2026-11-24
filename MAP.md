@@ -429,7 +429,7 @@ Web Push, some checked first (`runCheck`). Each device once (its Orbit, else the
   - `news-site.yml`: News's site (this repo's token), started by `newsSite`;
   - `news-clips.yml`: the clips in Taiwan's articles, started by `newsClips`;
   - every app repo's deploy workflow: its site, to Cloudflare.
-- Every 3 hours: `free-watch.yml` (`tools/free-watch.mjs`, started by the cron's `startFreeWatch`): pages, routes, crons, free amounts; a failure mails Jay.
+- Every 3 hours: `free-watch.yml` (started by `startFreeWatch`): pages, routes, free amounts; never fails, findings to the alert mail.
 - GitHub turns a public repo's scheduled workflows off after 60 days with no
   commit: `github-keep.js` (hourly, a repo in turn) turns them on again
   with `GH_ACTIONS_TOKEN`; Jay is mailed 21 days before it ends.

@@ -96,8 +96,8 @@ Values are never written anywhere else. The admin panel's system report and
   `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `RESEND_API_KEY`, `ANTHROPIC_CREDIT_KEY`
   (batch jobs and `agent.yml` only).
   `deploy.yml` and `deploy-guard.yml` copy the Worker ones into the Workers.
-  The free plans' watch (`free-watch.yml`, 3-hourly) fails, and GitHub mails
-  Jay, when either Cloudflare token is refused or ends within 21 days.
+  The free plans' watch (`free-watch.yml`, 3-hourly) tells the proxy, whose
+  alert mail tells Jay, when either Cloudflare token is refused or ends within 21 days.
 - **GitHub › Orbit-Law:** `CLOUDFLARE_API_TOKEN`, `LAW_BUILD_KEY` (the same
   value as Orbit-Core's), `JDOC_USER`, `JDOC_PASS`.
 - **GitHub › every other app repo:** `CLOUDFLARE_API_TOKEN` (its own site's deploy).

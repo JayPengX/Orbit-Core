@@ -64,7 +64,7 @@ import { paceOf } from './pace.js';
 import { beat, tellOwner, systemReport, countFolders, FOLDERS_KEY, startFreeWatch, startShowcaseLook, moveAlertAccount } from './ops.js';
 import { keepWorkflows } from './github-keep.js';
 import { liveGeminiUrl, checkModels } from './ai-models.js';
-import { mailAlerts, gather as alertsNow } from './mail-alerts.js';
+import { mailAlerts, gather as alertsNow, keepWatchReport } from './mail-alerts.js';
 import { mailSettings, sendMail } from './mail.js';
 import { sweepKept, keptText } from './kept-store.js';
 import { withDataFallback, sweepDataFiles } from './data-fallback.js';
@@ -1618,6 +1618,8 @@ async function route(request, env, ctx, headers, origin) {
     // 問法律's steps timed on real questions, nothing kept read or written (law-chat.js).
     if (check === 'law-chat') return json(await lawChatTimes(env, ctx, headers, lawGemini('law-chat'), new URL(request.url).searchParams.get('try') || ''), 200, headers);
     if (check === 'system') return json(await systemReport(env, ECO_DEPS), 200, headers);
+    // The free plans' watch's findings (tools/free-watch.mjs), for the alert mail (mail-alerts.js watchIssues).
+    if (check === 'watch-report') return json(await keepWatchReport(env, await request.json().catch(() => ({})), ECO_DEPS.now()), 200, headers);
     // Every account standing before levels began made 'full', once (eco.js stampLevels; ?dry=1 counts).
     if (check === 'levels') return json(await stampLevels(env, { dry: new URL(request.url).searchParams.get('dry') === '1' }), 200, headers);
     // What the alert mails would say now, and whether an address is set (never the address): mail-alerts.js.

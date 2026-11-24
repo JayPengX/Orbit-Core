@@ -3,8 +3,12 @@
 // against its free amount. From 2026-11-13 Orbit pays only for its domain:
 // Cloudflare's Free plan (Workers, KV, D1, R2, Durable Objects: the guard's
 // shares of a day), Google's free months (the proxy's caps) and TDX's free
-// points. The run fails, and GitHub mails the owner, when a page or a route
-// doesn't answer, a cron job keeps failing, or an allowance passes WARN.
+// points. The run never fails (Jay 11-24: "never do that again … we already
+// have email send by our server"): what's wrong goes to the proxy
+// (/ops?check=watch-report), and its alert mail (mail-alerts.js, the
+// one mail Jay gets) says it with the rest. What the proxy already mails
+// (Cloudflare's shares, a cron job failing, an AI cap) and what stops itself
+// (Google's caps, at 90% of each free month) is a note here.
 //   node tools/free-watch.mjs            (DATA_PUSH_SECRET: the cron jobs' health too)
 const DOMAIN = 'jaypengx.com';
 const SITE = `https://orbit.${DOMAIN}`;
@@ -74,8 +78,8 @@ async function allowances(transitStatus) {
   const day = s.period ? Math.min(1, Math.max(0.05, ((s.at || Date.now()) - s.period.start) / (s.period.end - s.period.start))) : 1;
   for (const [k, v] of shares) {
     const end = v / day;
-    if (v >= WARN) bad(`Cloudflare ${k}: ${Math.round(v * 100)}% of today's free amount used`);
-    else if (end >= 1) bad(`Cloudflare ${k}: ${Math.round(v * 100)}% used, heading for ${Math.round(end * 100)}% by the day's end`);
+    if (v >= WARN) notes.push(`high: Cloudflare ${k}: ${Math.round(v * 100)}% of today's free amount used`);
+    else if (end >= 1) notes.push(`Cloudflare ${k}: ${Math.round(v * 100)}% used, heading for ${Math.round(end * 100)}% by the day's end`);
   }
   notes.push(`Cloudflare (today so far): ${shares.slice(0, 6).map(([k, v]) => `${k} ${(v * 100).toFixed(1)}%`).join(', ')}`);
   // Google's free months, by the proxy's own caps (90% of each), and TDX's points.
@@ -86,7 +90,7 @@ async function allowances(transitStatus) {
     for (const [k, g] of Object.entries(t.google || {})) if (g?.cap) rows.push([k, (g.used || 0) / g.cap]);
     if (t.google?.error) bad(`Google counts: ${t.google.error}`);
     rows.sort((a, b) => b[1] - a[1]);
-    for (const [k, v] of rows) if (v >= WARN) bad(`Google ${k}: ${Math.round(v * 100)}% of this month's cap`);
+    for (const [k, v] of rows) if (v >= WARN) notes.push(`high: Google ${k}: ${Math.round(v * 100)}% of this month's cap`);
     notes.push(`Google (this month, of each cap under the free amount): ${rows.slice(0, 6).map(([k, v]) => `${k} ${(v * 100).toFixed(0)}%`).join(', ')}`);
   }
 }
@@ -98,7 +102,7 @@ async function beats() {
   const r = await get(`https://orbit-workers-proxy.pengzjay.workers.dev/ops?check=system`, { json: true, secret });
   if (!r?.body) return bad(`ops system: ${r?.status} ${String(r?.text || '').slice(0, 120)}`);
   const failing = (r.body.beats || []).filter(b => !b.ok && (b.fails || 0) >= 3);
-  for (const b of failing) bad(`cron ${b.job}: failed ${b.fails} times in a row; last good ${b.okAt ? new Date(b.okAt).toISOString() : 'never'}: ${String(b.note || '').slice(0, 200)}`);
+  for (const b of failing) notes.push(`failing: cron ${b.job}: failed ${b.fails} times in a row; last good ${b.okAt ? new Date(b.okAt).toISOString() : 'never'}: ${String(b.note || '').slice(0, 200)}`);
   notes.push(`cron jobs: ${(r.body.beats || []).length} watched, ${failing.length} failing`);
   // (GitHub's token for the schedules, github-keep.js: Jay is mailed 21 days before it ends.)
   const gh = r.body.github;
@@ -163,13 +167,13 @@ async function aiMoney() {
     said.push(`${prov} NT$${Math.round(left * rate)} left${days != null ? `, ~${days} days` : ''}`);
     if (left <= m.typed.usd * 0.25 || (days != null && days <= 7)) notes.push(`low: AI ${prov}: about NT$${Math.max(0, Math.round(left * rate))} left${days != null ? ` (about ${days} days at this week's rate)` : ''}: top it up, or it falls to its backup`);
   }
-  for (const [prov, t] of Object.entries(r.body.today || {})) if (t.n != null && t.cap && t.n >= t.cap * 0.8) bad(`AI ${prov}: ${t.n} of ${t.cap} calls today (its day cap)`);
+  for (const [prov, t] of Object.entries(r.body.today || {})) if (t.n != null && t.cap && t.n >= t.cap * 0.8) notes.push(`high: AI ${prov}: ${t.n} of ${t.cap} calls today (its day cap)`);
   notes.push(`AI money: ${said.join(', ')}; today ${Object.entries(r.body.today || {}).map(([p, t]) => `${p} ${t.n}/${t.cap}`).join(', ')}`);
 }
 
 // Cloudflare's tokens' end dates: the deploys' (CLOUDFLARE_API_TOKEN: every
 // app's site, Law's data, the Showcase's demos) and the guard's (CF_GUARD_TOKEN).
-// One ending within 21 days, or refused, fails the run (GitHub mails it); a
+// One ending within 21 days, or refused, is mailed by the proxy; a
 // token with no end date is fine for good. A new one: Cloudflare › My Profile ›
 // API Tokens, the same rights, typed into GitHub (Orbit-Core › Settings › Secrets).
 const TOKEN_DAYS = 21;
@@ -216,4 +220,13 @@ await cfTokens();
 const out = [`# Orbit on the free plans: ${problems.length ? `${problems.length} problem${problems.length > 1 ? 's' : ''}` : 'all well'}`, '', ...problems.map(p => `- ❌ ${p}`), ...(problems.length ? [''] : []), ...notes.map(n => `- ${n}`)].join('\n');
 console.log(out);
 if (process.env.GITHUB_STEP_SUMMARY) (await import('node:fs')).appendFileSync(process.env.GITHUB_STEP_SUMMARY, out + '\n');
-process.exit(problems.length ? 1 : 0);
+// (Told to the proxy, every run, an empty list too: what's fixed drops out of its next mail.)
+if (process.env.DATA_PUSH_SECRET) {
+  const r = await fetch('https://orbit-workers-proxy.pengzjay.workers.dev/ops?check=watch-report', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.DATA_PUSH_SECRET}`, 'Content-Type': 'application/json', 'User-Agent': 'Orbit free-watch (GitHub Actions)' },
+    body: JSON.stringify({ problems }),
+    signal: AbortSignal.timeout(20_000)
+  }).catch(e => ({ status: 0, statusText: e.message }));
+  console.log(`told the proxy: ${r.status} ${r.statusText || ''}`);
+}

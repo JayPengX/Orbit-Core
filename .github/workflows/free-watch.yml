@@ -1,12 +1,13 @@
 # The free plans' watch (tools/free-watch.mjs): every page and route a phone
 # reaches, the cron jobs' health, and every allowance (Cloudflare's day,
 # Google's month) against its free amount. From 2026-11-13 Orbit pays only for
-# its domain: a failed run (GitHub mails it) is something broken or near a limit.
+# its domain. Started every 3 hours by the proxy's cron (ops.js startFreeWatch),
+# never by GitHub's own timer too (two runs counted one blip twice). It never
+# fails: what's wrong is handed to the proxy, whose alert mail says it
+# (mail-alerts.js), so GitHub mails nothing (Jay 11-24).
 name: Free plans' watch
 
 on:
-  schedule:
-    - cron: '17 */3 * * *'
   workflow_dispatch:
     inputs:
       trace:

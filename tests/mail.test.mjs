@@ -197,3 +197,20 @@ test("TDX's month near its points: mailed on 銅級; on the free tier amber only
   assert.ok(!free[0].mail);
   assert.deepEqual(tdxIssue({ 'tdx:a:2026-12-20': 100 }, dec), []);
 });
+
+test("the free plans' watch never fails on GitHub: its findings reach the alert mail, a blip (one run) never, a stale report never", async () => {
+  const { watchMerge, watchIssues } = await import('../mail-alerts.js');
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../tools/free-watch.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /process\.exit\(\s*problems/, 'a failed run is a GitHub mail (Jay 11-24)');
+  assert.doesNotMatch(readFileSync(new URL('../.github/workflows/free-watch.yml', import.meta.url), 'utf8'), /schedule:/, 'started by the proxy only');
+  const t = Date.parse('2026-11-24T04:00:00Z');
+  const one = watchMerge(null, ['sports page: 502 bad gateway (https://…)'], t);
+  assert.deepEqual(watchIssues(one, t + 60_000), []);
+  const two = watchMerge(one, ['sports page: 503 (https://…)', 'vault: 1 account(s) still plain'], t + 3 * 3_600_000);
+  const issues = watchIssues(two, t + 3 * 3_600_000);
+  assert.deepEqual(issues.map(i => [i.id, i.tone]), [['watch:sports page', 'bad']]);
+  assert.deepEqual(watchIssues(two, t + 11 * 3_600_000), []);
+  // Fixed: the next run's empty list drops it.
+  assert.deepEqual(watchIssues(watchMerge(two, [], t + 6 * 3_600_000), t + 6 * 3_600_000), []);
+});
