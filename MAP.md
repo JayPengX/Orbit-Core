@@ -96,7 +96,7 @@ first screen's modules for modulepreload.
 | `pass.mjs`, `help.mjs`, `coach.mjs` | The Pass sheet (account, looks, apps, help; no money); each app's help (`#help=<app>[:topic]`), 帶我走一遍 (`GUIDES`) |
 | `passkey.mjs`, `pass-mail.mjs` | Passkeys in the browser (`passkeyHere()`); the recovery email's screens |
 | `news-outlets.mjs` | News' outlets: owner, place (藍綠, 統獨, left–right), sources (`BASIS`); `TOPICS`; `sideOf`, `partiesIn`, `topicsOf`, `namesRe` |
-| `ai.mjs`, `family.mjs`, `act.mjs` | AI (mark `icons.ai`, `--q-ai`; `.q-ai-ref` a name chip): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer`, `aiAnswerWait` (answers drawn); the family notebook (`tell`/`heard`, places, `planHash`); `act.mjs` `readAct`: a command in an app's ask box (a focus, a countdown, a team to follow) read by code, no AI |
+| `ai.mjs`, `family.mjs`, `act.mjs` | AI (mark `icons.ai`, `--q-ai`; `.q-ai-ref` a name chip): `aiCall`, `aiFlow` (asks back), `pickList`/`picker`, `aiBar`, `aiPicture`, `aiAnswer`, `aiAnswerWait` (answers drawn); the family notebook (`tell`/`heard`); `act.mjs` `readAct`: a command in an app's ask box (a focus, a countdown, a team to follow) read by code, no AI |
 | `testtools.mjs` | 測試工具, hidden until unlocked (seven taps on 除錯紀錄 in 4 s): a moved or fast clock, a place, a trip's fixes played back (`playTrip`), the network off/slow/failing (`boot.js`, `orbit.tester`), test notices (`pushTest`), each app's switches (`ORBIT_TEST_TOOLS`, `ORBIT_TEST?.flags?.x`), versions; a pill while anything is on |
 | `suite.mjs` | Orbit (`site/app/`; `inSuite()`): each app a frame of `host`, kept running (`toClose`), tabs, the ⌄ switcher; behaviour: `docs/ORBIT.md` |
 | `notice-kinds.mjs` | Notice kinds |
@@ -361,7 +361,7 @@ writing a file only when it changed (`builders/store.js`):
 | `asia.js`, `cpbl.js` | CPBL's month and standings | daily 15:00 |
 | `f1kept.js` | each finished F1 session's 數據 and laps, kept early (via the proxy); OpenF1 refusing: waiting, 4 days | :06, :26, :46 |
 | `kept.js` | wipes kept copies (`mirror/`) before a league's first askable day | daily 17:00 |
-| `news.js`, `news-words.js`, `news-laws.js` | `news/index.json` (3 days), `past.json`: stories by weight, topic, side, 快訊 (`live`: many outlets in 2 h); `laws.json`; read here, the desk laid by `news-desk.yml` | every 10 min |
+| `news.js`, `news-words.js` | `news/index.json` (3 days), `past.json`: stories by weight, topic, side, 快訊 (`live`: many outlets in 2 h); read here, the desk laid by `news-desk.yml` | every 10 min |
 | `tools/flight-pool.mjs` (`flight.yml`, started by the cron: `flight.js keepPool`) | `flight/` | 10 min |
 | `tools/news-clips.mjs` (`news-clips.yml`) | `news/clips.json`: the clips in Taiwan's articles (those outlets refuse Cloudflare) for `news.js`; TPEx's 重大訊息 list too (`TPEX_COPY`) | started by `newsClips` (15 min) |
 | `filings.js`; `ai.js` | 重大訊息 as rows: `stock/filings/`; Mondays the admin's 除錯紀錄週報 (`rec-weekly`, the only AI made ahead). Words' cards (`words/cards/`) were made once and are kept as they are | :04 :34 |

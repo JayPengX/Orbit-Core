@@ -35,7 +35,6 @@ import { runKept, KEPT_HOUR } from './kept.js';
 import { runF1Kept } from './f1kept.js';
 import { runNews, newsSite, newsClips, startNewsDesk } from './news.js';
 import { runFilings } from './filings.js';
-import { runNewsLaws } from './news-laws.js';
 import { runAi } from './ai.js';
 
 export const WINPROB_HOUR = 23;
@@ -76,7 +75,6 @@ export async function runBuilders(env, { proxy, now = Date.now(), job = SLOTS[ne
     await step('newsDesk', () => startNewsDesk(env));
     await step('newsSite', () => newsSite({ store, env, now }));
     await step('newsClips', () => newsClips({ store, env, now }));
-    await step('newsLaws', () => runNewsLaws({ store, now }));
   }
   // (f1kept-count: how many are kept, none read.)
   if (job === 'f1kept' || only === 'f1kept' || only === 'f1kept-count') await step('f1kept', () => runF1Kept({ store, proxy, now, ...(only === 'f1kept-count' ? { per: 0 } : {}) }));

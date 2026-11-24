@@ -10,18 +10,15 @@
 // and the Pass's copy is merged in at each sign-in and return (`mergeHeard`),
 // newer per fact. The facts are the person's own, already in their apps' data.
 //
-//   tell(app, key, value)            this app's fact ('class', 'week', {...})
+//   tell(app, key, value)            this app's fact ('weather', 'rain', {...})
 //   heard(app, key, { maxAge })      another's fact, or null (too old, never told)
-//   setPlace(role, place, app)       home / school / work: { lat, lon, name } (Weather's pins, Transit's places)
-//   placeFor(role)                   that place, or null
-//   planHash(place, at)              Orbit Transit's trip to a place (#plan…), there by `at` when given
 //
 // The facts each app tells (keep this list current; Jay 11-24 cut the thin
-// ones: 車資記帳, Class in 我的行程, News lifted by the family, 下課背五個, 今天):
+// ones and every button into another app: 車資記帳, Class in 我的行程, News
+// lifted by the family, 下課背五個, 今天, 去球場, 出門時間 and the places, 看法案,
+// a bill's 新聞, 持股新聞):
 //   weather.rain    { places: [{ lat, lon, wet: [[from, to]] }] } where rain is due in the next 12 hours (ms; the
 //                   radar's shower, then hours at 50%+), Transit's 下雨改搭車
-// Places (place.home / place.school / place.work) are the family's, written
-// by whichever app last learned them.
 
 const KEY = 'orbit.family.v1';
 const read = () => {
@@ -74,17 +71,3 @@ export function heard(app, key, { maxAge = Infinity, now = Date.now() } = {}) {
   const f = read()[`${app}.${key}`];
   return f && now - f.at <= maxAge ? f.v : null;
 }
-
-const okPlace = p => p && Number.isFinite(+p.lat) && Number.isFinite(+p.lon);
-// A trip in Orbit Transit (its #plan, Transit's lib/links.mjs): from where
-// the phone is to `place`, there by `at` (a moment) when given. Sports'
-// 去球場, Class's 出門時間 open `/transit/` with it (the session's go).
-export function planHash({ lat, lon, name = '' }, at = null) {
-  const by = at != null && Number.isFinite(new Date(at).getTime()) ? `&by=${encodeURIComponent(new Date(at).toISOString())}` : '';
-  return `#plan?to=${Number(lat).toFixed(6)},${Number(lon).toFixed(6)},${encodeURIComponent(String(name))}${by}`;
-}
-export function setPlace(role, place, app = '') {
-  if (!['home', 'school', 'work'].includes(role) || !okPlace(place)) return;
-  tell('place', role, { lat: +(+place.lat).toFixed(5), lon: +(+place.lon).toFixed(5), name: String(place.name || '').slice(0, 40), from: app });
-}
-export const placeFor = role => heard('place', role);
