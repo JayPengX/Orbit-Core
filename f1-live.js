@@ -831,10 +831,12 @@ export async function f1LiveResponse(url, { log = null } = {}) {
   if (url.pathname === '/drops.json') {
     try {
       const start = url.searchParams.get('start') || '';
-      const kept = dropsKept.get(start);
+      const [name, prev] = ['name', 'prev'].map(k => (url.searchParams.get(k) || '').slice(0, 60));
+      const key = `${start}|${name}|${prev}`;
+      const kept = dropsKept.get(key);
       if (kept && Date.now() - kept.at < 10 * 60_000) return json({ drops: kept.drops }, 200);
-      const drops = await raceDrops(start);
-      dropsKept.set(start, { at: Date.now(), drops });
+      const drops = await raceDrops(start, { name, prev });
+      dropsKept.set(key, { at: Date.now(), drops });
       return json({ drops }, 200);
     } catch (error) {
       return json({ error: String(error.message || error) }, 502);

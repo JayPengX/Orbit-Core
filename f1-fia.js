@@ -191,14 +191,17 @@ async function inTurn(list, fn, n = 4) {
 // The race starting at `start`: its meeting's drops (all of them) and the
 // last meeting's from its race (served at the next one), each car's once.
 // [{ no, name, kind, n, session, doc }]
-export async function raceDrops(start, { f = fetch } = {}) {
+// (`name`, `prev`: the race's and the last one's, as the phone read them
+// from the same schedule: Jolpica turns the Workers away, 429, and answers
+// a phone.)
+export async function raceDrops(start, { f = fetch, name = '', prev = '' } = {}) {
   const at = Date.parse(start);
   if (!Number.isFinite(at)) throw new Error('start');
   const year = new Date(at).getUTCFullYear();
-  const schedule = await f(`https://api.jolpi.ca/ergast/f1/${year}.json?limit=100`, { signal: AbortSignal.timeout(TIMEOUT), cf: { cacheTtl: 6 * 3_600, cacheEverything: true } })
+  const schedule = name ? null : await f(`https://api.jolpi.ca/ergast/f1/${year}.json?limit=100`, { signal: AbortSignal.timeout(TIMEOUT), cf: { cacheTtl: 6 * 3_600, cacheEverything: true } })
     .then(r => (r.ok ? r.json() : null))
     .catch(() => null);
-  const races = racesOf(schedule);
+  const races = name ? [...(prev ? [{ name: prev, at: 0 }] : []), { name, at }] : racesOf(schedule);
   const root = await page(`${F1_DOCS}`, f).catch(() => '');
   const season = new RegExp(`season-${year}-(\\d+)`).exec(root)?.[1];
   if (!season) return [];
