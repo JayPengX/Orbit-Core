@@ -4,7 +4,8 @@
 # proxy (POST /ops): gemini-check, one tiny Gemini call through the Taiwan
 # relay; system, the report the admin panel's 系統 shows; capacity, its 容量;
 # sources, its 外部來源 (the proxy's and the phones' counts); sources-state,
-# the panel's own verdict (what's red or amber, and why).
+# the panel's own verdict (what's red or amber, and why); mail-check, what the
+# alert mails would say now and the last 40 mails sent (no address).
 name: Run a builder or a check
 on:
   workflow_dispatch:
@@ -12,7 +13,7 @@ on:
       job:
         description: The job
         type: choice
-        options: [watch, watch-full, cutouts, buses, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, news, gemini-check, gemini-use, ai-money, law-chat-time, ai-models, ai-compare, ai-try, as-phone, ai, ai-weekly, system, folders, levels, capacity, detail, cpu, sources, sources-state, store-time]
+        options: [watch, watch-full, cutouts, buses, asia, cpbl, sports, photos, winprob, kept, kept-dry, f1kept, f1kept-count, news, gemini-check, gemini-use, ai-money, law-chat-time, ai-models, ai-compare, ai-try, as-phone, ai, ai-weekly, system, folders, levels, capacity, detail, cpu, sources, sources-state, store-time, mail-check]
         default: watch
       try:
         description: "law-chat-time: settings to try, e.g. answer=minimal,plan=minimal,model=lite; gemini-check: a model name; ai-money: set=anthropic:5,openai:3 (balances, US$); ai-compare: models=a,b&from=0&n=3; cpu: query, e.g. hours=24&group=…&keys=1&script=…; as-phone: path=/ai&app=money&body=<base64 JSON>; sources: ids, e.g. tnn-bus,txg-bus; levels: dry=1 to count only"
@@ -43,6 +44,7 @@ jobs:
             detail) url="$base/ops?check=detail" ;;
             sources) url="$base/ops?check=sources&src=$TRY" ;;
             sources-state) url="$base/ops?check=sources-state" ;;
+            mail-check) url="$base/ops?check=mail-check" ;;
             watch-full) url="$base/data/build?job=watch&full=1" ;;
             watch|cutouts|buses) url="$base/data/build?job=$JOB" ;;
             *) url="$base/data/build?only=$JOB" ;;

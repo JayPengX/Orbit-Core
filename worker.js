@@ -64,8 +64,8 @@ import { paceOf } from './pace.js';
 import { beat, tellOwner, systemReport, countFolders, FOLDERS_KEY, startFreeWatch, startShowcaseLook, moveAlertAccount } from './ops.js';
 import { keepWorkflows } from './github-keep.js';
 import { liveGeminiUrl, checkModels } from './ai-models.js';
-import { mailAlerts, gather as alertsNow, keepWatchReport } from './mail-alerts.js';
-import { mailSettings, sendMail } from './mail.js';
+import { mailAlerts, gather as alertsNow, keepWatchReport, alertState } from './mail-alerts.js';
+import { mailSettings, sendMail, mailLog } from './mail.js';
 import { sweepKept, keptText } from './kept-store.js';
 import { withDataFallback, sweepDataFiles } from './data-fallback.js';
 import { applyScale } from './capacity.js';
@@ -1627,7 +1627,9 @@ async function route(request, env, ctx, headers, origin) {
     // What the alert mails would say now, and whether an address is set (never the address): mail-alerts.js.
     if (check === 'mail-check') {
       const set = await mailSettings(env, ECO_DEPS);
-      return json({ address: !!set.to, on: set.on, quiet: set.quiet, mail: !!env.MAIL, resend: !!env.RESEND_API_KEY, issues: await alertsNow(env, ECO_DEPS, ['fast', 'mid', 'slow']) }, 200, headers);
+      // (The mails sent, newest first: when, what kind and the subject, never the address: the run's log is public.)
+      const sent = (await mailLog(env)).map(({ at, kind, via, subject }) => ({ at: new Date(at).toISOString(), kind, via, subject }));
+      return json({ address: !!set.to, on: set.on, quiet: set.quiet, mail: !!env.MAIL, resend: !!env.RESEND_API_KEY, issues: await alertsNow(env, ECO_DEPS, ['fast', 'mid', 'slow']), open: await alertState(env), sent }, 200, headers);
     }
     // The paid makers' keys and their models' names (ai-other.js).
     if (check === 'ai-models') return json(await modelsOf(env), 200, headers);
