@@ -465,7 +465,8 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
       lastTopAt.set(s, s.scrollTop);
       const st = held.get(s);
       if (st && st.top === s.scrollTop) return;
-      if (!st && !s.scrollTop) return;
+      // (Not held yet, the person's first scroll still running: thrown to the top is looked at below.)
+      if (!st && !s.scrollTop && !(was >= THROWN_PX && settle.has(s))) return;
       // A scroll no one made: the browser's own, after a redraw with no
       // change to the page left to hear (Safari put a live game's page back
       // to the top a moment after its refresh, Jay 2026-11-05): the place put
@@ -496,7 +497,12 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
       // the bar's chain took it for its own and the page stayed at the top
       // (Jay 2026-11-20, a live game's page, hovering its chart). Put back
       // where that scroll had it.
-      if (st && safari && s.scrollTop < 1 && was >= THROWN_PX && !fingers() && now - inputAt > GESTURE_MS && !codeScrolled(s)) {
+      // Also a scroller not held yet, its first scroll still running (Jay
+      // 2026-11-24, Sports' sheets in Safari: "every time I open a sport sheet
+      // and I scroll it still reset me back up … it only happen once": a first
+      // open's reads land as the first fling runs, before the sheet is held,
+      // so the throw was let be; every later scroll was held).
+      if ((st || settle.has(s)) && safari && s.scrollTop < 1 && was >= THROWN_PX && !fingers() && now - inputAt > GESTURE_MS && !codeScrolled(s)) {
         putBackAt.set(s, now);
         place(s, was);
         lastTopAt.set(s, s.scrollTop);
@@ -530,9 +536,9 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
     for (const m of list) for (const n of m.addedNodes) if (n.nodeName === 'DIALOG' && n.classList.contains('q-sheet')) floorSheet(n);
     const t = tapLive() ? tap : null;
     if (t && !settle.has(t.s) && touched(t.s, list)) keepTap(t);
+    // (When each held scroller, or one in its first scroll, was last drawn in: Safari's own move follows that. Not a hover's: the person's own.)
+    if (!hovering) for (const s of [...held.keys(), ...settle.keys()]) touched(s, list) && drawnAt.set(s, Date.now());
     if (!held.size) return;
-    // (When each held scroller was last drawn in: Safari's own move follows that. Not a hover's: the person's own.)
-    if (!hovering) for (const s of held.keys()) touched(s, list) && drawnAt.set(s, Date.now());
     if (theirs() || fingers() || hovering) {
       for (const s of held.keys()) (t && s === t.s) || settle.has(s) || (s.isConnected ? anchor(s) : held.delete(s));
       return;

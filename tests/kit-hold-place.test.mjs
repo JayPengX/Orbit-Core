@@ -435,3 +435,61 @@ test('in a browser: a page made shorter behind a sheet shows no empty room once 
     server.close();
   }
 });
+
+// Jay 2026-11-24 (iPhone, Sports): "every time I open a sport sheet and I scroll it
+// still reset me back up … it only happen once". A first open's reads landed as the
+// first fling ran, before the sheet was held (held once a scroll settles): Safari's
+// throw to the top was let be. Caught from the first scroll now.
+test("in a browser: a sheet's first scroll, a redraw landing in it and Safari's throw to the top: put back", async t => {
+  let chromium;
+  try {
+    ({ chromium } = (await import('node:module')).createRequire(import.meta.url)('playwright'));
+  } catch {
+    return t.skip('no Playwright here');
+  }
+  const { createServer } = await import('node:http');
+  const page = `<!doctype html><html><head><meta name="viewport" content="width=device-width"><style>
+    body { margin: 0; height: 100vh; }
+    dialog { width: 390px; height: 700px; max-height: none; margin: auto; padding: 0 16px; overflow-y: auto; border: 0; box-sizing: border-box; }
+    .row { height: 80px; border-bottom: 1px solid #ddd; }
+  </style></head><body>
+  <dialog id="d"></dialog>
+  <script type="module">
+    const raw = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
+    globalThis.rawTop = (s, v) => raw.set.call(s, v);
+    await import('/hold-place.mjs');
+    const d = document.getElementById('d');
+    d.append(...Array.from({ length: 40 }, (_, k) => Object.assign(document.createElement('div'), { className: 'row', textContent: 'Row ' + k })));
+    d.show();
+    globalThis.ready = true;
+  </script></body></html>`;
+  const server = createServer((req, res) => {
+    if (req.url === '/hold-place.mjs') return res.writeHead(200, { 'content-type': 'text/javascript' }).end(kit('hold-place.mjs'));
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(page);
+  });
+  await new Promise(r => server.listen(0, r));
+  let browser;
+  try {
+    browser = await chromium.launch();
+    const p = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await p.goto(`http://localhost:${server.address().port}/`);
+    await p.waitForFunction(() => globalThis.ready);
+    const got = await p.evaluate(async () => {
+      const d = document.getElementById('d');
+      const frame = () => new Promise(r => requestAnimationFrame(r));
+      // The first fling, a frame at a time, never settled.
+      for (let k = 1; k <= 12; k++) (rawTop(d, k * 50), await frame());
+      const was = d.scrollTop;
+      // The game's read lands: a card drawn anew, and Safari throws the sheet to the top.
+      d.children[2].replaceWith(Object.assign(document.createElement('div'), { className: 'row', textContent: 'Row 2, read' }));
+      rawTop(d, 0);
+      await new Promise(r => setTimeout(r, 50));
+      return { was, now: d.scrollTop };
+    });
+    assert.equal(got.was, 600);
+    assert.equal(got.now, got.was, 'put back where the fling had it');
+  } finally {
+    await browser?.close();
+    server.close();
+  }
+});
