@@ -225,7 +225,7 @@ export async function raceDrops(start, { f = fetch, name = '', prev = '' } = {})
     );
     return read.filter(Boolean);
   };
-  const [prev, now] = await Promise.all([i > 0 ? event(meetings[i - 1], true) : [], event(meetings[i], false)]);
+  const [before, here] = await Promise.all([i > 0 ? event(meetings[i - 1], true) : [], event(meetings[i], false)]);
   const seen = new Set();
-  return [...prev, ...now].filter(d => !seen.has(`${d.no}|${d.kind}|${d.n}|${d.session}`) && seen.add(`${d.no}|${d.kind}|${d.n}|${d.session}`));
+  return [...before, ...here].filter(d => !seen.has(`${d.no}|${d.kind}|${d.n}|${d.session}`) && seen.add(`${d.no}|${d.kind}|${d.n}|${d.session}`));
 }
