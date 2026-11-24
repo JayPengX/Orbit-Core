@@ -29,14 +29,6 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      HAS_TOKEN_SECRET: ${{ secrets.ECO_TOKEN_SECRET != '' }}
-      HAS_ADMIN_TOKEN: ${{ secrets.ECO_ADMIN_TOKEN != '' }}
-      HAS_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET != '' }}
-      HAS_LAW_BUILD_KEY: ${{ secrets.LAW_BUILD_KEY != '' }}
-      HAS_ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
-      HAS_OPENAI_KEY: ${{ secrets.OPENAI_API_KEY != '' }}
-      HAS_RESEND_KEY: ${{ secrets.RESEND_API_KEY != '' }}
     steps:
       # The account: the deploy token's own (one), so it needn't be a secret.
       - name: The account
@@ -78,8 +70,38 @@ jobs:
           echo "orbit-store bound as STORE ($id)"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # What changed since the last deploy (Jay 2026-11-24: a final's notice came 16 minutes
+      # late through 8 deploys in half an hour). Each deploy, and each secret put on its own,
+      # is a new version of the proxy, and every version starts its Runner over (the crons'
+      # object, notices among them): a push that changed only the kit's pages, or nothing
+      # the Workers run, restarted it about 7 times. Now the Workers as built (wrangler's dry
+      # run) and the secrets are each hashed and compared with the last deploy's (kept in the
+      # proxy's KV, deploy:hashes); only what changed goes. Unread, everything goes as before.
+      - name: What changed
+        run: |
+          npx --yes wrangler@4 deploy --dry-run --outdir /tmp/b-proxy >/dev/null
+          npx --yes wrangler@4 deploy --dry-run --outdir /tmp/b-gemini --config wrangler.gemini.toml >/dev/null
+          code=$( (cat wrangler.toml wrangler.gemini.toml; find /tmp/b-proxy /tmp/b-gemini -type f -not -name '*.map' -not -name 'README.md' | sort | xargs cat) | sha256sum | cut -c1-32)
+          sec=$(printf '%s|' "$ECO_TOKEN_SECRET" "$DATA_PUSH_SECRET" "$LAW_BUILD_KEY" "$ANTHROPIC_API_KEY" "$OPENAI_API_KEY" "$RESEND_API_KEY" "$ECO_ADMIN_TOKEN" | sha256sum | cut -c1-32)
+          kv="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces/8b24d75fbe0a4a69aef0f35cb7a8d847/values/deploy%3Ahashes"
+          was=$(curl -fsS --max-time 20 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$kv" 2>/dev/null || true)
+          echo "CODE_HASH=$code" >> "$GITHUB_ENV"
+          echo "SECRETS_HASH=$sec" >> "$GITHUB_ENV"
+          case "$was" in "$code "*) echo "SAME_CODE=yes" >> "$GITHUB_ENV";; esac
+          case "$was" in *" $sec") echo "SAME_SECRETS=yes" >> "$GITHUB_ENV";; esac
+          echo "last: ${was:-none} now: $code $sec"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ECO_TOKEN_SECRET: ${{ secrets.ECO_TOKEN_SECRET }}
+          DATA_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET }}
+          LAW_BUILD_KEY: ${{ secrets.LAW_BUILD_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ECO_ADMIN_TOKEN: ${{ secrets.ECO_ADMIN_TOKEN }}
       # Gemini's relay, pinned to Taiwan (gemini-relay.js): before the proxy that binds it.
       - name: Deploy gemini-relay
+        if: ${{ env.SAME_CODE != 'yes' }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -87,6 +109,7 @@ jobs:
           command: deploy --config wrangler.gemini.toml
           wranglerVersion: '4'
       - name: Deploy orbit-workers-proxy (the proxy, every route)
+        if: ${{ env.SAME_CODE != 'yes' }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -94,71 +117,36 @@ jobs:
           command: deploy
           # wrangler.toml's [placement] uses `region` (explicit cloud-region
           # placement, see that file's own comment) instead of the older
-          # `mode = "smart"` - Wrangler 3.90 (this action's actual installed
-          # default as of this writing, despite its docs claiming v4) doesn't
-          # recognize that on its own and fails config validation with
-          # "placement.mode is a required field". Pinned to major version 4
-          # explicitly rather than relying on the action's own default,
-          # so a future change to that default can't silently break this
-          # again the same way.
+          # `mode = "smart"`: Wrangler 3.90 fails it ("placement.mode is a
+          # required field"), so pinned to major version 4.
           wranglerVersion: '4'
-      # The Orbit Pass token secret (see orbit-token.js): /eco signs
-      # session tokens with it and every route checks them. Only when the repo has the secret
-      # ECO_TOKEN_SECRET (any long random string); until then the proxy's
-      # Orbit Pass gate is simply off.
-      - name: Orbit Pass token secret on the proxy
-        if: ${{ env.HAS_TOKEN_SECRET == 'true' }}
+      # The proxy's secrets, those the repo has, all in one version (one at a time each made its
+      # own), and only when one changed. ECO_TOKEN_SECRET (orbit-token.js: the Pass's tokens),
+      # DATA_PUSH_SECRET (the builders' and /ops'), LAW_BUILD_KEY (law-hosts.js), ANTHROPIC_API_KEY
+      # and OPENAI_API_KEY (paid AI, Jay 11-10), RESEND_API_KEY (mail.js), ECO_ADMIN_TOKEN (the
+      # owner's, tools/issue-passes.mjs).
+      - name: The proxy's secrets
+        if: ${{ env.SAME_SECRETS != 'yes' }}
         run: |
-          printf '%s' "$ECO_TOKEN_SECRET" | npx --yes wrangler@4 secret put ECO_TOKEN_SECRET
+          node -e 'const o={};for(const k of ["ECO_TOKEN_SECRET","DATA_PUSH_SECRET","LAW_BUILD_KEY","ANTHROPIC_API_KEY","OPENAI_API_KEY","RESEND_API_KEY","ECO_ADMIN_TOKEN"])if(process.env[k])o[k]=process.env[k];require("fs").writeFileSync("/tmp/secrets.json",JSON.stringify(o));console.log(Object.keys(o).length+" secrets")'
+          npx --yes wrangler@4 secret bulk /tmp/secrets.json
+          rm -f /tmp/secrets.json
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           ECO_TOKEN_SECRET: ${{ secrets.ECO_TOKEN_SECRET }}
-      # The builders' key to write the family's data (data.js /data/push; the
-      # same secret is Shared-Data's).
-      - name: The data push secret on the proxy
-        if: ${{ env.HAS_PUSH_SECRET == 'true' }}
-        run: printf '%s' "$DATA_PUSH_SECRET" | npx --yes wrangler@4 secret put DATA_PUSH_SECRET
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DATA_PUSH_SECRET: ${{ secrets.DATA_PUSH_SECRET }}
-      # Orbit Law's build key (law-hosts.js: /law-page reads the Taiwan-only
-      # county 法規 sites for its nightly build; the same secret is Orbit-Law's).
-      - name: Orbit Law's build key on the proxy
-        if: ${{ env.HAS_LAW_BUILD_KEY == 'true' }}
-        run: printf '%s' "$LAW_BUILD_KEY" | npx --yes wrangler@4 secret put LAW_BUILD_KEY
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           LAW_BUILD_KEY: ${{ secrets.LAW_BUILD_KEY }}
-      # Paid AI keys (Jay 11-10: Claude and OpenAI, prepaid credit), on the
-      # proxy only when the repo has them; tried side by side with Gemini first.
-      - name: Anthropic's key on the proxy
-        if: ${{ env.HAS_ANTHROPIC_KEY == 'true' }}
-        run: printf '%s' "$ANTHROPIC_API_KEY" | npx --yes wrangler@4 secret put ANTHROPIC_API_KEY
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      - name: OpenAI's key on the proxy
-        if: ${{ env.HAS_OPENAI_KEY == 'true' }}
-        run: printf '%s' "$OPENAI_API_KEY" | npx --yes wrangler@4 secret put OPENAI_API_KEY
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      # Resend's key (mail.js): the admin panel's 寫信 to anyone, not only the
-      # owner's own inbox; only when the repo has it.
-      - name: Resend's key on the proxy
-        if: ${{ env.HAS_RESEND_KEY == 'true' }}
-        run: printf '%s' "$RESEND_API_KEY" | npx --yes wrangler@4 secret put RESEND_API_KEY
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-      # The owner's admin token (tools/issue-passes.mjs makes it and keeps it
-      # on the owner's computer): handing out passes, /eco op 'admin'.
-      - name: Owner's admin token on the eco Worker
-        if: ${{ env.HAS_ADMIN_TOKEN == 'true' }}
-        run: printf '%s' "$ECO_ADMIN_TOKEN" | npx --yes wrangler@4 secret put ECO_ADMIN_TOKEN
+          ECO_ADMIN_TOKEN: ${{ secrets.ECO_ADMIN_TOKEN }}
+      # What went, for the next deploy to compare (a failed write: the next one goes whole).
+      - name: Keep what was deployed
+        continue-on-error: true
+        run: |
+          curl -fsS --max-time 20 -X PUT -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" --data "$CODE_HASH $SECRETS_HASH" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces/8b24d75fbe0a4a69aef0f35cb7a8d847/values/deploy%3Ahashes" >/dev/null && echo kept
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          ECO_ADMIN_TOKEN: ${{ secrets.ECO_ADMIN_TOKEN }}
       # FIREBASE_PRIVATE_KEY off the proxy from 2026-12-06: sign-ins made
       # before ECO_TOKEN_SECRET (2026-10-05, 60 days) were signed with a key
       # made from it (orbit-token.js), and the last ran out on 2026-12-05.
