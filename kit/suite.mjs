@@ -503,19 +503,24 @@ const topWin = () => {
 };
 // An Orbit of one app in its switcher: the app, then the way to the others.
 function soloCard(id) {
-  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const page = `${location.origin}/app/#setup`;
   return el('div', { class: 'q-sw-sec q-sw-solo' }, [
     el('div', { class: 'q-sw-solo-app', style: `--app:${BRANDS[id]?.color || '#5e5ce6'}` }, [
       el('span', { class: 'q-sw-solo-icon' }, [img(id)]),
       el('span', { class: 'q-sw-row-text' }, [el('strong', { text: short(id) }), el('small', { text: W(`這個 Orbit 只有 ${short(id)}`, `This Orbit holds ${short(id)} alone`) })])
     ]),
-    el('div', { class: 'q-sw-solo-more' }, [
+    newOrbitCard()
+  ]);
+}
+// The way to the apps this Orbit doesn't hold: another Orbit, set up in Safari
+// (the one-app switcher's, and the Pass sheet's under its apps, Jay 11-24).
+export function newOrbitCard() {
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const page = `${location.origin}/app/#setup`;
+  return el('div', { class: 'q-sw-solo-more' }, [
       el('strong', { text: W('想用其他 App？', 'Want other apps?') }),
       el('p', { text: W('在 Safari 打開 Orbit，選好 App，再加入主畫面。主畫面可以放好幾個 Orbit，這個照樣留著。', 'Open Orbit in Safari, pick the apps and add it to your home screen. A home screen holds several Orbits; this one stays.') }),
       // (Safari's address from Orbit's own window: from the app's frame, where this sheet is, iOS did nothing, Jay 11-15.)
       el('a', { class: 'q-btn block', href: ios ? `x-safari-${page}` : page, target: ios ? null : '_blank', rel: 'noopener', 'data-q-quick': '', text: W(ios ? '在 Safari 設定新的 Orbit' : '設定新的 Orbit', ios ? 'Set up a new Orbit in Safari' : 'Set up a new Orbit'), onclick: ios ? e => (e.preventDefault(), (topWin().location.href = `x-safari-${page}`)) : null })
-    ])
   ]);
 }
 async function switcher() {

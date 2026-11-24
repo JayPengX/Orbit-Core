@@ -71,7 +71,7 @@ export const STRINGS = {
     here: '這裡',
     share: '分享',
     allApps: '所有 App',
-    orbitApps: '這個 Orbit 的 App'
+    notHere: '不在這個 Orbit'
   },
   en: {
     looksTitle: 'Avatar and frame',
@@ -127,7 +127,7 @@ export const STRINGS = {
     here: 'Here',
     share: 'Share',
     allApps: 'Every app',
-    orbitApps: 'Apps in this Orbit'
+    notHere: 'Not in this Orbit'
   }
 };
 const TABS = ['pass', 'looks', 'apps', 'help'];
@@ -260,7 +260,8 @@ function renderHelp(box, { q, t, locale }, { app, topic }) {
   }
   const { HELP_ORDER, helpFor, tourFor, shotFor, ROLE } = helpMod;
   // (In an Orbit: the Pass and its own apps' guides only.)
-  const order = HELP_ORDER.filter(a => a === 'pass' || reachable(a));
+  // (Every app's guide, so people know what each does; 打開 only for this Orbit's own.)
+  const order = HELP_ORDER;
   const at = order.includes(app) ? app : 'pass';
   const en = locale === 'en';
   const name = a => (a === 'pass' ? 'Pass' : APPS[a]?.short || a);
@@ -415,9 +416,11 @@ function looksSection({ q, t, locale, wornOf, wear, wearPair }) {
 
 // ---- Apps -----------------------------------------------------------------------------------
 
-// In an Orbit, only its own apps are reached from the Pass (docs/ORBIT.md 20, 21):
-// a one-app Orbit's sheet led into every other app (Jay 11-24, "a design gap").
-// A separate app's window: every app. `mine`: the Orbit's apps, null outside one.
+// In an Orbit, only its own apps open from the Pass (docs/ORBIT.md 20, 21): a
+// one-app Orbit's sheet led into every other app (Jay 11-24, "a design gap").
+// Every app is still shown (Jay 11-24: "still show all of it so they know"),
+// the others not opened, the way to another Orbit under them. A separate
+// app's window: every app opens. `mine`: the Orbit's apps, null outside one.
 export const passApps = (ids, mine) => (mine ? ids.filter(id => mine.includes(id)) : ids);
 const orbitApps = () => {
   try {
@@ -444,20 +447,24 @@ function renderApps(box, { q, t, locale, state }, top = []) {
     if (open) closeSheet(open.dialog);
     shareSheet({ url: homeOf(id), title: APPS[id].name, app: id, lang: locale });
   };
+  const mine = orbitApps();
   const row = ([id, a]) => {
     const last = w.apps?.[id]?.last;
     const here = id === q.app;
-    return el('div', { class: 'q-cell q-app-row' }, [
-      el('button', { class: 'q-app-open', type: 'button', disabled: here, 'aria-label': here ? a.name : t('openApp', { app: a.name }), onclick: here ? null : () => q.go(id) }, [
+    const out = !here && !passApps([id], mine).length;
+    return el('div', { class: `q-cell q-app-row${out ? ' q-app-out' : ''}` }, [
+      el('button', { class: 'q-app-open', type: 'button', disabled: here || out, 'aria-label': here || out ? a.name : t('openApp', { app: a.name }), onclick: here || out ? null : () => q.go(id) }, [
         el('span', { class: 'q-cell-icon' }, [el('img', { src: svgUrl(appIcon(id, { crisp: true })), alt: '', width: 30, height: 30 })]),
-        el('span', { class: 'q-cell-text' }, [el('span', { text: a.name }), el('small', { text: [a.role[en ? 'en' : 'zh'], here ? t('here') : last ? ago(t, last) : t('neverUsed')].join(' · ') })])
+        el('span', { class: 'q-cell-text' }, [el('span', { text: a.name }), el('small', { text: [a.role[en ? 'en' : 'zh'], here ? t('here') : out ? t('notHere') : last ? ago(t, last) : t('neverUsed')].join(' · ') })])
       ]),
       el('button', { class: 'q-cell-act q-app-share', type: 'button', 'aria-label': `${t('share')} ${a.name}`, html: icons.share })
     ]);
   };
-  const mine = orbitApps();
-  const ids = passApps(Object.keys(APPS), mine);
+  const ids = Object.keys(APPS);
   const rows = ids.map(id => row([id, APPS[id]]));
   rows.forEach((r, i) => r.querySelector('.q-app-share').addEventListener('click', () => shareApp(ids[i])));
-  put(box, ...top.filter(Boolean), el('h3', { class: 'q-sheet-h', text: t(mine ? 'orbitApps' : 'allApps') }), el('div', { class: 'q-rows q-pass-group q-app-rows' }, rows));
+  // (Apps this Orbit doesn't hold: the way to another Orbit, the switcher's own card.)
+  const more = mine && ids.some(id => id !== q.app && !mine.includes(id)) ? el('div', { class: 'q-app-more' }) : null;
+  if (more) import('./suite.mjs').then(m => more.isConnected !== false && m.newOrbitCard && more.replaceChildren(m.newOrbitCard())).catch(() => more.remove());
+  put(box, ...top.filter(Boolean), el('h3', { class: 'q-sheet-h', text: t('allApps') }), el('div', { class: 'q-rows q-pass-group q-app-rows' }, rows), more);
 }

@@ -123,13 +123,17 @@ test("Android: each Orbit's manifest has a scope of its own, none inside another
 });
 
 // Jay 2026-11-24: a one-app Orbit's Pass sheet (its App list, 今天, 說明's 打開) led into every other app.
-test("in an Orbit the Pass sheet reaches its own apps only; a separate app's window every app", async () => {
+test("in an Orbit the Pass sheet shows every app but opens only its own, the way to another Orbit under them", async () => {
   const { passApps } = await import('../kit/pass.mjs');
   const src = await readFile(new URL('../kit/pass.mjs', import.meta.url), 'utf8');
   assert.deepEqual(passApps([...APP_ORDER], [APP_ORDER[0]]), [APP_ORDER[0]]);
   assert.deepEqual(passApps([...APP_ORDER], null), [...APP_ORDER]);
-  // Each way to another app goes through it: the App list, 說明's guides and 打開.
-  assert.match(src, /const ids = passApps\(Object\.keys\(APPS\), mine\);/);
-  assert.match(src, /HELP_ORDER\.filter\(a => a === 'pass' \|\| reachable\(a\)\)/);
-  assert.doesNotMatch(src, /Object\.entries\(APPS\)\.map\(row\)/);
+  // Every app listed (Jay 11-24: "still show all of it so they know"), one outside the Orbit not opened.
+  assert.match(src, /const ids = Object\.keys\(APPS\);/);
+  assert.match(src, /const out = !here && !passApps\(\[id\], mine\)\.length;/);
+  assert.match(src, /disabled: here \|\| out/);
+  assert.match(src, /m\.newOrbitCard/);
+  // 說明: every guide; 打開 only for this Orbit's own.
+  assert.match(src, /const order = HELP_ORDER;/);
+  assert.match(src, /APPS\[at\] && reachable\(at\)/);
 });

@@ -3984,6 +3984,10 @@ dialog {
 .q-app-open { display: flex; flex: 1 1 auto; align-items: center; gap: 12px; min-width: 0; min-height: var(--q-row); padding: 8px 0 8px 16px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .q-app-open:disabled { cursor: default; }
 .q-app-open:is(:active, [data-q-press]):not(:disabled) { opacity: 0.6; }
+/* (An app this Orbit doesn't hold: shown, quieter, not opened; the way to another Orbit under the list.) */
+.q-app-out .q-cell-icon { opacity: 0.45; }
+.q-app-out .q-cell-text > span { color: var(--q-label-2); }
+.q-app-more { margin-top: 16px; }
 .q-app-share svg { width: 20px; height: 20px; display: block; }
 .q-app-share { color: var(--q-label-2); }
 .q-pass .muted { color: var(--q-muted); }
