@@ -177,6 +177,7 @@ them on by hand in each repo's Actions tab.
 | `quota-guard` cron | every 5 minutes | Reads the bill, paces, warns at 50/75/90% |
 | Orbit-Core `free-watch.yml` | every 3 hours | Pages, routes, crons, free amounts, AI balances; a failure mails Jay |
 | Orbit-Core `flight.yml` | every 10 minutes | 專注飛行's flight pool |
+| Orbit-Showcase `deploy.yml` with look=true | hourly 08:22–21:22 Taipei, started by the proxy's `startShowcaseLook` | The demos recorded again once an app or the kit is newer (`scripts/demo/stale.mjs`) |
 | Orbit-Core `news-desk.yml` | after each news read (every 10 minutes); :25 and :55 as a spare | Orbit News's stories laid (too heavy for the Worker since 11-19) |
 | Orbit-Core `news-site.yml`, `news-clips.yml` | hourly, half-hourly | News's site and the clips in Taiwan's articles |
 | Orbit-Core `buses.yml` | Sundays 03:07 | Bus packs from GTFS |

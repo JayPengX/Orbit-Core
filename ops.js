@@ -216,6 +216,21 @@ export async function systemReport(env, deps) {
 
 // The free plans' watch (tools/free-watch.mjs) started on GitHub, as
 // news-clips is (builders/news.js): GitHub's schedule runs late or not at all.
+// The showcase's demos kept on each app's newest (Jay 11-21: "make sure demo catch up the newest
+// version"): its deploy started with look=true every hour of Taiwan's day, which records the demos
+// again only when an app's main or the kit has moved on (Orbit-Showcase scripts/demo/stale.mjs).
+// (GitHub's own hourly timer for it ran 2 or 3 of its 14 a day, some at 04:00 in Taiwan, 11-21 to 11-23.)
+export async function startShowcaseLook(env, fetchImpl = fetch) {
+  if (!env?.GH_ACTIONS_TOKEN) return { off: 'no token' };
+  const go = await fetchImpl('https://api.github.com/repos/JayPengX/Orbit-Showcase/actions/workflows/deploy.yml/dispatches', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.GH_ACTIONS_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'orbit-ops', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ref: 'main', inputs: { look: 'true' } }),
+    signal: AbortSignal.timeout(10_000)
+  });
+  return go.ok ? { started: true } : { failed: `start: HTTP ${go.status}` };
+}
+
 export async function startFreeWatch(env, fetchImpl = fetch) {
   if (!env?.GH_ACTIONS_TOKEN) return { off: 'no token' };
   const go = await fetchImpl('https://api.github.com/repos/JayPengX/Orbit-Core/actions/workflows/free-watch.yml/dispatches', {
