@@ -617,13 +617,13 @@ export const TOURS = {
       ['first', '第一次登入', ['別人給你的通行碼，第一次登入時要先換成你自己的一組新通行碼（換好才打開 App）；接著可以加入通行密鑰（建議，用 Face ID 登入），也可以以後再說。']],
       ['pass', 'Pass', ['你的帳號（頭像、等級、里程碑），點它換外觀；下面是這個 App 的設定、登入與安全、通知和一般。']],
       ['looks', '外觀', ['里程碑，和免費的頭像、頭像框。最上面是最接近的下一枚。']],
-      ['apps', 'App', ['今天，和每個 Orbit App：上次什麼時候用，一點就打開。']]
+      ['apps', 'App', ['每個 Orbit App：上次什麼時候用，一點就打開。']]
     ],
     en: [
       ['first', 'First sign-in', ['A pass someone gave you is replaced with a new one of your own at its first sign-in (then the app opens); after that you can add a passkey (recommended: sign in with Face ID), or leave it for later.']],
       ['pass', 'Pass', ['Your account (avatar, level, milestones); tap it for your look. Below: this app’s settings, sign-in and security, notifications and general.']],
       ['looks', 'Looks', ['Milestones, and the free avatars and frames. On top, the nearest next medal.']],
-      ['apps', 'Apps', ['Today, and every Orbit app: when you last used it, a tap to open it.']]
+      ['apps', 'Apps', ['Every Orbit app: when you last used it, a tap to open it.']]
     ]
   },
   match: {

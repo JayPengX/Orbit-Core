@@ -1,5 +1,4 @@
-// The family's notebook (kit/family.mjs): one app tells, the others hear;
-// Class's periods read by the hour.
+// The family's notebook (kit/family.mjs): one app tells, the others hear.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -9,31 +8,14 @@ const F = await import('../kit/family.mjs');
 
 test('a fact told is heard, old ones when allowed', () => {
   const now = Date.parse('2026-11-10T00:00:00Z');
-  F.tell('sports', 'follows', [{ league: 'mlb', id: '10', name: '洋基' }], now);
-  assert.equal(F.heard('sports', 'follows', { now })[0].name, '洋基');
-  assert.equal(F.heard('sports', 'follows', { maxAge: 1000, now: now + 5000 }), null);
-  assert.equal(F.heard('stock', 'holds'), null);
+  F.tell('weather', 'rain', { places: [{ lat: 25, lon: 121.5, wet: [] }] }, now);
+  assert.equal(F.heard('weather', 'rain', { now }).places[0].lat, 25);
+  assert.equal(F.heard('weather', 'rain', { maxAge: 1000, now: now + 5000 }), null);
+  assert.equal(F.heard('nobody', 'told'), null);
   F.setPlace('school', { lat: 25.04, lon: 121.5, name: '測試高中' }, 'weather');
   assert.equal(F.placeFor('school').name, '測試高中');
   F.setPlace('moon', { lat: 1, lon: 1 });
   assert.equal(F.placeFor('moon'), null);
-});
-
-test("Class's periods: the one on now, the break after it, the school day's hours", () => {
-  F.tell('class', 'week', { 2: [{ n: 2, name: '數學', from: '09:10', to: '10:00' }, { n: 1, name: '國文', from: '08:10', to: '09:00' }, { n: 6, name: '體育', from: '14:10', to: '15:00', out: true }] });
-  // 2026-11-10 is a Tuesday.
-  assert.deepEqual(F.classesOn('2026-11-10').map(p => p.name), ['國文', '數學', '體育']);
-  assert.deepEqual(F.schoolHours('2026-11-10'), { from: '08:10', to: '15:00' });
-  assert.equal(F.schoolHours('2026-11-11'), null);
-  assert.equal(F.classAt(Date.parse('2026-11-10T09:30:00+08:00')).name, '數學');
-  assert.equal(F.classAt(Date.parse('2026-11-10T09:05:00+08:00')), null, 'a break');
-});
-
-test("Class's days as held win over its week: a holiday empty, a swapped period moved", () => {
-  F.tell('class', 'days', { '2026-11-10': [], '2026-11-11': [{ n: 1, name: '體育', from: '08:10', to: '09:00', out: true }] });
-  assert.deepEqual(F.classesOn('2026-11-10'), [], 'a day off, though the week has classes on Tuesdays');
-  assert.equal(F.classesOn('2026-11-11')[0].name, '體育');
-  assert.equal(F.classesOn('2026-11-17').length, 3, 'past the days told: the week');
 });
 
 test('planHash: Orbit Transit\'s trip to a place, there by a time', async () => {

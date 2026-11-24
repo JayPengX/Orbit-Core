@@ -128,9 +128,8 @@ test("in an Orbit the Pass sheet reaches its own apps only; a separate app's win
   const src = await readFile(new URL('../kit/pass.mjs', import.meta.url), 'utf8');
   assert.deepEqual(passApps([...APP_ORDER], [APP_ORDER[0]]), [APP_ORDER[0]]);
   assert.deepEqual(passApps([...APP_ORDER], null), [...APP_ORDER]);
-  // Each way to another app goes through it: the App list, 今天's rows, 說明's guides and 打開.
+  // Each way to another app goes through it: the App list, 說明's guides and 打開.
   assert.match(src, /const ids = passApps\(Object\.keys\(APPS\), mine\);/);
-  assert.match(src, /todayRows\(\{ en: locale === 'en' \}\)\.filter\(r => reachable\(r\.app\)\)/);
   assert.match(src, /HELP_ORDER\.filter\(a => a === 'pass' \|\| reachable\(a\)\)/);
   assert.doesNotMatch(src, /Object\.entries\(APPS\)\.map\(row\)/);
 });

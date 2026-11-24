@@ -13,7 +13,6 @@ let helpMod = null;
 let helpLoad = null;
 export const loadHelp = () => (helpLoad ||= import('./help.mjs').then(m => (helpMod = m)).catch(e => ((helpLoad = null), Promise.reject(e))));
 import { sheet, section, list, cell, toast, icons } from './ui.mjs';
-import { todayRows } from './today.mjs';
 import { homeOf } from './brand.mjs';
 import { hasGuide, startGuide } from './coach.mjs';
 
@@ -72,8 +71,7 @@ export const STRINGS = {
     here: '這裡',
     share: '分享',
     allApps: '所有 App',
-    orbitApps: '這個 Orbit 的 App',
-    today: '今天'
+    orbitApps: '這個 Orbit 的 App'
   },
   en: {
     looksTitle: 'Avatar and frame',
@@ -129,8 +127,7 @@ export const STRINGS = {
     here: 'Here',
     share: 'Share',
     allApps: 'Every app',
-    orbitApps: 'Apps in this Orbit',
-    today: 'Today'
+    orbitApps: 'Apps in this Orbit'
   }
 };
 const TABS = ['pass', 'looks', 'apps', 'help'];
@@ -216,27 +213,9 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
       return put(body, ...account.nodes);
     }
     if (state.tab === 'looks') return put(body, looksSection(ctx));
-    // (今天 opens another app: it sits over every app, not over the account.)
-    if (state.tab === 'apps') return renderApps(body, ctx, [todayCard()]);
+    // (The apps: over every app, not over the account.)
+    if (state.tab === 'apps') return renderApps(body, ctx);
     renderHelp(body, ctx, state.help);
-  }
-  // 今天 (today.mjs): what each app told the phone's family notebook for
-  // today, a row an app, each opening its app there (this one: closes the sheet).
-  function todayCard() {
-    let rows = [];
-    try {
-      rows = todayRows({ en: locale === 'en' }).filter(r => reachable(r.app));
-    } catch {}
-    if (!rows.length) return null;
-    const goTo = r => () => {
-      if (r.app !== s.app) return void s.go?.(r.app, r.hash);
-      close();
-      if (r.hash) location.hash = r.hash;
-    };
-    return list(
-      rows.map(r => cell({ icon: el('img', { src: svgUrl(appIcon(r.app, { crisp: true })), alt: '', width: 29, height: 29 }), title: r.title, sub: r.sub, chevron: true, onClick: goTo(r) })),
-      { head: t('today'), ai: true }
-    );
   }
   // (The Pass tab only redraws its card: a device code or a note on it stays.)
   const onWallet = () => dialog?.open && !Object.keys(pending).length && (state.tab === 'pass' ? account?.card?.() : state.tab !== 'help' && paint());

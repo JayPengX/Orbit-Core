@@ -14,21 +14,10 @@
 //   heard(app, key, { maxAge })      another's fact, or null (too old, never told)
 //   setPlace(role, place, app)       home / school / work: { lat, lon, name } (Weather's pins, Transit's places)
 //   placeFor(role)                   that place, or null
-//   classesOn(day)                   Class's periods that day [{ n, name, from, to, out }] (out: outdoors, 體育)
-//   classAt(t)                       the period on now
-//   schoolHours(day)                 { from, to } of the first and last period, or null (no school)
 //   planHash(place, at)              Orbit Transit's trip to a place (#plan…), there by `at` when given
 //
-// The facts each app tells (keep this list current):
-//   class.days      { 'YYYY-MM-DD': [{ n, name, from: 'HH:MM', to, out }] } the next two weeks' periods as held
-//                   (單/雙週, holidays, typhoon days and 調課 applied: Class's own); a day not in it, the week's
-//   class.week      { 1..7: [{ n, name, from: 'HH:MM', to, out }] } the week's periods by weekday (1 Monday)
-//   sports.follows  [{ league, id, name, zh, short, athlete }] the teams and players followed
-//   stock.holds     [{ code, symbol, name, en, market }] what the account holds (names only, never money)
-//   vocab.due       { day, n } words due for review today
-//   transit.ride    { id, at, name, fare, modes } the latest planned trip with a fare (Money's 車資記帳)
-//   weather.today   { day, word, lines: [{ kind: umbrella|pe|wear, level, text }] } 我的行程's advice for the day
-//   sports.next     [{ at, title, hash }] followed games starting within a day (their start notices')
+// The facts each app tells (keep this list current; Jay 11-24 cut the thin
+// ones: 車資記帳, Class in 我的行程, News lifted by the family, 下課背五個, 今天):
 //   weather.rain    { places: [{ lat, lon, wet: [[from, to]] }] } where rain is due in the next 12 hours (ms; the
 //                   radar's shower, then hours at 50%+), Transit's 下雨改搭車
 // Places (place.home / place.school / place.work) are the family's, written
@@ -99,29 +88,3 @@ export function setPlace(role, place, app = '') {
   tell('place', role, { lat: +(+place.lat).toFixed(5), lon: +(+place.lon).toFixed(5), name: String(place.name || '').slice(0, 40), from: app });
 }
 export const placeFor = role => heard('place', role);
-
-// ---- Class's day ----
-const mins = hm => {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(hm || '');
-  return m ? +m[1] * 60 + +m[2] : null;
-};
-const twParts = t => {
-  const d = new Date((typeof t === 'number' ? t : Date.parse(t)) + 8 * 3_600_000);
-  return { day: d.toISOString().slice(0, 10), wd: d.getUTCDay() || 7, min: d.getUTCHours() * 60 + d.getUTCMinutes() };
-};
-const weekdayOf = day => new Date(`${day}T12:00:00Z`).getUTCDay() || 7;
-
-export function classesOn(day) {
-  const days = heard('class', 'days');
-  const list = Array.isArray(days?.[day]) ? days[day] : heard('class', 'week')?.[weekdayOf(day)];
-  return Array.isArray(list) ? list.filter(p => mins(p.from) != null && mins(p.to) != null).sort((a, b) => mins(a.from) - mins(b.from)) : [];
-}
-export function schoolHours(day) {
-  const list = classesOn(day);
-  return list.length ? { from: list[0].from, to: list.at(-1).to } : null;
-}
-// The period on at `t` (a moment), or null (a break, before or after school).
-export function classAt(t = Date.now()) {
-  const { day, min } = twParts(t);
-  return classesOn(day).find(p => mins(p.from) <= min && min < mins(p.to)) || null;
-}
