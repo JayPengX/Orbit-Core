@@ -1931,7 +1931,7 @@ function watchScreen() {
     const root = document.documentElement;
     rec('turn', { inner: `${innerWidth}x${innerHeight}`, client: `${root.clientWidth}x${root.clientHeight}`, vv: vv ? `${Math.round(vv.width)}x${Math.round(vv.height)}@${Math.round(vv.offsetTop)} s${vv.scale}` : '', scroll: Math.round(globalThis.scrollY || 0), page: root.scrollHeight, screen: `${screen.width}x${screen.height}`, safeBottom: getComputedStyle(root).getPropertyValue('--q-safe-bottom'), frame });
   };
-  const turned = () => (again(), [150, 450, 1000].forEach(ms => setTimeout(again, ms)), setTimeout(sizes, 1000));
+  const turned = () => (again(), [150, 450, 1000].forEach(ms => setTimeout(again, ms)), setTimeout(sizes, 1000), setTimeout(() => recOn() && rec('layers', layersNow()), 1200));
   globalThis.screen?.orientation?.addEventListener?.('change', turned);
   globalThis.addEventListener?.('orientationchange', turned);
   // (Not on every change of the page's own box: on an iPad in Orbit's frame
@@ -1941,7 +1941,7 @@ function watchScreen() {
   // (Shown again: an app in Orbit's window hidden as a tab, or the phone's
   // screen back on. A size change while hidden went unmeasured on an iPad,
   // the app laid out for the old one, its tab bar gone; Jay 11-14.)
-  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && measureScreen());
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && (measureScreen(), recOn() && setTimeout(() => rec('layers', layersNow()), 1000)));
   // (A mouse plugged into a tablet, or taken away.)
   globalThis.matchMedia?.('(hover: hover) and (pointer: fine)').addEventListener?.('change', again);
   // (A page that grows a scroll bar on a computer: the width it leaves.)
@@ -7161,6 +7161,31 @@ function layoutNow() {
   };
 }
 // Everything to send: where and what, the last of each kind, and the log.
+// What floats over the page now, here and in Orbit's window (Jay 11-24: an
+// empty graphite panel over Sports' 賽事 on his iPad, nothing to say what it
+// was): each fixed, sticky or top-layer box of some size that's seen, its tag,
+// classes, place and colour; never its words. In the 除錯紀錄 when it's
+// copied, and as it's recorded each time the app is shown again or turned.
+export function layersNow() {
+  const out = [];
+  const look = (doc, where) => {
+    if (!doc?.body) return;
+    for (const el of doc.body.querySelectorAll('*')) {
+      if (out.length >= 24) return;
+      const cs = doc.defaultView.getComputedStyle(el);
+      const top = el.matches?.('dialog[open], :popover-open');
+      if (!top && cs.position !== 'fixed' && cs.position !== 'sticky') continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 80 || r.height < 40 || cs.visibility === 'hidden' || cs.display === 'none' || Number(cs.opacity) === 0) continue;
+      out.push({ in: where, tag: el.tagName.toLowerCase(), cls: String(el.className?.baseVal ?? el.className ?? '').split(/\s+/).slice(0, 4).join('.'), at: `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}`, bg: cs.backgroundColor, ...(top ? { top: true } : {}), ...(el.childElementCount ? {} : { empty: true }) });
+    }
+  };
+  try {
+    look(document, 'app');
+    if (globalThis.top !== globalThis) look(globalThis.top.document, 'orbit');
+  } catch {}
+  return out;
+}
 export function recDump(app = dataSession?.app || '') {
   const log = recRead();
   return JSON.stringify(
@@ -7173,6 +7198,7 @@ export function recDump(app = dataSession?.app || '') {
       installed: typeof matchMedia !== 'undefined' && matchMedia('(display-mode: standalone)').matches,
       screen: typeof innerWidth !== 'undefined' ? `${innerWidth}x${innerHeight}@${devicePixelRatio}` : '',
       layout: layoutNow(),
+      layers: layersNow(),
       last: Object.fromEntries([...recLast].filter(([, e]) => !log.some(x => x.at === e.at && x.kind === e.kind))),
       log
     },
