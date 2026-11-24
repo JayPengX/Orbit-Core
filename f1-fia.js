@@ -169,6 +169,27 @@ export function racesOf(schedule) {
     .filter(r => r.name && Number.isFinite(r.at))
     .sort((a, b) => a.at - b.at);
 }
+// A race's name as the FIA files its event (the schedule says "Brazilian
+// Grand Prix", the FIA "São Paulo Grand Prix"; "Barcelona" its
+// "Barcelona-Catalunya"): the same name, else the one sharing most words,
+// else ''. `events`: the FIA's names (its season page's links).
+const ALIAS = { brazilian: 'sao paulo', brazil: 'sao paulo', mexican: 'mexico city' };
+const words = n => slugOf(n).split('_').filter(w => w && !['grand', 'prix', 'in', 'the'].includes(w));
+export function fiaEvent(name, events = []) {
+  if (!name) return '';
+  if (events.includes(name)) return name;
+  const said = words(name);
+  for (const [k, v] of Object.entries(ALIAS)) if (said.join(' ').includes(k)) said.push(...v.split(' '));
+  let best = '';
+  let most = 0;
+  for (const e of events) {
+    const n = words(e).filter(w => said.includes(w)).length;
+    if (n > most) (most = n), (best = e);
+  }
+  return best;
+}
+export const eventsOf = (html, year) => [...new Set([...String(html || '').matchAll(new RegExp(`season-${year}-\\d+/event/([^"?#]+)`, 'g'))].map(x => decodeURIComponent(x[1])))];
+
 // Whether a drop is served at this race: the last meeting's only if its
 // race decided it (for the next one); this one's never if its race did
 // (that's the next one's), but a pit-lane start, decided for this race, is.
@@ -210,7 +231,9 @@ export async function raceDrops(start, { f = fetch, name = '', prev = '' } = {})
   if (!races.length) throw new Error('no schedule');
   const i = races.findIndex(r => Math.abs(r.at - at) < 86_400_000);
   if (i < 0) return [];
-  const meetings = races;
+  // (Each by the FIA's own name for it.)
+  const fiaNames = eventsOf(root, year);
+  const meetings = races.map(r => ({ ...r, name: fiaEvent(r.name, fiaNames) || r.name }));
   const event = async (m, last) => {
     const html = await page(`${F1_DOCS}/season/season-${year}-${season}/event/${encodeURIComponent(m.name)}`, f).catch(() => '');
     const docs = docLinks(html, `${year}_${slugOf(m.name)}`);

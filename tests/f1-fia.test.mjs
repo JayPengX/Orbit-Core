@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { pdfText, dropOf, docLinks, slugOf, racesOf, mayDrop, servedAt } from '../f1-fia.js';
+import { pdfText, dropOf, docLinks, slugOf, racesOf, mayDrop, servedAt, fiaEvent, eventsOf } from '../f1-fia.js';
 
 const pdf = f => new Uint8Array(readFileSync(new URL(`./fixtures/fia/${f}`, import.meta.url)));
 
@@ -55,4 +55,16 @@ test("a drop is served at the race it's for: the last race's at this one, never 
   assert.equal(servedAt(antonelli, false), true);
   assert.equal(servedAt(antonelli, true), false);
   assert.equal(servedAt({ no: '18', kind: 'pitlane', session: 'Race' }, false), true);
+});
+
+// The schedule's names and the FIA's differ (2026): Brazilian / São Paulo,
+// Barcelona / Barcelona-Catalunya, Bahrain Grand Prix in Malaysia / Bahrain.
+test("a race's name as the FIA files its event", () => {
+  const events = eventsOf(['Las Vegas Grand Prix', 'São Paulo Grand Prix', 'Barcelona-Catalunya Grand Prix', 'Bahrain Grand Prix', 'Spanish Grand Prix'].map(n => `<a href="/documents/x/season/season-2026-2072/event/${encodeURIComponent(n)}">`).join(''), 2026);
+  assert.equal(events.length, 5);
+  assert.equal(fiaEvent('Las Vegas Grand Prix', events), 'Las Vegas Grand Prix');
+  assert.equal(fiaEvent('Brazilian Grand Prix', events), 'São Paulo Grand Prix');
+  assert.equal(fiaEvent('Barcelona Grand Prix', events), 'Barcelona-Catalunya Grand Prix');
+  assert.equal(fiaEvent('Bahrain Grand Prix in Malaysia', events), 'Bahrain Grand Prix');
+  assert.equal(fiaEvent('Qatar Grand Prix', events), '');
 });
