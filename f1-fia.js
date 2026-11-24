@@ -169,9 +169,6 @@ export function racesOf(schedule) {
     .filter(r => r.name && Number.isFinite(r.at))
     .sort((a, b) => a.at - b.at);
 }
-// The FIA's page's own current event (its open one), when the schedule can't be read.
-export const activeEvent = html => /event-title active">([^<]+)</.exec(String(html || ''))?.[1]?.trim() || '';
-
 // Whether a drop is served at this race: the last meeting's only if its
 // race decided it (for the next one); this one's never if its race did
 // (that's the next one's), but a pit-lane start, decided for this race, is.
@@ -205,11 +202,12 @@ export async function raceDrops(start, { f = fetch } = {}) {
   const root = await page(`${F1_DOCS}`, f).catch(() => '');
   const season = new RegExp(`season-${year}-(\\d+)`).exec(root)?.[1];
   if (!season) return [];
-  // (No schedule: the FIA's open event, this one's documents alone.)
-  let i = races.findIndex(r => Math.abs(r.at - at) < 86_400_000);
-  const meetings = i >= 0 ? races : [{ name: activeEvent(root) }];
-  if (i < 0) i = meetings[0].name ? 0 : -1;
+  // (No schedule read: no answer, never a guess. The FIA's open event stood
+  // in once and was the last race's: Qatar given Las Vegas's drops.)
+  if (!races.length) throw new Error('no schedule');
+  const i = races.findIndex(r => Math.abs(r.at - at) < 86_400_000);
   if (i < 0) return [];
+  const meetings = races;
   const event = async (m, last) => {
     const html = await page(`${F1_DOCS}/season/season-${year}-${season}/event/${encodeURIComponent(m.name)}`, f).catch(() => '');
     const docs = docLinks(html, `${year}_${slugOf(m.name)}`);

@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { pdfText, dropOf, docLinks, slugOf, racesOf, activeEvent, mayDrop, servedAt } from '../f1-fia.js';
+import { pdfText, dropOf, docLinks, slugOf, racesOf, mayDrop, servedAt } from '../f1-fia.js';
 
 const pdf = f => new Uint8Array(readFileSync(new URL(`./fixtures/fia/${f}`, import.meta.url)));
 
@@ -38,11 +38,10 @@ test("an event's documents that can decide a drop, by their names", () => {
   assert.equal(slugOf('São Paulo Grand Prix'), 'sao_paulo_grand_prix');
 });
 
-test("a year's races in order from Jolpica's schedule (the one before a race's: its drops served at it); the FIA's open event without it", () => {
+test("a year's races in order from Jolpica's schedule (the one before a race's: its drops served at it)", () => {
   const schedule = { MRData: { RaceTable: { Races: [{ raceName: 'Las Vegas Grand Prix', date: '2026-11-22', time: '04:00:00Z' }, { raceName: 'São Paulo Grand Prix', date: '2026-11-08', time: '17:00:00Z' }] } } };
   assert.deepEqual(racesOf(schedule).map(r => [r.name, new Date(r.at).toISOString()]), [['São Paulo Grand Prix', '2026-11-08T17:00:00.000Z'], ['Las Vegas Grand Prix', '2026-11-22T04:00:00.000Z']]);
   assert.deepEqual(racesOf(null), []);
-  assert.equal(activeEvent('<a class="event-title active">Las Vegas Grand Prix</a>'), 'Las Vegas Grand Prix');
 });
 
 // Las Vegas 2026: Pérez five places for a collision in its race, served at
