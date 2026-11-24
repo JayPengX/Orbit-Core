@@ -501,3 +501,35 @@ test('the notices kept in D1 (push_kv): KV moved in once, the due lists without 
   await pushStore(env).get('push:prefs:a1');
   assert.equal(lists, 1);
 });
+
+// Jay 2026-11-24: a final 16 minutes after the game, a start that never came, and nothing said why.
+test("each notice's timing is kept: late ones with how many runs looked, and one due that a newer list dropped", async () => {
+  const { pushLate } = await import('../push.js');
+  const kv = memoryKv();
+  const env = { RATE_LIMIT_KV: kv };
+  const post = (path, body) => handlePush(new Request(`https://w/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, { d: 'acct', a: 'match' }, path);
+  await post('/push/subscribe', { sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/t', keys: { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' } } });
+  const now = Date.now();
+  const start = { at: now - 5 * 60_000, title: '拓荒者 vs 76 人', body: 'NBA', tag: 'start:nba:401910037', kind: 'start' };
+  const final = { at: now - 3 * 60_000, title: '拓荒者 vs 76 人', body: '{result} · NBA', tag: 'end:nba:401910037', kind: 'end', check: { espn: 'basketball/nba', event: '401910037' } };
+  let state = 'in';
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    if (!String(url).includes('espn.com')) return new Response(null, { status: 201 });
+    const side = (h, abbr, score) => ({ homeAway: h, score, winner: h === 'away' && state === 'post', team: { shortDisplayName: abbr } });
+    return new Response(JSON.stringify({ header: { competitions: [{ status: { type: { state, name: state === 'post' ? 'STATUS_FINAL' : 'STATUS_IN_PROGRESS', completed: state === 'post' }, period: 4, displayClock: '5:00' }, competitors: [side('away', '拓荒者', '128'), side('home', '76 人', '111')] }] } }), { status: 200 });
+  };
+  try {
+    await post('/push/schedule', { items: [start, final] });
+    // The phone's list again, the start no longer on it (its 10 minutes' grace gone), never sent.
+    await post('/push/schedule', { items: [final] });
+    for (let k = 1; k <= 3; k++) await sendDue(env, now + k * 120_000);
+    state = 'post';
+    assert.equal((await sendDue(env, now + 8 * 120_000)).sent, 1);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  const late = await pushLate(env, { since: now - 3_600_000 });
+  assert.deepEqual(late.map(x => [x.tag, x.dropped ? 'dropped' : 'late']), [['start:nba:401910037', 'dropped'], ['end:nba:401910037', 'late']]);
+  assert.equal(late[1].runs, 3, 'three runs looked at it before it went');
+});

@@ -513,7 +513,11 @@ export async function handlePush(request, env, headers, session, path) {
     // told already isn't taken again: an app whose copy of the game is behind
     // ('on' still) would have it sent at every open.
     const told = record.told || {};
-    record.items = cleanItems(body?.items).filter(x => !(x.tag && told[toldKey(x)]));
+    const next = cleanItems(body?.items).filter(x => !(x.tag && told[toldKey(x)]));
+    // (A notice due a minute and more ago, never sent, that this list leaves out: logged as dropped, noticeLog.)
+    const now = Date.now();
+    for (const x of record.items || []) if (x.tag && !x.check && x.at < now - 60_000 && !told[toldKey(x)] && !next.some(y => y.tag === x.tag)) noticeLog(record, { tag: x.tag, kind: x.kind || '', due: x.at, dropped: now });
+    record.items = next;
   } else return reply({ error: { message: 'Not found' } }, 404);
   // Each open sends the app's list again; written only when it changed (or
   // once a month, so the 60-day expiry never takes a quiet one), its due
@@ -524,6 +528,34 @@ export async function handlePush(request, env, headers, session, path) {
     await putRecord(kv, key, record);
   }
   return reply({ ok: true, n: record.items.length });
+}
+
+// ---- Each notice's timing (Jay 2026-11-24: a final sent 16 minutes after the
+// game, and a start that never came; nothing said why) ----
+// The last 20 notices of a list, as they went: due (when it was due, or for a
+// check when it was first asked), at (sent), r (the push service's answer),
+// runs and since (this Runner's runs that looked at it before it went, and the
+// first: a check asked every 2 minutes that went late with few runs means the
+// Runner stopped or started over; with many, the source was slow), or dropped
+// (a newer list from the phone left it out, due and never sent). Read by
+// /ops?check=notices (pushLate), which the free plans' watch hands the alert mail.
+const looked = new Map();
+const LOG_MAX = 20;
+export function noticeLog(record, entry) {
+  record.log = [...(record.log || []), entry].slice(-LOG_MAX);
+}
+// Every list's notices more than `late` past due, or dropped, since `since`: [{ app, tag, kind, due, at|dropped, runs }].
+export const LATE_MS = 5 * 60_000;
+export async function pushLate(env, { since = Date.now() - 24 * 3_600_000, late = LATE_MS } = {}) {
+  const kv = pushStore(env);
+  if (!kv?.list) return [];
+  const out = [];
+  for (const k of (await kv.list({ prefix: 'push:', all: true })).keys || []) {
+    if (k.name.startsWith('push:prefs:') || k.name.split(':').length !== 3) continue;
+    const rec = await kv.get(k.name, 'json').catch(() => null);
+    for (const x of rec?.log || []) if ((x.dropped || x.at) >= since && (x.dropped || x.at - x.due > late)) out.push({ app: k.name.slice(k.name.lastIndexOf(':') + 1), ...x });
+  }
+  return out.sort((a, b) => (a.dropped || a.at) - (b.dropped || b.at));
 }
 
 // ---- Checks: news the Worker finds out itself --------------------------------
@@ -684,6 +716,8 @@ export async function sendDue(env, now = Date.now()) {
       if (item.check) {
         const found = await ask(item.check, record.lang);
         if (!found) {
+          const k = `${key}|${item.tag}`;
+          looked.set(k, { n: (looked.get(k)?.n || 0) + 1, first: looked.get(k)?.first || now });
           if (now < (item.until || item.firstAt || item.at) + (item.until ? 0 : HOLD_MS)) keep.push({ ...item, firstAt: item.firstAt || item.at, at: item.check.espn || item.check.tsdb ? item.at : now + (item.check.bus ? BUS_EVERY : CHECK_EVERY) });
           continue;
         }
@@ -694,6 +728,10 @@ export async function sendDue(env, now = Date.now()) {
       const answers = await Promise.all(subs.map(x => sendPush(env, x, decorate(app, x, message)).catch(e => `failed ${e?.message || e}`)));
       const r = answers.includes('sent') ? 'sent' : answers.find(a => a !== 'gone') || 'gone';
       record.last = { at: now, r };
+      // (When it was due, when it went, and how many of this Runner's runs looked at it meanwhile: noticeLog.)
+      const seen = looked.get(`${key}|${item.tag}`);
+      looked.delete(`${key}|${item.tag}`);
+      noticeLog(record, { tag: item.tag || '', kind: item.kind || '', due: item.firstAt || item.at, at: now, r, ...(seen ? { runs: seen.n, since: seen.first } : {}) });
       if (r === 'sent' && item.tag) record.told = { ...Object.fromEntries(Object.entries(record.told || {}).filter(([, at]) => at > now - TOLD_MS)), [toldKey(item)]: now };
       if (answers.includes('gone')) {
         subs = subs.filter((_, i) => answers[i] !== 'gone');

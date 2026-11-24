@@ -129,6 +129,18 @@ async function vault() {
   if (sealed < accounts) bad(`vault: ${accounts - sealed} account(s) still plain`);
   if (escrow < accounts) notes.push(`vault: ${accounts - escrow} account(s) waiting for a device that holds the key (op vault-escrow)`);
 }
+// Notices over 5 minutes late, or due and dropped unsent, in the last day (push.js noticeLog):
+// each said with when it was due and sent and how many of the Runner's runs looked at it.
+async function notices() {
+  const secret = process.env.DATA_PUSH_SECRET;
+  if (!secret) return;
+  const r = await get(`https://orbit-workers-proxy.pengzjay.workers.dev/ops?check=notices`, { json: true, secret });
+  if (!r?.body?.late) return notes.push(`notices: not checked (${r?.status})`);
+  const tw = ms => new Date(ms + 8 * 3_600_000).toISOString().slice(5, 16).replace('T', ' ');
+  for (const x of r.body.late)
+    bad(x.dropped ? `notice dropped: ${x.app} ${x.kind} ${x.tag}, due ${tw(x.due)} TW, left out by a newer list from the phone` : `notice late: ${x.app} ${x.kind} ${x.tag}, due ${tw(x.due)} TW, sent ${tw(x.at)} (${Math.round((x.at - x.due) / 60_000)} min${x.runs != null ? `, ${x.runs} runs looked since ${tw(x.since)}` : ', no run of this Runner looked at it before'})`);
+  notes.push(`notices: ${r.body.late.length} late or dropped in the last day`);
+}
 // (TRACE=1, a run by hand: each account's documents and kept versions, no content: ops trace.)
 async function trace() {
   if (!process.env.TRACE || !process.env.DATA_PUSH_SECRET) return;
@@ -213,6 +225,7 @@ await allowances(got.find(r => r?.body?.caps));
 await beats();
 await aiMoney();
 await vault();
+await notices();
 await trace();
 await rekey();
 await cfTokens();

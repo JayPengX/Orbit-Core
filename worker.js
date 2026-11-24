@@ -51,7 +51,7 @@ import { aiSpend, aiMay, aiBack, moveUse } from './ai-allow.js';
 import { checkStock, VERIFIED_COLLECTION } from './stock-check.js';
 import { readToken, tokenSecret, signToken, sessionLimited, READ_GRACE_MS } from './orbit-token.js';
 import { handleShowcasePass, showcaseOf, SHOW_PER_MIN } from './showcase.js';
-import { handlePush, sendDue, movePushes, forgetPushes, keepDevices } from './push.js';
+import { handlePush, sendDue, movePushes, forgetPushes, keepDevices, pushLate } from './push.js';
 import { handleWeather } from './weather.js';
 import { weatherCron, skillReport } from './weather-skill.js';
 import { radarCron } from './weather-radar.js';
@@ -1619,6 +1619,8 @@ async function route(request, env, ctx, headers, origin) {
     if (check === 'law-chat') return json(await lawChatTimes(env, ctx, headers, lawGemini('law-chat'), new URL(request.url).searchParams.get('try') || ''), 200, headers);
     if (check === 'system') return json(await systemReport(env, ECO_DEPS), 200, headers);
     // The free plans' watch's findings (tools/free-watch.mjs), for the alert mail (mail-alerts.js watchIssues).
+    // Notices sent over 5 minutes late or dropped unsent in the last day (push.js noticeLog): the free plans' watch.
+    if (check === 'notices') return json({ late: await pushLate(env) }, 200, headers);
     if (check === 'watch-report') return json(await keepWatchReport(env, await request.json().catch(() => ({})), ECO_DEPS.now()), 200, headers);
     // Every account standing before levels began made 'full', once (eco.js stampLevels; ?dry=1 counts).
     if (check === 'levels') return json(await stampLevels(env, { dry: new URL(request.url).searchParams.get('dry') === '1' }), 200, headers);
