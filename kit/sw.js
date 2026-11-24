@@ -423,7 +423,7 @@ self.addEventListener('notificationclick', event => {
   // that app inside Orbit (/app/?open=<path>, in the Orbit that got it: o), never a separate app's window.
   const home = new URL(self.registration.scope);
   const to = new URL(url);
-  const inOrbit = /\/app\/$/.test(home.pathname) && to.origin === home.origin && !to.href.startsWith(home.href);
+  const inOrbit = /^\/app\/(o\/[^/]+\/)?$/.test(home.pathname) && to.origin === home.origin && !to.href.startsWith(home.href);
   const fresh = inOrbit ? `${home.href}?${event.notification.data?.o ? `o=${encodeURIComponent(event.notification.data.o)}&` : ''}open=${encodeURIComponent(`${to.pathname}${to.search}${to.hash}`)}` : url;
   // (other: a page of another app, which answers only in Orbit's window, kit suite.mjs.)
   const told = (c, other = false) =>

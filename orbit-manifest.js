@@ -7,8 +7,8 @@ import { orbitManifest } from './kit/orbit-mine.mjs';
 
 export function handleOrbitManifest(request, headers) {
   const tag = new URL(request.url).searchParams.get('o') || '';
-  const m = orbitManifest(tag);
+  const m = orbitManifest(tag, { android: /Android/i.test(request.headers.get('User-Agent') || '') });
   if (!m) return new Response(JSON.stringify({ error: 'NOT_AN_ORBIT' }), { status: 404, headers: { ...headers, 'Content-Type': 'application/json' } });
   // (A tag is its manifest for good: kept a day at the edge and on the phone.)
-  return new Response(JSON.stringify(m), { headers: { ...headers, 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=86400' } });
+  return new Response(JSON.stringify(m), { headers: { ...headers, 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=86400', Vary: 'User-Agent' } });
 }

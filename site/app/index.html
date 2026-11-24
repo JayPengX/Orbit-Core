@@ -36,6 +36,12 @@
       tag = btoa('{"i":"' + id + '"}').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
       history.replaceState(history.state, '', location.pathname + '?o=' + tag + location.hash);
     }
+    // (Android: this Orbit's own path, its manifest's scope, kit orbit-mine.mjs ownPath: in the
+    // browser before it's added; added, Chrome opens it there.)
+    if (tag && /Android/i.test(ua) && !/^\/app\/o\//.test(location.pathname)) {
+      var t = JSON.parse(decodeURIComponent(escape(atob(tag.replace(/-/g, '+').replace(/_/g, '/')))));
+      history.replaceState(history.state, '', '/app/o/' + (/^[a-z0-9]{6,12}$/.test(t.i || '') ? t.i : tag) + '/' + location.search + location.hash);
+    }
     if (tag) ss.setItem('orbit.which', tag); else ss.removeItem('orbit.which');
     window.ORBIT_TAG = tag;
     var name = 'Orbit', look = '', manifest = '/app/manifest.webmanifest', apple = '/app/icons/apple-touch-icon.png';
@@ -424,7 +430,9 @@
   let addressed = false;
   let wanted = null;
   function addressOf(id) {
-    if (!onDomain) return;
+    // (An Orbit at its own path, Android's, kit orbit-mine.mjs ownPath: the address stays in its
+    // scope, or Chrome would show a bar over it. An added app shows no address anyway.)
+    if (!onDomain || /^\/app\/o\//.test(location.pathname)) return;
     if (!addressed) return void (wanted = [id]);
     const to = id ? pathOf(id) : '/';
     try {

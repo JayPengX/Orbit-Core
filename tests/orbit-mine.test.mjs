@@ -99,3 +99,38 @@ test('every Orbit added has its own id, so apps changed in one never show up in 
   assert.deepEqual(decodeSetup(one).apps, ['money']);
   assert.equal(decodeSetup(one).name, 'Money');
 });
+
+// Jay 2026-11-24: on a friend's Pixel a second Orbit said "already installed": Chrome
+// on Android takes a page inside an installed app's scope for that app, and every
+// Orbit's scope was '/'. Android's Orbits each have a scope of their own, apart.
+test("Android: each Orbit's manifest has a scope of its own, none inside another's; an iPhone's stays as it was", async () => {
+  const a = encodeSetup({ apps: [...APP_ORDER], id: newId() });
+  const b = encodeSetup({ apps: [...APP_ORDER], id: newId() });
+  const one = encodeSetup({ apps: [APP_ORDER[0]] });
+  const [ma, mb, mo] = [a, b, one].map(t => orbitManifest(t, { android: true }));
+  for (const m of [ma, mb, mo]) {
+    assert.match(m.scope, /^\/app\/o\/[^/]+\/$/);
+    assert.ok(m.start_url.startsWith(m.scope), 'the start inside its scope');
+  }
+  const scopes = [ma.scope, mb.scope, mo.scope];
+  for (const x of scopes) for (const y of scopes) if (x !== y) assert.ok(!x.startsWith(y), `${x} inside ${y}`);
+  assert.equal(ma.id, orbitManifest(a).id, 'the same Orbit, the same id');
+  assert.equal(orbitManifest(a).scope, '/');
+  assert.equal(orbitManifest(a).start_url, startOf(a));
+  const got = await handleOrbitManifest(new Request(`https://api.example/orbit-manifest?o=${b}`, { headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 15; Pixel 9) Chrome/140 Mobile' } }), {});
+  assert.equal((await got.json()).scope, mb.scope);
+  assert.match(got.headers.get('Vary') || '', /User-Agent/);
+});
+
+// Jay 2026-11-24: a one-app Orbit's Pass sheet (its App list, 今天, 說明's 打開) led into every other app.
+test("in an Orbit the Pass sheet reaches its own apps only; a separate app's window every app", async () => {
+  const { passApps } = await import('../kit/pass.mjs');
+  const src = await readFile(new URL('../kit/pass.mjs', import.meta.url), 'utf8');
+  assert.deepEqual(passApps([...APP_ORDER], [APP_ORDER[0]]), [APP_ORDER[0]]);
+  assert.deepEqual(passApps([...APP_ORDER], null), [...APP_ORDER]);
+  // Each way to another app goes through it: the App list, 今天's rows, 說明's guides and 打開.
+  assert.match(src, /const ids = passApps\(Object\.keys\(APPS\), mine\);/);
+  assert.match(src, /todayRows\(\{ en: locale === 'en' \}\)\.filter\(r => reachable\(r\.app\)\)/);
+  assert.match(src, /HELP_ORDER\.filter\(a => a === 'pass' \|\| reachable\(a\)\)/);
+  assert.doesNotMatch(src, /Object\.entries\(APPS\)\.map\(row\)/);
+});

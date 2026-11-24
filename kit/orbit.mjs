@@ -4045,7 +4045,7 @@ export async function enablePush(s, force = false) {
     // An app that isn't in this Orbit's list sends nothing to it.
     const orbit = inSuite() ? { o: whichTag(), apps: appsOf(whichTag()) } : null;
     if (orbit && !orbit.apps.includes(s.app)) return false;
-    const own = orbit ? await navigator.serviceWorker.getRegistration('/app/').catch(() => null) : null;
+    const own = orbit ? await navigator.serviceWorker.getRegistration(orbitPath()).catch(() => null) : null;
     const reg = own || (await Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(r, 4000))]));
     if (!reg?.pushManager) return false;
     // The Worker's key, asked once a day (it was asked at every list change).
@@ -4369,6 +4369,15 @@ export function noticeLife(el, { onGone = () => {} } = {}) {
   addEventListener('pointerdown', outside, true);
   wait();
   return gone;
+}
+
+// Orbit's window's own folder: /app/, or an Orbit's own path on Android (/app/o/<id>/, kit orbit-mine.mjs ownPath).
+function orbitPath() {
+  try {
+    return /^\/app\/o\/[^/]+\//.exec(globalThis.top.location.pathname)?.[0] || '/app/';
+  } catch {
+    return '/app/';
+  }
 }
 
 // A switch: role=switch, aria-checked.

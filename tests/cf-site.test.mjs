@@ -48,3 +48,8 @@ test('/key/ (the giveaway, retired 11-14) is gone: no page and no forward (Jay 1
   assert.ok(!core.put.some(([from]) => from === 'key'));
   assert.ok(!(core.redirects || []).some(r => String(r).startsWith('/key')));
 });
+
+test("Android's Orbits at their own paths: /app/o/<id>/ is /app/'s files, rewritten (never a copy, never a redirect)", () => {
+  const core = siteFor('Orbit-Core', 'example.tw');
+  assert.deepEqual(core.rewrites, ['/app/o/:id/ /app/index.html 200', '/app/o/:id/* /app/:splat 200']);
+});

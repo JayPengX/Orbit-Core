@@ -98,13 +98,24 @@ export function lookFiles(look) {
 
 // The address an Orbit's icon opens, and its manifest's (served by the proxy).
 export const startOf = tag => (tag ? `/app/?o=${tag}` : '/app/');
+// Android: each Orbit at a path of its own, /app/o/<its id>/ (the site serves
+// /app/'s files there: deploy/cf-site.mjs), the scope of its manifest. Chrome
+// on Android calls a page "already installed" when it is inside an installed
+// app's scope, so with every Orbit's scope '/' a second Orbit couldn't be added
+// (Jay 11-24, a friend's Pixel). An iPhone keeps /app/ (each icon is its own anyway).
+export const ownPath = tag => {
+  const s = tag ? decodeSetup(tag) : null;
+  return s ? `/app/o/${s.id || tag}/` : null;
+};
 export const manifestOf = tag => (tag ? `/api/orbit-manifest?o=${tag}` : '/app/manifest.webmanifest');
 
 // A tag's web app manifest (the proxy's /orbit-manifest; the plain Orbit's
 // own file, site/app/manifest.webmanifest, says the same).
-export function orbitManifest(tag) {
+export function orbitManifest(tag, { android = false } = {}) {
   const s = decodeSetup(tag);
   if (!s) return null;
+  // (The id stays /app/?o=<tag> on both: an Orbit already added keeps being itself.)
+  const own = android ? ownPath(tag) : null;
   const f = lookFiles(s.look);
   return {
     name: s.name,
@@ -112,8 +123,8 @@ export function orbitManifest(tag) {
     description: s.apps.length === 1 ? BRANDS[s.apps[0]].tag?.zh || '' : `${s.apps.map(id => BRANDS[id].short).join('、')}，在一個 Orbit 裡。`,
     lang: 'zh-Hant-TW',
     id: startOf(tag),
-    start_url: startOf(tag),
-    scope: '/',
+    start_url: own ? `${own}?o=${tag}` : startOf(tag),
+    scope: own || '/',
     display: 'standalone',
     orientation: 'any',
     background_color: '#f2f2f7',

@@ -76,9 +76,10 @@ test('pushes, delete and broadcast list and drop subscriptions in D1', async () 
   if (!(del instanceof Error)) assert.equal(del.pushes, 1);
 });
 
-test('/app/: the home-screen app subscribes with its own worker (scope /app/), saved under each framed app\'s slug', () => {
+test('/app/: the home-screen app subscribes with its own worker (scope /app/, or its own path on Android), saved under each framed app\'s slug', () => {
   const orbit = readFileSync(new URL('../kit/orbit.mjs', import.meta.url), 'utf8');
-  assert.match(orbit, /getRegistration\('\/app\/'\)/);
+  assert.match(orbit, /getRegistration\(orbitPath\(\)\)/);
+  assert.match(orbit, /\/\^\\\/app\\\/o\\\/\[\^\/\]\+\\\/\/\.exec\(globalThis\.top\.location\.pathname\)\?\.\[0\] \|\| '\/app\/'/);
   assert.match(orbit, /orbit\.push\.sub\.\$\{s\.app\}/);
   assert.match(readFileSync(new URL('../site/app/index.html', import.meta.url), 'utf8'), /register\('\.\/sw\.js'\)/);
 });

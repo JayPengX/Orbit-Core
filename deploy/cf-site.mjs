@@ -42,6 +42,8 @@ export function siteFor(repo, domain = DOMAIN) {
       put: [['', '/Orbit-Core'], ['index.html', '/index.html'], ['app', '/app'], ['admin', '/admin'], ['privacy', '/privacy'], ['terms', '/terms'], ['favicon.ico', '/favicon.ico'], ['icons/apple-touch-icon.png', '/apple-touch-icon.png'], ['icons/apple-touch-icon.png', '/apple-touch-icon-precomposed.png']],
       // (The root's pages only at the root: not a second copy under /Orbit-Core/.)
       skip: ['index.html', 'app', 'admin', 'privacy', 'terms'],
+      // (Each Orbit's own path on Android, /app/o/<id>/: /app/'s files, rewritten, never a copy. kit/orbit-mine.mjs ownPath.)
+      rewrites: ['/app/o/:id/ /app/index.html 200', '/app/o/:id/* /app/:splat 200'],
       // The whole orbit. host bar the apps' paths (theirs are more
       // specific, so they win): the root, the family page, the kit, the root
       // icons, and a 404 for anything else. The kit on the bare host too
@@ -125,7 +127,7 @@ async function main() {
   const files = await walk(out);
   if (files.length > MAX_FILES) throw new Error(`${files.length} files: over ${MAX_FILES}`);
   for (const f of files) if ((await stat(join(out, f))).size > MAX_BYTES) throw new Error(`${f} is over 25 MB`);
-  const redirects = folderRules(files);
+  const redirects = [...(site.rewrites || []), ...folderRules(files)];
   await writeFile(join(out, '_redirects'), redirects.join('\n') + '\n');
   await writeFile(join(out, '_headers'), ownHeaders(own, site.put, site.skip) + SITE_HEADERS);
   const zone = DOMAIN.trim().toLowerCase();

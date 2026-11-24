@@ -5,7 +5,8 @@
 //   外觀   an avatar and a frame, free for everyone
 //   App    今天, every app: when it was last used, a way in
 //   說明   every app's guide (help.mjs)
-import { APPS, AVATARS, FRAMES, MILESTONES, TIERS, DEFAULT_AVATAR, milestoneOf, avatarSrc, settingPatch, passAccount, appIcon, closeSheet, el as node } from '#kit/orbit.mjs';
+import { APPS, AVATARS, FRAMES, MILESTONES, TIERS, DEFAULT_AVATAR, milestoneOf, avatarSrc, settingPatch, passAccount, appIcon, closeSheet, inSuite, el as node } from '#kit/orbit.mjs';
+import { appsOf } from './orbit-mine.mjs';
 // The guides (80 KB) only for the 說明 tab: fetched after the sheet's own
 // code while the app is idle (orbit.mjs warmPassLater), or when that tab opens.
 let helpMod = null;
@@ -71,6 +72,7 @@ export const STRINGS = {
     here: '這裡',
     share: '分享',
     allApps: '所有 App',
+    orbitApps: '這個 Orbit 的 App',
     today: '今天'
   },
   en: {
@@ -127,6 +129,7 @@ export const STRINGS = {
     here: 'Here',
     share: 'Share',
     allApps: 'Every app',
+    orbitApps: 'Apps in this Orbit',
     today: 'Today'
   }
 };
@@ -222,7 +225,7 @@ export function openPass(s, { extra = null, tab = 'pass', help = null } = {}) {
   function todayCard() {
     let rows = [];
     try {
-      rows = todayRows({ en: locale === 'en' });
+      rows = todayRows({ en: locale === 'en' }).filter(r => reachable(r.app));
     } catch {}
     if (!rows.length) return null;
     const goTo = r => () => {
@@ -277,7 +280,9 @@ function renderHelp(box, { q, t, locale }, { app, topic }) {
     return;
   }
   const { HELP_ORDER, helpFor, tourFor, shotFor, ROLE } = helpMod;
-  const at = HELP_ORDER.includes(app) ? app : 'pass';
+  // (In an Orbit: the Pass and its own apps' guides only.)
+  const order = HELP_ORDER.filter(a => a === 'pass' || reachable(a));
+  const at = order.includes(app) ? app : 'pass';
   const en = locale === 'en';
   const name = a => (a === 'pass' ? 'Pass' : APPS[a]?.short || a);
   const full = a => (a === 'pass' ? 'Orbit Pass' : APPS[a]?.name || a);
@@ -287,11 +292,11 @@ function renderHelp(box, { q, t, locale }, { app, topic }) {
   const picker = el(
     'div',
     { class: 'hp-apps', role: 'tablist', 'aria-label': t('tab_help') },
-    HELP_ORDER.map(a => el('button', { class: 'hp-app', type: 'button', role: 'tab', 'aria-selected': String(at === a), onclick: at === a ? null : again(a) }, [mark(a, 36), el('span', { text: name(a) })]))
+    order.map(a => el('button', { class: 'hp-app', type: 'button', role: 'tab', 'aria-selected': String(at === a), onclick: at === a ? null : again(a) }, [mark(a, 36), el('span', { text: name(a) })]))
   );
   const topics = helpFor(at, locale);
   const what = topics.find(([id]) => id === 'what');
-  const go = at !== 'pass' && at !== q.app && APPS[at] ? el('button', { class: 'q-btn hp-go', type: 'button', text: t('open'), 'aria-label': t('openApp', { app: full(at) }), onclick: () => q.go(at) }) : null;
+  const go = at !== 'pass' && at !== q.app && APPS[at] && reachable(at) ? el('button', { class: 'q-btn hp-go', type: 'button', text: t('open'), 'aria-label': t('openApp', { app: full(at) }), onclick: () => q.go(at) }) : null;
   const head = el('header', { class: 'hp-head' }, [
     mark(at, 56),
     el('div', { class: 'hp-head-text' }, [el('h3', { text: full(at) }), el('small', { text: (ROLE?.[at] || APPS[at]?.role)?.[en ? 'en' : 'zh'] || '' })]),
@@ -431,6 +436,19 @@ function looksSection({ q, t, locale, wornOf, wear, wearPair }) {
 
 // ---- Apps -----------------------------------------------------------------------------------
 
+// In an Orbit, only its own apps are reached from the Pass (docs/ORBIT.md 20, 21):
+// a one-app Orbit's sheet led into every other app (Jay 11-24, "a design gap").
+// A separate app's window: every app. `mine`: the Orbit's apps, null outside one.
+export const passApps = (ids, mine) => (mine ? ids.filter(id => mine.includes(id)) : ids);
+const orbitApps = () => {
+  try {
+    return inSuite() ? appsOf() : null;
+  } catch {
+    return null;
+  }
+};
+const reachable = id => passApps([id], orbitApps()).length > 0;
+
 const ago = (t, then) => {
   const days = Math.floor((Date.now() - then) / 86_400_000);
   return days <= 0 ? t('usedToday') : t('usedDaysAgo', { n: days });
@@ -458,7 +476,9 @@ function renderApps(box, { q, t, locale, state }, top = []) {
       el('button', { class: 'q-cell-act q-app-share', type: 'button', 'aria-label': `${t('share')} ${a.name}`, html: icons.share })
     ]);
   };
-  const rows = Object.entries(APPS).map(row);
-  rows.forEach((r, i) => r.querySelector('.q-app-share').addEventListener('click', () => shareApp(Object.keys(APPS)[i])));
-  put(box, ...top.filter(Boolean), el('h3', { class: 'q-sheet-h', text: t('allApps') }), el('div', { class: 'q-rows q-pass-group q-app-rows' }, rows));
+  const mine = orbitApps();
+  const ids = passApps(Object.keys(APPS), mine);
+  const rows = ids.map(id => row([id, APPS[id]]));
+  rows.forEach((r, i) => r.querySelector('.q-app-share').addEventListener('click', () => shareApp(ids[i])));
+  put(box, ...top.filter(Boolean), el('h3', { class: 'q-sheet-h', text: t(mine ? 'orbitApps' : 'allApps') }), el('div', { class: 'q-rows q-pass-group q-app-rows' }, rows));
 }
