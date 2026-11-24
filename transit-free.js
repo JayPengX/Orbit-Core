@@ -336,6 +336,12 @@ export const CITY_FEEDS = {
   NewTaipei: { pre: 'NWT', eta: 'https://data.ntpc.gov.tw/api/datasets/07f7ccb3-ed00-43c4-966d-08e9dab24e95/csv/file', fresh: 30_000 }
 };
 const CITY_KEEP = 3 * MIN;
+// A city file read fresh each time (Jay 11-24, testing a bus on the map: 臺北's
+// buses came back 12 minutes old while the city's file was seconds old).
+// Cloudflare keeps a .gz a Worker fetches as a static file when its site
+// sends no Cache-Control (tcgbusfs sends none): each read is its own
+// address (tcgbusfs ignores the tag), never one Cloudflare has a copy of.
+export const freshUrl = (url, now) => `${url}${url.includes('?') ? '&' : '?'}t=${Math.floor(now / 1000)}`;
 
 // A body that may be a .gz file (served as is, no Content-Encoding) → its text.
 async function bodyText(res) {
@@ -395,7 +401,7 @@ async function cityEtaIndex(city, deps) {
   const f = CITY_FEEDS[city];
   const pack = await cityPack(city, deps).catch(() => null);
   const got = await held(`eta:${city}`, f.fresh, CITY_KEEP, async () => {
-    const res = await deps.fetchFn(f.eta, { headers: { Accept: '*/*' }, signal: AbortSignal.timeout?.(10_000) });
+    const res = await deps.fetchFn(freshUrl(f.eta, deps.now), { headers: { Accept: '*/*' }, signal: AbortSignal.timeout?.(10_000) });
     if (!res.ok) throw new Error(`${city} ${res.status}`);
     const text = await bodyText(res);
     const list = text.trimStart().startsWith('{') ? JSON.parse(text).BusInfo : text.trimStart().startsWith('[') ? JSON.parse(text) : csvRows(text);
@@ -411,7 +417,7 @@ async function cityGpsList(city, deps) {
   if (!f.bus) return null;
   const pack = await cityPack(city, deps).catch(() => null);
   const got = await held(`bus:${city}`, f.fresh, CITY_KEEP, async () => {
-    const res = await deps.fetchFn(f.bus, { signal: AbortSignal.timeout?.(10_000) });
+    const res = await deps.fetchFn(freshUrl(f.bus, deps.now), { signal: AbortSignal.timeout?.(10_000) });
     if (!res.ok) throw new Error(`${city} buses ${res.status}`);
     const list = JSON.parse(await bodyText(res)).BusInfo;
     if (!Array.isArray(list)) throw new Error(`${city} buses: not a list`);

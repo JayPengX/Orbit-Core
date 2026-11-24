@@ -163,9 +163,9 @@ function cityFetch(log, { slow = 0 } = {}) {
     log.push(url);
     if (url.includes('tdx.transportdata.tw')) return url.includes('token') ? json({ access_token: 'T', expires_in: 86400 }) : json([]);
     if (slow) await new Promise(r => setTimeout(r, slow));
-    if (url === CITY_FEEDS.Taipei.eta) return new Response(gzipSync(JSON.stringify(cb.eta)));
-    if (url === CITY_FEEDS.Taipei.bus) return new Response(gzipSync(JSON.stringify(cb.bus)));
-    if (url === CITY_FEEDS.NewTaipei.eta) return new Response(cb.ncsv);
+    if (url.split('?t=')[0] === CITY_FEEDS.Taipei.eta) return new Response(gzipSync(JSON.stringify(cb.eta)));
+    if (url.split('?t=')[0] === CITY_FEEDS.Taipei.bus) return new Response(gzipSync(JSON.stringify(cb.bus)));
+    if (url.split('?t=')[0] === CITY_FEEDS.NewTaipei.eta) return new Response(cb.ncsv);
     return assert.fail(`asked ${url}`);
   };
 }
@@ -188,7 +188,7 @@ test("臺北's stops from the city's own file (gzipped): TDX's rows with the pac
   const dirs = cb.tpack.routes[0].ways.filter(w => w[3].includes(`TPE${odd.StopID}`)).map(w => w[2]);
   assert.deepEqual(b.rows.map(r => r.Direction).sort(), dirs.sort());
   assert.equal(b.rows[0].StopStatus, 1, '-1: 尚未發車');
-  assert.equal(log.filter(u => u === CITY_FEEDS.Taipei.eta).length, 1, 'the city read once for both');
+  assert.equal(log.filter(u => u.split('?t=')[0] === CITY_FEEDS.Taipei.eta).length, 1, 'the city read once for both');
 });
 
 test("臺北's buses' places by their route (the feed names a way: the pack's route); 新北's stops from its CSV, a way from the pack when it says 3", async () => {
@@ -1149,4 +1149,19 @@ test("公路客運's News from 公路局's own 最新消息 (營運異動 and �
   assert.equal(asked.filter(a => a.startsWith('2:')).length, 2, 'the list each 5 minutes');
   assert.equal(await freeTdx('basic/v2/Bus/Alert/InterCity', '', { fetchFn, now }), null, "路線通阻: TDX's");
   assert.equal(await freeTdx('basic/v2/Bus/News/City/Taipei', '', { fetchFn, now }), null);
+});
+
+// Jay 11-24, testing a bus on the map: 臺北's buses came back 12 minutes old from
+// the proxy while the city's file was seconds old: Cloudflare kept the .gz (its
+// site sends no Cache-Control). Each read is an address of its own.
+test("the cities' files are read fresh: each read a new address, never one Cloudflare kept", async () => {
+  resetFree();
+  const log = [];
+  await askCity('/transit/gps', 'city=Taipei&routes=TPE16111', cityFetch(log), NOW2);
+  await askCity('/transit/gps', 'city=Taipei&routes=TPE16111', cityFetch(log), NOW2 + 60_000);
+  await askCity('/transit/eta', `city=NewTaipei&stops=${cb.nfirst}`, cityFetch(log), NOW2);
+  const reads = log.filter(u => !u.includes('tdx'));
+  assert.ok(reads.length >= 3);
+  for (const u of reads) assert.match(u, /[?&]t=\d+$/, u);
+  assert.equal(new Set(reads.filter(u => u.startsWith(CITY_FEEDS.Taipei.bus))).size, 2, 'a minute later: another address');
 });
