@@ -234,7 +234,7 @@ on `SPORTS_PROXY_ALLOWED_HOSTS`. Two hosts are not real: `asia-baseball.orbit`
 (CPBL, TheSportsDB) and `f1-live.orbit` (F1 live timing: `now.json`,
 `session.json`, `laps.json`, `circuit.json`; `about.json`, `face.json`
 (`f1-people.js`); `drops.json`, the FIA's grid drops (`f1-fia.js`); the DO
-`F1Log` logs laps). A finished session is F1's archive's (shut to everyone since 10-25: once refused, not asked for 12 h), else rebuilt from
+`F1Log` logs laps). A finished session is F1's archive's (shut since 10-25: a 401 rests it 12 h), else rebuilt from
 OpenF1's tables (`openF1Raw`), kept in R2.
 
 - **Trims** (`&trim=`) return only what an app reads (ESPN, Polymarket, Jolpica, FotMob, ELTA, YouTube, F1).
@@ -359,12 +359,12 @@ writing a file only when it changed (`builders/store.js`):
 | `photos.js`, `official-photos.js` | photo lists, cutouts, official headshots | hourly / daily 18:00 |
 | `gtfs.js`, `buses.js`, `ntpc.js` (GitHub `buses.yml`, `tools/gtfs-buses.mjs`) | `bus/…`, `shape/…`, `station/…`, `where.json`, `rail/…`, `tdx/…` | weekly (`kickBuses`) |
 | `asia.js`, `cpbl.js` | CPBL's month and standings | daily 15:00 |
-| `f1kept.js` | each finished F1 session's 數據 and laps, kept early (via the proxy); OpenF1 refusing or empty: waiting, 4 days (empty then set aside for good, `none`) | :06, :26, :46 |
+| `f1kept.js` | each finished F1 session's 數據 and laps, kept early (via the proxy); OpenF1 refusing or empty: waiting, 4 days (empty: then `none`) | :06, :26, :46 |
 | `kept.js` | wipes kept copies (`mirror/`) before a league's first askable day | daily 17:00 |
 | `news.js`, `news-words.js` | `news/index.json` (3 days), `past.json`: stories by weight, topic, side, 快訊 (`live`: many outlets in 2 h); read here, the desk laid by `news-desk.yml` | every 10 min |
 | `tools/flight-pool.mjs` (`flight.yml`, started by the cron: `flight.js keepPool`) | `flight/` | 10 min |
 | `tools/news-clips.mjs` (`news-clips.yml`) | `news/clips.json`: the clips in Taiwan's articles (those outlets refuse Cloudflare) for `news.js`; TPEx's 重大訊息 list too (`TPEX_COPY`) | started by `newsClips` (15 min) |
-| `filings.js`; `ai.js` | 重大訊息 as rows: `stock/filings/` (TPEx only from GitHub's copy, 12 h); Mondays the admin's 除錯紀錄週報 (`rec-weekly`, the only AI made ahead). Words' cards (`words/cards/`) were made once and are kept as they are | :04 :34 |
+| `filings.js`; `ai.js` | 重大訊息 as rows: `stock/filings/`; Mondays the admin's 除錯紀錄週報 (`rec-weekly`, the only AI made ahead). Words' cards (`words/cards/`) were made once and are kept as they are | :04 :34 |
 
 A season is kept until the next one's first game.
 
