@@ -725,7 +725,7 @@ export async function sendDue(env, now = Date.now()) {
           if (now < (item.until || item.firstAt || item.at) + (item.until ? 0 : HOLD_MS)) keep.push({ ...item, firstAt: item.firstAt || item.at, at: item.check.espn || item.check.tsdb ? item.at : now + (item.check.bus ? BUS_EVERY : CHECK_EVERY) });
           continue;
         }
-        // (A check's title can hold the app's own: "{title} 31° / 25°" keeps "家 今天天氣".)
+        // (A check's title can hold the app's own: "{title}" keeps "家 今天天氣".)
         const own = placedTitle(item.title, found.place);
         message = { ...message, title: found.title ? found.title.replace('{title}', own) : own, body: (item.body || found.body || '').replace('{result}', found.result || '') };
       }

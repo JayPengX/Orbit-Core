@@ -1136,8 +1136,9 @@ export function headline(resp, now) {
 }
 
 // The morning brief (push.js, check { weather }): today, in one line.
-// The title the day's high and low (the app's own name for the place before
-// them, "{title}": 家 今天天氣 31° / 25°), the line under it the rest.
+// The title the app's own name for it ("{title}": 家 今天天氣), the line under it
+// the day's high and low first, then the rest: a phone's title is one line and
+// "Weather・家 今天天氣 22° / 1…" lost the low (Jay 11-25: "text wrap").
 // English words for the brief (a subscriber whose app is in English: push.js
 // record.lang); the zh words are the advice's and the air reading's own.
 const UV_EN = { 低: 'low', 中: 'moderate', 高: 'high', 過量: 'very high', 危險: 'extreme' };
@@ -1162,7 +1163,7 @@ export function briefText(resp, now, lang = 'zh') {
   if (resp.air?.level) parts.push(en ? (AQI_EN[resp.air.level] ? `air ${AQI_EN[resp.air.level]}` : resp.air.aqi != null ? `AQI ${resp.air.aqi}` : '') : `空氣${resp.air.level}`);
   const wear = resp.advice?.find(a => a.kind === 'wear');
   if (wear) parts.push(en ? `${WEAR_EN[wear.level] || ''}${wear.why?.layers ? `${WEAR_EN[wear.level] ? ', ' : ''}layers for morning and evening` : ''}` : wear.text.replace(/^穿著：/, ''));
-  return { title: `{title}${temps ? ` ${temps}` : ''}`, body: parts.filter(Boolean).join(en ? '; ' : '，'), place: noticePlace(resp, lang) };
+  return { title: '{title}', body: [temps, ...parts].filter(Boolean).join(en ? '; ' : '，'), place: noticePlace(resp, lang) };
 }
 
 // A notice's check (push.js): { weather: { lat, lon, kind: 'brief' | 'rain' } }.

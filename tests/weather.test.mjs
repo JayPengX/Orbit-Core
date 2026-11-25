@@ -553,8 +553,9 @@ test('one sentence and the morning brief, from the numbers', async () => {
   assert.match(resp.headline, /明天最高 \d+°、最低 \d+°。$/, 'evening: tomorrow');
   const morning = NOW + 11 * 3_600_000; // 06:46 the next day
   const b = briefText(resp, morning);
-  // The app's own name for the place, then the day's high and low; the rest under it.
-  assert.match(b.title, /^\{title\} \d+° \/ \d+°$/);
+  // The title the app's own name only (one line on a phone: the low was cut off, 11-25); the high and low lead the line under it.
+  assert.equal(b.title, '{title}');
+  assert.match(b.body, /^\d+° \/ \d+°，/);
   assert.equal(b.place, '信義區');
   for (const w of ['Google', 'google', 'CWA', '氣象署']) assert.ok(!b.body.includes(w) && !resp.headline.includes(w));
   const t = h => Date.parse('2026-10-03T00:00:00+08:00') + h * 3_600_000;
@@ -564,7 +565,8 @@ test('one sentence and the morning brief, from the numbers', async () => {
   assert.equal(rainPhrase([{ t: t(8), pop: 80 }], t(8) + 600_000), '正在或即將下雨（80%）');
   // An English subscriber's brief is in English, the place's name too (it was 信義區, 11-18).
   const en = briefText(resp, morning, 'en');
-  assert.match(en.title, /^\{title\} \d+° \/ \d+°$/);
+  assert.equal(en.title, '{title}');
+  assert.match(en.body, /^\d+° \/ \d+°; /);
   assert.equal(en.place, 'Xinyi');
   assert.ok(en.body && !/[\u4e00-\u9fff]/.test(en.body), en.body);
   assert.equal(rainPhrase([{ t: t(8), pop: 10 }, { t: t(15), pop: 70 }], t(8), 12, undefined, 'en'), 'Rain likely from 15:00 (70%)');
@@ -596,7 +598,7 @@ test('the rain alert answers only when the next 2 hours turn wet', async () => {
   const DATA = { get: async (k, o) => ({ customMetadata: { at: String(at - 10 * 60_000), motion: still }, arrayBuffer: async () => new ArrayBuffer(o.range.length) }) };
   assert.equal(await weatherCheck({ ...e, DATA }, { lat: 25.034, lon: 121.565, kind: 'rain' }, { fetchFn: upstream(), now: at }), null);
   const brief = await weatherCheck(e, { lat: 25.034, lon: 121.565, kind: 'brief' }, { fetchFn: upstream(), now: at });
-  assert.match(brief.title, /^\{title\} \d+°/);
+  assert.match(brief.body, /^\d+° \/ \d+°，/);
 });
 
 test('opened cells are noted for the scoring, at most every 6 hours', async () => {
