@@ -374,10 +374,16 @@ test('figures, notices and bills Orbit Law publishes ground the answer, and come
   GROUND['bills/items.json'] = { items: [{ k: 'b1', n: '勞動基準法部分條文修正草案', stage: 2, u: '2026-10-01', by: [['民進黨', 2]] }, { k: 'b2', n: '民法部分條文修正草案', stage: 6, passed: '2026-05-01', u: '2026-05-01' }] };
   forgetGround();
   try {
+    const was = answer;
+    // (The answer rests on the figure (gf:0), not on the notice (gn:0).)
+    answer = { ...answer, points: [...answer.points, { text: '最低工資月薪 NT$28,590', cites: ['gf:0'] }] };
     const r = await chat({ q: '現在基本工資多少？勞動基準法有要修法嗎？', lang: 'zh' });
+    answer = was;
     assert.equal(r.status, 200);
     const j = await r.json();
     const p = lastOf('answer');
+    assert.match(p, /\[cite "gf:0"\]/);
+    assert.match(p, /\[cite "gn:0"\]/);
     assert.match(p, /政府公告與數字/);
     assert.match(p, /NT\$28,590/);
     assert.match(p, /最低工資審議會/);
@@ -386,9 +392,9 @@ test('figures, notices and bills Orbit Law publishes ground the answer, and come
     assert.match(p, /勞動基準法部分條文修正草案」進度：委員會/);
     assert.doesNotMatch(p, /民法部分條文/);
     assert.deepEqual(j.bills, [{ k: 'b1', n: '勞動基準法部分條文修正草案', stage: 2, d: '2026-10-01' }]);
-    assert.equal(j.notices.length, 2);
-    assert.equal(j.notices[1].url, 'https://www.mol.gov.tw/news/1');
-    assert.equal(j.notices[1].agency, '勞動部');
+    // Jay 11-25: only what the answer rests on is shown; a notice matched by words, uncited, is not.
+    assert.deepEqual(j.notices.map(n => n.id), ['gf:0']);
+    assert.equal(j.notices[0].url, 'https://www.mol.gov.tw/1607/28162/');
   } finally {
     for (const k of Object.keys(GROUND)) delete GROUND[k];
     forgetGround();

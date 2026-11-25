@@ -280,7 +280,7 @@ export const groundKey = g => (hasGround(g) ? [...g.facts.map(f => `${f.id}=${f.
 export function groundPrompt(g) {
   if (!hasGround(g)) return '';
   const blocks = [];
-  if (g.facts.length || g.news.length) blocks.push(`政府公告與數字 (official figures and agencies' notices, newest data Orbit Law has):\n${[...g.facts.map(factLine), ...g.news.map(newsLine)].map(l => `- ${l}`).join('\n')}`);
+  if (g.facts.length || g.news.length) blocks.push(`政府公告與數字 (official figures and agencies' notices, newest data Orbit Law has, matched by words only, so many are off the question: cite one by its id in quotes only where a point rests on it, and leave the rest unmentioned):\n${[...g.facts.map((f, i) => `[cite "${groundId('f', i)}"] ${factLine(f)}`), ...g.news.map((n, i) => `[cite "${groundId('n', i)}"] ${newsLine(n)}`)].join('\n')}`);
   if (g.bills.length || budgetsOf(g).length) blocks.push(`立法院進度 (bills and budgets in the 立法院 and their stage):\n${[...g.bills.map(billLine), ...budgetsOf(g).map(budgetLine)].map(l => `- ${l}`).join('\n')}`);
   if (recentOf(g).length) blocks.push(`最近三讀的法案 (the newest the 立法院 passed, on any subject: what it passed ahead of an election):\n${recentOf(g).map(l => `- ${billLine(l)}`).join('\n')}`);
   return `${blocks.join('\n\n')}
@@ -288,7 +288,7 @@ export function groundPrompt(g) {
 About these:
 - Quote any figure, amount or date exactly as written above, with its date and source (the agency or 立法院); never change or estimate a number.
 - Prefer the official figures over a notice when they differ; a 將來 figure is not in force yet, so say from when it applies.
-- These are not articles: never put them in cites. Use them in answer (and next) only.
+- A bill or a budget is not an article: never put one in cites. A notice or a figure goes in cites by its id, and only when the point uses it; one that isn't about the question is never named.
 - A bill is not law until it is 三讀 and 公布: say its stage plainly. Say what each bill does (its 目的) in a few words, not just its name.
 - 提案 by party says who proposed versions of it; a bill both big parties proposed has their support. How a party voted is only what a 記名表決 line says (most bills pass without one).
 - A budget's amounts are only those its line gives (in 億元): quote them exactly; a line without amounts has none, so never give a figure for it. 凍結 isn't in the data.
@@ -298,10 +298,17 @@ About these:
 
 // The bill cards (the app shows 6): with the newest passed beside them, 3 of each first.
 const billsShown = g => (recentOf(g).length ? [...g.bills.slice(0, 3), ...recentOf(g).slice(0, 3), ...g.bills.slice(3), ...recentOf(g).slice(3)] : g.bills);
-// What the answer carries: the notices and bills the model was given.
+// A notice's or a figure's id in the prompt and in an answer's cites.
+export const groundId = (kind, i) => `g${kind}:${i}`;
+// The ids an answer may cite (law-chat.js checkChat's others).
+export const groundCites = g => (hasGround(g) ? [...g.facts.map((_, i) => groundId('f', i)), ...g.news.map((_, i) => groundId('n', i))] : []);
+// What the answer carries: the notices (each with its id: law-chat.js shownOf keeps those the
+// answer cites) and bills the model was given.
+// (Jay 2026-11-25: a question on 搜索票 showed 少年事件處理法's and 法院組織法's notices, matched
+// on 法院 alone; every notice matched was shown, used or not.)
 export function groundOut(g) {
   if (!hasGround(g)) return {};
-  const notices = [...g.facts.map(f => ({ t: cut(f.t || f.text, 120), url: urls(f.src)[0] || '', d: cut(f.d ?? f.date ?? '', 40), agency: cut(f.agency ?? '', 40) })), ...g.news.map(n => ({ t: cut(n[2], 120), url: urls([n[3]])[0] || '', d: cut(n[0], 10), agency: cut(n[1], 40) }))];
+  const notices = [...g.facts.map((f, i) => ({ id: groundId('f', i), t: cut(f.t || f.text, 120), url: urls(f.src)[0] || '', d: cut(f.d ?? f.date ?? '', 40), agency: cut(f.agency ?? '', 40) })), ...g.news.map((n, i) => ({ id: groundId('n', i), t: cut(n[2], 120), url: urls([n[3]])[0] || '', d: cut(n[0], 10), agency: cut(n[1], 40) }))];
   // (A budget first: it's what a budget question asked, not 預算法's bills; Jay 2026-10-27 found it under 更多1件.)
   const bills = [...budgetsOf(g).map(b => ({ k: `budget:${b.k}`, n: b.title, stage: -1, d: cut(b.stage, 20) })), ...billsShown(g).map(b => ({ k: b.k, n: b.n, stage: b.stage, ...(b.passed || b.u ? { d: String(b.passed || b.u).slice(0, 10) } : {}) }))];
   return { ...(notices.length ? { notices } : {}), ...(bills.length ? { bills } : {}) };

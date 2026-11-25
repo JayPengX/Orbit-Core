@@ -25,7 +25,7 @@
 // by the question, its answer by the versions (m) of the laws found too, so
 // a new version asks again. Follow-ups aren't kept (they rarely repeat).
 import { json, sha256Hex } from './http.js';
-import { groundFor, groundKey, groundOut, groundPrompt, hasGround } from './law-ground.js';
+import { groundCites, groundFor, groundKey, groundOut, groundPrompt, hasGround } from './law-ground.js';
 import { moreFor, moreKey, moreOut, morePrompt, moreCites, hasMore, readMine, matchPeople, asksLy, warmMore } from './law-more.js';
 import { localFor, localPrompt, localOut, localCites, localKey, hasLocal } from './law-local.js';
 import { viaTaiwan } from './law-hosts.js';
@@ -461,6 +461,10 @@ export function shownOf(extra, out) {
   else delete res.cases;
   if (rules.length) res.rules = rules;
   else delete res.rules;
+  // A notice or a figure, only one the answer rests on (matched by words, most are off the question).
+  const notices = (extra.notices || []).filter(n => used.has(n.id));
+  if (notices.length) res.notices = notices;
+  else delete res.notices;
   // A council or 代表會 stays (a way to its page); of its bills and rows, those cited.
   if (extra.local) res.local = { councils: extra.local.councils.map(c => ({ ...c, bills: c.bills.filter(b => used.has(`cc:${b.id}`)), talks: (c.talks || []).filter(x => used.has(`cq:${x.id}`)) })), towns: extra.local.towns.map(t => ({ ...t, rows: t.rows.filter(r => used.has(r.id)) })) };
   return res;
@@ -578,7 +582,7 @@ export async function answerChat(chat, pass, env, ctx, headers, gemini, stage = 
     ]);
     mark('more');
     const grounded = hasGround(ground) || hasMore(more) || hasLocal(local);
-    const others = [...moreCites(more), ...localCites(local)];
+    const others = [...moreCites(more), ...localCites(local), ...groundCites(ground)];
     stage({ stage: 'write', arts: articles.length, cases: more.cases.length, rules: more.rules.length, people: more.people.map(p => p.n), votes: more.votes.length, bills: ground.bills.length, budgets: ground.budgets?.length || 0, news: ground.news.length + ground.facts.length });
     const extra = { ...groundOut(ground), ...moreOut(more), ...localOut(local) };
     const versions = [...new Set(articles.map(a => `${a.p}@${a.m}`))].sort().join(',');
