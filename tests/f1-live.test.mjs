@@ -322,3 +322,26 @@ test("the grid drops race control said: places back, the back of the grid, the p
     { no: '18', kind: 'pitlane', n: 0, at: '2026-11-20T05:01:00' }
   ]);
 });
+
+// Jay 11-25, the alert mails: F1's archive answers 401 to everyone, and a race weekend's
+// every minute asked it again ('F1 即時計時 壞了' mailed). Once refused, not asked for 12 hours.
+test("F1's archive, once it refuses, isn't asked again for 12 hours; OpenF1 still answers", async () => {
+  const { f1LiveResponse, SHUT_MS } = await import('../f1-live.js');
+  const was = { fetch: globalThis.fetch, caches: globalThis.caches };
+  const kept = new Map();
+  globalThis.caches = { default: { match: async k => kept.get(String(k))?.clone() || undefined, put: async (k, r) => void kept.set(String(k), r) } };
+  const asked = [];
+  globalThis.fetch = async url => (asked.push(String(url)), String(url).includes('livetiming') ? new Response('', { status: 401 }) : new Response('[]', { status: 200 }));
+  try {
+    const url = new URL('https://f1-live.orbit/session.json?start=2026-11-20T00%3A30%3A00.000Z');
+    await f1LiveResponse(url);
+    assert.equal(asked.filter(u => u.includes('livetiming')).length, 1);
+    assert.ok(asked.some(u => u.includes('openf1')), 'OpenF1 asked instead');
+    asked.length = 0;
+    await f1LiveResponse(url);
+    assert.equal(asked.filter(u => u.includes('livetiming')).length, 0, 'not asked again');
+    assert.match(kept.get('https://f1-live.orbit/archive-shut').headers.get('Cache-Control'), new RegExp(`max-age=${SHUT_MS / 1000}`));
+  } finally {
+    Object.assign(globalThis, was);
+  }
+});

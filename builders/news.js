@@ -95,8 +95,10 @@ const sec = (list, url, every = S3) => list.map(x => [url(x), 'rss', every]);
 // 503): its 12 latest, each with the outlet's own link and summary.
 export const bing = site => `https://www.bing.com/news/search?q=site%3a${site}&format=rss&qft=sortbydate%3d%221%22&mkt=en-US&setlang=en-US&cc=US`;
 export const FEEDS = {
-  // (自由's 'all' holds every section's news: read every build, the sections every 2nd.)
-  ltn: [['https://news.ltn.com.tw/rss/all.xml', 'rss'], ...sec(['politics', 'society', 'life', 'world', 'local'], c => `https://news.ltn.com.tw/rss/${c}.xml`, S2), ...sec(['business', 'sports'], c => `https://news.ltn.com.tw/rss/${c}.xml`)],
+  // (自由's 'all' holds every section's news: read every build, the sections every 2nd. Its
+  // politics, society, life, local and sports feeds answer 403 to everyone since 11-24: gone,
+  // 'all' carries their stories; each build's 403s marked 新聞媒體 RSS broken, mailed to Jay.)
+  ltn: [['https://news.ltn.com.tw/rss/all.xml', 'rss'], ...sec(['world'], c => `https://news.ltn.com.tw/rss/${c}.xml`, S2), ...sec(['business'], c => `https://news.ltn.com.tw/rss/${c}.xml`)],
   setn: [['https://www.setn.com/sitemapGoogleNews.xml', 'map']],
   // (Its site answers only Taiwan, Google News' feed of it refuses Cloudflare:
   // its YouTube channel's reports, each headline the clip's.)

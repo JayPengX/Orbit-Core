@@ -62,11 +62,11 @@ test("either list's row read as one filing, by code", () => {
 });
 
 test('a new filing written into its bucket once; nothing new, nothing written', async () => {
-  const files = new Map();
+  const now = Date.parse('2026-11-11T00:00:00Z');
+  const files = new Map([[TPEX_COPY, { at: now, rows: [tpex] }]]);
   let puts = 0;
   const store = { json: async p => (files.has(p) ? structuredClone(files.get(p)) : null), put: async (p, d) => (puts++, files.set(p, d)) };
-  const get = async u => ({ ok: true, json: async () => (/twse/.test(u) ? [twse] : [tpex]) });
-  const now = Date.parse('2026-11-11T00:00:00Z');
+  const get = async () => ({ ok: true, json: async () => [twse] });
   const r = await runFilings({ store, get, now });
   assert.equal(r.fresh, 2);
   assert.equal(files.get(bucketOf('5306')).codes['5306'][0].title, twse['主旨 ']);
@@ -97,8 +97,9 @@ test("a list that never answers: given up at its time, the other list's filings 
 });
 
 // TPEx answers GitHub's machines but not Cloudflare's (from about 2026-11-14 上櫃 filings were missing):
-// GitHub's copy of its list (tools/news-clips.mjs) is read while under 2 hours old, TPEx itself never asked then.
-test("TPEx's list from GitHub's copy while it's new; past 2 hours TPEx is asked itself", async () => {
+// GitHub's copy of its list (tools/news-clips.mjs) is read while under 12 hours old, TPEx itself never asked
+// (asked past 2 hours, it timed out from Cloudflare and marked the source broken: mailed to Jay, 11-24).
+test("TPEx's list from GitHub's copy, never TPEx itself; a copy past 12 hours left out, no failure", async () => {
   const now = Date.parse('2026-11-11T00:00:00Z');
   const files = new Map([[TPEX_COPY, { at: now - 30 * 60_000, rows: [tpex] }]]);
   const store = { json: async p => (files.has(p) ? structuredClone(files.get(p)) : null), put: async (p, d) => files.set(p, d) };
@@ -109,13 +110,20 @@ test("TPEx's list from GitHub's copy while it's new; past 2 hours TPEx is asked 
   assert.equal(r.fresh, 2);
   assert.equal(r.tpex, 'copy');
   assert.ok(files.get(bucketOf('6790')).codes['6790']);
-  // An old copy: TPEx asked (and its failure said).
+  // A copy 3 hours old still taken; TPEx not asked.
   files.clear();
   files.set(TPEX_COPY, { at: now - 3 * 3_600_000, rows: [tpex] });
   asked.length = 0;
   const r2 = await runFilings({ store, get, now });
-  assert.deepEqual(asked.sort(), ['tpex', 'twse']);
-  assert.equal(r2.tpexFailed, '522');
+  assert.deepEqual(asked, ['twse']);
+  assert.equal(r2.tpex, 'copy');
+  // Past 12 hours: left out, said, not a failure; TPEx still not asked.
+  files.set(TPEX_COPY, { at: now - 13 * 3_600_000, rows: [tpex] });
+  asked.length = 0;
+  const r3 = await runFilings({ store, get, now });
+  assert.deepEqual(asked, ['twse']);
+  assert.equal(r3.tpex, 'old copy');
+  assert.equal(r3.failed, undefined);
 });
 
 test("sec-filing: the line's figures the filing's (rounded, in 萬/億, dates without zeros), the rows picked by number", () => {

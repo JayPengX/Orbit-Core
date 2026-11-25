@@ -295,8 +295,26 @@ async function snapshot(topics = TOPICS) {
 // (ESPN has only the order). `start`: the session's start (UTC, ISO); the
 // year's index says which session that is.
 const ARCHIVE = 'https://livetiming.formula1.com/static/';
+// F1 has turned its archive away (401) for everyone since 2026-10-25: once refused, not asked
+// again for 12 hours in this colo (`archiveShut`), the refusal answered at once, so the
+// fallbacks (OpenF1, the log) run as before. Asked each minute of a race weekend (the cron's
+// look for a running session), every one a 401: 'F1 即時計時 壞了' mailed to Jay (11-24).
+export const SHUT_MS = 12 * 3_600_000;
+const SHUT_KEY = 'https://f1-live.orbit/archive-shut';
+export const archiveShut = {
+  async is() {
+    const hit = await globalThis.caches?.default?.match(SHUT_KEY).catch(() => null);
+    return hit ? Number(await hit.text()) : 0;
+  },
+  async mark(status) {
+    await globalThis.caches?.default?.put(SHUT_KEY, new Response(String(status), { headers: { 'Cache-Control': `max-age=${SHUT_MS / 1000}` } })).catch(() => {});
+  }
+};
 const archiveJson = async path => {
+  const shut = await archiveShut.is();
+  if (shut) throw new Error(`archive ${shut}`);
   const res = await fetch(`${ARCHIVE}${path}`, { signal: AbortSignal.timeout(TIMEOUT) });
+  if (res.status === 401 || res.status === 403) await archiveShut.mark(res.status);
   if (!res.ok) throw new Error(`archive ${res.status}`);
   return JSON.parse((await res.text()).replace(/^\uFEFF/, ''));
 };

@@ -1070,3 +1070,12 @@ test('a read then the desk write what one build does; the read alone writes no p
   await runNews({ store: two.store, now: NOW + 600_000, fetchImpl, feeds, channels: {}, desk: false });
   assert.deepEqual(two.files.get(NEWS_STATE).recs, one.files.get(NEWS_RECS).recs);
 });
+
+// Jay 11-25, the alert mails: 自由's section feeds that answer 403 to everyone made every build's
+// read a failure ('新聞媒體 RSS 壞了' mailed); its 'all' feed carries their stories.
+test("自由時報 is read from its feeds that answer, never the five it closed", async () => {
+  const { FEEDS } = await import('../builders/news.js');
+  const urls = FEEDS.ltn.map(([u]) => u);
+  assert.ok(urls.includes('https://news.ltn.com.tw/rss/all.xml'));
+  for (const c of ['politics', 'society', 'life', 'local', 'sports']) assert.ok(!urls.includes(`https://news.ltn.com.tw/rss/${c}.xml`), c);
+});
