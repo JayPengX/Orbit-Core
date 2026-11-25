@@ -1066,9 +1066,32 @@ test('a read then the desk write what one build does; the read alone writes no p
   assert.equal(desk.tw, 1);
   assert.deepEqual(two.files.get(NEWS_PATH), one.files.get(NEWS_PATH));
   assert.deepEqual(two.files.get(NEWS_RECS).recs, one.files.get(NEWS_RECS).recs);
-  // The next read keeps the desk's stories beside what it read.
+  // The next read leaves the stories to the desk: never read, never copied into what it keeps.
   await runNews({ store: two.store, now: NOW + 600_000, fetchImpl, feeds, channels: {}, desk: false });
-  assert.deepEqual(two.files.get(NEWS_STATE).recs, one.files.get(NEWS_RECS).recs);
+  assert.equal(two.files.get(NEWS_STATE).recs, undefined);
+  assert.deepEqual(two.files.get(NEWS_RECS).recs, one.files.get(NEWS_RECS).recs);
+});
+
+// Jay 11-25, the alert mails: the read opened all the desk's stories (6,500, each up to 80
+// headlines) and kept a copy of them, and ran the Runner out of its 128 MB: cut off most
+// runs, '建置：新聞 停了' mailed day after day. The pages the stories show come from the desk's list.
+test("the read never opens the desk's stories; a page one of them shows is kept by the desk's list", async () => {
+  const { NEWS_PAGE_KEEP } = await import('../builders/news.js');
+  const files = new Map();
+  const opened = [];
+  const store = { json: async p => (opened.push(p), files.get(p) ?? null), put: async (p, d) => (files.set(p, JSON.parse(JSON.stringify(d))), true) };
+  const old = 'https://x.example/old-story-page';
+  files.set(NEWS_STATE, { items: [], etag: {}, pages: { [old]: { i: 'https://x.example/pic.jpg', y: [] }, 'https://x.example/gone': { i: '', y: [] } }, recs: [{ id: 'a', items: [{ u: old }] }] });
+  files.set(NEWS_RECS, { at: NOW, recs: [{ id: 'a', items: [{ u: old }] }] });
+  files.set(NEWS_PAGE_KEEP, { at: NOW, urls: [old] });
+  await runNews({ store, now: NOW, fetchImpl: async () => new Response('', { status: 304 }), feeds: { cna: [['https://cna/1', 'rss']] }, channels: {}, desk: false });
+  assert.ok(!opened.includes(NEWS_RECS), 'the stories never opened');
+  const kept = files.get(NEWS_STATE);
+  assert.equal(kept.recs, undefined, 'no copy of them kept');
+  assert.deepEqual(Object.keys(kept.pages), [old], "the story's page kept, the one nothing shows dropped");
+  // The desk writes the list from its stories and the pages kept.
+  await runDesk({ store, now: NOW });
+  assert.ok(Array.isArray(files.get(NEWS_PAGE_KEEP).urls));
 });
 
 // Jay 11-25, the alert mails: 自由's section feeds that answer 403 to everyone made every build's

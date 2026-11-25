@@ -55,6 +55,9 @@ import { enOf, NAMES } from './news-words.js';
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
 export const NEWS_PATH = 'news/index.json';
 export const NEWS_STATE = 'private/news/items.json.gz';
+// The pages (pictures, clips) the desk's stories still show, beyond the headlines kept: written
+// by the desk, so the proxy's read never opens the stories themselves (6,500 of them, 11-25).
+export const NEWS_PAGE_KEEP = 'private/news/page-keep.json.gz';
 // The stories kept, as the desk last laid them (runDesk, in GitHub Actions: tools/news-desk.mjs).
 export const NEWS_RECS = 'private/news/recs.json.gz';
 const HOUR = 3_600_000;
@@ -1733,8 +1736,21 @@ async function readFeed(url, kind, tag, { fetchImpl = fetch } = {}) {
 // `desk: false` (the proxy's cron) reads the feeds, channels and pages and
 // keeps them (NEWS_STATE); runDesk, in GitHub Actions, lays the desk from them.
 // `desk: true` does both in one (tests, a build by hand).
-export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feeds = FEEDS, channels = CHANNELS, channelEvery = CHANNEL_EVERY, desk = true } = {}) {
+// Feeds read a few at a time, each page parsed and let go before the next: all ~100 at once
+// held every page and its parse together, and with the 22,000 headlines kept the Runner's
+// 128 MB ran out ("exceeded its memory limit", 11-25): the build cut off most runs, its
+// news hours old, '建置：新聞 停了' mailed to Jay day after day.
+export const FEEDS_AT_ONCE = 6;
+async function inTurn(list, n, fn) {
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(n, list.length) }, async () => {
+    while (i < list.length) await fn(list[i++]);
+  }));
+}
+export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feeds = FEEDS, channels = CHANNELS, channelEvery = CHANNEL_EVERY, desk = true, atOnce = FEEDS_AT_ONCE } = {}) {
   const kept = (await store.json(NEWS_STATE).catch(() => null)) || { items: [], etag: {} };
+  // (The stories are the desk's (NEWS_RECS): a state from before held a copy of them too.)
+  delete kept.recs;
   const byUrl = new Map(kept.items.filter(it => now - it.at <= KEEP_MS && OUTLETS[it.o]).map(it => [it.u, it]));
   // (A feed not due this build keeps its ETag.)
   const urls = new Set(Object.values(feeds).flatMap(list => list.map(f => f[0])));
@@ -1755,28 +1771,26 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
   };
   const chansDue = feedsDue(chans, now);
   const feedsNow = feedsDue(feeds, now);
-  await Promise.all([
-    ...chansDue.map(readChannel),
-    ...feedsNow.map(async ([o, url, kind]) => {
-      try {
-        const r = await readFeed(url, kind, kept.etag?.[url], { fetchImpl });
-        if (r.same) return void (etag[url] = kept.etag[url]);
-        if (r.etag) etag[url] = r.etag;
-        const lang = OUTLETS[o].region === 'tw' ? 'zh' : 'en';
-        for (const it of r.items) {
-          const u = cleanUrl(it.u);
-          if (!newsUrl(u) || byUrl.has(u)) continue;
-          // (A time ahead of now is a feed's wrong zone: taken as now.)
-          const at = Math.min(it.at ?? now, now);
-          if (now - at > KEEP_MS) continue;
-          byUrl.set(u, { o, t: it.t, u, d: cut(unboiled(it.d), SUM_MAX[lang] * 2), at, img: it.img, ...(isVideo(u) ? { v: 1 } : {}) });
-          fresh++;
-        }
-      } catch (e) {
-        failed.push(`${o}: ${String(e?.message || e).slice(0, 40)}`);
+  await inTurn([...chansDue.map(c => () => readChannel(c)), ...feedsNow.map(f => () => readOne(f))], atOnce, go => go());
+  async function readOne([o, url, kind]) {
+    try {
+      const r = await readFeed(url, kind, kept.etag?.[url], { fetchImpl });
+      if (r.same) return void (etag[url] = kept.etag[url]);
+      if (r.etag) etag[url] = r.etag;
+      const lang = OUTLETS[o].region === 'tw' ? 'zh' : 'en';
+      for (const it of r.items) {
+        const u = cleanUrl(it.u);
+        if (!newsUrl(u) || byUrl.has(u)) continue;
+        // (A time ahead of now is a feed's wrong zone: taken as now.)
+        const at = Math.min(it.at ?? now, now);
+        if (now - at > KEEP_MS) continue;
+        byUrl.set(u, { o, t: it.t, u, d: cut(unboiled(it.d), SUM_MAX[lang] * 2), at, img: it.img, ...(isVideo(u) ? { v: 1 } : {}) });
+        fresh++;
       }
-    })
-  ]);
+    } catch (e) {
+      failed.push(`${o}: ${String(e?.message || e).slice(0, 40)}`);
+    }
+  }
   const clips = [];
   const perOutlet = new Map();
   for (const v of [...vids.values()].sort((a, b) => b.at - a.at)) {
@@ -1791,14 +1805,21 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
     return !seen.has(k) && seen.add(k);
   });
   // The pages read before (still kept), then a few more for the top stories.
-  const recs = (await store.json(NEWS_RECS).catch(() => null))?.recs || kept.recs || [];
-  const pages = {};
-  for (const it of [...items, ...recs.flatMap(r => r.items)]) if (kept.pages?.[it.u]) pages[it.u] = kept.pages[it.u];
-  // (And the clips GitHub found in the pages that refuse us.)
-  withClips(pages, await store.json(NEWS_CLIPS).catch(() => null));
-  // (Which pages: the last build's top stories (its index), so the desk is
+  // (Read here, desk: false, the stories aren't opened: reading all 6,500 with their
+  // headlines, and keeping a copy in the state, ran the Runner out of its 128 MB
+  // ("exceeded its memory limit") and cut the build off most runs, 11-25. The pages
+  // their stories show are the desk's list (NEWS_PAGE_KEEP); before it, all kept.)
+  const recs = desk ? (await store.json(NEWS_RECS).catch(() => null))?.recs || [] : [];
+  // (Which pages to read: the last build's top stories (its index), so the desk is
   // laid once a build; twice passed the Runner's 30 s of CPU, 11-12.)
   const last = await store.json(NEWS_PATH).catch(() => null);
+  const shown = new Set([...(last?.tw || []), ...(last?.intl || [])].flatMap(s => s.items.map(x => x[2])));
+  const deskKeep = desk ? null : (await store.json(NEWS_PAGE_KEEP).catch(() => null))?.urls;
+  const keepPage = desk ? new Set([...items, ...recs.flatMap(r => r.items)].map(it => it.u)) : deskKeep ? new Set([...items.map(it => it.u), ...deskKeep, ...shown]) : null;
+  const pages = {};
+  for (const [u, p] of Object.entries(kept.pages || {})) if (!keepPage || keepPage.has(u)) pages[u] = p;
+  // (And the clips GitHub found in the pages that refuse us.)
+  withClips(pages, await store.json(NEWS_CLIPS).catch(() => null));
   const want = pagesToRead({ tw: last?.tw || [], intl: last?.intl || [] }, pages);
   const whyNot = {};
   const read = await Promise.all(want.map(u => readPage(u, { fetchImpl, why: w => (whyNot[u] = w) })));
@@ -1819,16 +1840,14 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
   const missed = failed.length && storyFails * 2 < feedsNow.length ? failed.slice(0, 12) : null;
   const read_ = { items: items.length, fresh, clips: clips.length, pages: want.length, ...(Object.keys(unread).length ? { unread } : {}), ...(ask.length ? { asked: ask.length, shorts: isShort.filter(Boolean).length } : {}) };
   if (!desk) {
-    // (What's read kept, the stories as the desk last left them beside it: the desk lays them next.)
-    const keep = new Set([...items, ...recs.flatMap(r => r.items)].map(it => it.u));
-    for (const u of Object.keys(pages)) if (!keep.has(u)) delete pages[u];
-    await store.put(NEWS_STATE, { items, etag, pages, recs, vids: clips, shorts });
+    // (What's read kept: the desk lays it next, with its own stories.)
+    await store.put(NEWS_STATE, { items, etag, pages, vids: clips, shorts });
     return { ...read_, ...(missed ? { missed } : { failed }) };
   }
   const out = deskOf(items, recs, now, { pages, vids: clips });
   const keep = new Set([...items, ...out.recs.flatMap(r => r.items)].map(it => it.u));
   for (const u of Object.keys(pages)) if (!keep.has(u)) delete pages[u];
-  await store.put(NEWS_STATE, { items, etag, pages, recs: out.recs, vids: clips, shorts });
+  await store.put(NEWS_STATE, { items, etag, pages, vids: clips, shorts });
   await store.put(NEWS_RECS, { at: now, recs: out.recs });
   // (Never an empty page over a good one: a build that read nothing keeps the last.)
   if (out.tw.length || out.intl.length) {
@@ -1848,9 +1867,12 @@ export async function runNews({ store, now = Date.now(), fetchImpl = fetch, feed
 export async function runDesk({ store, now = Date.now() } = {}) {
   const state = await store.json(NEWS_STATE).catch(() => null);
   if (!state?.items) return { off: 'nothing read yet' };
-  const recs = (await store.json(NEWS_RECS).catch(() => null))?.recs || state.recs || [];
+  const recs = (await store.json(NEWS_RECS).catch(() => null))?.recs || [];
   const out = deskOf(state.items, recs, now, { pages: state.pages || {}, vids: state.vids || [] });
   await store.put(NEWS_RECS, { at: now, recs: out.recs });
+  // (The pages its stories show, for the proxy's next read to keep: NEWS_PAGE_KEEP.)
+  const pages = state.pages || {};
+  await store.put(NEWS_PAGE_KEEP, { at: now, urls: [...new Set(out.recs.flatMap(r => r.items.map(it => it.u)))].filter(u => pages[u]) });
   // (Never an empty page over a good one.)
   if (out.tw.length || out.intl.length) {
     await store.put(NEWS_PATH, { built: now, tw: out.tw, intl: out.intl });
