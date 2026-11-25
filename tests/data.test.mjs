@@ -122,3 +122,31 @@ test('R2 switched off or unbound (2026-11-13): a read is a 503 failure, never a 
   }
   assert.equal((await ask('/data/sports/none.json', {}, { DATA: fakeR2() })).status, 404);
 });
+
+// Jay 11-25: the news desk failed (503 four times) writing its stories: the push unpacked the
+// whole file (some 30 MB) to sum it, beside the Runner's 128 MB. Summed as it unpacks.
+test("a pushed .gz is summed as it unpacks (the platform's DigestStream), the same sum as whole", async () => {
+  const { sumOf } = await import('../data.js');
+  const { sha256, gunzip, gzip } = await import('../builders/store.js');
+  const { createHash } = await import('node:crypto');
+  const bytes = await gzip(new TextEncoder().encode('新聞'.repeat(200_000)));
+  const whole = await sha256(await gunzip(bytes));
+  let pieces = 0;
+  const had = crypto.DigestStream;
+  crypto.DigestStream = class extends WritableStream {
+    constructor() {
+      const h = createHash('sha256');
+      let done;
+      const p = new Promise(r => (done = r));
+      super({ write: c => void (pieces++, h.update(c)), close: () => done(h.digest().buffer) });
+      this.digest = p;
+    }
+  };
+  try {
+    assert.equal(await sumOf(bytes), whole);
+    assert.ok(pieces > 1, 'summed piece by piece');
+  } finally {
+    crypto.DigestStream = had;
+  }
+  assert.equal(await sumOf(bytes), whole, 'and where there is none, whole');
+});

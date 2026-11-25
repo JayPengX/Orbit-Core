@@ -533,3 +533,32 @@ test("each notice's timing is kept: late ones with how many runs looked, and one
   assert.deepEqual(late.map(x => [x.tag, x.dropped ? 'dropped' : 'late']), [['start:nba:401910037', 'dropped'], ['end:nba:401910037', 'late']]);
   assert.equal(late[1].runs, 3, 'three runs looked at it before it went');
 });
+
+// Jay 11-25: 巡檢 mailed an MLS final '42 min late': the game kicked off 45 minutes behind and the
+// final went 1.5 minutes after the whistle. Late counts from the last look that found it not over.
+test("a final sent at the first run after the whistle isn't late, however long past its guessed end", async () => {
+  const { pushLate } = await import('../push.js');
+  const kv = memoryKv();
+  const env = { RATE_LIMIT_KV: kv };
+  const post = (path, body) => handlePush(new Request(`https://w/${path}`, { method: 'POST', body: JSON.stringify(body) }), env, {}, { d: 'acct', a: 'match' }, path);
+  await post('/push/subscribe', { sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/t', keys: { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' } } });
+  const now = Date.now();
+  const final = { at: now + 60_000, title: 'San Jose vs Houston', body: '{result} · MLS', tag: 'end:mls:401933738', kind: 'end', check: { espn: 'soccer/usa.1', event: '401933738' } };
+  let state = 'in';
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    if (!String(url).includes('espn.com')) return new Response(null, { status: 201 });
+    const side = (h, abbr, score) => ({ homeAway: h, score, winner: h === 'away' && state === 'post', team: { shortDisplayName: abbr } });
+    return new Response(JSON.stringify({ header: { competitions: [{ status: { type: { state, name: state === 'post' ? 'STATUS_FULL_TIME' : 'STATUS_SECOND_HALF', completed: state === 'post' }, period: 2, displayClock: "88'" }, competitors: [side('away', 'SJ', '2'), side('home', 'HOU', '1')] }] } }), { status: 200 });
+  };
+  try {
+    await post('/push/schedule', { items: [final] });
+    // (Its guessed end long past: the runs from 40 minutes on find the game still on, then over.)
+    for (let k = 0; k < 5; k++) await sendDue(env, now + 40 * 60_000 + k * 120_000);
+    state = 'post';
+    assert.equal((await sendDue(env, now + 40 * 60_000 + 5 * 120_000)).sent, 1);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.deepEqual(await pushLate(env, { since: now - 3_600_000 }), []);
+});

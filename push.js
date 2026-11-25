@@ -546,6 +546,10 @@ export function noticeLog(record, entry) {
 }
 // Every list's notices more than `late` past due, or dropped, since `since`: [{ app, tag, kind, due, at|dropped, runs }].
 export const LATE_MS = 5 * 60_000;
+// (A notice waiting on what really happens (a game's end) is late from the last run that looked
+// and found it not yet so, not from its guessed time: an MLS game that kicked off 45 minutes
+// behind ended at 13:24, its final went at 13:26, and the watch mailed it '42 min late', 11-25.)
+const lateBy = x => x.at - (x.last ?? x.due);
 export async function pushLate(env, { since = Date.now() - 24 * 3_600_000, late = LATE_MS } = {}) {
   const kv = pushStore(env);
   if (!kv?.list) return [];
@@ -553,7 +557,7 @@ export async function pushLate(env, { since = Date.now() - 24 * 3_600_000, late 
   for (const k of (await kv.list({ prefix: 'push:', all: true })).keys || []) {
     if (k.name.startsWith('push:prefs:') || k.name.split(':').length !== 3) continue;
     const rec = await kv.get(k.name, 'json').catch(() => null);
-    for (const x of rec?.log || []) if ((x.dropped || x.at) >= since && (x.dropped || x.at - x.due > late)) out.push({ app: k.name.slice(k.name.lastIndexOf(':') + 1), ...x });
+    for (const x of rec?.log || []) if ((x.dropped || x.at) >= since && (x.dropped || lateBy(x) > late)) out.push({ app: k.name.slice(k.name.lastIndexOf(':') + 1), ...x });
   }
   return out.sort((a, b) => (a.dropped || a.at) - (b.dropped || b.at));
 }
@@ -717,7 +721,7 @@ export async function sendDue(env, now = Date.now()) {
         const found = await ask(item.check, record.lang);
         if (!found) {
           const k = `${key}|${item.tag}`;
-          looked.set(k, { n: (looked.get(k)?.n || 0) + 1, first: looked.get(k)?.first || now });
+          looked.set(k, { n: (looked.get(k)?.n || 0) + 1, first: looked.get(k)?.first || now, last: now });
           if (now < (item.until || item.firstAt || item.at) + (item.until ? 0 : HOLD_MS)) keep.push({ ...item, firstAt: item.firstAt || item.at, at: item.check.espn || item.check.tsdb ? item.at : now + (item.check.bus ? BUS_EVERY : CHECK_EVERY) });
           continue;
         }
@@ -731,7 +735,7 @@ export async function sendDue(env, now = Date.now()) {
       // (When it was due, when it went, and how many of this Runner's runs looked at it meanwhile: noticeLog.)
       const seen = looked.get(`${key}|${item.tag}`);
       looked.delete(`${key}|${item.tag}`);
-      noticeLog(record, { tag: item.tag || '', kind: item.kind || '', due: item.firstAt || item.at, at: now, r, ...(seen ? { runs: seen.n, since: seen.first } : {}) });
+      noticeLog(record, { tag: item.tag || '', kind: item.kind || '', due: item.firstAt || item.at, at: now, r, ...(seen ? { runs: seen.n, since: seen.first, last: seen.last } : {}) });
       if (r === 'sent' && item.tag) record.told = { ...Object.fromEntries(Object.entries(record.told || {}).filter(([, at]) => at > now - TOLD_MS)), [toldKey(item)]: now };
       if (answers.includes('gone')) {
         subs = subs.filter((_, i) => answers[i] !== 'gone');

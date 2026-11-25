@@ -78,20 +78,25 @@ async function readFile(env, ctx, path, request) {
 const authorized = (request, env) => !!env.DATA_PUSH_SECRET && request.headers.get('Authorization') === `Bearer ${env.DATA_PUSH_SECRET}`;
 
 // The push body's frames, read as they come (a 40 MB batch never whole in memory).
+// (The pieces gathered and joined once there are enough: each piece joined as it came
+// copied the whole frame again, a few MB a piece, beside the Runner's 128 MB, 11-25.)
 export async function* frames(stream) {
   const reader = stream.getReader();
   let buf = new Uint8Array(0);
   let done = false;
   const need = async n => {
-    while (buf.length < n && !done) {
+    if (buf.length >= n) return true;
+    const parts = [buf];
+    let have = buf.length;
+    while (have < n && !done) {
       const r = await reader.read();
       if (r.done) done = true;
-      else {
-        const next = new Uint8Array(buf.length + r.value.length);
-        next.set(buf);
-        next.set(r.value, buf.length);
-        buf = next;
-      }
+      else (parts.push(r.value), (have += r.value.length));
+    }
+    if (parts.length > 1) {
+      buf = new Uint8Array(have);
+      let at = 0;
+      for (const p of parts) (buf.set(p, at), (at += p.length));
     }
     return buf.length >= n;
   };
@@ -126,6 +131,16 @@ export function frame(path, bytes) {
   return out;
 }
 
+// The sum of what's meant: a gzipped file's unpacked bytes, summed as they unpack where the
+// platform can (crypto.DigestStream: the news desk's stories unpack to some 30 MB, held whole
+// beside the Runner's 128 MB the push answered 503 and the desk failed, Jay 11-25).
+export async function sumOf(bytes) {
+  const gz = bytes[0] === 0x1f && bytes[1] === 0x8b;
+  if (!gz || typeof crypto.DigestStream !== 'function') return sha256(gz ? await gunzip(bytes) : bytes);
+  const digest = new crypto.DigestStream('SHA-256');
+  await new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')).pipeTo(digest);
+  return [...new Uint8Array(await digest.digest)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
 async function push(request, env, ctx, headers) {
   let put = 0;
   let gone = 0;
@@ -142,8 +157,7 @@ async function push(request, env, ctx, headers) {
       gone++;
     } else {
       // (Its sum as builders/store.js keeps it: a builder writing the same leaves it.)
-      const meant = f.bytes[0] === 0x1f && f.bytes[1] === 0x8b ? await gunzip(f.bytes) : f.bytes;
-      await env.DATA.put(path, f.bytes, { httpMetadata: { contentType: typeOf(path) }, customMetadata: { sha256: await sha256(meant) } });
+      await env.DATA.put(path, f.bytes, { httpMetadata: { contentType: typeOf(path) }, customMetadata: { sha256: await sumOf(f.bytes) } });
       put++;
     }
     purge.push(path);
