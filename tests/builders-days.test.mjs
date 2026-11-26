@@ -61,3 +61,11 @@ test("ESPN answering an empty object (or nothing at all) for a season's months: 
     assert.deepEqual((await store.json('sports/mlb/2026.json')).events.map(e => e.id), month.events ? ['1'] : ['1', '3', '4'], JSON.stringify(month));
   }
 });
+
+// Jay 11-26: MLB's spring opened on an empty 2/19: its games' hours not set, ESPN stamps them at US Eastern
+// midnight (05:00Z), a day early in Taiwan. Filed under the day the app shows them on (kit startOf).
+test("a game whose hour isn't set is a game day the app's own way", () => {
+  const tbd = { date: '2027-02-19T05:00Z', competitions: [{ timeValid: false }] };
+  assert.deepEqual(seasonDays([tbd]), ['2027-02-20']);
+  assert.deepEqual(seasonDays([{ date: '2027-02-19T05:00Z', competitions: [{ timeValid: true }] }]), ['2027-02-19']);
+});

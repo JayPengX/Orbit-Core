@@ -21,6 +21,7 @@ import { CATALOG, ESPN_SITE as SITE, asiaMonthUrl } from '../kit/catalog.mjs';
 import { BROADCAST } from '../kit/sports-broadcast.mjs';
 import { mirrorPath } from '../kit/mirror.mjs';
 import { twDay } from '../kit/format.mjs';
+import { startOf } from '../kit/sports-espn.mjs';
 import { asiaBaseballResponse } from '../asia-baseball.js';
 import { keptFrom, seasonBounds, seasonState, yearSeason } from './season.js';
 import { within } from './within.js';
@@ -118,7 +119,9 @@ export function seasonDays(events, start = NaN) {
   const from = Number.isFinite(start) ? start - DAY : -Infinity;
   const days = new Set();
   for (const e of events) {
-    const t = Date.parse(e.date || '');
+    // (A game whose hour isn't set yet by the day the app files it under: ESPN stamps it at US Eastern midnight,
+    // a day early in Taiwan, and MLB's spring opened on an empty 2/19, Jay 11-26. kit sports-espn.mjs startOf.)
+    const t = Date.parse(startOf(e.date || '', e.competitions?.[0]).start || '');
     const state = e.status?.type || e.competitions?.[0]?.status?.type || {};
     if (!Number.isFinite(t) || t < from || /postponed|canceled|cancelled|abandoned/i.test(state.name || state.description || '')) continue;
     days.add(twDay(t));
