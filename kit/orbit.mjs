@@ -45,7 +45,7 @@ import './steady-pics.mjs';
 // (A phone's own outside reads counted, and sent back when one fails: source-watch.mjs, on import.)
 import './source-watch.mjs';
 // (How the apps are used, as counts with no id: usage.mjs, on import; its switch on the Pass sheet.)
-import { usageProbe, usageTab, usageOn, setUsageOn, adoptUsage, usageNoticeSeen, markUsageNotice } from './usage.mjs';
+import { usageProbe, usageTab, usageStep, usageOn, setUsageOn, adoptUsage, usageNoticeSeen, markUsageNotice } from './usage.mjs';
 
 export const ECO_URL = `${API}/eco`;
 export const PROXY_URL = `${API}/sports-proxy`;
@@ -3087,12 +3087,14 @@ function signInGate(s, look = null) {
     const error = node('p', { class: 'q-gate-error', role: 'alert' });
     const enter = node('button', { class: 'q-btn primary block', type: 'submit', text: en ? 'Sign in' : '登入' });
     const keys = passkeyHere() ? passkeyGate(s, error, res => finish(res), on => busy(on)) : null;
-    const make = node('button', { class: 'q-btn block q-gate-make', type: 'button', text: en ? 'Make a new Orbit Pass' : '建立新的 Orbit Pass', onclick: () => swap(m => m.createPanel(s, { done: made, back: unswap, recover, had: readStore(HAD_KEY) === '1' })) });
+    const make = node('button', { class: 'q-btn block q-gate-make', type: 'button', text: en ? 'Make a new Orbit Pass' : '建立新的 Orbit Pass', onclick: () => (usageStep('pass:make-open'), swap(m => m.createPanel(s, { done: made, back: unswap, recover, had: readStore(HAD_KEY) === '1' }))) });
     const busy = on => [enter, input, keys?.button, make].forEach(b => b && (b.disabled = on));
     let over = false;
+    // (The sign-in screen's steps, counted with no id: admin's 使用 › 登入的步驟.)
     const finish = res => {
       if (over) return;
       over = true;
+      if (res) usageStep(made.ok ? 'pass:make-ok' : 'pass:signin-ok');
       keys?.stop();
       dropFromTop(gate);
       document.documentElement.classList.remove('q-signing-in');
@@ -3100,6 +3102,7 @@ function signInGate(s, look = null) {
     };
     // A pass made (createPanel): shown once to keep, then in.
     const made = async res => {
+      made.ok = true;
       if (res?.passcode) await showNewPass(s, res.passcode);
       finish(res);
     };
@@ -3140,7 +3143,7 @@ function signInGate(s, look = null) {
       text: en ? 'Forgot your pass? Use your recovery email' : '忘記通行碼？用救援信箱找回',
       onclick: () => recover()
     });
-    const recover = (addr = '') => swap(m => m.recoverPanel(s, { done: res => finish(res), back: unswap, addr }));
+    const recover = (addr = '') => (usageStep('pass:recover-open'), swap(m => m.recoverPanel(s, { done: res => finish(res), back: unswap, addr })));
     // A panel of pass-mail.mjs (用信箱找回, 建立) in the form's place; back: the form again.
     let panel = null;
     const unswap = () => {
@@ -3181,6 +3184,7 @@ function signInGate(s, look = null) {
     // Alone on screen: any sheet the app had open closes first.
     for (const d of document.querySelectorAll('dialog[open]')) if (!onTop.has(d)) d.close();
     keepOnTop(gate);
+    usageStep('pass:signin-shown');
     keys?.start();
     // (No keyboard on its own: the field is tapped when wanted. Jay 11-14.)
     // An invite (admin's 邀請 QR code, /app/?join):

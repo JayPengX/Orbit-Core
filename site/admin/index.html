@@ -475,6 +475,10 @@
   .use-line:last-child { border-bottom: 0; }
   .use-line span { min-width: 0; overflow-wrap: anywhere; }
   .use-line b { flex: none; font-variant-numeric: tabular-nums; }
+  .use-err span { display: grid; gap: 2px; }
+  .use-err code { font: 13px/18px ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+  .use-err small, .use-line b small { font-size: 12px; font-weight: 400; }
+  .use-sub { display: block; }
   [hidden] { display: none !important; }
   /* A part a link scrolls to (data-to, 工具's shortcuts, 健康's chips) lands under the sticky top bar, not behind it. */
   main [id] { scroll-margin-top: calc(env(safe-area-inset-top) + 76px); }
@@ -581,7 +585,7 @@
       <div id="use-dims" class="use-dims"></div>
       <div class="sec-head"><h2>回來的比例</h2></div>
       <div class="card"><p class="muted" style="margin:0 0 8px">每一列是第一次打開 Orbit 的那一週，往右每一格是之後的一週（+1、+2…），還有多少裝置回來。</p><div id="use-ret" class="use-ret"></div></div>
-      <div class="sec-head"><h2>步驟・30 天</h2></div>
+      <div class="sec-head"><h2>登入的步驟・30 天</h2></div>
       <div id="use-steps" class="card"></div>
       <div class="sec-head"><h2>錯誤・7 天</h2></div>
       <div id="use-errs" class="card"></div>
@@ -2503,8 +2507,14 @@ async function loadUse() {
           const a = apps[id];
           const tabs = Object.entries(a.tabs).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([t, n]) => `${t} ${n}`).join('・');
           const mins = Math.round(a.sec / 60);
-          const sub = [`${a.day} 台・${mins.toLocaleString()} 分鐘`, Object.keys(a.load).length ? `載入 ${loadMid(a.load)}，9 成 ${loadMid(a.load, 0.9)}` : '', a.err ? `${a.err} 個錯誤` : '', tabs].filter(Boolean).join(' · ');
-          return `<div class="q-ritem">${appIc(id) || `<img class="app-ic" src="${svgUrl(familyMark())}" alt="Orbit">`}<span class="q-ritem-text"><span class="q-ritem-title">${escHtml(useName(id))}</span><small>${escHtml(sub)}</small></span><span class="q-ritem-value">${a.open.toLocaleString()} 次</span></div>`;
+          // (A line each, never one run wrapped mid-phrase: who and how long; how fast it opens; its tabs.)
+          const per = a.day ? Math.round((a.sec / 60 / a.day) * 10) / 10 : 0;
+          const subs = [
+            [`${a.day} 台`, `${mins.toLocaleString()} 分鐘`, per ? `每台 ${per} 分` : ''].filter(Boolean).join('・'),
+            [Object.keys(a.load).length ? `載入 ${loadMid(a.load)}，9 成 ${loadMid(a.load, 0.9)}` : '', a.err ? `${a.err} 個錯誤` : ''].filter(Boolean).join('・'),
+            tabs ? `分頁 ${tabs}` : ''
+          ].filter(Boolean);
+          return `<div class="q-ritem">${appIc(id) || `<img class="app-ic" src="${svgUrl(familyMark())}" alt="Orbit">`}<span class="q-ritem-text"><span class="q-ritem-title">${escHtml(useName(id))}</span>${subs.map(t => `<small class="use-sub">${escHtml(t)}</small>`).join('')}</span><span class="q-ritem-value">${a.open.toLocaleString()} 次</span></div>`;
         })
         .join('')
     : emptyCard('bars', '這 7 天還沒有統計。');
@@ -2554,8 +2564,42 @@ async function loadUse() {
     const list = Object.entries(m).sort((x, y) => y[1] - x[1]).slice(0, 30);
     return list.length ? list.map(([k, n]) => `<div class="use-line"><span>${escHtml(k)}</span><b>${n.toLocaleString()}</b></div>`).join('') : `<p class="muted" style="margin:0">${escHtml(empty)}</p>`;
   };
-  $('use-steps').innerHTML = lines('step', since(30), '還沒有步驟的統計。');
-  $('use-errs').innerHTML = lines('err', since(7), '這 7 天沒有錯誤。');
+  $('use-steps').innerHTML = stepLines(d.rows, since(30));
+  $('use-errs').innerHTML = errLines(d.rows, since(7));
+}
+// The sign-in screen's steps in words, each with its share of the screen shown (kit/orbit.mjs signInGate).
+const STEP_WORDS = { 'pass:signin-shown': '看到登入畫面', 'pass:signin-ok': '登入成功', 'pass:make-open': '點「建立新的 Pass」', 'pass:make-ok': '建立了 Pass', 'pass:recover-open': '點「忘記通行碼」' };
+function stepLines(rows, from) {
+  const m = {};
+  for (const [day, app, k, key, n] of rows) if (k === 'step' && app !== '*' && day >= from) m[key] = (m[key] || 0) + n;
+  const shown = m['pass:signin-shown'] || 0;
+  const keys = [...Object.keys(STEP_WORDS).filter(k => m[k]), ...Object.keys(m).filter(k => !STEP_WORDS[k]).sort((x, y) => m[y] - m[x])];
+  if (!keys.length) return '<p class="muted" style="margin:0">還沒有步驟的統計。</p>';
+  return keys
+    .map(k => {
+      const pct = shown && k !== 'pass:signin-shown' ? Math.round((m[k] / shown) * 100) : null;
+      return `<div class="use-line"><span>${escHtml(STEP_WORDS[k] || k)}</span><b>${m[k].toLocaleString()}${pct != null ? `<small class="muted"> ${pct}%</small>` : ''}</b></div>`;
+    })
+    .join('');
+}
+// Errors: one line a message, the apps it came from under it (the same kit error in every app is one problem).
+function errLines(rows, from) {
+  const m = {};
+  for (const [day, app, k, key, n] of rows) {
+    if (k !== 'err' || app === '*' || day < from) continue;
+    const e = (m[key] ||= { n: 0, apps: {} });
+    e.n += n;
+    e.apps[app] = (e.apps[app] || 0) + n;
+  }
+  const list = Object.entries(m).sort((x, y) => y[1].n - x[1].n).slice(0, 20);
+  if (!list.length) return '<p class="muted" style="margin:0">這 7 天沒有錯誤。</p>';
+  return list
+    .map(([msg, e]) => {
+      const apps = Object.entries(e.apps).sort((x, y) => y[1] - x[1]);
+      const where = apps.length >= 6 ? `${apps.length} 個 App` : apps.map(([a, n]) => `${useName(a)} ${n}`).join('・');
+      return `<div class="use-line use-err"><span><code>${escHtml(msg)}</code><small class="muted">${escHtml(where)}</small></span><b>${e.n.toLocaleString()}</b></div>`;
+    })
+    .join('');
 }
 async function loadSources() {
   $('health-error').textContent = '';
@@ -2564,7 +2608,8 @@ async function loadSources() {
     const x = await sourcesNow();
     sourcesCell(x);
     const count = st => x.rows.filter(o => o.state === st).length;
-    $('src-sum').textContent = `${count('ok')} 個正常${count('warn') ? `・${count('warn')} 個不穩` : ''}${count('bad') ? `・${count('bad')} 個壞了` : ''}・${count('idle')} 個 24 小時沒人用。只算 App 平常的呼叫，點一列看細節。`;
+    // (What's wrong first, in one short line beside 現在問一次; the rest is the list's.)
+    $('src-sum').textContent = [count('bad') && `${count('bad')} 個壞了`, count('warn') && `${count('warn')} 個不穩`, `${count('ok')} 個正常`, count('idle') && `${count('idle')} 個一天沒人用`].filter(Boolean).join('・');
     if (x.error) $('health-error').textContent = x.error;
     $('sources').replaceChildren(
       ...SOURCE_GROUPS.map(([g, name]) => {

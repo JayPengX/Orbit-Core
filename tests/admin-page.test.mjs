@@ -113,3 +113,27 @@ test('admin: a fine source shows its dot alone; 撐得住多少人 draws the las
   assert.match(page, /if \(kept\?\.users\) drawCapacity\(kept\);/);
   assert.ok(page.includes('const base = Math.max(0, ...Object.values(ret[c]));'), 'retention never over 100%');
 });
+
+test('使用: sign-in steps in words with their share of the screen shown; one error line a message, its apps under it', () => {
+  const from = page.indexOf('const STEP_WORDS');
+  const code = page.slice(from, page.indexOf('async function loadSources()'));
+  const escHtml = x => String(x);
+  const useName = a => ({ match: 'Sports', money: 'Money' })[a] || a;
+  const { stepLines, errLines } = new Function('escHtml', 'useName', `${code}; return { stepLines, errLines };`)(escHtml, useName);
+  const rows = [
+    ['2026-11-20', 'match', 'step', 'pass:signin-shown', 10],
+    ['2026-11-20', 'money', 'step', 'pass:signin-shown', 10],
+    ['2026-11-21', 'match', 'step', 'pass:signin-ok', 15],
+    ['2026-11-21', 'match', 'err', 'boom @app.js:#', 2],
+    ['2026-11-21', 'money', 'err', 'boom @app.js:#', 3]
+  ];
+  const steps = stepLines(rows, '2026-11-01');
+  assert.match(steps, /看到登入畫面<\/span><b>20/);
+  assert.match(steps, /登入成功<\/span><b>15<small class="muted"> 75%/);
+  const errs = errLines(rows, '2026-11-01');
+  assert.equal(errs.match(/use-err/g).length, 1);
+  assert.match(errs, /Money 3・Sports 2/);
+  // (And the kit counts the steps it's named by.)
+  const kit = readFileSync(new URL('../kit/orbit.mjs', import.meta.url), 'utf8');
+  for (const k of ['pass:signin-shown', 'pass:signin-ok', 'pass:make-ok']) assert.ok(kit.includes(`'${k}'`), k);
+});
