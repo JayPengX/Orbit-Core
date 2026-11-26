@@ -93,6 +93,7 @@ export const SOURCES = [
   { id: 'kambi', zh: 'Kambi', group: 'sports', apps: ['match'], feeds: '場中比分', hosts: ['eu-offering-api.kambicdn.com'], where: ['worker'] },
   { id: 'fotmob', zh: 'FotMob', group: 'sports', apps: ['match'], feeds: '足球細節、球員照', hosts: ['www.fotmob.com', 'data.fotmob.com'], where: ['worker', 'cron'] },
   { id: 'tsdb', zh: 'TheSportsDB', group: 'sports', apps: ['match'], feeds: '中職、照片、隊徽', hosts: ['www.thesportsdb.com', 'r2.thesportsdb.com'], where: ['phone', 'relay', 'cron'] },
+  { id: 'tpbl', zh: 'TPBL', group: 'sports', apps: ['match'], feeds: 'TPBL 賽程、比分與 YouTube 直播', hosts: ['api.tpbl.basketball'], where: ['relay', 'cron'] },
   { id: 'cpbl', zh: '中華職棒', group: 'sports', apps: ['match'], feeds: '中職賽程與戰績', hosts: ['www.cpbl.com.tw'], where: ['cron'], fresh: { job: 'build:daily', every: 26 * HOUR }, steady: true },
   { id: 'elta', zh: '愛爾達', group: 'sports', apps: ['match'], feeds: '在哪裡看（轉播表）', hosts: ['piceltaott-elta.cdn.hinet.net', 'eltaott.tv'], where: ['phone', 'worker', 'cron'], fresh: { job: 'build:watch', every: 2 * HOUR }, steady: true },
   { id: 'youtube', zh: 'YouTube', group: 'sports', apps: ['match', 'news'], feeds: '精華影片', hosts: ['www.youtube.com', 'i.ytimg.com'], where: ['worker', 'cron'] },

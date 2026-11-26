@@ -231,7 +231,7 @@ w;dur=`, noted by the 除錯紀錄 when slow, and `LOCKED` (never runs as a page
 
 `?url=<encoded>&app=<kit id>&qt=` passes an upstream through if its host is
 on `SPORTS_PROXY_ALLOWED_HOSTS`. Two hosts are not real: `asia-baseball.orbit`
-(CPBL, TheSportsDB) and `f1-live.orbit` (F1 live timing: `now.json`,
+(CPBL, TPBL) and `f1-live.orbit` (F1 live timing: `now.json`,
 `session.json`, `laps.json`, `circuit.json`; `about.json`, `face.json`
 (`f1-people.js`); `drops.json`, the FIA's grid drops (`f1-fia.js`); the DO
 `F1Log` logs laps). A finished session is F1's archive's (shut since 10-25: a 401 rests it 12 h), else rebuilt from

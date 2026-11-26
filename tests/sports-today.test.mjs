@@ -83,11 +83,11 @@ test('a day answers in one request: the shape, each league read, the events the 
   assert.match(res.headers.get('Cache-Control'), /^private, max-age=15$/);
 });
 
-test("a day other than today reads a race weekend by its dated pages, and 28 pages in all", async () => {
+test("a day other than today reads a race weekend by its dated pages, and 32 pages in all (LaLiga and the NFL two each, 11-26)", async () => {
   fresh();
   const day = dayOf(-3);
   const body = await (await ask(day)).json();
-  assert.equal(calls.length, 28);
+  assert.equal(calls.length, 32);
   assert.ok(calls.filter(u => u.pathname.includes('/f1/')).every(u => espnDaysOf(day).includes(u.searchParams.get('dates'))));
   assert.ok(body.covered.includes('f1'));
 });
@@ -135,7 +135,7 @@ test('read while one is still kept: no read again; past its time: built again; a
   const [a, b, c] = await Promise.all([ask(day), ask(day), ask(day)]);
   assert.deepEqual([a, b, c].map(r => r.headers.get('X-Sports-Today')).sort(), ['JOIN', 'JOIN', 'MISS']);
   const pages = calls.length;
-  assert.equal(pages, 28, 'one build of a day, not three');
+  assert.equal(pages, 32, 'one build of a day, not three');
   assert.deepEqual(await b.json(), await a.json());
   // Another day is its own build.
   await ask(dayOf(3));

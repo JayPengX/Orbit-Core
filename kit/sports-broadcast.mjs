@@ -21,6 +21,11 @@ const ELTA = { zh: '愛爾達 ELTA.tv', en: 'ELTA.tv', short: { zh: '愛爾達',
 // link the Apple TV app opens.
 const APPLE = { zh: 'Apple TV', en: 'Apple TV', short: { zh: 'Apple TV', en: 'Apple TV' }, svc: 'appletv', url: 'https://tv.apple.com/tw/channel/mls/tvs.sbd.7000', exact: true };
 
+// YouTube: Taiwan's own leagues stream every game there (a game's own live
+// once its league lists it, else its channel's search: sheets' 觀看).
+const YOUTUBE = { zh: 'YouTube', en: 'YouTube', short: { zh: 'YouTube', en: 'YouTube' }, svc: 'youtube', exact: true };
+// A league with no TV here (Jay 11-26: shown all the same, no other
+// streaming service yet): `[]`, kept out of the way in 賽事 (NO_TV).
 export const BROADCAST = {
   mlb: [ELTA],
   // The home games of four clubs (台鋼, 富邦, 統一, 味全: ELTA's 2026 rights); which ones, its schedule says.
@@ -42,8 +47,13 @@ export const BROADCAST = {
   facup: [{ ...ELTA, rounds: { not: ['first-round', 'second-round'] } }],
   nationsleague: [ELTA],
   // Every session, practice too (2026-2029): its channel once ELTA's list names it.
-  f1: [{ ...ELTA, every: true }]
+  f1: [{ ...ELTA, every: true }],
+  tpbl: [{ ...YOUTUBE, url: 'https://www.youtube.com/results?search_query=TPBL+%E7%9B%B4%E6%92%AD' }],
+  laliga: [],
+  nfl: []
 };
+// The leagues on no TV here: shown, never in the way of the ones that are.
+export const NO_TV = new Set(Object.keys(BROADCAST).filter(k => !BROADCAST[k].length));
 
 export const broadcastsOf = league => BROADCAST[league] || [];
 // A round of a cup its service doesn't carry (the FA Cup's first two): known not on.
@@ -52,6 +62,7 @@ export const roundOff = e => Boolean(e?.round?.key && broadcastsOf(e.league)[0]?
 // channel named), NBA.com (its ELTA games, the channel not yet), else when
 // the list was checked. A league ELTA carries whole (F1) is no NBA.com game.
 export function twSource(exact, en) {
+  if (exact.some(b => b.svc === 'youtube')) return en ? "The league's YouTube" : '聯盟的 YouTube 直播';
   if (exact.some(b => b.guess)) return en ? "ELTA's usual line-up" : '依愛爾達往例預估';
   if (exact.some(b => b.ch)) return en ? "ELTA's schedule" : '愛爾達節目表';
   // (MLB's postseason, its channel to come: ELTA has the whole of it, not NBA.com's word.)

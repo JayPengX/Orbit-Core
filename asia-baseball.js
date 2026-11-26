@@ -3,6 +3,7 @@
 // it, so without this Orbit Sports had "no recent games" mid-season.
 //
 //   CPBL  TheSportsDB's day lists (CPBL's own site turns addresses outside Taiwan away)
+//   TPBL  its own site's API (`watch`: a game's YouTube live)
 //
 // Served by the sports proxy as if from `https://asia-baseball.orbit/<league>/<YYYY-MM>.json`,
 // so the apps read it through proxyJson like any other list:
@@ -108,7 +109,50 @@ async function cpbl(year, month, now = Date.now()) {
   if (month === 12 || month <= 2) return { games: [], read: [], whole: 1 };
   return fetchCpblTsdb(year, month, { now });
 }
-const FETCHERS = { cpbl };
+// ---- TPBL (Taiwan's basketball league): its own site's API, the season's
+// games at once (with each game's YouTube live when it's set). -----------------
+export const TPBL_API = 'https://api.tpbl.basketball/api';
+export const TPBL_CLUBS = { aquas: ['Kaohsiung Aquas', '高雄全家海神', '海神'], dea: ['New Taipei CTBC DEA', '新北中信特攻', '特攻'], dreamers: ['Formosa Dreamers', '福爾摩沙夢想家', '夢想家'], kings: ['New Taipei Kings', '新北國王', '國王'], leopards: ['Taoyuan Taiwan Beer Leopards', '桃園台啤永豐雲豹', '雲豹'], lioneers: ['Hsinchu Toplus Lioneers', '新竹御嵿攻城獅', '攻城獅'], mars: ['Taipei Taishin Mars', '臺北台新戰神', '戰神'] };
+// A game of its list in the shape above (`watch`: its YouTube live; `logo` each side's).
+export function tpblGame(g) {
+  const side = (t, score) => {
+    const slug = t?.meta?.alt_name || '';
+    const [en, zh, short] = TPBL_CLUBS[slug] || [t?.name || slug, t?.name || slug, t?.name || slug];
+    return { side: { en, zh, short, ...(t?.meta?.logo ? { logo: t.meta.logo } : {}) }, score };
+  };
+  const live = g.is_live || /LIVE|IN_PROGRESS|PLAYING/.test(g.status || '');
+  const state = /CANCEL|POSTPON|VOID/.test(g.status || '') ? 'void' : g.status === 'COMPLETED' ? 'post' : live ? 'in' : 'pre';
+  const h = side(g.home_team);
+  const a = side(g.away_team);
+  // (Its time is Taipei's.)
+  const start = new Date(Date.parse(`${g.game_date}T${g.game_time || '00:00:00'}+08:00`)).toISOString();
+  const scored = state === 'post' || state === 'in';
+  return {
+    id: `tpbl-${g.id}`,
+    start,
+    home: h.side,
+    away: a.side,
+    homeScore: scored ? (g.home_team?.won_score ?? null) : null,
+    awayScore: scored ? (g.away_team?.won_score ?? null) : null,
+    state,
+    venue: g.venue || '',
+    ...(g.meta?.live_stream_url ? { watch: g.meta.live_stream_url } : {})
+  };
+}
+async function tpbl(year, month) {
+  const seasons = await (await fetch(`${TPBL_API}/seasons`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(TIMEOUT), cf: { cacheTtl: 6 * 3600 } })).json();
+  const first = Date.UTC(year, month - 1, 1);
+  const last = Date.UTC(year, month, 1);
+  const on = (seasons || []).filter(x => Date.parse(`${x.started_at.slice(0, 10)}T00:00:00Z`) - 31 * 86_400_000 < last && Date.parse(`${x.ended_at.slice(0, 10)}T00:00:00Z`) + 31 * 86_400_000 >= first);
+  const games = [];
+  for (const x of on) {
+    const r = await fetch(`${TPBL_API}/seasons/${x.id}/games`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(TIMEOUT), cf: { cacheTtl: 120 } });
+    if (!r.ok) throw new Error(`tpbl ${r.status}`);
+    for (const g of await r.json()) if (g.game_date?.startsWith(`${year}-${String(month).padStart(2, '0')}`)) games.push(tpblGame(g));
+  }
+  return { games, whole: 1 };
+}
+const FETCHERS = { cpbl, tpbl };
 
 // ---- A CPBL game's box score (the league's own: its box page's getlive) -----------
 //
@@ -234,7 +278,7 @@ export async function cpblDay(day, via = relay) {
 
 // `/<league>/<YYYY-MM>.json` -> { league, month } or null.
 export function asiaTarget(url) {
-  const m = /^\/(cpbl)\/(\d{4})-(\d{2})\.json$/.exec(url.pathname);
+  const m = /^\/(cpbl|tpbl)\/(\d{4})-(\d{2})\.json$/.exec(url.pathname);
   if (!m) return null;
   const month = Number(m[3]);
   return month >= 1 && month <= 12 ? { league: m[1], year: Number(m[2]), month } : null;

@@ -195,7 +195,7 @@ export async function runSports({ store, get = fetch, now = Date.now(), sleep = 
     if (copy?.data?.games) return copy.data.games;
     return (await (await asiaBaseballResponse(new URL(url))).json().catch(() => null))?.games || [];
   };
-  // (Only the leagues Orbit Sports shows: LaLiga is in the catalogue for its players' photos alone.)
+  // (Only the leagues Orbit Sports shows: kit BROADCAST, those on no TV here too.)
   const leagues = Object.entries(CATALOG).filter(([key, l]) => BROADCAST[key] && l.data === 'espn' && l.espn && (!only.length || only.includes(key)));
   const built = new Date(now).toISOString();
   const old = (await store.json('sports/index.json')) || { leagues: {} };

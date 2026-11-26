@@ -305,7 +305,8 @@ export async function runWatch({ store, proxy, get = fetch, now = Date.now(), un
     return eps.length ? eps : (await proxy(eltaVodUrl(vod)).catch(() => null))?.episodes || [];
   };
   const read = url => proxy(url);
-  const leagues = Object.keys(BROADCAST).filter(k => CATALOG[k]);
+  // (ELTA's and Apple TV's: a league on YouTube only, or on no TV here, has no replays kept.)
+  const leagues = Object.keys(BROADCAST).filter(k => CATALOG[k] && BROADCAST[k].some(b => b.svc === 'elta' || b.svc === 'appletv'));
   const has = x => typeof x?.elta === 'object';
   const old = (await store.json('sports/watch.json'))?.games || {};
   const pending = await store.json(`${ARCHIVE}/_pending.json`);

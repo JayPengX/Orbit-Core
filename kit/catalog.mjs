@@ -16,6 +16,7 @@ export const SPORTS = {
   soccer: { zh: '足球', en: 'Soccer', icon: '⚽' },
   baseball: { zh: '棒球', en: 'Baseball', icon: '⚾' },
   basketball: { zh: '籃球', en: 'Basketball', icon: '🏀' },
+  football: { zh: '美式足球', en: 'Football', icon: '🏈' },
   racing: { zh: '賽車', en: 'Racing', icon: '🏎️' }
 };
 
@@ -29,9 +30,13 @@ export const CATALOG = {
   cpbl: { sport: 'baseball', kind: 'match', data: 'asia', asia: 'cpbl', kambi: 'baseball/taiwan/chinese_professional_baseball', zh: '中華職棒', en: 'CPBL', bet: 'cpbl', top: true, icon: '⚾', badge: 'c3vetj1655924198' },
   // Basketball
   nba: espn('basketball', 'basketball/nba', 'NBA', 'NBA', 'nba', { top: true, kambi: 'basketball/nba' }),
+  // Taiwan's league: its own site's (asia-baseball.js tpbl), every game live on YouTube.
+  tpbl: { sport: 'basketball', kind: 'match', data: 'asia', asia: 'tpbl', zh: 'TPBL 台灣職業籃球大聯盟', en: 'TPBL', bet: 'tpbl', icon: '🏀' },
+  // Football
+  nfl: espn('football', 'football/nfl', 'NFL', 'NFL', 'nfl', {}),
   // Soccer
   epl: soccer('eng.1', '英超', 'Premier League', 'epl', { top: true, logo: 23, kambi: 'football/england/premier_league' }),
-  // Not shown (not on ELTA): its clubs' players' photos (the cups', builders/photos.js).
+  // (No TV here: shown since 11-26, in 賽事's 更多聯賽 unless followed.)
   laliga: soccer('esp.1', '西甲', 'LaLiga', 'laliga', { logo: 15 }),
   seriea: soccer('ita.1', '義甲', 'Serie A', 'seriea', { logo: 12, kambi: 'football/italy/serie_a' }),
   bundesliga: soccer('ger.1', '德甲', 'Bundesliga', 'bundesliga', { logo: 10, kambi: 'football/germany/bundesliga' }),
