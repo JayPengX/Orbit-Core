@@ -67,7 +67,7 @@ export const SOURCES = [
   { id: 'tra-site', zh: '臺鐵網站', group: 'transit', apps: ['transit'], feeds: '路線運行狀態、一班車的誤點、票價', hosts: ['www.railway.gov.tw'], where: ['worker'] },
   { id: 'thsr-site', zh: '高鐵網站', group: 'transit', apps: ['transit'], feeds: '票價、列車運行狀況', hosts: ['www.thsrc.com.tw'], where: ['worker'] },
   { id: 'youbike', zh: 'YouBike', group: 'transit', apps: ['transit'], feeds: '站點的車與空位', hosts: ['apis.youbike.com.tw'], where: ['phone', 'worker'], backup: ['worker', 'cron'] },
-  { id: 'bus-build', zh: '公車與鐵路時刻（每週）', group: 'transit', apps: ['transit'], feeds: '路線、站牌、時刻表、高鐵 4 週、捷運', hosts: [], where: ['github'], fresh: { r2: 'where.json', every: 8 * DAY } },
+  { id: 'bus-build', zh: '公車與鐵路時刻（每週）', group: 'transit', apps: ['transit'], feeds: '路線、站牌、時刻表、高鐵 4 週、捷運', hosts: [], where: ['github'], fresh: { r2: 'index.json', every: 8 * DAY } },
   { id: 'osm', zh: 'OpenStreetMap', group: 'transit', apps: ['transit'], feeds: '地點搜尋的備援、走路路線', hosts: ['nominatim.openstreetmap.org', 'routing.openstreetmap.de'], where: ['worker', 'phone'] },
 
   // ---- 天氣 ----

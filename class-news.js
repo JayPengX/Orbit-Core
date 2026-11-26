@@ -446,7 +446,8 @@ export async function handleClassNews(request, env, ctx, headers, session, { cap
   if (may && out.at > Date.now() - 60_000) await addOne(env, who, day);
   const body = { site: out.site, at: out.at, how: out.how, stale: !!out.stale, unread: !!out.unread, wording: !!out.wording, items: (out.items || []).map(({ desc, ...it }) => it) };
   // (Kept at the edge only when it's whole: while the AI words it, the phone asks again.)
-  if (body.items.length && !body.wording && !unworded(body)) ctx?.waitUntil?.(edge()?.put(ck, new Response(JSON.stringify(body), { headers: { 'Cache-Control': `max-age=${NEWS.edgeS}` } })).catch(() => {}));
+  // (Nor an old copy answered while the school is read again behind it: the phone asks again in seconds for the new one, Jay 11-26.)
+  if (body.items.length && !body.wording && !body.stale && !unworded(body)) ctx?.waitUntil?.(edge()?.put(ck, new Response(JSON.stringify(body), { headers: { 'Cache-Control': `max-age=${NEWS.edgeS}` } })).catch(() => {}));
   return json(body, 200, headers);
 }
 

@@ -89,3 +89,12 @@ test('the report: secrets and bindings set or not (never a value), R2 by folder,
   const r2 = await systemReport(env, { now: () => 5, fsGet: async () => ({ exists: false }), count: async () => ({}) });
   assert.deepEqual(r2.github, { tokenEnds: Date.parse('2027-03-01T12:00:00Z'), at: 4, bad: null });
 });
+
+// Jay 11-26: 公車與鐵路時刻（每週）壞了, 16 days: the weekly build ran, but where.json, unchanged, isn't written
+// again (only changed files are). Its age is read off index.json, the one file each run writes.
+test("the weekly bus build's age is read off a file every run writes", async () => {
+  const { SOURCES } = await import('../kit/sources.mjs');
+  const { readFileSync } = await import('node:fs');
+  assert.equal(SOURCES.find(s => s.id === 'bus-build').fresh.r2, 'index.json');
+  assert.match(readFileSync(new URL('../tools/gtfs-buses.mjs', import.meta.url), 'utf8'), /if \(path === 'index\.json' \|\| !was/);
+});
