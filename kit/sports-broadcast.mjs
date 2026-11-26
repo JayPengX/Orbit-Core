@@ -24,8 +24,8 @@ const APPLE = { zh: 'Apple TV', en: 'Apple TV', short: { zh: 'Apple TV', en: 'Ap
 // YouTube: Taiwan's own leagues stream every game there (a game's own live
 // once its league lists it, else its channel's search: sheets' 觀看).
 const YOUTUBE = { zh: 'YouTube', en: 'YouTube', short: { zh: 'YouTube', en: 'YouTube' }, svc: 'youtube', exact: true };
-// A league with no TV here (Jay 11-26: shown all the same, no other
-// streaming service yet): `[]`, kept out of the way in 賽事 (NO_TV).
+// A league with no TV here (Jay 11-26: shown all the same, as any other
+// league, no other streaming service yet): `[]` (NO_TV: no channel said).
 export const BROADCAST = {
   mlb: [ELTA],
   // The home games of four clubs (台鋼, 富邦, 統一, 味全: ELTA's 2026 rights); which ones, its schedule says.
@@ -52,7 +52,7 @@ export const BROADCAST = {
   laliga: [],
   nfl: []
 };
-// The leagues on no TV here: shown, never in the way of the ones that are.
+// The leagues on no TV here (shown and placed as any other; only no channel).
 export const NO_TV = new Set(Object.keys(BROADCAST).filter(k => !BROADCAST[k].length));
 
 export const broadcastsOf = league => BROADCAST[league] || [];

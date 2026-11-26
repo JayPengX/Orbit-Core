@@ -36,7 +36,7 @@ export const CATALOG = {
   nfl: espn('football', 'football/nfl', 'NFL', 'NFL', 'nfl', {}),
   // Soccer
   epl: soccer('eng.1', '英超', 'Premier League', 'epl', { top: true, logo: 23, kambi: 'football/england/premier_league' }),
-  // (No TV here: shown since 11-26, in 賽事's 更多聯賽 unless followed.)
+  // (No TV here: shown since 11-26, as any other league.)
   laliga: soccer('esp.1', '西甲', 'LaLiga', 'laliga', { logo: 15 }),
   seriea: soccer('ita.1', '義甲', 'Serie A', 'seriea', { logo: 12, kambi: 'football/italy/serie_a' }),
   bundesliga: soccer('ger.1', '德甲', 'Bundesliga', 'bundesliga', { logo: 10, kambi: 'football/germany/bundesliga' }),

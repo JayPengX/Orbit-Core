@@ -132,14 +132,14 @@ export function formerLogo(league, name) {
 
 // ESPN's soccer league logo ids.
 const SOCCER_LOGO = {
-  epl: 23, seriea: 12, bundesliga: 10, ligue1: 9, ucl: 2, uel: 2310, uecl: 20296,
+  epl: 23, laliga: 15, seriea: 12, bundesliga: 10, ligue1: 9, ucl: 2, uel: 2310, uecl: 20296,
   scotland: 45, mls: 19, facup: 40, nationsleague: 2395
 };
 // TheSportsDB's league badges.
 const LEAGUE_BADGE = { cpbl: 'c3vetj1655924198' };
 // ESPN's other league logos.
 const ESPN_LEAGUE = {
-  mlb: 'teamlogos/leagues/500/mlb.png', nba: 'teamlogos/leagues/500/nba.png', f1: 'teamlogos/leagues/500/f1.png'
+  mlb: 'teamlogos/leagues/500/mlb.png', nba: 'teamlogos/leagues/500/nba.png', nfl: 'teamlogos/leagues/500/nfl.png', f1: 'teamlogos/leagues/500/f1.png'
 };
 // ESPN's resizer at 192 px, sharp to 64 px on a 3x screen, for a third of
 // the 500 px original's bytes (the NBA's: 19 KB to 7 KB), so a first

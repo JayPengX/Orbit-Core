@@ -26,7 +26,7 @@ import { teamNameZh } from '#kit/names.mjs';
 // ---- The leagues (Orbit Sports' lib/leagues.mjs) -----------------------------------
 // Every league of the catalogue that's on ELTA.tv or Apple TV in Taiwan, soccer
 // in the order a Taiwan viewer would watch it (the owner's calls, 2026-10-15).
-const SOCCER_WATCH = ['epl', 'bundesliga', 'seriea', 'ligue1', 'mls', 'ucl', 'uel', 'uecl', 'facup', 'scotland', 'nationsleague'];
+const SOCCER_WATCH = ['epl', 'laliga', 'bundesliga', 'seriea', 'ligue1', 'mls', 'ucl', 'uel', 'uecl', 'facup', 'scotland', 'nationsleague'];
 const watchRank = k => (SOCCER_WATCH.includes(k) ? SOCCER_WATCH.indexOf(k) : SOCCER_WATCH.length);
 const inOrder = entries => {
   const soccer = entries.filter(([, l]) => l.sport === 'soccer').sort(([a], [b]) => watchRank(a) - watchRank(b));
