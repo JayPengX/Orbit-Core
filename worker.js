@@ -33,7 +33,7 @@
 
 // (First: the outside calls counted, sources.js, before anything keeps a fetch of its own.)
 import { watchRelay, flushSources, asSourceCall, pruneSources, takeBeacon, readSources } from './sources.js';
-import { takeUsage, flushUsage, pruneUsage } from './usage.js';
+import { takeUsage, flushUsage, pruneUsage, topErrors } from './usage.js';
 import { pruneReports } from './rec-weekly.js';
 import { privacyMail } from './privacy-mail.js';
 import { SOURCES, freshAt, sourceState } from './kit/sources.mjs';
@@ -1784,6 +1784,7 @@ async function route(request, env, ctx, headers, origin) {
     }
     // The admin panel's 容量 (capacity.js): people (counts only), every quota
     // and how many people it holds.
+    if (check === 'use-errors') return json(await topErrors(env, { days: Number(new URL(request.url).searchParams.get('days')) || 7 }), 200, headers);
     if (check === 'capacity') return json(await ADMIN_TOOLS.capacity({ env, deps: ECO_DEPS }), 200, headers);
     // R2's folders counted now, as the 6-hourly job does (build.yml `folders`): its heartbeat kept too.
     if (check === 'folders') return json(await beat(env, 'data-folders', () => countFolders(env)), 200, headers);

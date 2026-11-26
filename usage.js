@@ -120,3 +120,12 @@ export function _reset() {
   lastFlush = 0;
   flushing = null;
 }
+
+// The errors phones counted (their signatures: no address, nothing typed) in the last `days`, most first,
+// for the ops check `use-errors` and the panel's 使用 (each app's commonest).
+export async function topErrors(env, { days = 7, now = Date.now(), limit = 60 } = {}) {
+  if (!env.STORE) return [];
+  const from = twDayOf(now - (days - 1) * DAY);
+  const { results } = await env.STORE.prepare("SELECT app, key, SUM(n) AS n, MAX(day) AS last FROM usage WHERE kind = 'err' AND day >= ?1 GROUP BY app, key ORDER BY n DESC LIMIT ?2").bind(from, limit).all();
+  return results || [];
+}
