@@ -562,3 +562,17 @@ test("a final sent at the first run after the whistle isn't late, however long p
   }
   assert.deepEqual(await pushLate(env, { since: now - 3_600_000 }), []);
 });
+
+// Jay 11-26: a followed team's notices went at any hour; now they wait out the person's quiet hours unless let through.
+test("a notice due in the person's quiet hours waits till they end", async () => {
+  const { cleanItems, inQuiet, quietEnds } = await import('../push.js');
+  const q = { from: 0, to: 7, tz: 480 };
+  const at3 = Date.parse('2026-11-27T03:00:00+08:00');
+  assert.equal(inQuiet(q, at3), true);
+  assert.equal(inQuiet(q, Date.parse('2026-11-27T08:00:00+08:00')), false);
+  assert.equal(quietEnds(q, at3), Date.parse('2026-11-27T07:00:00+08:00'));
+  assert.equal(inQuiet({ from: 23, to: 6, tz: 480 }, Date.parse('2026-11-27T23:30:00+08:00')), true);
+  const [item] = cleanItems([{ at: at3 + 60_000, title: 'x', quiet: { from: 0, to: 7, tz: 480 } }], at3);
+  assert.deepEqual(item.quiet, q);
+  assert.equal(cleanItems([{ at: at3 + 60_000, title: 'x', quiet: { from: 0, to: 99, tz: 480 } }], at3)[0].quiet, undefined);
+});

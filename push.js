@@ -194,6 +194,10 @@ export function cleanItems(items, now = Date.now()) {
       const item = { at: Math.round(x.at), title: cleanText(x.title, 120), body: cleanText(x.body, 240), tag: cleanText(x.tag, 80), url: okUrl(x.url) };
       if (typeof x.kind === 'string' && /^[a-z]{1,16}$/.test(x.kind)) item.kind = x.kind;
       if (Number.isFinite(x.until) && x.until > x.at && x.until < now + 40 * 86_400_000) item.until = Math.round(x.until);
+      // The person's quiet hours (by their clock, `tz` minutes east of UTC): a notice due in them waits till they end.
+      const q = x.quiet;
+      const hour = n => Number.isInteger(n) && n >= 0 && n < 24;
+      if (q && hour(q.from) && hour(q.to) && q.from !== q.to && Number.isInteger(q.tz) && Math.abs(q.tz) <= 14 * 60) item.quiet = { from: q.from, to: q.to, tz: q.tz };
       const c = x.check;
       if (c?.espn && /^[a-z-]+\/[a-z0-9.-]+$/.test(c.espn) && /^\d+$/.test(String(c.event))) {
         item.check = { espn: c.espn, event: String(c.event) };
@@ -221,6 +225,20 @@ export function cleanItems(items, now = Date.now()) {
     })
     .filter(x => x.title || x.check)
     .sort((a, b) => a.at - b.at);
+}
+
+// Quiet hours (Sports' 安靜時段, Jay 11-26: a followed team's final at 03:00 waits for the morning
+// unless they let follows through): whether `now` is in them, and when they end.
+export function inQuiet(q, now = Date.now()) {
+  if (!q) return false;
+  const h = new Date(now + q.tz * 60_000).getUTCHours();
+  return q.from < q.to ? h >= q.from && h < q.to : h >= q.from || h < q.to;
+}
+export function quietEnds(q, now = Date.now()) {
+  const local = new Date(now + q.tz * 60_000);
+  let end = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), q.to) - q.tz * 60_000;
+  if (end <= now) end += 86_400_000;
+  return end;
 }
 
 // A notice of news that happens once: told once (by its tag), for 2 days.
@@ -714,6 +732,11 @@ export async function sendDue(env, now = Date.now()) {
       if (!wanted(prefs, app, item)) continue;
       if (item.at > now + 60_000 || gone) {
         keep.push(item);
+        continue;
+      }
+      // In the person's quiet hours: held, and its time to lapse moved past them (a final found at 03:00 told at 07:00).
+      if (inQuiet(item.quiet, now)) {
+        keep.push(item.until ? { ...item, until: Math.max(item.until, quietEnds(item.quiet, now) + 3_600_000) } : item);
         continue;
       }
       let message = { title: item.title, body: item.body, tag: item.tag, url: item.url };
