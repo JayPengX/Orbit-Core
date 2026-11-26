@@ -211,9 +211,22 @@ export const withLogo = (league, side, lang = 'zh') => {
 };
 
 // A playoff series: its summary ("LAL lead series 2-1") and each side's wins.
-export function parseSeries(s) {
-  if (!s || s.type !== 'playoff') return null;
-  return { summary: s.summary || '', completed: Boolean(s.completed), games: s.totalCompetitions || 0, wins: Object.fromEntries((s.competitors || []).map(c => [String(c.id), c.wins ?? 0])) };
+// MLS's series (its first round, best of 3) come without a type, wins or
+// summary: their length, and how they stand from the game's note ("NE leads
+// series 1-0", "Series tied 1-1"), its sides by abbreviation (`comp`'s). Without
+// it an MLS playoff game read as a regular-season one (Jay 11-26).
+export function parseSeries(s, comp = null) {
+  if (!s) return null;
+  if (s.type === 'playoff') return { summary: s.summary || '', completed: Boolean(s.completed), games: s.totalCompetitions || 0, wins: Object.fromEntries((s.competitors || []).map(c => [String(c.id), c.wins ?? 0])) };
+  if (s.type || !/series/i.test(s.title || '') || !(s.totalCompetitions > 1)) return null;
+  const ids = (s.competitors || []).map(c => String(c.id));
+  const note = String(comp?.notes?.[0]?.headline || '').trim();
+  const lead = /^(\S+) (leads|wins) series (\d+)-(\d+)$/i.exec(note);
+  const tied = /^series tied (\d+)-\1$/i.exec(note);
+  const leader = lead && String(comp?.competitors?.find(c => String(c.team?.abbreviation || '').toUpperCase() === lead[1].toUpperCase())?.id ?? '');
+  const wins = Object.fromEntries(ids.map(id => [id, lead && leader ? Number(id === leader ? lead[3] : lead[4]) : tied ? Number(tied[1]) : 0]));
+  const won = Boolean(s.completed) || Boolean(lead && leader && /wins/i.test(lead[2]));
+  return { summary: (lead && leader) || tied ? note : '', completed: won, games: s.totalCompetitions, wins };
 }
 
 // A playoff or knockout game's round, for the bracket: `key` the round
@@ -441,7 +454,7 @@ export function parseScoreboard(data, league, { lang = null } = {}) {
       venue: comp?.venue?.fullName || e.venue?.fullName || e.circuit?.fullName || '',
       tv: [...new Set((comp?.broadcasts || []).flatMap(b => b.names || []))].join(' · '),
       note: comp?.notes?.[0]?.headline || '',
-      series: parseSeries(comp?.series),
+      series: parseSeries(comp?.series, comp),
       round: knockoutRound(e, comp, league),
       stage: stageFrom({ seasonType: e.season?.type, seasonSlug: e.season?.slug, typeAbbr: comp?.type?.abbreviation, note: comp?.notes?.[0]?.headline || '', name: e.name, cup: LEAGUES[league]?.cup })
     };

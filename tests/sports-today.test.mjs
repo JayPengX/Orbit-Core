@@ -226,3 +226,14 @@ test('the leagues the first screen shows: every league of the app with an ESPN s
   assert.deepEqual(TODAY_LEAGUES(), Object.keys(LEAGUES).filter(k => LEAGUES[k].espn));
   assert.ok(TODAY_LEAGUES().length <= 24, "the app's first screen reads at most 24 of the others (pickLeagues, then otherLeagues().slice(0, 24))");
 });
+
+// MLS's best-of-3 comes with no type, wins or summary: read from the note, else its playoff game showed as a regular-season one (Jay 11-26).
+test("an MLS playoff series is read from the game's note", async () => {
+  const { parseScoreboard } = await import('../kit/sports-espn.mjs');
+  const side = (id, abbreviation, homeAway) => ({ id, homeAway, score: '2', team: { id, abbreviation, displayName: abbreviation } });
+  const ev = (headline, completed = false) => ({ id: '1', date: '2026-11-21T19:00Z', season: { year: 2026, type: 13842, slug: 'eastern-conference-playoffs---round-one' }, competitions: [{ status: { type: { state: 'post', completed: true } }, notes: [{ headline }], series: { competitors: [{ id: '189' }, { id: '10739' }], completed, title: 'Playoff Series', totalCompetitions: 3 }, competitors: [side('189', 'NE', 'home'), side('10739', 'PHI', 'away')] }] });
+  const [g1] = parseScoreboard({ events: [ev('NE leads series 1-0')] }, 'mls');
+  assert.deepEqual(g1.series, { summary: 'NE leads series 1-0', completed: false, games: 3, wins: { 189: 1, 10739: 0 } });
+  assert.deepEqual(parseScoreboard({ events: [ev('Series tied 1-1')] }, 'mls')[0].series.wins, { 189: 1, 10739: 1 });
+  assert.equal(parseScoreboard({ events: [ev('PHI wins series 2-1')] }, 'mls')[0].series.completed, true);
+});
