@@ -146,3 +146,9 @@ test('the Pass sheet adds an app to an Orbit of several, never to one of a singl
   assert.equal(canAddHere({ apps: ['class'] }, true), false);
   assert.equal(canAddHere({ apps: ['class', 'news'] }, false), false, 'a separate app’s window: every app opens anyway');
 });
+
+// Jay 11-26: on a Pixel, 設定新的 Orbit from an Orbit opened inside that Orbit's own window, the apps at once, no install.
+test("Android's new Orbit opens in Chrome itself, its setup kept", async () => {
+  const { chromeIntent } = await import('../kit/suite.mjs');
+  assert.equal(chromeIntent('https://orbit.jaypengx.com', '/app/?setup=1'), 'intent://orbit.jaypengx.com/app/?setup=1#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=https%3A%2F%2Forbit.jaypengx.com%2Fapp%2F%3Fsetup%3D1;end');
+});

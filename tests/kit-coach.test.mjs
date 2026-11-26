@@ -21,3 +21,23 @@ test('each guide: both languages, a selector or a line, an app with Help, nothin
     assert.ok(!steps[0].tap, `${app}: opens on a line, before any tap`);
   }
 });
+
+// Jay 11-26: the guide's offer came back each opening until answered; it's shown once a Pass.
+test("the guide's offer is kept as offered the moment it's shown", async () => {
+  const { guideOffer } = await import('../kit/coach.mjs');
+  const had = { document: globalThis.document };
+  globalThis.document = { querySelector: () => null, visibilityState: 'visible', createElement: () => ({ setAttribute() {}, append() {}, classList: { add() {} }, style: {} }) };
+  try {
+    const writes = [];
+    const app = Object.keys(GUIDES)[0];
+    const s = { app, wallet: { settings: {} }, lang: 'zh', write: async x => (writes.push(x), true) };
+    assert.equal(guideOffer(s, () => true), true);
+    const kept = writes.map(w => Object.values(w.wallet.settings)[0]?.value);
+    assert.deepEqual(kept, ['offered']);
+    // (Kept: never offered again.)
+    s.wallet.settings = writes[0].wallet.settings;
+    assert.equal(guideOffer(s, () => true), false);
+  } finally {
+    globalThis.document = had.document;
+  }
+});

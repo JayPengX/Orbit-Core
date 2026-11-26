@@ -513,14 +513,18 @@ function soloCard(id) {
 }
 // The way to the apps this Orbit doesn't hold: another Orbit, set up in Safari
 // (the one-app switcher's, and the Pass sheet's under its apps, Jay 11-24).
+// (Android: in Chrome itself, by an intent. Opened from an Orbit there, /app/ is that Orbit's own window, where
+// nothing can be added: a Pixel's new Orbit opened as the apps in the browser, no install, Jay 11-26.)
+export const chromeIntent = (origin, path) => `intent://${new URL(origin).host}${path}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(origin + path)};end`;
 export function newOrbitCard() {
   const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const page = `${location.origin}/app/#setup`;
+  const android = /Android/i.test(navigator.userAgent);
+  const page = android ? chromeIntent(location.origin, '/app/?setup=1') : `${location.origin}/app/#setup`;
   return el('div', { class: 'q-sw-solo-more' }, [
       el('strong', { text: W('想用其他 App？', 'Want other apps?') }),
-      el('p', { text: W('在 Safari 打開 Orbit，選好 App，再加入主畫面。主畫面可以放好幾個 Orbit，這個照樣留著。', 'Open Orbit in Safari, pick the apps and add it to your home screen. A home screen holds several Orbits; this one stays.') }),
+      el('p', { text: android ? W('在 Chrome 打開 Orbit，選好 App，再安裝到主畫面。主畫面可以放好幾個 Orbit，這個照樣留著。', 'Open Orbit in Chrome, pick the apps and install it to your home screen. A home screen holds several Orbits; this one stays.') : W('在 Safari 打開 Orbit，選好 App，再加入主畫面。主畫面可以放好幾個 Orbit，這個照樣留著。', 'Open Orbit in Safari, pick the apps and add it to your home screen. A home screen holds several Orbits; this one stays.') }),
       // (Safari's address from Orbit's own window: from the app's frame, where this sheet is, iOS did nothing, Jay 11-15.)
-      el('a', { class: 'q-btn block', href: ios ? `x-safari-${page}` : page, target: ios ? null : '_blank', rel: 'noopener', 'data-q-quick': '', text: W(ios ? '在 Safari 設定新的 Orbit' : '設定新的 Orbit', ios ? 'Set up a new Orbit in Safari' : 'Set up a new Orbit'), onclick: ios ? e => (e.preventDefault(), (topWin().location.href = `x-safari-${page}`)) : null })
+      el('a', { class: 'q-btn block', href: ios ? `x-safari-${page}` : page, target: ios || android ? null : '_blank', rel: 'noopener', 'data-q-quick': '', text: W(ios ? '在 Safari 設定新的 Orbit' : android ? '在 Chrome 設定新的 Orbit' : '設定新的 Orbit', ios ? 'Set up a new Orbit in Safari' : android ? 'Set up a new Orbit in Chrome' : 'Set up a new Orbit'), onclick: ios ? e => (e.preventDefault(), (topWin().location.href = `x-safari-${page}`)) : android ? e => (e.preventDefault(), (topWin().location.href = page)) : null })
   ]);
 }
 async function switcher() {

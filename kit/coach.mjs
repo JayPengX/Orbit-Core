@@ -9,8 +9,8 @@
 // whose target goes away (redrawn: found again; its sheet closed: moved on;
 // else 下一步 shows) is never stuck. Started from the Pass sheet's 說明 (帶我走一遍), or once from a quiet
 // offer the first time an account opens the app (guideOffer, orbit.mjs boot);
-// 'done' or 'no' is kept on the account (settings guide_<app>), so a new phone
-// doesn't offer it again.
+// 'offered' (the moment it's shown), 'done' or 'no' is kept on the account (settings guide_<app>),
+// so it's offered once a Pass, on any phone.
 //
 // GUIDES[app] = [{ tap | show (a selector), say: [zh, en], wait (ms after the tap), optional }, …]
 // A step with neither is a line with 下一步 (the opening one).
@@ -458,5 +458,8 @@ export function guideOffer(s, quietTip, tries = 5) {
     onGo: () => startGuide(s, app),
     onNever: () => keep(s, app, 'no')
   });
+  // (Shown once a Pass: kept as offered the moment it's up, so a banner let go by or closed isn't back
+  // each opening (Jay 11-26: "only show once of that pass"). 帶我走一遍 in the Pass sheet's 說明 still starts it.)
+  if (shown) keep(s, app, 'offered');
   return shown ? true : later();
 }
