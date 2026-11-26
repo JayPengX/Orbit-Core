@@ -1927,6 +1927,17 @@ async function statusSample(env, name, dependencies) {
   const hit = !deps.fresh && deps.cache && (await deps.cache.match(key).catch(() => null));
   if (hit) return { ...(await hit.json()), cached: true };
   let out;
+  // 臺鐵's booking links (TDX maas-tra, approved 11-26): its paths asked bare, so TDX says what each needs.
+  if (name === 'tra-book') {
+    const token = await tdxAccess(env, deps.fetchFn, deps.now);
+    if (!token) return { name, status: 503, body: 'no TDX key' };
+    const paths = ['maas-tra/booking/deeplink/direct/tra', 'maas-tra/booking/deeplink/web/tra', 'maas-tra/booking/deeplink/url/tra', 'maas-tra/booking/deeplink/direct/tra?' + (deps.transit || '')];
+    const got = await Promise.all(paths.map(async p => {
+      const r = await fetchOf(deps)(TDX_BASE + p, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, signal: timeout(8000) }).catch(e => ({ status: 0, text: async () => String(e) }));
+      return { p, status: r.status, body: cut(await r.text()).slice(0, 800) };
+    }));
+    return { name, got };
+  }
   if (name === 'maas' || name === 'maas-local') {
     const token = await tdxAccess(env, deps.fetchFn, deps.now);
     if (!token) return { name, status: 503, body: 'no TDX key' };
