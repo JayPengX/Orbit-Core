@@ -1989,13 +1989,24 @@ const scrubKey = (text, env) => [env.GOOGLE_MAPS_KEY, env.GOOGLE_WEATHER_KEY, en
 // address, not one a redirect reaches. TDX's maas-thsr (0 points, never metered;
 // approved for our key 2026-11-10). Each link lasts minutes: asked on a tap,
 // never kept. Orbit sells nothing: the person books and pays there.
-// (臺鐵's, maas-tra, once TDX approves it.)
 const HSR_NAMES = ['南港', '台北', '板橋', '桃園', '新竹', '苗栗', '台中', '彰化', '雲林', '嘉義', '台南', '左營'];
 export const hsrName = s => {
   const n = String(s || '').replace(/臺/g, '台').replace(/^高鐵/, '').replace(/(高鐵)?站$/, '').trim();
   return HSR_NAMES.includes(n) ? n : null;
 };
+// 臺鐵's (maas-tra, approved 11-26): its stations by their Chinese names, the date, the train's number
+// (direct: its 台鐵e訂通 app; web: its site), the same answer as 高鐵's.
+export const traName = s => {
+  const n = String(s || '').replace(/^(臺鐵|台鐵)/, '').replace(/(火?車站|站)$/, '').replace(/台/g, '臺').trim();
+  return /^[\u4E00-\u9FFF]{1,8}$/.test(n) ? n : null;
+};
 export function bookPath(q) {
+  if (q.get('sys') === 'tra') {
+    const [from, to] = [traName(q.get('from')), traName(q.get('to'))];
+    const [date, no] = ['date', 'no'].map(k => String(q.get(k) || ''));
+    if (!from || !to || from === to || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{1,4}$/.test(no)) return null;
+    return `maas-tra/booking/deeplink/${q.get('app') === '1' ? 'direct' : 'web'}/tra?${new URLSearchParams({ train_date: date, start_station: from, end_station: to, train_number: String(Number(no)) })}`;
+  }
   if ((q.get('sys') || 'hsr') !== 'hsr') return null;
   const [from, to] = [hsrName(q.get('from')), hsrName(q.get('to'))];
   const [date, time, no] = ['date', 'time', 'no'].map(k => String(q.get(k) || ''));

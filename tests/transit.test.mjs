@@ -1279,7 +1279,7 @@ test('高鐵 booking: a link into 高鐵’s own booking, the trip filled in, as
   assert.match(asked[0], /ticket_type=S&carriage_type=Y&adult_ticket=1/, 'one adult, one way, standard');
   await ask('sys=hsr&from=高鐵新竹站&to=左營&date=2026-11-10&time=13:10&no=123&app=1');
   assert.match(asked[1], /deeplink\/direct\/hsr\?start_station=新竹&end_station=左營&train_date=2026-11-10&train_time=13:10&train_number=123$/);
-  for (const bad of ['sys=tra&from=新竹&to=台北&date=2026-11-10&no=123', 'from=新竹&to=新竹&date=2026-11-10&no=123', 'from=竹北&to=台北&date=2026-11-10&no=123', 'from=新竹&to=台北&date=11/10&no=123', 'from=新竹&to=台北&date=2026-11-10&no=12345'])
+  for (const bad of ['sys=bus&from=新竹&to=台北&date=2026-11-10&no=123', 'from=新竹&to=新竹&date=2026-11-10&no=123', 'from=竹北&to=台北&date=2026-11-10&no=123', 'from=新竹&to=台北&date=11/10&no=123', 'from=新竹&to=台北&date=2026-11-10&no=12345'])
     assert.equal((await ask(bad)).status, 400, bad);
   assert.equal(asked.length, 2, 'never asked for those');
   assert.equal(hsrName('臺中'), '台中');
@@ -1437,4 +1437,15 @@ test('place search, 竹北高中 (Jay 2026-11-20): the school by its new name (�
   assert.equal(nearFirst([{ id: 'j', name: '新竹市立光華國民中學', dist: 900, types: hsnu }, { id: 'x', name: '光華國中前公車站', dist: 800, types: ['bus_stop'] }], [], '光華國中')[0].id, 'j');
   // No place points at the words: nothing renamed (新竹高中 stays the 新竹高中 named so).
   assert.equal(aliasOf([{ id: 's', name: '新竹高中', types: ['school'] }, { id: 'k', name: '補習班', types: ['school'] }], '新竹高中'), null);
+});
+
+// Jay 11-26: 臺鐵's 訂票導訂 approved; a 台鐵 ride books as a 高鐵 one does.
+test("臺鐵's booking link: its stations by name, the date, the train's number", async () => {
+  const { bookPath, traName } = await import('../transit.js');
+  assert.equal(traName('臺鐵竹東車站'), '竹東');
+  assert.equal(traName('台北'), '臺北');
+  const app = bookPath(new URLSearchParams('sys=tra&from=竹東&to=新竹&date=2026-11-27&no=1831&app=1'));
+  assert.equal(app, 'maas-tra/booking/deeplink/direct/tra?train_date=2026-11-27&start_station=%E7%AB%B9%E6%9D%B1&end_station=%E6%96%B0%E7%AB%B9&train_number=1831');
+  assert.match(bookPath(new URLSearchParams('sys=tra&from=竹東&to=新竹&date=2026-11-27&no=1831')), /^maas-tra\/booking\/deeplink\/web\/tra\?/);
+  assert.equal(bookPath(new URLSearchParams('sys=tra&from=竹東&to=竹東&date=2026-11-27&no=1831')), null);
 });
