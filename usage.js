@@ -16,7 +16,7 @@
 //   - Rows go after 400 days (errors after 30): the nightly backup's slot.
 //   - Read: the admin panel's 使用 (eco-admin.js `use`), on demand.
 
-import { cleanBeacon, loadBucket, weekOf, twDayOf } from './kit/usage.mjs';
+import { cleanBeacon, loadBucket, weekOf, twDayOf, NOT_AN_ERROR } from './kit/usage.mjs';
 
 const MIN = 60_000;
 const DAY = 86_400_000;
@@ -109,7 +109,8 @@ export async function readUsage(env, { days = 35, now = Date.now() } = {}) {
   const from = twDayOf(now - Math.min(Math.max(days, 1), 120) * DAY);
   const retFrom = twDayOf(now - 12 * 7 * DAY);
   const { results } = await env.STORE.prepare("SELECT day, app, kind, key, n FROM usage WHERE day >= ?1 OR (kind = 'ret' AND day >= ?2)").bind(from, retFrom).all();
-  return { from, to: twDayOf(now), rows: (results || []).map(r => [r.day, r.app, r.kind, r.key, r.n]) };
+  // (What phones counted before NOT_AN_ERROR was left out stays out of the panel too.)
+  return { from, to: twDayOf(now), rows: (results || []).filter(r => !(r.kind === 'err' && NOT_AN_ERROR.test(r.key))).map(r => [r.day, r.app, r.kind, r.key, r.n]) };
 }
 
 // (Tests.)
@@ -127,5 +128,5 @@ export async function topErrors(env, { days = 7, now = Date.now(), limit = 60 } 
   if (!env.STORE) return [];
   const from = twDayOf(now - (days - 1) * DAY);
   const { results } = await env.STORE.prepare("SELECT app, key, SUM(n) AS n, MAX(day) AS last FROM usage WHERE kind = 'err' AND day >= ?1 GROUP BY app, key ORDER BY n DESC LIMIT ?2").bind(from, limit).all();
-  return results || [];
+  return (results || []).filter(r => !NOT_AN_ERROR.test(r.key));
 }

@@ -57,6 +57,10 @@ export function weekOf(day) {
   return new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * DAY_MS).toISOString().slice(0, 10);
 }
 
+// Not breakage: the browser's note that a ResizeObserver's answer moved the layout (nothing is lost), and a
+// read the page called off itself (AbortError). They were 9 in 10 of the counted errors (Jay 11-26:
+// "check the 使用 tab's most common errors"), hiding the real ones.
+export const NOT_AN_ERROR = /^ResizeObserver loop|^The (operation|user) (was )?abort|^AbortError|signal is aborted/i;
 // An error said without anything a person typed or kept: addresses,
 // numbers, quoted text and long words go; at most 100 characters, with the
 // file's name (never its path or query) and line.
@@ -98,7 +102,7 @@ export function cleanBeacon(b) {
   for (const [k, vals] of Object.entries(DIMS)) if (vals.includes(b.dims?.[k])) dims[k] = b.dims[k];
   const coh = typeof b.coh === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.coh) ? b.coh : '';
   const errs = {};
-  for (const [k, v] of Object.entries(b.err && typeof b.err === 'object' ? b.err : {}).slice(0, 5)) {
+  for (const [k, v] of Object.entries(b.err && typeof b.err === 'object' ? b.err : {}).filter(([k]) => !NOT_AN_ERROR.test(k)).slice(0, 5)) {
     const s = errSig(k.replace(/ @[\w.-]+:\d+$/, ''), (k.match(/ @([\w.-]+):\d+$/) || [])[1] || '', Number((k.match(/:(\d+)$/) || [])[1]) || 0);
     if (s) errs[s] = (errs[s] || 0) + n(v, 50);
   }
@@ -253,7 +257,8 @@ export function usageStep(name) {
   if (!started || !STEP.test(String(name))) return;
   add(bag().step, String(name));
 }
-function noteError(message, file, line) {
+export function noteError(message, file, line) {
+  if (NOT_AN_ERROR.test(String(message || ''))) return;
   const b = bag();
   const k = errSig(message, file, line);
   if (b.err[k] || Object.keys(b.err).length < 5) add(b.err, k);
@@ -305,7 +310,7 @@ export function watchUsage() {
     if (g.document.body) mo.observe(g.document.body, { childList: true });
   }
   g.addEventListener('error', e => e?.message && noteError(e.message, e.filename, e.lineno));
-  g.addEventListener('unhandledrejection', e => noteError(e?.reason?.message || String(e?.reason || 'rejected'), '', 0));
+  g.addEventListener('unhandledrejection', e => e?.reason?.name !== 'AbortError' && noteError(e?.reason?.message || String(e?.reason || 'rejected'), '', 0));
   g.document.addEventListener('visibilitychange', () => {
     if (g.document.visibilityState === 'hidden') sendUsage();
     else shownAt = Date.now();

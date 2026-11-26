@@ -56,8 +56,9 @@ test('admin: the search’s account rows keep a square avatar and the apps’ sh
   assert.match(page, /w\.apps\.map\(k => BRANDS\[k\]\?\.short \|\| appName\(k\)\)\.join\('、'\)/);
 });
 
-test('admin: 總覽’s 外部來源 cell names two sources at most (five names filled six lines at 320 px)', () => {
-  assert.ok(page.includes("const few = (list, word) => (list.length > 2 ? `${names(list.slice(0, 1))}等 ${list.length} 個${word}` : `${names(list)} ${word}`);"));
+// (11-26: one name at most: "竹塹交通資訊網等 4 個壞了" still wrapped; more than one is a count, the 健康 tab names them.)
+test('admin: 總覽’s 外部來源 cell names one source at most (five names filled six lines at 320 px)', () => {
+  assert.ok(page.includes("const few = (list, word) => (list.length > 1 ? `${list.length} 個${word}` : `${names(list)} ${word}`);"));
   assert.ok(page.includes("bad.length ? few(bad, '壞了') : warn.length ? few(warn, '不穩')"));
 });
 
@@ -104,4 +105,11 @@ test('admin: 總覽’s 14-day chart and TDX’s are drawn at their own width, w
   assert.match(page, /const H = 170, W = chartWidth\(svg, H, 700\)/);
   assert.match(page, /const H = 150, W = chartWidth\(\$\('tdx-chart'\), H, 360\)/);
   assert.doesNotMatch(page, /font-size="18"/);
+});
+
+// Jay 11-26: 健康 "looks ugly", 正常 in bold on every fine row; 撐得住多少人 popped in seconds late.
+test('admin: a fine source shows its dot alone; 撐得住多少人 draws the last estimate at once', () => {
+  assert.ok(page.includes("[state === 'ok' ? null : el('b', { text: STATE_WORD[state] }), el('small', { text: right })]"));
+  assert.match(page, /if \(kept\?\.users\) drawCapacity\(kept\);/);
+  assert.ok(page.includes('const base = Math.max(0, ...Object.values(ret[c]));'), 'retention never over 100%');
 });

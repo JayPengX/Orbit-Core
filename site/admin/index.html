@@ -111,6 +111,8 @@
   .ai-list li small.warnt { color: var(--q-warn, #c77700); }
   .ai-list li .v { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
   .ai-list li.grp { padding-top: 18px; border-bottom-width: 2px; flex-wrap: wrap; row-gap: 2px; }
+  /* (Its figures on a line of their own under the name, never half beside it: 11-26.) */
+  .ai-list li.grp .v { flex-basis: 100%; }
   .ai-list li.grp strong { white-space: nowrap; }
   .ai-list li.grp .v { font-weight: 500; font-size: 13px; color: var(--q-muted); }
   .ai-list li.grp .v.neg { color: var(--q-bad); }
@@ -158,7 +160,7 @@
   details.src .dot.off { background: var(--q-muted); opacity: .6; }
   details.src .nm { flex: 1; min-width: 0; font-weight: 600; }
   details.src small { display: block; font-weight: 400; font-size: 12px; color: var(--q-muted); }
-  details.src .nm small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  details.src .nm small { overflow-wrap: anywhere; }
   details.src .st { flex: none; text-align: right; font-size: 14px; }
   details.src .st b { font-weight: 650; }
   details.src.s-bad .st b { color: var(--q-bad); }
@@ -637,7 +639,7 @@
         <div class="row"><input id="alert-pass" placeholder="Orbit Pass" autocomplete="off" spellcheck="false" style="flex:1 1 0;min-width:0" /><button id="alert-save" class="small" style="flex:none">設定</button><button id="alert-test" class="small" style="flex:none">測試</button></div>
         <p id="alert-ok" class="ok"></p>
       </div>
-      <div class="pane-head" id="ai-use"><div><h2>AI</h2><p class="muted">三家 AI 的預付餘額，和每個 App 的 AI 今天用了多少、這個月花多少。金額都是新台幣。</p></div><div class="row" style="flex:none"><button class="small" data-go="dev" data-to="set-ai">上限</button><button class="small" id="aim-load">重新整理</button></div></div>
+      <div class="pane-head" id="ai-use"><div><h2>AI</h2><p class="muted">預付餘額，和各 App 的 AI 用量（新台幣）。</p></div><div class="row" style="flex:none"><button class="small" data-go="dev" data-to="set-ai">上限</button><button class="small" id="aim-load">重新整理</button></div></div>
       <p id="aim-error" class="error"></p>
       <div class="card">
         <div class="tiles" id="aim-tiles"></div>
@@ -2380,7 +2382,7 @@ function sourcesCell(x) {
   const n = x.rows.filter(o => o.state === 'ok').length;
   const names = list => list.map(o => o.s.zh.replace(/（.*）/, '')).join('、');
   // (The cell names two at most: five names filled six lines on a phone; 健康 lists them all.)
-  const few = (list, word) => (list.length > 2 ? `${names(list.slice(0, 1))}等 ${list.length} 個${word}` : `${names(list)} ${word}`);
+  const few = (list, word) => (list.length > 1 ? `${list.length} 個${word}` : `${names(list)} ${word}`);
   setHealth('sources', bad.length ? 'bad' : warn.length ? 'warn' : 'ok', bad.length ? few(bad, '壞了') : warn.length ? few(warn, '不穩') : `${n} 個都正常`, bad.length ? (bad.length === 1 ? `${names(bad)} 壞了` : `${bad.length} 個外部來源壞了`) : warn.length ? (warn.length === 1 ? `${names(warn)} 不穩` : `${warn.length} 個外部來源不穩`) : '');
 }
 const pctOf = (f, n) => (n ? `${f / n >= 0.1 ? Math.round((f / n) * 100) : ((f / n) * 100).toFixed(1)}%` : '—');
@@ -2432,7 +2434,8 @@ function sourceRow(o, now) {
     el('summary', {}, [
       el('span', { class: `dot ${STATE_DOT[state]}` }),
       el('span', { class: 'nm' }, [s.zh, el('small', { text: s.feeds })]),
-      el('span', { class: 'st' }, [el('b', { text: STATE_WORD[state] }), el('small', { text: right })])
+      // (A source fine says so by its green dot alone: 正常 in bold on every row drowned the ones that aren't, Jay 11-26.)
+      el('span', { class: 'st' }, [state === 'ok' ? null : el('b', { text: STATE_WORD[state] }), el('small', { text: right })].filter(Boolean))
     ]),
     el('div', { class: 'src-more' }, [stripOf(r, now), el('dl', { class: 'kv' }, kv.flatMap(([k, v]) => [el('dt', { text: k }), el('dd', { text: v })]))])
   ]);
@@ -2501,7 +2504,7 @@ async function loadUse() {
           const tabs = Object.entries(a.tabs).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([t, n]) => `${t} ${n}`).join('・');
           const mins = Math.round(a.sec / 60);
           const sub = [`${a.day} 台・${mins.toLocaleString()} 分鐘`, Object.keys(a.load).length ? `載入 ${loadMid(a.load)}，9 成 ${loadMid(a.load, 0.9)}` : '', a.err ? `${a.err} 個錯誤` : '', tabs].filter(Boolean).join(' · ');
-          return `<div class="q-ritem">${appIc(id) || tileHtml(ic('grid'), '#64748b', 'sm')}<span class="q-ritem-text"><span class="q-ritem-title">${escHtml(useName(id))}</span><small>${escHtml(sub)}</small></span><span class="q-ritem-value">${a.open.toLocaleString()} 次</span></div>`;
+          return `<div class="q-ritem">${appIc(id) || `<img class="app-ic" src="${svgUrl(familyMark())}" alt="Orbit">`}<span class="q-ritem-text"><span class="q-ritem-title">${escHtml(useName(id))}</span><small>${escHtml(sub)}</small></span><span class="q-ritem-value">${a.open.toLocaleString()} 次</span></div>`;
         })
         .join('')
     : emptyCard('bars', '這 7 天還沒有統計。');
@@ -2528,7 +2531,8 @@ async function loadUse() {
   $('use-ret').innerHTML = cohorts.length
     ? `<table><tr><th>第一週</th>${Array.from({ length: 6 }, (_, k) => `<th>${k ? `+${k}` : '當週'}</th>`).join('')}</tr>${cohorts
         .map(c => {
-          const base = ret[c][c] || 0;
+          // (The first week counted short where it began before the counting did, 10-19's: 233%. The row's largest week is its base, never over 100%.)
+          const base = Math.max(0, ...Object.values(ret[c]));
           return `<tr><td>${c.slice(5)}</td>${Array.from({ length: 6 }, (_, k) => {
             if (k > span(c)) return '<td></td>';
             const n = ret[c][weekAfter(c, k)] || 0;
@@ -2724,12 +2728,28 @@ const quotaName = key => {
   if (kind === 'tdx') return 'TDX 點數';
   return key;
 };
+// 撐得住多少人: the last estimate drawn at once, the new one over it when it comes (it sums every account and
+// the week's use: seconds, and the card stood empty then popped in, Jay 11-26).
+const CAP_KEPT = 'orbit.admin.cap';
 async function loadCapacity() {
   $('cap-error').textContent = '';
+  try {
+    const kept = JSON.parse(localStorage.getItem(CAP_KEPT) || 'null');
+    if (kept?.users) drawCapacity(kept);
+  } catch {}
   try {
     // (Its note says whether 依人數自動調整 is on: the settings, read once when 設定 wasn't opened.)
     if (!devSaved) await admin('config').then(got => { if (!devSaved) devSaved = { ...cleanDev(got), at: got.at || 0 }; }).catch(() => {});
     const p = await admin('capacity');
+    try {
+      localStorage.setItem(CAP_KEPT, JSON.stringify(p));
+    } catch {}
+    drawCapacity(p);
+  } catch (e) {
+    $('cap-error').textContent = e.message;
+  }
+}
+function drawCapacity(p) {
     const u = p.users;
     const q = p.quotas || { rows: [] };
     // How much of a quota is used now: a day of Workers, Gemini's busiest day, the month carried to its end.
@@ -2815,9 +2835,6 @@ async function loadCapacity() {
       ? '每一項的「撐 N 人」＝本週活躍人數 ×（上限扣掉固定用量）÷ 現在大家用掉的。Cloudflare 的固定用量是近 7 天最安靜的一成小時 × 24（排程、建置、帳單保護，沒人用也在跑）；其他項目全部算成人用的，所以只會估少。'
       : `每一項的「撐 N 人」＝本週活躍人數 × 上限 ÷ 現在用掉的；${p.hours?.error ? `近 7 天的逐時用量讀不到（${p.hours.error}），` : '還沒有近 7 天的逐時用量，'}排程的固定用量也算成人用的，所以只會估少。`);
     $('cap-note').textContent = `${how}Gemini 看一週裡最忙的一天；Google 地圖、TDX 看本月照這速度到月底。30 天後 ${u.expected} 人：${slow}。${on ? '「依人數自動調整」開著，每 6 小時照這個套用（下面的數字是你的設定，也是最快的）。' : p.scale > 1 || p.scale == null ? '打開下面的「依人數自動調整」就會自動套用。' : ''}${fmt(p.at)} 估算。`;
-  } catch (e) {
-    $('cap-error').textContent = e.message;
-  }
 }
 $('cap-load').onclick = () => busy($('cap-load'), loadCapacity);
 $('dev-defaults').onclick = () => { devDraft = cleanDev(); drawDev(); };
@@ -2978,7 +2995,7 @@ async function loadSystem() {
       tile(g?.free ? '推估到今天結束' : '推估到月底', g?.paceTop != null ? pct(g.paceTop) : '—', '最高的一項'),
       tile('警示', g ? ['沒有', '過 50%', '過 75%', '過 90%'][g.alert || 0] : '—', r.told?.at ? `上次通知 ${ago(r.told.at)}` : '還沒通知過'),
       // (The free plan's period is a day, 08:00 Taiwan; the paid month ran to 11-13.)
-      g?.free ? tile('方案', '免費', '每天 08:00 重算，永遠不收費') : tile('本期', g?.period ? `${fmtDay(g.period.start)} 起` : '—', g?.period ? `付費方案到 11/13，之後免費` : '')
+      g?.free ? tile('方案', '免費', '每天 08:00 重算，永遠不收費') : tile('本期', g?.period ? `${fmtDay(g.period.start)} 起` : '—', g?.period ? `11/13 後免費` : '')
     );
     // (Only when it says something the 節流 tile doesn't: slowed down, or the bill unread.)
     // (The forecast is a warning only: nobody is slowed by it, the owner 2026-11-05.)

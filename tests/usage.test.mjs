@@ -47,3 +47,11 @@ test('beacons add up per Taiwan day, app and any app; retention by cohort week',
   assert.equal(weekOf('2026-11-14'), '2026-11-09');
   _reset();
 });
+
+// Jay 11-26, the 使用 tab's commonest errors: 9 in 10 were the browser's ResizeObserver note and reads called off
+// on purpose, none of them breakage. Not counted, from a phone of any kit.
+test("a ResizeObserver note or a read called off isn't counted as an error", () => {
+  const b = cleanBeacon({ v: 1, app: 'match', open: 1, day: [1, 1], err: { 'ResizeObserver loop completed with undelivered notifications.': 4, 'The operation was aborted.': 2, "TypeError: Cannot read properties of undefined (reading 'x') @app.js:12": 1 } });
+  assert.deepEqual(Object.keys(b.err).length, 1);
+  assert.match(Object.keys(b.err)[0], /Cannot read properties/);
+});
