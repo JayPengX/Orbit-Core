@@ -306,3 +306,29 @@ test('two fingers on a trackpad: sideways steps once a gesture, its empty space 
   gesture(main, -20, 0);
   assert.deepEqual(steps, [1, -1]);
 });
+
+// Jay 11-26: "match sheet can swipe left and right but team and player can't": a team's page opened from a
+// game's stands over it, and the game's sheet below kept its swipe from it. Only the sheet on top has the finger.
+test('a panel in the sheet on top swipes; one in a sheet under it does not', () => {
+  const game = new El('dialog');
+  const team = new El('dialog');
+  const steps = [];
+  const inSheet = (sheet, name) => {
+    const panel = new El();
+    panel.append(new El('part'));
+    sheet.append(panel);
+    daySwipe(panel, () => (steps.push(name), true));
+    return panel;
+  };
+  const under = inSheet(game, 'game');
+  const top = inSheet(team, 'team');
+  const was = document.querySelectorAll;
+  document.querySelectorAll = sel => (sel === 'dialog[open]' ? [game, team] : []);
+  try {
+    drag(top, -200);
+    drag(under, -200);
+  } finally {
+    document.querySelectorAll = was;
+  }
+  assert.deepEqual(steps, ['team']);
+});

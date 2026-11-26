@@ -292,8 +292,11 @@ export function daySwipe(panel, step, { can = null, page = true } = {}) {
     panel.style.removeProperty('--swipe-fade');
   };
   const begin = (ev, src) => {
-    // (Not under a sheet: one open over the page has the finger; a panel inside that sheet swipes.)
-    const over = [...document.querySelectorAll('dialog[open]')].some(d => !d.contains(panel));
+    // (Not under a sheet: the one on top has the finger; a panel inside it swipes. Only the top one:
+    // a team's or player's page opened from a game's stands over it, and the game's below had kept
+    // its swipe from it, Jay 11-26: "match sheet can swipe … but team and player can't".)
+    const top = [...document.querySelectorAll('dialog[open]')].pop();
+    const over = Boolean(top && !top.contains(panel));
     const box = ev.touches.length === 1 && !over ? (src === 'panel' ? sideways(ev.target) : null) : true;
     start = box !== true ? { x: ev.touches[0].clientX, y: ev.touches[0].clientY, at: Date.now(), lock: null, box, src } : null;
   };
