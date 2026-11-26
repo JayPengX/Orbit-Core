@@ -1449,3 +1449,11 @@ test("臺鐵's booking link: its stations by name, the date, the train's number"
   assert.match(bookPath(new URLSearchParams('sys=tra&from=竹東&to=新竹&date=2026-11-27&no=1831')), /^maas-tra\/booking\/deeplink\/web\/tra\?/);
   assert.equal(bookPath(new URLSearchParams('sys=tra&from=竹東&to=竹東&date=2026-11-27&no=1831')), null);
 });
+
+test("臺鐵's link followed to railway.gov.tw's own, so a tap there can open its app", async () => {
+  const { landing } = await import('../transit.js');
+  const to = 'https://www.railway.gov.tw/tra-tip-web/tip/applink?tsp=tra&trainNo=1831';
+  const fetchFn = async () => new Response(null, { status: 302, headers: { location: to } });
+  assert.equal(await landing('https://tdx.transportdata.tw/maas-common/trip/api/v1/booking/deeplink/redirect?token=x', fetchFn), to);
+  assert.equal(await landing('https://tdx.transportdata.tw/maas-common/trip/api/v1/booking/deeplink/redirect?token=x', async () => new Response(null, { status: 302, headers: { location: 'https://evil.example/' } })), 'https://tdx.transportdata.tw/maas-common/trip/api/v1/booking/deeplink/redirect?token=x');
+});

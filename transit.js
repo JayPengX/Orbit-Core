@@ -2031,10 +2031,11 @@ export function linkIn(j) {
 }
 // Where TDX's redirect lands (高鐵's own address), else TDX's as it was.
 export async function landing(url, fetchFn) {
-  if (!/^https:\/\/maas\.transportdata\.tw\/.*\/redirect\?/.test(url)) return url;
+  // (臺鐵's comes from tdx.transportdata.tw/maas-common/…/redirect, on to railway.gov.tw's applink.)
+  if (!/^https:\/\/(maas\.transportdata\.tw\/|tdx\.transportdata\.tw\/maas-common\/).*\/redirect\?/.test(url)) return url;
   const r = await fetchFn(url, { redirect: 'manual', signal: timeout(5000) }).catch(() => null);
   const to = r && r.status >= 300 && r.status < 400 ? r.headers.get('location') : null;
-  return to && /^https:\/\/[a-z0-9.-]*thsrc\.com\.tw\//i.test(to) ? to : url;
+  return to && /^https:\/\/[a-z0-9.-]*(thsrc\.com\.tw|railway\.gov\.tw)\//i.test(to) ? to : url;
 }
 async function book(env, q, { fetchFn, now }) {
   const path = bookPath(q);
