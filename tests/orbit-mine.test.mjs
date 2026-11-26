@@ -137,3 +137,12 @@ test("in an Orbit the Pass sheet shows every app but opens only its own, the way
   assert.match(src, /const order = HELP_ORDER;/);
   assert.match(src, /APPS\[at\] && reachable\(at\)/);
 });
+
+// Jay 11-26: in an Orbit of several apps, one not in it is added from the Pass sheet as from its own page;
+// only an Orbit of one app is locked.
+test('the Pass sheet adds an app to an Orbit of several, never to one of a single app', async () => {
+  const { canAddHere } = await import('../kit/pass.mjs');
+  assert.equal(canAddHere({ apps: ['class', 'news', 'law'] }, true), true);
+  assert.equal(canAddHere({ apps: ['class'] }, true), false);
+  assert.equal(canAddHere({ apps: ['class', 'news'] }, false), false, 'a separate app’s window: every app opens anyway');
+});

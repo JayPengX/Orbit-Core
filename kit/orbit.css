@@ -3987,6 +3987,8 @@ dialog {
 /* (An app this Orbit doesn't hold: shown, quieter, not opened; the way to another Orbit under the list.) */
 .q-app-out .q-cell-icon { opacity: 0.45; }
 .q-app-out .q-cell-text > span { color: var(--q-label-2); }
+/* (One it can take in: 加入, a small pill before its share, the row as dim as any not here.) */
+.q-app-addbtn { flex: none; min-height: 32px; padding: 0 14px; border-radius: 999px; font-size: 14px; font-weight: 600; }
 .q-app-more { margin-top: 16px; }
 .q-app-share svg { width: 20px; height: 20px; display: block; }
 .q-app-share { color: var(--q-label-2); }

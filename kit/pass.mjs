@@ -6,7 +6,7 @@
 //   App    今天, every app: when it was last used, a way in
 //   說明   every app's guide (help.mjs)
 import { APPS, AVATARS, FRAMES, MILESTONES, TIERS, DEFAULT_AVATAR, milestoneOf, avatarSrc, settingPatch, passAccount, appIcon, closeSheet, inSuite, el as node } from '#kit/orbit.mjs';
-import { appsOf } from './orbit-mine.mjs';
+import { appsOf, setApps, decodeSetup, whichTag } from './orbit-mine.mjs';
 // The guides (80 KB) only for the 說明 tab: fetched after the sheet's own
 // code while the app is idle (orbit.mjs warmPassLater), or when that tab opens.
 let helpMod = null;
@@ -71,7 +71,10 @@ export const STRINGS = {
     here: '這裡',
     share: '分享',
     allApps: '所有 App',
-    notHere: '不在這個 Orbit'
+    notHere: '不在這個 Orbit',
+    addHere: '加入',
+    addHereLabel: '把 {app} 加入這個 Orbit',
+    added: '{app} 已加入這個 Orbit'
   },
   en: {
     looksTitle: 'Avatar and frame',
@@ -127,7 +130,10 @@ export const STRINGS = {
     here: 'Here',
     share: 'Share',
     allApps: 'Every app',
-    notHere: 'Not in this Orbit'
+    notHere: 'Not in this Orbit',
+    addHere: 'Add',
+    addHereLabel: 'Add {app} to this Orbit',
+    added: '{app} is in this Orbit now'
   }
 };
 const TABS = ['pass', 'looks', 'apps', 'help'];
@@ -430,6 +436,17 @@ const orbitApps = () => {
   }
 };
 const reachable = id => passApps([id], orbitApps()).length > 0;
+// An Orbit set up with several apps takes another in, as its own page's 選擇這個 Orbit 裡的 App does
+// (orbit-mine setApps); one of a single app stays that app (its name and icon are the app's; another
+// Orbit for the rest). Jay 11-26: "only lock it for single app orbit".
+export const canAddHere = (setup, inOrbit) => Boolean(inOrbit && (setup?.apps?.length || 0) > 1);
+const addable = () => {
+  try {
+    return canAddHere(decodeSetup(whichTag()), inSuite());
+  } catch {
+    return false;
+  }
+};
 
 const ago = (t, then) => {
   const days = Math.floor((Date.now() - then) / 86_400_000);
@@ -448,15 +465,24 @@ function renderApps(box, { q, t, locale, state }, top = []) {
     shareSheet({ url: homeOf(id), title: APPS[id].name, app: id, lang: locale });
   };
   const mine = orbitApps();
+  const adds = addable();
+  const addHere = id => {
+    if (!setApps(whichTag(), [...(mine || []), id])) return;
+    toast?.(t('added', { app: APPS[id].name }));
+    if (open) closeSheet(open.dialog);
+    // (Orbit's window hears it through the storage, then opens it as any of its own.)
+    setTimeout(() => q.go(id), 120);
+  };
   const row = ([id, a]) => {
     const last = w.apps?.[id]?.last;
     const here = id === q.app;
     const out = !here && !passApps([id], mine).length;
-    return el('div', { class: `q-cell q-app-row${out ? ' q-app-out' : ''}` }, [
+    return el('div', { class: `q-cell q-app-row${out ? ' q-app-out' : ''}${out && adds ? ' q-app-add' : ''}` }, [
       el('button', { class: 'q-app-open', type: 'button', disabled: here || out, 'aria-label': here || out ? a.name : t('openApp', { app: a.name }), onclick: here || out ? null : () => q.go(id) }, [
         el('span', { class: 'q-cell-icon' }, [el('img', { src: svgUrl(appIcon(id, { crisp: true })), alt: '', width: 30, height: 30 })]),
         el('span', { class: 'q-cell-text' }, [el('span', { text: a.name }), el('small', { text: [a.role[en ? 'en' : 'zh'], here ? t('here') : out ? t('notHere') : last ? ago(t, last) : t('neverUsed')].join(' · ') })])
       ]),
+      out && adds ? el('button', { class: 'q-btn q-app-addbtn', type: 'button', 'aria-label': t('addHereLabel', { app: a.name }), text: t('addHere'), onclick: () => addHere(id) }) : null,
       el('button', { class: 'q-cell-act q-app-share', type: 'button', 'aria-label': `${t('share')} ${a.name}`, html: icons.share })
     ]);
   };
@@ -464,7 +490,7 @@ function renderApps(box, { q, t, locale, state }, top = []) {
   const rows = ids.map(id => row([id, APPS[id]]));
   rows.forEach((r, i) => r.querySelector('.q-app-share').addEventListener('click', () => shareApp(ids[i])));
   // (Apps this Orbit doesn't hold: the way to another Orbit, the switcher's own card.)
-  const more = mine && ids.some(id => id !== q.app && !mine.includes(id)) ? el('div', { class: 'q-app-more' }) : null;
+  const more = mine && !adds && ids.some(id => id !== q.app && !mine.includes(id)) ? el('div', { class: 'q-app-more' }) : null;
   if (more) import('./suite.mjs').then(m => more.isConnected !== false && m.newOrbitCard && more.replaceChildren(m.newOrbitCard())).catch(() => more.remove());
   put(box, ...top.filter(Boolean), el('h3', { class: 'q-sheet-h', text: t('allApps') }), el('div', { class: 'q-rows q-pass-group q-app-rows' }, rows), more);
 }
